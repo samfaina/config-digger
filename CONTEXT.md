@@ -11,8 +11,12 @@ An AI coding tool whose configuration config-digger reads, such as Claude Code, 
 _Avoid_: Client, host, tool
 
 **Agent definition**:
-A data file that describes where an Agent keeps its configuration, in which format, and with what precedence. Supporting a new Agent means writing an Agent definition, not code.
+A data file that describes where an Agent keeps its configuration, in which format, and with what precedence. It is assembled from building blocks config-digger already implements, so supporting a new Agent means writing an Agent definition, not code, unless the Agent needs a building block that does not exist yet. Agent definitions ship with the app.
 _Avoid_: Adapter, plugin, driver
+
+**Skill manager definition**:
+A data file that describes how a skill manager, such as `npx skills`, lays out the skills it installs, so that the Provenance of a skill Entry can be recognised in any Agent.
+_Avoid_: Installer definition, package manager
 
 **Agent home**:
 The root folder from which one instance of an Agent reads its user-level configuration. An Agent can have several (another `CODEX_HOME`, a VS Code profile, Claude Desktop's Store and classic folders); Entries in different Agent homes never compete. A home whose folder the Agent's lookup order skips is still shown, as not read.
@@ -45,11 +49,11 @@ An Entry whose location is a junction or symlink to another location. It is its 
 _Avoid_: Alias, shortcut, mirror
 
 **Scope**:
-The level at which an Agent applies an Entry, such as managed, user, project or local. Each Agent has its own Scopes, so an Entry read by several Agents has a Scope for each of them.
+The level at which an Agent applies an Entry, such as managed, user, project or local. Each Agent has its own Scopes, so an Entry read by several Agents has a Scope for each of them. A Scope does not decide on its own which Entry wins: an Agent can rank two locations of the same Scope, as VS Code ranks `.vscode/mcp.json` above `.mcp.json`.
 _Avoid_: Level, layer, tier
 
 **Provenance**:
-How an Entry got where it is — a file entry, a versioned project file, a plugin or extension, a skill manager, or managed/cloud configuration. Provenance decides how the Entry can be taken away.
+How an Entry got where it is — a file entry, a versioned project file, a plugin or extension, a skill manager, something built into the Agent, something installed through the user's account, or managed/cloud configuration. Provenance decides how the Entry can be taken away.
 _Avoid_: Origin, source, installer
 
 **Effective**:
