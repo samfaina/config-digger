@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
   PROTOTYPE — throwaway. Answers ticket #22 "Main view and explaining Effective vs Shadowed".
-  Four structurally different main views over one illustrative inventory, switchable via ?variant=A|B|C|D
+  Five main views over one illustrative inventory, switchable via ?variant=A|B|C|D|E (E = A restyled after the
+  "MISTY" Minecraft launcher on Behance; also takes &agent=, &item=, &entry=, &ctx=, &modal=)
   (bottom bar or ←/→). Data is fictional but every path, mechanism and precedence rule comes from the
   research docs on the research/* branches. Nothing here is wired to anything; buttons are inert.
 -->
@@ -10,7 +11,90 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>config-digger — main view prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
+/* E — launcher look, after the "MISTY" Minecraft launcher on Behance (Cera Pro → Outfit stand-in) */
+body.vE .top{display:none}
+.E{--e-bg:#141419;--e-rail:#18181e;--e-card:#1f1f27;--e-card2:#262630;--e-line:#2c2c37;--e-pur:#7b5fd0;--e-pur2:#9a82e6;--e-dim:#8b8b98;--e-faint:#5d5d6a;
+  flex:1;display:flex;min-height:0;font-family:Outfit,"Segoe UI",sans-serif;background:var(--e-bg);position:relative;overflow:hidden}
+.E::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(900px 500px at 75% 10%,#7b5fd02e,transparent 60%),radial-gradient(700px 500px at 10% 100%,#7b5fd01c,transparent 60%)}
+.E-rail{width:64px;background:var(--e-rail);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:10px;z-index:1;border-right:1px solid #ffffff08}
+.E-logo{font-weight:800;font-size:20px;color:var(--e-pur2);margin-bottom:22px;letter-spacing:-.04em}
+.E-ag{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--e-dim);cursor:pointer;position:relative;background:transparent}
+.E-ag:hover{background:var(--e-card)}.E-ag.sel{background:var(--e-pur);color:#fff;box-shadow:0 6px 18px #7b5fd066}
+.E-ag .warn{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#f85149;border:2px solid var(--e-rail)}
+.E-ag .tip{display:none;position:absolute;left:48px;white-space:nowrap;background:#000;color:#fff;padding:3px 8px;border-radius:5px;font-weight:500;z-index:9}
+.E-ag:hover .tip{display:block}
+.E-rail .sp{flex:1}
+.E-body{flex:1;display:flex;flex-direction:column;min-width:0;z-index:1}
+.E-top{display:flex;align-items:center;gap:22px;padding:16px 34px}
+.E-k{font-size:10.5px;color:var(--e-faint);text-transform:uppercase;letter-spacing:.08em}
+.E-v{font-weight:700;font-size:13.5px}
+.E select{background:transparent;border:0;color:#fff;font:700 13.5px Outfit,"Segoe UI",sans-serif;padding:0;cursor:pointer}
+.E select option,.E select optgroup{background:var(--e-card);color:#fff}
+.E-status{display:flex;align-items:center;gap:8px;color:var(--e-dim);font-size:12px;margin:0 auto}
+.E-status .spin{width:14px;height:14px;border:2px solid var(--e-pur);border-right-color:transparent;border-radius:50%;cursor:pointer}
+.E-me{display:flex;align-items:center;gap:10px;text-align:right}
+.E-me .av{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--e-pur),#e0773a);display:grid;place-items:center;font-weight:800}
+.E-main{flex:1;overflow:auto;padding:10px 34px 90px}
+.E-back{color:var(--e-dim);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;display:inline-flex;gap:6px;margin-top:8px}
+.E-back:hover{color:#fff}
+.E-h1{font-size:54px;font-weight:800;text-transform:uppercase;letter-spacing:-.01em;margin:8px 0 4px;line-height:1}
+.E-h1.sm{font-size:34px}
+.E-meta{color:var(--e-dim);font-size:12.5px}
+.E-lead{max-width:620px;color:#c9c9d3;line-height:1.55;margin:14px 0 18px;font-size:14px}
+.E-btns{display:flex;align-items:center;gap:22px}
+.E-pill{background:var(--e-pur);color:#fff;border:0;border-radius:999px;padding:8px 20px;font:700 12px Outfit,sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;box-shadow:0 6px 18px #7b5fd055}
+.E-pill:hover{background:var(--e-pur2)}
+.E-pill[disabled]{background:#3a3a46;box-shadow:none;color:var(--e-faint);cursor:not-allowed}
+.E-txt{background:none;border:0;color:#fff;font:700 12px Outfit,sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;padding:0}
+.E-txt:hover{color:var(--e-pur2)}.E-txt[disabled]{color:var(--e-faint);cursor:not-allowed}
+.E-why-no{color:var(--e-faint);font-size:12px;margin-top:10px;max-width:620px}
+.E-sec{margin-top:34px}
+.E-sec>.h{font-size:11px;color:var(--e-faint);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;display:flex;justify-content:space-between}
+.E-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.E-card{background:var(--e-card);border-radius:12px;padding:16px 18px 14px;cursor:pointer;border:1px solid transparent;transition:.12s}
+.E-card:hover{background:var(--e-card2);border-color:#7b5fd055;transform:translateY(-1px)}
+.E-card .t{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;text-transform:uppercase}
+.E-card .ic{color:var(--e-pur2);font-size:16px}
+.E-card .f{display:flex;align-items:center;gap:10px;margin-top:22px;color:var(--e-dim);font-size:12px}
+.E-card .f .ln{flex:1;height:1px;background:var(--e-line);position:relative}
+.E-card .f .ln::after{content:"";position:absolute;right:0;top:-3px;border:3.5px solid transparent;border-left:6px solid var(--e-line)}
+.E-card:hover .f .ln,.E-card:hover .f .ln::after{background:var(--e-pur);border-left-color:var(--e-pur)}
+.E-card:hover .f .ln::after{background:none}
+.E-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:18px}
+.E-chip{background:var(--e-card);color:var(--e-dim);border:0;border-radius:999px;padding:4px 12px;font:500 12px Outfit,sans-serif;cursor:pointer}
+.E-chip.on{background:var(--e-pur);color:#fff}
+.E-search{background:var(--e-card);border:0;border-radius:999px;padding:5px 14px;color:#fff;font:500 12px Outfit,sans-serif;width:200px}
+.E-ladder{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}
+.E-rung{flex:1 1 260px;max-width:420px;background:var(--e-card);border-radius:12px;padding:14px 16px;cursor:pointer;border:1px solid transparent;position:relative}
+.E-rung.win{border-color:var(--e-pur);box-shadow:0 0 0 1px var(--e-pur),0 10px 30px #7b5fd033}
+.E-rung.lose{opacity:.62}.E-rung.lose .loc{text-decoration:line-through}
+.E-rung.sel{background:var(--e-card2);outline:2px solid #ffffffcc;outline-offset:2px;opacity:1}
+.E-rung .n{position:absolute;top:12px;right:14px;font-weight:800;font-size:22px;color:#ffffff14}
+.E-rung .ly{font-weight:800;text-transform:uppercase;font-size:13px;letter-spacing:.03em}
+.E-rung .loc{font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--e-dim);margin-top:6px;word-break:break-all}
+.E-gt{align-self:center;color:var(--e-faint);font-weight:800;font-size:20px}
+.E-detail{background:var(--e-card);border-radius:12px;padding:16px 18px;margin-top:14px;max-width:1100px}
+.E-detail .explain{background:transparent;padding:0}
+.E .tag{border-color:var(--e-line);color:var(--e-dim);border-radius:999px;padding:0 7px}
+.E .tag.git{border-color:#a371f7;color:#b597f5}.E .tag.link{border-color:#58a6ff;color:#79b8ff}
+.E .badge{border-radius:999px;padding:0 9px;font-family:Outfit,sans-serif}
+.E-banner{background:#f8514918;color:#ffb3ad;border-radius:10px;padding:9px 14px;margin-top:14px;font-size:13px;max-width:900px}
+.E-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 34px 60px;color:var(--e-dim);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;z-index:1}
+.E-foot a{color:var(--e-dim)}.E-foot a:hover{color:#fff}
+.E-modal-bg{position:absolute;inset:0;background:#0009;backdrop-filter:blur(3px);display:grid;place-items:center;z-index:20}
+.E-modal{width:560px;max-width:92vw;background:var(--e-card);border-radius:14px;padding:20px 22px 16px;box-shadow:0 30px 80px #000c}
+.E-modal h3{margin:0 0 4px;font-weight:700}
+.E-modal .row{display:flex;align-items:flex-start;gap:10px;margin-top:12px;font-size:13px}
+.E-modal pre{background:#15151b;border-radius:8px;padding:10px 12px;font-size:11.5px;white-space:pre-wrap;margin:10px 0 0;line-height:1.5}
+.E-modal pre .del{color:#ff7b72}.E-modal pre .add{color:#7ee787}
+.E-tog{width:32px;height:18px;border-radius:999px;background:#3a3a46;position:relative;flex:none;cursor:pointer;margin-top:1px}
+.E-tog::after{content:"";position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#fff;transition:.12s}
+.E-tog.on{background:var(--e-pur)}.E-tog.on::after{left:17px}
+.E-modal .ft{display:flex;justify-content:flex-end;gap:22px;margin-top:20px}
 :root{
   --bg:#1e1f22;--panel:#26282c;--panel2:#2d3035;--line:#3a3d43;--text:#e3e5e8;--dim:#9aa0a8;--faint:#6b7079;
   --eff:#3fb950;--sha:#8b949e;--mer:#39c5cf;--dis:#d29922;--blo:#f0883e;--unr:#6e7681;--inv:#f85149;--acc:#58a6ff;
@@ -480,13 +564,113 @@ function VariantD(){
     ${sec('mcp')}${sec('skill')}${its.length?'':'<div class="dim" style="margin-top:14px">No Entries for this Agent in this context.</div>'}${panel}</div>`;
 }
 
+// ───────────────────────── Variant E: A, dressed as the MISTY game launcher ─────────────────────────
+S.E = {agent:'cc', item:null, sel:null, q:'', st:null, modal:null};
+{ const q = new URLSearchParams(location.search); if (q.get('agent')) S.E.agent = q.get('agent'); if (q.get('item')) S.E.item = q.get('item');
+  if (q.get('ctx')) S.ctx = q.get('ctx'); if (q.get('modal')) S.E.modal = {verb:q.get('modal'), entry:q.get('entry')}; if (q.get('entry')) S.E.sel = q.get('entry'); }
+const MONO = {cc:'CC', cd:'CD', vs:'VS', cu:'CU', cx:'CX', gm:'GM'};
+const RUNNING = {cc:'warn', vs:'block'};   // pretend: Claude Code and VS Code are running right now
+function acts(x){
+  const [s] = st(x); const e = E[x.entry]; const o = {};
+  if (x.mirrored) return {ro:true};
+  if (['Effective','Shadowed','Merged','Blocked'].includes(s)) o.disable = x.dis && x.dis.no ? {no:x.dis.no} : {how:x.dis||'Native Disable for this Agent.'};
+  if (s==='Disabled') o.enable = x.en && x.en.no ? {no:x.en.no} : {how:'Inverse of the Disable that is in place.'};
+  o.remove = e.rm ? {no:e.rm} : {how:'Deletes the Entry from where it lives.'};
+  return o;
+}
+function VariantE(){
+  const e = S.E, ag = e.agent, A = AG[ag], its = itemsOf(ag);
+  const ctxLabel = CTX.find(c=>c.id===S.ctx).label;
+  const rail = `<div class="E-rail"><div class="E-logo">cd</div>
+    ${AGENTS.map(a=>`<div class="E-ag ${a.id===ag?'sel':''}" onclick="S.E.agent='${a.id}';S.E.item=null;S.E.sel=null;render()">${MONO[a.id]}${flag(a.id)?'<span class="warn"></span>':''}<span class="tip">${esc(a.name)}</span></div>`).join('')}
+    <span class="sp"></span><div class="E-ag" onclick="toast('Prototype: History of Operations')">⟲<span class="tip">History · Undo</span></div>
+    <div class="E-ag" onclick="toast('Prototype: Projects and homes')">⚙<span class="tip">Projects &amp; homes</span></div></div>`;
+  const projOpts = CTX.filter(c=>!c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('') +
+    `<optgroup label="Missing Projects">${CTX.filter(c=>c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('')}</optgroup>`;
+  const top = `<div class="E-top">
+    <div><div class="E-k">Project</div><select onchange="S.ctx=this.value;S.E.item=null;S.E.sel=null;render()">${projOpts}</select></div>
+    <div><div class="E-k">Agent home</div><div class="E-v">${homeSelect(ag)}</div></div>
+    <div class="E-status"><span class="spin" title="Refresh" onclick="toast('Prototype: would re-run scan()')"></span><div><div class="E-v" style="font-size:12px">Inventory read 10:42</div><div class="E-k" style="text-transform:none;letter-spacing:0">refreshes when the window regains focus</div></div></div>
+    <div class="E-me"><div><div class="E-v">${esc(A.name)}</div><div class="E-k" style="text-transform:none;letter-spacing:0">${RUNNING[ag]?'running now':'not running'}</div></div><div class="av">${MONO[ag]}</div></div></div>`;
+  let main;
+  const item = e.item && its.find(i=>i.name===e.item);
+  if (!item) {
+    const c = {}; its.forEach(i=>i.rs.forEach(x=>c[st(x)[0]]=(c[st(x)[0]]||0)+1));
+    const inUse = its.filter(i=>['Effective','Merged'].includes(i.state)).length;
+    const lead = its.length ? `In ${ctxLabel}, ${A.name} uses ${inUse} of ${its.length} Items.` + (Object.entries(c).filter(([k])=>!['Effective','Merged'].includes(k)).map(([k,v])=>` ${v} Entr${v>1?'ies are':'y is'} ${k}.`).join('')) : `${A.name} has nothing configured for this context.`;
+    const shown = its.filter(i=>(!e.q||i.name.includes(e.q)) && (!e.st||i.rs.some(x=>st(x)[0]===e.st)));
+    const card = i => { const win = i.rs.find(x=>['Effective','Merged'].includes(st(x)[0]));
+      return `<div class="E-card" onclick="S.E.item='${i.name}';S.E.sel=null;render()"><div class="t"><span class="ic">${i.kind==='mcp'?'⚙':'✦'}</span>${esc(i.name)}</div>
+        <div class="f">${badge(i.state)}<span>${i.rs.length} ${i.rs.length>1?'Entries':'Entry'}</span><span class="ln"></span>${win?`<span>${esc(win.layer)}</span>`:''}</div></div>`; };
+    const chip = (v,l) => `<button class="E-chip ${e.st===v?'on':''}" onclick="S.E.st=${v?`'${v}'`:'null'};render()">${l}</button>`;
+    main = `<div class="E-k" style="margin-top:8px">Agent</div><div class="E-h1">${esc(A.name)}</div>
+      <div class="E-meta">${esc(A.homes.find(h=>h.id===homeOf(ag)).label)} · ${esc(ctxLabel)}</div>
+      <div class="E-lead">${esc(lead)}</div>
+      ${flag(ag)?`<div class="E-banner">⚠ ${esc(flag(ag))}</div>`:''}
+      <div class="E-chips"><input class="E-search" id="eq" placeholder="Search Items" value="${esc(e.q)}" oninput="S.E.q=this.value;render(true)">${chip(null,'All')}${STATES.map(s=>chip(s,s)).join('')}</div>
+      ${['mcp','skill'].map(k=>{const g=shown.filter(i=>i.kind===k);return g.length?`<div class="E-sec"><div class="h"><span>${k==='mcp'?'MCP servers':'Skills'}</span><span>${g.length}</span></div><div class="E-grid">${g.map(card).join('')}</div></div>`:''}).join('')}`;
+  } else {
+    const winner = item.rs.find(x=>['Effective','Merged'].includes(st(x)[0])) || item.rs.find(x=>st(x)[0]!=='Unread') || item.rs[0];
+    const sel = item.rs.find(x=>x.entry===e.sel) || winner;
+    const a = acts(sel), selS = st(sel)[0];
+    const primary = a.ro ? `<button class="E-pill" onclick="toast('Prototype: jumps to the source Entry in ~\\\\.codex')">Go to source</button>`
+      : a.enable ? `<button class="E-pill" ${a.enable.no?'disabled':''} onclick="S.E.modal={verb:'Enable',entry:'${sel.entry}'};render()">Enable</button>`
+      : a.disable ? `<button class="E-pill" ${a.disable.no?'disabled':''} onclick="S.E.modal={verb:'Disable',entry:'${sel.entry}'};render()">Disable</button>`
+      : `<button class="E-pill" ${a.remove.no?'disabled':''} onclick="S.E.modal={verb:'Remove',entry:'${sel.entry}'};render()">Remove</button>`;
+    const secondary = a.ro || (!a.disable && !a.enable) ? '' : `<button class="E-txt" ${a.remove.no?'disabled':''} onclick="S.E.modal={verb:'Remove',entry:'${sel.entry}'};render()">Remove…</button>`;
+    const nots = [a.disable&&a.disable.no, a.enable&&a.enable.no, a.remove&&a.remove.no, a.ro&&'Read-only: Orca copies this home from ~\\.codex.'].filter(Boolean);
+    const ladder = item.rs.map((x,k)=>{ const s=st(x)[0];
+      return `${k?'<span class="E-gt">›</span>':''}<div class="E-rung ${['Effective','Merged'].includes(s)?'win':''} ${s==='Shadowed'?'lose':''} ${x===sel?'sel':''}" onclick="S.E.sel='${x.entry}';render()">
+        <span class="n">${k+1}</span><div class="ly">${esc(x.layer)}</div><div style="margin-top:6px">${badge(s)}</div>
+        <div class="loc">${esc(E[x.entry].file)}<br>${esc(E[x.entry].key)}</div></div>`; }).join('');
+    const also = readersOf(sel.entry, sel);
+    main = `<div class="E-back" onclick="S.E.item=null;render()">← ${esc(A.name)}</div>
+      <div class="E-h1">${esc(item.name)}</div>
+      <div class="E-meta">${item.kind==='mcp'?'MCP server':'Skill'} · ${esc(ctxLabel)} · ${badge(item.state)}</div>
+      <div class="E-lead">${esc(st(winner)[1])}</div>
+      <div class="E-btns">${primary}${secondary}<span class="E-meta">applies to the <b style="color:#fff">${esc(sel.layer)}</b> Entry ${badge(selS)}</span></div>
+      ${nots.map(n=>`<div class="E-why-no">${esc(n)}</div>`).join('')}
+      <div class="E-sec"><div class="h"><span>Entries · highest precedence first</span><span>actions apply to the highlighted Entry</span></div><div class="E-ladder">${ladder}</div>
+      <div class="E-detail"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><b>${esc(sel.layer)}</b>${tags(E[sel.entry],sel)}</div>
+        <div class="mono" style="margin-top:6px;color:var(--e-dim)">${esc(E[sel.entry].file)} → ${esc(E[sel.entry].key)}</div>
+        ${explain(sel,{compact:true})}
+        ${E[sel.entry].cfg?`<div class="mono" style="margin-top:8px;color:var(--e-dim)">${esc(E[sel.entry].cfg)}</div>`:''}
+        ${also.length?`<div class="also" style="margin-top:8px">Also read by: ${also.map(({a,x:y})=>`${esc(a.name)} ${badge(st(y)[0])}`).join(' · ')}</div>`:''}</div></div>`;
+  }
+  let modal = '';
+  if (e.modal) {
+    const x = live(ag).find(y=>y.entry===e.modal.entry), en = E[x.entry], verb = e.modal.verb, ac = acts(x);
+    const how = verb==='Disable' ? ac.disable.how : verb==='Enable' ? ac.enable.how : ac.remove.how;
+    const reach = [...new Set(AGENTS.filter(a=>RD.some(y=>y.agent===a.id && y.entry===x.entry)).map(a=>a.name))];
+    const run = RUNNING[ag];
+    const acks = [];
+    if (run==='warn') acks.push(`${A.name} is running and rewrites its config while running. Write anyway.`);
+    if (verb==='Remove' && en.git) acks.push('This file is git-versioned. Remove the Entry from it anyway.');
+    const blocked = run==='block' && verb!=='Remove';
+    e.modal.acks ||= {};
+    const canApply = !blocked && acks.every((_,k)=>e.modal.acks[k]);
+    modal = `<div class="E-modal-bg" onclick="if(event.target===this){S.E.modal=null;render()}"><div class="E-modal">
+      <h3>${verb} ${esc(x.item)}</h3><div class="E-meta">${esc(A.name)} · ${esc(x.layer)} · ${esc(en.file)}</div>
+      <pre class="mono">${esc(how)}${verb==='Remove'?`\n\n<span class="del">- ${esc(en.key)}${en.cfg?': '+esc(en.cfg):''}</span>`:''}</pre>
+      <div class="row"><span class="dim">Reach</span><span>${verb==='Remove'?esc(reach.join(', ')):esc(A.name)}${verb==='Remove'&&reach.length>1?' — every Agent that reads this Entry':''}</span></div>
+      <div class="row"><span class="dim">Backup</span><span class="mono">%LOCALAPPDATA%\\config-digger\\backups\\…</span><span class="dim">· undoable from History</span></div>
+      ${blocked?`<div class="E-banner" style="margin-top:12px">${esc(A.name)} is running. Close it to apply: its state database is locked while it runs.</div>`:''}
+      ${acks.map((t,k)=>`<div class="row"><span class="E-tog ${e.modal.acks[k]?'on':''}" onclick="S.E.modal.acks[${k}]=!S.E.modal.acks[${k}];render()"></span><span>${esc(t)}</span></div>`).join('')}
+      <div class="ft"><button class="E-txt" onclick="S.E.modal=null;render()">Cancel</button><button class="E-txt" style="color:${canApply?'var(--e-pur2)':'var(--e-faint)'}" ${canApply?'':'disabled'} onclick="S.E.modal=null;render();toast('Prototype: Operation applied and verified')">Apply</button></div>
+    </div></div>`;
+  }
+  return `<div class="E">${rail}<div class="E-body">${top}<div class="E-main">${main}</div>
+    <div class="E-foot"><a onclick="toast('Prototype: History of Operations')">⟲ History · 0 Operations</a><a>github.com/samfaina/config-digger</a></div></div>${modal}</div>`;
+}
+
 // ───────────────────────── shell & switcher ─────────────────────────
-const VARIANTS = {A:['Agents → Items → explainer',VariantA], B:['Name × Agent matrix',VariantB], C:['Locations tree',VariantC], D:['Per-Agent cascade',VariantD]};
+const VARIANTS = {A:['Agents → Items → explainer',VariantA], B:['Name × Agent matrix',VariantB], C:['Locations tree',VariantC], D:['Per-Agent cascade',VariantD], E:['A as a launcher (MISTY)',VariantE]};
 const KEYS = Object.keys(VARIANTS);
 let variant = new URLSearchParams(location.search).get('variant') || 'A'; if(!VARIANTS[variant]) variant='A';
 function setVariant(v){ variant=v; try{ const u=new URL(location.href); u.searchParams.set('variant',v); history.replaceState(null,'',u); }catch(e){} render(); }
 function render(keepFocus){
   const f = keepFocus && document.activeElement && document.activeElement.id; const pos = f && document.activeElement.selectionStart;
+  document.body.className = 'v'+variant;
   document.getElementById('main').innerHTML = VARIANTS[variant][1]();
   document.getElementById('vlabel').textContent = `${variant} — ${VARIANTS[variant][0]}`;
   if (f) { const el=document.getElementById(f); if(el){el.focus(); el.setSelectionRange(pos,pos);} }
