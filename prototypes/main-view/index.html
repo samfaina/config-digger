@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   PROTOTYPE — throwaway. Answers ticket #22 "Main view and explaining Effective vs Shadowed".
-  Five main views over one illustrative inventory, switchable via ?variant=A|B|C|D|E (E = A restyled after the
+  Five main views over one illustrative inventory, switchable via ?variant=A|B|C|D|E (E = A restyled after the "MISTY" launcher, rejected; F = A restyled after a dark time-tracker app;
   "MISTY" Minecraft launcher on Behance; also takes &agent=, &item=, &entry=, &ctx=, &modal=)
   (bottom bar or ←/→). Data is fictional but every path, mechanism and precedence rule comes from the
   research docs on the research/* branches. Nothing here is wired to anything; buttons are inert.
@@ -12,8 +12,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>config-digger — main view prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* F — A's layout, look after a dark time-tracker desktop app (rounded panels, indigo accent) */
+body.vF .top{display:none}
+body.vF{overflow:hidden}
+.F{--f-bg:#16171d;--f-pan:#22242d;--f-tile:#2a2d38;--f-tile2:#323543;--f-line:#363a48;--f-acc:#6366f1;--f-acc2:#818cf8;--f-dim:#9a9db0;--f-faint:#666a7d;
+  flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--f-bg);font-family:Inter,"Segoe UI",sans-serif;font-size:13px;padding:0 10px 10px 0}
+.F-title{display:flex;align-items:center;height:38px;padding:0 6px 0 14px;color:var(--f-dim);font-size:12.5px}
+.F-title .app{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+.F-title .app i{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--f-acc),#a855f7);display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:800}
+.F-title .mid{flex:1;text-align:center}
+.F-title .wb{width:34px;text-align:center;color:var(--f-dim)}
+.F-shell{flex:1;display:flex;min-height:0;min-width:0;gap:10px}
+.F-rail{width:64px;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:2px}
+.F-rb{width:40px;height:40px;border-radius:10px;background:var(--f-pan);display:grid;place-items:center;color:var(--f-dim);cursor:pointer;font-size:17px;border:1px solid #ffffff0a}
+.F-rb:hover{color:#fff}.F-rb.sel{background:var(--f-acc);color:#fff;box-shadow:0 4px 14px #6366f155}
+.F-rail .sp{flex:1}
+.F-col{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0}
+.F-pan{background:var(--f-pan);border-radius:14px;padding:14px;border:1px solid #ffffff08;min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}
+.F-pan>.h{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;margin-bottom:12px}
+.F-pan>.h .q{width:16px;height:16px;border-radius:50%;border:1px solid var(--f-faint);color:var(--f-faint);font-size:10px;display:grid;place-items:center;cursor:help;font-weight:600}
+.F-pan>.h .sp{flex:1}
+.F-hero{background:linear-gradient(100deg,#3b3d7a 0%,#2c2e52 45%,#26283a 100%);flex-direction:row;align-items:center;gap:30px;padding:14px 20px}
+.F-ring{position:relative;width:74px;height:74px;flex:none}
+.F-ring svg{transform:rotate(-90deg)}
+.F-ring .c{position:absolute;inset:14px;border-radius:50%;background:var(--f-acc);display:grid;place-items:center;font-weight:700;font-size:15px;box-shadow:0 0 0 6px #6366f133}
+.F-k{color:#c3c5e0;font-size:12px}
+.F-big{font-size:26px;font-weight:600;letter-spacing:-.01em}
+.F-v{font-size:15px;font-weight:600;margin-top:4px}
+.F-hero select{background:transparent;border:0;color:#fff;font:600 15px Inter,"Segoe UI",sans-serif;padding:0;margin-top:4px;cursor:pointer}
+.F select option,.F select optgroup{background:var(--f-pan);color:#fff}
+.F-hero .sp{flex:1}
+.F-btn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--f-line);border-radius:8px;padding:6px 12px;color:#e6e7f0;font:500 12.5px Inter,"Segoe UI",sans-serif;cursor:pointer}
+.F-btn:hover{background:var(--f-tile)}.F-btn.solid{background:#ffffff14;border-color:transparent}
+.F-btn.pri{background:var(--f-acc);border-color:var(--f-acc);color:#fff}.F-btn.pri:hover{background:var(--f-acc2)}
+.F-btn[disabled]{opacity:.4;cursor:not-allowed}
+.F-scroll{overflow:auto;min-height:0;min-width:0;flex:1;margin-right:-6px;padding-right:6px;display:flex;flex-direction:column;gap:6px}
+.F-ag{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--f-tile);cursor:pointer;border:1px solid transparent}
+.F-ag:hover{background:var(--f-tile2)}
+.F-ag.sel{background:linear-gradient(100deg,#5558d9,#3d3f8f);box-shadow:0 4px 16px #6366f133}
+.F-ag .grip{color:var(--f-faint);letter-spacing:-2px}
+.F-ag .nm{flex:1;font-weight:500;font-size:13.5px}
+.F-ag .rt{text-align:right;font-size:11.5px;color:var(--f-dim);line-height:1.45}
+.F-ag.sel .rt{color:#d8d9ff}
+.F-ag .warn{color:#f87171}
+.F-bar{display:grid;grid-template-columns:80px 1fr;align-items:end;gap:10px;margin:7px 0;cursor:pointer;color:var(--f-dim)}
+.F-bar:hover .lbl,.F-bar.on .lbl{color:#fff}
+.F-bar .tr{position:relative;height:3px;background:#ffffff14;border-radius:2px;margin-bottom:5px}
+.F-bar .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.F-bar .n{position:absolute;right:0;bottom:7px;font-size:12px;color:#e6e7f0}
+.F-bar.on .tr{box-shadow:0 0 0 1px var(--f-acc2)}
+.F-search{display:flex;align-items:center;gap:8px;border:1px solid var(--f-line);border-radius:8px;padding:7px 11px;color:var(--f-dim);margin-bottom:10px}
+.F-search input{flex:1;background:transparent;border:0;color:#fff;font:13px Inter,"Segoe UI",sans-serif;outline:none;padding:0}
+.F-seg{display:inline-flex;background:var(--f-tile);border-radius:8px;padding:2px;gap:2px}
+.F-seg button{background:transparent;border:0;border-radius:6px;padding:3px 10px;color:var(--f-dim);font:500 12px Inter,sans-serif}
+.F-seg button.on{background:var(--f-tile2);color:#fff}
+.F-grp{color:var(--f-faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:6px 2px 0}
+.F-row{min-width:0;display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+.F-row:hover{background:var(--f-tile)}
+.F-row.sel{background:var(--f-tile2);border-color:#ffffff10}
+.F-row .ic{width:30px;height:30px;border-radius:50%;background:#ffffff1a;display:grid;place-items:center;flex:none;font-size:13px;color:#d0d2ff}
+.F-row.sel .ic{background:var(--f-acc);color:#fff}
+.F-row .tx{flex:1;min-width:0}
+.F-row .nm{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.F-row .nm .k{width:14px;height:14px;border-radius:3px;background:#6366f1;display:inline-grid;place-items:center;font-size:9px;color:#fff}
+.F-row .lc{color:var(--f-dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;font-family:"Cascadia Mono",Consolas,monospace}
+.F-pill{display:inline-flex;align-items:center;gap:8px;background:#ffffff0f;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;min-width:118px;justify-content:space-between}
+.F-pill .d{width:7px;height:7px;border-radius:50%}
+.F-cnt{color:var(--f-faint);font-size:11.5px;width:58px;text-align:right}
+.F .badge{border-radius:6px;padding:1px 8px;font-family:Inter,sans-serif;font-weight:600}
+.F .tag{border-color:var(--f-line);color:var(--f-dim);border-radius:6px;padding:0 6px}
+.F .tag.git{border-color:#a78bfa;color:#c4b5fd}.F .tag.link{border-color:#60a5fa;color:#93c5fd}.F .tag.ro{border-color:#fb923c;color:#fdba74}
+.F .explain{background:transparent;padding:0;margin-top:8px}
+.F .explain ul{color:var(--f-dim)}
+.F .actions button{border-radius:8px;background:transparent;border-color:var(--f-line);padding:5px 11px}
+.F .actions button:hover{background:var(--f-tile)}
+.F .actions .note{color:var(--f-faint)}
+.F .also{color:var(--f-dim)}
+.F-rung{background:var(--f-tile);border-radius:12px;padding:11px 13px;margin-bottom:8px;border:1px solid transparent;position:relative}
+.F-rung.win{border-color:#6366f188;background:linear-gradient(180deg,#6366f11c,var(--f-tile) 60%)}
+.F-rung.lose .loc{text-decoration:line-through;text-decoration-color:var(--f-faint)}
+.F-rung .hd{display:flex;align-items:center;gap:8px}
+.F-rung .rk{width:22px;height:22px;border-radius:50%;background:#ffffff12;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--f-dim);flex:none}
+.F-rung.win .rk{background:var(--f-acc);color:#fff}
+.F-rung .ly{font-weight:600;flex:1}
+.F-rung .loc{margin-top:6px;font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--f-dim);word-break:break-all}
+.F-banner{background:#f871711a;color:#fecaca;border:1px solid #f8717144;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12.5px}
+.F .fields{width:100%;table-layout:fixed}.F .fields td{word-break:break-all;font-size:11px}
+.F-empty{color:var(--f-faint);padding:20px 4px;text-align:center}
 /* E — launcher look, after the "MISTY" Minecraft launcher on Behance (Cera Pro → Outfit stand-in) */
 body.vE .top{display:none}
 .E{--e-bg:#141419;--e-rail:#18181e;--e-card:#1f1f27;--e-card2:#262630;--e-line:#2c2c37;--e-pur:#7b5fd0;--e-pur2:#9a82e6;--e-dim:#8b8b98;--e-faint:#5d5d6a;
@@ -564,10 +651,67 @@ function VariantD(){
     ${sec('mcp')}${sec('skill')}${its.length?'':'<div class="dim" style="margin-top:14px">No Entries for this Agent in this context.</div>'}${panel}</div>`;
 }
 
+// ───────────────────────── Variant F: A's layout, time-tracker look ─────────────────────────
+const SCOL = {Effective:'#3fb950',Shadowed:'#8b949e',Merged:'#39c5cf',Disabled:'#d29922',Blocked:'#f0883e',Unread:'#6e7681',Invalid:'#f85149'};
+function VariantF(){
+  const a = S.A, A = AG[a.agent], ctxLabel = CTX.find(c=>c.id===S.ctx).label;
+  const q = t => `<span class="q" title="${esc(t)}">?</span>`;
+  const statsOf = ag => { const its = itemsOf(ag); const c = {}; let n = 0; its.forEach(i=>i.rs.forEach(x=>{c[st(x)[0]]=(c[st(x)[0]]||0)+1; n++;})); return {its, c, n, inUse: its.filter(i=>['Effective','Merged'].includes(i.state)).length}; };
+  const cur = statsOf(a.agent);
+  // title bar + rail
+  const title = `<div class="F-title"><span class="app"><i>cd</i>config-digger</span><span class="mid">${esc(A.name)} · ${esc(ctxLabel)}</span><span class="wb">–</span><span class="wb">▢</span><span class="wb">✕</span></div>`;
+  const rail = `<div class="F-rail"><div class="F-rb sel" title="Inventory">▤</div><div class="F-rb" title="History · Undo" onclick="toast('Prototype: History of Operations')">⟲</div><div class="F-rb" title="Projects & homes" onclick="toast('Prototype: Projects and homes')">▣</div>
+    <span class="sp"></span><div class="F-rb" title="Settings" onclick="toast('Prototype: Settings')">⚙</div><div class="F-rb" title="Refresh" onclick="toast('Prototype: would re-run scan()')">↻</div></div>`;
+  // hero
+  const pct = cur.its.length ? cur.inUse/cur.its.length : 0, C = 2*Math.PI*33;
+  const projOpts = CTX.filter(c=>!c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('') +
+    `<optgroup label="Missing Projects">${CTX.filter(c=>c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('')}</optgroup>`;
+  const hero = `<div class="F-pan F-hero">
+    <div class="F-ring"><svg width="74" height="74"><circle cx="37" cy="37" r="33" fill="none" stroke="#ffffff1a" stroke-width="3"/><circle cx="37" cy="37" r="33" fill="none" stroke="#a5b4fc" stroke-width="3" stroke-linecap="round" stroke-dasharray="${C*pct} ${C}"/></svg><div class="c">${cur.inUse}/${cur.its.length}</div></div>
+    <div><div class="F-k">Items in use</div><div class="F-big">${esc(A.name)}</div></div>
+    <div><div class="F-k">Project</div><select onchange="S.ctx=this.value;S.A.item=null;render()">${projOpts}</select></div>
+    <div><div class="F-k">Inventory read</div><div class="F-v">10:42 <span class="F-k">· on focus</span></div></div>
+    <span class="sp"></span>
+    <button class="F-btn solid" onclick="toast('Prototype: would re-run scan()')">↻ Refresh</button></div>`;
+  // left column
+  const agents = `<div class="F-pan" style="flex:1"><div class="h">Agents ${q('Every v0.1 Agent found on this machine')}</div><div class="F-scroll">
+    ${AGENTS.map(g=>{ const s = statsOf(g.id); const off = s.n - (s.c.Effective||0) - (s.c.Merged||0);
+      return `<div class="F-ag ${g.id===a.agent?'sel':''}" onclick="S.A.agent='${g.id}';S.A.item=null;render()"><span class="grip">⋮⋮</span><span class="nm">${esc(g.name)} ${flag(g.id)?'<span class="warn" title="'+esc(flag(g.id))+'">⚑</span>':''}</span>
+        <span class="rt">in use: ${s.inUse} / ${s.its.length}<br>no effect: ${off}</span></div>`; }).join('')}</div></div>`;
+  const states = `<div class="F-pan"><div class="h">Entries by State ${q('Click a State to filter the Items list')}<span class="sp"></span>${a.st?`<a style="font-size:12px;font-weight:500" onclick="S.A.st=null;render()">clear</a>`:''}</div>
+    ${STATES.filter(s=>cur.c[s]).map(s=>`<div class="F-bar ${a.st===s?'on':''}" onclick="S.A.st=${a.st===s?'null':`'${s}'`};render()"><span class="lbl">${s}</span><span class="tr"><i style="width:${100*cur.c[s]/cur.n}%;background:${SCOL[s]}"></i><span class="n">${cur.c[s]} / ${cur.n}</span></span></div>`).join('') || '<div class="F-empty">No Entries</div>'}</div>`;
+  const homes = `<div class="F-pan"><div class="h">Agent home ${q('Where this Agent reads its user configuration. Entries in different homes never compete.')}</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${A.homes.map(h=>`<div class="F-ag ${h.id===homeOf(a.agent)?'sel':''}" style="padding:8px 12px" onclick="S.homes['${a.agent}']='${h.id}';S.A.item=null;render()"><span class="nm" style="font-size:12.5px">${esc(h.label)}</span>${h.mirrored?'<span class="tag ro">read-only</span>':''}${h.unread?'<span class="tag">not read</span>':''}</div>`).join('')}</div></div>`;
+  // items
+  let its = cur.its.filter(i=> (a.kind==='all'||i.kind===a.kind) && (!a.q||i.name.includes(a.q)) && (!a.st||i.rs.some(x=>st(x)[0]===a.st)));
+  const seg = (v,l) => `<button class="${a.kind===v?'on':''}" onclick="S.A.kind='${v}';render()">${l}</button>`;
+  const row = i => { const win = i.rs.find(x=>['Effective','Merged'].includes(st(x)[0])) || i.rs[0]; const e = E[win.entry];
+    return `<div class="F-row ${a.item===i.name?'sel':''}" onclick="S.A.item='${i.name}';render()"><span class="ic">${i.kind==='mcp'?'⚙':'✦'}</span>
+      <div class="tx"><div class="nm">${esc(i.name)}</div><div class="lc" title="${esc(e.file+' → '+e.key)}">${esc(win.layer)} · ${esc(e.file)}</div></div>
+      <span class="F-cnt">${i.rs.length} ${i.rs.length>1?'Entries':'Entry'}</span>
+      <span class="F-pill"><span>${i.state}</span><span class="d" style="background:${SCOL[i.state]}"></span></span></div>`; };
+  const items = `<div class="F-pan" style="flex:1;min-width:0"><div class="h">Items ${q('Each Item belongs to one Agent. Its State comes from its Entries.')}<span class="sp"></span><span class="F-seg">${seg('all','All')}${seg('mcp','MCP servers')}${seg('skill','Skills')}</span></div>
+    <div class="F-search">⌕<input id="fq" placeholder="Search Items…" value="${esc(a.q)}" oninput="S.A.q=this.value;render(true)"></div>
+    ${flag(a.agent)?`<div class="F-banner">⚑ ${esc(flag(a.agent))}</div>`:''}
+    <div class="F-scroll">${its.length?['mcp','skill'].map(k=>{const g=its.filter(i=>i.kind===k);return g.length?`<div class="F-grp">${k==='mcp'?'MCP servers':'Skills'}</div>`+g.map(row).join(''):''}).join(''):'<div class="F-empty">Nothing in this context</div>'}</div></div>`;
+  // detail
+  const sel = its.find(i=>i.name===a.item);
+  const detail = `<div class="F-pan" style="width:470px;flex:none"><div class="h">${sel?`${esc(sel.name)} ${badge(sel.state)}`:'Details'} ${q('Entries in precedence order, highest first. The first one wins.')}</div>
+    ${sel ? `<div class="F-k" style="color:var(--f-dim);margin:-6px 0 12px">${sel.kind==='mcp'?'MCP server':'Skill'} · ${esc(A.homes.find(h=>h.id===homeOf(a.agent)).label)} · ${esc(ctxLabel)}</div>
+      <div class="F-scroll">${sel.rs.map((x,k)=>{ const s=st(x)[0]; return `<div class="F-rung ${['Effective','Merged'].includes(s)?'win':''} ${s==='Shadowed'?'lose':''}">
+        <div class="hd"><span class="rk">${k+1}</span><span class="ly">${esc(x.layer)}</span>${badge(s)}</div>
+        <div style="margin-top:6px">${tags(E[x.entry],x)}</div>
+        <div class="loc">${esc(E[x.entry].file)}<br>${esc(E[x.entry].key)}</div>${explain(x)}</div>`; }).join('')}</div>`
+      : '<div class="F-empty">Select an Item to see which Entry wins and why.</div>'}</div>`;
+  return `<div class="F">${title}<div class="F-shell">${rail}<div class="F-col" style="flex:1">${hero}
+    <div style="display:flex;gap:10px;flex:1;min-height:0;min-width:0"><div class="F-col" style="width:290px;flex:none">${agents}${states}${homes}</div>${items}${detail}</div></div></div></div>`;
+}
+
 // ───────────────────────── Variant E: A, dressed as the MISTY game launcher ─────────────────────────
 S.E = {agent:'cc', item:null, sel:null, q:'', st:null, modal:null};
 { const q = new URLSearchParams(location.search); if (q.get('agent')) S.E.agent = q.get('agent'); if (q.get('item')) S.E.item = q.get('item');
-  if (q.get('ctx')) S.ctx = q.get('ctx'); if (q.get('modal')) S.E.modal = {verb:q.get('modal'), entry:q.get('entry')}; if (q.get('entry')) S.E.sel = q.get('entry'); }
+  if (q.get('ctx')) S.ctx = q.get('ctx');
+  if (q.get("item")) S.A.item = q.get("item"); if (q.get("agent")) S.A.agent = q.get("agent"); if (q.get('modal')) S.E.modal = {verb:q.get('modal'), entry:q.get('entry')}; if (q.get('entry')) S.E.sel = q.get('entry'); }
 const MONO = {cc:'CC', cd:'CD', vs:'VS', cu:'CU', cx:'CX', gm:'GM'};
 const RUNNING = {cc:'warn', vs:'block'};   // pretend: Claude Code and VS Code are running right now
 function acts(x){
@@ -664,7 +808,7 @@ function VariantE(){
 }
 
 // ───────────────────────── shell & switcher ─────────────────────────
-const VARIANTS = {A:['Agents → Items → explainer',VariantA], B:['Name × Agent matrix',VariantB], C:['Locations tree',VariantC], D:['Per-Agent cascade',VariantD], E:['A as a launcher (MISTY)',VariantE]};
+const VARIANTS = {A:['Agents → Items → explainer',VariantA], B:['Name × Agent matrix',VariantB], C:['Locations tree',VariantC], D:['Per-Agent cascade',VariantD], E:['A as a launcher (MISTY)',VariantE], F:['A, time-tracker look',VariantF]};
 const KEYS = Object.keys(VARIANTS);
 let variant = new URLSearchParams(location.search).get('variant') || 'A'; if(!VARIANTS[variant]) variant='A';
 function setVariant(v){ variant=v; try{ const u=new URL(location.href); u.searchParams.set('variant',v); history.replaceState(null,'',u); }catch(e){} render(); }
