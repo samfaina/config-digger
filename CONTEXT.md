@@ -66,6 +66,18 @@ _Avoid_: Overridden, hidden, inactive
 Make an Entry stop taking effect for one Agent while keeping it recoverable. The write can reach other Agents that share the same mechanism.
 _Avoid_: Deactivate, turn off, mute
 
+**Enable**:
+Make a Disabled Entry take effect again for one Agent — the inverse of Disable, whoever disabled it (the Agent itself or config-digger).
+_Avoid_: Re-enable, restore, activate
+
 **Remove**:
 Delete an Entry permanently from where it lives, for every Agent that reads it.
 _Avoid_: Delete, uninstall, purge
+
+**Operation**:
+A set of Disables, Enables and Removes confirmed together in one preview. It takes effect entirely or not at all, and is undone as a unit.
+_Avoid_: Change, transaction, batch
+
+**Undo**:
+Revert one Operation, as long as nothing it touched has changed since. Any Operation in the history can be undone, not only the last one, and an Undo is itself an Operation.
+_Avoid_: Rollback, revert, restore
