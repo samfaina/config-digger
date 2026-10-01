@@ -19,18 +19,20 @@
 body.vF .top{display:none}
 body.vF{overflow:hidden}
 .F{--f-bg:#16171B;--f-pan:#1d1e23;--f-tile:#24252b;--f-tile2:#2c2d35;--f-line:#33343c;--f-acc:#7D67CB;--f-acc2:#957fe0;--f-dim:#8B8C8F;--f-faint:#5e5f66;
-  flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--f-bg);font-family:Outfit,"Segoe UI",sans-serif;font-size:13px;padding:0 10px 10px 0;color:#fff}
+  flex:1;display:flex;flex-direction:row;min-height:0;min-width:0;background:var(--f-bg);font-family:Outfit,"Segoe UI",sans-serif;font-size:13px;padding:0 10px 10px 0;color:#fff}
 .F svg.i{width:18px;height:18px;fill:currentColor;flex:none;display:block}
 .F svg.i.s{width:15px;height:15px}
-.F-title{display:flex;align-items:center;height:38px;padding:0 6px 0 14px;color:var(--f-dim)}
-.F-title .app{display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:13px;flex:1}
-.F-title .app i{width:22px;height:22px;border-radius:7px;background:var(--f-acc);display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:800}
+.F-title{display:flex;align-items:center;justify-content:flex-end;height:34px;padding:0 6px;color:var(--f-dim)}
 .F-title .wb{width:34px;display:grid;place-items:center;color:var(--f-dim)}
 .F-shell{flex:1;display:flex;min-height:0;min-width:0;gap:10px}
-.F-rail{width:64px;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:2px}
-.F-rb{width:40px;height:40px;border-radius:12px;background:var(--f-pan);display:grid;place-items:center;color:var(--f-dim);cursor:pointer}
-.F-rb:hover{color:#fff}.F-rb.sel{background:var(--f-acc);color:#fff;box-shadow:0 6px 18px #7D67CB55}
-.F-rail .sp{flex:1}
+.F-rail{width:76px;background:#1b1c21;border-radius:18px;display:flex;flex-direction:column;align-items:center;padding:22px 0 18px;margin:10px 0 0 10px;flex:none}
+.F-logo{font-weight:800;font-size:22px;letter-spacing:-.06em;color:var(--f-acc);line-height:1}
+.F-rb{width:48px;height:48px;border-radius:50%;background:#25262d;display:grid;place-items:center;color:var(--f-dim);cursor:pointer;flex:none}
+.F-grp2{width:48px;border-radius:999px;background:#25262d;display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;margin-top:12px}
+.F-grp2 .F-rb{background:transparent}
+.F-rb:hover{color:#fff}.F-rb.sel{color:var(--f-acc)}
+.F-rail .sp{flex:1}.F-rail .sp2{flex:1.6}
+.F-main{margin-left:10px;flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .F-col{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0}
 .F-pan{background:var(--f-pan);border-radius:16px;padding:14px;min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}
 .F-pan>.h{display:flex;align-items:center;gap:8px;font-weight:500;font-size:14.5px;margin-bottom:12px}
@@ -680,6 +682,7 @@ const ICONS = {
   close:'<path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   trash:'<path d="M4 6.5h16"  stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M9 4.5h6"  stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M6 8h12l-1 11.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.5z"/>',
   pause:'<mask id="mz"><rect width="24" height="24" fill="#fff"/><rect x="8.5" y="8" width="2.4" height="8" rx="1" fill="#000"/><rect x="13.1" y="8" width="2.4" height="8" rx="1" fill="#000"/></mask><circle cx="12" cy="12" r="9.5" mask="url(#mz)"/>',
+  info:'<mask id="mi"><rect width="24" height="24" fill="#fff"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2" fill="#000"/><circle cx="12" cy="7.6" r="1.5" fill="#000"/></mask><circle cx="12" cy="12" r="9.5" mask="url(#mi)"/>',
   arrow:'<path d="M5 12h12M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24">${ICONS[n]}</svg>`;
@@ -702,9 +705,11 @@ function VariantF(){
   const statsOf = ags => { const its = ags.flatMap(itemsOf); const c = {}; let n = 0; its.forEach(i=>i.rs.forEach(x=>{c[st(x)[0]]=(c[st(x)[0]]||0)+1; n++;})); return {its, c, n, inUse: its.filter(i=>['Effective','Merged'].includes(i.state)).length}; };
   const scope = all ? AGENTS.map(g=>g.id) : [f.agent];
   const cur = statsOf(scope);
-  const title = `<div class="F-title"><span class="app"><i>cd</i>config-digger</span><span class="wb">${ic('min','s')}</span><span class="wb">${ic('max','s')}</span><span class="wb">${ic('close','s')}</span></div>`;
-  const rail = `<div class="F-rail"><div class="F-rb sel" title="Inventory">${ic('grid')}</div><div class="F-rb" title="History · Undo" onclick="toast('Prototype: History of Operations')">${ic('history')}</div><div class="F-rb" title="Projects & homes" onclick="toast('Prototype: Projects and homes')">${ic('folder')}</div>
-    <span class="sp"></span><div class="F-rb" title="Settings" onclick="toast('Prototype: Settings')">${ic('gear')}</div></div>`;
+  const title = `<div class="F-title"><span class="wb">${ic('min','s')}</span><span class="wb">${ic('max','s')}</span><span class="wb">${ic('close','s')}</span></div>`;
+  const rail = `<div class="F-rail"><div class="F-logo">cd</div><span class="sp"></span>
+    <div class="F-rb" title="Projects & homes" onclick="toast('Prototype: Projects and homes')">${ic('folder')}</div>
+    <div class="F-grp2"><div class="F-rb sel" title="Inventory">${ic('grid')}</div><div class="F-rb" title="History · Undo" onclick="toast('Prototype: History of Operations')">${ic('history')}</div><div class="F-rb" title="Settings" onclick="toast('Prototype: Settings')">${ic('gear')}</div></div>
+    <span class="sp2"></span><div class="F-rb" title="About · docs" onclick="toast('Prototype: About config-digger')">${ic('info')}</div></div>`;
   const pct = cur.its.length ? cur.inUse/cur.its.length : 0, C = 2*Math.PI*33;
   const projOpts = CTX.filter(c=>!c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('') +
     `<optgroup label="Missing Projects">${CTX.filter(c=>c.missing).map(c=>`<option value="${c.id}" ${c.id===S.ctx?'selected':''}>${esc(c.label)}</option>`).join('')}</optgroup>`;
@@ -756,8 +761,8 @@ function VariantF(){
         ${(()=>{const also=readersOf(x.entry,x);return also.length?`<div class="also" style="margin-top:6px;color:var(--f-dim);font-size:11.5px">Also read by: ${also.map(({a:g,x:y})=>`${esc(g.name)} ${badge(st(y)[0])}`).join(' · ')}</div>`:''})()}
         ${fActions(x)}</div>`; }).join('')}</div>`
       : '<div class="F-empty">Select an Item to see which Entry wins and why.</div>'}</div>`;
-  return `<div class="F">${title}<div class="F-shell">${rail}<div class="F-col" style="flex:1">${hero}
-    <div style="display:flex;gap:10px;flex:1;min-height:0;min-width:0"><div class="F-col" style="width:290px;flex:none">${agents}${states}${homes}</div>${items}${detail}</div></div></div></div>`;
+  return `<div class="F">${rail}<div class="F-main">${title}<div class="F-shell"><div class="F-col" style="flex:1">${hero}
+    <div style="display:flex;gap:10px;flex:1;min-height:0;min-width:0"><div class="F-col" style="width:290px;flex:none">${agents}${states}${homes}</div>${items}${detail}</div></div></div></div></div>`;
 }
 
 // ───────────────────────── Variant E: A, dressed as the MISTY game launcher ─────────────────────────
