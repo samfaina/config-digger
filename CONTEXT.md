@@ -60,12 +60,48 @@ _Avoid_: Active, winning, resolved
 Said of an Entry that loses, for a given Agent home and Project (or none), to the Effective Entry of the same Item and therefore has no effect in that Agent.
 _Avoid_: Overridden, hidden, inactive
 
+**State**:
+What one Agent does with an Entry for a given Agent home and Project (or none): Effective, Shadowed, Merged, Disabled, Blocked, Unread or Invalid. An Entry has exactly one State per context, set by the first of the Agent's own checks that it fails. Any other checks it also fails are listed as secondary reasons.
+_Avoid_: Status, condition
+
+**Merged**:
+Said of an Entry that supplies some fields of a server the Agent builds by combining several same-named Entries field by field, so that no single Entry is Effective.
+_Avoid_: Partial, combined, partly Effective
+
+**Disabled**:
+Said of an Entry that the Agent skips because it was Disabled, natively or by config-digger. When the Agent's mechanism works by name, every Entry of the Item is Disabled.
+_Avoid_: Off, inactive
+
+**Blocked**:
+Said of an Entry that the Agent will not use because of a gate outside the Entry that Enable cannot lift: an untrusted folder, a project server not yet approved, or managed policy. config-digger never lifts these gates.
+_Avoid_: Pending, denied, untrusted
+
+**Unread**:
+Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips or one keyed to a missing Project. It competes with nothing and can only be Removed.
+_Avoid_: Orphaned, stale, ignored
+
+**Invalid**:
+Said of an Entry that takes part in a combination the Agent rejects, such as Codex Entries that merge into a server with two transports, which stops the Agent from starting.
+_Avoid_: Broken, conflicting, error
+
 ### Actions
 
 **Disable**:
 Make an Entry stop taking effect for one Agent while keeping it recoverable. The write can reach other Agents that share the same mechanism.
 _Avoid_: Deactivate, turn off, mute
 
+**Enable**:
+Make a Disabled Entry take effect again for one Agent — the inverse of Disable, whoever disabled it (the Agent itself or config-digger).
+_Avoid_: Re-enable, restore, activate
+
 **Remove**:
 Delete an Entry permanently from where it lives, for every Agent that reads it.
 _Avoid_: Delete, uninstall, purge
+
+**Operation**:
+A set of Disables, Enables and Removes confirmed together in one preview. It takes effect entirely or not at all, and is undone as a unit.
+_Avoid_: Change, transaction, batch
+
+**Undo**:
+Revert one Operation, as long as nothing it touched has changed since. Any Operation in the history can be undone, not only the last one, and an Undo is itself an Operation.
+_Avoid_: Rollback, revert, restore
