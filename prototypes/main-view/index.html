@@ -1,0 +1,508 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Answers ticket #22 "Main view and explaining Effective vs Shadowed".
+  Four structurally different main views over one illustrative inventory, switchable via ?variant=A|B|C|D
+  (bottom bar or ←/→). Data is fictional but every path, mechanism and precedence rule comes from the
+  research docs on the research/* branches. Nothing here is wired to anything; buttons are inert.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>config-digger — main view prototype</title>
+<style>
+:root{
+  --bg:#1e1f22;--panel:#26282c;--panel2:#2d3035;--line:#3a3d43;--text:#e3e5e8;--dim:#9aa0a8;--faint:#6b7079;
+  --eff:#3fb950;--sha:#8b949e;--mer:#39c5cf;--dis:#d29922;--blo:#f0883e;--unr:#6e7681;--inv:#f85149;--acc:#58a6ff;
+  font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;font-size:13px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+code,.mono{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:3px 9px;cursor:pointer}
+button:hover{border-color:var(--dim)}
+button[disabled]{opacity:.45;cursor:not-allowed}
+select,input{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:3px 6px}
+a{color:var(--acc);cursor:pointer;text-decoration:none}
+a:hover{text-decoration:underline}
+.top{display:flex;align-items:center;gap:14px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.top h1{font-size:14px;margin:0;font-weight:600}
+.top .proto{color:var(--blo);font-size:11px;border:1px solid var(--blo);border-radius:3px;padding:0 5px}
+.top .sp{flex:1}
+.dim{color:var(--dim)}.faint{color:var(--faint)}
+main{flex:1;min-height:0;display:flex}
+.badge{display:inline-block;border-radius:3px;padding:0 6px;font-size:11px;font-weight:600;line-height:18px;white-space:nowrap}
+.b-Effective{background:#3fb95026;color:var(--eff)}.b-Shadowed{background:#8b949e26;color:var(--sha)}
+.b-Merged{background:#39c5cf26;color:var(--mer)}.b-Disabled{background:#d2992226;color:var(--dis)}
+.b-Blocked{background:#f0883e26;color:var(--blo)}.b-Unread{background:#6e768126;color:var(--unr)}
+.b-Invalid{background:#f8514933;color:var(--inv)}
+.tag{display:inline-block;font-size:10.5px;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--dim);margin-left:4px;white-space:nowrap}
+.tag.git{border-color:#a371f7;color:#a371f7}.tag.link{border-color:var(--acc);color:var(--acc)}.tag.ro{border-color:var(--blo);color:var(--blo)}
+.flag{color:var(--inv);font-size:12px}
+.explain{padding:8px 10px;background:var(--panel2);border-radius:4px;margin-top:6px;line-height:1.5}
+.explain .why{margin-bottom:4px}
+.explain ul{margin:4px 0 0 16px;padding:0;color:var(--dim)}
+.explain .whatif{color:var(--dim);font-style:italic}
+.actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.actions .note{color:var(--faint);font-size:11.5px;flex-basis:100%}
+.fields{border-collapse:collapse;margin-top:6px}
+.fields td{padding:1px 10px 1px 0;vertical-align:top}
+.toast{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--acc);color:#000;padding:6px 12px;border-radius:4px;display:none;z-index:99}
+/* switcher */
+.switcher{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:#fff;color:#000;
+  border-radius:999px;padding:5px 8px;box-shadow:0 4px 18px #000a;z-index:100;font-weight:600}
+.switcher button{background:#000;color:#fff;border:0;border-radius:999px;width:28px;height:28px;padding:0}
+.switcher span{min-width:230px;text-align:center}
+/* A */
+.A-left{width:240px;border-right:1px solid var(--line);overflow:auto;padding:8px 0}
+.A-agent{padding:7px 12px;cursor:pointer;border-left:3px solid transparent}
+.A-agent.sel{background:var(--panel2);border-left-color:var(--acc)}
+.A-agent .counts{font-size:11.5px;color:var(--dim);margin-top:2px}
+.A-mid{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.A-tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.chip{border-radius:999px;padding:1px 9px;font-size:11.5px}
+.chip.on{border-color:var(--acc);color:var(--acc)}
+.A-list{overflow:auto;flex:1}
+.A-group{padding:10px 12px 4px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.A-row{display:grid;grid-template-columns:18px 1fr auto;gap:8px;padding:6px 12px;cursor:pointer;align-items:center;border-bottom:1px solid #ffffff08}
+.A-row:hover{background:#ffffff08}.A-row.sel{background:var(--panel2)}
+.A-row .sub{font-size:11.5px;color:var(--dim)}
+.A-right{width:500px;overflow:auto;padding:14px}
+.ladder{margin-top:10px}
+.rung{border:1px solid var(--line);border-radius:5px;padding:8px 10px;margin-bottom:8px;position:relative}
+.rung.win{border-color:var(--eff)}
+.rung .rank{position:absolute;left:-26px;top:9px;color:var(--faint);font-size:11px;width:20px;text-align:right}
+.rung .hdr{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.rung.lose .loc{text-decoration:line-through;text-decoration-color:var(--faint)}
+.also{font-size:11.5px;color:var(--dim);margin-top:4px}
+/* B */
+.B-wrap{flex:1;overflow:auto;padding:12px 14px 120px}
+table.mx{border-collapse:separate;border-spacing:0;width:100%}
+.mx th,.mx td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.mx th{position:sticky;top:0;background:var(--panel);z-index:2;font-weight:600}
+.mx td.name{font-weight:600;white-space:nowrap}
+.mx td.cell{cursor:pointer;min-width:120px}
+.mx td.cell:hover{background:#ffffff0a}.mx td.cell.sel{outline:2px solid var(--acc);outline-offset:-2px}
+.mx td.empty{color:var(--faint)}
+.dots{margin-top:3px;letter-spacing:2px;font-size:11px}
+.mx tr.grp td{background:transparent;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:14px}
+.drawer{position:fixed;left:0;right:0;bottom:0;height:42vh;background:var(--panel);border-top:2px solid var(--acc);overflow:auto;padding:12px 16px 70px;z-index:5}
+.stack{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.stack .card{flex:1 1 300px;border:1px solid var(--line);border-radius:5px;padding:8px 10px}
+.stack .card.win{border-color:var(--eff)}
+.arrow{align-self:center;color:var(--faint);font-size:18px}
+/* C */
+.C-wrap{flex:1;overflow:auto;padding:12px 16px 80px}
+.C-tools{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.C-root{margin-bottom:14px}
+.C-root>.h{font-weight:600;padding:4px 0;border-bottom:1px solid var(--line)}
+.C-file{margin:6px 0 0 14px}
+.C-file>.h{color:var(--dim)}
+.C-entry{margin:3px 0 0 28px;padding:4px 8px;border-radius:4px;cursor:pointer;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.C-entry:hover{background:#ffffff08}.C-entry.sel{background:var(--panel2)}
+.C-entry .k{min-width:170px}
+.reader{border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:11.5px}
+.C-detail{margin:2px 0 10px 28px;padding:4px 0 4px 12px;border-left:2px solid var(--acc)}
+/* D */
+.D-wrap{flex:1;overflow:auto;padding:0 16px 80px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:3;padding-top:10px}
+.tabs .t{padding:6px 12px;cursor:pointer;border-radius:4px 4px 0 0;color:var(--dim)}
+.tabs .t.sel{background:var(--panel);color:var(--text);border:1px solid var(--line);border-bottom-color:var(--panel)}
+.D-sec{margin-top:14px}
+.D-sec>.h{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+table.casc{border-collapse:collapse;width:100%}
+.casc th{font-weight:600;color:var(--dim);text-align:left;padding:4px 6px;font-size:11.5px;border-bottom:1px solid var(--line)}
+.casc th .prec{color:var(--faint);font-weight:400}
+.casc td{padding:5px 6px;border-bottom:1px solid #ffffff10;vertical-align:top}
+.casc td.item{font-weight:600;white-space:nowrap}
+.ec{border:1px solid var(--line);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:12px}
+.ec.win{border-color:var(--eff);background:#3fb95012}
+.ec.lose .loc{text-decoration:line-through;color:var(--faint)}
+.ec.sel{outline:2px solid var(--acc)}
+.result{font-size:12px}
+.D-panel{position:sticky;bottom:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-top:14px}
+.banner{background:#f8514922;border:1px solid var(--inv);color:var(--text);padding:6px 10px;border-radius:4px;margin:8px 0}
+.banner.warn{background:#f0883e1c;border-color:var(--blo)}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>config-digger</h1><span class="proto">PROTOTYPE · illustrative data</span>
+  <label class="dim">Project
+    <select id="ctx"></select>
+  </label>
+  <span class="sp"></span>
+  <span class="faint">Read 10:42 · refreshes when the window regains focus</span>
+  <button onclick="toast('Prototype: would re-run scan()')">⟳ Refresh</button>
+</div>
+<main id="main"></main>
+<div class="toast" id="toast"></div>
+<div class="switcher"><button id="prev">←</button><span id="vlabel"></span><button id="next">→</button></div>
+
+<script>
+// ───────────────────────── data ─────────────────────────
+const R = String.raw;
+const AGENTS = [
+  {id:'cc', name:'Claude Code', homes:[{id:'cc', label:R`~\.claude`}]},
+  {id:'cd', name:'Claude Desktop', homes:[
+    {id:'cd-store', label:'Store package', path:R`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude`},
+    {id:'cd-classic', label:R`%APPDATA%\Claude (not read)`, unread:true}]},
+  {id:'vs', name:'VS Code / Copilot', homes:[{id:'vs', label:'Default profile'}]},
+  {id:'cu', name:'Cursor', homes:[{id:'cu', label:R`~\.cursor`}]},
+  {id:'cx', name:'Codex', homes:[{id:'cx', label:R`~\.codex`},{id:'cx-orca', label:'Orca (Mirrored, read-only)', mirrored:'Orca'}]},
+  {id:'gm', name:'Gemini CLI', homes:[{id:'gm', label:R`~\.gemini`}]},
+];
+const AG = Object.fromEntries(AGENTS.map(a=>[a.id,a]));
+const CTX = [
+  {id:'w', label:R`E:\code\webshop`},
+  {id:'n', label:R`E:\code\notes`},
+  {id:'x', label:'No Project'},
+  {id:'g', label:R`C:\old\gone`, missing:true},
+];
+const WS = R`E:\code\webshop`;
+const NOT_IN_V01 = how => `Not in v0.1: ${how}`;
+const E = {
+  E1:{kind:'mcp', file:R`~\.claude.json`, key:'projects["E:/code/webshop"].mcpServers.github', prov:'File entry', cfg:'npx -y @modelcontextprotocol/server-github · env GITHUB_PERSONAL_ACCESS_TOKEN=ghp_••••'},
+  E2:{kind:'mcp', file:R`E:\code\webshop\.mcp.json`, key:'mcpServers.github', prov:'Versioned project file', git:true, cfg:'https://api.githubcopilot.com/mcp/ · header Authorization=Bearer ••••'},
+  E3:{kind:'mcp', file:R`~\.claude.json`, key:'mcpServers.github', prov:'File entry', cfg:'npx -y @modelcontextprotocol/server-github@0.6 · env GITHUB_PERSONAL_ACCESS_TOKEN=ghp_••••'},
+  E4:{kind:'mcp', file:R`E:\code\webshop\.mcp.json`, key:'mcpServers.postgres', prov:'Versioned project file', git:true, cfg:'uvx postgres-mcp postgresql://app:••••@localhost/shop'},
+  E5:{kind:'mcp', file:R`~\.claude.json`, key:'mcpServers.filesystem', prov:'File entry', cfg:R`npx -y @modelcontextprotocol/server-filesystem E:\code`},
+  E6:{kind:'skill', file:R`~\.claude\skills`, key:'pdf', prov:'Skill manager (npx skills)', link:R`~\.agents\skills\pdf`},
+  E7:{kind:'skill', file:R`~\.agents\skills`, key:'pdf', prov:'Skill manager (npx skills)', rmNote:'npx skills keeps its canonical copy here; junctions in other Agents\' folders will dangle.'},
+  E8:{kind:'skill', file:R`~\.claude\plugins\cache\claude-plugins-official\frontend-design\skills`, key:'frontend-design', prov:'Plugin frontend-design@claude-plugins-official', rm:NOT_IN_V01('uninstall the plugin in Claude Code (/plugin).')},
+  E9:{kind:'skill', file:R`~\.claude\skills`, key:'release-notes', prov:'File entry'},
+  E10:{kind:'skill', file:R`E:\code\webshop\.claude\skills`, key:'release-notes', prov:'Versioned project file', git:true},
+  E11:{kind:'mcp', file:R`~\.claude.json`, key:'projects["C:/old/gone"].mcpServers.legacy-db', prov:'File entry', cfg:'node C:\\old\\gone\\mcp.js'},
+  E12:{kind:'mcp', file:R`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`, key:'mcpServers.filesystem', prov:'File entry', cfg:R`npx -y @modelcontextprotocol/server-filesystem C:\Users\sam\Documents`},
+  E13:{kind:'mcp', file:R`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Claude Extensions`, key:'ant.dir.desktop-commander', prov:'Extension (.mcpb)', rm:NOT_IN_V01('uninstall the extension in Claude Desktop → Settings → Extensions.')},
+  E14:{kind:'mcp', file:R`%APPDATA%\Claude\claude_desktop_config.json`, key:'mcpServers.filesystem', prov:'File entry', cfg:'npx -y @modelcontextprotocol/server-filesystem C:\\Users\\sam'},
+  E15:{kind:'mcp', file:R`E:\code\webshop\.vscode\mcp.json`, key:'servers.github', prov:'Versioned project file', git:true, cfg:'https://api.githubcopilot.com/mcp/'},
+  E16:{kind:'mcp', file:R`%APPDATA%\Code\User\mcp.json`, key:'servers.github', prov:'File entry', cfg:'docker run -i ghcr.io/github/github-mcp-server · env GITHUB_TOKEN=••••'},
+  E17:{kind:'mcp', file:R`~\.cursor\mcp.json`, key:'mcpServers.github', prov:'File entry', cfg:'https://api.githubcopilot.com/mcp/ · header Authorization=Bearer ••••'},
+  E18:{kind:'mcp', file:R`E:\code\webshop\.cursor\mcp.json`, key:'mcpServers.github', prov:'Versioned project file', git:true, cfg:'npx -y @modelcontextprotocol/server-github'},
+  E19:{kind:'mcp', file:R`E:\code\webshop\.cursor\mcp.json`, key:'mcpServers.postgres', prov:'Versioned project file', git:true, cfg:'uvx postgres-mcp postgresql://app:••••@localhost/shop'},
+  E20:{kind:'mcp', file:R`~\.codex\config.toml`, key:'mcp_servers.github', prov:'File entry', cfg:'command = "npx", args = ["-y","@modelcontextprotocol/server-github"]'},
+  E21:{kind:'mcp', file:R`E:\code\webshop\.codex\config.toml`, key:'mcp_servers.github', prov:'Versioned project file', git:true, cfg:'env.GITHUB_TOKEN = "••••"'},
+  E22:{kind:'mcp', file:R`~\.codex\config.toml`, key:'mcp_servers.sentry', prov:'File entry', cfg:'url = "https://mcp.sentry.dev/mcp"'},
+  E23:{kind:'mcp', file:R`E:\code\webshop\.codex\config.toml`, key:'mcp_servers.sentry', prov:'Versioned project file', git:true, cfg:'enabled = false'},
+  E26:{kind:'mcp', file:R`E:\code\notes\.codex\config.toml`, key:'mcp_servers.linear', prov:'File entry', cfg:'command = "npx", args = ["-y","mcp-remote","https://mcp.linear.app/sse"]'},
+  E27:{kind:'mcp', file:R`~\.codex\config.toml`, key:'mcp_servers.linear', prov:'File entry', cfg:'url = "https://mcp.linear.app/mcp"'},
+  E28:{kind:'mcp', file:R`~\.gemini\settings.json`, key:'mcpServers.github', prov:'File entry', cfg:'npx -y @modelcontextprotocol/server-github · env GITHUB_PERSONAL_ACCESS_TOKEN=••••'},
+  E29:{kind:'mcp', file:R`E:\code\webshop\.gemini\settings.json`, key:'mcpServers.github', prov:'Versioned project file', git:true, cfg:'httpUrl = https://api.githubcopilot.com/mcp/'},
+  E30:{kind:'mcp', file:R`~\.gemini\settings.json`, key:'mcpServers.context7', prov:'File entry', cfg:'excludeTools = ["resolve-library-id"]'},
+  E31:{kind:'mcp', file:R`~\.gemini\extensions\context7\gemini-extension.json`, key:'mcpServers.context7', prov:'Extension context7', rm:NOT_IN_V01('gemini extensions uninstall context7.'), cfg:'httpUrl = https://mcp.context7.com/mcp · header CONTEXT7_API_KEY=••••'},
+  // Orca's Mirrored Codex home — copies of the ~\.codex Entries
+  M20:{kind:'mcp', file:R`~\.orca\codex\config.toml`, key:'mcp_servers.github', prov:'Mirrored by Orca', mirrorOf:'E20', cfg:'(copy of ~\\.codex\\config.toml)'},
+  M22:{kind:'mcp', file:R`~\.orca\codex\config.toml`, key:'mcp_servers.sentry', prov:'Mirrored by Orca', mirrorOf:'E22'},
+  M27:{kind:'mcp', file:R`~\.orca\codex\config.toml`, key:'mcp_servers.linear', prov:'Mirrored by Orca', mirrorOf:'E27'},
+};
+for (const [id,e] of Object.entries(E)) e.id = id;
+
+// reading = how one Agent (in one home) treats one Entry. st[ctx] = [State, why, opts]
+const RD = [];
+function r(agent, home, entry, item, layer, st, more={}) { RD.push({agent, home, entry, item, layer, st, ...more}); }
+const all = (...v) => ({w:v, n:v, x:v});
+const wnx = (w, nx) => ({w, n:nx, x:nx});
+
+// Claude Code
+const CC_BYNAME = 'Adds "github" to disabledMcpServers for this Project in ~\\.claude.json. Works by name: every Entry of the Item becomes Disabled.';
+r('cc','cc','E1','github','Local', {w:['Effective','Local Scope wins for this Project (managed > local > project > user).']}, {dis:CC_BYNAME});
+r('cc','cc','E2','github','Project', {w:['Shadowed','Shadowed by the local Entry in ~\\.claude.json (managed > local > project > user).',{by:'E1'}]},
+  {dis:'Adds "github" to disabledMcpjsonServers in ~\\.claude.json. .mcp.json is git-versioned and is not edited.'});
+r('cc','cc','E3','github','User', wnx(['Shadowed','Shadowed by the local Entry in ~\\.claude.json (managed > local > project > user).',{by:'E1'}],
+  ['Effective','Only Entry of this Item in this context.']), {dis:CC_BYNAME});
+r('cc','cc','E4','postgres','Project', {w:['Blocked','Not approved: Claude Code has not approved this .mcp.json server for E:\\code\\webshop. Approve it in Claude Code (/mcp); config-digger never approves servers.',{whatIf:'Would be Effective once approved.'}]},
+  {dis:'Adds "postgres" to disabledMcpjsonServers in ~\\.claude.json.'});
+r('cc','cc','E5','filesystem','User', wnx(['Disabled','Disabled by name for this Project: ~\\.claude.json → projects["E:/code/webshop"].disabledMcpServers lists "filesystem".',{whatIf:'Would be Effective.'}],
+  ['Effective','Only Entry of this Item in this context.']));
+r('cc','cc','E6','pdf','User', all('Effective','Personal skill; no other Entry named "pdf" in Claude Code.',{notes:['Linked Entry: junction to ~\\.agents\\skills\\pdf (npx skills). Remove deletes the junction, not the folder it points to.']}),
+  {dis:'skillOverrides {"pdf": "off"} in ~\\.claude\\settings.json.'});
+r('cc','cc','E8','frontend-design','Plugin', all('Effective','Plugin skill, invoked as /frontend-design:frontend-design. Plugin skills never Shadow.'),
+  {dis:'Sets enabledPlugins["frontend-design@claude-plugins-official"] = false in ~\\.claude\\settings.json. Disables the whole plugin (3 skills).'});
+r('cc','cc','E9','release-notes','User', all('Effective','Personal skills beat project skills in Claude Code (managed > personal > project).'), {dis:'skillOverrides {"release-notes": "off"} in ~\\.claude\\settings.json. By name: both Entries become Disabled.'});
+r('cc','cc','E10','release-notes','Project', {w:['Shadowed','Shadowed by ~\\.claude\\skills\\release-notes (managed > personal > project).',{by:'E9'}]},
+  {dis:'skillOverrides {"release-notes": "off"} in E:\\code\\webshop\\.claude\\settings.local.json (machine-local). By name: both Entries become Disabled.'});
+r('cc','cc','E11','legacy-db','Local', {g:['Unread','Keyed to C:\\old\\gone, which no longer exists. Claude Code never reads it; it can only be Removed.']});
+
+// Claude Desktop
+const CD_NOTE = {notes:['Claude Desktop has no Projects: the same in every context.']};
+r('cd','cd-store','E12','filesystem','User file', all('Effective','Only Entry of this Item.',CD_NOTE), {dis:'No native Disable: config-digger parks the Entry (moves it to its own storage; Enable puts it back).'});
+r('cd','cd-store','E13','desktop-commander','Extension', all('Disabled','Disabled in Claude Desktop: isEnabled = false in Claude Extensions Settings\\ant.dir.desktop-commander.json.',{whatIf:'Would be Effective.', ...CD_NOTE}));
+r('cd','cd-classic','E14','filesystem','User file', all('Unread','Claude Desktop is installed from the Microsoft Store and reads only its package folder; this classic folder is never read.'));
+
+// VS Code
+const VS_DIS = 'Sets mcp.enablement for this server to false in the workspace state.vscdb. Blocked while VS Code is running.';
+r('vs','vs','E15','github','.vscode/mcp.json', {w:['Effective','Collected first: .vscode/mcp.json > .mcp.json > user > extensions.']}, {dis:VS_DIS});
+r('vs','vs','E2','github','.mcp.json', {w:['Shadowed','Shadowed by E:\\code\\webshop\\.vscode\\mcp.json: same label "github", collected earlier.',{by:'E15'}]}, {dis:VS_DIS});
+r('vs','vs','E16','github','User', wnx(['Shadowed','Shadowed by E:\\code\\webshop\\.vscode\\mcp.json: same label "github", collected earlier.',{by:'E15'}],
+  ['Effective','Only Entry of this Item in this context.']), {dis:VS_DIS});
+r('vs','vs','E4','postgres','.mcp.json', {w:['Effective','Only Entry of this Item. The workspace is trusted.']}, {dis:VS_DIS});
+r('vs','vs','E10','release-notes','Workspace', {w:['Effective','Workspace skills beat personal skills in VS Code (workspace > personal > plugin > extension).']},
+  {dis:'Adds the folder to chat.disabledPromptFiles.skill in the profile state.vscdb.'});
+r('vs','vs','E9','release-notes',R`Personal ~\.claude`, wnx(['Shadowed','Shadowed by E:\\code\\webshop\\.claude\\skills\\release-notes (workspace > personal).',{by:'E10'}],
+  ['Effective','Only Entry of this Item in this context.']), {dis:'Adds the folder to chat.disabledPromptFiles.skill in the profile state.vscdb.'});
+r('vs','vs','E7','pdf',R`Personal ~\.agents`, all('Effective','First personal folder read: ~\\.agents\\skills comes before ~\\.claude\\skills.'), {dis:'Adds the folder to chat.disabledPromptFiles.skill in the profile state.vscdb.'});
+r('vs','vs','E6','pdf',R`Personal ~\.claude`, all('Shadowed','Shadowed by ~\\.agents\\skills\\pdf: the same name in an earlier personal folder.',{by:'E7'}), {dis:'Adds the folder to chat.disabledPromptFiles.skill in the profile state.vscdb.'});
+
+// Cursor
+const CU_DIS = 'Adds the server to cursor/disabledMcpServers in the workspace state.vscdb. Blocked while Cursor is running.';
+r('cu','cu','E17','user-github','User', all('Effective','Cursor never Shadows servers by name: every Entry is its own server.',{notes:['Also running in E:\\code\\webshop: project-0-webshop-github.']}), {dis:CU_DIS, row:'github'});
+r('cu','cu','E18','project-0-webshop-github','Project', {w:['Effective','Approved project server.',{notes:['Also running: user-github from ~\\.cursor\\mcp.json.']}]}, {dis:CU_DIS, row:'github'});
+r('cu','cu','E19','project-0-webshop-postgres','Project', {w:['Blocked','Not approved in Cursor: cursor/approvedProjectMcpServers in the workspace state.vscdb has no entry for it. Approve it in Cursor.',{whatIf:'Would be Effective once approved.'}]}, {dis:CU_DIS, row:'postgres'});
+r('cu','cu','E6','pdf',R`~\.claude`, all('Effective','Same path key "pdf": ~\\.claude\\skills ranks above ~\\.agents\\skills (.cursor > .claude > .codex > .agents).',{notes:['Cursor reads Claude Code skills behind one switch, on by default.']}), {dis:{no:'Cursor has no per-skill Disable. Disable not offered.'}});
+r('cu','cu','E7','pdf',R`~\.agents`, all('Shadowed','Shadowed by ~\\.claude\\skills\\pdf: same path key, .claude ranks above .agents.',{by:'E6'}), {dis:{no:'Cursor has no per-skill Disable. Disable not offered.'}});
+
+// Codex
+const CX_GH_FIELDS = [['command','"npx"','E20'],['args','["-y","@modelcontextprotocol/server-github"]','E20'],['env.GITHUB_TOKEN','"••••"','E21'],['startup_timeout_sec','20','E20']];
+const CX_MERGED = ['Merged','Codex merges same-named servers field by field across layers; this Entry supplies some fields.',{fields:CX_GH_FIELDS}];
+const CX_SENTRY = ['Disabled','Turned off for this Project: enabled = false in E:\\code\\webshop\\.codex\\config.toml.',{by:'E23', whatIf:'Would be Merged.'}];
+const CX_LINEAR = ['Invalid','Transport conflict: ~\\.codex\\config.toml gives url, E:\\code\\notes\\.codex\\config.toml gives command. Codex refuses to start in this context.'];
+r('cx','cx','E20','github','User', wnx(CX_MERGED, ['Effective','Only Entry of this Item in this context.']), {dis:'Sets enabled = false on mcp_servers.github in ~\\.codex\\config.toml.'});
+r('cx','cx','E21','github','Project', {w:CX_MERGED}, {dis:'Sets enabled = false on mcp_servers.github in ~\\.codex\\config.toml (the project file is git-versioned and is not edited).'});
+r('cx','cx','E22','sentry','User', wnx(CX_SENTRY, ['Effective','Only Entry of this Item in this context.']), {en:{no:'Enable not offered: the off switch lives in a git-versioned file.'}});
+r('cx','cx','E23','sentry','Project', {w:CX_SENTRY}, {en:{no:'Enable not offered: the off switch lives in a git-versioned file.'}});
+r('cx','cx','E27','linear','User', {w:['Effective','Only Entry of this Item in this context.'], x:['Effective','Only Entry of this Item in this context.'], n:CX_LINEAR});
+r('cx','cx','E26','linear','Project', {n:CX_LINEAR});
+r('cx','cx','E7','pdf',R`User ~\.agents`, all('Effective','Codex skills never Shadow each other: two same-named skills are both listed.'), {dis:'Adds [[skills.config]] path = ~\\.agents\\skills\\pdf, enabled = false to ~\\.codex\\config.toml.'});
+// Orca's Mirrored home: same rules, user Entries replaced by their mirror
+for (const x of RD.filter(x=>x.home==='cx').slice()) {
+  const m = Object.values(E).find(e=>e.mirrorOf===x.entry);
+  RD.push({...x, home:'cx-orca', entry: m ? m.id : x.entry, mirrored:!!m});
+}
+
+// Gemini CLI
+const GM_UNTRUSTED = ['Blocked','E:\\code\\notes is not a trusted folder: Gemini CLI starts no MCP server there, user ones included. Trust the folder in Gemini CLI.',{whatIf:'Would be Effective.'}];
+const GM_DIS = 'Adds the server to ~\\.gemini\\mcp-server-enablement.json. By name, global: every Entry of the Item becomes Disabled.';
+const GM_FIELDS = [['httpUrl','https://mcp.context7.com/mcp','E31'],['headers.CONTEXT7_API_KEY','••••','E31'],['excludeTools','["resolve-library-id"]','E30']];
+const GM_MERGED = ['Merged','Settings and extension servers with the same name merge field by field.',{fields:GM_FIELDS}];
+r('gm','gm','E29','github','Project', {w:['Effective','Project settings beat user settings (system override > project > user > system defaults).']}, {dis:GM_DIS});
+r('gm','gm','E28','github','User', {w:['Shadowed','Shadowed by E:\\code\\webshop\\.gemini\\settings.json (system override > project > user > system defaults).',{by:'E29'}],
+  n:GM_UNTRUSTED, x:['Effective','Only Entry of this Item.',{notes:['No Project: folder trust is not evaluated. Any untrusted folder Blocks it.']}]}, {dis:GM_DIS});
+r('gm','gm','E30','context7','User', {w:GM_MERGED, x:GM_MERGED, n:[...GM_UNTRUSTED.slice(0,2),{whatIf:'Would be Merged.'}]}, {dis:GM_DIS});
+r('gm','gm','E31','context7','Extension', {w:GM_MERGED, x:GM_MERGED, n:[...GM_UNTRUSTED.slice(0,2),{whatIf:'Would be Merged.'}]}, {dis:GM_DIS});
+
+const AGENT_FLAGS = {
+  cx:{n:'Cannot start in E:\\code\\notes: linear has conflicting transports.'},
+  gm:{n:'E:\\code\\notes is not trusted: no MCP server starts.'},
+};
+const LAYERS = {
+  cc:{mcp:['Managed','Local','Project','User','Plugin'], skill:['Managed','User','Project','Plugin']},
+  cd:{mcp:['User file','Extension'], skill:[]},
+  vs:{mcp:['.vscode/mcp.json','.mcp.json','User','Extension'], skill:['Workspace',R`Personal ~\.agents`,R`Personal ~\.claude`,'Plugin']},
+  cu:{mcp:['Project','User','Plugin'], skill:[R`~\.cursor`,R`~\.claude`,R`~\.codex`,R`~\.agents`]},
+  cx:{mcp:['Project','User','System'], skill:['Project',R`User ~\.agents`]},
+  gm:{mcp:['System override','Project','User','System defaults','Extension'], skill:[]},
+};
+const LAYER_NOTE = {
+  cu:'Cursor does not Shadow servers: every Entry is its own server. Skills compete by path key.',
+  cx:'Codex deep-merges layers field by field (higher layer wins per field). Skills never Shadow.',
+  gm:'Same name = whole-Entry win between settings files; settings + extension merge field by field.',
+};
+const STATES = ['Effective','Shadowed','Merged','Disabled','Blocked','Unread','Invalid'];
+
+// ───────────────────────── state & helpers ─────────────────────────
+const S = {ctx:'w', homes:{cd:'cd-store', cx:'cx'}, A:{agent:'cc', item:null, q:'', st:null, kind:'all'}, B:{cell:null}, C:{sel:null, waste:false, q:''}, D:{agent:'cc', sel:null}};
+const homeOf = a => S.homes[a] || AG[a].homes[0].id;
+const st = x => x.st[S.ctx];
+const live = (agent) => RD.filter(x=>x.agent===agent && x.home===homeOf(agent) && st(x));
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const badge = s => `<span class="badge b-${s}">${s}</span>`;
+function itemsOf(agent){
+  const m = new Map();
+  for (const x of live(agent)) { if(!m.has(x.item)) m.set(x.item, {agent, name:x.item, row:x.row||x.item, kind:E[x.entry].kind, rs:[]}); m.get(x.item).rs.push(x); }
+  for (const it of m.values()) it.state = itemState(it.rs);
+  return [...m.values()];
+}
+function itemState(rs){
+  if (rs.some(x=>st(x)[0]==='Invalid')) return 'Invalid';
+  const eff = rs.find(x=>['Effective','Merged'].includes(st(x)[0])); if (eff) return st(eff)[0];
+  const named = rs.find(x=>st(x)[0]!=='Unread'); return named ? st(named)[0] : 'Unread';
+}
+const shortLoc = e => `<span class="loc mono">${esc(e.file)}</span> <span class="mono dim">${esc(e.key)}</span>`;
+function tags(e, x){
+  let t = `<span class="tag">${esc(e.prov)}</span>`;
+  if (e.git) t += `<span class="tag git">git-versioned</span>`;
+  if (e.link) t += `<span class="tag link">junction → ${esc(e.link)}</span>`;
+  if (x && x.mirrored) t += `<span class="tag ro">read-only · Orca</span>`;
+  return t;
+}
+function readersOf(entryId, except){
+  return AGENTS.flatMap(a => live(a.id).filter(x=>x.entry===entryId && x!==except).map(x=>({a, x})));
+}
+function explain(x, {compact=false}={}){
+  const [s, why, o={}] = st(x); const e = E[x.entry];
+  let h = `<div class="explain"><div class="why">${badge(s)} ${esc(why)}`;
+  if (o.by) h += ` <a onclick="jump('${x.agent}','${o.by}')">show winner</a>`;
+  h += `</div>`;
+  if (o.whatIf) h += `<div class="whatif">${esc(o.whatIf)}</div>`;
+  if (o.fields) h += `<table class="fields mono">${o.fields.map(([k,v,src])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td><td class="dim">← ${src===x.entry?'<b>this Entry</b>':esc(E[src].file)}</td></tr>`).join('')}</table>`;
+  const notes = [...(o.notes||[])];
+  if (e.cfg && !compact) notes.unshift(`Config: ${e.cfg}`);
+  if (notes.length) h += `<ul>${notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`;
+  if (!compact) {
+    const also = readersOf(x.entry, x);
+    if (also.length) h += `<div class="also">Also read by: ${also.map(({a,x:y})=>`${a.name} ${badge(st(y)[0])}`).join(' · ')}</div>`;
+    h += actions(x);
+  }
+  return h + `</div>`;
+}
+function actions(x){
+  const [s] = st(x); const e = E[x.entry]; const notes = [];
+  let b = '';
+  if (x.mirrored) {
+    const src = e.mirrorOf ? E[e.mirrorOf].file : e.file;
+    return `<div class="actions"><span class="note">Read-only: Orca copies this home from ~\\.codex. Actions go to ${esc(src)}.</span><button onclick="toast('Prototype: jumps to the source Entry')">Go to source Entry</button></div>`;
+  }
+  if (['Effective','Shadowed','Merged','Blocked'].includes(s)) {
+    if (x.dis && x.dis.no) { b += `<button disabled>Disable</button>`; notes.push(x.dis.no); }
+    else { b += `<button onclick="toast('Prototype: would open the Disable preview')">Disable</button>`; if (x.dis) notes.push('Disable: '+x.dis); }
+  }
+  if (s==='Disabled') {
+    if (x.en && x.en.no) { b += `<button disabled>Enable</button>`; notes.push(x.en.no); }
+    else b += `<button onclick="toast('Prototype: would open the Enable preview')">Enable</button>`;
+  }
+  if (e.rm) { b += `<button disabled>Remove</button>`; notes.push(e.rm); }
+  else {
+    const reach = [...new Set(AGENTS.filter(a=>RD.some(y=>y.agent===a.id && y.entry===x.entry)).map(a=>a.name))];
+    b += `<button onclick="toast('Prototype: would open the Remove preview')">Remove…</button>`;
+    notes.push(`Remove reaches ${reach.join(', ')}${e.git?' · git-versioned: needs explicit confirmation':''}${e.link?' · deletes the junction only':''}${e.rmNote?' · '+e.rmNote:''}`);
+  }
+  return `<div class="actions">${b}${notes.map(n=>`<span class="note">${esc(n)}</span>`).join('')}</div>`;
+}
+function homeSelect(agent){
+  const a = AG[agent]; if (a.homes.length<2) return `<span class="dim">${esc(a.homes[0].label)}</span>`;
+  return `<select onclick="event.stopPropagation()" onchange="S.homes['${agent}']=this.value;render()">${a.homes.map(h=>`<option value="${h.id}" ${h.id===homeOf(agent)?'selected':''}>${esc(h.label)}</option>`).join('')}</select>`;
+}
+const flag = a => AGENT_FLAGS[a]?.[S.ctx];
+function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>el.style.display='none',1800); }
+function jump(agent, entry){
+  const x = live(agent).find(y=>y.entry===entry); if(!x) return;
+  S.A.agent=agent; S.A.item=x.item; S.D.agent=agent; S.D.sel=agent+'|'+entry; S.C.sel=entry;
+  S.B.cell = {row:x.row||x.item, agent}; render();
+}
+
+// ───────────────────────── Variant A: Agents → Items → explainer ─────────────────────────
+function VariantA(){
+  const a = S.A;
+  const counts = ag => { const its = itemsOf(ag); const c = {}; its.forEach(i=>i.rs.forEach(x=>c[st(x)[0]]=(c[st(x)[0]]||0)+1)); return `${its.length} Items · `+Object.entries(c).filter(([k])=>k!=='Effective').map(([k,v])=>`${v} ${k}`).join(' · '); };
+  let left = AGENTS.map(ag=>`<div class="A-agent ${a.agent===ag.id?'sel':''}" onclick="S.A.agent='${ag.id}';S.A.item=null;render()">
+    <div>${esc(ag.name)} ${flag(ag.id)?'<span class="flag">⚠</span>':''}</div>
+    <div class="counts">${counts(ag.id)}</div>
+    ${a.agent===ag.id?`<div style="margin-top:4px">${homeSelect(ag.id)}</div>`:''}</div>`).join('');
+  let its = itemsOf(a.agent).filter(i=> (a.kind==='all'||i.kind===a.kind) && (!a.q||i.name.includes(a.q)) && (!a.st||i.rs.some(x=>st(x)[0]===a.st)));
+  const chip = (v,l) => `<button class="chip ${a.st===v?'on':''}" onclick="S.A.st=${v?`'${v}'`:'null'};render()">${l}</button>`;
+  const kchip = (v,l) => `<button class="chip ${a.kind===v?'on':''}" onclick="S.A.kind='${v}';render()">${l}</button>`;
+  const row = i => { const win = i.rs.find(x=>['Effective','Merged'].includes(st(x)[0])) || i.rs[0];
+    return `<div class="A-row ${a.item===i.name?'sel':''}" onclick="S.A.item='${i.name}';render()">
+      <span>${i.kind==='mcp'?'⚙':'✦'}</span>
+      <div><div>${esc(i.name)}</div><div class="sub">${i.rs.length} Entr${i.rs.length>1?'ies':'y'} · ${esc(E[win.entry].file)}</div></div>
+      ${badge(i.state)}</div>`; };
+  const mid = `<div class="A-mid"><div class="A-tools"><input placeholder="Filter Items…" value="${esc(a.q)}" oninput="S.A.q=this.value;render(true)" id="aq">
+     ${kchip('all','All')}${kchip('mcp','MCP servers')}${kchip('skill','Skills')}<span style="width:8px"></span>${chip(null,'Any State')}${STATES.map(s=>chip(s,s)).join('')}</div>
+     ${flag(a.agent)?`<div class="banner" style="margin:8px 12px">${esc(flag(a.agent))}</div>`:''}
+     <div class="A-list">${its.length?['mcp','skill'].map(k=>{const g=its.filter(i=>i.kind===k);return g.length?`<div class="A-group">${k==='mcp'?'MCP servers':'Skills'}</div>`+g.map(row).join(''):''}).join(''):'<div class="A-group">Nothing in this context</div>'}</div></div>`;
+  const sel = its.find(i=>i.name===a.item);
+  let right = '<div class="dim">Select an Item to see which Entry wins and why.</div>';
+  if (sel) {
+    const lad = sel.rs.map((x,k)=>{ const s=st(x)[0]; return `<div class="rung ${['Effective','Merged'].includes(s)?'win':''} ${s==='Shadowed'?'lose':''}">
+      <span class="rank">${k+1}</span>
+      <div class="hdr"><span><b>${esc(x.layer)}</b> ${tags(E[x.entry],x)}</span></div>
+      <div style="margin-top:3px">${shortLoc(E[x.entry])}</div>${explain(x)}</div>`; }).join('');
+    right = `<h3 style="margin:0">${esc(sel.name)} ${badge(sel.state)}</h3>
+      <div class="dim" style="margin-top:4px">${esc(AG[a.agent].name)} · ${esc(AG[a.agent].homes.find(h=>h.id===homeOf(a.agent)).label)} · ${esc(CTX.find(c=>c.id===S.ctx).label)}</div>
+      <div class="dim" style="margin-top:8px">Entries in precedence order, highest first:</div>
+      <div class="ladder" style="margin-left:26px">${lad}</div>`;
+  }
+  return `<div class="A-left">${left}</div>${mid}<div class="A-right">${right}</div>`;
+}
+
+// ───────────────────────── Variant B: Item name × Agent matrix ─────────────────────────
+function VariantB(){
+  const per = Object.fromEntries(AGENTS.map(a=>[a.id, itemsOf(a.id)]));
+  const rows = []; for (const a of AGENTS) for (const i of per[a.id]) if (!rows.find(r=>r.row===i.row)) rows.push({row:i.row, kind:i.kind});
+  const dot = x => { const s = st(x)[0]; return `<span title="${esc(x.layer)}: ${s}" style="color:var(--${({Effective:'eff',Shadowed:'sha',Merged:'mer',Disabled:'dis',Blocked:'blo',Unread:'unr',Invalid:'inv'})[s]})">${['Effective','Merged'].includes(s)?'●':s==='Shadowed'?'○':'◌'}</span>`; };
+  const cell = (r,a) => { const its = per[a.id].filter(i=>i.row===r.row); if(!its.length) return `<td class="cell empty">—</td>`;
+    const sel = S.B.cell && S.B.cell.row===r.row && S.B.cell.agent===a.id;
+    return `<td class="cell ${sel?'sel':''}" onclick="S.B.cell={row:'${r.row}',agent:'${a.id}'};render()">${its.map(i=>`<div>${badge(i.state)}${its.length>1?` <span class="dim mono">${esc(i.name)}</span>`:''}<div class="dots">${i.rs.map(dot).join('')}</div></div>`).join('')}</td>`; };
+  const head = `<tr><th>Name</th>${AGENTS.map(a=>`<th>${esc(a.name)} ${flag(a.id)?`<span class="flag" title="${esc(flag(a.id))}">⚠</span>`:''}<div style="font-weight:400;margin-top:3px">${homeSelect(a.id)}</div></th>`).join('')}</tr>`;
+  const body = ['mcp','skill'].map(k=>{ const g = rows.filter(r=>r.kind===k); return g.length ? `<tr class="grp"><td colspan="${AGENTS.length+1}">${k==='mcp'?'MCP servers':'Skills'}</td></tr>`+g.map(r=>`<tr><td class="name">${esc(r.row)}</td>${AGENTS.map(a=>cell(r,a)).join('')}</tr>`).join('') : ''; }).join('');
+  let drawer = '';
+  if (S.B.cell) {
+    const its = per[S.B.cell.agent].filter(i=>i.row===S.B.cell.row);
+    if (its.length) drawer = `<div class="drawer"><div style="display:flex;justify-content:space-between"><b>${esc(AG[S.B.cell.agent].name)} · ${esc(S.B.cell.row)}</b><a onclick="S.B.cell=null;render()">close ✕</a></div>
+      ${its.map(i=>`<div style="margin-top:10px"><div>${esc(i.name)} ${badge(i.state)} <span class="dim">— highest precedence on the left</span></div><div class="stack" style="margin-top:6px">${i.rs.map((x,k)=>`${k?'<span class="arrow">›</span>':''}<div class="card ${['Effective','Merged'].includes(st(x)[0])?'win':''}"><b>${esc(x.layer)}</b> ${tags(E[x.entry],x)}<div style="margin-top:3px">${shortLoc(E[x.entry])}</div>${explain(x)}</div>`).join('')}</div></div>`).join('')}</div>`;
+  }
+  return `<div class="B-wrap"><div class="dim" style="margin-bottom:8px">Rows group Items by name across Agents (a lens only: each cell is its own Item). ● in use · ○ Shadowed · ◌ other. Click a cell.</div>
+    <table class="mx">${head}${body}</table></div>${drawer}`;
+}
+
+// ───────────────────────── Variant C: locations tree ─────────────────────────
+function VariantC(){
+  const readers = {}; for (const a of AGENTS) for (const x of live(a.id)) (readers[x.entry] ||= []).push(x);
+  let ids = Object.keys(readers);
+  const noEffect = id => readers[id].every(x=>!['Effective','Merged','Invalid'].includes(st(x)[0]));
+  if (S.C.waste) ids = ids.filter(noEffect);
+  if (S.C.q) ids = ids.filter(id=>(E[id].file+E[id].key).toLowerCase().includes(S.C.q.toLowerCase()));
+  const rootOf = f => f.startsWith(WS)?`Project · ${WS}`: f.startsWith('E:\\code\\notes')?'Project · E:\\code\\notes': f.startsWith('C:\\old')?'Missing Project · C:\\old\\gone': f.startsWith('~')?'User home · C:\\Users\\sam': 'AppData';
+  const roots = {}; for (const id of ids) { const e=E[id]; ((roots[rootOf(e.file)] ||= {})[e.file] ||= []).push(id); }
+  const order = Object.keys(roots).sort((a,b)=>(b.startsWith('Project')-a.startsWith('Project')));
+  const tree = order.map(rt=>`<div class="C-root"><div class="h">${esc(rt)}</div>${Object.entries(roots[rt]).map(([f,es])=>`<div class="C-file"><div class="h mono">📄 ${esc(f)}</div>${es.map(id=>{const e=E[id];
+     const chips = readers[id].map(x=>`<span class="reader">${esc(AG[x.agent].name)}${x.mirrored?' (Orca)':''} ${badge(st(x)[0])}</span>`).join('');
+     const sel = S.C.sel===id;
+     return `<div class="C-entry ${sel?'sel':''}" onclick="S.C.sel=${sel?'null':`'${id}'`};render()"><span class="k mono">${e.kind==='mcp'?'⚙':'✦'} ${esc(e.key)}</span>${chips}${tags(e)}${noEffect(id)?'<span class="tag" style="color:var(--dis);border-color:var(--dis)">no effect anywhere</span>':''}</div>`+
+       (sel?`<div class="C-detail">${readers[id].map(x=>`<div style="margin-top:6px"><b>${esc(AG[x.agent].name)}</b> <span class="dim">· Item "${esc(x.item)}" · ${esc(x.layer)}</span>${explain(x,{compact:true})}</div>`).join('')}${actions(readers[id][0])}</div>`:'');}).join('')}</div>`).join('')}</div>`).join('');
+  const flags = AGENTS.filter(a=>flag(a.id)).map(a=>`<div class="banner">${esc(a.name)}: ${esc(flag(a.id))}</div>`).join('');
+  return `<div class="C-wrap"><div class="C-tools"><input placeholder="Filter paths and keys…" value="${esc(S.C.q)}" oninput="S.C.q=this.value;render(true)" id="cq">
+    <label><input type="checkbox" ${S.C.waste?'checked':''} onchange="S.C.waste=this.checked;render()"> Only Entries with no effect anywhere</label>
+    <span class="dim">Homes: Claude Desktop ${homeSelect('cd')} · Codex ${homeSelect('cx')}</span></div>${flags}
+    ${tree || '<div class="dim">Nothing matches.</div>'}</div>`;
+}
+
+// ───────────────────────── Variant D: per-Agent cascade (layers as columns) ─────────────────────────
+function VariantD(){
+  const ag = S.D.agent; const its = itemsOf(ag);
+  const tabs = `<div class="tabs">${AGENTS.map(a=>`<div class="t ${a.id===ag?'sel':''}" onclick="S.D.agent='${a.id}';S.D.sel=null;render()">${esc(a.name)} ${flag(a.id)?'<span class="flag">⚠</span>':''}</div>`).join('')}<span style="flex:1"></span><span style="padding:4px">${homeSelect(ag)}</span></div>`;
+  const sec = kind => { const L = LAYERS[ag][kind]; const g = its.filter(i=>i.kind===kind); if (!g.length) return '';
+    const head = `<tr><th>Item</th>${L.map((l,k)=>`<th>${esc(l)} <span class="prec">${k===0?'(highest)':''}${k===L.length-1?'(lowest)':''}</span></th>`).join('')}<th>Result</th></tr>`;
+    const rows = g.map(i=>{ const cells = L.map(l=>{ const xs = i.rs.filter(x=>x.layer===l); if(!xs.length) return '<td></td>';
+        return `<td>${xs.map(x=>{const s=st(x)[0]; const key=ag+'|'+x.entry; return `<div class="ec ${['Effective','Merged'].includes(s)?'win':''} ${s==='Shadowed'?'lose':''} ${S.D.sel===key?'sel':''}" onclick="S.D.sel='${key}';render()"><span class="loc mono">${esc(E[x.entry].key.split('.').pop())}</span> ${badge(s)}<div class="faint mono" style="font-size:10.5px">${esc(E[x.entry].file.split('\\').slice(-2).join('\\'))}</div></div>`;}).join('')}</td>`; }).join('');
+      const win = i.rs.find(x=>st(x)[0]==='Effective'); const merged = i.rs.find(x=>st(x)[0]==='Merged');
+      let res = badge(i.state);
+      if (win) res += ` <span class="dim">from ${esc(win.layer)}</span>`;
+      if (merged) res += `<table class="fields mono">${st(merged)[2].fields.map(([k,v,src])=>`<tr><td>${esc(k)}</td><td class="dim">← ${esc(i.rs.find(x=>x.entry===src)?.layer||src)}</td></tr>`).join('')}</table>`;
+      if (!win && !merged) { const o = st(i.rs[0])[2]||{}; if (o.whatIf) res += `<div class="dim" style="font-size:11.5px">${esc(o.whatIf)}</div>`; }
+      return `<tr><td class="item">${esc(i.name)}</td>${cells}<td class="result">${res}</td></tr>`; }).join('');
+    return `<div class="D-sec"><div class="h">${kind==='mcp'?'MCP servers':'Skills'}</div><table class="casc">${head}${rows}</table></div>`; };
+  const sel = S.D.sel && live(ag).find(x=>ag+'|'+x.entry===S.D.sel);
+  const panel = sel ? `<div class="D-panel"><b>${esc(sel.item)}</b> · ${esc(sel.layer)} ${tags(E[sel.entry],sel)}<div style="margin-top:3px">${shortLoc(E[sel.entry])}</div>${explain(sel)}</div>`
+    : `<div class="D-panel dim">Click an Entry. Columns are this Agent's locations in precedence order; struck-through Entries are Shadowed by the highlighted one in the same row.</div>`;
+  return `<div class="D-wrap">${tabs}${flag(ag)?`<div class="banner">${esc(flag(ag))}</div>`:''}${LAYER_NOTE[ag]?`<div class="dim" style="margin-top:8px">${esc(LAYER_NOTE[ag])}</div>`:''}
+    ${sec('mcp')}${sec('skill')}${its.length?'':'<div class="dim" style="margin-top:14px">No Entries for this Agent in this context.</div>'}${panel}</div>`;
+}
+
+// ───────────────────────── shell & switcher ─────────────────────────
+const VARIANTS = {A:['Agents → Items → explainer',VariantA], B:['Name × Agent matrix',VariantB], C:['Locations tree',VariantC], D:['Per-Agent cascade',VariantD]};
+const KEYS = Object.keys(VARIANTS);
+let variant = new URLSearchParams(location.search).get('variant') || 'A'; if(!VARIANTS[variant]) variant='A';
+function setVariant(v){ variant=v; try{ const u=new URL(location.href); u.searchParams.set('variant',v); history.replaceState(null,'',u); }catch(e){} render(); }
+function render(keepFocus){
+  const f = keepFocus && document.activeElement && document.activeElement.id; const pos = f && document.activeElement.selectionStart;
+  document.getElementById('main').innerHTML = VARIANTS[variant][1]();
+  document.getElementById('vlabel').textContent = `${variant} — ${VARIANTS[variant][0]}`;
+  if (f) { const el=document.getElementById(f); if(el){el.focus(); el.setSelectionRange(pos,pos);} }
+}
+const ctxSel = document.getElementById('ctx');
+ctxSel.innerHTML = CTX.filter(c=>!c.missing).map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join('') +
+  `<optgroup label="Missing Projects (leftovers)">${CTX.filter(c=>c.missing).map(c=>`<option value="${c.id}">${esc(c.label)} — missing</option>`).join('')}</optgroup>`;
+ctxSel.onchange = () => { S.ctx = ctxSel.value; S.A.item=null; S.B.cell=null; S.D.sel=null; render(); };
+document.getElementById('prev').onclick = () => setVariant(KEYS[(KEYS.indexOf(variant)+KEYS.length-1)%KEYS.length]);
+document.getElementById('next').onclick = () => setVariant(KEYS[(KEYS.indexOf(variant)+1)%KEYS.length]);
+document.addEventListener('keydown', ev => {
+  const t = ev.target; if (t.matches && t.matches('input,textarea,select,[contenteditable]')) return;
+  if (ev.key==='ArrowLeft') document.getElementById('prev').click();
+  if (ev.key==='ArrowRight') document.getElementById('next').click();
+});
+render();
+</script>
+</body>
+</html>
