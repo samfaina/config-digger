@@ -18,6 +18,8 @@ use std::path::{Path, PathBuf};
 /// A plan, as [`api::Plan`] holds it.
 pub(crate) struct Planned {
     pub action: Action,
+    /// How many Entries it targets.
+    pub entries: usize,
     pub context: Context,
     /// What Verify scans with.
     pub scan_options: ScanOptions,
@@ -107,11 +109,10 @@ pub(crate) fn plan(
         .collect();
     let (changes, effective) = predict(&before, &after, &removed_locators);
 
-    let backup_folder = history::data_folder(ports.env.as_ref())
-        .map(|data| history::backups_folder(&data))
-        .ok_or_else(|| Error::unexpected("cannot determine config-digger's data folder"))?;
+    let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
     let preview = Preview {
         action,
+        title: explain::operation_title(action, targeted.len()),
         project: before.project.clone(),
         changes,
         effective,
@@ -128,10 +129,12 @@ pub(crate) fn plan(
                 diff: file.edited.diff.clone(),
             })
             .collect(),
+        backup_note: explain::backup_note(&backup_folder),
         backup_folder,
     };
     Ok(Planned {
         action,
+        entries: targeted.len(),
         context: context.clone(),
         scan_options: scan_options.clone(),
         files,

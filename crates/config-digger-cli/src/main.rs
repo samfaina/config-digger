@@ -151,7 +151,7 @@ enum Exit {
     Locked = 6,
     Stale = 7,
     Failed = 9,
-    RollbackIncomplete = 10,
+    NeedsRecovery = 10,
 }
 
 /// A failed invocation, reported as `{schema_version, error: {code, message, …}}`.
@@ -191,13 +191,13 @@ impl From<api::Error> for Failure {
             api::ErrorCode::Unexpected => ("unexpected", Exit::Unexpected),
             api::ErrorCode::NoMatch => ("no_match", Exit::Selector),
             api::ErrorCode::Ambiguous => ("ambiguous", Exit::Selector),
-            api::ErrorCode::NotAcknowledged => ("ack_required", Exit::NotConfirmed),
+            api::ErrorCode::AckRequired => ("ack_required", Exit::NotConfirmed),
             api::ErrorCode::Blocked => ("blocked", Exit::Blocked),
             api::ErrorCode::Locked => ("locked", Exit::Locked),
             api::ErrorCode::Stale => ("stale", Exit::Stale),
             api::ErrorCode::BackupFailed => ("backup_failed", Exit::Failed),
             api::ErrorCode::WriteFailed => ("write_failed", Exit::Failed),
-            api::ErrorCode::RollbackIncomplete => ("rollback_incomplete", Exit::RollbackIncomplete),
+            api::ErrorCode::NeedsRecovery => ("needs_recovery", Exit::NeedsRecovery),
         };
         Failure {
             candidates: error.candidates,
@@ -311,7 +311,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             yes,
             ack,
             dry_run,
-        } => write(
+        } => plan_and_execute(
             cli,
             Action::Remove,
             Targets {
@@ -420,7 +420,12 @@ fn warning_bodies<'a>(
 
 /// Plans `action`, prints the preview, gets the Operation confirmed and its
 /// warnings acknowledged, then executes it.
-fn write(cli: &Cli, action: Action, targets: Targets, flags: &WriteFlags) -> Result<(), Failure> {
+fn plan_and_execute(
+    cli: &Cli,
+    action: Action,
+    targets: Targets,
+    flags: &WriteFlags,
+) -> Result<(), Failure> {
     let Scanned {
         core,
         snapshot,
@@ -447,7 +452,7 @@ fn write(cli: &Cli, action: Action, targets: Targets, flags: &WriteFlags) -> Res
         }
         return Ok(());
     }
-    confirm(cli, action, flags.yes, &warnings, &mut acknowledged)?;
+    confirm(cli, &preview.title, flags.yes, &warnings, &mut acknowledged)?;
     let outcome = core.execute(plan, &acknowledged)?;
     if cli.json {
         print_json(&WriteBody {
@@ -456,7 +461,7 @@ fn write(cli: &Cli, action: Action, targets: Targets, flags: &WriteFlags) -> Res
             result: Some(&outcome),
         });
     } else {
-        anstream::print!("{}", render_outcome(action, &preview, &outcome, width));
+        anstream::print!("{}", render_outcome(&outcome, width));
     }
     Ok(())
 }
@@ -472,7 +477,7 @@ struct WriteFlags {
 /// `--ack`. On a terminal it asks; otherwise `--yes` and `--ack` must say so.
 fn confirm(
     cli: &Cli,
-    action: Action,
+    title: &str,
     yes: bool,
     warnings: &[api::Warning],
     acknowledged: &mut Vec<WarningClass>,
@@ -487,7 +492,7 @@ fn confirm(
                 Exit::NotConfirmed,
             ));
         }
-        if !ask(&format!("\n{}? [y/N] ", action_verb(action)))? {
+        if !ask(&format!("\n{title}? [y/N] "))? {
             return Err(Failure::new(
                 "cancelled",
                 "cancelled; nothing was written",
@@ -534,12 +539,6 @@ fn ask(question: &str) -> Result<bool, Failure> {
         answer.trim().to_ascii_lowercase().as_str(),
         "y" | "yes"
     ))
-}
-
-fn action_verb(action: Action) -> &'static str {
-    match action {
-        Action::Remove => "Remove",
-    }
 }
 
 /// The `error:` prefix on stderr.
@@ -855,17 +854,7 @@ fn render_preview(
 ) -> String {
     let mut out = project_line(inventory, width);
     out.push('\n');
-    let entries: usize = preview.files.iter().map(|file| file.edits.len()).sum();
-    let mut title = Line::default();
-    title.push(
-        format!(
-            "{} {}",
-            action_verb(preview.action),
-            count(entries, "Entry", "Entries")
-        ),
-        BOLD,
-    );
-    out.push_str(&title.fit(width).render());
+    out.push_str(&styled_line(&preview.title, BOLD, width));
 
     let rows: Vec<[(&str, Style); 4]> = preview
         .changes
@@ -938,38 +927,19 @@ fn render_preview(
     }
 
     out.push('\n');
-    let backup = format!(
-        "Each file is copied to {} before anything is written.",
-        preview.backup_folder.display()
-    );
-    for line in terminal::wrap(&backup, width) {
+    for line in terminal::wrap(&preview.backup_note, width) {
         out.push_str(&plain_line(&line, width));
     }
     out
 }
 
-/// What an executed write did, and where its backup is.
-fn render_outcome(
-    action: Action,
-    preview: &api::Preview,
-    outcome: &api::Outcome,
-    width: Option<usize>,
-) -> String {
-    let entries: usize = preview.files.iter().map(|file| file.edits.len()).sum();
-    let verify = match outcome.verify {
-        api::Verify::Verified => "verified",
-        api::Verify::VerifiedWithDifferences => "verified with differences",
-    };
+/// What an executed write did, any State that differs from the prediction,
+/// and where its backup is.
+fn render_outcome(outcome: &api::Outcome, width: Option<usize>) -> String {
     let mut out = String::from("\n");
-    out.push_str(&plain_line(
-        &format!(
-            "{} {}. Operation {}: {verify}.",
-            action_past(action),
-            count(entries, "Entry", "Entries"),
-            outcome.operation
-        ),
-        width,
-    ));
+    for line in terminal::wrap(&outcome.sentence, width) {
+        out.push_str(&plain_line(&line, width));
+    }
     for difference in &outcome.differences {
         out.push_str(&plain_line(
             &format!(
@@ -986,17 +956,6 @@ fn render_outcome(
         width,
     ));
     out
-}
-
-fn action_past(action: Action) -> &'static str {
-    match action {
-        Action::Remove => "Removed",
-    }
-}
-
-/// `n` and the noun in the right number.
-fn count(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 fn state_after_label(state: api::StateAfter) -> &'static str {

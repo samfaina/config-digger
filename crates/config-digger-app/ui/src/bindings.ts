@@ -38,7 +38,7 @@ export type ErrorCode = "unexpected" |
 /**  A selector matched more than one Item, or more than one Entry. */
 "ambiguous" | 
 /**  A warning in the plan was not acknowledged. */
-"not_acknowledged" | 
+"ack_required" | 
 /**  The action cannot be done on a target, whatever is acknowledged. */
 "blocked" | 
 /**  Another Operation holds the global write lock. */
@@ -50,10 +50,10 @@ export type ErrorCode = "unexpected" |
 /**  The first write failed; nothing was written. */
 "write_failed" | 
 /**
- *  Some files were written and the Operation did not complete: restore
- *  them from the backup.
+ *  Some files were written and the Operation did not complete, so it
+ *  needs manual recovery from its backup.
  */
-"rollback_incomplete";
+"needs_recovery";
 
 /**  An Agent home found on this machine. */
 export type Home = {

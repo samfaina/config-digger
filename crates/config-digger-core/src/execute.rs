@@ -9,11 +9,11 @@ use crate::edit::EditableFile;
 use crate::history::{self, EditRecord, LocationRecord, Manifest, Status, VerifyRecord};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::Ports;
-use crate::{resolve, scan};
+use crate::{explain, resolve, scan};
 use std::path::{Path, PathBuf};
 
 /// One file about to be written.
-struct Write<'p> {
+struct PendingWrite<'p> {
     file: &'p PlannedFile,
     /// The bytes read under the lock, which the backup holds.
     current: Vec<u8>,
@@ -34,11 +34,10 @@ pub(crate) fn execute(
         }
     }
     if !missing.is_empty() {
-        return Err(Error::not_acknowledged(&missing));
+        return Err(Error::ack_required(&missing));
     }
 
-    let data = history::data_folder(ports.env.as_ref())
-        .ok_or_else(|| Error::unexpected("cannot determine config-digger's data folder"))?;
+    let data = history::data_folder(ports.env.as_ref())?;
     ports
         .fs
         .create_dir_all(&data)
@@ -59,13 +58,7 @@ pub(crate) fn execute(
 
     let now = ports.clock.now();
     let (id, folder) = operation_folder(ports, &data, now)?;
-    let mut manifest = Manifest::new(
-        id.clone(),
-        now,
-        planned.action,
-        planned.preview.project.clone(),
-    );
-    manifest.changes = planned.preview.changes.clone();
+    let mut manifest = Manifest::new(id.clone(), now, &planned.preview);
     for (index, write) in writes.iter().enumerate() {
         let backup = backup_name(index, &write.file.path);
         back_up(ports, &folder.join(&backup), &write.current)?;
@@ -95,11 +88,11 @@ pub(crate) fn execute(
             return Err(fail(ports, &folder, &mut manifest, index > 0, cause));
         }
     }
-    if let Err(cause) = check_writes(ports, &writes) {
+    if let Err(cause) = verify_files(ports, &writes) {
         return Err(fail(ports, &folder, &mut manifest, true, cause));
     }
 
-    let differences = compare(definitions, ports, &planned)?;
+    let differences = verify_states(definitions, ports, &planned)?;
     let verify = if differences.is_empty() {
         Verify::Verified
     } else {
@@ -117,8 +110,9 @@ pub(crate) fn execute(
     }
     tracing::info!(operation = %id, files = writes.len(), ?verify, "operation applied");
     Ok(Outcome {
-        operation: id,
         verify,
+        sentence: explain::outcome(planned.action, planned.entries, &id, verify),
+        operation: id,
         differences,
         backup: folder,
     })
@@ -127,10 +121,10 @@ pub(crate) fn execute(
 /// Reads a touched file again under the lock. When it changed since the plan,
 /// the edits are applied again to what it holds now, as long as every key
 /// they depend on still holds the value the plan saw.
-fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<Write<'p>, Error> {
+fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, Error> {
     let current = plan::read(ports, &file.path)?;
     if current == file.read {
-        return Ok(Write {
+        return Ok(PendingWrite {
             file,
             bytes: file.edited.bytes.clone(),
             current,
@@ -160,7 +154,7 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<Write<'p>, Error> 
             file.path.display()
         )));
     }
-    Ok(Write {
+    Ok(PendingWrite {
         file,
         bytes: edited.bytes,
         current,
@@ -228,8 +222,8 @@ fn record(ports: &Ports, folder: &Path, manifest: &Manifest) -> Result<(), Strin
         .map_err(|error| format!("cannot write {}: {error}", path.display()))
 }
 
-/// Records a failed Operation and the error to report. Without rollback, an
-/// Operation that wrote anything needs the user to restore from the backup.
+/// Records a failed Operation and the error to report. There is no Rollback
+/// yet, so an Operation that wrote anything needs manual recovery.
 fn fail(
     ports: &Ports,
     folder: &Path,
@@ -248,7 +242,7 @@ fn fail(
     }
     tracing::error!(operation = %manifest.id, %cause, "operation failed");
     if written {
-        Error::rollback_incomplete(cause, folder.to_path_buf())
+        Error::needs_recovery(cause, folder.to_path_buf())
     } else {
         Error::write_failed(cause)
     }
@@ -256,7 +250,7 @@ fn fail(
 
 /// Verify, per file: it reads back and every key an edit changed holds the
 /// value the edit gave it.
-fn check_writes(ports: &Ports, writes: &[Write]) -> Result<(), String> {
+fn verify_files(ports: &Ports, writes: &[PendingWrite]) -> Result<(), String> {
     for write in writes {
         let path = &write.file.path;
         let bytes = ports
@@ -290,7 +284,7 @@ fn check_writes(ports: &Ports, writes: &[Write]) -> Result<(), String> {
 
 /// Verify, overall: scans and resolves the context again and compares each
 /// predicted State with the actual one.
-fn compare(
+fn verify_states(
     definitions: &[AgentDefinition],
     ports: &Ports,
     planned: &Planned,
@@ -357,7 +351,7 @@ mod tests {
             .execute(plan, &[WarningClass::GitVersioned])
             .unwrap_err();
 
-        assert_eq!(error.code, ErrorCode::NotAcknowledged);
+        assert_eq!(error.code, ErrorCode::AckRequired);
         assert!(error.message.contains("running-agent"), "{}", error.message);
         assert_eq!(fs.contents(CLAUDE_JSON).unwrap(), SERVERS.as_bytes());
     }

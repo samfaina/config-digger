@@ -145,6 +145,8 @@ impl Plan {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Preview {
     pub action: Action,
+    /// What the Operation does, as a title such as "Remove 2 Entries".
+    pub title: String,
     /// The context's Project, as in [`Inventory::project`].
     pub project: Option<PathBuf>,
     /// One row per (Agent, Entry, Project) whose State the Operation changes.
@@ -154,6 +156,8 @@ pub struct Preview {
     pub files: Vec<FileChange>,
     /// Where each touched file is copied before anything is written.
     pub backup_folder: PathBuf,
+    /// The same, as a sentence.
+    pub backup_note: String,
 }
 
 /// An Entry's State in one Agent and context, before and after an Operation.
@@ -286,6 +290,8 @@ pub struct Outcome {
     pub differences: Vec<Difference>,
     /// The folder holding the Operation's backup and manifest.
     pub backup: PathBuf,
+    /// What the Operation did, as a sentence rendered by the core.
+    pub sentence: String,
 }
 
 /// What Verify found once every edit had landed.
@@ -490,7 +496,7 @@ pub enum ErrorCode {
     /// A selector matched more than one Item, or more than one Entry.
     Ambiguous,
     /// A warning in the plan was not acknowledged.
-    NotAcknowledged,
+    AckRequired,
     /// The action cannot be done on a target, whatever is acknowledged.
     Blocked,
     /// Another Operation holds the global write lock.
@@ -501,9 +507,9 @@ pub enum ErrorCode {
     BackupFailed,
     /// The first write failed; nothing was written.
     WriteFailed,
-    /// Some files were written and the Operation did not complete: restore
-    /// them from the backup.
-    RollbackIncomplete,
+    /// Some files were written and the Operation did not complete, so it
+    /// needs manual recovery from its backup.
+    NeedsRecovery,
 }
 
 impl Error {
@@ -560,10 +566,10 @@ impl Error {
         }
     }
 
-    pub(crate) fn not_acknowledged(missing: &[WarningClass]) -> Self {
+    pub(crate) fn ack_required(missing: &[WarningClass]) -> Self {
         let classes: Vec<&str> = missing.iter().map(|class| class.code()).collect();
         Self::new(
-            ErrorCode::NotAcknowledged,
+            ErrorCode::AckRequired,
             format!("not acknowledged: {}", classes.join(", ")),
         )
     }
@@ -600,14 +606,14 @@ impl Error {
         )
     }
 
-    pub(crate) fn rollback_incomplete(message: String, backup: PathBuf) -> Self {
+    pub(crate) fn needs_recovery(message: String, backup: PathBuf) -> Self {
         Self {
             message: format!(
-                "{message}; the Operation was not rolled back: restore the files from {}",
+                "{message}; the Operation needs manual recovery: the files as they were before it are in {}",
                 backup.display()
             ),
             backup: Some(backup),
-            ..Self::new(ErrorCode::RollbackIncomplete, String::new())
+            ..Self::new(ErrorCode::NeedsRecovery, String::new())
         }
     }
 }

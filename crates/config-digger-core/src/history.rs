@@ -2,7 +2,7 @@
 //! `backups` in the data folder, holding a copy of every file it touched and a
 //! JSON manifest with the edits, their inverses and the keys they depend on.
 
-use crate::api::{Action, Change, Difference, Verify};
+use crate::api::{Action, Change, Difference, Error, Preview, Verify};
 use crate::edit::{Dependency, Edit};
 use crate::ports::Environment;
 use serde::Serialize;
@@ -16,12 +16,16 @@ const MANIFEST_VERSION: u32 = 1;
 
 /// config-digger's machine-local data folder: `%LOCALAPPDATA%\config-digger`,
 /// or `~/.local/share/config-digger` where there is no `LOCALAPPDATA`.
-pub(crate) fn data_folder(env: &dyn Environment) -> Option<PathBuf> {
+pub(crate) fn data_folder(env: &dyn Environment) -> Result<PathBuf, Error> {
     let base = match env.var("LOCALAPPDATA").filter(|value| !value.is_empty()) {
         Some(local) => PathBuf::from(local),
-        None => env.home_dir()?.join(".local").join("share"),
+        None => env
+            .home_dir()
+            .ok_or_else(|| Error::unexpected("cannot determine config-digger's data folder"))?
+            .join(".local")
+            .join("share"),
     };
-    Some(base.join("config-digger"))
+    Ok(base.join("config-digger"))
 }
 
 /// The file the global write lock is taken on.
@@ -63,6 +67,8 @@ pub(crate) struct Manifest {
     /// When the Operation started, in RFC 3339.
     pub created_at: String,
     pub action: Action,
+    /// What the Operation does, as the preview titled it.
+    pub title: String,
     pub status: Status,
     /// Why the Operation did not complete.
     pub cause: Option<String>,
@@ -74,16 +80,17 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
-    pub fn new(id: String, now: SystemTime, action: Action, project: Option<PathBuf>) -> Self {
+    pub fn new(id: String, now: SystemTime, preview: &Preview) -> Self {
         Self {
             manifest_version: MANIFEST_VERSION,
             id,
             created_at: humantime::format_rfc3339_seconds(now).to_string(),
-            action,
+            action: preview.action,
+            title: preview.title.clone(),
             status: Status::InProgress,
             cause: None,
-            project,
-            changes: Vec::new(),
+            project: preview.project.clone(),
+            changes: preview.changes.clone(),
             locations: Vec::new(),
             verify: None,
         }

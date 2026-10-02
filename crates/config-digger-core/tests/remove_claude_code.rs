@@ -42,7 +42,7 @@ const TWO_USER_SERVERS: &str = r#"{
 "#;
 
 #[test]
-fn remove_deletes_only_the_entry_key() {
+fn remove_takes_out_only_the_entry_key() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
     let core = core(&fs);
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
@@ -200,6 +200,13 @@ fn the_preview_has_the_files_diff_and_the_backup_folder() {
     );
     assert_eq!(rows(&plan), [row(&user("notes"), "effective", "removed")]);
     assert_eq!(preview["effective"], serde_json::json!([]));
+    assert_eq!(preview["title"], "Remove 1 Entry");
+    assert_eq!(
+        preview["backup_note"],
+        format!(
+            r"Each touched file is copied to {LOCAL_APP_DATA}\config-digger\backups before anything is written."
+        )
+    );
 }
 
 #[test]
@@ -454,6 +461,13 @@ fn verify_reports_verified_when_every_state_is_as_predicted() {
 
     assert_eq!(outcome.verify, config_digger_core::api::Verify::Verified);
     assert!(outcome.differences.is_empty());
+    assert_eq!(
+        outcome.sentence,
+        format!(
+            "Removed 1 Entry. Operation {}: verified.",
+            outcome.operation
+        )
+    );
 }
 
 #[test]
