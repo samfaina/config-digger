@@ -1,6 +1,7 @@
 //! `scan()`: reads every location of every found Agent home into an immutable
 //! snapshot of Entries and Read failures. Nothing here decides a State.
 
+use crate::api::ReadFailureKind;
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::{Anchored, Locate, Parse};
 use crate::ports::Ports;
@@ -18,14 +19,14 @@ pub(crate) struct Snapshot {
 
 /// An Agent home found on this machine.
 pub(crate) struct ScannedHome {
-    /// Index into the definitions the snapshot was scanned with.
-    pub agent: usize,
+    /// Index of the Agent definition in the definitions the snapshot was scanned with.
+    pub agent_index: usize,
     pub home: String,
 }
 
 /// One declaration at one concrete location.
 pub(crate) struct ScannedEntry {
-    pub agent: usize,
+    pub agent_index: usize,
     pub home: String,
     pub location: String,
     pub path: PathBuf,
@@ -34,18 +35,10 @@ pub(crate) struct ScannedEntry {
 }
 
 pub(crate) struct ScannedReadFailure {
-    pub agent: usize,
+    pub agent_index: usize,
     pub home: String,
     pub path: PathBuf,
     pub kind: ReadFailureKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ReadFailureKind {
-    Parse,
-    Decode,
-    Permission,
-    Io,
 }
 
 /// Why a scan could not run at all.
@@ -63,7 +56,7 @@ pub(crate) fn scan(definitions: &[AgentDefinition], ports: &Ports) -> Result<Sna
         read_failures: Vec::new(),
     };
 
-    for (agent, definition) in definitions.iter().enumerate() {
+    for (agent_index, definition) in definitions.iter().enumerate() {
         for home in &definition.homes {
             let roots = home
                 .roots
@@ -80,7 +73,7 @@ pub(crate) fn scan(definitions: &[AgentDefinition], ports: &Ports) -> Result<Sna
             }
             tracing::debug!(agent = %definition.agent.id, home = %home.id, "home found");
             snapshot.homes.push(ScannedHome {
-                agent,
+                agent_index,
                 home: home.id.clone(),
             });
 
@@ -99,7 +92,7 @@ pub(crate) fn scan(definitions: &[AgentDefinition], ports: &Ports) -> Result<Sna
                             "read failure"
                         );
                         snapshot.read_failures.push(ScannedReadFailure {
-                            agent,
+                            agent_index,
                             home: home.id.clone(),
                             path,
                             kind,
@@ -125,7 +118,7 @@ pub(crate) fn scan(definitions: &[AgentDefinition], ports: &Ports) -> Result<Sna
                     let mut key_path = location.root.clone();
                     key_path.push(name.clone());
                     snapshot.entries.push(ScannedEntry {
-                        agent,
+                        agent_index,
                         home: home.id.clone(),
                         location: location.id.clone(),
                         path: path.clone(),

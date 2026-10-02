@@ -5,7 +5,7 @@ use crate::api::{self, Context};
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Compete;
 use crate::locator;
-use crate::scan::{ReadFailureKind, ScannedEntry, Snapshot};
+use crate::scan::{ScannedEntry, Snapshot};
 use std::collections::BTreeMap;
 
 pub(crate) fn resolve(
@@ -17,7 +17,7 @@ pub(crate) fn resolve(
         .homes
         .iter()
         .map(|home| {
-            let definition = &definitions[home.agent];
+            let definition = &definitions[home.agent_index];
             api::Home {
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
@@ -30,11 +30,11 @@ pub(crate) fn resolve(
     // competition key. The map's order sorts Items by Agent, home and key.
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
     for entry in &snapshot.entries {
-        let definition = &definitions[entry.agent];
+        let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
         let key = definition.rules(location.kind).competition.key(&entry.name);
         competing
-            .entry((entry.agent, entry.home.as_str(), location.kind, key))
+            .entry((entry.agent_index, entry.home.as_str(), location.kind, key))
             .or_default()
             .push(entry);
     }
@@ -75,16 +75,15 @@ pub(crate) fn resolve(
     let read_failures = snapshot
         .read_failures
         .iter()
-        .map(|failure| api::ReadFailure {
-            agent: definitions[failure.agent].agent.id.clone(),
-            home: failure.home.clone(),
-            path: failure.path.clone(),
-            kind: match failure.kind {
-                ReadFailureKind::Parse => api::ReadFailureKind::Parse,
-                ReadFailureKind::Decode => api::ReadFailureKind::Decode,
-                ReadFailureKind::Permission => api::ReadFailureKind::Permission,
-                ReadFailureKind::Io => api::ReadFailureKind::Io,
-            },
+        .map(|failure| {
+            let agent = &definitions[failure.agent_index].agent;
+            api::ReadFailure {
+                agent: agent.id.clone(),
+                agent_name: agent.name.clone(),
+                home: failure.home.clone(),
+                path: failure.path.clone(),
+                kind: failure.kind,
+            }
         })
         .collect();
 

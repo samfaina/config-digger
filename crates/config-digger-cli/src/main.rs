@@ -81,6 +81,7 @@ fn main() -> ExitCode {
         Err(error) => return usage_error(&error),
     };
     init_logging(cli.verbose);
+    report_panics_as_unexpected(cli.json);
 
     match run(&cli) {
         Ok(()) => ExitCode::SUCCESS,
@@ -104,7 +105,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             for failure in &inventory.read_failures {
                 eprintln!(
                     "warning: {} cannot read {} ({})",
-                    agent_name(&inventory, &failure.agent),
+                    failure.agent_name,
                     failure.path.display(),
                     failure.kind.code()
                 );
@@ -144,6 +145,23 @@ fn usage_error(error: &clap::Error) -> ExitCode {
     ExitCode::from(Exit::Usage as u8)
 }
 
+/// A panic is an unexpected error: it exits 1 and, with `--json`, still prints one error document.
+fn report_panics_as_unexpected(json: bool) {
+    std::panic::set_hook(Box::new(move |info| {
+        let failure = Failure {
+            code: "unexpected",
+            message: format!("internal error: {info}"),
+            exit: Exit::Unexpected,
+        };
+        if json {
+            print_json(&ErrorBody { error: &failure });
+        } else {
+            eprintln!("error: {}", failure.message);
+        }
+        std::process::exit(failure.exit as i32);
+    }));
+}
+
 fn init_logging(verbose: u8) {
     use tracing_subscriber::filter::LevelFilter;
 
@@ -171,15 +189,7 @@ fn print_json(body: &impl Serialize) {
     );
 }
 
-fn agent_name<'a>(inventory: &'a Inventory, agent: &'a str) -> &'a str {
-    inventory
-        .homes
-        .iter()
-        .find(|home| home.agent == agent)
-        .map_or(agent, |home| home.agent_name.as_str())
-}
-
-/// One table per Agent home: each Item with the Scope, State and location of its winning Entry.
+/// One table per Agent home: each Item with the Scope, State and location of its Effective Entry.
 fn render_list(inventory: &Inventory) -> String {
     if inventory.homes.is_empty() {
         return "No Agent home found.\n".to_owned();
@@ -195,12 +205,13 @@ fn render_list(inventory: &Inventory) -> String {
             .iter()
             .filter(|item| item.agent == home.agent && item.home == home.home)
             .map(|item| {
-                let winner = &item.entries[0];
+                // Entries come in precedence order, so the first one is Effective.
+                let effective = &item.entries[0];
                 [
                     item.name.as_str(),
-                    winner.scope.as_str(),
+                    effective.scope.as_str(),
                     state_label(item.state),
-                    winner.locator.as_str(),
+                    effective.locator.as_str(),
                 ]
             })
             .collect();

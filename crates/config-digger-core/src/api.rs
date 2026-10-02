@@ -112,6 +112,7 @@ pub enum State {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReadFailure {
     pub agent: String,
+    pub agent_name: String,
     pub home: String,
     pub path: PathBuf,
     pub kind: ReadFailureKind,

@@ -108,6 +108,7 @@ fn a_claude_json_that_does_not_parse_is_a_read_failure_with_no_entries() {
         inventory["read_failures"],
         json!([{
             "agent": "claude-code",
+            "agent_name": "Claude Code",
             "home": "default",
             "path": r"C:\Users\fixture\.claude.json",
             "kind": "parse"
