@@ -92,6 +92,10 @@ _Avoid_: Broken, conflicting, error
 A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
 _Avoid_: Unreadable, broken file, corrupt file, invalid file
 
+**Secret**:
+A literal value in an Entry that config-digger never shows, such as a token in an env or header value, a URL credential, or a field an Agent definition marks. It is masked everywhere configuration appears, keeping only a recognised prefix such as `Bearer ` or `ghp_`. A reference to an environment variable is not a Secret.
+_Avoid_: Credential, sensitive value, token
+
 ### Actions
 
 **Disable**:
