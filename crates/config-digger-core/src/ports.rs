@@ -8,7 +8,10 @@ use std::time::SystemTime;
 pub mod fake;
 pub mod real;
 
-/// Read access to files and folders.
+/// A lock held on a file, released when dropped.
+pub type HeldLock = Box<dyn Send>;
+
+/// Access to files and folders.
 pub trait FileSystem: Send + Sync {
     /// The bytes of a file. A missing file is an error of kind `NotFound`.
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
@@ -20,6 +23,18 @@ pub trait FileSystem: Send + Sync {
     /// junction resolved and each name spelled as on disk; `None` when nothing
     /// exists at `path`.
     fn real_path(&self, path: &Path) -> Option<PathBuf>;
+
+    /// Creates a folder and any missing parent folders.
+    fn create_dir_all(&self, path: &Path) -> io::Result<()>;
+
+    /// Replaces the file at `path` with `bytes` through a temporary file and a
+    /// rename, so that readers see either the old file or the new one. A link
+    /// is written through, to the file it points to. The folder must exist.
+    fn write_atomic(&self, path: &Path, bytes: &[u8]) -> io::Result<()>;
+
+    /// Takes an exclusive OS lock on the file at `path`, creating the file if
+    /// needed, without waiting: `None` when someone else holds it.
+    fn try_lock(&self, path: &Path) -> io::Result<Option<HeldLock>>;
 }
 
 /// A process running on this machine, as far as process detection needs it.

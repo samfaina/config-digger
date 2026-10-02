@@ -12,6 +12,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+#[derive(Clone)]
 pub(crate) struct Snapshot {
     pub read_at: SystemTime,
     pub homes: Vec<ScannedHome>,
@@ -21,7 +22,22 @@ pub(crate) struct Snapshot {
     pub read_failures: Vec<ScannedReadFailure>,
 }
 
+impl Snapshot {
+    /// The snapshot as it would be read once the Entries at `removed`, each a
+    /// path and a key path, are gone.
+    pub fn without(&self, removed: &[(PathBuf, Vec<String>)]) -> Snapshot {
+        let mut snapshot = self.clone();
+        snapshot.entries.retain(|entry| {
+            !removed
+                .iter()
+                .any(|(path, key_path)| entry.path == *path && entry.key_path == *key_path)
+        });
+        snapshot
+    }
+}
+
 /// An Agent home found on this machine.
+#[derive(Clone)]
 pub(crate) struct ScannedHome {
     /// Index of the Agent definition in the definitions the snapshot was scanned with.
     pub agent_index: usize,
@@ -29,6 +45,7 @@ pub(crate) struct ScannedHome {
 }
 
 /// A Project, found in a registry or asked for.
+#[derive(Clone)]
 pub(crate) struct ScannedProject {
     /// The real path of an existing folder, the lexical normalisation otherwise.
     pub path: PathBuf,
@@ -42,6 +59,7 @@ pub(crate) struct ScannedProject {
 }
 
 /// One declaration at one concrete location.
+#[derive(Clone)]
 pub(crate) struct ScannedEntry {
     pub agent_index: usize,
     pub home: String,
@@ -54,6 +72,7 @@ pub(crate) struct ScannedEntry {
     pub project: Option<String>,
 }
 
+#[derive(Clone)]
 pub(crate) struct ScannedReadFailure {
     pub agent_index: usize,
     pub home: String,

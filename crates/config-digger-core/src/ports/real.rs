@@ -1,7 +1,8 @@
 //! Ports backed by this machine.
 
-use super::{Clock, Environment, FileSystem, GitIndex, Hive, Processes, RunningProcess};
-use std::io;
+use super::{Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Processes, RunningProcess};
+use std::fs::{File, OpenOptions, TryLockError};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::SystemTime;
@@ -28,6 +29,49 @@ impl FileSystem for RealFileSystem {
             Some(share) => PathBuf::from(format!(r"\\{share}")),
             None => PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(text)),
         })
+    }
+
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+        std::fs::create_dir_all(path)
+    }
+
+    /// The temporary file sits next to the target, so that the rename stays
+    /// on one volume, and is removed when anything fails.
+    fn write_atomic(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let (Some(folder), Some(name)) = (target.parent(), target.file_name()) else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "not a file path",
+            ));
+        };
+        let mut temp_name = name.to_os_string();
+        temp_name.push(format!(".config-digger-{}.tmp", std::process::id()));
+        let temp = folder.join(temp_name);
+        let written = File::create(&temp)
+            .and_then(|mut file| {
+                file.write_all(bytes)?;
+                file.sync_all()
+            })
+            .and_then(|()| std::fs::rename(&temp, &target));
+        if written.is_err() {
+            let _ = std::fs::remove_file(&temp);
+        }
+        written
+    }
+
+    /// Closing the file releases the lock, so the held lock is the open file.
+    fn try_lock(&self, path: &Path) -> io::Result<Option<HeldLock>> {
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path)?;
+        match file.try_lock() {
+            Ok(()) => Ok(Some(Box::new(file))),
+            Err(TryLockError::WouldBlock) => Ok(None),
+            Err(TryLockError::Error(error)) => Err(error),
+        }
     }
 }
 

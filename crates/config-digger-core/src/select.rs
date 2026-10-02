@@ -1,26 +1,17 @@
 //! Selectors: an Item name, or the `<path>#<key path>` locator of an Entry.
 
-use crate::api::{Inventory, Item};
+use crate::api::{Entry, Error, Inventory, Item};
 use crate::{locator, paths};
+use std::collections::BTreeSet;
 
 /// The Items with an Entry at the locator `selector`, or else the Items named
 /// `selector`. Locator paths compare like any other path; key paths exactly.
 pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i Item> {
-    let locators: Vec<(String, Vec<String>)> = locator::parse(selector)
-        .into_iter()
-        .map(|(path, key_path)| (paths::lexical_key(&path), key_path))
-        .collect();
+    let at_locator = at_locator(selector);
     let by_locator: Vec<&Item> = inventory
         .items
         .iter()
-        .filter(|item| {
-            item.entries.iter().any(|entry| {
-                let path = paths::lexical_key(&entry.path);
-                locators
-                    .iter()
-                    .any(|(want, key_path)| *want == path && *key_path == entry.key_path)
-            })
-        })
+        .filter(|item| item.entries.iter().any(|entry| at_locator(&entry)))
         .collect();
     if !by_locator.is_empty() {
         return by_locator;
@@ -30,6 +21,74 @@ pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i It
         .iter()
         .filter(|item| item.name == selector)
         .collect()
+}
+
+/// The Entries an action targets, each once, in selector order. Without
+/// `all`, each selector must name exactly one Entry: the one at a locator, or
+/// the only Entry of the Items with a name. With `all`, it must name exactly
+/// one Item, and stands for every Entry of it.
+pub(crate) fn select_entries<'i>(
+    inventory: &'i Inventory,
+    selectors: &[String],
+    all: bool,
+) -> Result<Vec<&'i Entry>, Error> {
+    let mut selected: Vec<&Entry> = Vec::new();
+    for selector in selectors {
+        let entries = if all {
+            match select(inventory, selector).as_slice() {
+                [item] => item.entries.iter().collect(),
+                [] => return Err(Error::no_match(selector)),
+                items => return Err(Error::ambiguous(selector, items)),
+            }
+        } else {
+            one_entry(inventory, selector)?
+        };
+        for entry in entries {
+            if !selected.iter().any(|known| known.locator == entry.locator) {
+                selected.push(entry);
+            }
+        }
+    }
+    Ok(selected)
+}
+
+/// The one Entry `selector` names, in a list. An Entry several Agents read
+/// belongs to an Item in each of them, so it is counted once by locator.
+fn one_entry<'i>(inventory: &'i Inventory, selector: &str) -> Result<Vec<&'i Entry>, Error> {
+    let at_locator = at_locator(selector);
+    let mut found: Vec<&Entry> = inventory
+        .items
+        .iter()
+        .flat_map(|item| &item.entries)
+        .filter(&at_locator)
+        .collect();
+    if found.is_empty() {
+        found = select(inventory, selector)
+            .into_iter()
+            .flat_map(|item| &item.entries)
+            .collect();
+    }
+    let mut seen = BTreeSet::new();
+    found.retain(|entry| seen.insert(entry.locator.clone()));
+    match found.as_slice() {
+        [_] => Ok(found),
+        [] => Err(Error::no_match(selector)),
+        entries => Err(Error::ambiguous_entries(selector, entries)),
+    }
+}
+
+/// Whether an Entry is at one of the locators `selector` can be read as.
+fn at_locator(selector: &str) -> impl Fn(&&Entry) -> bool {
+    let locators: Vec<(String, Vec<String>)> = locator::parse(selector)
+        .into_iter()
+        .map(|(path, key_path)| (paths::lexical_key(&path), key_path))
+        .collect();
+    move |entry| {
+        let path = paths::lexical_key(&entry.path);
+        locators
+            .iter()
+            .any(|(want, key_path)| *want == path && *key_path == entry.key_path)
+    }
 }
 
 #[cfg(test)]

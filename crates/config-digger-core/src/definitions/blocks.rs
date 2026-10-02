@@ -5,6 +5,7 @@
 //! new block is added in one place and the compiler points at every `match`
 //! that must handle it.
 
+use crate::edit::Syntax;
 use crate::ports::Environment;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -296,6 +297,9 @@ pub(crate) struct ParseError;
 /// Parses a location's text in the reader's dialect.
 pub(crate) trait Parse {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError>;
+
+    /// The syntax a location in this format is edited in.
+    fn syntax(&self) -> Syntax;
 }
 
 /// The file format and dialect a location is read in.
@@ -319,6 +323,12 @@ impl Parse for Format {
             Format::Json(block) => block.parse(text),
         }
     }
+
+    fn syntax(&self) -> Syntax {
+        match self {
+            Format::Json(block) => block.syntax(),
+        }
+    }
 }
 
 /// Strict JSON: no comments, no trailing commas.
@@ -335,6 +345,11 @@ impl Validate for JsonFormat {
 impl Parse for JsonFormat {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
         serde_json::from_str(text).map_err(|_| ParseError)
+    }
+
+    /// Strict JSON is edited as JSONC, which accepts it as it is.
+    fn syntax(&self) -> Syntax {
+        Syntax::Jsonc
     }
 }
 

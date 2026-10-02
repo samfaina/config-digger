@@ -1,11 +1,13 @@
 //! In-memory ports for tests.
 
-use super::{Clock, Environment, FileSystem, GitIndex, Hive, Ports, Processes, RunningProcess};
+use super::{
+    Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Ports, Processes, RunningProcess,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 
 /// Fake ports around `fs` and `env`, with no running processes, nothing
@@ -21,16 +23,30 @@ pub fn ports(fs: FakeFileSystem, env: FakeEnvironment) -> Ports {
 }
 
 /// Files held in memory, looked up case-insensitively as on Windows. A folder
-/// exists when it was added or a file exists below it. Clones share one count
-/// of [`accesses`](Self::accesses).
+/// exists when it was added or a file exists below it. Clones share the same
+/// files, so a test sees what the core wrote, and one count of
+/// [`accesses`](Self::accesses).
 #[derive(Debug, Clone, Default)]
 pub struct FakeFileSystem {
+    state: Arc<Mutex<FakeFiles>>,
+    accesses: Arc<AtomicUsize>,
+}
+
+#[derive(Debug, Default)]
+struct FakeFiles {
     /// Keyed by the path as spelled on disk.
     files: BTreeMap<PathBuf, Vec<u8>>,
     folders: BTreeSet<PathBuf>,
     /// Link or junction → target.
     links: Vec<(PathBuf, PathBuf)>,
-    accesses: Arc<AtomicUsize>,
+    /// The lowercased paths of the files locked through this file system.
+    locked: BTreeSet<String>,
+    /// The lowercased paths of the files someone else holds a lock on.
+    locked_elsewhere: BTreeSet<String>,
+    /// Folders below which a write stores other bytes than it was given.
+    corrupting: Vec<PathBuf>,
+    /// Files whose writes fail.
+    failing: Vec<PathBuf>,
 }
 
 impl FakeFileSystem {
@@ -38,21 +54,63 @@ impl FakeFileSystem {
         Self::default()
     }
 
-    pub fn with_file(mut self, path: impl Into<PathBuf>, contents: impl Into<Vec<u8>>) -> Self {
-        self.files.insert(path.into(), contents.into());
+    pub fn with_file(self, path: impl Into<PathBuf>, contents: impl Into<Vec<u8>>) -> Self {
+        self.put_file(path, contents);
         self
     }
 
+    /// Writes a file as someone other than the core would, such as an Agent.
+    pub fn put_file(&self, path: impl Into<PathBuf>, contents: impl Into<Vec<u8>>) {
+        self.files().files.insert(path.into(), contents.into());
+    }
+
     /// An empty folder.
-    pub fn with_folder(mut self, path: impl Into<PathBuf>) -> Self {
-        self.folders.insert(path.into());
+    pub fn with_folder(self, path: impl Into<PathBuf>) -> Self {
+        self.files().folders.insert(path.into());
         self
     }
 
     /// A link or junction at `link` that points to the folder `target`.
-    pub fn with_link(mut self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
-        self.links.push((link.into(), target.into()));
+    pub fn with_link(self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
+        self.files().links.push((link.into(), target.into()));
         self
+    }
+
+    /// Below `folder`, every write stores bytes other than those it was given.
+    pub fn corrupting_writes_below(self, folder: impl Into<PathBuf>) -> Self {
+        self.files().corrupting.push(folder.into());
+        self
+    }
+
+    /// Every write to the file at `path` fails.
+    pub fn failing_writes_to(self, path: impl Into<PathBuf>) -> Self {
+        self.files().failing.push(path.into());
+        self
+    }
+
+    /// Someone else holds the lock on the file at `path` from now on.
+    pub fn lock_elsewhere(&self, path: impl AsRef<Path>) {
+        self.files()
+            .locked_elsewhere
+            .insert(lock_key(path.as_ref()));
+    }
+
+    /// The bytes of the file at `path`, `None` when there is none.
+    pub fn contents(&self, path: impl AsRef<Path>) -> Option<Vec<u8>> {
+        let files = self.files();
+        files
+            .find_file(&files.follow(path.as_ref()))
+            .map(|(_, bytes)| bytes.clone())
+    }
+
+    /// The files below `folder`, as spelled on disk.
+    pub fn files_below(&self, folder: impl AsRef<Path>) -> Vec<PathBuf> {
+        self.files()
+            .files
+            .keys()
+            .filter(|file| strip_prefix(file, folder.as_ref()).is_some_and(|rest| !rest.is_empty()))
+            .cloned()
+            .collect()
     }
 
     /// How many times the core has touched this file system, across clones.
@@ -60,6 +118,18 @@ impl FakeFileSystem {
         self.accesses.load(Ordering::SeqCst)
     }
 
+    fn files(&self) -> MutexGuard<'_, FakeFiles> {
+        self.state
+            .lock()
+            .expect("no test panics while holding the fake files")
+    }
+
+    fn count_access(&self) {
+        self.accesses.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl FakeFiles {
     /// `path` with a link at its start replaced by the link's target.
     fn follow(&self, path: &Path) -> PathBuf {
         for (link, target) in &self.links {
@@ -72,13 +142,27 @@ impl FakeFileSystem {
         path.to_path_buf()
     }
 
-    /// Every file and folder, as spelled on disk.
-    fn paths(&self) -> impl Iterator<Item = &PathBuf> {
-        self.files.keys().chain(&self.folders)
+    /// The file at a followed path, with its spelling on disk.
+    fn find_file(&self, path: &Path) -> Option<(&PathBuf, &Vec<u8>)> {
+        self.files
+            .iter()
+            .find(|(file, _)| strip_prefix(file, path).is_some_and(|rest| rest.is_empty()))
     }
 
-    fn count_access(&self) {
-        self.accesses.fetch_add(1, Ordering::SeqCst);
+    /// The real path of a followed path.
+    fn real_path(&self, path: &Path) -> Option<PathBuf> {
+        let depth = path.components().count();
+        self.files
+            .keys()
+            .chain(&self.folders)
+            .find(|known| strip_prefix(known, path).is_some())
+            .map(|known| known.components().take(depth).collect())
+    }
+
+    fn is_below(folders: &[PathBuf], path: &Path) -> bool {
+        folders
+            .iter()
+            .any(|folder| strip_prefix(path, folder).is_some())
     }
 }
 
@@ -97,17 +181,32 @@ fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<Vec<std::path::Comp
     Some(components.collect())
 }
 
+fn lock_key(path: &Path) -> String {
+    path.to_string_lossy().to_lowercase()
+}
+
+/// A lock taken through [`FakeFileSystem::try_lock`], released when dropped.
+struct FakeLock {
+    state: Arc<Mutex<FakeFiles>>,
+    key: String,
+}
+
+impl Drop for FakeLock {
+    fn drop(&mut self) {
+        if let Ok(mut files) = self.state.lock() {
+            files.locked.remove(&self.key);
+        }
+    }
+}
+
 impl FileSystem for FakeFileSystem {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         self.count_access();
-        let path = self.follow(path);
-        let file = self
-            .files
-            .iter()
-            .find(|(file, _)| strip_prefix(file, &path).is_some_and(|rest| rest.is_empty()));
-        match file {
+        let files = self.files();
+        let path = files.follow(path);
+        match files.find_file(&path) {
             Some((_, contents)) => Ok(contents.clone()),
-            None if self.real_path(&path).is_some() => Err(io::Error::other("is a folder")),
+            None if files.real_path(&path).is_some() => Err(io::Error::other("is a folder")),
             None => Err(io::ErrorKind::NotFound.into()),
         }
     }
@@ -118,11 +217,61 @@ impl FileSystem for FakeFileSystem {
 
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
         self.count_access();
-        let path = self.follow(path);
-        let depth = path.components().count();
-        self.paths()
-            .find(|known| strip_prefix(known, &path).is_some())
-            .map(|known| known.components().take(depth).collect())
+        let files = self.files();
+        files.real_path(&files.follow(path))
+    }
+
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+        self.count_access();
+        let mut files = self.files();
+        let path = files.follow(path);
+        if files.find_file(&path).is_some() {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+        if files.real_path(&path).is_none() {
+            files.folders.insert(path);
+        }
+        Ok(())
+    }
+
+    fn write_atomic(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        self.count_access();
+        let mut files = self.files();
+        let path = files.follow(path);
+        if files
+            .failing
+            .iter()
+            .any(|failing| strip_prefix(&path, failing).is_some_and(|rest| rest.is_empty()))
+        {
+            return Err(io::Error::other("this fake write fails"));
+        }
+        let folder = path.parent().unwrap_or(Path::new(""));
+        if files.real_path(folder).is_none() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        let mut bytes = bytes.to_vec();
+        if FakeFiles::is_below(&files.corrupting, &path) {
+            bytes.push(b'!');
+        }
+        let spelling = match files.find_file(&path) {
+            Some((spelling, _)) => spelling.clone(),
+            None => path,
+        };
+        files.files.insert(spelling, bytes);
+        Ok(())
+    }
+
+    fn try_lock(&self, path: &Path) -> io::Result<Option<HeldLock>> {
+        self.count_access();
+        let mut files = self.files();
+        let key = lock_key(&files.follow(path));
+        if files.locked_elsewhere.contains(&key) || !files.locked.insert(key.clone()) {
+            return Ok(None);
+        }
+        Ok(Some(Box::new(FakeLock {
+            state: Arc::clone(&self.state),
+            key,
+        })))
     }
 }
 

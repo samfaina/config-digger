@@ -5,11 +5,15 @@ mod terminal;
 
 use anstyle::{AnsiColor, Style};
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
-use config_digger_core::api::{self, Context, Core, Inventory, SCHEMA_VERSION, ScanOptions};
+use config_digger_core::api::{
+    self, Action, Context, Core, Inventory, SCHEMA_VERSION, ScanOptions, Snapshot, Targets,
+    WarningClass,
+};
 use config_digger_core::ports::Ports;
 use serde::Serialize;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::io::IsTerminal;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use terminal::{ColorWhen, Line, columns};
 
@@ -67,6 +71,29 @@ enum Command {
         /// An Item name, or the `<path>#<key path>` locator of one of its Entries.
         selector: String,
     },
+    /// Remove Entries for good, from where they live, for every Agent that reads them.
+    ///
+    /// Prints the preview, asks for confirmation, then backs up each touched
+    /// file, writes, verifies and records the Operation in History.
+    Remove {
+        /// Each one an Item name with a single Entry, or the
+        /// `<path>#<key path>` locator of an Entry. Together they form one
+        /// Operation, applied entirely or not at all.
+        #[arg(required = true)]
+        selectors: Vec<String>,
+        /// Target every Entry of the one Item each selector names.
+        #[arg(long)]
+        all: bool,
+        /// Confirm the Operation without asking.
+        #[arg(long)]
+        yes: bool,
+        /// Acknowledge one class of warning without asking. Repeat for several.
+        #[arg(long, value_enum, value_name = "CLASS")]
+        ack: Vec<Ack>,
+        /// Print the plan and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Print a completion script for a shell.
     Completions {
         /// The shell to complete in.
@@ -95,12 +122,36 @@ impl From<Shell> for clap_complete::Shell {
     }
 }
 
+/// The classes of warning `--ack` acknowledges.
+#[derive(Clone, Copy, ValueEnum)]
+enum Ack {
+    GitVersioned,
+    WideReach,
+    RunningAgent,
+}
+
+impl From<Ack> for WarningClass {
+    fn from(ack: Ack) -> Self {
+        match ack {
+            Ack::GitVersioned => WarningClass::GitVersioned,
+            Ack::WideReach => WarningClass::WideReach,
+            Ack::RunningAgent => WarningClass::RunningAgent,
+        }
+    }
+}
+
 /// The public exit codes. Each failure also has a stable `error.code`.
 #[derive(Clone, Copy)]
 enum Exit {
     Unexpected = 1,
     Usage = 2,
     Selector = 3,
+    NotConfirmed = 4,
+    Blocked = 5,
+    Locked = 6,
+    Stale = 7,
+    Failed = 9,
+    NeedsRecovery = 10,
 }
 
 /// A failed invocation, reported as `{schema_version, error: {code, message, …}}`.
@@ -111,18 +162,26 @@ struct Failure {
     /// What an ambiguous selector could mean.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     candidates: Vec<String>,
+    /// The backup folder of an Operation that needs manual recovery.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backup: Option<PathBuf>,
     #[serde(skip)]
     exit: Exit,
 }
 
 impl Failure {
-    fn usage(message: impl Into<String>) -> Self {
+    fn new(code: &'static str, message: impl Into<String>, exit: Exit) -> Self {
         Failure {
-            code: "usage",
+            code,
             message: message.into(),
             candidates: Vec::new(),
-            exit: Exit::Usage,
+            backup: None,
+            exit,
         }
+    }
+
+    fn usage(message: impl Into<String>) -> Self {
+        Failure::new("usage", message, Exit::Usage)
     }
 }
 
@@ -132,12 +191,18 @@ impl From<api::Error> for Failure {
             api::ErrorCode::Unexpected => ("unexpected", Exit::Unexpected),
             api::ErrorCode::NoMatch => ("no_match", Exit::Selector),
             api::ErrorCode::Ambiguous => ("ambiguous", Exit::Selector),
+            api::ErrorCode::AckRequired => ("ack_required", Exit::NotConfirmed),
+            api::ErrorCode::Blocked => ("blocked", Exit::Blocked),
+            api::ErrorCode::Locked => ("locked", Exit::Locked),
+            api::ErrorCode::Stale => ("stale", Exit::Stale),
+            api::ErrorCode::BackupFailed => ("backup_failed", Exit::Failed),
+            api::ErrorCode::WriteFailed => ("write_failed", Exit::Failed),
+            api::ErrorCode::NeedsRecovery => ("needs_recovery", Exit::NeedsRecovery),
         };
         Failure {
-            code,
-            message: error.message,
             candidates: error.candidates,
-            exit,
+            backup: error.backup,
+            ..Failure::new(code, error.message, exit)
         }
     }
 }
@@ -179,6 +244,9 @@ fn main() -> ExitCode {
                 print_error(&failure.message);
                 for candidate in &failure.candidates {
                     anstream::eprintln!("  {candidate}");
+                }
+                if let Some(backup) = &failure.backup {
+                    anstream::eprintln!("  backup: {}", backup.display());
                 }
             }
             ExitCode::from(failure.exit as u8)
@@ -237,6 +305,25 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
+        Command::Remove {
+            selectors,
+            all,
+            yes,
+            ack,
+            dry_run,
+        } => plan_and_execute(
+            cli,
+            Action::Remove,
+            Targets {
+                selectors: selectors.clone(),
+                all: *all,
+            },
+            &WriteFlags {
+                yes: *yes,
+                ack: ack.clone(),
+                dry_run: *dry_run,
+            },
+        ),
         Command::Completions { shell } => {
             if cli.json {
                 return Err(Failure::usage(
@@ -257,6 +344,19 @@ fn run(cli: &Cli) -> Result<(), Failure> {
 /// Scans and resolves for the Project the flags ask for, printing Read
 /// failures to stderr as warnings.
 fn inventory(cli: &Cli) -> Result<Inventory, Failure> {
+    scanned(cli).map(|scanned| scanned.inventory)
+}
+
+/// What [`scanned`] read and resolved.
+struct Scanned {
+    core: Core,
+    snapshot: Snapshot,
+    context: Context,
+    inventory: Inventory,
+}
+
+/// Scans and resolves like [`inventory`], keeping what a write plans with.
+fn scanned(cli: &Cli) -> Result<Scanned, Failure> {
     let project = if cli.no_project {
         None
     } else {
@@ -270,7 +370,8 @@ fn inventory(cli: &Cli) -> Result<Inventory, Failure> {
     let snapshot = core.scan(&ScanOptions {
         projects: project.iter().cloned().collect(),
     })?;
-    let inventory = core.resolve(&snapshot, &Context { project });
+    let context = Context { project };
+    let inventory = core.resolve(&snapshot, &context);
     for failure in &inventory.read_failures {
         anstream::eprintln!(
             "{WARNING}warning:{WARNING:#} {} cannot read {} ({})",
@@ -279,7 +380,165 @@ fn inventory(cli: &Cli) -> Result<Inventory, Failure> {
             failure.kind.code()
         );
     }
-    Ok(inventory)
+    Ok(Scanned {
+        core,
+        snapshot,
+        context,
+        inventory,
+    })
+}
+
+/// A write's JSON document: the plan, its warnings and, unless it was a dry
+/// run, the result.
+#[derive(Serialize)]
+struct WriteBody<'a> {
+    plan: &'a api::Preview,
+    warnings: Vec<WarningBody<'a>>,
+    result: Option<&'a api::Outcome>,
+}
+
+#[derive(Serialize)]
+struct WarningBody<'a> {
+    class: WarningClass,
+    sentence: &'a str,
+    acknowledged: bool,
+}
+
+fn warning_bodies<'a>(
+    warnings: &'a [api::Warning],
+    acknowledged: &[WarningClass],
+) -> Vec<WarningBody<'a>> {
+    warnings
+        .iter()
+        .map(|warning| WarningBody {
+            class: warning.class,
+            sentence: &warning.sentence,
+            acknowledged: acknowledged.contains(&warning.class),
+        })
+        .collect()
+}
+
+/// Plans `action`, prints the preview, gets the Operation confirmed and its
+/// warnings acknowledged, then executes it.
+fn plan_and_execute(
+    cli: &Cli,
+    action: Action,
+    targets: Targets,
+    flags: &WriteFlags,
+) -> Result<(), Failure> {
+    let Scanned {
+        core,
+        snapshot,
+        context,
+        inventory,
+    } = scanned(cli)?;
+    let plan = core.plan(&snapshot, &context, action, &targets)?;
+    let preview = plan.preview().clone();
+    let warnings = plan.warnings().to_vec();
+    let mut acknowledged: Vec<WarningClass> = flags.ack.iter().map(|&ack| ack.into()).collect();
+    let width = terminal::output_width(cli.wide);
+    if !cli.json {
+        anstream::print!("{}", render_preview(&inventory, &preview, &warnings, width));
+    }
+    if flags.dry_run {
+        if cli.json {
+            print_json(&WriteBody {
+                plan: &preview,
+                warnings: warning_bodies(&warnings, &acknowledged),
+                result: None,
+            });
+        } else {
+            anstream::println!("\nDry run: nothing was written.");
+        }
+        return Ok(());
+    }
+    confirm(cli, &preview.title, flags.yes, &warnings, &mut acknowledged)?;
+    let outcome = core.execute(plan, &acknowledged)?;
+    if cli.json {
+        print_json(&WriteBody {
+            plan: &preview,
+            warnings: warning_bodies(&warnings, &acknowledged),
+            result: Some(&outcome),
+        });
+    } else {
+        anstream::print!("{}", render_outcome(&outcome, width));
+    }
+    Ok(())
+}
+
+/// The flags every write takes.
+struct WriteFlags {
+    yes: bool,
+    ack: Vec<Ack>,
+    dry_run: bool,
+}
+
+/// Gets the Operation confirmed, then each warning not acknowledged by
+/// `--ack`. On a terminal it asks; otherwise `--yes` and `--ack` must say so.
+fn confirm(
+    cli: &Cli,
+    title: &str,
+    yes: bool,
+    warnings: &[api::Warning],
+    acknowledged: &mut Vec<WarningClass>,
+) -> Result<(), Failure> {
+    let interactive =
+        !cli.json && std::io::stdin().is_terminal() && std::io::stderr().is_terminal();
+    if !yes {
+        if !interactive {
+            return Err(Failure::new(
+                "confirmation_required",
+                "nothing was written: confirm the Operation with --yes",
+                Exit::NotConfirmed,
+            ));
+        }
+        if !ask(&format!("\n{title}? [y/N] "))? {
+            return Err(Failure::new(
+                "cancelled",
+                "cancelled; nothing was written",
+                Exit::NotConfirmed,
+            ));
+        }
+    }
+    let mut missing: Vec<&str> = Vec::new();
+    for warning in warnings {
+        if acknowledged.contains(&warning.class) {
+            continue;
+        }
+        if interactive && ask(&format!("{} Acknowledge? [y/N] ", warning.sentence))? {
+            acknowledged.push(warning.class);
+        } else if !missing.contains(&warning.class.code()) {
+            missing.push(warning.class.code());
+        }
+    }
+    if !missing.is_empty() {
+        let flags: Vec<String> = missing
+            .iter()
+            .map(|class| format!("--ack {class}"))
+            .collect();
+        return Err(Failure::new(
+            "ack_required",
+            format!(
+                "nothing was written: acknowledge each warning with {}",
+                flags.join(" ")
+            ),
+            Exit::NotConfirmed,
+        ));
+    }
+    Ok(())
+}
+
+/// Asks a yes-or-no question on stderr; only `y` or `yes` is yes.
+fn ask(question: &str) -> Result<bool, Failure> {
+    anstream::eprint!("{question}");
+    let mut answer = String::new();
+    std::io::stdin()
+        .read_line(&mut answer)
+        .map_err(api::Error::unexpected)?;
+    Ok(matches!(
+        answer.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 /// The `error:` prefix on stderr.
@@ -548,19 +807,28 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
 
 /// A line of unstyled text, fitted to `width`.
 fn plain_line(text: &str, width: Option<usize>) -> String {
+    styled_line(text, Style::new(), width)
+}
+
+/// A line of text in one style, fitted to `width`.
+fn styled_line(text: &str, style: Style, width: Option<usize>) -> String {
     let mut line = Line::default();
-    line.push(text, Style::new());
+    line.push(text, style);
     line.fit(width).render()
 }
 
 /// An Entry's locator, shortened to `width` by eliding the middle of its path:
 /// the key path is what tells Entries of one file apart, so it stays whole.
 fn location(entry: &api::Entry, width: Option<usize>) -> String {
-    let locator = entry.locator.as_str();
+    elide_locator(&entry.locator, &entry.path, width)
+}
+
+/// The locator of an Entry in the file at `path`, shortened like [`location`].
+fn elide_locator(locator: &str, path: &Path, width: Option<usize>) -> String {
     let Some(width) = width.filter(|&width| columns(locator) > width) else {
         return locator.to_owned();
     };
-    let path = entry.path.display().to_string();
+    let path = path.display().to_string();
     let (path, key_path) = match locator.strip_prefix(path.as_str()) {
         Some(key_path) => (path.as_str(), key_path),
         None => (locator, ""),
@@ -572,6 +840,137 @@ fn location(entry: &api::Entry, width: Option<usize>) -> String {
         _ if width >= MIN_LOCATION_WIDTH => terminal::elide_middle(locator, width),
         // Too narrow to elide usefully: the line is cut at the terminal edge instead.
         _ => locator.to_owned(),
+    }
+}
+
+/// A write's preview: the State before and after of each (Agent, Entry,
+/// Project) it changes, which Entry is Effective afterwards, the files diff,
+/// the warnings and where the backup goes.
+fn render_preview(
+    inventory: &Inventory,
+    preview: &api::Preview,
+    warnings: &[api::Warning],
+    width: Option<usize>,
+) -> String {
+    let mut out = project_line(inventory, width);
+    out.push('\n');
+    out.push_str(&styled_line(&preview.title, BOLD, width));
+
+    let rows: Vec<[(&str, Style); 4]> = preview
+        .changes
+        .iter()
+        .map(|change| {
+            [
+                (change.agent_name.as_str(), Style::new()),
+                (change.item.as_str(), Style::new()),
+                (state_label(change.before), state_style(change.before)),
+                (
+                    state_after_label(change.after),
+                    state_after_style(change.after),
+                ),
+            ]
+        })
+        .collect();
+    let header = [
+        ("AGENT", DIM),
+        ("ITEM", DIM),
+        ("BEFORE", DIM),
+        ("AFTER", DIM),
+    ];
+    let widths = column_widths(&header, &rows);
+    let location_width = last_column_width(&widths, width);
+    out.push_str(
+        &table_line(&header, &widths, "ENTRY".to_owned(), DIM)
+            .fit(width)
+            .render(),
+    );
+    for (change, cells) in preview.changes.iter().zip(&rows) {
+        let entry = elide_locator(&change.locator, &change.path, location_width);
+        out.push_str(
+            &table_line(cells, &widths, entry, Style::new())
+                .fit(width)
+                .render(),
+        );
+    }
+    let sentence_width = width.map(|width| width.saturating_sub(INDENT.len()));
+    for effective in &preview.effective {
+        out.push('\n');
+        for text in terminal::wrap(&effective.sentence, sentence_width) {
+            out.push_str(&plain_line(&format!("{INDENT}{text}"), width));
+        }
+    }
+
+    out.push('\n');
+    out.push_str(&styled_line("Files", BOLD, width));
+    for file in &preview.files {
+        for line in file.diff.lines() {
+            let style = match line.as_bytes().first() {
+                Some(b'+') if !line.starts_with("+++") => AnsiColor::Green.on_default(),
+                Some(b'-') if !line.starts_with("---") => AnsiColor::Red.on_default(),
+                Some(b'@') => AnsiColor::Cyan.on_default(),
+                _ => Style::new(),
+            };
+            // A diff line is never cut: a hidden change is worse than a long line.
+            out.push_str(&format!("{style}{line}{style:#}\n"));
+        }
+    }
+
+    if !warnings.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Warnings", BOLD, width));
+        for warning in warnings {
+            let text = format!("{INDENT}[{}] {}", warning.class.code(), warning.sentence);
+            for line in terminal::wrap(&text, width) {
+                out.push_str(&plain_line(&line, width));
+            }
+        }
+    }
+
+    out.push('\n');
+    for line in terminal::wrap(&preview.backup_note, width) {
+        out.push_str(&plain_line(&line, width));
+    }
+    out
+}
+
+/// What an executed write did, any State that differs from the prediction,
+/// and where its backup is.
+fn render_outcome(outcome: &api::Outcome, width: Option<usize>) -> String {
+    let mut out = String::from("\n");
+    for line in terminal::wrap(&outcome.sentence, width) {
+        out.push_str(&plain_line(&line, width));
+    }
+    for difference in &outcome.differences {
+        out.push_str(&plain_line(
+            &format!(
+                "{INDENT}{}: predicted {}, actually {}",
+                difference.locator,
+                state_after_label(difference.predicted),
+                state_after_label(difference.actual)
+            ),
+            width,
+        ));
+    }
+    out.push_str(&plain_line(
+        &format!("Backup: {}", outcome.backup.display()),
+        width,
+    ));
+    out
+}
+
+fn state_after_label(state: api::StateAfter) -> &'static str {
+    match state {
+        api::StateAfter::Effective => "Effective",
+        api::StateAfter::Shadowed => "Shadowed",
+        api::StateAfter::Removed => "removed",
+    }
+}
+
+fn state_after_style(state: api::StateAfter) -> Style {
+    match state {
+        api::StateAfter::Effective => state_style(api::State::Effective),
+        api::StateAfter::Shadowed => state_style(api::State::Shadowed),
+        api::StateAfter::Removed => AnsiColor::Red.on_default(),
     }
 }
 

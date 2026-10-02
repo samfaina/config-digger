@@ -92,11 +92,15 @@ impl Applied {
     /// A unified diff of the file before and after the edit, as text, with
     /// `label` as the file name in its header.
     pub fn unified_diff(&self, label: &str) -> String {
-        TextDiff::from_lines(&self.before, &self.after)
-            .unified_diff()
-            .header(&format!("a/{label}"), &format!("b/{label}"))
-            .to_string()
+        unified_diff(&self.before, &self.after, label)
     }
+}
+
+fn unified_diff(before: &str, after: &str, label: &str) -> String {
+    TextDiff::from_lines(before, after)
+        .unified_diff()
+        .header(&format!("a/{label}"), &format!("b/{label}"))
+        .to_string()
 }
 
 /// A key an edit depends on, with its value before and after the edit
@@ -159,6 +163,12 @@ impl EditableFile {
             bom,
             text: text.to_owned(),
         })
+    }
+
+    /// A unified diff from this file to `after`, as text, with `label` as the
+    /// file name in its header.
+    pub fn unified_diff(&self, after: &EditableFile, label: &str) -> String {
+        unified_diff(&self.text, &after.text, label)
     }
 
     /// Parses the file and prints it again without editing it.
