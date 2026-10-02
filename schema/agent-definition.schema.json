@@ -37,8 +37,12 @@
         "$ref": "#/$defs/LocationDefinition"
       }
     },
+    "projects": {
+      "description": "Where this Agent records the Projects it has been started on.",
+      "$ref": "#/$defs/ProjectsDefinition"
+    },
     "scopes": {
-      "description": "The Scopes this Agent applies Entries at.",
+      "description": "The Scopes this Agent applies Entries at, in display order. A Scope is\nonly a label: precedence comes from the order of locations in `items`.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/ScopeDefinition"
@@ -100,6 +104,25 @@
           "required": [
             "block",
             "root"
+          ]
+        },
+        {
+          "description": "A path in the Project folder itself.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "project"
+            },
+            "path": {
+              "description": "A `/`-separated path relative to the Project folder.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
           ]
         }
       ]
@@ -203,8 +226,12 @@
         "kind": {
           "$ref": "#/$defs/ItemKind"
         },
+        "provenance": {
+          "description": "The base Provenance of the location's Entries.",
+          "$ref": "#/$defs/Provenance"
+        },
         "root": {
-          "description": "The key path of the object whose keys are Entries.",
+          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project.",
           "type": "array",
           "items": {
             "type": "string"
@@ -222,7 +249,8 @@
         "format",
         "root",
         "kind",
-        "scope"
+        "scope",
+        "provenance"
       ]
     },
     "Locator": {
@@ -244,6 +272,61 @@
           "required": [
             "block",
             "path"
+          ]
+        }
+      ]
+    },
+    "ProjectsDefinition": {
+      "type": "object",
+      "properties": {
+        "registries": {
+          "description": "Each registry adds the Projects it records. Projects found by any Agent\nare evaluated for every Agent.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Registry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "description": "How the Entries of a location got there, which decides how they can be taken away.",
+      "oneOf": [
+        {
+          "description": "A key someone wrote into a configuration file, by hand or through the Agent.",
+          "type": "string",
+          "const": "file"
+        }
+      ]
+    },
+    "Registry": {
+      "description": "Where an Agent records the Projects it has been started on.",
+      "oneOf": [
+        {
+          "description": "The keys of an object in a strict JSON file, each one a Project path.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the file is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "block": {
+              "type": "string",
+              "const": "json-keys"
+            },
+            "root": {
+              "description": "The key path of the object whose keys are Project paths.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "root"
           ]
         }
       ]

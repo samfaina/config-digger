@@ -4,14 +4,15 @@
 use crate::api::{self, Context};
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Compete;
-use crate::locator;
 use crate::scan::{ScannedEntry, Snapshot};
+use crate::{explain, locator, paths};
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 pub(crate) fn resolve(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,
-    _context: &Context,
+    context: &Context,
 ) -> api::Inventory {
     let homes = snapshot
         .homes
@@ -22,14 +23,39 @@ pub(crate) fn resolve(
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
                 home: home.home.clone(),
+                scopes: definition
+                    .scopes
+                    .iter()
+                    .map(|scope| scope.id.clone())
+                    .collect(),
             }
         })
         .collect();
+
+    let projects = snapshot
+        .projects
+        .iter()
+        .map(|project| api::Project {
+            path: project.path.clone(),
+            missing: !project.exists,
+            registered_by: project
+                .registered_by
+                .iter()
+                .map(|&agent| definitions[agent].agent.id.clone())
+                .collect(),
+        })
+        .collect();
+
+    let project = context_project(snapshot, context);
+    let project_key = project.as_ref().map(|(_, key)| key);
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
     for entry in &snapshot.entries {
+        if entry.project.is_some() && entry.project.as_ref() != project_key {
+            continue;
+        }
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
         let key = definition.rules(location.kind).competition.key(&entry.name);
@@ -43,22 +69,40 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            entries.sort_by_key(|entry| definition.rank(definition.location(&entry.location)));
+            let rank = |entry: &ScannedEntry| definition.rank(definition.location(&entry.location));
+            // Entries of equal rank, such as under two spellings of one Project
+            // key, are ordered by key path so that the choice is stable.
+            entries.sort_by(|a, b| (rank(a), &a.key_path).cmp(&(rank(b), &b.key_path)));
             // An Item is named after the Entry that would be Effective.
             let name = entries[0].name.clone();
+            let effective = locator::render(&entries[0].path, &entries[0].key_path);
+            let effective_scope = &definition.location(&entries[0].location).scope;
+            let effective_rank = rank(entries[0]);
             let entries: Vec<api::Entry> = entries
                 .iter()
                 .enumerate()
-                .map(|(rank, entry)| api::Entry {
-                    path: entry.path.clone(),
-                    key_path: entry.key_path.clone(),
-                    locator: locator::render(&entry.path, &entry.key_path),
-                    scope: definition.location(&entry.location).scope.clone(),
-                    state: if rank == 0 {
-                        api::State::Effective
+                .map(|(index, entry)| {
+                    let location = definition.location(&entry.location);
+                    let (state, reason) = if index == 0 {
+                        (api::State::Effective, None)
                     } else {
-                        api::State::Shadowed
-                    },
+                        let reason = explain::shadowed_by_precedence(
+                            &definition.agent.name,
+                            effective_scope,
+                            &effective,
+                            rank(entry) == effective_rank,
+                        );
+                        (api::State::Shadowed, Some(reason))
+                    };
+                    api::Entry {
+                        path: entry.path.clone(),
+                        key_path: entry.key_path.clone(),
+                        locator: locator::render(&entry.path, &entry.key_path),
+                        scope: location.scope.clone(),
+                        provenance: location.provenance.into(),
+                        state,
+                        reason,
+                    }
                 })
                 .collect();
             api::Item {
@@ -89,8 +133,27 @@ pub(crate) fn resolve(
 
     api::Inventory {
         read_at: humantime::format_rfc3339_seconds(snapshot.read_at).to_string(),
+        project: project.map(|(path, _)| path),
+        projects,
         homes,
         items,
         read_failures,
     }
+}
+
+/// The context's Project path and key: a scanned Project that any spelling of
+/// it names, or else the lexical normalisation of the spelling.
+fn context_project(snapshot: &Snapshot, context: &Context) -> Option<(PathBuf, String)> {
+    let lexical = paths::lexical(context.project.as_deref()?);
+    let spelling = paths::key(&lexical);
+    Some(
+        match snapshot
+            .projects
+            .iter()
+            .find(|project| project.spellings.contains(&spelling))
+        {
+            Some(project) => (project.path.clone(), project.key.clone()),
+            None => (lexical, spelling),
+        },
+    )
 }

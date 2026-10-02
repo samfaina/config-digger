@@ -5,10 +5,11 @@ mod terminal;
 
 use anstyle::{AnsiColor, Style};
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
-use config_digger_core::api::{self, Context, Core, Inventory, SCHEMA_VERSION};
+use config_digger_core::api::{self, Context, Core, Inventory, SCHEMA_VERSION, ScanOptions};
 use config_digger_core::ports::Ports;
 use serde::Serialize;
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use terminal::{ColorWhen, Line, columns};
 
@@ -36,6 +37,19 @@ struct Cli {
     #[arg(long, global = true)]
     wide: bool,
 
+    /// Resolve for this Project, a folder in any spelling. Defaults to the current directory.
+    #[arg(
+        long,
+        value_name = "PATH",
+        global = true,
+        conflicts_with = "no_project"
+    )]
+    project: Option<PathBuf>,
+
+    /// Resolve with no Project: only Entries that apply everywhere take part.
+    #[arg(long, global = true)]
+    no_project: bool,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -43,7 +57,16 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// List the Items of every Agent home and the State of each.
-    List,
+    List {
+        /// Only the Items this selects: an Item name, or the
+        /// `<path>#<key path>` locator of one of their Entries.
+        selector: Option<String>,
+    },
+    /// Show one Item with every Entry in precedence order, and why each has its State.
+    Show {
+        /// An Item name, or the `<path>#<key path>` locator of one of its Entries.
+        selector: String,
+    },
     /// Print a completion script for a shell.
     Completions {
         /// The shell to complete in.
@@ -77,25 +100,44 @@ impl From<Shell> for clap_complete::Shell {
 enum Exit {
     Unexpected = 1,
     Usage = 2,
+    Selector = 3,
 }
 
-/// A failed invocation, reported as `{schema_version, error: {code, message}}`.
+/// A failed invocation, reported as `{schema_version, error: {code, message, …}}`.
 #[derive(Serialize)]
 struct Failure {
     code: &'static str,
     message: String,
+    /// What an ambiguous selector could mean.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    candidates: Vec<String>,
     #[serde(skip)]
     exit: Exit,
 }
 
+impl Failure {
+    fn usage(message: impl Into<String>) -> Self {
+        Failure {
+            code: "usage",
+            message: message.into(),
+            candidates: Vec::new(),
+            exit: Exit::Usage,
+        }
+    }
+}
+
 impl From<api::Error> for Failure {
     fn from(error: api::Error) -> Self {
-        match error.code {
-            api::ErrorCode::Unexpected => Failure {
-                code: "unexpected",
-                message: error.message,
-                exit: Exit::Unexpected,
-            },
+        let (code, exit) = match error.code {
+            api::ErrorCode::Unexpected => ("unexpected", Exit::Unexpected),
+            api::ErrorCode::NoMatch => ("no_match", Exit::Selector),
+            api::ErrorCode::Ambiguous => ("ambiguous", Exit::Selector),
+        };
+        Failure {
+            code,
+            message: error.message,
+            candidates: error.candidates,
+            exit,
         }
     }
 }
@@ -135,46 +177,74 @@ fn main() -> ExitCode {
                 print_json(&ErrorBody { error: &failure });
             } else {
                 print_error(&failure.message);
+                for candidate in &failure.candidates {
+                    anstream::eprintln!("  {candidate}");
+                }
             }
             ExitCode::from(failure.exit as u8)
         }
     }
 }
 
+/// `show --json`: the Item and the context it was resolved for.
+#[derive(Serialize)]
+struct ShowBody<'a> {
+    project: &'a Option<PathBuf>,
+    item: &'a api::Item,
+    read_failures: &'a [api::ReadFailure],
+}
+
 fn run(cli: &Cli) -> Result<(), Failure> {
-    match cli.command {
-        Command::List => {
-            let core = Core::new(Ports::real())?;
-            let snapshot = core.scan()?;
-            let inventory = core.resolve(&snapshot, &Context::default());
-            for failure in &inventory.read_failures {
-                anstream::eprintln!(
-                    "{WARNING}warning:{WARNING:#} {} cannot read {} ({})",
-                    failure.agent_name,
-                    failure.path.display(),
-                    failure.kind.code()
-                );
+    match &cli.command {
+        Command::List { selector } => {
+            let mut inventory = inventory(cli)?;
+            if let Some(selector) = selector {
+                let selected: Vec<api::Item> =
+                    inventory.select(selector).into_iter().cloned().collect();
+                if selected.is_empty() {
+                    return Err(api::Error::no_match(selector).into());
+                }
+                inventory.items = selected;
             }
             if cli.json {
                 print_json(&inventory);
             } else {
                 anstream::print!(
                     "{}",
-                    render_list(&inventory, terminal::output_width(cli.wide))
+                    render_list(
+                        &inventory,
+                        selector.is_some(),
+                        terminal::output_width(cli.wide)
+                    )
+                );
+            }
+            Ok(())
+        }
+        Command::Show { selector } => {
+            let inventory = inventory(cli)?;
+            let item = inventory.select_one(selector)?;
+            if cli.json {
+                print_json(&ShowBody {
+                    project: &inventory.project,
+                    item,
+                    read_failures: &inventory.read_failures,
+                });
+            } else {
+                anstream::print!(
+                    "{}",
+                    render_show(&inventory, item, terminal::output_width(cli.wide))
                 );
             }
             Ok(())
         }
         Command::Completions { shell } => {
             if cli.json {
-                return Err(Failure {
-                    code: "usage",
-                    message: "completions prints a shell script, not a JSON document".to_owned(),
-                    exit: Exit::Usage,
-                });
+                return Err(Failure::usage(
+                    "completions prints a shell script, not a JSON document",
+                ));
             }
             clap_complete::generate(
-                clap_complete::Shell::from(shell),
+                clap_complete::Shell::from(*shell),
                 &mut Cli::command(),
                 "config-digger",
                 &mut std::io::stdout(),
@@ -182,6 +252,34 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             Ok(())
         }
     }
+}
+
+/// Scans and resolves for the Project the flags ask for, printing Read
+/// failures to stderr as warnings.
+fn inventory(cli: &Cli) -> Result<Inventory, Failure> {
+    let project = if cli.no_project {
+        None
+    } else {
+        let project = match &cli.project {
+            Some(project) => std::path::absolute(project),
+            None => std::env::current_dir(),
+        };
+        Some(project.map_err(api::Error::unexpected)?)
+    };
+    let core = Core::new(Ports::real())?;
+    let snapshot = core.scan(&ScanOptions {
+        projects: project.iter().cloned().collect(),
+    })?;
+    let inventory = core.resolve(&snapshot, &Context { project });
+    for failure in &inventory.read_failures {
+        anstream::eprintln!(
+            "{WARNING}warning:{WARNING:#} {} cannot read {} ({})",
+            failure.agent_name,
+            failure.path.display(),
+            failure.kind.code()
+        );
+    }
+    Ok(inventory)
 }
 
 /// The `error:` prefix on stderr.
@@ -207,11 +305,7 @@ fn usage_error(error: &clap::Error, args: &[OsString]) -> ExitCode {
     }
     // Parsing failed, so whether `--json` was asked for is read from the raw arguments.
     if args.iter().skip(1).any(|arg| arg == "--json") {
-        let failure = Failure {
-            code: "usage",
-            message: clap_message(error),
-            exit: Exit::Usage,
-        };
+        let failure = Failure::usage(clap_message(error));
         print_json(&ErrorBody { error: &failure });
     } else {
         let _ = error.print();
@@ -222,11 +316,7 @@ fn usage_error(error: &clap::Error, args: &[OsString]) -> ExitCode {
 /// A panic is an unexpected error: it exits 1 and, with `--json`, still prints one error document.
 fn report_panics_as_unexpected(json: bool) {
     std::panic::set_hook(Box::new(move |info| {
-        let failure = Failure {
-            code: "unexpected",
-            message: format!("internal error: {info}"),
-            exit: Exit::Unexpected,
-        };
+        let failure = Failure::from(api::Error::unexpected(format!("internal error: {info}")));
         if json {
             print_json(&ErrorBody { error: &failure });
         } else {
@@ -271,20 +361,23 @@ const DIM: Style = Style::new().dimmed();
 /// Below this many columns a location is cut with the rest of the line instead of elided.
 const MIN_LOCATION_WIDTH: usize = 8;
 
+/// Before the first column of a table.
+const INDENT: &str = "  ";
+/// Between table columns.
+const GAP: &str = "  ";
+
 /// One table per Agent home: each Item with the Scope, State and location of its
-/// Effective Entry, fitted to `width` columns when there is a limit.
-fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
+/// Effective Entry, fitted to `width` columns when there is a limit. When the
+/// Items were `selected`, homes with none of them are left out.
+fn render_list(inventory: &Inventory, selected: bool, width: Option<usize>) -> String {
+    let mut out = project_line(inventory, width);
+    out.push('\n');
     if inventory.homes.is_empty() {
-        return plain_line("No Agent home found.", width);
+        out.push_str(&plain_line("No Agent home found.", width));
+        return out;
     }
-    let mut out = String::new();
-    for (index, home) in inventory.homes.iter().enumerate() {
-        if index > 0 {
-            out.push('\n');
-        }
-        let mut title = Line::default();
-        title.push(format!("{} (home: {})", home.agent_name, home.home), BOLD);
-        out.push_str(&title.fit(width).render());
+    let mut first = true;
+    for home in &inventory.homes {
         let rows: Vec<Row> = inventory
             .items
             .iter()
@@ -302,22 +395,24 @@ fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
                 }
             })
             .collect();
+        if rows.is_empty() && selected {
+            continue;
+        }
+        if !first {
+            out.push('\n');
+        }
+        first = false;
+        let mut title = Line::default();
+        title.push(format!("{} (home: {})", home.agent_name, home.home), BOLD);
+        out.push_str(&title.fit(width).render());
         if rows.is_empty() {
             out.push_str(&plain_line("  No Items.", width));
             continue;
         }
         let header = [("NAME", DIM), ("SCOPE", DIM), ("STATE", DIM)];
-        let widths: [usize; 3] = std::array::from_fn(|column| {
-            rows.iter()
-                .map(|row| columns(row.cells[column].0))
-                .chain([columns(header[column].0)])
-                .max()
-                .unwrap_or(0)
-        });
-        let location_width = width.map(|width| {
-            let before: usize = widths.iter().map(|w| w + 2).sum::<usize>() + 2;
-            width.saturating_sub(before)
-        });
+        let cells: Vec<[(&str, Style); 3]> = rows.iter().map(|row| row.cells).collect();
+        let widths = column_widths(&header, &cells);
+        let location_width = last_column_width(&widths, width);
 
         let header_line = table_line(&header, &widths, "LOCATION".to_owned(), DIM);
         out.push_str(&header_line.fit(width).render());
@@ -337,15 +432,118 @@ struct Row<'a> {
 }
 
 /// The padded cells of one table line, followed by its unpadded last column.
-fn table_line(cells: &[(&str, Style); 3], widths: &[usize; 3], last: String, style: Style) -> Line {
+fn table_line<const N: usize>(
+    cells: &[(&str, Style); N],
+    widths: &[usize; N],
+    last: String,
+    style: Style,
+) -> Line {
     let mut line = Line::default();
-    line.push("  ", Style::new());
+    line.push(INDENT, Style::new());
     for (&(cell, cell_style), &width) in cells.iter().zip(widths) {
         line.push_padded(cell, width, cell_style)
-            .push("  ", Style::new());
+            .push(GAP, Style::new());
     }
     line.push(last, style);
     line
+}
+
+/// The width of each padded column, wide enough for the header and every row.
+fn column_widths<const N: usize>(
+    header: &[(&str, Style); N],
+    rows: &[[(&str, Style); N]],
+) -> [usize; N] {
+    std::array::from_fn(|column| {
+        rows.iter()
+            .map(|row| columns(row[column].0))
+            .chain([columns(header[column].0)])
+            .max()
+            .unwrap_or(0)
+    })
+}
+
+/// How many columns are left for the last column after the padded ones.
+fn last_column_width<const N: usize>(widths: &[usize; N], width: Option<usize>) -> Option<usize> {
+    width.map(|width| {
+        let before: usize = widths.iter().map(|w| w + GAP.len()).sum::<usize>() + INDENT.len();
+        width.saturating_sub(before)
+    })
+}
+
+/// The first line of `list` and `show`: the Project the States are resolved for.
+fn project_line(inventory: &Inventory, width: Option<usize>) -> String {
+    let Some(project) = &inventory.project else {
+        return plain_line("No Project", width);
+    };
+    let missing = inventory
+        .projects
+        .iter()
+        .any(|known| known.path == *project && known.missing);
+    let suffix = if missing { " (missing)" } else { "" };
+    plain_line(&format!("Project: {}{suffix}", project.display()), width)
+}
+
+/// One Item with every Entry in precedence order: its rank, Scope, State,
+/// Provenance and locator, then the reason for its State.
+fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) -> String {
+    let mut out = project_line(inventory, width);
+    out.push('\n');
+    let agent_name = inventory
+        .homes
+        .iter()
+        .find(|home| home.agent == item.agent)
+        .map_or(item.agent.as_str(), |home| home.agent_name.as_str());
+    let mut title = Line::default();
+    title.push(
+        format!("{} ({agent_name}, home: {})", item.name, item.home),
+        BOLD,
+    );
+    out.push_str(&title.fit(width).render());
+
+    let ranks: Vec<String> = (1..=item.entries.len())
+        .map(|rank| format!("{rank}."))
+        .collect();
+    let rows: Vec<[(&str, Style); 4]> = item
+        .entries
+        .iter()
+        .zip(&ranks)
+        .map(|(entry, rank)| {
+            [
+                (rank.as_str(), Style::new()),
+                (entry.scope.as_str(), Style::new()),
+                (state_label(entry.state), state_style(entry.state)),
+                (provenance_label(entry.provenance), Style::new()),
+            ]
+        })
+        .collect();
+    let header = [
+        ("#", DIM),
+        ("SCOPE", DIM),
+        ("STATE", DIM),
+        ("PROVENANCE", DIM),
+    ];
+    let widths = column_widths(&header, &rows);
+    let location_width = last_column_width(&widths, width);
+    let header_line = table_line(&header, &widths, "LOCATION".to_owned(), DIM);
+    out.push_str(&header_line.fit(width).render());
+
+    // A reason sits under the Scope column, wrapped to the room left there.
+    let reason_indent = " ".repeat(INDENT.len() + widths[0] + GAP.len());
+    let reason_width = width.map(|width| width.saturating_sub(reason_indent.len()));
+    for (entry, cells) in item.entries.iter().zip(&rows) {
+        let location = location(entry, location_width);
+        let line = table_line(cells, &widths, location, Style::new());
+        out.push_str(&line.fit(width).render());
+        if let Some(reason) = &entry.reason {
+            for text in terminal::wrap(&reason.sentence, reason_width) {
+                let mut line = Line::default();
+                line.push(reason_indent.as_str(), Style::new())
+                    .push(text, Style::new());
+                out.push_str(&line.fit(width).render());
+            }
+        }
+    }
+    out
 }
 
 /// A line of unstyled text, fitted to `width`.
@@ -389,6 +587,12 @@ fn state_style(state: api::State) -> Style {
     match state {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
+    }
+}
+
+fn provenance_label(provenance: api::Provenance) -> &'static str {
+    match provenance {
+        api::Provenance::File => "file",
     }
 }
 

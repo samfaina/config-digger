@@ -4,6 +4,8 @@ use super::{Clock, Environment, FileSystem, GitIndex, Hive, Ports, Processes, Ru
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime};
 
 /// Fake ports around `fs` and `env`, with no running processes, nothing
@@ -18,10 +20,17 @@ pub fn ports(fs: FakeFileSystem, env: FakeEnvironment) -> Ports {
     }
 }
 
-/// Files held in memory. A folder exists when a file exists below it.
+/// Files held in memory, looked up case-insensitively as on Windows. A folder
+/// exists when it was added or a file exists below it. Clones share one count
+/// of [`accesses`](Self::accesses).
 #[derive(Debug, Clone, Default)]
 pub struct FakeFileSystem {
+    /// Keyed by the path as spelled on disk.
     files: BTreeMap<PathBuf, Vec<u8>>,
+    folders: BTreeSet<PathBuf>,
+    /// Link or junction → target.
+    links: Vec<(PathBuf, PathBuf)>,
+    accesses: Arc<AtomicUsize>,
 }
 
 impl FakeFileSystem {
@@ -33,19 +42,87 @@ impl FakeFileSystem {
         self.files.insert(path.into(), contents.into());
         self
     }
+
+    /// An empty folder.
+    pub fn with_folder(mut self, path: impl Into<PathBuf>) -> Self {
+        self.folders.insert(path.into());
+        self
+    }
+
+    /// A link or junction at `link` that points to the folder `target`.
+    pub fn with_link(mut self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
+        self.links.push((link.into(), target.into()));
+        self
+    }
+
+    /// How many times the core has touched this file system, across clones.
+    pub fn accesses(&self) -> usize {
+        self.accesses.load(Ordering::SeqCst)
+    }
+
+    /// `path` with a link at its start replaced by the link's target.
+    fn follow(&self, path: &Path) -> PathBuf {
+        for (link, target) in &self.links {
+            if let Some(rest) = strip_prefix(path, link) {
+                return rest
+                    .iter()
+                    .fold(target.clone(), |path, part| path.join(part));
+            }
+        }
+        path.to_path_buf()
+    }
+
+    /// Every file and folder, as spelled on disk.
+    fn paths(&self) -> impl Iterator<Item = &PathBuf> {
+        self.files.keys().chain(&self.folders)
+    }
+
+    fn count_access(&self) {
+        self.accesses.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// The components of `path` after `prefix`, compared case-insensitively.
+fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<Vec<std::path::Component<'a>>> {
+    let mut components = path.components();
+    for expected in prefix.components() {
+        let actual = components.next()?;
+        if !actual
+            .as_os_str()
+            .eq_ignore_ascii_case(expected.as_os_str())
+        {
+            return None;
+        }
+    }
+    Some(components.collect())
 }
 
 impl FileSystem for FakeFileSystem {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        match self.files.get(path) {
-            Some(contents) => Ok(contents.clone()),
-            None if self.exists(path) => Err(io::Error::other("is a folder")),
+        self.count_access();
+        let path = self.follow(path);
+        let file = self
+            .files
+            .iter()
+            .find(|(file, _)| strip_prefix(file, &path).is_some_and(|rest| rest.is_empty()));
+        match file {
+            Some((_, contents)) => Ok(contents.clone()),
+            None if self.real_path(&path).is_some() => Err(io::Error::other("is a folder")),
             None => Err(io::ErrorKind::NotFound.into()),
         }
     }
 
     fn exists(&self, path: &Path) -> bool {
-        self.files.keys().any(|file| file.starts_with(path))
+        self.real_path(path).is_some()
+    }
+
+    fn real_path(&self, path: &Path) -> Option<PathBuf> {
+        self.count_access();
+        let path = self.follow(path);
+        let depth = path.components().count();
+        self.paths()
+            .find(|known| strip_prefix(known, &path).is_some())
+            .map(|known| known.components().take(depth).collect())
     }
 }
 

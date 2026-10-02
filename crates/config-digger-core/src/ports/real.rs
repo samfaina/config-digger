@@ -16,6 +16,19 @@ impl FileSystem for RealFileSystem {
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }
+
+    /// `canonicalize` asks Windows through `GetFinalPathNameByHandle`, which
+    /// answers with a verbatim path whose `\\?\` prefix is dropped here.
+    fn real_path(&self, path: &Path) -> Option<PathBuf> {
+        let real = std::fs::canonicalize(path).ok()?;
+        let Some(text) = real.to_str() else {
+            return Some(real);
+        };
+        Some(match text.strip_prefix(r"\\?\UNC\") {
+            Some(share) => PathBuf::from(format!(r"\\{share}")),
+            None => PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(text)),
+        })
+    }
 }
 
 /// Lists processes with `sysinfo`. Detection is best-effort: a process whose

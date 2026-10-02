@@ -45,6 +45,35 @@ impl Harness {
         self.home.join(relative)
     }
 
+    /// A file in the folder the binary runs in, which is its default Project.
+    fn with_cwd_file(self, relative: &str, contents: &str) -> Self {
+        let path = self.root.path().join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+        self
+    }
+
+    /// The real path of the folder the binary runs in.
+    fn cwd(&self) -> PathBuf {
+        real_path(self.root.path())
+    }
+
+    /// A `.claude.json` with user servers `linear` and `notes`, and a local
+    /// `linear` keyed to the current folder in another spelling.
+    fn with_local_linear(self) -> Self {
+        let key = self
+            .cwd()
+            .display()
+            .to_string()
+            .replace('\\', "/")
+            .to_lowercase();
+        let claude_json = json!({
+            "mcpServers": { "linear": { "url": "https://user" }, "notes": { "command": "n" } },
+            "projects": { key: { "mcpServers": { "linear": { "url": "https://local" } } } }
+        });
+        self.with_file(".claude.json", &claude_json.to_string())
+    }
+
     fn run(&self, args: &[&str]) -> Run {
         self.run_with_env(args, &[])
     }
@@ -103,6 +132,247 @@ fn locator(path: &Path, key_path: &str) -> String {
     format!("{}#{key_path}", path.display())
 }
 
+/// A path with links resolved, as config-digger prints it: without `\\?\`.
+fn real_path(path: &Path) -> PathBuf {
+    let real = std::fs::canonicalize(path).unwrap();
+    let text = real.display().to_string();
+    PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
+}
+
+/// `(scope, state)` of each Entry of the Item named `name`.
+fn entry_states(document: &Value, name: &str) -> Vec<(String, String)> {
+    let item = document["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["name"] == name)
+        .unwrap_or_else(|| panic!("no Item {name}: {document:#}"));
+    item["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            (
+                entry["scope"].as_str().unwrap().to_owned(),
+                entry["state"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+
+fn pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs
+        .iter()
+        .map(|(a, b)| ((*a).to_owned(), (*b).to_owned()))
+        .collect()
+}
+
+#[test]
+fn the_current_directory_is_the_default_project() {
+    let harness = Harness::new().with_local_linear().with_cwd_file(
+        ".mcp.json",
+        r#"{"mcpServers": {"supabase": {"url": "https://p"}}}"#,
+    );
+
+    let run = harness.run(&["list", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["project"], harness.cwd().display().to_string());
+    assert_eq!(
+        entry_states(&document, "linear"),
+        pairs(&[("local", "effective"), ("user", "shadowed")])
+    );
+    assert_eq!(
+        entry_states(&document, "supabase"),
+        pairs(&[("project", "effective")])
+    );
+}
+
+#[test]
+fn the_current_directory_is_evaluated_even_when_no_registry_knows_it() {
+    let harness = Harness::new()
+        .with_file(".claude.json", CLAUDE_JSON)
+        .with_cwd_file(
+            ".mcp.json",
+            r#"{"mcpServers": {"linear": {"url": "https://p"}}}"#,
+        );
+
+    let run = harness.run(&["list", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert_eq!(
+        entry_states(&run.document(), "linear"),
+        pairs(&[("project", "effective"), ("user", "shadowed")])
+    );
+}
+
+#[test]
+fn no_project_leaves_out_local_and_project_entries() {
+    let harness = Harness::new().with_local_linear().with_cwd_file(
+        ".mcp.json",
+        r#"{"mcpServers": {"supabase": {"url": "https://p"}}}"#,
+    );
+
+    let run = harness.run(&["list", "--json", "--no-project"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["project"], Value::Null);
+    assert_eq!(
+        entry_states(&document, "linear"),
+        pairs(&[("user", "effective")])
+    );
+    let names: Vec<&str> = document["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["linear", "notes"]);
+}
+
+#[test]
+fn project_picks_another_folder() {
+    let harness = Harness::new()
+        .with_file(".claude.json", CLAUDE_JSON)
+        .with_file(
+            r"work\app\.mcp.json",
+            r#"{"mcpServers": {"linear": {"url": "https://p"}}}"#,
+        );
+    let app = harness.path(r"work\app");
+
+    let run = harness.run(&["list", "--json", "--project", app.to_str().unwrap()]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["project"], real_path(&app).display().to_string());
+    assert_eq!(
+        entry_states(&document, "linear"),
+        pairs(&[("project", "effective"), ("user", "shadowed")])
+    );
+}
+
+#[test]
+fn project_and_no_project_together_are_a_usage_error() {
+    let run = Harness::new().run(&["list", "--project", ".", "--no-project"]);
+
+    assert_eq!(run.code, 2);
+}
+
+#[test]
+fn list_names_the_project_it_resolved_for() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let in_project = harness.run(&["list"]);
+    let without = harness.run(&["list", "--no-project"]);
+
+    let cwd = harness.cwd().display().to_string();
+    assert!(
+        in_project.stdout.lines().next().unwrap().contains(&cwd),
+        "{}",
+        in_project.stdout
+    );
+    assert_eq!(without.stdout.lines().next(), Some("No Project"));
+}
+
+#[test]
+fn show_lists_every_entry_in_precedence_order_with_its_reason() {
+    let harness = Harness::new().with_local_linear();
+    let claude_json = harness.path(".claude.json");
+
+    let run = harness.run(&["show", "linear"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let local = run
+        .stdout
+        .lines()
+        .position(|line| line.contains("#projects.") && line.contains("Effective"))
+        .unwrap_or_else(|| panic!("no local Entry:\n{}", run.stdout));
+    let user_locator = locator(&claude_json, "mcpServers.linear");
+    let user = run
+        .stdout
+        .lines()
+        .position(|line| line.contains(&user_locator))
+        .unwrap_or_else(|| panic!("no user Entry:\n{}", run.stdout));
+    assert!(local < user, "{}", run.stdout);
+    let user_line: Vec<&str> = run
+        .stdout
+        .lines()
+        .nth(user)
+        .unwrap()
+        .split_whitespace()
+        .collect();
+    assert_eq!(
+        user_line,
+        ["2.", "user", "Shadowed", "file", user_locator.as_str()]
+    );
+    let reason = run.stdout.lines().nth(user + 1).unwrap();
+    assert!(
+        reason.trim().starts_with("Shadowed by the local Entry"),
+        "{}",
+        run.stdout
+    );
+}
+
+#[test]
+fn show_accepts_a_locator() {
+    let harness = Harness::new().with_local_linear();
+    let user_locator = locator(&harness.path(".claude.json"), "mcpServers.linear");
+
+    let run = harness.run(&["show", &user_locator, "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["item"]["name"], "linear");
+    assert_eq!(document["item"]["entries"][1]["locator"], user_locator);
+    assert_eq!(
+        document["item"]["entries"][1]["reason"]["code"],
+        "shadowed_by_precedence"
+    );
+    assert_eq!(
+        document["item"]["entries"][1]["reason"]["effective"],
+        document["item"]["entries"][0]["locator"]
+    );
+    assert_eq!(document["project"], harness.cwd().display().to_string());
+}
+
+#[test]
+fn show_of_nothing_exits_3() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let text = harness.run(&["show", "nothing"]);
+    let json = harness.run(&["show", "nothing", "--json"]);
+
+    assert_eq!(text.code, 3);
+    assert!(text.stderr.contains("nothing"), "{}", text.stderr);
+    assert_eq!(json.code, 3);
+    assert_eq!(json.document()["error"]["code"], "no_match");
+}
+
+#[test]
+fn list_accepts_a_selector() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+    let linear = locator(&harness.path(".claude.json"), "mcpServers.linear");
+
+    let by_locator = harness.run(&["list", &linear, "--json"]);
+    let by_name = harness.run(&["list", "linear"]);
+    let nothing = harness.run(&["list", "nothing"]);
+
+    assert_eq!(by_locator.code, 0, "{}", by_locator.stderr);
+    let items = by_locator.document()["items"].clone();
+    assert_eq!(items.as_array().unwrap().len(), 1, "{items}");
+    assert_eq!(items[0]["name"], "linear");
+    assert!(by_name.stdout.contains(&linear), "{}", by_name.stdout);
+    assert!(
+        !by_name.stdout.contains("cd-throwaway-github"),
+        "{}",
+        by_name.stdout
+    );
+    assert_eq!(nothing.code, 3);
+}
+
 #[test]
 fn list_prints_each_user_server_with_name_scope_location_and_state() {
     let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
@@ -136,7 +406,12 @@ fn list_json_prints_one_document_with_schema_version() {
     assert_eq!(document["schema_version"], 1);
     assert_eq!(
         document["homes"],
-        json!([{ "agent": "claude-code", "agent_name": "Claude Code", "home": "default" }])
+        json!([{
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "scopes": ["local", "project", "user"]
+        }])
     );
     let items: Vec<(&str, &str, &str)> = document["items"]
         .as_array()

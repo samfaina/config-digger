@@ -1,7 +1,7 @@
 //! Task-level commands: each one is a thin async wrapper that runs the
 //! synchronous core on a blocking thread.
 
-use config_digger_core::api::{self, Context, Core, Inventory};
+use config_digger_core::api::{self, Context, Core, Inventory, ScanOptions};
 use config_digger_core::ports::Ports;
 use std::time::Instant;
 
@@ -12,7 +12,7 @@ pub async fn read_inventory() -> Result<Inventory, api::Error> {
     let started = Instant::now();
     let result = tauri::async_runtime::spawn_blocking(|| {
         let core = Core::new(Ports::real())?;
-        let snapshot = core.scan()?;
+        let snapshot = core.scan(&ScanOptions::default())?;
         Ok(core.resolve(&snapshot, &Context::default()))
     })
     .await

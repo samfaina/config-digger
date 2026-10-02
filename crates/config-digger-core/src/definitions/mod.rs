@@ -3,7 +3,9 @@
 
 pub(crate) mod blocks;
 
-use blocks::{Anchor, Anchored, Competition, Format, Locator, Validate};
+use blocks::{
+    Anchor, Anchored, Competition, Format, Locator, Provenance, Register, Registry, Validate,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -61,8 +63,12 @@ pub(crate) struct AgentDefinition {
     pub agent: AgentInfo,
     /// The Agent homes this Agent can have.
     pub homes: Vec<HomeDefinition>,
-    /// The Scopes this Agent applies Entries at.
+    /// The Scopes this Agent applies Entries at, in display order. A Scope is
+    /// only a label: precedence comes from the order of locations in `items`.
     pub scopes: Vec<ScopeDefinition>,
+    /// Where this Agent records the Projects it has been started on.
+    #[serde(default)]
+    pub projects: ProjectsDefinition,
     /// The configuration locations this Agent reads.
     pub locations: Vec<LocationDefinition>,
     /// Rules per Item kind.
@@ -92,17 +98,40 @@ pub(crate) struct ScopeDefinition {
     pub id: String,
 }
 
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectsDefinition {
+    /// Each registry adds the Projects it records. Projects found by any Agent
+    /// are evaluated for every Agent.
+    #[serde(default)]
+    pub registries: Vec<Registry>,
+}
+
+/// The `root` segment that stands for any Project path key.
+pub(crate) const PROJECT_KEY: &str = "{project}";
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LocationDefinition {
     pub id: String,
     pub anchor: Anchor,
     pub format: Format,
-    /// The key path of the object whose keys are Entries.
+    /// The key path of the object whose keys are Entries. One segment may be
+    /// `{project}`: each key there is a Project path, and the Entries below it
+    /// apply only in that Project.
     pub root: Vec<String>,
     pub kind: ItemKind,
     /// The id of a declared Scope.
     pub scope: String,
+    /// The base Provenance of the location's Entries.
+    pub provenance: Provenance,
+}
+
+impl LocationDefinition {
+    /// Whether the location's Entries are keyed by Project inside the file.
+    pub fn keyed_by_project(&self) -> bool {
+        self.root.iter().any(|key| key == PROJECT_KEY)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
@@ -172,16 +201,25 @@ impl AgentDefinition {
             }
         }
 
+        for (index, registry) in self.projects.registries.iter().enumerate() {
+            let context = |e: String| format!("projects.registries[{index}]: {e}");
+            registry.validate().map_err(context)?;
+            self.validate_home_root(registry.anchor())
+                .map_err(context)?;
+        }
+
         for location in &self.locations {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
             location.format.validate().map_err(context)?;
-            if let Some(root) = location.anchor.home_root()
-                && let Some(home) = self.homes.iter().find(|h| !h.roots.contains_key(root))
-            {
+            self.validate_home_root(&location.anchor).map_err(context)?;
+            let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
+            if project_keys.count() > 1 {
+                return Err(context(format!("root holds `{PROJECT_KEY}` twice")));
+            }
+            if location.keyed_by_project() && location.anchor.in_project() {
                 return Err(context(format!(
-                    "home `{}` declares no root `{root}`",
-                    home.id
+                    "a location in a Project cannot be keyed by `{PROJECT_KEY}`"
                 )));
             }
             if !self.scopes.iter().any(|scope| scope.id == location.scope) {
@@ -218,6 +256,18 @@ impl AgentDefinition {
             if let Some(id) = declared.difference(&ranked).next() {
                 return Err(context(format!("precedence leaves out location `{id}`")));
             }
+        }
+        Ok(())
+    }
+}
+
+impl AgentDefinition {
+    /// Every home must declare the root an anchor needs.
+    fn validate_home_root(&self, anchor: &Anchor) -> Result<(), String> {
+        if let Some(root) = anchor.home_root()
+            && let Some(home) = self.homes.iter().find(|h| !h.roots.contains_key(root))
+        {
+            return Err(format!("home `{}` declares no root `{root}`", home.id));
         }
         Ok(())
     }
@@ -275,11 +325,39 @@ format = { block = "json" }
 root = ["servers"]
 kind = "mcp"
 scope = "user"
+provenance = "file"
 
 [items.mcp]
 precedence = ["user-mcp"]
 competition = { block = "exact-name" }
 "#;
+
+    /// `VALID` plus a project registry and a location keyed by Project.
+    fn with_projects(registry_anchor: &str, local_anchor: &str, local_root: &str) -> String {
+        let local = format!(
+            r#"
+[[locations]]
+id = "local-mcp"
+anchor = {local_anchor}
+format = {{ block = "json" }}
+root = {local_root}
+kind = "mcp"
+scope = "user"
+provenance = "file"
+"#
+        );
+        VALID
+            .replace(
+                "[[locations]]",
+                &format!(
+                    "[projects]\nregistries = [{{ block = \"json-keys\", anchor = {registry_anchor}, root = [\"projects\"] }}]\n\n{local}\n[[locations]]"
+                ),
+            )
+            .replace(r#"["user-mcp"]"#, r#"["local-mcp", "user-mcp"]"#)
+    }
+
+    const STATE: &str = r#"{ block = "home", root = "state" }"#;
+    const IN_PROJECT: &str = r#"{ block = "project", path = ".test.json" }"#;
 
     fn error(text: &str) -> String {
         parse("test.toml", text).unwrap_err().message
@@ -298,6 +376,64 @@ competition = { block = "exact-name" }
     #[test]
     fn a_valid_definition_loads() {
         assert!(parse("test.toml", VALID).is_ok());
+    }
+
+    #[test]
+    fn a_definition_with_projects_loads() {
+        let text = with_projects(STATE, STATE, r#"["projects", "{project}", "servers"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_projects(STATE, IN_PROJECT, r#"["servers"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_project_registry_in_a_project_is_rejected() {
+        let text = with_projects(IN_PROJECT, STATE, r#"["servers"]"#);
+        assert!(
+            error(&text).contains("must not lie in a Project"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_project_registry_with_an_undeclared_root_is_rejected() {
+        let text = with_projects(
+            r#"{ block = "home", root = "config" }"#,
+            STATE,
+            r#"["servers"]"#,
+        );
+        assert!(
+            error(&text).contains("no root `config`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_in_a_project_cannot_be_keyed_by_project() {
+        let text = with_projects(STATE, IN_PROJECT, r#"["{project}", "servers"]"#);
+        assert!(
+            error(&text).contains("cannot be keyed by `{project}`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_root_holds_at_most_one_project_key() {
+        let text = with_projects(STATE, STATE, r#"["{project}", "{project}"]"#);
+        assert!(
+            error(&text).contains("`{project}` twice"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_needs_a_provenance() {
+        let text = VALID.replace("provenance = \"file\"\n", "");
+        assert!(error(&text).contains("provenance"), "{}", error(&text));
     }
 
     #[test]

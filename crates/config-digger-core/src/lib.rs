@@ -5,6 +5,9 @@ pub mod api;
 pub mod definitions;
 pub mod ports;
 
+mod explain;
 mod locator;
+mod paths;
 mod resolve;
 mod scan;
+mod select;
