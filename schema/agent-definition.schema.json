@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "config-digger Agent definition",
+  "description": "Where an Agent keeps its configuration, in which format, and with what precedence.",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "$ref": "#/$defs/AgentInfo"
+    },
+    "format_version": {
+      "description": "The version of this file format. Must be 1.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "homes": {
+      "description": "The Agent homes this Agent can have.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/HomeDefinition"
+      }
+    },
+    "items": {
+      "description": "Rules per Item kind.",
+      "type": "object",
+      "properties": {
+        "mcp": {
+          "$ref": "#/$defs/ItemRules"
+        }
+      },
+      "additionalProperties": false
+    },
+    "locations": {
+      "description": "The configuration locations this Agent reads.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LocationDefinition"
+      }
+    },
+    "scopes": {
+      "description": "The Scopes this Agent applies Entries at.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ScopeDefinition"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "agent",
+    "homes",
+    "scopes",
+    "locations",
+    "items"
+  ],
+  "$defs": {
+    "AgentInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "A stable id, such as `claude-code`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The display name, such as `Claude Code`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Anchor": {
+      "description": "What a location's path is relative to.",
+      "oneOf": [
+        {
+          "description": "A root of the Agent home, or a path below it.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "home"
+            },
+            "path": {
+              "description": "A `/`-separated path relative to the root. Omitted when the root is the location.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "root": {
+              "description": "The name of a root declared by every home of the definition.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "root"
+          ]
+        }
+      ]
+    },
+    "Competition": {
+      "description": "How same-kind Entries of one Agent home compete.",
+      "oneOf": [
+        {
+          "description": "Entries compete when their names are exactly equal.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "exact-name"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
+      ]
+    },
+    "Format": {
+      "description": "The file format and dialect a location is read in.",
+      "oneOf": [
+        {
+          "description": "Strict JSON: no comments, no trailing commas.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "json"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
+      ]
+    },
+    "HomeDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "roots": {
+          "description": "Named roots of the home. The home is found when any root exists.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Locator"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "roots"
+      ]
+    },
+    "ItemKind": {
+      "type": "string",
+      "enum": [
+        "mcp"
+      ]
+    },
+    "ItemRules": {
+      "type": "object",
+      "properties": {
+        "competition": {
+          "$ref": "#/$defs/Competition"
+        },
+        "precedence": {
+          "description": "Location ids of this kind, highest precedence first.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "precedence",
+        "competition"
+      ]
+    },
+    "LocationDefinition": {
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "format": {
+          "$ref": "#/$defs/Format"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ItemKind"
+        },
+        "root": {
+          "description": "The key path of the object whose keys are Entries.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scope": {
+          "description": "The id of a declared Scope.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "anchor",
+        "format",
+        "root",
+        "kind",
+        "scope"
+      ]
+    },
+    "Locator": {
+      "description": "Where one root of an Agent home lives.",
+      "oneOf": [
+        {
+          "description": "A fixed path below the user's home folder, written `~/<relative path>`.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "path"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
+          ]
+        }
+      ]
+    },
+    "ScopeDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ]
+    }
+  }
+}

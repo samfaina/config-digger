@@ -1,0 +1,32 @@
+#:schema ../../../schema/agent-definition.schema.json
+# Claude Code. Facts from docs/research/claude-code.md on research/claude-code
+# (verified against 2.1.286).
+
+format_version = 1
+
+[agent]
+id = "claude-code"
+name = "Claude Code"
+
+[[homes]]
+id = "default"
+
+# `~/.claude.json` holds user and local Scope MCP servers.
+[homes.roots.state_file]
+block = "path"
+path = "~/.claude.json"
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "state_file" }
+format = { block = "json" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+
+[items.mcp]
+precedence = ["user-mcp"]
+competition = { block = "exact-name" }

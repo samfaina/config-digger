@@ -1,0 +1,26 @@
+[package]
+name = "config-digger-cli"
+description = "The config-digger console binary."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "config-digger"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+config-digger-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

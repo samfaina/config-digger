@@ -1,0 +1,146 @@
+//! Listing Claude Code user MCP servers through the core `api`, with fake ports.
+
+use config_digger_core::api::{Context, Core};
+use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+use serde_json::{Value, json};
+use std::path::PathBuf;
+
+const HOME: &str = r"C:\Users\fixture";
+const CLAUDE_JSON: &[u8] = include_bytes!("fixtures/claude-code-home/.claude.json");
+
+fn in_home(relative: &str) -> PathBuf {
+    PathBuf::from(HOME).join(relative)
+}
+
+fn list(fs: FakeFileSystem) -> Value {
+    let core = Core::new(fake::ports(fs, FakeEnvironment::with_home(HOME))).unwrap();
+    let snapshot = core.scan().unwrap();
+    serde_json::to_value(core.resolve(&snapshot, &Context::default())).unwrap()
+}
+
+#[test]
+fn each_user_server_is_an_effective_item_of_the_default_home() {
+    let inventory = list(FakeFileSystem::new().with_file(in_home(".claude.json"), CLAUDE_JSON));
+
+    assert_eq!(
+        inventory["homes"],
+        json!([{ "agent": "claude-code", "agent_name": "Claude Code", "home": "default" }])
+    );
+    assert_eq!(
+        inventory["items"],
+        json!([
+            {
+                "agent": "claude-code",
+                "home": "default",
+                "kind": "mcp",
+                "name": "cd-throwaway-github",
+                "state": "effective",
+                "entries": [{
+                    "path": r"C:\Users\fixture\.claude.json",
+                    "key_path": ["mcpServers", "cd-throwaway-github"],
+                    "locator": r"C:\Users\fixture\.claude.json#mcpServers.cd-throwaway-github",
+                    "scope": "user",
+                    "state": "effective"
+                }]
+            },
+            {
+                "agent": "claude-code",
+                "home": "default",
+                "kind": "mcp",
+                "name": "linear",
+                "state": "effective",
+                "entries": [{
+                    "path": r"C:\Users\fixture\.claude.json",
+                    "key_path": ["mcpServers", "linear"],
+                    "locator": r"C:\Users\fixture\.claude.json#mcpServers.linear",
+                    "scope": "user",
+                    "state": "effective"
+                }]
+            }
+        ])
+    );
+}
+
+#[test]
+fn servers_in_project_keys_are_not_user_servers() {
+    let inventory = list(FakeFileSystem::new().with_file(in_home(".claude.json"), CLAUDE_JSON));
+
+    let names: Vec<&str> = inventory["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["name"].as_str().unwrap())
+        .collect();
+    assert!(!names.contains(&"dart"), "{names:?}");
+}
+
+#[test]
+fn without_claude_json_no_home_is_found() {
+    let inventory = list(FakeFileSystem::new().with_file(in_home(r"Documents\notes.txt"), "x"));
+
+    assert_eq!(inventory["homes"], json!([]));
+    assert_eq!(inventory["items"], json!([]));
+}
+
+#[test]
+fn a_home_without_mcp_servers_has_no_items() {
+    let inventory =
+        list(FakeFileSystem::new().with_file(in_home(".claude.json"), r#"{"numStartups": 1}"#));
+
+    assert_eq!(inventory["homes"].as_array().unwrap().len(), 1);
+    assert_eq!(inventory["items"], json!([]));
+}
+
+#[test]
+fn read_time_comes_from_the_clock() {
+    let inventory = list(FakeFileSystem::new().with_file(in_home(".claude.json"), CLAUDE_JSON));
+
+    assert_eq!(inventory["read_at"], "2026-10-01T12:00:00Z");
+}
+
+#[test]
+fn a_claude_json_that_does_not_parse_is_a_read_failure_with_no_entries() {
+    let inventory =
+        list(FakeFileSystem::new().with_file(in_home(".claude.json"), r#"{"mcpServers": {"#));
+
+    assert_eq!(inventory["items"], json!([]));
+    assert_eq!(
+        inventory["read_failures"],
+        json!([{
+            "agent": "claude-code",
+            "home": "default",
+            "path": r"C:\Users\fixture\.claude.json",
+            "kind": "parse"
+        }])
+    );
+}
+
+#[test]
+fn a_claude_json_that_is_not_utf8_is_a_decode_read_failure() {
+    let inventory = list(
+        FakeFileSystem::new().with_file(in_home(".claude.json"), b"{\"a\": \"\xff\"}".to_vec()),
+    );
+
+    assert_eq!(inventory["read_failures"][0]["kind"], "decode");
+}
+
+#[test]
+fn a_locator_quotes_names_that_hold_dots_or_spaces() {
+    let claude_json = r#"{"mcpServers": {"acme.tools": {}, "my server": {}, "say \"hi\"": {}}}"#;
+    let inventory = list(FakeFileSystem::new().with_file(in_home(".claude.json"), claude_json));
+
+    let locators: Vec<&str> = inventory["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["entries"][0]["locator"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        locators,
+        [
+            r#"C:\Users\fixture\.claude.json#mcpServers."acme.tools""#,
+            r#"C:\Users\fixture\.claude.json#mcpServers."my server""#,
+            r#"C:\Users\fixture\.claude.json#mcpServers."say \"hi\"""#,
+        ]
+    );
+}

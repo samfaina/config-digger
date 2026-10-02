@@ -1,0 +1,14 @@
+[package]
+name = "config-digger-app"
+description = "The config-digger desktop app (Tauri). Placeholder until the inventory window lands."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+config-digger-core.workspace = true
+
+[lints]
+workspace = true

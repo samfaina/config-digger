@@ -1,0 +1,29 @@
+{
+  "numStartups": 42,
+  "installMethod": "native",
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+    "cd-throwaway-github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "CD_FAKE_TOKEN=not-a-real-secret"
+      }
+    }
+  },
+  "projects": {
+    "E:/projects/petme-app": {
+      "mcpServers": {
+        "dart": {
+          "type": "stdio",
+          "command": "dart",
+          "args": ["mcp-server"]
+        }
+      }
+    }
+  }
+}

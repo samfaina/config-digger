@@ -1,0 +1,10 @@
+//! config-digger core: everything that matters for safety lives here, behind
+//! [`api`]. Front-ends parse input, render output and collect acknowledgements.
+
+pub mod api;
+pub mod definitions;
+pub mod ports;
+
+mod locator;
+mod resolve;
+mod scan;
