@@ -85,8 +85,12 @@ Said of an Entry that the Agent never reads in any context, such as one in an Ag
 _Avoid_: Orphaned, stale, ignored
 
 **Invalid**:
-Said of an Entry that takes part in a combination the Agent rejects, such as Codex Entries that merge into a server with two transports, which stops the Agent from starting.
+Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, or Codex Entries that merge into a server with two transports, which stops the Agent from starting.
 _Avoid_: Broken, conflicting, error
+
+**Read failure**:
+A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
+_Avoid_: Unreadable, broken file, corrupt file, invalid file
 
 ### Actions
 
