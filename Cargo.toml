@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/samfaina/config-digger"
+
+[workspace.dependencies]
+config-digger-core = { path = "crates/config-digger-core" }
+clap = { version = "4.6", features = ["derive"] }
+humantime = "2.4"
+schemars = "1.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+tempfile = "3.27"
+thiserror = "2.0"
+toml = "1.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+winreg = "0.56"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
