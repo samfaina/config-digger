@@ -102,19 +102,20 @@ pub(crate) fn operation_status(
     }
 }
 
-/// Why an Operation that did not apply cannot be undone.
-pub(crate) fn not_undoable(status: OperationStatus) -> String {
-    match status {
+/// Why an Operation with this status cannot be undone, or `None` for an
+/// applied one.
+pub(crate) fn not_undoable(status: OperationStatus) -> Option<String> {
+    let reason = match status {
+        OperationStatus::Applied => return None,
         OperationStatus::InProgress => "It did not complete; recover its files from its backup.",
-        OperationStatus::Applied => "It can be undone.",
         OperationStatus::Failed => {
             "It failed before writing anything, so there is nothing to undo."
         }
         OperationStatus::NeedsAttention => {
             "It needs manual recovery; the files as they were before it are in its backup."
         }
-    }
-    .to_owned()
+    };
+    Some(reason.to_owned())
 }
 
 /// Why an Operation that was undone cannot be undone again.

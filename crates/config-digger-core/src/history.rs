@@ -7,8 +7,8 @@ use crate::api::{
     OperationStatus, OperationSummary, Preview, Verify,
 };
 use crate::edit::{Dependency, Edit, Syntax};
-use crate::explain;
-use crate::ports::{Environment, Ports};
+use crate::ports::{Environment, HeldLock, Ports};
+use crate::{explain, plan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::hash::{BuildHasher, RandomState};
@@ -41,6 +41,17 @@ pub(crate) fn lock_file(data: &Path) -> PathBuf {
     data.join("lock")
 }
 
+/// Takes the global write lock without waiting, failing with `Locked` when
+/// another Operation holds it. It is released when dropped.
+pub(crate) fn lock(ports: &Ports, data: &Path) -> Result<HeldLock, Error> {
+    let lock = lock_file(data);
+    ports
+        .fs
+        .try_lock(&lock)
+        .map_err(|error| Error::unexpected(format!("cannot lock {}: {error}", lock.display())))?
+        .ok_or_else(|| Error::locked(&lock))
+}
+
 /// The folder holding every Operation's backup and manifest.
 pub(crate) fn backups_folder(data: &Path) -> PathBuf {
     data.join("backups")
@@ -57,6 +68,11 @@ pub(crate) fn operation_id(now: SystemTime) -> String {
         .collect();
     let random = RandomState::new().hash_one(now) & 0xfff;
     format!("{}-{}-{random:03x}", &digits[..8], &digits[8..])
+}
+
+/// The folder holding the backup and manifest of the Operation `id`.
+pub(crate) fn operation_folder(ports: &Ports, id: &str) -> Result<PathBuf, Error> {
+    Ok(backups_folder(&data_folder(ports.env.as_ref())?).join(id))
 }
 
 /// The SHA-256 of some bytes, in lowercase hex.
@@ -205,16 +221,22 @@ pub(crate) fn next_sequence(ports: &Ports) -> Result<u64, Error> {
 }
 
 /// What History says of each Operation in `manifests`, in their order.
-pub(crate) fn summaries(manifests: &[Manifest]) -> Vec<OperationSummary> {
+pub(crate) fn summaries(ports: &Ports, manifests: &[Manifest]) -> Vec<OperationSummary> {
     manifests
         .iter()
-        .map(|manifest| summary(manifest, manifests))
+        .map(|manifest| summary(ports, manifest, manifests))
         .collect()
 }
 
-fn summary(manifest: &Manifest, manifests: &[Manifest]) -> OperationSummary {
+/// What History says of one Operation. Whether it can be undone is checked
+/// as its Undo would be planned, against the files as they are now.
+fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> OperationSummary {
     let undone_by = undone_by(&manifest.id, manifests).map(|undo| undo.id.clone());
-    let not_undoable = not_undoable(manifest, manifests);
+    let not_undoable = not_undoable(manifest, manifests).or_else(|| {
+        plan::undo_files(ports, manifest)
+            .err()
+            .map(|error| error.message)
+    });
     let mut agents: Vec<String> = Vec::new();
     for change in &manifest.changes {
         if !agents.contains(&change.agent_name) {
@@ -245,10 +267,20 @@ fn summary(manifest: &Manifest, manifests: &[Manifest]) -> OperationSummary {
     }
 }
 
-/// Why the Operation cannot be undone, or `None` when it can.
+/// The Operation `id` among `manifests`.
+pub(crate) fn find<'m>(manifests: &'m [Manifest], id: &str) -> Result<&'m Manifest, Error> {
+    manifests
+        .iter()
+        .find(|manifest| manifest.id == id)
+        .ok_or_else(|| Error::no_operation(id))
+}
+
+/// Why the Operation cannot be undone, from History alone, or `None` when
+/// History does not stop it. Whether its files still allow it is up to
+/// [`plan::undo_files`].
 pub(crate) fn not_undoable(manifest: &Manifest, manifests: &[Manifest]) -> Option<String> {
-    if manifest.status != OperationStatus::Applied {
-        return Some(explain::not_undoable(manifest.status));
+    if let Some(reason) = explain::not_undoable(manifest.status) {
+        return Some(reason);
     }
     undone_by(&manifest.id, manifests).map(|undo| explain::already_undone(&undo.id))
 }
@@ -266,13 +298,10 @@ fn undone_by<'m>(id: &str, manifests: &'m [Manifest]) -> Option<&'m Manifest> {
 /// The Operation `id`, with its edits and backed-up files.
 pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> {
     let manifests = load_all(ports)?;
-    let manifest = manifests
-        .iter()
-        .find(|manifest| manifest.id == id)
-        .ok_or_else(|| Error::no_operation(id))?;
-    let folder = backups_folder(&data_folder(ports.env.as_ref())?).join(id);
+    let manifest = find(&manifests, id)?;
+    let folder = operation_folder(ports, id)?;
     Ok(OperationDetail {
-        summary: summary(manifest, &manifests),
+        summary: summary(ports, manifest, &manifests),
         project: manifest.project.clone(),
         changes: manifest.changes.clone(),
         locations: manifest
@@ -313,12 +342,7 @@ pub(crate) fn prune(ports: &Ports) -> Result<Vec<String>, Error> {
     if !ports.fs.exists(&backups) {
         return Ok(Vec::new());
     }
-    let lock = lock_file(&data);
-    let _lock = ports
-        .fs
-        .try_lock(&lock)
-        .map_err(|error| Error::unexpected(format!("cannot lock {}: {error}", lock.display())))?
-        .ok_or_else(|| Error::locked(&lock))?;
+    let _lock = lock(ports, &data)?;
     let now = ports.clock.now();
     let mut pruned = Vec::new();
     for manifest in load_all(ports)?.iter().skip(KEEP_OPERATIONS).rev() {

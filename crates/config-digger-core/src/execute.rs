@@ -43,13 +43,18 @@ pub(crate) fn execute(
         .fs
         .create_dir_all(&data)
         .map_err(|error| Error::unexpected(format!("cannot create {}: {error}", data.display())))?;
-    let lock = history::lock_file(&data);
     // Held until this function returns, after Verify and the History write.
-    let _lock = ports
-        .fs
-        .try_lock(&lock)
-        .map_err(|error| Error::unexpected(format!("cannot lock {}: {error}", lock.display())))?
-        .ok_or_else(|| Error::locked(&lock))?;
+    let _lock = history::lock(ports, &data)?;
+    if let Some(undone) = &planned.preview.undo_of {
+        // Another Undo of the same Operation may have run since the plan.
+        let manifests = history::load_all(ports)?;
+        if let Some(reason) = history::not_undoable(history::find(&manifests, undone)?, &manifests)
+        {
+            return Err(Error::stale(format!(
+                "Operation {undone} cannot be undone any more: {reason}"
+            )));
+        }
+    }
 
     let writes = planned
         .files

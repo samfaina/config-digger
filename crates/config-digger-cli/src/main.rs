@@ -968,45 +968,7 @@ fn render_preview(
     out.push('\n');
     out.push_str(&styled_line(&preview.title, BOLD, width));
 
-    let rows: Vec<[(&str, Style); 4]> = preview
-        .changes
-        .iter()
-        .map(|change| {
-            [
-                (change.agent_name.as_str(), Style::new()),
-                (change.item.as_str(), Style::new()),
-                (
-                    state_after_label(change.before),
-                    state_after_style(change.before),
-                ),
-                (
-                    state_after_label(change.after),
-                    state_after_style(change.after),
-                ),
-            ]
-        })
-        .collect();
-    let header = [
-        ("AGENT", DIM),
-        ("ITEM", DIM),
-        ("BEFORE", DIM),
-        ("AFTER", DIM),
-    ];
-    let widths = column_widths(&header, &rows);
-    let location_width = last_column_width(&widths, width);
-    out.push_str(
-        &table_line(&header, &widths, "ENTRY".to_owned(), DIM)
-            .fit(width)
-            .render(),
-    );
-    for (change, cells) in preview.changes.iter().zip(&rows) {
-        let entry = elide_locator(&change.locator, &change.path, location_width);
-        out.push_str(
-            &table_line(cells, &widths, entry, Style::new())
-                .fit(width)
-                .render(),
-        );
-    }
+    out.push_str(&render_changes(&preview.changes, width));
     let sentence_width = width.map(|width| width.saturating_sub(INDENT.len()));
     for effective in &preview.effective {
         out.push('\n');
@@ -1155,45 +1117,7 @@ fn render_operation(operation: &api::OperationDetail, width: Option<usize>) -> S
     if !operation.changes.is_empty() {
         out.push('\n');
         out.push_str(&styled_line("Changes", BOLD, width));
-        let rows: Vec<[(&str, Style); 4]> = operation
-            .changes
-            .iter()
-            .map(|change| {
-                [
-                    (change.agent_name.as_str(), Style::new()),
-                    (change.item.as_str(), Style::new()),
-                    (
-                        state_after_label(change.before),
-                        state_after_style(change.before),
-                    ),
-                    (
-                        state_after_label(change.after),
-                        state_after_style(change.after),
-                    ),
-                ]
-            })
-            .collect();
-        let header = [
-            ("AGENT", DIM),
-            ("ITEM", DIM),
-            ("BEFORE", DIM),
-            ("AFTER", DIM),
-        ];
-        let widths = column_widths(&header, &rows);
-        let location_width = last_column_width(&widths, width);
-        out.push_str(
-            &table_line(&header, &widths, "ENTRY".to_owned(), DIM)
-                .fit(width)
-                .render(),
-        );
-        for (change, cells) in operation.changes.iter().zip(&rows) {
-            let entry = elide_locator(&change.locator, &change.path, location_width);
-            out.push_str(
-                &table_line(cells, &widths, entry, Style::new())
-                    .fit(width)
-                    .render(),
-            );
-        }
+        out.push_str(&render_changes(&operation.changes, width));
     }
 
     out.push('\n');
@@ -1274,4 +1198,46 @@ fn clap_message(error: &clap::Error) -> String {
     let text = error.render().to_string();
     let text = text.trim();
     text.strip_prefix("error: ").unwrap_or(text).to_owned()
+}
+
+/// The State before and after of each (Agent, Entry, Project) an Operation
+/// changes, one row each.
+fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
+    let rows: Vec<[(&str, Style); 4]> = changes
+        .iter()
+        .map(|change| {
+            [
+                (change.agent_name.as_str(), Style::new()),
+                (change.item.as_str(), Style::new()),
+                (
+                    state_after_label(change.before),
+                    state_after_style(change.before),
+                ),
+                (
+                    state_after_label(change.after),
+                    state_after_style(change.after),
+                ),
+            ]
+        })
+        .collect();
+    let header = [
+        ("AGENT", DIM),
+        ("ITEM", DIM),
+        ("BEFORE", DIM),
+        ("AFTER", DIM),
+    ];
+    let widths = column_widths(&header, &rows);
+    let location_width = last_column_width(&widths, width);
+    let mut out = table_line(&header, &widths, "ENTRY".to_owned(), DIM)
+        .fit(width)
+        .render();
+    for (change, cells) in changes.iter().zip(&rows) {
+        let entry = elide_locator(&change.locator, &change.path, location_width);
+        out.push_str(
+            &table_line(cells, &widths, entry, Style::new())
+                .fit(width)
+                .render(),
+        );
+    }
+    out
 }

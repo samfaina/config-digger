@@ -134,43 +134,13 @@ pub(crate) fn plan_undo(
     id: &str,
 ) -> Result<Planned, Error> {
     let manifests = history::load_all(ports)?;
-    let manifest = manifests
-        .iter()
-        .find(|manifest| manifest.id == id)
-        .ok_or_else(|| Error::no_operation(id))?;
+    let manifest = history::find(&manifests, id)?;
     if let Some(reason) = history::not_undoable(manifest, &manifests) {
         return Err(Error::blocked(format!(
             "Operation {id} cannot be undone: {reason}"
         )));
     }
-    let folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?).join(id);
-
-    let mut files = Vec::new();
-    let mut changed = Vec::new();
-    for location in &manifest.locations {
-        let (read, created) = read_or_create(ports, &location.path, location.syntax)?;
-        match undo_edits(&read, location) {
-            Ok(edited) => files.push(PlannedFile {
-                path: location.path.clone(),
-                syntax: location.syntax,
-                read,
-                created,
-                edited,
-            }),
-            Err(UndoFailure::Changed(key_path)) => changed.push((location, key_path, read)),
-            Err(UndoFailure::Appeared(key_path)) => {
-                return Err(Error::blocked(format!(
-                    "`{}` in {} appeared since Operation {id}, and the Undo would overwrite it",
-                    key_path.join("."),
-                    location.path.display()
-                )));
-            }
-            Err(UndoFailure::Other(failure)) => return Err(failure.into_error(&location.path)),
-        }
-    }
-    if !changed.is_empty() {
-        return Err(refused(ports, &folder, &changed));
-    }
+    let files = undo_files(ports, manifest)?;
 
     let scan_options = ScanOptions {
         projects: manifest.project.iter().cloned().collect(),
@@ -313,25 +283,78 @@ fn with_parents(file: &EditableFile, edit: &Edit) -> Result<Edit, EditError> {
     Ok(edit.clone())
 }
 
-/// The refusal of an Undo whose files changed since the Operation: which
-/// keys changed, and a diff from each backed-up file to what it holds now.
-fn refused(
+/// The files of an Operation with the inverse of its edits applied to each
+/// one as it is now, or why its Undo is refused. History runs the same
+/// check to say whether the Operation can be undone.
+pub(crate) fn undo_files(
     ports: &Ports,
-    folder: &Path,
-    changed: &[(&history::LocationRecord, Vec<String>, Vec<u8>)],
-) -> Error {
-    let keys: Vec<String> = changed
+    manifest: &history::Manifest,
+) -> Result<Vec<PlannedFile>, Error> {
+    let mut files = Vec::new();
+    let mut changed = Vec::new();
+    for location in &manifest.locations {
+        let (read, created) = read_or_create(ports, &location.path, location.syntax)?;
+        match undo_edits(&read, location) {
+            Ok(edited) => files.push(PlannedFile {
+                path: location.path.clone(),
+                syntax: location.syntax,
+                read,
+                created,
+                edited,
+            }),
+            Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
+                location,
+                key_path,
+                current: (!created).then_some(read),
+            }),
+            Err(UndoFailure::Appeared(key_path)) => {
+                return Err(Error::blocked(format!(
+                    "`{}` in {} appeared since Operation {}, and the Undo would overwrite it",
+                    key_path.join("."),
+                    location.path.display(),
+                    manifest.id
+                )));
+            }
+            Err(UndoFailure::Other(failure)) => return Err(failure.into_error(&location.path)),
+        }
+    }
+    if !changed.is_empty() {
+        let folder = history::operation_folder(ports, &manifest.id)?;
+        return Err(refused(ports, &folder, &changed));
+    }
+    Ok(files)
+}
+
+/// A touched file whose Undo is refused.
+struct ChangedFile<'m> {
+    location: &'m history::LocationRecord,
+    /// The first key found changed.
+    key_path: Vec<String>,
+    /// What the file holds now, `None` when it was deleted.
+    current: Option<Vec<u8>>,
+}
+
+/// The refusal of an Undo whose files changed since the Operation: what
+/// changed, and a diff from each backed-up file to what it holds now.
+fn refused(ports: &Ports, folder: &Path, changed: &[ChangedFile]) -> Error {
+    let what: Vec<String> = changed
         .iter()
-        .map(|(location, key_path, _)| {
-            format!("`{}` in {}", key_path.join("."), location.path.display())
+        .map(|file| match file.current {
+            Some(_) => format!(
+                "`{}` in {} changed",
+                file.key_path.join("."),
+                file.location.path.display()
+            ),
+            None => format!("{} was deleted", file.location.path.display()),
         })
         .collect();
     let diff: String = changed
         .iter()
-        .map(|(location, _, current)| {
-            let label = location.path.display().to_string();
+        .map(|file| {
+            let label = file.location.path.display().to_string();
+            let current = file.current.as_deref().unwrap_or_default();
             // A file the Operation created had nothing to back up.
-            let Some(backup) = &location.backup else {
+            let Some(backup) = &file.location.backup else {
                 return edit::unified_diff_bytes(b"", current, &label);
             };
             let backup = folder.join(backup);
@@ -342,7 +365,7 @@ fn refused(
         })
         .collect();
     Error::undo_refused(
-        format!("{} changed since the Operation", keys.join(", ")),
+        format!("{} since the Operation", what.join("; ")),
         folder.to_path_buf(),
         diff,
     )

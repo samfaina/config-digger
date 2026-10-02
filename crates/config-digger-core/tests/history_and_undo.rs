@@ -456,7 +456,7 @@ fn pruning_never_removes_an_operation_that_needs_attention() {
 }
 
 #[test]
-fn pruning_skips_while_another_operation_holds_the_lock() {
+fn pruning_fails_at_once_while_another_operation_holds_the_lock() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
     let clock = FakeClock::default();
     let ids = operations(&fs, &clock, 51);
@@ -467,4 +467,50 @@ fn pruning_skips_while_another_operation_holds_the_lock() {
 
     assert_eq!(error.code, ErrorCode::Locked);
     assert_eq!(history_ids(&fs), ids);
+}
+
+#[test]
+fn history_says_why_an_undo_would_be_refused() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let readded = TWO_USER_SERVERS.replace("https://mcp.linear.app/mcp", "https://readded");
+    fs.put_file(claude_json(), readded);
+
+    let history = core(&fs).history().unwrap();
+    let operation = core(&fs).history_show(&removed.operation).unwrap();
+
+    assert!(!history[0].undoable, "{:?}", history[0]);
+    let reason = history[0].not_undoable.as_deref().unwrap();
+    assert!(reason.contains("mcpServers.linear"), "{reason}");
+    assert_eq!(operation.summary.not_undoable.as_deref(), Some(reason));
+}
+
+#[test]
+fn an_undo_is_refused_when_the_file_it_changed_is_gone() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let undo = undo_with(&core(&fs), &removed.operation).unwrap();
+    fs.delete_file(claude_json());
+
+    let error = core(&fs).plan_undo(&undo.operation).err().unwrap();
+
+    assert_eq!(error.code, ErrorCode::UndoRefused);
+    assert!(error.message.contains("was deleted"), "{}", error.message);
+    assert_eq!(fs.contents(claude_json()), None);
+}
+
+#[test]
+fn a_second_undo_planned_before_the_first_ran_writes_nothing() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let core = core(&fs);
+    let first = core.plan_undo(&removed.operation).unwrap();
+    let second = core.plan_undo(&removed.operation).unwrap();
+    core.execute(first, &[]).unwrap();
+
+    let error = core.execute(second, &[]).err().unwrap();
+
+    assert_eq!(error.code, ErrorCode::Stale);
+    assert_eq!(text(&fs, claude_json()), TWO_USER_SERVERS);
+    assert_eq!(core.history().unwrap().len(), 2);
 }

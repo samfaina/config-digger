@@ -116,7 +116,10 @@ impl Core {
 
     /// Every Operation in History, newest first, across restarts.
     pub fn history(&self) -> Result<Vec<OperationSummary>, Error> {
-        Ok(history::summaries(&history::load_all(&self.ports)?))
+        Ok(history::summaries(
+            &self.ports,
+            &history::load_all(&self.ports)?,
+        ))
     }
 
     /// Prunes History, as the front-ends do at startup: it keeps at least the
@@ -374,7 +377,7 @@ pub struct OperationSummary {
     pub status_text: String,
     /// The Operation this one undoes, when it is an Undo.
     pub undo_of: Option<String>,
-    /// The Undo that reverted this Operation, while that Undo is in effect.
+    /// The Undo of this Operation, while that Undo is in effect.
     pub undone_by: Option<String>,
     /// The names of the Agents whose States it changed.
     pub agents: Vec<String>,
