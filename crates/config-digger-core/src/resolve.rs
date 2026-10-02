@@ -69,23 +69,28 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            entries.sort_by_key(|entry| definition.rank(definition.location(&entry.location)));
+            let rank = |entry: &ScannedEntry| definition.rank(definition.location(&entry.location));
+            // Entries of equal rank, such as under two spellings of one Project
+            // key, are ordered by key path so that the choice is stable.
+            entries.sort_by(|a, b| (rank(a), &a.key_path).cmp(&(rank(b), &b.key_path)));
             // An Item is named after the Entry that would be Effective.
             let name = entries[0].name.clone();
-            let winner = locator::render(&entries[0].path, &entries[0].key_path);
-            let winner_scope = &definition.location(&entries[0].location).scope;
+            let effective = locator::render(&entries[0].path, &entries[0].key_path);
+            let effective_scope = &definition.location(&entries[0].location).scope;
+            let effective_rank = rank(entries[0]);
             let entries: Vec<api::Entry> = entries
                 .iter()
                 .enumerate()
-                .map(|(rank, entry)| {
+                .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
-                    let (state, reason) = if rank == 0 {
+                    let (state, reason) = if index == 0 {
                         (api::State::Effective, None)
                     } else {
                         let reason = explain::shadowed_by_precedence(
                             &definition.agent.name,
-                            winner_scope,
-                            &winner,
+                            effective_scope,
+                            &effective,
+                            rank(entry) == effective_rank,
                         );
                         (api::State::Shadowed, Some(reason))
                     };
@@ -140,15 +145,15 @@ pub(crate) fn resolve(
 /// it names, or else the lexical normalisation of the spelling.
 fn context_project(snapshot: &Snapshot, context: &Context) -> Option<(PathBuf, String)> {
     let lexical = paths::lexical(context.project.as_deref()?);
-    let alias = paths::key(&lexical);
+    let spelling = paths::key(&lexical);
     Some(
         match snapshot
             .projects
             .iter()
-            .find(|project| project.aliases.contains(&alias))
+            .find(|project| project.spellings.contains(&spelling))
         {
             Some(project) => (project.path.clone(), project.key.clone()),
-            None => (lexical, alias),
+            None => (lexical, spelling),
         },
     )
 }

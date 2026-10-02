@@ -2,21 +2,20 @@
 
 use crate::api::{Inventory, Item};
 use crate::{locator, paths};
-use std::path::Path;
 
 /// The Items with an Entry at the locator `selector`, or else the Items named
 /// `selector`. Locator paths compare like any other path; key paths exactly.
 pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i Item> {
     let locators: Vec<(String, Vec<String>)> = locator::parse(selector)
         .into_iter()
-        .map(|(path, key_path)| (path_key(&path), key_path))
+        .map(|(path, key_path)| (paths::lexical_key(&path), key_path))
         .collect();
     let by_locator: Vec<&Item> = inventory
         .items
         .iter()
         .filter(|item| {
             item.entries.iter().any(|entry| {
-                let path = path_key(&entry.path);
+                let path = paths::lexical_key(&entry.path);
                 locators
                     .iter()
                     .any(|(want, key_path)| *want == path && *key_path == entry.key_path)
@@ -31,10 +30,6 @@ pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i It
         .iter()
         .filter(|item| item.name == selector)
         .collect()
-}
-
-fn path_key(path: &Path) -> String {
-    paths::key(&paths::lexical(path))
 }
 
 #[cfg(test)]
@@ -84,6 +79,22 @@ mod tests {
         let inventory = inventory(vec![item("a", "linear"), item("b", "linear")]);
 
         assert_eq!(homes(inventory.select("linear")), ["a", "b"]);
+    }
+
+    #[test]
+    fn select_one_of_an_ambiguous_name_lists_a_locator_per_item() {
+        let inventory = inventory(vec![item("a", "linear"), item("b", "linear")]);
+
+        let error = inventory.select_one("linear").unwrap_err();
+
+        assert_eq!(error.code, crate::api::ErrorCode::Ambiguous);
+        assert_eq!(
+            error.candidates,
+            [
+                r"C:\a\.claude.json#mcpServers.linear",
+                r"C:\b\.claude.json#mcpServers.linear"
+            ]
+        );
     }
 
     #[test]

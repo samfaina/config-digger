@@ -332,7 +332,7 @@ fn show_accepts_a_locator() {
         "shadowed_by_precedence"
     );
     assert_eq!(
-        document["item"]["entries"][1]["reason"]["winner"],
+        document["item"]["entries"][1]["reason"]["effective"],
         document["item"]["entries"][0]["locator"]
     );
     assert_eq!(document["project"], harness.cwd().display().to_string());

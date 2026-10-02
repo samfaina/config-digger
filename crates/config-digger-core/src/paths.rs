@@ -13,11 +13,17 @@ pub(crate) fn lexical(spelling: &Path) -> PathBuf {
     if is_drive(text.strip_prefix('\\').unwrap_or("")) {
         text = &text[1..];
     }
+    // A drive-relative `E:x` is read as `E:\x`: config-digger has no current
+    // folder per drive to resolve it against.
     let (prefix, rest) = if is_drive(text) {
         let drive = text[..1].to_ascii_uppercase();
         (format!("{drive}:\\"), &text[2..])
-    } else if let Some(rest) = text.strip_prefix("\\\\") {
-        ("\\\\".to_owned(), rest)
+    } else if let Some(unc) = text.strip_prefix("\\\\") {
+        // `\\server\share` is the root of a UNC path, which `..` cannot climb out of.
+        let mut parts = unc.splitn(3, '\\');
+        let server = parts.next().unwrap_or("");
+        let share = parts.next().unwrap_or("");
+        (format!("\\\\{server}\\{share}"), parts.next().unwrap_or(""))
     } else if let Some(rest) = text.strip_prefix('\\') {
         ("\\".to_owned(), rest)
     } else {
@@ -39,7 +45,19 @@ pub(crate) fn lexical(spelling: &Path) -> PathBuf {
             part => parts.push(part),
         }
     }
-    PathBuf::from(format!("{prefix}{}", parts.join("\\")))
+    let parts = parts.join("\\");
+    if prefix.is_empty() || prefix.ends_with('\\') || parts.is_empty() {
+        PathBuf::from(format!("{prefix}{parts}"))
+    } else {
+        PathBuf::from(format!("{prefix}\\{parts}"))
+    }
+}
+
+/// Whether a lexically normalised path is absolute: it starts with a drive or
+/// a UNC share. A path relative to some current folder cannot name a Project.
+pub(crate) fn is_absolute(lexical: &Path) -> bool {
+    let text = lexical.to_string_lossy();
+    is_drive(&text) || text.starts_with("\\\\")
 }
 
 /// Whether `text` starts with a drive, such as `E:`.
@@ -61,6 +79,11 @@ pub(crate) fn canonical(fs: &dyn FileSystem, spelling: &Path) -> (PathBuf, bool)
 /// The key two normalised paths are compared by.
 pub(crate) fn key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
+}
+
+/// The key of a spelling's lexical normalisation, for comparing without the disk.
+pub(crate) fn lexical_key(spelling: &Path) -> String {
+    key(&lexical(spelling))
 }
 
 #[cfg(test)]
@@ -89,5 +112,24 @@ mod tests {
     #[test]
     fn unc_paths_keep_their_leading_separators() {
         assert_eq!(lexical("//server/share/x/"), r"\\server\share\x");
+        assert_eq!(lexical(r"\\server\share\..\..\x"), r"\\server\share\x");
+    }
+
+    #[test]
+    fn only_drive_and_unc_paths_are_absolute() {
+        for (spelling, absolute) in [
+            (r"E:\x", true),
+            ("/E:/x", true),
+            (r"\\server\share", true),
+            (r"\x", false),
+            ("rel/x", false),
+            ("", false),
+        ] {
+            assert_eq!(
+                is_absolute(&super::lexical(Path::new(spelling))),
+                absolute,
+                "{spelling}"
+            );
+        }
     }
 }

@@ -77,7 +77,7 @@ impl FakeFileSystem {
         self.files.keys().chain(&self.folders)
     }
 
-    fn touch(&self) {
+    fn count_access(&self) {
         self.accesses.fetch_add(1, Ordering::SeqCst);
     }
 }
@@ -99,7 +99,7 @@ fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<Vec<std::path::Comp
 
 impl FileSystem for FakeFileSystem {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        self.touch();
+        self.count_access();
         let path = self.follow(path);
         let file = self
             .files
@@ -117,7 +117,7 @@ impl FileSystem for FakeFileSystem {
     }
 
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
-        self.touch();
+        self.count_access();
         let path = self.follow(path);
         let depth = path.components().count();
         self.paths()

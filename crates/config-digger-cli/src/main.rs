@@ -211,14 +211,18 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             } else {
                 anstream::print!(
                     "{}",
-                    render_list(&inventory, terminal::output_width(cli.wide))
+                    render_list(
+                        &inventory,
+                        selector.is_some(),
+                        terminal::output_width(cli.wide)
+                    )
                 );
             }
             Ok(())
         }
         Command::Show { selector } => {
             let inventory = inventory(cli)?;
-            let item = inventory.show(selector)?;
+            let item = inventory.select_one(selector)?;
             if cli.json {
                 print_json(&ShowBody {
                     project: &inventory.project,
@@ -312,12 +316,7 @@ fn usage_error(error: &clap::Error, args: &[OsString]) -> ExitCode {
 /// A panic is an unexpected error: it exits 1 and, with `--json`, still prints one error document.
 fn report_panics_as_unexpected(json: bool) {
     std::panic::set_hook(Box::new(move |info| {
-        let failure = Failure {
-            code: "unexpected",
-            message: format!("internal error: {info}"),
-            candidates: Vec::new(),
-            exit: Exit::Unexpected,
-        };
+        let failure = Failure::from(api::Error::unexpected(format!("internal error: {info}")));
         if json {
             print_json(&ErrorBody { error: &failure });
         } else {
@@ -368,21 +367,17 @@ const INDENT: &str = "  ";
 const GAP: &str = "  ";
 
 /// One table per Agent home: each Item with the Scope, State and location of its
-/// Effective Entry, fitted to `width` columns when there is a limit.
-fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
+/// Effective Entry, fitted to `width` columns when there is a limit. When the
+/// Items were `selected`, homes with none of them are left out.
+fn render_list(inventory: &Inventory, selected: bool, width: Option<usize>) -> String {
     let mut out = project_line(inventory, width);
     out.push('\n');
     if inventory.homes.is_empty() {
         out.push_str(&plain_line("No Agent home found.", width));
         return out;
     }
-    for (index, home) in inventory.homes.iter().enumerate() {
-        if index > 0 {
-            out.push('\n');
-        }
-        let mut title = Line::default();
-        title.push(format!("{} (home: {})", home.agent_name, home.home), BOLD);
-        out.push_str(&title.fit(width).render());
+    let mut first = true;
+    for home in &inventory.homes {
         let rows: Vec<Row> = inventory
             .items
             .iter()
@@ -400,6 +395,16 @@ fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
                 }
             })
             .collect();
+        if rows.is_empty() && selected {
+            continue;
+        }
+        if !first {
+            out.push('\n');
+        }
+        first = false;
+        let mut title = Line::default();
+        title.push(format!("{} (home: {})", home.agent_name, home.home), BOLD);
+        out.push_str(&title.fit(width).render());
         if rows.is_empty() {
             out.push_str(&plain_line("  No Items.", width));
             continue;

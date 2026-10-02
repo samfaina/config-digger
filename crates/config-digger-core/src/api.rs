@@ -65,7 +65,9 @@ impl Core {
         context: &Context,
         selector: &str,
     ) -> Result<Item, Error> {
-        self.resolve(snapshot, context).show(selector).cloned()
+        self.resolve(snapshot, context)
+            .select_one(selector)
+            .cloned()
     }
 }
 
@@ -92,7 +94,7 @@ impl Inventory {
     }
 
     /// The one Item a selector names, as [`Core::show`] finds it.
-    pub fn show(&self, selector: &str) -> Result<&Item, Error> {
+    pub fn select_one(&self, selector: &str) -> Result<&Item, Error> {
         match self.select(selector).as_slice() {
             [item] => Ok(item),
             [] => Err(Error::no_match(selector)),
@@ -186,8 +188,8 @@ pub enum State {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Reason {
     pub code: ReasonCode,
-    /// The locator of the Entry that wins over this one, if another one does.
-    pub winner: Option<String>,
+    /// The locator of the Effective Entry that beats this one, if one does.
+    pub effective: Option<String>,
     /// The reason as a sentence, rendered by the core.
     pub sentence: String,
 }

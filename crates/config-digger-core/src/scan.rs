@@ -36,7 +36,7 @@ pub(crate) struct ScannedProject {
     pub key: String,
     pub exists: bool,
     /// The keys of every lexically normalised spelling that names this Project.
-    pub aliases: BTreeSet<String>,
+    pub spellings: BTreeSet<String>,
     /// The Agents whose registries record it.
     pub registered_by: BTreeSet<usize>,
 }
@@ -95,24 +95,36 @@ pub(crate) fn scan(
     for path in extra_projects {
         scanner.projects.add(path, None);
     }
+    // Locations keyed by Project can name Projects no registry records, so
+    // every one of them is read before any location in a Project folder.
     for home in &found {
         let definition = &definitions[home.agent_index];
-        for location in &definition.locations {
+        for location in definition.locations.iter() {
             if location.anchor.in_project() {
-                let folders: Vec<(PathBuf, String)> = scanner
-                    .projects
-                    .list
-                    .iter()
-                    .filter(|project| project.exists)
-                    .map(|project| (project.path.clone(), project.key.clone()))
-                    .collect();
-                for (folder, key) in folders {
-                    if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
-                        scanner.read_location(home, definition, location, path, Some(key));
-                    }
-                }
-            } else if let Some(path) = location.anchor.path(&home.roots, None) {
+                continue;
+            }
+            if let Some(path) = location.anchor.path(&home.roots, None) {
                 scanner.read_location(home, definition, location, path, None);
+            }
+        }
+    }
+    let folders: Vec<(PathBuf, String)> = scanner
+        .projects
+        .list
+        .iter()
+        .filter(|project| project.exists)
+        .map(|project| (project.path.clone(), project.key.clone()))
+        .collect();
+    for home in &found {
+        let definition = &definitions[home.agent_index];
+        for location in definition.locations.iter() {
+            if !location.anchor.in_project() {
+                continue;
+            }
+            for (folder, key) in &folders {
+                if let Some(path) = location.anchor.path(&home.roots, Some(folder)) {
+                    scanner.read_location(home, definition, location, path, Some(key.clone()));
+                }
             }
         }
     }
@@ -222,7 +234,11 @@ impl Scanner<'_> {
                 "read location"
             );
             let project = match object.project {
-                Some(spelling) => Some(self.projects.add(Path::new(&spelling), None)),
+                Some(spelling) => match self.projects.add(Path::new(&spelling), None) {
+                    Some(key) => Some(key),
+                    // Keyed to something that is not a Project path: no context reads it.
+                    None => continue,
+                },
                 None => project.clone(),
             };
             for name in object.entries.keys() {
@@ -352,7 +368,7 @@ struct Projects<'p> {
     ports: &'p Ports,
     list: Vec<ScannedProject>,
     /// The key of a lexically normalised spelling → index in `list`.
-    by_alias: BTreeMap<String, usize>,
+    by_spelling: BTreeMap<String, usize>,
 }
 
 impl<'p> Projects<'p> {
@@ -360,15 +376,20 @@ impl<'p> Projects<'p> {
         Self {
             ports,
             list: Vec::new(),
-            by_alias: BTreeMap::new(),
+            by_spelling: BTreeMap::new(),
         }
     }
 
-    /// Records a spelling of a Project and returns the Project's key.
-    fn add(&mut self, spelling: &Path, registered_by: Option<usize>) -> String {
+    /// Records a spelling of a Project and returns the Project's key, or
+    /// `None` when the spelling is not an absolute path and names no Project.
+    fn add(&mut self, spelling: &Path, registered_by: Option<usize>) -> Option<String> {
         let lexical = paths::lexical(spelling);
-        let alias = paths::key(&lexical);
-        let index = match self.by_alias.get(&alias) {
+        if !paths::is_absolute(&lexical) {
+            tracing::debug!(spelling = %spelling.display(), "not a Project path");
+            return None;
+        }
+        let spelling = paths::key(&lexical);
+        let index = match self.by_spelling.get(&spelling) {
             Some(&index) => index,
             None => {
                 let (path, exists) = paths::canonical(self.ports.fs.as_ref(), &lexical);
@@ -380,20 +401,20 @@ impl<'p> Projects<'p> {
                             path,
                             key: key.clone(),
                             exists,
-                            aliases: BTreeSet::from([key.clone()]),
+                            spellings: BTreeSet::from([key.clone()]),
                             registered_by: BTreeSet::new(),
                         });
-                        self.by_alias.insert(key, self.list.len() - 1);
+                        self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1
                     }
                 };
-                self.by_alias.insert(alias.clone(), index);
+                self.by_spelling.insert(spelling.clone(), index);
                 index
             }
         };
         let project = &mut self.list[index];
-        project.aliases.insert(alias);
+        project.spellings.insert(spelling);
         project.registered_by.extend(registered_by);
-        project.key.clone()
+        Some(project.key.clone())
     }
 }

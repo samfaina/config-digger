@@ -130,7 +130,7 @@ fn a_shadowed_entry_points_at_the_effective_entry_with_a_reason() {
         linear["entries"][1]["reason"],
         json!({
             "code": "shadowed_by_precedence",
-            "winner": r"E:\projects\petme-app\.mcp.json#mcpServers.linear",
+            "effective": r"E:\projects\petme-app\.mcp.json#mcpServers.linear",
             "sentence": r"Shadowed by the project Entry E:\projects\petme-app\.mcp.json#mcpServers.linear, which Claude Code ranks higher."
         })
     );
@@ -290,6 +290,50 @@ fn switching_context_does_not_read_the_disk() {
 
     assert!(accesses > 0);
     assert_eq!(fs.accesses(), accesses);
+}
+
+#[test]
+fn two_spellings_of_one_project_key_tie_and_the_reason_says_so() {
+    let claude_json = r#"{"projects": {
+        "E:/projects/petme-app": {"mcpServers": {"dart": {"command": "a"}}},
+        "e:\\projects\\petme-app": {"mcpServers": {"dart": {"command": "b"}}}
+    }}"#;
+    let fs = FakeFileSystem::new()
+        .with_file(PathBuf::from(HOME).join(".claude.json"), claude_json)
+        .with_folder(PETME);
+
+    let inventory = inventory(fs, Some(PETME));
+
+    let dart = item(&inventory, "dart");
+    assert_eq!(
+        states(&inventory),
+        expected(&[("dart", &[("local", "effective"), ("local", "shadowed")])])
+    );
+    assert_eq!(
+        dart["entries"][1]["reason"]["sentence"],
+        r"Shadowed by the local Entry C:\Users\fixture\.claude.json#projects.E:/projects/petme-app.mcpServers.dart, which has the same precedence in Claude Code; which of the two it uses is not known."
+    );
+}
+
+#[test]
+fn registry_keys_that_are_not_absolute_paths_are_not_projects() {
+    let claude_json = r#"{"projects": {
+        "": {"mcpServers": {"empty": {"command": "a"}}},
+        "rel/x": {"mcpServers": {"relative": {"command": "b"}}},
+        "E:/projects/petme-app": {}
+    }}"#;
+    let fs = FakeFileSystem::new()
+        .with_file(PathBuf::from(HOME).join(".claude.json"), claude_json)
+        .with_folder(PETME)
+        .with_folder(r"rel\x");
+
+    let inventory = inventory(fs, Some("rel/x"));
+
+    assert_eq!(
+        inventory["projects"],
+        json!([{ "path": PETME, "missing": false, "registered_by": ["claude-code"] }])
+    );
+    assert_eq!(inventory["items"], json!([]));
 }
 
 #[test]

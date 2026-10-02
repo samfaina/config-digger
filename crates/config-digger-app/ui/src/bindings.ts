@@ -99,8 +99,8 @@ export type ReadFailureKind = "parse" | "decode" | "permission" | "io";
 /**  Why an Entry has its State. */
 export type Reason = {
 	code: ReasonCode,
-	/**  The locator of the Entry that wins over this one, if another one does. */
-	winner: string | null,
+	/**  The locator of the Effective Entry that beats this one, if one does. */
+	effective: string | null,
 	/**  The reason as a sentence, rendered by the core. */
 	sentence: string,
 };
