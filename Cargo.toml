@@ -10,7 +10,10 @@ repository = "https://github.com/samfaina/config-digger"
 
 [workspace.dependencies]
 config-digger-core = { path = "crates/config-digger-core" }
+anstream = "1.0"
+anstyle = "1.0"
 clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.6"
 humantime = "2.4"
 schemars = "1.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -22,11 +25,13 @@ tauri = "2.12"
 tauri-build = "2.7"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tempfile = "3.27"
+terminal_size = "0.4"
 thiserror = "2.0"
 toml = "1.1"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+unicode-width = "0.2"
 winreg = "0.56"
 
 [workspace.lints.rust]

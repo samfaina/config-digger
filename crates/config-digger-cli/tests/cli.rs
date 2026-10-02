@@ -11,7 +11,8 @@ const CLAUDE_JSON: &str =
 
 /// A temporary user home folder the binary is pointed at.
 struct Harness {
-    home: TempDir,
+    root: TempDir,
+    home: PathBuf,
 }
 
 struct Run {
@@ -22,9 +23,15 @@ struct Run {
 
 impl Harness {
     fn new() -> Self {
-        Self {
-            home: tempfile::tempdir().unwrap(),
-        }
+        Self::in_folder("home")
+    }
+
+    /// A home in a folder with the given name, inside a fresh temporary folder.
+    fn in_folder(name: &str) -> Self {
+        let root = tempfile::tempdir().unwrap();
+        let home = root.path().join(name);
+        std::fs::create_dir(&home).unwrap();
+        Self { root, home }
     }
 
     fn with_file(self, relative: &str, contents: &str) -> Self {
@@ -35,14 +42,19 @@ impl Harness {
     }
 
     fn path(&self, relative: &str) -> PathBuf {
-        self.home.path().join(relative)
+        self.home.join(relative)
     }
 
     fn run(&self, args: &[&str]) -> Run {
+        self.run_with_env(args, &[])
+    }
+
+    fn run_with_env(&self, args: &[&str], env: &[(&str, &str)]) -> Run {
         let mut command = self.command(args);
         command
-            .env("USERPROFILE", self.home.path())
-            .env("HOME", self.home.path());
+            .env("USERPROFILE", &self.home)
+            .env("HOME", &self.home)
+            .envs(env.iter().copied());
         execute(command)
     }
 
@@ -57,9 +69,13 @@ impl Harness {
         let mut command = Command::new(env!("CARGO_BIN_EXE_config-digger"));
         command
             .args(args)
-            .current_dir(self.home.path())
+            .current_dir(self.root.path())
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("RUST_LOG");
+        // Terminal conventions the tests opt into one at a time.
+        for variable in ["NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "COLUMNS"] {
+            command.env_remove(variable);
+        }
         command
     }
 }
@@ -80,6 +96,8 @@ impl Run {
             .unwrap_or_else(|e| panic!("stdout is not one JSON document ({e}):\n{}", self.stdout))
     }
 }
+
+const ESC: char = '\u{1b}';
 
 fn locator(path: &Path, key_path: &str) -> String {
     format!("{}#{key_path}", path.display())
@@ -249,4 +267,198 @@ fn without_verbose_nothing_is_logged() {
 
     assert_eq!(run.code, 0);
     assert!(run.stderr.is_empty(), "{}", run.stderr);
+}
+
+#[test]
+fn completions_print_a_script_for_each_shell() {
+    for (shell, marker) in [
+        ("powershell", "Register-ArgumentCompleter"),
+        ("bash", "complete -F"),
+        ("zsh", "#compdef config-digger"),
+        ("fish", "complete -c config-digger"),
+    ] {
+        let run = Harness::new().run(&["completions", shell]);
+
+        assert_eq!(run.code, 0, "{shell}: {}", run.stderr);
+        assert!(run.stdout.contains(marker), "{shell}:\n{}", run.stdout);
+        assert!(run.stdout.contains("list"), "{shell}:\n{}", run.stdout);
+        assert!(run.stderr.is_empty(), "{shell}: {}", run.stderr);
+    }
+}
+
+#[test]
+fn completions_for_an_unknown_shell_is_a_usage_error() {
+    let run = Harness::new().run(&["completions", "tcsh"]);
+
+    assert_eq!(run.code, 2);
+    assert!(run.stdout.is_empty(), "{}", run.stdout);
+}
+
+#[test]
+fn completions_with_json_is_a_usage_error_document() {
+    let run = Harness::new().run(&["completions", "bash", "--json"]);
+
+    assert_eq!(run.code, 2);
+    assert_eq!(run.document()["error"]["code"], "usage");
+}
+
+#[test]
+fn color_always_colours_the_list() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run(&["list", "--color", "always"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains(ESC), "{}", run.stdout);
+}
+
+#[test]
+fn color_never_prints_no_escape_codes_even_when_forced() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run_with_env(&["list", "--color", "never"], &[("CLICOLOR_FORCE", "1")]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("Effective"), "{}", run.stdout);
+    assert!(!run.stdout.contains(ESC), "{}", run.stdout);
+}
+
+#[test]
+fn color_auto_is_off_when_stdout_is_not_a_terminal() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run(&["list"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(!run.stdout.contains(ESC), "{}", run.stdout);
+}
+
+#[test]
+fn no_color_turns_colour_off_in_auto() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let forced = harness.run_with_env(&["list"], &[("CLICOLOR_FORCE", "1")]);
+    let no_color = harness.run_with_env(
+        &["list", "--color", "auto"],
+        &[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")],
+    );
+
+    assert!(forced.stdout.contains(ESC), "{}", forced.stdout);
+    assert_eq!(no_color.code, 0, "{}", no_color.stderr);
+    assert!(no_color.stdout.contains("Effective"), "{}", no_color.stdout);
+    assert!(!no_color.stdout.contains(ESC), "{}", no_color.stdout);
+}
+
+#[test]
+fn an_empty_no_color_is_ignored() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run_with_env(&["list"], &[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "")]);
+
+    assert!(run.stdout.contains(ESC), "{}", run.stdout);
+}
+
+#[test]
+fn color_always_overrides_no_color() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run_with_env(&["list", "--color", "always"], &[("NO_COLOR", "1")]);
+
+    assert!(run.stdout.contains(ESC), "{}", run.stdout);
+}
+
+#[test]
+fn color_applies_to_warnings_on_stderr() {
+    let harness = Harness::new().with_file(".claude.json", "{ not json");
+
+    let always = harness.run(&["list", "--color", "always"]);
+    let never = harness.run_with_env(&["list", "--color", "never"], &[("CLICOLOR_FORCE", "1")]);
+
+    assert!(always.stderr.contains(ESC), "{}", always.stderr);
+    assert!(never.stderr.contains("warning"), "{}", never.stderr);
+    assert!(!never.stderr.contains(ESC), "{}", never.stderr);
+}
+
+#[test]
+fn color_never_applies_to_help() {
+    let harness = Harness::new();
+
+    let forced = harness.run_with_env(&["--help"], &[("CLICOLOR_FORCE", "1")]);
+    let never = harness.run_with_env(&["--help", "--color", "never"], &[("CLICOLOR_FORCE", "1")]);
+
+    assert!(forced.stdout.contains(ESC), "{}", forced.stdout);
+    assert_eq!(never.code, 0);
+    assert!(!never.stdout.contains(ESC), "{}", never.stdout);
+}
+
+#[test]
+fn json_is_never_coloured() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run(&["list", "--json", "--color", "always"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert_eq!(run.document()["schema_version"], 1);
+}
+
+#[test]
+fn an_unknown_color_is_a_usage_error() {
+    let run = Harness::new().run(&["list", "--color", "sometimes"]);
+
+    assert_eq!(run.code, 2);
+}
+
+#[test]
+fn list_truncates_to_the_terminal_width() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run_with_env(&["list"], &[("COLUMNS", "80")]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    for line in run.stdout.lines() {
+        assert!(line.chars().count() <= 80, "too wide:\n{}", run.stdout);
+    }
+    assert!(run.stdout.contains('…'), "{}", run.stdout);
+    // The key path is what tells the rows apart, so it survives the cut.
+    for name in ["cd-throwaway-github", "linear"] {
+        let key_path = format!("#mcpServers.{name}");
+        assert!(run.stdout.contains(&key_path), "{}", run.stdout);
+    }
+}
+
+#[test]
+fn list_wide_does_not_truncate() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run_with_env(&["list", "--wide"], &[("COLUMNS", "80")]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(!run.stdout.contains('…'), "{}", run.stdout);
+    let location = locator(&harness.path(".claude.json"), "mcpServers.linear");
+    assert!(run.stdout.contains(&location), "{}", run.stdout);
+}
+
+#[test]
+fn list_is_not_truncated_when_stdout_is_not_a_terminal() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run(&["list"]);
+
+    assert!(!run.stdout.contains('…'), "{}", run.stdout);
+}
+
+#[test]
+fn non_ascii_paths_print_as_utf8() {
+    let harness = Harness::in_folder("café-ñandú-日本").with_file(".claude.json", CLAUDE_JSON);
+    let location = locator(&harness.path(".claude.json"), "mcpServers.linear");
+
+    let text = harness.run(&["list"]);
+    let json = harness.run(&["list", "--json"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(text.stdout.contains(&location), "{}", text.stdout);
+    assert_eq!(
+        json.document()["items"][1]["entries"][0]["locator"],
+        location
+    );
 }
