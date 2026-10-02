@@ -22,6 +22,14 @@ _Avoid_: Installer definition, package manager
 The root folder from which one instance of an Agent reads its user-level configuration. An Agent can have several (another `CODEX_HOME`, a VS Code profile, Claude Desktop's Store and classic folders); Entries in different Agent homes never compete. A home whose folder the Agent's lookup order skips is still shown, as not read.
 _Avoid_: Profile, instance, installation
 
+**Installation**:
+A launchable copy of an Agent, with its own version, such as the native Claude Code, the Claude Code that Claude Desktop downloads, or a VS Code user setup. Several Installations can read the same Agent home, and one Installation can read several. Older version files an installer keeps around are not Installations.
+_Avoid_: Install, binary, copy
+
+**Feature gate**:
+A switch on the Agent vendor's side that changes how the Agent treats its configuration, such as whether Cursor collapses servers with the same URL. config-digger sees at most the value the Agent last cached, as of when it cached it; otherwise it assumes the Agent's default.
+_Avoid_: Flag, experiment, rollout
+
 **Mirrored home**:
 An Agent home whose content another tool copies from a source Agent home, such as the Codex home Orca keeps in sync with `~/.codex`. config-digger never writes to it: actions on its Entries go to the Entry they were copied from.
 _Avoid_: Managed home, runtime home, shadow home
@@ -85,8 +93,16 @@ Said of an Entry that the Agent never reads in any context, such as one in an Ag
 _Avoid_: Orphaned, stale, ignored
 
 **Invalid**:
-Said of an Entry that takes part in a combination the Agent rejects, such as Codex Entries that merge into a server with two transports, which stops the Agent from starting.
+Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, or Codex Entries that merge into a server with two transports, which stops the Agent from starting.
 _Avoid_: Broken, conflicting, error
+
+**Read failure**:
+A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
+_Avoid_: Unreadable, broken file, corrupt file, invalid file
+
+**Secret**:
+A literal value in an Entry that config-digger never shows, such as a token in an env or header value, a URL credential, or a field an Agent definition marks. It is masked everywhere configuration appears, keeping only a recognised prefix such as `Bearer ` or `ghp_`. A reference to an environment variable is not a Secret.
+_Avoid_: Credential, sensitive value, token
 
 ### Actions
 
@@ -109,3 +125,7 @@ _Avoid_: Change, transaction, batch
 **Undo**:
 Revert one Operation, as long as nothing it touched has changed since. Any Operation in the history can be undone, not only the last one, and an Undo is itself an Operation.
 _Avoid_: Rollback, revert, restore
+
+**Rollback**:
+The automatic return of an Operation's locations to what they were before it, when one of its writes fails or its result cannot be verified. It happens before the Operation completes and never overwrites a location someone else changed after config-digger wrote it; when it cannot return every location, the Operation is left needing manual recovery.
+_Avoid_: Undo, revert, abort
