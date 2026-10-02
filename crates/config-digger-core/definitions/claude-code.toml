@@ -17,7 +17,40 @@ block = "path"
 path = "~/.claude.json"
 
 [[scopes]]
+id = "local"
+
+[[scopes]]
+id = "project"
+
+[[scopes]]
 id = "user"
+
+# Every Project Claude Code has been started on has a key in `projects`, in
+# whatever spelling it was started with (`E:/x` and `E:\x` both occur).
+[projects]
+registries = [
+  { block = "json-keys", anchor = { block = "home", root = "state_file" }, root = ["projects"] },
+]
+
+[[locations]]
+id = "local-mcp"
+anchor = { block = "home", root = "state_file" }
+format = { block = "json" }
+root = ["projects", "{project}", "mcpServers"]
+kind = "mcp"
+scope = "local"
+provenance = "file"
+
+# Read in the Project folder only: whether Claude Code also looks in parent
+# folders is not known.
+[[locations]]
+id = "project-mcp"
+anchor = { block = "project", path = ".mcp.json" }
+format = { block = "json" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "project"
+provenance = "file"
 
 [[locations]]
 id = "user-mcp"
@@ -26,7 +59,9 @@ format = { block = "json" }
 root = ["mcpServers"]
 kind = "mcp"
 scope = "user"
+provenance = "file"
 
+# Same-named Entries compete whole; the highest location wins.
 [items.mcp]
-precedence = ["user-mcp"]
+precedence = ["local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }

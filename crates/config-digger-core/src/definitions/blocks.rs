@@ -80,11 +80,15 @@ impl Locate for PathLocator {
 
 /// Turns an anchor into the path of a configuration location.
 pub(crate) trait Anchored {
-    /// The location's path, given the roots of the Agent home being scanned.
-    fn path(&self, roots: &BTreeMap<String, PathBuf>) -> Option<PathBuf>;
+    /// The location's path, given the roots of the Agent home being scanned
+    /// and, for an anchor inside a Project, the Project's folder.
+    fn path(&self, roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf>;
 
     /// The home root this anchor needs, if any.
     fn home_root(&self) -> Option<&str>;
+
+    /// Whether the location lies in a Project folder, so that there is one per Project.
+    fn in_project(&self) -> bool;
 }
 
 /// What a location's path is relative to.
@@ -92,26 +96,37 @@ pub(crate) trait Anchored {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Anchor {
     Home(HomeAnchor),
+    Project(ProjectAnchor),
 }
 
 impl Validate for Anchor {
     fn validate(&self) -> Result<(), String> {
         match self {
             Anchor::Home(block) => block.validate(),
+            Anchor::Project(block) => block.validate(),
         }
     }
 }
 
 impl Anchored for Anchor {
-    fn path(&self, roots: &BTreeMap<String, PathBuf>) -> Option<PathBuf> {
+    fn path(&self, roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
         match self {
-            Anchor::Home(block) => block.path(roots),
+            Anchor::Home(block) => block.path(roots, project),
+            Anchor::Project(block) => block.path(roots, project),
         }
     }
 
     fn home_root(&self) -> Option<&str> {
         match self {
             Anchor::Home(block) => block.home_root(),
+            Anchor::Project(block) => block.home_root(),
+        }
+    }
+
+    fn in_project(&self) -> bool {
+        match self {
+            Anchor::Home(block) => block.in_project(),
+            Anchor::Project(block) => block.in_project(),
         }
     }
 }
@@ -136,7 +151,7 @@ impl Validate for HomeAnchor {
 }
 
 impl Anchored for HomeAnchor {
-    fn path(&self, roots: &BTreeMap<String, PathBuf>) -> Option<PathBuf> {
+    fn path(&self, roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
         let root = roots.get(&self.root)?;
         Some(match &self.path {
             Some(path) => join_relative(root, path),
@@ -147,6 +162,129 @@ impl Anchored for HomeAnchor {
     fn home_root(&self) -> Option<&str> {
         Some(&self.root)
     }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+}
+
+/// A path in the Project folder itself.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectAnchor {
+    /// A `/`-separated path relative to the Project folder.
+    pub path: String,
+}
+
+impl Validate for ProjectAnchor {
+    fn validate(&self) -> Result<(), String> {
+        validate_relative(&self.path)
+    }
+}
+
+impl Anchored for ProjectAnchor {
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
+        Some(join_relative(project?, &self.path))
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        true
+    }
+}
+
+// --- Project registries -----------------------------------------------------
+
+/// Lists the Projects an Agent has recorded, in the Agent's own spelling.
+pub(crate) trait Register {
+    /// Where the registry lives.
+    fn anchor(&self) -> &Anchor;
+
+    /// The Project paths the registry's text records.
+    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError>;
+}
+
+/// Where an Agent records the Projects it has been started on.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Registry {
+    JsonKeys(JsonKeys),
+}
+
+impl Validate for Registry {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Registry::JsonKeys(block) => block.validate(),
+        }
+    }
+}
+
+impl Register for Registry {
+    fn anchor(&self) -> &Anchor {
+        match self {
+            Registry::JsonKeys(block) => block.anchor(),
+        }
+    }
+
+    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+        match self {
+            Registry::JsonKeys(block) => block.spellings(text),
+        }
+    }
+}
+
+/// The keys of an object in a strict JSON file, each one a Project path.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonKeys {
+    /// Where the file is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The key path of the object whose keys are Project paths.
+    pub root: Vec<String>,
+}
+
+impl Validate for JsonKeys {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        if self.anchor.in_project() {
+            return Err("a project registry must not lie in a Project".into());
+        }
+        if self.root.is_empty() {
+            return Err("a project registry needs a root key path".into());
+        }
+        Ok(())
+    }
+}
+
+impl Register for JsonKeys {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+        let document = JsonFormat {}.parse(text)?;
+        let root = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        Ok(match root {
+            Some(serde_json::Value::Object(projects)) => projects.keys().cloned().collect(),
+            _ => Vec::new(),
+        })
+    }
+}
+
+// --- Provenance -------------------------------------------------------------
+
+/// How the Entries of a location got there, which decides how they can be taken away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Provenance {
+    /// A key someone wrote into a configuration file, by hand or through the Agent.
+    File,
 }
 
 // --- Formats ----------------------------------------------------------------

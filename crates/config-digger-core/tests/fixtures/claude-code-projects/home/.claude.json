@@ -1,0 +1,47 @@
+{
+  "numStartups": 7,
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+    "notes": {
+      "command": "notes-mcp"
+    }
+  },
+  "projects": {
+    "E:/projects/petme-app": {
+      "mcpServers": {
+        "github": {
+          "command": "gh-mcp"
+        },
+        "dart": {
+          "type": "stdio",
+          "command": "dart",
+          "args": ["mcp-server"]
+        }
+      }
+    },
+    "E:\\projects\\petme-app": {
+      "allowedTools": []
+    },
+    "e:/projects/petme-app": {
+      "mcpServers": {
+        "flutter": {
+          "command": "flutter-mcp"
+        }
+      }
+    },
+    "E:/projects/gone": {
+      "mcpServers": {
+        "old": {
+          "command": "old-mcp"
+        }
+      }
+    }
+  }
+}

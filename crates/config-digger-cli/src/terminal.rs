@@ -178,6 +178,26 @@ pub fn elide_middle(text: &str, width: usize) -> String {
     format!("{head}{ELLIPSIS}{tail}")
 }
 
+/// Splits `text` into lines of at most `width` columns, breaking between
+/// words. A word wider than `width` gets a line of its own, to be cut later.
+/// Without a width the text stays one line.
+pub fn wrap(text: &str, width: Option<usize>) -> Vec<String> {
+    let Some(width) = width else {
+        return vec![text.to_owned()];
+    };
+    let mut lines: Vec<String> = Vec::new();
+    for word in text.split_whitespace() {
+        match lines.last_mut() {
+            Some(line) if columns(line) + 1 + columns(word) <= width => {
+                line.push(' ');
+                line.push_str(word);
+            }
+            _ => lines.push(word.to_owned()),
+        }
+    }
+    lines
+}
+
 /// The longest run of `chars` that fits in `columns`.
 fn take_columns(chars: impl Iterator<Item = char>, columns: usize) -> String {
     let mut used = 0;
@@ -213,6 +233,27 @@ mod tests {
 
         assert!(columns(&elided) <= 12, "{elided}");
         assert!(elided.ends_with("\\x.json"), "{elided}");
+    }
+
+    #[test]
+    fn wrap_breaks_between_words() {
+        assert_eq!(
+            wrap("Shadowed by the user Entry", Some(12)),
+            ["Shadowed by", "the user", "Entry"]
+        );
+    }
+
+    #[test]
+    fn wrap_gives_a_long_word_its_own_line() {
+        assert_eq!(
+            wrap(r"by C:\a\very\long\path.json#x here", Some(10)),
+            ["by", r"C:\a\very\long\path.json#x", "here"]
+        );
+    }
+
+    #[test]
+    fn wrap_without_a_width_keeps_one_line() {
+        assert_eq!(wrap("a b  c", None), ["a b  c"]);
     }
 
     #[test]

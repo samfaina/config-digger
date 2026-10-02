@@ -1,6 +1,6 @@
 //! Listing Claude Code user MCP servers through the core `api`, with fake ports.
 
-use config_digger_core::api::{Context, Core};
+use config_digger_core::api::{Context, Core, ScanOptions};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -14,7 +14,7 @@ fn in_home(relative: &str) -> PathBuf {
 
 fn list(fs: FakeFileSystem) -> Value {
     let core = Core::new(fake::ports(fs, FakeEnvironment::with_home(HOME))).unwrap();
-    let snapshot = core.scan().unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
     serde_json::to_value(core.resolve(&snapshot, &Context::default())).unwrap()
 }
 
@@ -24,7 +24,12 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
 
     assert_eq!(
         inventory["homes"],
-        json!([{ "agent": "claude-code", "agent_name": "Claude Code", "home": "default" }])
+        json!([{
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "scopes": ["local", "project", "user"]
+        }])
     );
     assert_eq!(
         inventory["items"],
@@ -40,7 +45,9 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "key_path": ["mcpServers", "cd-throwaway-github"],
                     "locator": r"C:\Users\fixture\.claude.json#mcpServers.cd-throwaway-github",
                     "scope": "user",
-                    "state": "effective"
+                    "provenance": "file",
+                    "state": "effective",
+                    "reason": null
                 }]
             },
             {
@@ -54,7 +61,9 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "key_path": ["mcpServers", "linear"],
                     "locator": r"C:\Users\fixture\.claude.json#mcpServers.linear",
                     "scope": "user",
-                    "state": "effective"
+                    "provenance": "file",
+                    "state": "effective",
+                    "reason": null
                 }]
             }
         ])

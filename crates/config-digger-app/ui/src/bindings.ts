@@ -16,28 +16,43 @@ export type Entry = {
 	/**  `<path>#<key path>`. */
 	locator: string,
 	scope: string,
+	provenance: Provenance,
 	state: State,
+	/**  Why the Entry has its State, when it is not Effective. */
+	reason: Reason | null,
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
 export type Error = {
 	code: ErrorCode,
 	message: string,
+	/**  What an ambiguous selector could mean, one locator per Item. */
+	candidates: string[],
 };
 
-export type ErrorCode = "unexpected";
+export type ErrorCode = "unexpected" | 
+/**  A selector matched nothing in the context. */
+"no_match" | 
+/**  A selector matched more than one Item. */
+"ambiguous";
 
 /**  An Agent home found on this machine. */
 export type Home = {
 	agent: string,
 	agent_name: string,
 	home: string,
+	/**  The Agent's Scopes, in display order. */
+	scopes: string[],
 };
 
 /**  Every Item found, with the Agent homes they belong to. */
 export type Inventory = {
 	/**  When the snapshot was read, in RFC 3339. */
 	read_at: string,
+	/**  The context's Project, as found by the scan, or `None` for no Project. */
+	project: string | null,
+	/**  Every Project the scan found or was asked for, sorted by path. */
+	projects: Project[],
 	homes: Home[],
 	/**  Sorted by Agent, home, Item kind and name. */
 	items: Item[],
@@ -56,6 +71,20 @@ export type Item = {
 
 export type ItemKind = "mcp";
 
+/**  What an Agent can be started on. */
+export type Project = {
+	/**  The folder's real path, or its lexical normalisation when it is missing. */
+	path: string,
+	missing: boolean,
+	/**  The Agents whose registries record it. Empty when it was only asked for. */
+	registered_by: string[],
+};
+
+/**  How an Entry got where it is, which decides how it can be taken away. */
+export type Provenance = 
+/**  A key in a configuration file. */
+"file";
+
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {
 	agent: string,
@@ -66,6 +95,19 @@ export type ReadFailure = {
 };
 
 export type ReadFailureKind = "parse" | "decode" | "permission" | "io";
+
+/**  Why an Entry has its State. */
+export type Reason = {
+	code: ReasonCode,
+	/**  The locator of the Entry that wins over this one, if another one does. */
+	winner: string | null,
+	/**  The reason as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type ReasonCode = 
+/**  A same-named Entry at a location the Agent ranks higher is Effective. */
+"shadowed_by_precedence";
 
 export type State = "effective" | "shadowed";
 

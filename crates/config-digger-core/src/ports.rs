@@ -15,6 +15,11 @@ pub trait FileSystem: Send + Sync {
 
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
+
+    /// The real path of an existing file or folder, with every link and
+    /// junction resolved and each name spelled as on disk; `None` when nothing
+    /// exists at `path`.
+    fn real_path(&self, path: &Path) -> Option<PathBuf>;
 }
 
 /// A process running on this machine, as far as process detection needs it.
