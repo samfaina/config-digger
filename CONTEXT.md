@@ -22,6 +22,14 @@ _Avoid_: Installer definition, package manager
 The root folder from which one instance of an Agent reads its user-level configuration. An Agent can have several (another `CODEX_HOME`, a VS Code profile, Claude Desktop's Store and classic folders); Entries in different Agent homes never compete. A home whose folder the Agent's lookup order skips is still shown, as not read.
 _Avoid_: Profile, instance, installation
 
+**Installation**:
+A launchable copy of an Agent, with its own version, such as the native Claude Code, the Claude Code that Claude Desktop downloads, or a VS Code user setup. Several Installations can read the same Agent home, and one Installation can read several. Older version files an installer keeps around are not Installations.
+_Avoid_: Install, binary, copy
+
+**Feature gate**:
+A switch on the Agent vendor's side that changes how the Agent treats its configuration, such as whether Cursor collapses servers with the same URL. config-digger sees at most the value the Agent last cached, as of when it cached it; otherwise it assumes the Agent's default.
+_Avoid_: Flag, experiment, rollout
+
 **Mirrored home**:
 An Agent home whose content another tool copies from a source Agent home, such as the Codex home Orca keeps in sync with `~/.codex`. config-digger never writes to it: actions on its Entries go to the Entry they were copied from.
 _Avoid_: Managed home, runtime home, shadow home
