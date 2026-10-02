@@ -113,3 +113,7 @@ _Avoid_: Change, transaction, batch
 **Undo**:
 Revert one Operation, as long as nothing it touched has changed since. Any Operation in the history can be undone, not only the last one, and an Undo is itself an Operation.
 _Avoid_: Rollback, revert, restore
+
+**Rollback**:
+The automatic return of an Operation's locations to what they were before it, when one of its writes fails or its result cannot be verified. It happens before the Operation completes and never overwrites a location someone else changed after config-digger wrote it; when it cannot return every location, the Operation is left needing manual recovery.
+_Avoid_: Undo, revert, abort
