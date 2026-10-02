@@ -4,20 +4,38 @@
   "description": "Where an Agent keeps its configuration, in which format, and with what precedence.",
   "type": "object",
   "properties": {
-    "agent": {
-      "$ref": "#/$defs/AgentInfo"
-    },
     "format_version": {
       "description": "The version of this file format. Must be 1.",
       "type": "integer",
       "format": "uint32",
       "minimum": 0
     },
+    "agent": {
+      "$ref": "#/$defs/AgentInfo"
+    },
     "homes": {
       "description": "The Agent homes this Agent can have.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/HomeDefinition"
+      }
+    },
+    "scopes": {
+      "description": "The Scopes this Agent applies Entries at, in display order. A Scope is\nonly a label: precedence comes from the order of locations in `items`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ScopeDefinition"
+      }
+    },
+    "projects": {
+      "description": "Where this Agent records the Projects it has been started on.",
+      "$ref": "#/$defs/ProjectsDefinition"
+    },
+    "locations": {
+      "description": "The configuration locations this Agent reads.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LocationDefinition"
       }
     },
     "items": {
@@ -29,24 +47,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "locations": {
-      "description": "The configuration locations this Agent reads.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/LocationDefinition"
-      }
-    },
-    "projects": {
-      "description": "Where this Agent records the Projects it has been started on.",
-      "$ref": "#/$defs/ProjectsDefinition"
-    },
-    "scopes": {
-      "description": "The Scopes this Agent applies Entries at, in display order. A Scope is\nonly a label: precedence comes from the order of locations in `items`.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/ScopeDefinition"
-      }
     }
   },
   "additionalProperties": false,
@@ -77,6 +77,106 @@
         "name"
       ]
     },
+    "HomeDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "roots": {
+          "description": "Named roots of the home. The home is found when any root exists.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Locator"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "roots"
+      ]
+    },
+    "Locator": {
+      "description": "Where one root of an Agent home lives.",
+      "oneOf": [
+        {
+          "description": "A fixed path below the user's home folder, written `~/<relative path>`.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
+          ]
+        }
+      ]
+    },
+    "ScopeDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ]
+    },
+    "ProjectsDefinition": {
+      "type": "object",
+      "properties": {
+        "registries": {
+          "description": "Each registry adds the Projects it records. Projects found by any Agent\nare evaluated for every Agent.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Registry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Registry": {
+      "description": "Where an Agent records the Projects it has been started on.",
+      "oneOf": [
+        {
+          "description": "The keys of an object in a strict JSON file, each one a Project path.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the file is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "root": {
+              "description": "The key path of the object whose keys are Project paths.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "json-keys"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "root"
+          ]
+        }
+      ]
+    },
     "Anchor": {
       "description": "What a location's path is relative to.",
       "oneOf": [
@@ -84,9 +184,9 @@
           "description": "A root of the Agent home, or a path below it.",
           "type": "object",
           "properties": {
-            "block": {
-              "type": "string",
-              "const": "home"
+            "root": {
+              "description": "The name of a root declared by every home of the definition.",
+              "type": "string"
             },
             "path": {
               "description": "A `/`-separated path relative to the root. Omitted when the root is the location.",
@@ -95,9 +195,9 @@
                 "null"
               ]
             },
-            "root": {
-              "description": "The name of a root declared by every home of the definition.",
-              "type": "string"
+            "block": {
+              "type": "string",
+              "const": "home"
             }
           },
           "additionalProperties": false,
@@ -110,13 +210,13 @@
           "description": "A path in the Project folder itself.",
           "type": "object",
           "properties": {
-            "block": {
-              "type": "string",
-              "const": "project"
-            },
             "path": {
               "description": "A `/`-separated path relative to the Project folder.",
               "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "project"
             }
           },
           "additionalProperties": false,
@@ -127,23 +227,46 @@
         }
       ]
     },
-    "Competition": {
-      "description": "How same-kind Entries of one Agent home compete.",
-      "oneOf": [
-        {
-          "description": "Entries compete when their names are exactly equal.",
-          "type": "object",
-          "properties": {
-            "block": {
-              "type": "string",
-              "const": "exact-name"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "block"
-          ]
+    "LocationDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "format": {
+          "$ref": "#/$defs/Format"
+        },
+        "root": {
+          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "$ref": "#/$defs/ItemKind"
+        },
+        "scope": {
+          "description": "The id of a declared Scope.",
+          "type": "string"
+        },
+        "provenance": {
+          "description": "The base Provenance of the location's Entries.",
+          "$ref": "#/$defs/Provenance"
         }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "anchor",
+        "format",
+        "root",
+        "kind",
+        "scope",
+        "provenance"
       ]
     },
     "Format": {
@@ -165,129 +288,11 @@
         }
       ]
     },
-    "HomeDefinition": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "roots": {
-          "description": "Named roots of the home. The home is found when any root exists.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/Locator"
-          }
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "roots"
-      ]
-    },
     "ItemKind": {
       "type": "string",
       "enum": [
         "mcp"
       ]
-    },
-    "ItemRules": {
-      "type": "object",
-      "properties": {
-        "competition": {
-          "$ref": "#/$defs/Competition"
-        },
-        "precedence": {
-          "description": "Location ids of this kind, highest precedence first.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "precedence",
-        "competition"
-      ]
-    },
-    "LocationDefinition": {
-      "type": "object",
-      "properties": {
-        "anchor": {
-          "$ref": "#/$defs/Anchor"
-        },
-        "format": {
-          "$ref": "#/$defs/Format"
-        },
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/ItemKind"
-        },
-        "provenance": {
-          "description": "The base Provenance of the location's Entries.",
-          "$ref": "#/$defs/Provenance"
-        },
-        "root": {
-          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "scope": {
-          "description": "The id of a declared Scope.",
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "anchor",
-        "format",
-        "root",
-        "kind",
-        "scope",
-        "provenance"
-      ]
-    },
-    "Locator": {
-      "description": "Where one root of an Agent home lives.",
-      "oneOf": [
-        {
-          "description": "A fixed path below the user's home folder, written `~/<relative path>`.",
-          "type": "object",
-          "properties": {
-            "block": {
-              "type": "string",
-              "const": "path"
-            },
-            "path": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "block",
-            "path"
-          ]
-        }
-      ]
-    },
-    "ProjectsDefinition": {
-      "type": "object",
-      "properties": {
-        "registries": {
-          "description": "Each registry adds the Projects it records. Projects found by any Agent\nare evaluated for every Agent.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Registry"
-          }
-        }
-      },
-      "additionalProperties": false
     },
     "Provenance": {
       "description": "How the Entries of a location got there, which decides how they can be taken away.",
@@ -299,48 +304,43 @@
         }
       ]
     },
-    "Registry": {
-      "description": "Where an Agent records the Projects it has been started on.",
-      "oneOf": [
-        {
-          "description": "The keys of an object in a strict JSON file, each one a Project path.",
-          "type": "object",
-          "properties": {
-            "anchor": {
-              "description": "Where the file is. It must not lie in a Project.",
-              "$ref": "#/$defs/Anchor"
-            },
-            "block": {
-              "type": "string",
-              "const": "json-keys"
-            },
-            "root": {
-              "description": "The key path of the object whose keys are Project paths.",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "block",
-            "anchor",
-            "root"
-          ]
-        }
-      ]
-    },
-    "ScopeDefinition": {
+    "ItemRules": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "precedence": {
+          "description": "Location ids of this kind, highest precedence first.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "competition": {
+          "$ref": "#/$defs/Competition"
         }
       },
       "additionalProperties": false,
       "required": [
-        "id"
+        "precedence",
+        "competition"
+      ]
+    },
+    "Competition": {
+      "description": "How same-kind Entries of one Agent home compete.",
+      "oneOf": [
+        {
+          "description": "Entries compete when their names are exactly equal.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "exact-name"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
       ]
     }
   }

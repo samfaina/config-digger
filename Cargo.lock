@@ -235,6 +235,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -487,13 +497,16 @@ name = "config-digger-core"
 version = "0.1.0"
 dependencies = [
  "humantime",
+ "jsonc-parser",
  "schemars 1.2.2",
  "serde",
  "serde_json",
+ "similar",
  "specta",
  "sysinfo",
  "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
+ "toml_edit 0.25.15+spec-1.1.0",
  "tracing",
  "winreg 0.56.0",
 ]
@@ -1844,6 +1857,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonc-parser"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ecded084f9b9a718d39668a42657c32253663d1f6afb3fbb9134f0305f73f48"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jsonptr"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2974,6 +2997,7 @@ version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
+ "indexmap 2.14.2",
  "itoa",
  "memchr",
  "serde",
@@ -3105,6 +3129,15 @@ name = "simd-adler32"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+
+[[package]]
+name = "similar"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f66ca1f7aca2474dc10c942eb22feffc897735f54cd1db90138c2fddb490987"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "siphasher"
@@ -3899,6 +3932,7 @@ dependencies = [
  "indexmap 2.14.2",
  "toml_datetime 1.1.1+spec-1.1.0",
  "toml_parser",
+ "toml_writer",
  "winnow 1.0.4",
 ]
 
