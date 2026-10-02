@@ -920,3 +920,215 @@ fn remove_while_another_operation_holds_the_lock_exits_6() {
     assert_eq!(run.document()["error"]["code"], "locked");
     assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
 }
+
+impl Harness {
+    /// Removes `selector` with `--yes` and returns the Operation's id.
+    fn removed(&self, selector: &str) -> String {
+        let run = self.run(&["remove", selector, "--no-project", "--yes", "--json"]);
+        assert_eq!(run.code, 0, "{}", run.stderr);
+        run.document()["result"]["operation"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+}
+
+#[test]
+fn history_lists_operations_newest_first() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let first = harness.removed("linear");
+    let second = harness.removed("notes");
+
+    let json = harness.run(&["history", "--json"]);
+    let text = harness.run(&["history"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let document = json.document();
+    assert_eq!(document["schema_version"], 1);
+    let operations = document["operations"].as_array().unwrap();
+    assert_eq!(operations.len(), 2);
+    assert_eq!(operations[0]["id"], second.as_str());
+    assert_eq!(operations[1]["id"], first.as_str());
+    assert_eq!(operations[0]["title"], "Remove 1 Entry");
+    assert_eq!(operations[0]["status_text"], "Applied");
+    assert_eq!(operations[0]["undoable"], true);
+    assert!(operations[0]["created_at"].as_str().unwrap().ends_with('Z'));
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    let row = text
+        .stdout
+        .lines()
+        .find(|line| line.contains(&second))
+        .unwrap_or_else(|| panic!("no row for {second}:\n{}", text.stdout));
+    let columns: Vec<&str> = row.split_whitespace().collect();
+    assert_eq!(columns[0], second);
+    assert_eq!(&columns[2..], ["Applied", "yes", "Remove", "1", "Entry"]);
+}
+
+#[test]
+fn history_without_operations_says_so() {
+    let run = Harness::new().run(&["history"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("No Operations"), "{}", run.stdout);
+}
+
+#[test]
+fn history_show_prints_the_edits_and_the_backed_up_files() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let operation = harness.removed("linear");
+    let backup = harness.backups().join(&operation).join("1-.claude.json");
+
+    let text = harness.run(&["history", "show", &operation]);
+    let json = harness.run(&["history", "show", &operation, "--json"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout.contains("remove mcpServers.linear"),
+        "{}",
+        text.stdout
+    );
+    assert!(
+        text.stdout.contains(&backup.display().to_string()),
+        "{}",
+        text.stdout
+    );
+    let document = json.document();
+    assert_eq!(document["operation"]["summary"]["id"], operation.as_str());
+    assert_eq!(
+        document["operation"]["locations"][0]["backup"],
+        backup.display().to_string()
+    );
+    assert_eq!(
+        document["operation"]["locations"][0]["edits"][0]["key_path"],
+        json!(["mcpServers", "linear"])
+    );
+}
+
+#[test]
+fn history_show_of_an_unknown_operation_exits_3() {
+    let run = Harness::new().run(&["history", "show", "20261001-120000-abc", "--json"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+    assert_eq!(run.document()["error"]["code"], "no_match");
+}
+
+#[test]
+fn undo_with_yes_puts_the_entry_back_and_history_shows_it() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+
+    let run = harness.run(&["undo", &removed, "--yes"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("removed"), "{}", run.stdout);
+    assert!(run.stdout.contains("Effective"), "{}", run.stdout);
+    assert!(
+        run.stdout
+            .contains(r#"+    "linear": { "url": "https://u" },"#),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains(&format!("Undid {removed}")),
+        "{}",
+        run.stdout
+    );
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
+    let history = harness.run(&["history", "--json"]).document();
+    let undo = history["operations"][0]["id"].as_str().unwrap();
+    assert_eq!(
+        history["operations"][0]["status_text"],
+        format!("Undo of {removed}")
+    );
+    assert_eq!(
+        history["operations"][1]["status_text"],
+        format!("Undone by {undo}")
+    );
+    assert_eq!(history["operations"][1]["undoable"], false);
+}
+
+#[test]
+fn undo_without_a_tty_or_yes_prints_the_preview_and_exits_4() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let after_remove = read(&harness.path(".claude.json"));
+
+    let run = harness.run(&["undo", &removed]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    assert!(run.stdout.contains("Undo"), "{}", run.stdout);
+    assert_eq!(read(&harness.path(".claude.json")), after_remove);
+}
+
+#[test]
+fn undo_dry_run_prints_the_plan_and_writes_nothing() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let after_remove = read(&harness.path(".claude.json"));
+
+    let run = harness.run(&["undo", &removed, "--dry-run", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["plan"]["action"], "undo");
+    assert_eq!(document["plan"]["undo_of"], removed.as_str());
+    assert_eq!(document["plan"]["changes"][0]["before"], "removed");
+    assert_eq!(document["result"], Value::Null);
+    assert_eq!(read(&harness.path(".claude.json")), after_remove);
+}
+
+#[test]
+fn undo_refused_because_the_entry_changed_exits_8_with_the_backup_and_a_diff() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let undo = harness.run(&["undo", &removed, "--yes", "--json"]);
+    let undo = undo.document()["result"]["operation"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let rotated = TWO_USER_SERVERS.replace("https://u", "https://rotated");
+    std::fs::write(harness.path(".claude.json"), &rotated).unwrap();
+
+    let text = harness.run(&["undo", &undo, "--yes"]);
+    let json = harness.run(&["undo", &undo, "--yes", "--json"]);
+
+    let backup = harness.backups().join(&undo).display().to_string();
+    assert_eq!(text.code, 8, "{}", text.stderr);
+    assert!(text.stderr.contains(&backup), "{}", text.stderr);
+    assert!(
+        text.stderr
+            .contains(r#"+    "linear": { "url": "https://rotated" },"#),
+        "{}",
+        text.stderr
+    );
+    assert_eq!(json.code, 8);
+    let error = &json.document()["error"];
+    assert_eq!(error["code"], "undo_refused");
+    assert_eq!(error["backup"], backup);
+    assert!(
+        error["diff"].as_str().unwrap().contains("rotated"),
+        "{error}"
+    );
+    assert_eq!(read(&harness.path(".claude.json")), rotated);
+}
+
+#[test]
+fn undo_of_a_remove_exits_5_when_a_same_named_entry_appeared() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let readded = TWO_USER_SERVERS.replace("https://u", "https://readded");
+    std::fs::write(harness.path(".claude.json"), &readded).unwrap();
+
+    let run = harness.run(&["undo", &removed, "--yes", "--json"]);
+
+    assert_eq!(run.code, 5, "{}", run.stderr);
+    assert_eq!(run.document()["error"]["code"], "blocked");
+    assert_eq!(read(&harness.path(".claude.json")), readded);
+}
+
+#[test]
+fn undo_of_an_unknown_operation_exits_3() {
+    let run = Harness::new().run(&["undo", "20261001-120000-abc", "--yes"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+}

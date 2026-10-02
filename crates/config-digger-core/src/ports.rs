@@ -24,6 +24,13 @@ pub trait FileSystem: Send + Sync {
     /// exists at `path`.
     fn real_path(&self, path: &Path) -> Option<PathBuf>;
 
+    /// The paths of the files and folders directly in a folder, in no
+    /// particular order. A missing folder is an error of kind `NotFound`.
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>>;
+
+    /// Deletes a folder and everything below it.
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()>;
+
     /// Creates a folder and any missing parent folders.
     fn create_dir_all(&self, path: &Path) -> io::Result<()>;
 

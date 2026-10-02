@@ -6,7 +6,7 @@ mod terminal;
 use anstyle::{AnsiColor, Style};
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use config_digger_core::api::{
-    self, Action, Context, Core, Inventory, SCHEMA_VERSION, ScanOptions, Snapshot, Targets,
+    self, Action, Context, Core, Inventory, Plan, SCHEMA_VERSION, ScanOptions, Snapshot, Targets,
     WarningClass,
 };
 use config_digger_core::ports::Ports;
@@ -94,11 +94,43 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// List past Operations, newest first, and whether each can be undone.
+    History {
+        #[command(subcommand)]
+        command: Option<HistoryCommand>,
+    },
+    /// Undo an Operation in History, any one of them, not only the last.
+    ///
+    /// Applies the inverse of its edits to the files as they are now, through
+    /// the same preview, confirmation, backup, write and Verify as any
+    /// Operation. It is refused when what the Operation touched changed since.
+    Undo {
+        /// The Operation's id, as `history` lists it.
+        id: String,
+        /// Confirm the Operation without asking.
+        #[arg(long)]
+        yes: bool,
+        /// Acknowledge one class of warning without asking. Repeat for several.
+        #[arg(long, value_enum, value_name = "CLASS")]
+        ack: Vec<Ack>,
+        /// Print the plan and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Print a completion script for a shell.
     Completions {
         /// The shell to complete in.
         #[arg(value_enum)]
         shell: Shell,
+    },
+}
+
+#[derive(Subcommand)]
+enum HistoryCommand {
+    /// Show one Operation: what it changed, its edits, and the files copied to its backup.
+    Show {
+        /// The Operation's id, as `history` lists it.
+        id: String,
     },
 }
 
@@ -150,6 +182,7 @@ enum Exit {
     Blocked = 5,
     Locked = 6,
     Stale = 7,
+    UndoRefused = 8,
     Failed = 9,
     NeedsRecovery = 10,
 }
@@ -162,9 +195,14 @@ struct Failure {
     /// What an ambiguous selector could mean.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     candidates: Vec<String>,
-    /// The backup folder of an Operation that needs manual recovery.
+    /// The backup folder of an Operation that needs manual recovery, or of
+    /// one whose Undo was refused.
     #[serde(skip_serializing_if = "Option::is_none")]
     backup: Option<PathBuf>,
+    /// For a refused Undo, a diff from each backed-up file to what it holds
+    /// now. A boxed `str` keeps every `Result<_, Failure>` small.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff: Option<Box<str>>,
     #[serde(skip)]
     exit: Exit,
 }
@@ -176,6 +214,7 @@ impl Failure {
             message: message.into(),
             candidates: Vec::new(),
             backup: None,
+            diff: None,
             exit,
         }
     }
@@ -198,10 +237,12 @@ impl From<api::Error> for Failure {
             api::ErrorCode::BackupFailed => ("backup_failed", Exit::Failed),
             api::ErrorCode::WriteFailed => ("write_failed", Exit::Failed),
             api::ErrorCode::NeedsRecovery => ("needs_recovery", Exit::NeedsRecovery),
+            api::ErrorCode::UndoRefused => ("undo_refused", Exit::UndoRefused),
         };
         Failure {
             candidates: error.candidates,
             backup: error.backup,
+            diff: error.diff.map(String::into_boxed_str),
             ..Failure::new(code, error.message, exit)
         }
     }
@@ -248,6 +289,9 @@ fn main() -> ExitCode {
                 if let Some(backup) = &failure.backup {
                     anstream::eprintln!("  backup: {}", backup.display());
                 }
+                if let Some(diff) = &failure.diff {
+                    anstream::eprint!("{}", render_diff(diff));
+                }
             }
             ExitCode::from(failure.exit as u8)
         }
@@ -262,10 +306,31 @@ struct ShowBody<'a> {
     read_failures: &'a [api::ReadFailure],
 }
 
+/// `history --json`: every Operation, newest first.
+#[derive(Serialize)]
+struct HistoryBody<'a> {
+    operations: &'a [api::OperationSummary],
+}
+
+/// `history show --json`: one Operation.
+#[derive(Serialize)]
+struct OperationBody<'a> {
+    operation: &'a api::OperationDetail,
+}
+
 fn run(cli: &Cli) -> Result<(), Failure> {
+    if let Command::Completions { shell } = &cli.command {
+        return completions(cli, *shell);
+    }
+    let core = Core::new(Ports::real())?;
+    // Startup pruning is best-effort: History is pruned again next time.
+    if let Err(error) = core.prune_history() {
+        tracing::warn!(%error, "history not pruned");
+    }
+    let width = terminal::output_width(cli.wide);
     match &cli.command {
         Command::List { selector } => {
-            let mut inventory = inventory(cli)?;
+            let mut inventory = scanned(cli, &core)?.inventory;
             if let Some(selector) = selector {
                 let selected: Vec<api::Item> =
                     inventory.select(selector).into_iter().cloned().collect();
@@ -277,19 +342,12 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             if cli.json {
                 print_json(&inventory);
             } else {
-                anstream::print!(
-                    "{}",
-                    render_list(
-                        &inventory,
-                        selector.is_some(),
-                        terminal::output_width(cli.wide)
-                    )
-                );
+                anstream::print!("{}", render_list(&inventory, selector.is_some(), width));
             }
             Ok(())
         }
         Command::Show { selector } => {
-            let inventory = inventory(cli)?;
+            let inventory = scanned(cli, &core)?.inventory;
             let item = inventory.select_one(selector)?;
             if cli.json {
                 print_json(&ShowBody {
@@ -298,10 +356,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                     read_failures: &inventory.read_failures,
                 });
             } else {
-                anstream::print!(
-                    "{}",
-                    render_show(&inventory, item, terminal::output_width(cli.wide))
-                );
+                anstream::print!("{}", render_show(&inventory, item, width));
             }
             Ok(())
         }
@@ -311,52 +366,104 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             yes,
             ack,
             dry_run,
-        } => plan_and_execute(
-            cli,
-            Action::Remove,
-            Targets {
+        } => {
+            let scanned = scanned(cli, &core)?;
+            let targets = Targets {
                 selectors: selectors.clone(),
                 all: *all,
-            },
-            &WriteFlags {
-                yes: *yes,
-                ack: ack.clone(),
-                dry_run: *dry_run,
-            },
-        ),
-        Command::Completions { shell } => {
+            };
+            let plan = core.plan(
+                &scanned.snapshot,
+                &scanned.context,
+                Action::Remove,
+                &targets,
+            )?;
+            confirm_and_execute(
+                cli,
+                &core,
+                plan,
+                &project_line(&scanned.inventory, width),
+                &WriteFlags {
+                    yes: *yes,
+                    ack: ack.clone(),
+                    dry_run: *dry_run,
+                },
+            )
+        }
+        Command::History { command: None } => {
+            let operations = core.history()?;
             if cli.json {
-                return Err(Failure::usage(
-                    "completions prints a shell script, not a JSON document",
-                ));
+                print_json(&HistoryBody {
+                    operations: &operations,
+                });
+            } else {
+                anstream::print!("{}", render_history(&operations, width));
             }
-            clap_complete::generate(
-                clap_complete::Shell::from(*shell),
-                &mut Cli::command(),
-                "config-digger",
-                &mut std::io::stdout(),
-            );
             Ok(())
         }
+        Command::History {
+            command: Some(HistoryCommand::Show { id }),
+        } => {
+            let operation = core.history_show(id)?;
+            if cli.json {
+                print_json(&OperationBody {
+                    operation: &operation,
+                });
+            } else {
+                anstream::print!("{}", render_operation(&operation, width));
+            }
+            Ok(())
+        }
+        Command::Undo {
+            id,
+            yes,
+            ack,
+            dry_run,
+        } => {
+            let plan = core.plan_undo(id)?;
+            // An Undo resolves in the context its Operation ran in.
+            let project = context_line(plan.preview().project.as_deref(), width);
+            confirm_and_execute(
+                cli,
+                &core,
+                plan,
+                &project,
+                &WriteFlags {
+                    yes: *yes,
+                    ack: ack.clone(),
+                    dry_run: *dry_run,
+                },
+            )
+        }
+        Command::Completions { .. } => unreachable!("completions run without a core"),
     }
 }
 
-/// Scans and resolves for the Project the flags ask for, printing Read
-/// failures to stderr as warnings.
-fn inventory(cli: &Cli) -> Result<Inventory, Failure> {
-    scanned(cli).map(|scanned| scanned.inventory)
+fn completions(cli: &Cli, shell: Shell) -> Result<(), Failure> {
+    if cli.json {
+        return Err(Failure::usage(
+            "completions prints a shell script, not a JSON document",
+        ));
+    }
+    clap_complete::generate(
+        clap_complete::Shell::from(shell),
+        &mut Cli::command(),
+        "config-digger",
+        &mut std::io::stdout(),
+    );
+    Ok(())
 }
 
 /// What [`scanned`] read and resolved.
 struct Scanned {
-    core: Core,
     snapshot: Snapshot,
     context: Context,
     inventory: Inventory,
 }
 
-/// Scans and resolves like [`inventory`], keeping what a write plans with.
-fn scanned(cli: &Cli) -> Result<Scanned, Failure> {
+/// Scans and resolves for the Project the flags ask for, printing Read
+/// failures to stderr as warnings.
+fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
     let project = if cli.no_project {
         None
     } else {
@@ -366,7 +473,6 @@ fn scanned(cli: &Cli) -> Result<Scanned, Failure> {
         };
         Some(project.map_err(api::Error::unexpected)?)
     };
-    let core = Core::new(Ports::real())?;
     let snapshot = core.scan(&ScanOptions {
         projects: project.iter().cloned().collect(),
     })?;
@@ -381,7 +487,6 @@ fn scanned(cli: &Cli) -> Result<Scanned, Failure> {
         );
     }
     Ok(Scanned {
-        core,
         snapshot,
         context,
         inventory,
@@ -418,27 +523,24 @@ fn warning_bodies<'a>(
         .collect()
 }
 
-/// Plans `action`, prints the preview, gets the Operation confirmed and its
-/// warnings acknowledged, then executes it.
-fn plan_and_execute(
+/// Prints a plan's preview under the line naming its Project, gets the
+/// Operation confirmed and its warnings acknowledged, then executes it.
+fn confirm_and_execute(
     cli: &Cli,
-    action: Action,
-    targets: Targets,
+    core: &Core,
+    plan: Plan,
+    project_line: &str,
     flags: &WriteFlags,
 ) -> Result<(), Failure> {
-    let Scanned {
-        core,
-        snapshot,
-        context,
-        inventory,
-    } = scanned(cli)?;
-    let plan = core.plan(&snapshot, &context, action, &targets)?;
     let preview = plan.preview().clone();
     let warnings = plan.warnings().to_vec();
     let mut acknowledged: Vec<WarningClass> = flags.ack.iter().map(|&ack| ack.into()).collect();
     let width = terminal::output_width(cli.wide);
     if !cli.json {
-        anstream::print!("{}", render_preview(&inventory, &preview, &warnings, width));
+        anstream::print!(
+            "{}",
+            render_preview(project_line, &preview, &warnings, width)
+        );
     }
     if flags.dry_run {
         if cli.json {
@@ -731,15 +833,25 @@ fn last_column_width<const N: usize>(widths: &[usize; N], width: Option<usize>) 
 
 /// The first line of `list` and `show`: the Project the States are resolved for.
 fn project_line(inventory: &Inventory, width: Option<usize>) -> String {
+    let missing = inventory.project.as_ref().is_some_and(|project| {
+        inventory
+            .projects
+            .iter()
+            .any(|known| known.path == *project && known.missing)
+    });
     let Some(project) = &inventory.project else {
-        return plain_line("No Project", width);
+        return context_line(None, width);
     };
-    let missing = inventory
-        .projects
-        .iter()
-        .any(|known| known.path == *project && known.missing);
     let suffix = if missing { " (missing)" } else { "" };
     plain_line(&format!("Project: {}{suffix}", project.display()), width)
+}
+
+/// The line naming a Project, or saying there is none.
+fn context_line(project: Option<&Path>, width: Option<usize>) -> String {
+    match project {
+        Some(project) => plain_line(&format!("Project: {}", project.display()), width),
+        None => plain_line("No Project", width),
+    }
 }
 
 /// One Item with every Entry in precedence order: its rank, Scope, State,
@@ -847,12 +959,12 @@ fn elide_locator(locator: &str, path: &Path, width: Option<usize>) -> String {
 /// Project) it changes, which Entry is Effective afterwards, the files diff,
 /// the warnings and where the backup goes.
 fn render_preview(
-    inventory: &Inventory,
+    project_line: &str,
     preview: &api::Preview,
     warnings: &[api::Warning],
     width: Option<usize>,
 ) -> String {
-    let mut out = project_line(inventory, width);
+    let mut out = project_line.to_owned();
     out.push('\n');
     out.push_str(&styled_line(&preview.title, BOLD, width));
 
@@ -863,7 +975,10 @@ fn render_preview(
             [
                 (change.agent_name.as_str(), Style::new()),
                 (change.item.as_str(), Style::new()),
-                (state_label(change.before), state_style(change.before)),
+                (
+                    state_after_label(change.before),
+                    state_after_style(change.before),
+                ),
                 (
                     state_after_label(change.after),
                     state_after_style(change.after),
@@ -903,16 +1018,7 @@ fn render_preview(
     out.push('\n');
     out.push_str(&styled_line("Files", BOLD, width));
     for file in &preview.files {
-        for line in file.diff.lines() {
-            let style = match line.as_bytes().first() {
-                Some(b'+') if !line.starts_with("+++") => AnsiColor::Green.on_default(),
-                Some(b'-') if !line.starts_with("---") => AnsiColor::Red.on_default(),
-                Some(b'@') => AnsiColor::Cyan.on_default(),
-                _ => Style::new(),
-            };
-            // A diff line is never cut: a hidden change is worse than a long line.
-            out.push_str(&format!("{style}{line}{style:#}\n"));
-        }
+        out.push_str(&render_diff(&file.diff));
     }
 
     if !warnings.is_empty() {
@@ -956,6 +1062,174 @@ fn render_outcome(outcome: &api::Outcome, width: Option<usize>) -> String {
         width,
     ));
     out
+}
+
+/// A unified diff, coloured line by line. A diff line is never cut: a hidden
+/// change is worse than a long line.
+fn render_diff(diff: &str) -> String {
+    let mut out = String::new();
+    for line in diff.lines() {
+        let style = match line.as_bytes().first() {
+            Some(b'+') if !line.starts_with("+++") => AnsiColor::Green.on_default(),
+            Some(b'-') if !line.starts_with("---") => AnsiColor::Red.on_default(),
+            Some(b'@') => AnsiColor::Cyan.on_default(),
+            _ => Style::new(),
+        };
+        out.push_str(&format!("{style}{line}{style:#}\n"));
+    }
+    out
+}
+
+/// Every Operation, newest first: its id, time, status, whether it can be
+/// undone and its title, then why it cannot be undone when it cannot.
+fn render_history(operations: &[api::OperationSummary], width: Option<usize>) -> String {
+    if operations.is_empty() {
+        return plain_line("No Operations in History.", width);
+    }
+    let rows: Vec<[(&str, Style); 4]> = operations
+        .iter()
+        .map(|operation| {
+            [
+                (operation.id.as_str(), Style::new()),
+                (operation.created_at.as_str(), Style::new()),
+                (operation.status_text.as_str(), Style::new()),
+                (if operation.undoable { "yes" } else { "no" }, Style::new()),
+            ]
+        })
+        .collect();
+    let header = [("ID", DIM), ("TIME", DIM), ("STATUS", DIM), ("UNDO", DIM)];
+    let widths = column_widths(&header, &rows);
+    let mut out = table_line(&header, &widths, "SUMMARY".to_owned(), DIM)
+        .fit(width)
+        .render();
+    // Why one cannot be undone sits under the time column.
+    let reason_indent = " ".repeat(INDENT.len() + widths[0] + GAP.len());
+    let reason_width = width.map(|width| width.saturating_sub(reason_indent.len()));
+    for (operation, cells) in operations.iter().zip(&rows) {
+        out.push_str(
+            &table_line(cells, &widths, operation.title.clone(), Style::new())
+                .fit(width)
+                .render(),
+        );
+        if let Some(reason) = &operation.not_undoable {
+            for text in terminal::wrap(reason, reason_width) {
+                out.push_str(&plain_line(&format!("{reason_indent}{text}"), width));
+            }
+        }
+    }
+    out
+}
+
+/// One Operation: its status and context, the States it changed, and per
+/// file its edits and where the file was copied before it.
+fn render_operation(operation: &api::OperationDetail, width: Option<usize>) -> String {
+    let summary = &operation.summary;
+    let mut out = styled_line(
+        &format!("Operation {}: {}", summary.id, summary.title),
+        BOLD,
+        width,
+    );
+    out.push_str(&plain_line(&format!("Time: {}", summary.created_at), width));
+    out.push_str(&plain_line(
+        &format!("Status: {}", summary.status_text),
+        width,
+    ));
+    let undo = match &summary.not_undoable {
+        None => "Undo: yes".to_owned(),
+        Some(reason) => format!("Undo: no. {reason}"),
+    };
+    for line in terminal::wrap(&undo, width) {
+        out.push_str(&plain_line(&line, width));
+    }
+    if let Some(cause) = &operation.cause {
+        for line in terminal::wrap(&format!("Cause: {cause}"), width) {
+            out.push_str(&plain_line(&line, width));
+        }
+    }
+    out.push_str(&context_line(operation.project.as_deref(), width));
+    out.push_str(&plain_line(
+        &format!("Backup: {}", operation.backup.display()),
+        width,
+    ));
+
+    if !operation.changes.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Changes", BOLD, width));
+        let rows: Vec<[(&str, Style); 4]> = operation
+            .changes
+            .iter()
+            .map(|change| {
+                [
+                    (change.agent_name.as_str(), Style::new()),
+                    (change.item.as_str(), Style::new()),
+                    (
+                        state_after_label(change.before),
+                        state_after_style(change.before),
+                    ),
+                    (
+                        state_after_label(change.after),
+                        state_after_style(change.after),
+                    ),
+                ]
+            })
+            .collect();
+        let header = [
+            ("AGENT", DIM),
+            ("ITEM", DIM),
+            ("BEFORE", DIM),
+            ("AFTER", DIM),
+        ];
+        let widths = column_widths(&header, &rows);
+        let location_width = last_column_width(&widths, width);
+        out.push_str(
+            &table_line(&header, &widths, "ENTRY".to_owned(), DIM)
+                .fit(width)
+                .render(),
+        );
+        for (change, cells) in operation.changes.iter().zip(&rows) {
+            let entry = elide_locator(&change.locator, &change.path, location_width);
+            out.push_str(
+                &table_line(cells, &widths, entry, Style::new())
+                    .fit(width)
+                    .render(),
+            );
+        }
+    }
+
+    out.push('\n');
+    out.push_str(&styled_line("Files", BOLD, width));
+    for location in &operation.locations {
+        out.push_str(&plain_line(
+            &format!("{INDENT}{}", location.path.display()),
+            width,
+        ));
+        for edit in &location.edits {
+            out.push_str(&plain_line(
+                &format!(
+                    "{INDENT}{INDENT}{} {}",
+                    edit_label(edit.op),
+                    edit.key_path.join(".")
+                ),
+                width,
+            ));
+        }
+        let backup = match &location.backup {
+            Some(backup) => format!("backed up to {}", backup.display()),
+            None => "created by this Operation, so nothing was backed up".to_owned(),
+        };
+        out.push_str(&plain_line(&format!("{INDENT}{INDENT}{backup}"), width));
+    }
+    out
+}
+
+fn edit_label(op: api::EditOp) -> &'static str {
+    match op {
+        api::EditOp::Remove => "remove",
+        api::EditOp::Set => "set",
+        api::EditOp::Insert => "insert",
+        api::EditOp::Append => "append",
+        api::EditOp::RemoveItem => "remove item",
+    }
 }
 
 fn state_after_label(state: api::StateAfter) -> &'static str {

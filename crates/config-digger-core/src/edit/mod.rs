@@ -20,7 +20,8 @@ use similar::{Algorithm, DiffTag, TextDiff};
 use std::ops::Range;
 
 /// The syntax a file is edited in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Syntax {
     /// JSON with comments and trailing commas, which also covers strict JSON.
     Jsonc,
@@ -94,6 +95,16 @@ impl Applied {
     pub fn unified_diff(&self, label: &str) -> String {
         unified_diff(&self.before, &self.after, label)
     }
+}
+
+/// A unified diff between two versions of a file, as text, whatever their
+/// encoding: bytes that are not UTF-8 show as replacement characters.
+pub fn unified_diff_bytes(before: &[u8], after: &[u8], label: &str) -> String {
+    unified_diff(
+        &String::from_utf8_lossy(before),
+        &String::from_utf8_lossy(after),
+        label,
+    )
 }
 
 fn unified_diff(before: &str, after: &str, label: &str) -> String {

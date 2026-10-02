@@ -1,7 +1,7 @@
 //! Explain: turns reason codes into the sentences the front-ends show.
 //! Definitions carry codes and pointers only, never free text.
 
-use crate::api::{Action, Reason, ReasonCode, Verify};
+use crate::api::{Action, OperationStatus, Reason, ReasonCode, Verify};
 use std::path::Path;
 
 /// A Shadowed Entry's reason, pointing at the Effective Entry `effective`.
@@ -43,8 +43,14 @@ pub(crate) fn effective_after(
 pub(crate) fn operation_title(action: Action, entries: usize) -> String {
     let verb = match action {
         Action::Remove => "Remove",
+        Action::Undo => "Undo",
     };
     format!("{verb} {}", count(entries))
+}
+
+/// The title of an Undo: `Undo 20261001-143012-a3f "Remove 1 Entry"`.
+pub(crate) fn undo_title(operation: &str, title: &str) -> String {
+    format!("Undo {operation} \"{title}\"")
 }
 
 /// Where the preview says the backup goes.
@@ -56,19 +62,64 @@ pub(crate) fn backup_note(folder: &Path) -> String {
 }
 
 /// What an executed Operation did: "Removed 2 Entries. Operation
-/// 20261001-143012-a3f: verified."
-pub(crate) fn outcome(action: Action, entries: usize, operation: &str, verify: Verify) -> String {
-    let verb = match action {
-        Action::Remove => "Removed",
+/// 20261001-143012-a3f: verified.", or for an Undo of the Operation
+/// `undo_of`: "Undid 20261001-143012-a3f. Operation …: verified."
+pub(crate) fn outcome(
+    action: Action,
+    entries: usize,
+    undo_of: Option<&str>,
+    operation: &str,
+    verify: Verify,
+) -> String {
+    let done = match action {
+        Action::Remove => format!("Removed {}", count(entries)),
+        Action::Undo => format!("Undid {}", undo_of.unwrap_or("an Operation")),
     };
     let verify = match verify {
         Verify::Verified => "verified",
         Verify::VerifiedWithDifferences => "verified with differences",
     };
-    format!(
-        "{verb} {}. Operation {operation}: {verify}.",
-        count(entries)
-    )
+    format!("{done}. Operation {operation}: {verify}.")
+}
+
+/// An Operation's status as History shows it: "Applied", "Undone by …",
+/// "Undo of …", or both of the last two for an Undo that was undone.
+pub(crate) fn operation_status(
+    status: OperationStatus,
+    undo_of: Option<&str>,
+    undone_by: Option<&str>,
+) -> String {
+    match (status, undo_of, undone_by) {
+        (OperationStatus::InProgress, ..) => "Incomplete".to_owned(),
+        (OperationStatus::Failed, ..) => "Failed".to_owned(),
+        (OperationStatus::NeedsAttention, ..) => "Needs attention".to_owned(),
+        (OperationStatus::Applied, None, None) => "Applied".to_owned(),
+        (OperationStatus::Applied, Some(undone), None) => format!("Undo of {undone}"),
+        (OperationStatus::Applied, None, Some(undo)) => format!("Undone by {undo}"),
+        (OperationStatus::Applied, Some(undone), Some(undo)) => {
+            format!("Undo of {undone}, undone by {undo}")
+        }
+    }
+}
+
+/// Why an Operation that did not apply cannot be undone.
+pub(crate) fn not_undoable(status: OperationStatus) -> String {
+    match status {
+        OperationStatus::InProgress => "It did not complete; recover its files from its backup.",
+        OperationStatus::Applied => "It can be undone.",
+        OperationStatus::Failed => {
+            "It failed before writing anything, so there is nothing to undo."
+        }
+        OperationStatus::NeedsAttention => {
+            "It needs manual recovery; the files as they were before it are in its backup."
+        }
+    }
+    .to_owned()
+}
+
+/// Why an Operation that was undone cannot be undone again.
+pub(crate) fn already_undone(undo: &str) -> String {
+    format!("It was undone by {undo}; undo that Operation to apply it again.")
 }
 
 fn count(entries: usize) -> String {

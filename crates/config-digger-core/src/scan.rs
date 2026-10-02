@@ -100,10 +100,21 @@ pub(crate) fn scan(
     ports: &Ports,
     extra_projects: &[PathBuf],
 ) -> Result<Snapshot, ScanError> {
+    scan_as_if(definitions, ports, extra_projects, &[])
+}
+
+/// Scans as [`scan`] does, as if each file in `written` held the bytes paired
+/// with it, so that a plan can predict what a scan will read once it is done.
+pub(crate) fn scan_as_if(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    extra_projects: &[PathBuf],
+    written: &[(PathBuf, Vec<u8>)],
+) -> Result<Snapshot, ScanError> {
     let read_at = ports.clock.now();
     let found = find_homes(definitions, ports)?;
     let mut scanner = Scanner {
-        reader: Reader::new(ports),
+        reader: Reader::new(ports, written),
         projects: Projects::new(ports),
         entries: Vec::new(),
     };
@@ -324,15 +335,18 @@ fn find_objects<'v>(
 /// Reads each file once per scan, and reports each Read failure once per Agent home.
 struct Reader<'p> {
     ports: &'p Ports,
+    /// Files read as holding these bytes instead of what is on disk.
+    written: &'p [(PathBuf, Vec<u8>)],
     files: BTreeMap<PathBuf, Result<Option<String>, ReadFailureKind>>,
     reported: BTreeSet<(usize, String, PathBuf)>,
     failures: Vec<ScannedReadFailure>,
 }
 
 impl<'p> Reader<'p> {
-    fn new(ports: &'p Ports) -> Self {
+    fn new(ports: &'p Ports, written: &'p [(PathBuf, Vec<u8>)]) -> Self {
         Self {
             ports,
+            written,
             files: BTreeMap::new(),
             reported: BTreeSet::new(),
             failures: Vec::new(),
@@ -342,14 +356,20 @@ impl<'p> Reader<'p> {
     /// A file's text, `None` when it is missing or a Read failure, which is then reported.
     fn text(&mut self, home: &FoundHome, path: &Path) -> Option<&str> {
         if !self.files.contains_key(path) {
-            self.files
-                .insert(path.to_path_buf(), read(self.ports, path));
+            self.files.insert(path.to_path_buf(), self.read(path));
         }
         if let Some(kind) = self.files[path].as_ref().err().copied() {
             self.fail(home, path, kind);
             return None;
         }
         self.files[path].as_ref().ok()?.as_deref()
+    }
+
+    fn read(&self, path: &Path) -> Result<Option<String>, ReadFailureKind> {
+        match self.written.iter().find(|(written, _)| written == path) {
+            Some((_, bytes)) => decode(bytes.clone()).map(Some),
+            None => read(self.ports, path),
+        }
     }
 
     fn fail(&mut self, home: &FoundHome, path: &Path, kind: ReadFailureKind) {
@@ -377,9 +397,11 @@ fn read(ports: &Ports, path: &Path) -> Result<Option<String>, ReadFailureKind> {
         }
         Err(_) => return Err(ReadFailureKind::Io),
     };
-    String::from_utf8(bytes)
-        .map(Some)
-        .map_err(|_| ReadFailureKind::Decode)
+    decode(bytes).map(Some)
+}
+
+fn decode(bytes: Vec<u8>) -> Result<String, ReadFailureKind> {
+    String::from_utf8(bytes).map_err(|_| ReadFailureKind::Decode)
 }
 
 /// Every Project, found once however it is spelled.

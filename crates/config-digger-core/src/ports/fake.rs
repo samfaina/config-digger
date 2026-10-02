@@ -64,6 +64,27 @@ impl FakeFileSystem {
         self.files().files.insert(path.into(), contents.into());
     }
 
+    /// Deletes a file as someone other than the core would.
+    pub fn delete_file(&self, path: impl AsRef<Path>) {
+        let mut files = self.files();
+        let path = files.follow(path.as_ref());
+        files
+            .files
+            .retain(|file, _| strip_prefix(file, &path).is_none_or(|rest| !rest.is_empty()));
+    }
+
+    /// Deletes a folder and everything below it as someone other than the core would.
+    pub fn delete_folder(&self, path: impl AsRef<Path>) {
+        let mut files = self.files();
+        let path = files.follow(path.as_ref());
+        files
+            .files
+            .retain(|file, _| strip_prefix(file, &path).is_none());
+        files
+            .folders
+            .retain(|folder| strip_prefix(folder, &path).is_none());
+    }
+
     /// An empty folder.
     pub fn with_folder(self, path: impl Into<PathBuf>) -> Self {
         self.files().folders.insert(path.into());
@@ -86,6 +107,11 @@ impl FakeFileSystem {
     pub fn failing_writes_to(self, path: impl Into<PathBuf>) -> Self {
         self.files().failing.push(path.into());
         self
+    }
+
+    /// Writes that failed through [`failing_writes_to`](Self::failing_writes_to) succeed from now on.
+    pub fn stop_failing_writes(&self) {
+        self.files().failing.clear();
     }
 
     /// Someone else holds the lock on the file at `path` from now on.
@@ -219,6 +245,44 @@ impl FileSystem for FakeFileSystem {
         self.count_access();
         let files = self.files();
         files.real_path(&files.follow(path))
+    }
+
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
+        self.count_access();
+        let files = self.files();
+        let followed = files.follow(path);
+        if files.find_file(&followed).is_some() {
+            return Err(io::Error::other("is a file"));
+        }
+        if files.real_path(&followed).is_none() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        let mut children: Vec<PathBuf> = Vec::new();
+        for known in files.files.keys().chain(&files.folders) {
+            let Some(rest) = strip_prefix(known, &followed) else {
+                continue;
+            };
+            if let Some(name) = rest.first() {
+                let child = path.join(name);
+                if !children.contains(&child) {
+                    children.push(child);
+                }
+            }
+        }
+        Ok(children)
+    }
+
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()> {
+        self.count_access();
+        let exists = {
+            let files = self.files();
+            files.real_path(&files.follow(path)).is_some()
+        };
+        if !exists {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        self.delete_folder(path);
+        Ok(())
     }
 
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
@@ -355,19 +419,36 @@ impl Environment for FakeEnvironment {
     }
 }
 
-/// A clock stopped at one instant.
-#[derive(Debug, Clone, Copy)]
-pub struct FakeClock(pub SystemTime);
+/// A clock stopped at one instant until a test moves it. Clones share the
+/// same instant, so a test can move the clock the core holds.
+#[derive(Debug, Clone)]
+pub struct FakeClock(Arc<Mutex<SystemTime>>);
+
+impl FakeClock {
+    pub fn at(now: SystemTime) -> Self {
+        Self(Arc::new(Mutex::new(now)))
+    }
+
+    pub fn advance(&self, by: Duration) {
+        *self.instant() += by;
+    }
+
+    fn instant(&self) -> MutexGuard<'_, SystemTime> {
+        self.0
+            .lock()
+            .expect("no test panics while holding the fake clock")
+    }
+}
 
 impl Default for FakeClock {
     /// 2026-10-01T12:00:00Z.
     fn default() -> Self {
-        Self(SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_856_000))
+        Self::at(SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_856_000))
     }
 }
 
 impl Clock for FakeClock {
     fn now(&self) -> SystemTime {
-        self.0
+        *self.instant()
     }
 }
