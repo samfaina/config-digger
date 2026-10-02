@@ -7,7 +7,7 @@
 //! from an item by a blank line is not about that item, so a Remove moves it
 //! onto whatever comes next instead of taking it away.
 
-use super::{Change, Edit, EditError, line_of, lines, split_key_path};
+use super::{Change, Edit, EditError, line_of, line_range, line_start, lines, split_key_path};
 use serde_json::Value;
 use std::ops::Range;
 use toml_edit::{Decor, DocumentMut, InlineTable, Item, Key, Table, TableLike};
@@ -61,11 +61,19 @@ enum Parent<'d> {
     Inline(&'d mut InlineTable),
 }
 
-impl Parent<'_> {
+impl<'d> Parent<'d> {
     fn table_like(&mut self) -> &mut dyn TableLike {
         match self {
             Parent::Table(table) => *table,
             Parent::Inline(table) => *table,
+        }
+    }
+
+    /// The item at `key`, for as long as the table is borrowed.
+    fn into_item(self, key: &str) -> Option<&'d mut Item> {
+        match self {
+            Parent::Table(table) => table.get_mut(key),
+            Parent::Inline(table) => TableLike::get_mut(table, key),
         }
     }
 }
@@ -73,7 +81,7 @@ impl Parent<'_> {
 impl File<'_> {
     fn remove(mut self, key_path: &[String]) -> Result<Change, EditError> {
         let (parent_path, name) = split_key_path(key_path)?;
-        let allowed = vec![self.lines_with_attached_comments(key_path)?];
+        let allowed = self.lines_with_attached_comments(key_path)?;
         let mut parent = parent_mut(&mut self.doc, parent_path)?;
         let siblings: Vec<String> = parent
             .table_like()
@@ -153,6 +161,16 @@ impl File<'_> {
 
     fn set(mut self, key_path: &[String], value: &Value) -> Result<Change, EditError> {
         let (parent_path, name) = split_key_path(key_path)?;
+        if let (Some(parent), Value::Object(_)) =
+            (table_at(self.spans.as_table(), parent_path), value)
+            && parent.is_implicit()
+            && !parent.contains_key(name)
+        {
+            // A table with no header of its own holds only tables, so the
+            // new object becomes one too, after the last of them.
+            let last = parent.iter().last().map(|(key, _)| key.to_owned());
+            return self.insert(key_path, value, last.as_deref(), false, &[]);
+        }
         let mut new = to_toml(value, key_path)?;
         let own_lines = self.lines_of(key_path);
         let body_end = self.body_end(parent_path);
@@ -174,7 +192,12 @@ impl File<'_> {
                 });
             }
             None => {
-                insert_value(&mut parent, name, new);
+                let last = parent
+                    .table_like()
+                    .iter()
+                    .last()
+                    .map(|(key, _)| key.to_owned());
+                insert_value(&mut parent, name, new, last.as_deref());
                 let inverse = Edit::Remove {
                     key_path: key_path.to_vec(),
                 };
@@ -243,26 +266,11 @@ impl File<'_> {
 
         let allowed = self.body(parent_path)?;
         let mut parent = parent_mut(&mut self.doc, parent_path)?;
-        insert_value(&mut parent, name, to_toml(value, key_path)?);
-        if let Parent::Table(table) = parent {
-            if let Some(mut key) = table.key_mut(name) {
-                key.leaf_decor_mut().set_prefix(comment_block);
-            }
-            let mut order: Vec<String> = table
-                .iter()
-                .map(|(key, _)| key.to_owned())
-                .filter(|key| key != name)
-                .collect();
-            let index = match after {
-                None => 0,
-                Some(after) => order
-                    .iter()
-                    .position(|key| key == after)
-                    .map_or(order.len(), |index| index + 1),
-            };
-            order.insert(index, name.to_owned());
-            let rank = |key: &Key| order.iter().position(|name| name == key.get());
-            table.sort_values_by(|a, _, b, _| rank(a).cmp(&rank(b)));
+        insert_value(&mut parent, name, to_toml(value, key_path)?, after);
+        if let (Parent::Table(table), false) = (parent, comments.is_empty())
+            && let Some(mut key) = table.key_mut(name)
+        {
+            key.leaf_decor_mut().set_prefix(comment_block);
         }
         Ok(Change {
             text: self.doc.to_string(),
@@ -357,7 +365,8 @@ impl File<'_> {
         {
             return Ok(last);
         }
-        if after.is_none() {
+        // A table cannot go among plain keys, so after one it goes first.
+        if after.is_none_or(|after| parent.get(after).is_some_and(Item::is_value)) {
             let first = parent
                 .iter()
                 .filter_map(|(_, item)| positions(item.as_table()?))
@@ -396,23 +405,74 @@ impl File<'_> {
     /// The lines of the key at `key_path`, from its key to the end of its value.
     fn lines_of(&self, key_path: &[String]) -> Result<Range<usize>, EditError> {
         let extent = self.extent(key_path)?;
-        Ok(line_of(self.text, extent.start)..line_of(self.text, extent.end) + 1)
+        Ok(line_range(self.text, extent.start, extent.end))
     }
 
     /// The lines of the key at `key_path` with the comments attached above it.
-    fn lines_with_attached_comments(&self, key_path: &[String]) -> Result<Range<usize>, EditError> {
-        let extent = self.extent(key_path)?;
+    fn lines_with_attached_comments(
+        &self,
+        key_path: &[String],
+    ) -> Result<Vec<Range<usize>>, EditError> {
+        let (parent_path, name) = split_key_path(key_path)?;
+        let not_found = || EditError::NotFound {
+            key_path: key_path.to_vec(),
+        };
+        let parent = table_like_at(self.spans.as_table(), parent_path).ok_or_else(not_found)?;
+        let item = parent.get(name).ok_or_else(not_found)?;
+        let mut ranges = Vec::new();
+        match item {
+            Item::Table(table) => self.header_ranges(table, &mut ranges),
+            Item::ArrayOfTables(tables) => {
+                for table in tables.iter() {
+                    self.header_ranges(table, &mut ranges);
+                }
+            }
+            _ => {
+                let extent = item_extent(parent.key(name), item).ok_or(EditError::Parse)?;
+                ranges.push(self.with_attached_comments(extent));
+            }
+        }
+        Ok(ranges)
+    }
+
+    /// The lines of each table header in `table`, itself included: from the
+    /// comments attached above the header to the last key written under it.
+    /// Sub-tables need not follow their parent, so each header gets its own
+    /// range, and what lies between them stays out.
+    fn header_ranges(&self, table: &Table, ranges: &mut Vec<Range<usize>>) {
+        let mut add = |table: &Table| {
+            let Some(mut extent) = table.span().filter(|_| !table.is_implicit()) else {
+                return;
+            };
+            for (key, item) in table.iter() {
+                if let Some(span) = item_extent(table.key(key), item).filter(|_| item.is_value()) {
+                    extent.end = extent.end.max(span.end);
+                }
+            }
+            ranges.push(self.with_attached_comments(extent));
+        };
+        add(table);
+        visit_tables(table, &mut add);
+        if ranges.is_empty()
+            && let Some(extent) = table_extent(table)
+        {
+            ranges.push(self.with_attached_comments(extent));
+        }
+    }
+
+    /// The lines of `extent`, from the comments attached above it.
+    fn with_attached_comments(&self, extent: Range<usize>) -> Range<usize> {
         let lines = lines(self.text);
-        let line_start = self.text[..extent.start]
-            .rfind('\n')
-            .map_or(0, |newline| newline + 1);
         let mut top = line_of(self.text, extent.start);
-        if self.text[line_start..extent.start].trim().is_empty() {
+        if self.text[line_start(self.text, extent.start)..extent.start]
+            .trim()
+            .is_empty()
+        {
             while top > 0 && lines[top - 1].trim_start().starts_with('#') {
                 top -= 1;
             }
         }
-        Ok(top..line_of(self.text, extent.end) + 1)
+        top..line_range(self.text, extent.start, extent.end).end
     }
 
     /// The span of the key at `key_path` and everything below it.
@@ -443,7 +503,7 @@ impl File<'_> {
     /// inline table, its lines.
     fn body_end(&self, key_path: &[String]) -> Result<Range<usize>, EditError> {
         if let Some(inline) = inline_table_span(self.spans.as_table(), key_path) {
-            return Ok(line_of(self.text, inline.start)..line_of(self.text, inline.end) + 1);
+            return Ok(line_range(self.text, inline.start, inline.end));
         }
         let table = table_like_at(self.spans.as_table(), key_path).ok_or(EditError::Parse)?;
         let mut end: Option<usize> = None;
@@ -468,11 +528,7 @@ impl File<'_> {
 fn parent_mut<'d>(doc: &'d mut DocumentMut, key_path: &[String]) -> Result<Parent<'d>, EditError> {
     let mut parent = Parent::Table(doc.as_table_mut());
     for (depth, key) in key_path.iter().enumerate() {
-        let item = match parent {
-            Parent::Table(table) => table.get_mut(key),
-            Parent::Inline(table) => TableLike::get_mut(table, key),
-        }
-        .ok_or_else(|| EditError::NotFound {
+        let item = parent.into_item(key).ok_or_else(|| EditError::NotFound {
             key_path: key_path[..=depth].to_vec(),
         })?;
         parent = match item {
@@ -494,35 +550,61 @@ fn array_mut<'d>(
     key_path: &[String],
 ) -> Result<&'d mut toml_edit::Array, EditError> {
     let (parent_path, name) = split_key_path(key_path)?;
-    let item = match parent_mut(doc, parent_path)? {
-        Parent::Table(table) => table.get_mut(name),
-        Parent::Inline(table) => TableLike::get_mut(table, name),
-    }
-    .ok_or_else(|| EditError::NotFound {
-        key_path: key_path.to_vec(),
-    })?;
+    let item = parent_mut(doc, parent_path)?
+        .into_item(name)
+        .ok_or_else(|| EditError::NotFound {
+            key_path: key_path.to_vec(),
+        })?;
     item.as_array_mut().ok_or_else(|| EditError::WrongType {
         key_path: key_path.to_vec(),
         expected: "a list",
     })
 }
 
-/// Adds a key with a value at the end of a table, keeping an inline table's
-/// spacing: the new value takes over the space before `}`.
-fn insert_value(parent: &mut Parent<'_>, name: &str, mut value: toml_edit::Value) {
+/// Adds a key with a value to a table, right after the key `after`: first
+/// when `after` is `None`, last when it is `Some` of a missing key. An inline
+/// table keeps its spacing: whatever value ends up last keeps the space
+/// before `}`.
+fn insert_value(
+    parent: &mut Parent<'_>,
+    name: &str,
+    mut value: toml_edit::Value,
+    after: Option<&str>,
+) {
+    let mut order: Vec<String> = parent
+        .table_like()
+        .iter()
+        .map(|(key, _)| key.to_owned())
+        .collect();
+    let index = match after {
+        None => 0,
+        Some(after) => order
+            .iter()
+            .position(|key| key == after)
+            .map_or(order.len(), |index| index + 1),
+    };
+    order.insert(index, name.to_owned());
+    let rank = |key: &Key| order.iter().position(|name| name == key.get());
     match parent {
         Parent::Table(table) => {
             table.insert(name, Item::Value(value));
+            table.sort_values_by(|a, _, b, _| rank(a).cmp(&rank(b)));
         }
         Parent::Inline(table) => {
-            if let Some((_, last)) = table.iter_mut().last() {
-                if let Some(suffix) = last.decor().suffix().cloned() {
-                    value.decor_mut().set_suffix(suffix);
-                    last.decor_mut().set_suffix("");
-                }
+            let closing = table.iter_mut().last().and_then(|(_, last)| {
+                let suffix = last.decor().suffix().cloned();
+                last.decor_mut().set_suffix("");
+                suffix
+            });
+            if !table.is_empty() {
                 value.decor_mut().set_prefix(" ");
             }
+            value.decor_mut().set_suffix("");
             table.insert(name, value);
+            table.sort_values_by(|a, _, b, _| rank(a).cmp(&rank(b)));
+            if let (Some(closing), Some((_, last))) = (closing, table.iter_mut().last()) {
+                last.decor_mut().set_suffix(closing);
+            }
         }
     }
 }
@@ -693,12 +775,35 @@ fn to_toml(value: &Value, key_path: &[String]) -> Result<toml_edit::Value, EditE
     let unrepresentable = || EditError::Unrepresentable {
         key_path: key_path.to_vec(),
     };
+    if let Some((tag, text)) = untagged(value) {
+        return match tag {
+            DATETIME => text
+                .parse::<toml_edit::Datetime>()
+                .map(Into::into)
+                .map_err(|_| unrepresentable()),
+            _ => {
+                let magnitude = if text.trim_start_matches('-') == "nan" {
+                    f64::NAN
+                } else {
+                    f64::INFINITY
+                };
+                Ok(if text.starts_with('-') {
+                    -magnitude
+                } else {
+                    magnitude
+                }
+                .into())
+            }
+        };
+    }
     Ok(match value {
         Value::Null => return Err(unrepresentable()),
         Value::Bool(boolean) => (*boolean).into(),
-        Value::Number(number) => match number.as_i64() {
-            Some(integer) => integer.into(),
-            None => number.as_f64().ok_or_else(unrepresentable)?.into(),
+        Value::Number(number) => match (number.as_i64(), number.is_f64()) {
+            (Some(integer), _) => integer.into(),
+            (None, true) => number.as_f64().ok_or_else(unrepresentable)?.into(),
+            // An integer above TOML's 64-bit signed range.
+            (None, false) => return Err(unrepresentable()),
         },
         Value::String(string) => string.as_str().into(),
         Value::Array(items) => {
@@ -760,10 +865,19 @@ fn value_to_json(value: &toml_edit::Value) -> Value {
     match value {
         toml_edit::Value::String(string) => Value::String(string.value().clone()),
         toml_edit::Value::Integer(integer) => Value::from(*integer.value()),
-        toml_edit::Value::Float(float) => serde_json::Number::from_f64(*float.value())
-            .map_or_else(|| Value::String(float.to_string()), Value::Number),
+        toml_edit::Value::Float(float) => {
+            let float = *float.value();
+            serde_json::Number::from_f64(float).map_or_else(
+                || {
+                    let sign = if float.is_sign_negative() { "-" } else { "" };
+                    let name = if float.is_nan() { "nan" } else { "inf" };
+                    tagged(SPECIAL_FLOAT, format!("{sign}{name}"))
+                },
+                Value::Number,
+            )
+        }
         toml_edit::Value::Boolean(boolean) => Value::Bool(*boolean.value()),
-        toml_edit::Value::Datetime(datetime) => Value::String(datetime.value().to_string()),
+        toml_edit::Value::Datetime(datetime) => tagged(DATETIME, datetime.value().to_string()),
         toml_edit::Value::Array(array) => array.iter().map(value_to_json).collect(),
         toml_edit::Value::InlineTable(table) => table_to_json(table),
     }
@@ -776,4 +890,28 @@ fn spanned_prefix<'t>(text: &'t str, decor: &'t Decor) -> &'t str {
         .prefix()
         .and_then(|prefix| prefix.as_str().or_else(|| text.get(prefix.span()?)))
         .unwrap_or_default()
+}
+
+/// The key of the object that stands for a TOML datetime in a JSON value,
+/// as the `toml` crate spells it, so that it is not mistaken for a string.
+const DATETIME: &str = "$__toml_private_datetime";
+/// The key of the object that stands for a TOML `nan` or `inf`, which JSON
+/// numbers cannot hold.
+const SPECIAL_FLOAT: &str = "$__toml_private_special_float";
+
+fn tagged(tag: &str, text: String) -> Value {
+    Value::Object(serde_json::Map::from_iter([(
+        tag.to_owned(),
+        Value::String(text),
+    )]))
+}
+
+/// The tag and text of a value made by [`tagged`].
+fn untagged(value: &Value) -> Option<(&str, &str)> {
+    let object = value.as_object().filter(|object| object.len() == 1)?;
+    let (tag, text) = object.iter().next()?;
+    let tag = [DATETIME, SPECIAL_FLOAT]
+        .into_iter()
+        .find(|known| known == tag)?;
+    Some((tag, text.as_str()?))
 }

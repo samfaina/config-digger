@@ -185,7 +185,7 @@ fn set_of_an_existing_field_changes_one_token_and_keeps_its_comment() {
 }
 
 #[test]
-fn set_then_its_inverse_restores_the_original_bytes() {
+fn undoing_a_set_gives_back_the_original_bytes() {
     let disable = Edit::Set {
         key_path: key("mcp_servers.github.enabled"),
         value: json!(false),
@@ -342,7 +342,7 @@ fn edits_keep_a_missing_final_newline() {
 }
 
 #[test]
-fn remove_returns_an_insert_that_restores_the_table() {
+fn the_undo_of_a_remove_is_an_insert_that_brings_back_the_table() {
     let edit = Edit::Remove {
         key_path: key("mcp_servers.context7"),
     };
@@ -375,9 +375,9 @@ fn remove_returns_an_insert_that_restores_the_table() {
 
     let undone = apply(&applied.bytes, &applied.inverse);
     let original = EditableFile::decode(CONFIG_TOML, Syntax::Toml).unwrap();
-    let restored = EditableFile::decode(&undone.bytes, Syntax::Toml).unwrap();
+    let undone_file = EditableFile::decode(&undone.bytes, Syntax::Toml).unwrap();
     assert_eq!(
-        restored.value_at(&[]).unwrap(),
+        undone_file.value_at(&[]).unwrap(),
         original.value_at(&[]).unwrap()
     );
     let undone_text = String::from_utf8(undone.bytes).unwrap();
@@ -498,4 +498,110 @@ fn edits_of_missing_or_mistyped_keys_are_refused() {
             key_path: key("mcp_servers.github")
         }
     );
+}
+
+#[test]
+fn remove_of_a_table_whose_sub_table_is_further_down_keeps_what_lies_between() {
+    let text = b"[a]\nx = 1\n\n[b]\ny = 2\n\n# --- later ---\n\n[a.sub]\nz = 3\n";
+    let file = EditableFile::decode(text, Syntax::Toml).unwrap();
+
+    match file.apply(&Edit::Remove { key_path: key("a") }) {
+        Ok(applied) => {
+            let edited = String::from_utf8(applied.bytes).unwrap();
+            assert!(edited.contains("[b]\ny = 2\n"), "{edited}");
+            assert!(edited.contains("# --- later ---"), "{edited}");
+        }
+        Err(error) => assert!(matches!(error, EditError::OutsideEntry { .. }), "{error:?}"),
+    }
+}
+
+#[test]
+fn the_inverse_of_a_set_keeps_datetimes_and_special_floats() {
+    let text = b"created = 1979-05-27T07:32:00Z\nratio = nan\n";
+    for key_path in ["created", "ratio"] {
+        let edit = Edit::Set {
+            key_path: key(key_path),
+            value: json!("changed"),
+        };
+        let applied = apply(text, &edit);
+
+        assert_eq!(
+            apply(&applied.bytes, &applied.inverse).bytes,
+            text,
+            "{key_path}"
+        );
+    }
+}
+
+#[test]
+fn a_datetime_is_not_mistaken_for_its_string_form() {
+    let file = EditableFile::decode(b"created = 1979-05-27T07:32:00Z\n", Syntax::Toml).unwrap();
+    let applied = file
+        .apply(&Edit::Set {
+            key_path: key("created"),
+            value: json!("1979-05-27T07:32:00Z"),
+        })
+        .unwrap();
+
+    assert_eq!(
+        String::from_utf8(applied.bytes).unwrap(),
+        "created = \"1979-05-27T07:32:00Z\"\n"
+    );
+}
+
+#[test]
+fn insert_into_an_inline_table_goes_after_its_sibling() {
+    let toml = b"server = { a = 1, c = 3 }\n";
+    let insert = |after: Option<&str>| Edit::Insert {
+        key_path: key("server.b"),
+        value: json!(2),
+        after: after.map(String::from),
+        inline: true,
+        comments: Vec::new(),
+    };
+
+    assert_eq!(
+        text(toml, &insert(Some("a"))),
+        "server = { a = 1, b = 2, c = 3 }\n"
+    );
+    assert_eq!(
+        text(toml, &insert(None)),
+        "server = { b = 2, a = 1, c = 3 }\n"
+    );
+}
+
+#[test]
+fn a_table_inserted_after_a_plain_key_goes_before_the_first_sibling_table() {
+    let toml = b"[servers]\ntimeout = 5\n\n[servers.a]\nx = 1\n\n[other]\ny = 2\n";
+    let edit = Edit::Insert {
+        key_path: key("servers.b"),
+        value: json!({ "x": 2 }),
+        after: Some("timeout".into()),
+        inline: false,
+        comments: Vec::new(),
+    };
+
+    assert_eq!(
+        text(toml, &edit),
+        "[servers]\ntimeout = 5\n\n[servers.b]\nx = 2\n\n[servers.a]\nx = 1\n\n[other]\ny = 2\n"
+    );
+}
+
+#[test]
+fn a_server_set_under_a_table_without_header_gets_its_own_header_and_its_undo_leaves_none() {
+    let edit = Edit::Set {
+        key_path: key("mcp_servers.linear"),
+        value: json!({ "url": "https://mcp.linear.app/mcp" }),
+    };
+    let applied = apply(CONFIG_TOML, &edit);
+    let edited = String::from_utf8(applied.bytes.clone()).unwrap();
+
+    assert!(
+        edited.contains(
+            "enabled_tools = [\"list_issues\", \"get_issue\",]\n\n[mcp_servers.linear]\nurl = \"https://mcp.linear.app/mcp\"\n\n# Profiles below\n"
+        ),
+        "{edited}"
+    );
+    assert!(!edited.contains("[mcp_servers]\n"), "{edited}");
+    assert_eq!(apply(&applied.bytes, &applied.inverse).bytes, CONFIG_TOML);
 }

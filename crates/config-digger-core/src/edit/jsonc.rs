@@ -3,7 +3,7 @@
 //! parser's AST ranges instead, so that a mistake in either shows up as a
 //! refused edit.
 
-use super::{Change, Edit, EditError, line_of, lines, split_key_path};
+use super::{Change, Edit, EditError, line_of, line_range, line_start, lines, split_key_path};
 use jsonc_parser::common::Ranged;
 use jsonc_parser::cst::{
     CstArray, CstComment, CstInputValue, CstLeafNode, CstNode, CstObject, CstObjectProp,
@@ -117,11 +117,15 @@ impl File<'_> {
             comments,
         };
         prop.remove();
+        let members = Members::of_object(span);
+        if index == 0 && members.members.len() > 1 {
+            self.keep_opening_gap(&members, object.children());
+        }
 
         Ok(Change {
             text: self.root.to_string(),
             inverse,
-            allowed: self.removal(&Members::of_object(span), index),
+            allowed: self.removal(&members, index),
         })
     }
 
@@ -202,14 +206,36 @@ impl File<'_> {
                 value: value.clone(),
             })?;
         elements[index].clone().remove();
+        let members = Members::of_array(span);
+        if index == 0 && members.members.len() > 1 {
+            self.keep_opening_gap(&members, array.children());
+        }
         Ok(Change {
             text: self.root.to_string(),
             inverse: Edit::Append {
                 key_path: key_path.to_vec(),
                 value: value.clone(),
             },
-            allowed: self.removal(&Members::of_array(span), index),
+            allowed: self.removal(&members, index),
         })
+    }
+
+    /// Once the first member of a container written on one line is removed,
+    /// `jsonc-parser` leaves the space that followed its comma after the
+    /// opening bracket. This takes it away again when the container had none
+    /// there.
+    fn keep_opening_gap(&self, members: &Members, children: Vec<CstNode>) {
+        let gap = &self.text[members.container.start + 1..members.members[0].start];
+        if !gap.is_empty() || !self.is_single_line(members.container) {
+            return;
+        }
+        for space in children
+            .into_iter()
+            .skip(1)
+            .take_while(CstNode::is_whitespace)
+        {
+            space.remove();
+        }
     }
 
     /// The list at `key_path`, in the tree and in the AST.
@@ -317,7 +343,7 @@ impl File<'_> {
             Some(next) => next.start,
             None => members.container.end - 1,
         };
-        line_of(self.text, before)..line_of(self.text, after) + 1
+        line_range(self.text, before, after)
     }
 
     /// The lines removing member `index` may change: its own with the
@@ -341,7 +367,7 @@ impl File<'_> {
 
     /// The lines a range spans.
     fn lines(&self, range: jsonc_parser::common::Range) -> Range<usize> {
-        line_of(self.text, range.start)..line_of(self.text, range.end) + 1
+        line_range(self.text, range.start, range.end)
     }
 
     /// The object at `key_path` in the tree.
@@ -384,12 +410,11 @@ impl File<'_> {
     /// that holds byte `end`.
     fn lines_with_attached_comments(&self, start: usize, end: usize) -> Range<usize> {
         let lines = lines(self.text);
-        let first = line_of(self.text, start);
-        let line_start = self.text[..start]
-            .rfind('\n')
-            .map_or(0, |newline| newline + 1);
-        let mut top = first;
-        if self.text[line_start..start].trim().is_empty() {
+        let mut top = line_of(self.text, start);
+        if self.text[line_start(self.text, start)..start]
+            .trim()
+            .is_empty()
+        {
             while top > 0 {
                 let above = lines[top - 1].trim();
                 if above.starts_with("//") || (above.starts_with("/*") && above.ends_with("*/")) {
@@ -407,7 +432,7 @@ impl File<'_> {
                 }
             }
         }
-        top..line_of(self.text, end) + 1
+        top..line_range(self.text, start, end).end
     }
 }
 
@@ -518,7 +543,7 @@ fn with_comments_above(
         object = object.get_object(key).ok_or(EditError::Parse)?;
     }
     let start = object.get(name).ok_or(EditError::Parse)?.range.start;
-    let line_start = text[..start].rfind('\n').map_or(0, |newline| newline + 1);
+    let line_start = line_start(text, start);
     let indent = &text[line_start..start];
     if !indent.trim().is_empty() {
         return Ok(text.to_owned()); // the property shares its line with code

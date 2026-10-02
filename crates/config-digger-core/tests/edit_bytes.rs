@@ -134,3 +134,12 @@ fn edits_of_a_bom_file_keep_the_bom() {
     );
     assert_eq!(edited, "\u{FEFF}{ \"x\": 2 }\n");
 }
+
+#[test]
+fn utf32_is_read_only_but_a_nul_inside_utf8_text_is_left_to_the_parser() {
+    assert_eq!(
+        EditableFile::decode(&[0, 0, 0xFE, 0xFF, 0, 0, 0, b'{'], Syntax::Jsonc).unwrap_err(),
+        ReadOnly::Utf16
+    );
+    assert!(EditableFile::decode(b"{ \"a\": \"x\0y\" }", Syntax::Jsonc).is_ok());
+}

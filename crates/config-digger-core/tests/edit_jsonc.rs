@@ -137,7 +137,7 @@ fn remove_in_a_crlf_file_with_a_bom_keeps_both() {
 }
 
 #[test]
-fn remove_returns_an_insert_that_restores_the_value_and_its_comment() {
+fn the_undo_of_a_remove_is_an_insert_that_brings_back_the_value_and_its_comment() {
     let edit = Edit::Remove {
         key_path: key("mcpServers.github"),
     };
@@ -170,9 +170,9 @@ fn remove_returns_an_insert_that_restores_the_value_and_its_comment() {
 
     let undone = apply(&applied.bytes, &applied.inverse);
     let original = EditableFile::decode(MCP_JSONC, Syntax::Jsonc).unwrap();
-    let restored = EditableFile::decode(&undone.bytes, Syntax::Jsonc).unwrap();
+    let undone_file = EditableFile::decode(&undone.bytes, Syntax::Jsonc).unwrap();
     assert_eq!(
-        restored.value_at(&[]).unwrap(),
+        undone_file.value_at(&[]).unwrap(),
         original.value_at(&[]).unwrap()
     );
     assert_eq!(undone.inverse, edit);
@@ -348,7 +348,7 @@ fn set_in_a_crlf_file_inserts_a_crlf_line() {
 }
 
 #[test]
-fn each_inverse_restores_the_original_bytes() {
+fn undoing_each_edit_gives_back_the_original_bytes() {
     let edits = [
         Edit::Set {
             key_path: key("mcpServers.github.disabled"),
@@ -504,5 +504,33 @@ fn insert_into_a_single_line_object_goes_after_its_sibling() {
     assert_eq!(
         String::from_utf8(apply(text, &edit).bytes).unwrap(),
         "{ \"servers\": { \"a\": 1, \"b\": 2, \"c\": 3 } }\n"
+    );
+}
+
+#[test]
+fn remove_item_from_a_single_line_list_keeps_its_spacing() {
+    let text = b"{ \"args\": [\"-y\", \"pkg\", \"--flag\"] }\n";
+    let remove = |value: &str| Edit::RemoveItem {
+        key_path: key("args"),
+        value: json!(value),
+    };
+
+    assert_eq!(
+        String::from_utf8(apply(text, &remove("-y")).bytes).unwrap(),
+        "{ \"args\": [\"pkg\", \"--flag\"] }\n"
+    );
+    assert_eq!(
+        String::from_utf8(apply(text, &remove("--flag")).bytes).unwrap(),
+        "{ \"args\": [\"-y\", \"pkg\"] }\n"
+    );
+}
+
+#[test]
+fn remove_of_the_first_key_of_a_single_line_object_keeps_its_spacing() {
+    let text = b"{\"a\": 1, \"b\": 2}\n";
+
+    assert_eq!(
+        String::from_utf8(apply(text, &Edit::Remove { key_path: key("a") }).bytes).unwrap(),
+        "{\"b\": 2}\n"
     );
 }

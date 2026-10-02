@@ -35,12 +35,15 @@ pub enum Edit {
     /// Removes the key, with the comment lines directly above it.
     Remove { key_path: Vec<String> },
     /// Sets the key's value, adding the key at the end of its object or table
-    /// when it is missing.
+    /// when it is missing. In TOML, an object added under a table that has no
+    /// header of its own becomes a `[table]`.
     Set { key_path: Vec<String>, value: Value },
     /// Adds a missing key right after its sibling `after`: first when `after`
-    /// is `None`, last when that sibling is gone. `comments` go on their own
-    /// lines above it. `inline` writes an object on one line: a JSONC object
-    /// on a single line, or a TOML inline table instead of a `[table]`.
+    /// is `None`, last when that sibling is gone. `comments`, in the file's
+    /// own syntax, go on their own lines above it, unless it goes in an
+    /// object or table written on one line, where they are left out.
+    /// `inline` writes an object on one line: a JSONC object on a single
+    /// line, or a TOML inline table instead of a `[table]`.
     Insert {
         key_path: Vec<String>,
         value: Value,
@@ -48,9 +51,12 @@ pub enum Edit {
         inline: bool,
         comments: Vec<String>,
     },
-    /// Appends a value to the list at the key.
+    /// Appends a value to the list at the key. With [`Edit::RemoveItem`], its
+    /// inverse, it treats the list as a set of names, such as a list of
+    /// disabled servers, whose order does not matter.
     Append { key_path: Vec<String>, value: Value },
-    /// Removes the last item equal to `value` from the list at the key.
+    /// Removes the last item equal to `value` from the list at the key. Its
+    /// inverse appends the item back at the end.
     RemoveItem { key_path: Vec<String>, value: Value },
 }
 
@@ -125,9 +131,12 @@ const BOM: &str = "\u{FEFF}";
 impl EditableFile {
     /// Decodes a file's bytes, or says why the file can only be read.
     pub fn decode(bytes: &[u8], syntax: Syntax) -> Result<Self, ReadOnly> {
+        // A UTF-16 or UTF-32 BOM, or, without one, a NUL byte among the first
+        // two, which the first character of a configuration file never has.
         if bytes.starts_with(&[0xFF, 0xFE])
             || bytes.starts_with(&[0xFE, 0xFF])
-            || bytes.contains(&0)
+            || bytes.starts_with(&[0, 0, 0xFE, 0xFF])
+            || bytes.iter().take(2).any(|byte| *byte == 0)
         {
             return Err(ReadOnly::Utf16);
         }
@@ -159,7 +168,7 @@ impl EditableFile {
             Syntax::Jsonc => jsonc::reprint(&lf)?,
             Syntax::Toml => toml::reprint(&lf)?,
         };
-        Ok(self.encode(&self.restore(&lf, printed)))
+        Ok(self.encode(&self.with_own_line_endings(&lf, printed)))
     }
 
     /// The value at a key, `None` when the key is missing.
@@ -177,7 +186,7 @@ impl EditableFile {
             Syntax::Jsonc => jsonc::apply(&lf, edit)?,
             Syntax::Toml => toml::apply(&lf, edit)?,
         };
-        let after = self.restore(&lf, change.text);
+        let after = self.with_own_line_endings(&lf, change.text);
         let lf_after = to_lf(&after);
         check_lines(&lf, &lf_after, &change.allowed)?;
         let after_value = self.value(&lf_after)?;
@@ -215,7 +224,7 @@ impl EditableFile {
 
     /// Puts back what editing an LF copy loses: the final newline's absence
     /// and the line endings of every line the edit kept.
-    fn restore(&self, lf_before: &str, mut lf_after: String) -> String {
+    fn with_own_line_endings(&self, lf_before: &str, mut lf_after: String) -> String {
         if !self.text.is_empty() && !self.text.ends_with('\n') && lf_after.ends_with('\n') {
             lf_after.pop();
         }
@@ -253,7 +262,9 @@ impl EditableFile {
 /// Why a file can be read but not edited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ReadOnly {
-    #[error("the file is UTF-16; config-digger only writes UTF-8, so it leaves this file as it is")]
+    #[error(
+        "the file is UTF-16 or UTF-32; config-digger only writes UTF-8, so it leaves this file as it is"
+    )]
     Utf16,
     #[error(
         "the file is not UTF-8 and has no BOM, so it is probably in a legacy ANSI code page; config-digger cannot tell which one, so it cannot write the file back safely"
@@ -393,6 +404,17 @@ fn check_lines(before: &str, after: &str, allowed: &[Range<usize>]) -> Result<()
 
 fn lines(text: &str) -> Vec<&str> {
     text.split_inclusive('\n').collect()
+}
+
+/// The 0-based lines from the one that holds byte `start` of `text` to the
+/// one that holds byte `end`.
+fn line_range(text: &str, start: usize, end: usize) -> Range<usize> {
+    line_of(text, start)..line_of(text, end) + 1
+}
+
+/// Where the line that holds byte `offset` of `text` starts.
+fn line_start(text: &str, offset: usize) -> usize {
+    text[..offset].rfind('\n').map_or(0, |newline| newline + 1)
 }
 
 /// The 0-based line that holds byte `offset` of `text`.
