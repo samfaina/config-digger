@@ -10,8 +10,7 @@ use config_digger_core::ports::Ports;
 use serde::Serialize;
 use std::ffi::OsString;
 use std::process::ExitCode;
-use terminal::{ColorWhen, Line};
-use unicode_width::UnicodeWidthStr;
+use terminal::{ColorWhen, Line, columns};
 
 #[derive(Parser)]
 #[command(
@@ -33,7 +32,7 @@ struct Cli {
     #[arg(long, value_enum, value_name = "WHEN", default_value_t, global = true)]
     color: ColorWhen,
 
-    /// Print whole lines instead of fitting them to the terminal width.
+    /// Print whole lines instead of fitting them to the terminal width (or COLUMNS).
     #[arg(long, global = true)]
     wide: bool,
 
@@ -47,11 +46,13 @@ enum Command {
     List,
     /// Print a completion script for a shell.
     Completions {
+        /// The shell to complete in.
         #[arg(value_enum)]
         shell: Shell,
     },
 }
 
+/// The shells `completions` writes a script for.
 #[derive(Clone, Copy, ValueEnum)]
 enum Shell {
     Powershell,
@@ -183,9 +184,12 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     }
 }
 
+/// The `error:` prefix on stderr.
 const ERROR: Style = AnsiColor::Red.on_default().bold();
+/// The `warning:` prefix on stderr.
 const WARNING: Style = AnsiColor::Yellow.on_default().bold();
 
+/// A human-readable error on stderr.
 fn print_error(message: &str) {
     anstream::eprintln!("{ERROR}error:{ERROR:#} {message}");
 }
@@ -259,7 +263,9 @@ fn print_json(body: &impl Serialize) {
     );
 }
 
+/// Home titles.
 const BOLD: Style = Style::new().bold();
+/// Column headers.
 const DIM: Style = Style::new().dimmed();
 
 /// Below this many columns a location is cut with the rest of the line instead of elided.
@@ -288,12 +294,11 @@ fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
                 let effective = &item.entries[0];
                 Row {
                     cells: [
-                        item.name.as_str(),
-                        effective.scope.as_str(),
-                        state_label(item.state),
+                        (item.name.as_str(), Style::new()),
+                        (effective.scope.as_str(), Style::new()),
+                        (state_label(item.state), state_style(item.state)),
                     ],
-                    state: item.state,
-                    location: effective,
+                    effective,
                 }
             })
             .collect();
@@ -301,53 +306,49 @@ fn render_list(inventory: &Inventory, width: Option<usize>) -> String {
             out.push_str(&plain_line("  No Items.", width));
             continue;
         }
-        let header = ["NAME", "SCOPE", "STATE"];
-        let widths: Vec<usize> = (0..3)
-            .map(|column| {
-                rows.iter()
-                    .map(|row| row.cells[column].width())
-                    .chain([header[column].len()])
-                    .max()
-                    .unwrap_or(0)
-            })
-            .collect();
+        let header = [("NAME", DIM), ("SCOPE", DIM), ("STATE", DIM)];
+        let widths: [usize; 3] = std::array::from_fn(|column| {
+            rows.iter()
+                .map(|row| columns(row.cells[column].0))
+                .chain([columns(header[column].0)])
+                .max()
+                .unwrap_or(0)
+        });
         let location_width = width.map(|width| {
             let before: usize = widths.iter().map(|w| w + 2).sum::<usize>() + 2;
             width.saturating_sub(before)
         });
 
-        let mut line = Line::default();
-        line.push("  ", Style::new());
-        for (cell, &w) in header.iter().zip(&widths) {
-            line.push_padded(cell, w, DIM).push("  ", Style::new());
-        }
-        line.push("LOCATION", DIM);
-        out.push_str(&line.fit(width).render());
-
+        let header_line = table_line(&header, &widths, "LOCATION".to_owned(), DIM);
+        out.push_str(&header_line.fit(width).render());
         for row in &rows {
-            let mut line = Line::default();
-            line.push("  ", Style::new());
-            for (column, (cell, &w)) in row.cells.iter().zip(&widths).enumerate() {
-                let style = if column == 2 {
-                    state_style(row.state)
-                } else {
-                    Style::new()
-                };
-                line.push_padded(cell, w, style).push("  ", Style::new());
-            }
-            line.push(location(row.location, location_width), Style::new());
+            let location = location(row.effective, location_width);
+            let line = table_line(&row.cells, &widths, location, Style::new());
             out.push_str(&line.fit(width).render());
         }
     }
     out
 }
 
+/// An Item in `list`: its name, Scope and State cells, and its Effective Entry.
 struct Row<'a> {
-    cells: [&'a str; 3],
-    state: api::State,
-    location: &'a api::Entry,
+    cells: [(&'a str, Style); 3],
+    effective: &'a api::Entry,
 }
 
+/// The padded cells of one table line, followed by its unpadded last column.
+fn table_line(cells: &[(&str, Style); 3], widths: &[usize; 3], last: String, style: Style) -> Line {
+    let mut line = Line::default();
+    line.push("  ", Style::new());
+    for (&(cell, cell_style), &width) in cells.iter().zip(widths) {
+        line.push_padded(cell, width, cell_style)
+            .push("  ", Style::new());
+    }
+    line.push(last, style);
+    line
+}
+
+/// A line of unstyled text, fitted to `width`.
 fn plain_line(text: &str, width: Option<usize>) -> String {
     let mut line = Line::default();
     line.push(text, Style::new());
@@ -358,7 +359,7 @@ fn plain_line(text: &str, width: Option<usize>) -> String {
 /// the key path is what tells Entries of one file apart, so it stays whole.
 fn location(entry: &api::Entry, width: Option<usize>) -> String {
     let locator = entry.locator.as_str();
-    let Some(width) = width.filter(|&width| locator.width() > width) else {
+    let Some(width) = width.filter(|&width| columns(locator) > width) else {
         return locator.to_owned();
     };
     let path = entry.path.display().to_string();
@@ -366,7 +367,7 @@ fn location(entry: &api::Entry, width: Option<usize>) -> String {
         Some(key_path) => (path.as_str(), key_path),
         None => (locator, ""),
     };
-    match width.checked_sub(key_path.width()) {
+    match width.checked_sub(columns(key_path)) {
         Some(path_width) if path_width >= MIN_LOCATION_WIDTH => {
             format!("{}{key_path}", terminal::elide_middle(path, path_width))
         }

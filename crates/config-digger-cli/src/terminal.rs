@@ -3,11 +3,14 @@
 //!
 //! Output is always UTF-8 without touching the console code page: the standard
 //! library writes UTF-16 to a Windows console and UTF-8 bytes to pipes and files.
+//! A shell that decodes captured output with another encoding, as PowerShell
+//! does with `[Console]::OutputEncoding`, picks it before the process starts,
+//! so changing the code page from here would not help it.
 
 use anstyle::Style;
 use clap::ValueEnum;
 use std::ffi::OsString;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 /// The `--color` flag.
 #[derive(Clone, Copy, Default, ValueEnum)]
@@ -31,6 +34,7 @@ impl ColorWhen {
         choice.write_global();
     }
 
+    /// The same choice for clap's help and parse errors.
     pub fn for_clap(self) -> clap::ColorChoice {
         match self {
             ColorWhen::Auto => clap::ColorChoice::Auto,
@@ -64,18 +68,19 @@ pub fn stderr_is_colored() -> bool {
     anstream::AutoStream::choice(&std::io::stderr()) != anstream::ColorChoice::Never
 }
 
-/// The width `list` fits its lines to: `COLUMNS` when set, as most terminal
-/// tools honour it, otherwise the width of the terminal stdout writes to.
-/// `None` means no limit: `--wide`, or stdout is a pipe or a file.
+/// The width `list` fits its lines to. `COLUMNS` overrides it wherever stdout
+/// goes, as it does for Python's `shutil.get_terminal_size`; otherwise it is
+/// the width of the terminal stdout writes to. `None` means no limit: `--wide`,
+/// or stdout is a pipe or a file and `COLUMNS` is not set.
 pub fn output_width(wide: bool) -> Option<usize> {
     if wide {
         return None;
     }
-    let columns = std::env::var("COLUMNS")
+    let override_width = std::env::var("COLUMNS")
         .ok()
         .and_then(|columns| columns.trim().parse::<usize>().ok())
         .filter(|&columns| columns > 0);
-    columns.or_else(|| {
+    override_width.or_else(|| {
         terminal_size::terminal_size_of(std::io::stdout())
             .map(|(terminal_size::Width(width), _)| usize::from(width))
     })
@@ -88,6 +93,7 @@ const ELLIPSIS: char = '…';
 pub struct Line(Vec<(String, Style)>);
 
 impl Line {
+    /// Adds `text` in `style`.
     pub fn push(&mut self, text: impl Into<String>, style: Style) -> &mut Self {
         self.0.push((text.into(), style));
         self
@@ -96,12 +102,13 @@ impl Line {
     /// Adds `text` padded with spaces to `width` columns.
     pub fn push_padded(&mut self, text: &str, width: usize, style: Style) -> &mut Self {
         self.push(text, style);
-        let padding = width.saturating_sub(text.width());
+        let padding = width.saturating_sub(columns(text));
         self.push(" ".repeat(padding), Style::new())
     }
 
+    /// How many columns the line takes, escape codes excluded.
     pub fn width(&self) -> usize {
-        self.0.iter().map(|(text, _)| text.width()).sum()
+        self.0.iter().map(|(text, _)| columns(text)).sum()
     }
 
     /// Cuts the end of the line so that it fits `width` columns, marking the cut with `…`.
@@ -114,15 +121,20 @@ impl Line {
         let mut kept = Vec::new();
         for (text, style) in self.0.drain(..) {
             let piece = take_columns(text.chars(), room);
-            room -= piece.width();
+            room -= columns(&piece);
             let whole = piece.len() == text.len();
             kept.push((piece, style));
             if !whole {
                 break;
             }
         }
-        if let Some((last, _)) = kept.last_mut() {
+        // Padding before the cut would leave a gap between the text and the `…`.
+        while let Some((last, _)) = kept.last_mut() {
             last.truncate(last.trim_end().len());
+            if !last.is_empty() {
+                break;
+            }
+            kept.pop();
         }
         if width > 0 {
             kept.push((ELLIPSIS.to_string(), Style::new()));
@@ -143,17 +155,23 @@ impl Line {
     }
 }
 
+/// How many columns `text` takes, counted character by character so that
+/// measuring and cutting always agree.
+pub fn columns(text: &str) -> usize {
+    text.chars().map(|c| c.width().unwrap_or(0)).sum()
+}
+
 /// Shortens `text` to `width` columns by replacing its middle with `…`,
 /// keeping more of the end, where a path is most specific.
 pub fn elide_middle(text: &str, width: usize) -> String {
-    if text.width() <= width {
+    if columns(text) <= width {
         return text.to_owned();
     }
     let Some(room) = width.checked_sub(1) else {
         return String::new();
     };
     let head = take_columns(text.chars(), room / 3);
-    let tail: String = take_columns(text.chars().rev(), room - head.width())
+    let tail: String = take_columns(text.chars().rev(), room - columns(&head))
         .chars()
         .rev()
         .collect();
@@ -193,7 +211,7 @@ mod tests {
     fn elide_middle_counts_wide_characters_as_two_columns() {
         let elided = elide_middle("日本語のフォルダ\\x.json", 12);
 
-        assert!(elided.width() <= 12, "{elided}");
+        assert!(columns(&elided) <= 12, "{elided}");
         assert!(elided.ends_with("\\x.json"), "{elided}");
     }
 
@@ -222,6 +240,26 @@ mod tests {
             .push("Effective", Style::new());
 
         assert_eq!(plain(&line.fit(Some(8))), "name…");
+    }
+
+    #[test]
+    fn fit_drops_trailing_padding_pieces_before_the_cut() {
+        let mut line = Line::default();
+        line.push_padded("name", 6, Style::new())
+            .push("Effective", Style::new());
+
+        assert_eq!(plain(&line.fit(Some(7))), "name…");
+    }
+
+    #[test]
+    fn fit_measures_emoji_presentation_sequences_like_it_cuts_them() {
+        let mut line = Line::default();
+        line.push("☺\u{FE0F}☺\u{FE0F}☺\u{FE0F}", Style::new())
+            .push("tail", Style::new());
+
+        let fitted = line.fit(Some(3));
+
+        assert!(fitted.width() <= 3, "{}", plain(&fitted));
     }
 
     #[test]
