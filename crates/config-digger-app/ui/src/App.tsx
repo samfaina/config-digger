@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Inventory } from "./Inventory";
+import { InventoryScreen } from "./Inventory";
 import { Rail, SCREEN_TITLES, type Screen } from "./Rail";
 
 export function App() {
@@ -8,7 +8,7 @@ export function App() {
     <div className="app">
       <Rail current={screen} onSelect={setScreen} />
       <main className="main">
-        {screen === "inventory" ? <Inventory /> : <ComingLater title={SCREEN_TITLES[screen]} />}
+        {screen === "inventory" ? <InventoryScreen /> : <ComingLater title={SCREEN_TITLES[screen]} />}
       </main>
     </div>
   );

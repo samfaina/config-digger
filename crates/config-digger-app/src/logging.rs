@@ -10,9 +10,9 @@ use tracing_subscriber::EnvFilter;
 /// One file per day; older ones are deleted beyond this count.
 const KEPT_LOG_FILES: usize = 14;
 
-/// Only config-digger's own events: the webview stack logs URLs and page
-/// content we have no control over.
-const DEFAULT_FILTER: &str = "warn,config_digger_app=info,config_digger_core=info";
+/// Only config-digger's own events, and no way to widen them: the webview
+/// stack logs URLs and page content we have no control over.
+const FILTER: &str = "warn,config_digger_app=info,config_digger_core=info";
 
 /// Starts logging to the rotating file. Without `LOCALAPPDATA`, or when the
 /// folder cannot be created, the app runs without a log.
@@ -28,10 +28,7 @@ pub(crate) fn init() -> Option<WorkerGuard> {
     tracing_subscriber::fmt()
         .with_writer(writer)
         .with_ansi(false)
-        .with_env_filter(
-            EnvFilter::try_from_env("CONFIG_DIGGER_LOG")
-                .unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER)),
-        )
+        .with_env_filter(EnvFilter::new(FILTER))
         .try_init()
         .ok()?;
     Some(guard)

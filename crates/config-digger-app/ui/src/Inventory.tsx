@@ -1,11 +1,11 @@
 import { useState } from "react";
-import type { Home, Inventory as InventoryData, Item } from "./bindings";
+import type { Home, Inventory, Item } from "./bindings";
 import { Icon } from "./icons";
 import { STATE_LABELS } from "./states";
 import { useInventory } from "./useInventory";
 
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */
-export function Inventory() {
+export function InventoryScreen() {
   const { inventory, error, reading, refresh } = useInventory();
   const [selected, setSelected] = useState<string | null>(null);
   const selectedItem = inventory?.items.find((item) => itemKey(item) === selected) ?? null;
@@ -63,7 +63,7 @@ export function Inventory() {
           {error && (
             <div className="alert" role="alert">
               <Icon name="flag" small />
-              The inventory could not be read: {error.message}
+              The inventory couldn't be read: {error.message}
             </div>
           )}
           {inventory && inventory.read_failures.length > 0 && (
@@ -95,7 +95,7 @@ export function Inventory() {
           ) : (
             <>
               <h2 className="panel-title">Details</h2>
-              <p className="empty">Select an Item to see which Entry wins and why.</p>
+              <p className="empty">Select an Item to see which Entry is Effective and why.</p>
             </>
           )}
         </section>
@@ -119,7 +119,7 @@ function HomeList({ homes }: { homes: Home[] }) {
 }
 
 type ItemListProps = {
-  inventory: InventoryData;
+  inventory: Inventory;
   selected: string | null;
   onSelect: (key: string) => void;
 };
@@ -129,17 +129,13 @@ function ItemList({ inventory, selected, onSelect }: ItemListProps) {
   if (inventory.items.length === 0) return <p className="empty">No Items found.</p>;
   return (
     <>
-      {inventory.homes.map((home) => {
-        const items = inventory.items.filter(
-          (item) => item.agent === home.agent && item.home === home.home,
-        );
+      {agents(inventory.homes).map(({ agent, agentName }) => {
+        const items = inventory.items.filter((item) => item.agent === agent);
         if (items.length === 0) return null;
-        const agentHomes = inventory.homes.filter((other) => other.agent === home.agent);
         return (
-          <div className="item-group" key={`${home.agent}|${home.home}`}>
+          <div className="item-group" key={agent}>
             <div className="group">
-              {home.agent_name}
-              {agentHomes.length > 1 && <span className="dim"> · {home.home}</span>}
+              {agentName}
               <span className="line" />
               {items.length}
             </div>
@@ -159,8 +155,8 @@ function ItemList({ inventory, selected, onSelect }: ItemListProps) {
 }
 
 function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; onSelect: () => void }) {
-  // Entries come in precedence order, so the first one is the winning Entry.
-  const winner = item.entries[0];
+  // Entries come in precedence order, so the first one is Effective.
+  const effective = item.entries[0];
   const entries = item.entries.length === 1 ? "1 Entry" : `${item.entries.length} Entries`;
   return (
     <button type="button" className={`item-row${selected ? " selected" : ""}`} onClick={onSelect}>
@@ -169,8 +165,8 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
       </span>
       <span className="item-text">
         <span className="item-name">{item.name}</span>
-        <span className="item-location" title={winner.locator}>
-          {winner.scope} · {winner.locator}
+        <span className="item-location" title={effective.locator}>
+          {effective.scope} · {effective.locator}
         </span>
       </span>
       <span className="item-count">{entries}</span>
@@ -186,6 +182,13 @@ function StatePill({ item }: { item: Item }) {
       <span className="dot" />
     </span>
   );
+}
+
+/** Each Agent once, in the order of its first home. */
+function agents(homes: Home[]): { agent: string; agentName: string }[] {
+  const names = new Map<string, string>();
+  for (const home of homes) if (!names.has(home.agent)) names.set(home.agent, home.agent_name);
+  return [...names].map(([agent, agentName]) => ({ agent, agentName }));
 }
 
 function itemKey(item: Item): string {
