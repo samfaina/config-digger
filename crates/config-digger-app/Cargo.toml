@@ -1,14 +1,32 @@
 [package]
 name = "config-digger-app"
-description = "The config-digger desktop app (Tauri). Placeholder until the inventory window lands."
+description = "The config-digger desktop app: a thin Tauri 2 shell over the core."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+default-run = "config-digger-app"
+
+[lib]
+name = "config_digger_app"
+
+[[bin]]
+name = "config-digger-app"
+path = "src/main.rs"
 
 [dependencies]
 config-digger-core.workspace = true
+specta.workspace = true
+specta-typescript.workspace = true
+tauri.workspace = true
+tauri-specta.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+tauri-build.workspace = true
 
 [lints]
 workspace = true
