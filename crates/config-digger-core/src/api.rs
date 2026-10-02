@@ -1,5 +1,6 @@
 //! The public surface shared by the app and the CLI: [`Core`] and the serde
-//! DTOs it returns. Domain types stay internal.
+//! DTOs it returns. Domain types stay internal. The DTOs also derive
+//! `specta::Type`, from which the app's TypeScript bindings are generated.
 
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::ports::Ports;
@@ -48,7 +49,7 @@ impl Core {
 }
 
 /// Every Item found, with the Agent homes they belong to.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Inventory {
     /// When the snapshot was read, in RFC 3339.
     pub read_at: String,
@@ -59,14 +60,14 @@ pub struct Inventory {
 }
 
 /// An Agent home found on this machine.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Home {
     pub agent: String,
     pub agent_name: String,
     pub home: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Item {
     pub agent: String,
     pub home: String,
@@ -77,7 +78,7 @@ pub struct Item {
     pub entries: Vec<Entry>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemKind {
     Mcp,
@@ -91,7 +92,7 @@ impl From<DefinitionItemKind> for ItemKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Entry {
     pub path: PathBuf,
     pub key_path: Vec<String>,
@@ -101,7 +102,7 @@ pub struct Entry {
     pub state: State,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     Effective,
@@ -109,7 +110,7 @@ pub enum State {
 }
 
 /// A location config-digger could not turn into Entries for one Agent.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct ReadFailure {
     pub agent: String,
     pub agent_name: String,
@@ -118,7 +119,7 @@ pub struct ReadFailure {
     pub kind: ReadFailureKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFailureKind {
     Parse,
@@ -140,21 +141,22 @@ impl ReadFailureKind {
 }
 
 /// A failure of the call itself, as opposed to a Read failure.
-#[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type, thiserror::Error)]
 #[error("{message}")]
 pub struct Error {
     pub code: ErrorCode,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     Unexpected,
 }
 
 impl Error {
-    fn unexpected(error: impl std::fmt::Display) -> Self {
+    /// A failure the caller cannot act on, such as a bug or a lost worker thread.
+    pub fn unexpected(error: impl std::fmt::Display) -> Self {
         Self {
             code: ErrorCode::Unexpected,
             message: error.to_string(),
