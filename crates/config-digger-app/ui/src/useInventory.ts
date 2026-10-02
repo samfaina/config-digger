@@ -30,7 +30,7 @@ export function useInventory(): InventoryRead {
         setError(result.error);
       }
     } catch (thrown) {
-      setError({ code: "unexpected", message: String(thrown), candidates: [] });
+      setError({ code: "unexpected", message: String(thrown), candidates: [], backup: null });
     } finally {
       inFlight.current = false;
       setReading(false);

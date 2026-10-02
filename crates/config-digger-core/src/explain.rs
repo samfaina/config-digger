@@ -25,3 +25,15 @@ pub(crate) fn shadowed_by_precedence(
         sentence: format!("Shadowed by the {effective_scope} Entry {effective}, {why}."),
     }
 }
+
+/// Which Entry of an Item is Effective after an Operation that keeps some of
+/// its Entries. `unchanged` says it was Effective before too.
+pub(crate) fn effective_after(
+    item: &str,
+    agent_name: &str,
+    effective: &str,
+    unchanged: bool,
+) -> String {
+    let verb = if unchanged { "stays" } else { "becomes" };
+    format!("{effective} {verb} Effective for {item} in {agent_name}.")
+}

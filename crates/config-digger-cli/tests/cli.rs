@@ -58,6 +58,16 @@ impl Harness {
         real_path(self.root.path())
     }
 
+    /// Where the binary's `%LOCALAPPDATA%` points.
+    fn local_app_data(&self) -> PathBuf {
+        self.root.path().join("AppData").join("Local")
+    }
+
+    /// The folder Operations are backed up and recorded in.
+    fn backups(&self) -> PathBuf {
+        self.local_app_data().join("config-digger").join("backups")
+    }
+
     /// A `.claude.json` with user servers `linear` and `notes`, and a local
     /// `linear` keyed to the current folder in another spelling.
     fn with_local_linear(self) -> Self {
@@ -99,6 +109,8 @@ impl Harness {
         command
             .args(args)
             .current_dir(self.root.path())
+            // config-digger's data folder (backups, History, lock) stays in the temporary folder.
+            .env("LOCALAPPDATA", self.local_app_data())
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("RUST_LOG");
         // Terminal conventions the tests opt into one at a time.
@@ -736,4 +748,175 @@ fn non_ascii_paths_print_as_utf8() {
         json.document()["items"][1]["entries"][0]["locator"],
         location
     );
+}
+
+/// User servers `linear` and `notes`.
+const TWO_USER_SERVERS: &str = r#"{
+  "mcpServers": {
+    "linear": { "url": "https://u" },
+    "notes": { "command": "notes-mcp" }
+  }
+}
+"#;
+
+fn read(path: &Path) -> String {
+    std::fs::read_to_string(path).unwrap()
+}
+
+#[test]
+fn remove_without_a_tty_or_yes_prints_the_preview_and_exits_4() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "linear", "--no-project"]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    assert!(run.stdout.contains("Effective"), "{}", run.stdout);
+    assert!(run.stdout.contains("removed"), "{}", run.stdout);
+    assert!(run.stderr.contains("--yes"), "{}", run.stderr);
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
+    assert!(!harness.backups().exists());
+}
+
+#[test]
+fn remove_with_yes_prints_the_preview_then_writes_and_verifies() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let claude_json = harness.path(".claude.json");
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--yes"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let stdout = &run.stdout;
+    assert!(
+        stdout.contains(&locator(&claude_json, "mcpServers.linear")),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(r#"-    "linear": { "url": "https://u" },"#),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(&harness.backups().display().to_string()),
+        "{stdout}"
+    );
+    assert!(stdout.contains("verified"), "{stdout}");
+    assert_eq!(
+        read(&claude_json),
+        "{\n  \"mcpServers\": {\n    \"notes\": { \"command\": \"notes-mcp\" }\n  }\n}\n"
+    );
+}
+
+#[test]
+fn remove_json_returns_plan_warnings_and_result() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--yes", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["plan"]["changes"][0]["after"], "removed");
+    assert_eq!(document["warnings"], json!([]));
+    assert_eq!(document["result"]["verify"], "verified");
+    let operation = document["result"]["operation"].as_str().unwrap();
+    let backup = harness.backups().join(operation);
+    assert_eq!(document["result"]["backup"], backup.display().to_string());
+    assert_eq!(read(&backup.join("1-.claude.json")), TWO_USER_SERVERS);
+    let manifest: Value = serde_json::from_str(&read(&backup.join("manifest.json"))).unwrap();
+    assert_eq!(manifest["status"], "applied");
+}
+
+#[test]
+fn remove_dry_run_prints_the_plan_and_exits_0() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--dry-run", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["plan"]["changes"][0]["before"], "effective");
+    assert_eq!(document["result"], Value::Null);
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
+    assert!(!harness.backups().exists());
+}
+
+#[test]
+fn remove_dry_run_in_text_says_nothing_was_written() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--dry-run"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("removed"), "{}", run.stdout);
+    assert!(run.stdout.contains("Dry run"), "{}", run.stdout);
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
+}
+
+#[test]
+fn remove_json_without_yes_is_one_error_document_exiting_4() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--json"]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["error"]["code"], "confirmation_required");
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
+}
+
+#[test]
+fn remove_of_a_name_with_several_entries_exits_3_and_lists_their_locators() {
+    let harness = Harness::new().with_local_linear();
+    let claude_json = harness.path(".claude.json");
+
+    let run = harness.run(&["remove", "linear", "--yes", "--json"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["error"]["code"], "ambiguous");
+    let candidates = document["error"]["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 2, "{document}");
+    assert_eq!(candidates[1], locator(&claude_json, "mcpServers.linear"));
+}
+
+#[test]
+fn remove_all_removes_every_entry_of_the_item_in_one_operation() {
+    let harness = Harness::new().with_local_linear();
+
+    let run = harness.run(&["remove", "linear", "--all", "--yes", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    let afters: Vec<&str> = document["plan"]["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|change| change["after"].as_str().unwrap())
+        .collect();
+    assert_eq!(afters, ["removed", "removed"]);
+    let left: Value = serde_json::from_str(&read(&harness.path(".claude.json"))).unwrap();
+    assert_eq!(left["mcpServers"], json!({ "notes": { "command": "n" } }));
+}
+
+#[test]
+fn remove_of_nothing_exits_3() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+
+    let run = harness.run(&["remove", "nope", "--yes"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+}
+
+#[test]
+fn remove_while_another_operation_holds_the_lock_exits_6() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let data = harness.local_app_data().join("config-digger");
+    std::fs::create_dir_all(&data).unwrap();
+    let lock = std::fs::File::create(data.join("lock")).unwrap();
+    lock.try_lock().unwrap();
+
+    let run = harness.run(&["remove", "linear", "--no-project", "--yes", "--json"]);
+
+    assert_eq!(run.code, 6, "{}", run.stderr);
+    assert_eq!(run.document()["error"]["code"], "locked");
+    assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
 }

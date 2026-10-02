@@ -26,15 +26,34 @@ export type Entry = {
 export type Error = {
 	code: ErrorCode,
 	message: string,
-	/**  What an ambiguous selector could mean, one locator per Item. */
+	/**  What an ambiguous selector could mean, one locator per Item or Entry. */
 	candidates: string[],
+	/**  The backup folder of an Operation that needs manual recovery. */
+	backup: string | null,
 };
 
 export type ErrorCode = "unexpected" | 
 /**  A selector matched nothing in the context. */
 "no_match" | 
-/**  A selector matched more than one Item. */
-"ambiguous";
+/**  A selector matched more than one Item, or more than one Entry. */
+"ambiguous" | 
+/**  A warning in the plan was not acknowledged. */
+"not_acknowledged" | 
+/**  The action cannot be done on a target, whatever is acknowledged. */
+"blocked" | 
+/**  Another Operation holds the global write lock. */
+"locked" | 
+/**  A touched Entry changed after it was read: plan again. */
+"stale" | 
+/**  A backup copy does not hold the bytes read; nothing was written. */
+"backup_failed" | 
+/**  The first write failed; nothing was written. */
+"write_failed" | 
+/**
+ *  Some files were written and the Operation did not complete: restore
+ *  them from the backup.
+ */
+"rollback_incomplete";
 
 /**  An Agent home found on this machine. */
 export type Home = {

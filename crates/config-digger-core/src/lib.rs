@@ -6,9 +6,12 @@ pub mod definitions;
 pub mod edit;
 pub mod ports;
 
+mod execute;
 mod explain;
+mod history;
 mod locator;
 mod paths;
+mod plan;
 mod resolve;
 mod scan;
 mod select;

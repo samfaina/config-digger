@@ -4,8 +4,9 @@
 
 use crate::definitions::blocks::Provenance as DefinitionProvenance;
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
+use crate::edit::Edit;
 use crate::ports::Ports;
-use crate::{resolve, scan, select};
+use crate::{execute, plan, resolve, scan, select};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -19,7 +20,11 @@ pub struct Core {
 }
 
 /// What [`Core::scan`] read. Resolve it as often as needed without reading the disk again.
-pub struct Snapshot(scan::Snapshot);
+pub struct Snapshot {
+    scanned: scan::Snapshot,
+    /// What it was scanned with, so that Verify can scan the same way again.
+    options: ScanOptions,
+}
 
 /// What to read besides what the Agents' registries record.
 #[derive(Debug, Clone, Default)]
@@ -46,15 +51,18 @@ impl Core {
 
     /// Reads every location of every found Agent home and Project.
     pub fn scan(&self, options: &ScanOptions) -> Result<Snapshot, Error> {
-        scan::scan(&self.definitions, &self.ports, &options.projects)
-            .map(Snapshot)
-            .map_err(Error::unexpected)
+        let scanned = scan::scan(&self.definitions, &self.ports, &options.projects)
+            .map_err(Error::unexpected)?;
+        Ok(Snapshot {
+            scanned,
+            options: options.clone(),
+        })
     }
 
     /// The Items of every Agent home and each Entry's State, for `context`.
     /// It never reads the disk.
     pub fn resolve(&self, snapshot: &Snapshot, context: &Context) -> Inventory {
-        resolve::resolve(&self.definitions, &snapshot.0, context)
+        resolve::resolve(&self.definitions, &snapshot.scanned, context)
     }
 
     /// The one Item `selector` names in `context`: an Item name, or the
@@ -69,6 +77,235 @@ impl Core {
             .select_one(selector)
             .cloned()
     }
+
+    /// Plans `action` on the Entries `targets` names in `context`, without
+    /// writing anything. Several selectors form one Operation, and it fails
+    /// whole when any of them does.
+    pub fn plan(
+        &self,
+        snapshot: &Snapshot,
+        context: &Context,
+        action: Action,
+        targets: &Targets,
+    ) -> Result<Plan, Error> {
+        plan::plan(
+            &self.definitions,
+            &self.ports,
+            &snapshot.scanned,
+            &snapshot.options,
+            context,
+            action,
+            targets,
+        )
+        .map(Plan)
+    }
+
+    /// Executes a plan once every warning in it is acknowledged: takes the
+    /// global lock, backs up each touched file, writes, verifies and records
+    /// the Operation in History.
+    pub fn execute(&self, plan: Plan, acknowledged: &[WarningClass]) -> Result<Outcome, Error> {
+        execute::execute(&self.definitions, &self.ports, plan.0, acknowledged)
+    }
+}
+
+/// What an Operation does to the Entries it targets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    /// Deletes each Entry from where it lives, for every Agent that reads it.
+    Remove,
+}
+
+/// The Entries an action targets.
+#[derive(Debug, Clone, Default)]
+pub struct Targets {
+    /// Each one an Item name, or the `<path>#<key path>` locator of an Entry.
+    pub selectors: Vec<String>,
+    /// Each selector stands for every Entry of the one Item it names, instead
+    /// of the one Entry it names.
+    pub all: bool,
+}
+
+/// An Operation planned and not yet executed. It never leaves the process:
+/// front-ends show its preview and warnings, then hand it to [`Core::execute`].
+pub struct Plan(pub(crate) plan::Planned);
+
+impl Plan {
+    pub fn preview(&self) -> &Preview {
+        &self.0.preview
+    }
+
+    /// What the user must acknowledge, each on its own, before it executes.
+    pub fn warnings(&self) -> &[Warning] {
+        &self.0.warnings
+    }
+}
+
+/// What a plan will change, shown before it is confirmed.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Preview {
+    pub action: Action,
+    /// The context's Project, as in [`Inventory::project`].
+    pub project: Option<PathBuf>,
+    /// One row per (Agent, Entry, Project) whose State the Operation changes.
+    pub changes: Vec<Change>,
+    /// For each Item that keeps Entries, which one is Effective afterwards.
+    pub effective: Vec<EffectiveChange>,
+    pub files: Vec<FileChange>,
+    /// Where each touched file is copied before anything is written.
+    pub backup_folder: PathBuf,
+}
+
+/// An Entry's State in one Agent and context, before and after an Operation.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Change {
+    pub agent: String,
+    pub agent_name: String,
+    pub home: String,
+    /// The Item's name.
+    pub item: String,
+    pub path: PathBuf,
+    pub locator: String,
+    pub project: Option<PathBuf>,
+    pub before: State,
+    pub after: StateAfter,
+}
+
+/// An Entry's State after an Operation, or that it no longer exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum StateAfter {
+    Effective,
+    Shadowed,
+    Removed,
+}
+
+impl From<State> for StateAfter {
+    fn from(state: State) -> Self {
+        match state {
+            State::Effective => StateAfter::Effective,
+            State::Shadowed => StateAfter::Shadowed,
+        }
+    }
+}
+
+/// Which Entry of an Item is Effective after an Operation that leaves some of
+/// its Entries in place.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct EffectiveChange {
+    pub agent: String,
+    pub home: String,
+    pub item: String,
+    /// The locator of the Effective Entry before.
+    pub before: String,
+    /// The locator of the Effective Entry after.
+    pub after: String,
+    /// The change as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+/// The edits to one file and their diff.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct FileChange {
+    pub path: PathBuf,
+    pub edits: Vec<EditSummary>,
+    /// A unified diff of the whole file, before and after every edit.
+    pub diff: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct EditSummary {
+    pub op: EditOp,
+    pub key_path: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum EditOp {
+    Remove,
+    Set,
+    Insert,
+    Append,
+    RemoveItem,
+}
+
+impl From<&Edit> for EditSummary {
+    fn from(edit: &Edit) -> Self {
+        let op = match edit {
+            Edit::Remove { .. } => EditOp::Remove,
+            Edit::Set { .. } => EditOp::Set,
+            Edit::Insert { .. } => EditOp::Insert,
+            Edit::Append { .. } => EditOp::Append,
+            Edit::RemoveItem { .. } => EditOp::RemoveItem,
+        };
+        EditSummary {
+            op,
+            key_path: edit.key_path().to_vec(),
+        }
+    }
+}
+
+/// A risk the user must acknowledge before a plan executes.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Warning {
+    pub class: WarningClass,
+    /// The risk as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+/// Each class of warning is acknowledged on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub enum WarningClass {
+    /// The write lands in a git-versioned file.
+    GitVersioned,
+    /// The write reaches more than the targeted Entries.
+    WideReach,
+    /// An Agent that reads or rewrites the file is running.
+    RunningAgent,
+}
+
+impl WarningClass {
+    /// The class as it appears in JSON and in `--ack`.
+    pub fn code(self) -> &'static str {
+        match self {
+            WarningClass::GitVersioned => "git-versioned",
+            WarningClass::WideReach => "wide-reach",
+            WarningClass::RunningAgent => "running-agent",
+        }
+    }
+}
+
+/// An executed Operation.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Outcome {
+    /// The Operation's id in History, such as `20261001-143012-a3f`.
+    pub operation: String,
+    pub verify: Verify,
+    /// Where the States after differ from the preview's prediction.
+    pub differences: Vec<Difference>,
+    /// The folder holding the Operation's backup and manifest.
+    pub backup: PathBuf,
+}
+
+/// What Verify found once every edit had landed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Verify {
+    /// Every State after is the one the preview predicted.
+    Verified,
+    /// Some States after differ from the prediction, as listed.
+    VerifiedWithDifferences,
+}
+
+/// An Entry whose State after an Operation is not the one predicted.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Difference {
+    pub agent: String,
+    pub home: String,
+    pub locator: String,
+    pub predicted: StateAfter,
+    pub actual: StateAfter,
 }
 
 /// Every Item found, with the Agent homes they belong to.
@@ -238,8 +475,10 @@ impl ReadFailureKind {
 pub struct Error {
     pub code: ErrorCode,
     pub message: String,
-    /// What an ambiguous selector could mean, one locator per Item.
+    /// What an ambiguous selector could mean, one locator per Item or Entry.
     pub candidates: Vec<String>,
+    /// The backup folder of an Operation that needs manual recovery.
+    pub backup: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -248,41 +487,127 @@ pub enum ErrorCode {
     Unexpected,
     /// A selector matched nothing in the context.
     NoMatch,
-    /// A selector matched more than one Item.
+    /// A selector matched more than one Item, or more than one Entry.
     Ambiguous,
+    /// A warning in the plan was not acknowledged.
+    NotAcknowledged,
+    /// The action cannot be done on a target, whatever is acknowledged.
+    Blocked,
+    /// Another Operation holds the global write lock.
+    Locked,
+    /// A touched Entry changed after it was read: plan again.
+    Stale,
+    /// A backup copy does not hold the bytes read; nothing was written.
+    BackupFailed,
+    /// The first write failed; nothing was written.
+    WriteFailed,
+    /// Some files were written and the Operation did not complete: restore
+    /// them from the backup.
+    RollbackIncomplete,
 }
 
 impl Error {
+    fn new(code: ErrorCode, message: String) -> Self {
+        Self {
+            code,
+            message,
+            candidates: Vec::new(),
+            backup: None,
+        }
+    }
+
     /// A failure the caller cannot act on, such as a bug or a lost worker thread.
     pub fn unexpected(error: impl std::fmt::Display) -> Self {
-        Self {
-            code: ErrorCode::Unexpected,
-            message: error.to_string(),
-            candidates: Vec::new(),
-        }
+        Self::new(ErrorCode::Unexpected, error.to_string())
     }
 
     /// A selector that matched no Item in the context.
     pub fn no_match(selector: &str) -> Self {
-        Self {
-            code: ErrorCode::NoMatch,
-            message: format!("no Item matches `{selector}` in this context"),
-            candidates: Vec::new(),
-        }
+        Self::new(
+            ErrorCode::NoMatch,
+            format!("no Item matches `{selector}` in this context"),
+        )
     }
 
     /// Each candidate is the locator of an Item's first Entry.
     pub(crate) fn ambiguous(selector: &str, items: &[&Item]) -> Self {
         Self {
-            code: ErrorCode::Ambiguous,
-            message: format!(
-                "`{selector}` matches {} Items; select one by locator",
-                items.len()
-            ),
             candidates: items
                 .iter()
                 .map(|item| item.entries[0].locator.clone())
                 .collect(),
+            ..Self::new(
+                ErrorCode::Ambiguous,
+                format!(
+                    "`{selector}` matches {} Items; select one by locator",
+                    items.len()
+                ),
+            )
+        }
+    }
+
+    /// Each candidate is the locator of an Entry.
+    pub(crate) fn ambiguous_entries(selector: &str, entries: &[&Entry]) -> Self {
+        Self {
+            candidates: entries.iter().map(|entry| entry.locator.clone()).collect(),
+            ..Self::new(
+                ErrorCode::Ambiguous,
+                format!(
+                    "`{selector}` matches {} Entries; select one by locator, or every Entry of the Item",
+                    entries.len()
+                ),
+            )
+        }
+    }
+
+    pub(crate) fn not_acknowledged(missing: &[WarningClass]) -> Self {
+        let classes: Vec<&str> = missing.iter().map(|class| class.code()).collect();
+        Self::new(
+            ErrorCode::NotAcknowledged,
+            format!("not acknowledged: {}", classes.join(", ")),
+        )
+    }
+
+    pub(crate) fn blocked(message: String) -> Self {
+        Self::new(ErrorCode::Blocked, message)
+    }
+
+    pub(crate) fn locked(lock: &std::path::Path) -> Self {
+        Self::new(
+            ErrorCode::Locked,
+            format!(
+                "another config-digger Operation is writing (lock held on {}); try again when it ends",
+                lock.display()
+            ),
+        )
+    }
+
+    pub(crate) fn stale(message: String) -> Self {
+        Self::new(ErrorCode::Stale, format!("{message}; plan again"))
+    }
+
+    pub(crate) fn backup_failed(message: String) -> Self {
+        Self::new(
+            ErrorCode::BackupFailed,
+            format!("{message}; nothing was written"),
+        )
+    }
+
+    pub(crate) fn write_failed(message: String) -> Self {
+        Self::new(
+            ErrorCode::WriteFailed,
+            format!("{message}; nothing was written"),
+        )
+    }
+
+    pub(crate) fn rollback_incomplete(message: String, backup: PathBuf) -> Self {
+        Self {
+            message: format!(
+                "{message}; the Operation was not rolled back: restore the files from {}",
+                backup.display()
+            ),
+            backup: Some(backup),
+            ..Self::new(ErrorCode::RollbackIncomplete, String::new())
         }
     }
 }
