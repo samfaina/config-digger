@@ -1020,7 +1020,7 @@ function DialogFlow(){
     <div class="FL-sec"><div class="t">What changes <span class="ln"></span></div>${effTable(M.effects)}</div>
     ${cks.length?`<div class="FL-sec"><div class="t">Before you apply <span class="ln"></span></div>${checkList(op, cks)}</div>`:''}
     <div class="FL-sec"><div class="t">Files · ${M.changes.length} <span class="ln"></span></div>${M.changes.map(fileBlock).join('')}</div>
-    <div class="FL-ft"><span class="bk">${backupNote(M)}</span><span class="sp"></span><button class="F-cta sec" onclick="FL.op=null;render()">Cancel</button>${applyBtn(op, cks, op.undoOf?'Undo':v)}</div>`;
+    <div class="FL-ft"><span class="bk">${backupNote(M)}</span><span class="sp"></span><button class="F-cta sec" onclick="FL.op=null;render()">Cancel</button>${applyBtn(op, cks, op.applyLabel || (op.undoOf?'Undo':v))}</div>`;
   else if (op.phase==='apply') body = steps(op);
   else body = steps(op) + result(op);
   return `<div class="FL-bg" onclick="if(event.target===this&&FL.op.phase!=='apply')cancelOp()"><div class="FL-dlg">
@@ -1175,7 +1175,7 @@ function removeLeftovers(cid){
   const c = CTX.find(y=>y.id===cid), xs = leftovers(cid);
   const specs = xs.map(x=>({verb:'Remove', agent:x.agent, home:x.home, entry:x.entry, ctx:cid}));
   FL.op = {specs, plans:specs.map(planIn), acks:{}, phase:'preview', page:0,
-    title:`Remove leftovers of ${c.label}`, sub:`${plural(xs.length,'Entry','Entries')} keyed to a missing Project · ${names(xs.map(x=>x.agent))}`,
+    applyLabel:`Remove ${plural(xs.length,'leftover','leftovers')}`, title:`Remove leftovers of ${c.label}`, sub:`${plural(xs.length,'Entry','Entries')} keyed to a missing Project · ${names(xs.map(x=>x.agent))}`,
     doneText:`${plural(xs.length,'leftover','leftovers')} of ${c.label} removed. The Project stays listed while an Agent's registry still knows it.`};
   SNACK = null; render();
 }
