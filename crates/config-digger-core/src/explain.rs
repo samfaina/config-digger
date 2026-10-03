@@ -10,6 +10,7 @@ use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// A Shadowed Entry's reason, pointing at the Effective Entry `effective`.
 /// `tied` says the two have the same precedence, as under two spellings of
@@ -630,6 +631,79 @@ pub(crate) fn switch_read_failure(path: &Path) -> String {
     format!(
         "{} couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not.",
         path.display()
+    )
+}
+
+/// The caveat of an Entry that depends on `agent_name`'s gate `gate`, which
+/// the Agent last cached as `on` at `at`, when it recorded when.
+pub(crate) fn gate_cached(
+    agent_name: &str,
+    gate: &str,
+    on: bool,
+    at: Option<SystemTime>,
+) -> String {
+    let value = on_off(on);
+    match at {
+        Some(at) => format!(
+            "Depends on {agent_name} gate `{gate}`: {value} as of {}.",
+            as_of(at)
+        ),
+        None => format!(
+            "Depends on {agent_name} gate `{gate}`: {value} as {agent_name} last cached it, at a time it does not record."
+        ),
+    }
+}
+
+/// The caveat of an Entry that depends on `agent_name`'s gate `gate`,
+/// resolved with its default `on`: the gate cannot be read, or the Agent
+/// ignores its cache while the variable `bypassed_by` is set.
+pub(crate) fn gate_assumed(
+    agent_name: &str,
+    gate: &str,
+    on: bool,
+    bypassed_by: Option<&str>,
+) -> String {
+    let value = on_off(on);
+    match bypassed_by {
+        Some(variable) => format!(
+            "Depends on {agent_name} gate `{gate}`: assumed {value}; {agent_name} ignores its cached value while `{variable}` is set."
+        ),
+        None => format!("Depends on {agent_name} gate `{gate}`: assumed {value}; cannot be read."),
+    }
+}
+
+/// An Unread Entry's reason: `agent_name` does not read its location while
+/// its gate `gate` is `on`.
+pub(crate) fn feature_gate(agent_name: &str, gate: &str, on: bool) -> Reason {
+    Reason {
+        code: ReasonCode::FeatureGate,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} does not read it while its gate `{gate}` is {}.",
+            on_off(on)
+        ),
+    }
+}
+
+fn on_off(on: bool) -> &'static str {
+    if on { "on" } else { "off" }
+}
+
+/// A time as a caveat shows it, such as `2 Oct 2026 07:40 UTC`.
+fn as_of(time: SystemTime) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    // `YYYY-MM-DDTHH:MM:SSZ`, always ASCII.
+    let rfc3339 = humantime::format_rfc3339_seconds(time).to_string();
+    let month = rfc3339[5..7].parse::<usize>().unwrap_or(1);
+    let day = rfc3339[8..10].trim_start_matches('0');
+    format!(
+        "{day} {} {} {} UTC",
+        MONTHS[month.clamp(1, 12) - 1],
+        &rfc3339[..4],
+        &rfc3339[11..16]
     )
 }
 

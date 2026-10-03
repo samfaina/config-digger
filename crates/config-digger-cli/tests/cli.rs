@@ -130,6 +130,20 @@ impl Harness {
             .env("APPDATA", self.roaming_app_data())
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("RUST_LOG");
+        // Variables that make Claude Code ignore its cached Feature gates.
+        for variable in [
+            "DISABLE_GROWTHBOOK",
+            "DISABLE_TELEMETRY",
+            "DO_NOT_TRACK",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_CODE_USE_MANTLE",
+            "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+            "CLAUDE_CODE_USE_VERTEX",
+            "CLAUDE_CODE_USE_FOUNDRY",
+        ] {
+            command.env_remove(variable);
+        }
         // Terminal conventions the tests opt into one at a time.
         for variable in ["NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "COLUMNS"] {
             command.env_remove(variable);
@@ -458,6 +472,33 @@ fn list_prints_a_skill_with_its_folder() {
         .unwrap_or_else(|| panic!("no row for deploy:\n{}", run.stdout));
     let columns: Vec<&str> = row.split_whitespace().collect();
     assert_eq!(columns, ["deploy", "user", "Effective", folder.as_str()]);
+}
+
+#[test]
+fn a_feature_gate_caveat_shows_in_the_entry_detail_and_not_in_the_list() {
+    let state = json!({
+        "cachedGrowthBookFeatures": { "tengu_claudeai_skills_sync_enabled": true },
+        "cachedGrowthBookFeaturesAt": 1_790_926_800_000_u64,
+    });
+    let harness = Harness::new()
+        .with_file(".claude.json", &state.to_string())
+        .with_file(
+            ".claude/skills/synced/org1_acct1/pdf/SKILL.md",
+            "---
+name: pdf
+---
+",
+        );
+    let caveat = "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: on as of 2 Oct 2026 07:40 UTC.";
+
+    let show = harness.run(&["show", "pdf"]);
+    let list = harness.run(&["list", "--kind", "skill"]);
+
+    assert_eq!(show.code, 0, "{}", show.stderr);
+    assert!(show.stdout.contains(caveat), "{}", show.stdout);
+    assert_eq!(list.code, 0, "{}", list.stderr);
+    assert!(list.stdout.contains("pdf"), "{}", list.stdout);
+    assert!(!list.stdout.contains("Depends on"), "{}", list.stdout);
 }
 
 #[test]

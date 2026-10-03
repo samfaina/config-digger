@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 /// Checks a block's parameters beyond what deserialisation enforces.
 pub(crate) trait Validate {
@@ -1634,6 +1635,455 @@ impl Switch {
     /// Whether its key path holds `{name}`, so that it holds one value per name.
     pub fn names(&self) -> bool {
         self.key_path.iter().any(|key| key == NAME_KEY)
+    }
+}
+
+// --- Feature gate lookups ---------------------------------------------------
+
+/// The lookup `key_path` segment that stands for the gate's name, or its
+/// hash when the lookup has one.
+pub(crate) const GATE_KEY: &str = "{gate}";
+
+/// Where an Agent caches the value of a Feature gate, and how config-digger
+/// finds it there.
+pub(crate) trait LookUp {
+    /// The file the value is cached in.
+    fn anchor(&self) -> &Anchor;
+
+    /// What in the file holds the cached values.
+    fn store(&self) -> GateStore<'_>;
+
+    /// The value the Agent last cached for the gate `name`, and when it
+    /// cached it, read from `document`, what the store holds. `None` when
+    /// it holds no `true` or `false` for the gate.
+    fn cached(&self, document: &Value, name: &str) -> Option<Cached>;
+}
+
+/// What in a lookup's file holds the cached values.
+pub(crate) enum GateStore<'a> {
+    /// The whole file, as strict JSON.
+    JsonFile,
+    /// The JSON text under this key of a SQLite store's `ItemTable`.
+    SqliteItem(&'a str),
+}
+
+/// A Feature gate's value as the Agent last cached it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Cached {
+    pub on: bool,
+    /// When the Agent cached it, when the lookup says where that is and
+    /// the store holds it.
+    pub at: Option<SystemTime>,
+}
+
+/// Where an Agent caches a Feature gate's value.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum GateLookup {
+    JsonValue(JsonGateLookup),
+    SqliteJson(SqliteGateLookup),
+}
+
+impl Validate for GateLookup {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            GateLookup::JsonValue(block) => block.validate(),
+            GateLookup::SqliteJson(block) => block.validate(),
+        }
+    }
+}
+
+impl LookUp for GateLookup {
+    fn anchor(&self) -> &Anchor {
+        match self {
+            GateLookup::JsonValue(block) => block.anchor(),
+            GateLookup::SqliteJson(block) => block.anchor(),
+        }
+    }
+
+    fn store(&self) -> GateStore<'_> {
+        match self {
+            GateLookup::JsonValue(block) => block.store(),
+            GateLookup::SqliteJson(block) => block.store(),
+        }
+    }
+
+    fn cached(&self, document: &Value, name: &str) -> Option<Cached> {
+        match self {
+            GateLookup::JsonValue(block) => block.cached(document, name),
+            GateLookup::SqliteJson(block) => block.cached(document, name),
+        }
+    }
+}
+
+/// A gate's value in a JSON file of the Agent home, such as Claude Code's
+/// `cachedGrowthBookFeatures` in `~/.claude.json`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonGateLookup {
+    /// The file, in the Agent home.
+    pub anchor: Anchor,
+    /// The key path of the gate's `true` or `false`, one key per segment.
+    /// One segment is `{gate}`: the gate's name, or its hash with `hash`.
+    pub key_path: Vec<String>,
+    /// How the Agent hashes gate names in its cache. Omitted when it keys
+    /// them by name.
+    pub hash: Option<GateHash>,
+    /// The key path of when the Agent cached its values: milliseconds
+    /// since 1970, or an RFC 3339 time. Omitted when it records none.
+    pub cached_at: Option<Vec<String>>,
+}
+
+impl Validate for JsonGateLookup {
+    fn validate(&self) -> Result<(), String> {
+        validate_gate_anchor(&self.anchor)?;
+        validate_gate_value(&self.key_path, self.cached_at.as_deref())
+    }
+}
+
+impl LookUp for JsonGateLookup {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn store(&self) -> GateStore<'_> {
+        GateStore::JsonFile
+    }
+
+    fn cached(&self, document: &Value, name: &str) -> Option<Cached> {
+        let key = gate_key(self.hash, name);
+        cached_value(document, &self.key_path, &key, self.cached_at.as_deref())
+    }
+}
+
+/// A gate's value in the JSON text an Agent keeps under a key of the
+/// `ItemTable` of a SQLite store, as VS Code and Cursor keep their state in
+/// `state.vscdb`, such as Cursor's Statsig bootstrap.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SqliteGateLookup {
+    /// The SQLite file, in the Agent home.
+    pub anchor: Anchor,
+    /// The `ItemTable` key whose value is the JSON text.
+    pub key: String,
+    /// The key path of the gate's `true` or `false` in the JSON, one key
+    /// per segment. One segment is `{gate}`: the gate's name, or its hash
+    /// with `hash`.
+    pub key_path: Vec<String>,
+    /// How the Agent hashes gate names in its cache. Omitted when it keys
+    /// them by name.
+    pub hash: Option<GateHash>,
+    /// The key path in the JSON of when the Agent cached its values:
+    /// milliseconds since 1970, or an RFC 3339 time. Omitted when it
+    /// records none.
+    pub cached_at: Option<Vec<String>>,
+}
+
+impl Validate for SqliteGateLookup {
+    fn validate(&self) -> Result<(), String> {
+        validate_gate_anchor(&self.anchor)?;
+        if self.key.trim().is_empty() {
+            return Err("a sqlite-json lookup needs a key".into());
+        }
+        validate_gate_value(&self.key_path, self.cached_at.as_deref())
+    }
+}
+
+impl LookUp for SqliteGateLookup {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn store(&self) -> GateStore<'_> {
+        GateStore::SqliteItem(&self.key)
+    }
+
+    fn cached(&self, document: &Value, name: &str) -> Option<Cached> {
+        let key = gate_key(self.hash, name);
+        cached_value(document, &self.key_path, &key, self.cached_at.as_deref())
+    }
+}
+
+/// How an Agent hashes gate names in its cache.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum GateHash {
+    /// Statsig's djb2: a 32-bit hash of the name's UTF-16 code units,
+    /// written as an unsigned decimal number.
+    Djb2,
+}
+
+/// A lookup key path names `{gate}` once, and `cached_at` is a key path.
+fn validate_gate_value(key_path: &[String], cached_at: Option<&[String]>) -> Result<(), String> {
+    validate_key_path(key_path)?;
+    if key_path.iter().filter(|key| *key == GATE_KEY).count() != 1 {
+        return Err(format!("a lookup key path holds `{GATE_KEY}` exactly once"));
+    }
+    if let Some(cached_at) = cached_at {
+        validate_key_path(cached_at).map_err(|e| format!("cached_at: {e}"))?;
+    }
+    Ok(())
+}
+
+/// The key the gate `name` has in a cache that hashes names with `hash`.
+fn gate_key(hash: Option<GateHash>, name: &str) -> String {
+    match hash {
+        Some(GateHash::Djb2) => djb2(name),
+        None => name.to_owned(),
+    }
+}
+
+/// The `true` or `false` at `key_path` in `document`, `{gate}` standing
+/// for `key`, and the time at `cached_at`.
+fn cached_value(
+    document: &Value,
+    key_path: &[String],
+    key: &str,
+    cached_at: Option<&[String]>,
+) -> Option<Cached> {
+    let at_path = |key_path: &[String]| {
+        key_path.iter().try_fold(document, |value, segment| {
+            value.get(if segment == GATE_KEY { key } else { segment })
+        })
+    };
+    let on = at_path(key_path)?.as_bool()?;
+    let at = cached_at.and_then(at_path).and_then(|value| match value {
+        Value::Number(millis) => {
+            let millis = millis.as_f64().filter(|millis| *millis >= 0.0)?;
+            SystemTime::UNIX_EPOCH.checked_add(Duration::try_from_secs_f64(millis / 1000.0).ok()?)
+        }
+        Value::String(text) => humantime::parse_rfc3339_weak(text).ok(),
+        _ => None,
+    });
+    Some(Cached { on, at })
+}
+
+/// Statsig's djb2 hash of `name`, as it keys gates in its cache.
+pub(crate) fn djb2(name: &str) -> String {
+    name.encode_utf16()
+        .fold(0u32, |hash, unit| {
+            hash.wrapping_mul(31).wrapping_add(u32::from(unit))
+        })
+        .to_string()
+}
+
+/// A gate's cache is one file of the Agent home, so that it always has a path.
+fn validate_gate_anchor(anchor: &Anchor) -> Result<(), String> {
+    anchor.validate()?;
+    if anchor.home_root().is_none() {
+        return Err("a lookup must lie in the Agent home".into());
+    }
+    Ok(())
+}
+
+// --- Feature gate bypasses --------------------------------------------------
+
+/// When the Agent ignores its cached gate values and uses its own defaults.
+pub(crate) trait Bypasses {
+    /// The variable that makes the Agent ignore its cache, if one does.
+    /// `var` gives a variable's value as the Agent sees it.
+    fn bypassed_by(&self, var: &dyn Fn(&str) -> Option<String>) -> Option<String>;
+
+    /// The files whose maps of variables the Agent applies over its
+    /// environment, highest first, each with the key path of the map. A
+    /// machine-wide file whose path cannot be expanded is skipped.
+    fn env_maps(&self) -> &[EnvMap];
+}
+
+/// When an Agent ignores its cached Feature gate values.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Bypass {
+    Env(EnvBypass),
+}
+
+impl Validate for Bypass {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Bypass::Env(block) => block.validate(),
+        }
+    }
+}
+
+impl Bypasses for Bypass {
+    fn bypassed_by(&self, var: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+        match self {
+            Bypass::Env(block) => block.bypassed_by(var),
+        }
+    }
+
+    fn env_maps(&self) -> &[EnvMap] {
+        match self {
+            Bypass::Env(block) => block.env_maps(),
+        }
+    }
+}
+
+/// Environment variables that make the Agent ignore its cache, such as
+/// Claude Code's `DISABLE_GROWTHBOOK`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EnvBypass {
+    /// The cache is ignored when any of them is set.
+    pub variables: Vec<BypassVariable>,
+    /// Maps of variables the Agent applies over the environment it starts
+    /// in, such as the `env` of Claude Code's user settings, highest
+    /// first. A variable there replaces the one in the environment.
+    #[serde(default)]
+    pub env_maps: Vec<EnvMap>,
+}
+
+/// One variable that makes the Agent ignore its cache.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BypassVariable {
+    pub name: String,
+    /// Which of its values count.
+    pub values: VariableValues,
+    /// Variables that, when any is set to a non-empty value, keep this one
+    /// from counting.
+    #[serde(default)]
+    pub unless: Vec<String>,
+}
+
+/// Which values of a variable count as setting it.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum VariableValues {
+    /// Any non-empty value, `0` and `false` included.
+    NonEmpty,
+    /// `1`, `true`, `yes` or `on`, in any case.
+    Truthy,
+}
+
+/// A JSON object of variable names and string values in a file of the
+/// Agent home or the machine, such as the `env` of a settings file.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EnvMap {
+    pub anchor: Anchor,
+    /// The key path of the object, one key per segment.
+    pub key_path: Vec<String>,
+}
+
+impl Validate for EnvBypass {
+    fn validate(&self) -> Result<(), String> {
+        if self.variables.is_empty() {
+            return Err("an env bypass needs variables".into());
+        }
+        for variable in &self.variables {
+            for name in std::iter::once(&variable.name).chain(&variable.unless) {
+                if name.trim().is_empty() || name.contains('=') {
+                    return Err(format!("`{name}` is not a variable name"));
+                }
+            }
+        }
+        for map in &self.env_maps {
+            map.anchor.validate().map_err(|e| format!("env map: {e}"))?;
+            if map.anchor.in_project() {
+                return Err("an env map must lie in the Agent home or the machine".into());
+            }
+            validate_key_path(&map.key_path).map_err(|e| format!("env map: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl Bypasses for EnvBypass {
+    fn bypassed_by(&self, var: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+        let non_empty = |name: &str| var(name).is_some_and(|value| !value.is_empty());
+        self.variables
+            .iter()
+            .find(|variable| {
+                let set = match variable.values {
+                    VariableValues::NonEmpty => non_empty(&variable.name),
+                    VariableValues::Truthy => var(&variable.name).is_some_and(|value| {
+                        ["1", "true", "yes", "on"].contains(&value.trim().to_lowercase().as_str())
+                    }),
+                };
+                set && !variable.unless.iter().any(|name| non_empty(name))
+            })
+            .map(|variable| variable.name.clone())
+    }
+
+    fn env_maps(&self) -> &[EnvMap] {
+        &self.env_maps
+    }
+}
+
+// --- Conditions -------------------------------------------------------------
+
+/// Whether something a definition declares applies, such as a location the
+/// Agent reads only while a Feature gate is on.
+pub(crate) trait Holds {
+    /// Whether it holds, given whether each Feature gate is on, by name.
+    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool;
+
+    /// The Feature gate it depends on, if any.
+    fn gate(&self) -> Option<&str>;
+}
+
+/// A condition under which an Agent reads a location.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Condition {
+    FeatureGate(GateCondition),
+}
+
+impl Validate for Condition {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Condition::FeatureGate(block) => block.validate(),
+        }
+    }
+}
+
+impl Holds for Condition {
+    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool {
+        match self {
+            Condition::FeatureGate(block) => block.holds(gate_on),
+        }
+    }
+
+    fn gate(&self) -> Option<&str> {
+        match self {
+            Condition::FeatureGate(block) => block.gate(),
+        }
+    }
+}
+
+/// Holds while a Feature gate of the same definition is on, or with
+/// `is = false`, while it is off.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GateCondition {
+    /// The name of a declared Feature gate.
+    pub gate: String,
+    /// The value the gate must have. Omitted for on.
+    #[serde(default = "gate_on_by_default")]
+    pub is: bool,
+}
+
+fn gate_on_by_default() -> bool {
+    true
+}
+
+impl Validate for GateCondition {
+    fn validate(&self) -> Result<(), String> {
+        if self.gate.trim().is_empty() {
+            return Err("a feature-gate condition needs a gate".into());
+        }
+        Ok(())
+    }
+}
+
+impl Holds for GateCondition {
+    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool {
+        gate_on(&self.gate) == self.is
+    }
+
+    fn gate(&self) -> Option<&str> {
+        Some(&self.gate)
     }
 }
 

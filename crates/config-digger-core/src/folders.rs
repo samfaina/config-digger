@@ -191,6 +191,13 @@ impl FileSystem for AsIf<'_> {
         }
     }
 
+    fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>> {
+        match self.seen(path) {
+            Seen::Gone => Err(io::ErrorKind::NotFound.into()),
+            Seen::At(at) => self.fs.read_sqlite_item(&at, key),
+        }
+    }
+
     fn exists(&self, path: &Path) -> bool {
         match self.seen(path) {
             Seen::Gone => false,

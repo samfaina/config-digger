@@ -17,6 +17,9 @@ clap_complete = "4.6"
 humantime = "2.4"
 # Pre-1.0, and its CST API changes between minor releases: upgrade deliberately.
 jsonc-parser = { version = "=0.34.0", features = ["cst", "serde", "serde_json"] }
+# SQLite stores such as `state.vscdb`, read-only. Bundled, so no system
+# library is needed.
+rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = "1.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }

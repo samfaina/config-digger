@@ -27,6 +27,12 @@ pub trait FileSystem: Send + Sync {
         Ok(bytes[start..end].to_vec())
     }
 
+    /// The value under `key` in the `ItemTable` of the SQLite store at
+    /// `path`, as VS Code and Cursor keep their state in `state.vscdb`,
+    /// opened read-only for this one query: `None` when the key is not
+    /// there. A missing file is an error of kind `NotFound`.
+    fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>>;
+
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
 

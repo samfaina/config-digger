@@ -32,6 +32,9 @@ pub struct FakeFileSystem {
     accesses: Arc<AtomicUsize>,
 }
 
+/// What every SQLite file starts with.
+const SQLITE_HEADER: &[u8] = b"SQLite format 3\0";
+
 #[derive(Debug, Default)]
 struct FakeFiles {
     /// Keyed by the path as spelled on disk.
@@ -53,6 +56,9 @@ struct FakeFiles {
     rewrites: Vec<(PathBuf, Vec<u8>)>,
     /// The lowercased paths of the files whose reads are denied.
     denied: BTreeSet<String>,
+    /// The `ItemTable` of each SQLite store, by the store's path as
+    /// spelled on disk.
+    sqlite: BTreeMap<PathBuf, BTreeMap<String, String>>,
 }
 
 impl FakeFileSystem {
@@ -89,6 +95,21 @@ impl FakeFileSystem {
         files
             .folders
             .retain(|folder| strip_prefix(folder, &path).is_none());
+    }
+
+    /// A SQLite store at `path` whose `ItemTable` holds `value` under `key`,
+    /// next to what it held already.
+    pub fn with_sqlite_item(self, path: impl Into<PathBuf>, key: &str, value: &str) -> Self {
+        let path = path.into();
+        let mut files = self.files();
+        files.files.insert(path.clone(), SQLITE_HEADER.to_vec());
+        files
+            .sqlite
+            .entry(path)
+            .or_default()
+            .insert(key.to_owned(), value.to_owned());
+        drop(files);
+        self
     }
 
     /// An empty folder.
@@ -310,6 +331,18 @@ impl FileSystem for FakeFileSystem {
             None if files.real_path(&path).is_some() => Err(io::Error::other("is a folder")),
             None => Err(io::ErrorKind::NotFound.into()),
         }
+    }
+
+    fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>> {
+        self.read(path)?;
+        let files = self.files();
+        let path = files.follow(path);
+        let (_, table) = files
+            .sqlite
+            .iter()
+            .find(|(store, _)| strip_prefix(store, &path).is_some_and(|rest| rest.is_empty()))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a SQLite store"))?;
+        Ok(table.get(key).cloned())
     }
 
     fn exists(&self, path: &Path) -> bool {
