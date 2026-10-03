@@ -3,7 +3,7 @@
 //! what each Agent does about a location it cannot read.
 
 use config_digger_core::api::{
-    Action, Context, Core, Error, ErrorCode, Plan, ScanOptions, Targets,
+    Action, Context, Core, Error, ErrorCode, Info, InfoCode, Plan, ScanOptions, Targets,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -583,6 +583,15 @@ fn disable_is_refused_when_every_switch_store_is_a_read_failure() {
     assert!(error.message.contains("cannot read"), "{}", error.message);
 }
 
+/// The rows of a preview about Read failures, without those about versions.
+fn read_failure_info(plan: &Plan) -> Vec<&Info> {
+    plan.preview()
+        .info
+        .iter()
+        .filter(|info| matches!(info.code, InfoCode::ReadFailure | InfoCode::StillRejected))
+        .collect()
+}
+
 #[test]
 fn a_read_failure_that_could_change_the_outcome_adds_an_info_row_with_no_ack() {
     let fs = FakeFileSystem::new()
@@ -595,7 +604,7 @@ fn a_read_failure_that_could_change_the_outcome_adds_an_info_row_with_no_ack() {
     let plan = plan(&core(fs, &[]), Action::Remove, "linear").unwrap();
 
     assert_eq!(
-        serde_json::to_value(&plan.preview().info).unwrap(),
+        serde_json::to_value(read_failure_info(&plan)).unwrap(),
         json!([{
             "code": "read_failure",
             "path": mcp_json(),
@@ -620,7 +629,7 @@ fn writing_a_file_another_reader_rejects_notes_that_it_still_rejects_it() {
     .unwrap();
 
     assert_eq!(
-        serde_json::to_value(&plan.preview().info).unwrap(),
+        serde_json::to_value(read_failure_info(&plan)).unwrap(),
         json!([{
             "code": "still_rejected",
             "path": mcp_json(),

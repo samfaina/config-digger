@@ -489,6 +489,79 @@ impl Environment for FakeEnvironment {
     }
 }
 
+/// The bytes of a minimal 64-bit Windows executable whose version resource
+/// holds `version` as its product version, or no version at all.
+pub fn executable(version: Option<[u16; 4]>) -> Vec<u8> {
+    const RSRC_RVA: u32 = 0x1000;
+    const RSRC_OFFSET: usize = 0x200;
+    let dword = |out: &mut Vec<u8>, value: u32| out.extend_from_slice(&value.to_le_bytes());
+    let word = |out: &mut Vec<u8>, value: u16| out.extend_from_slice(&value.to_le_bytes());
+    // VS_VERSIONINFO: a header, its key, then VS_FIXEDFILEINFO.
+    let mut info = Vec::new();
+    word(&mut info, 0);
+    word(&mut info, if version.is_some() { 52 } else { 0 });
+    word(&mut info, 0);
+    for unit in "VS_VERSION_INFO\0".encode_utf16() {
+        word(&mut info, unit);
+    }
+    word(&mut info, 0);
+    if let Some([a, b, c, d]) = version {
+        let high = (u32::from(a) << 16) | u32::from(b);
+        let low = (u32::from(c) << 16) | u32::from(d);
+        for value in [0xFEEF_04BD, 0x0001_0000, high, low, high, low] {
+            dword(&mut info, value);
+        }
+        info.resize(info.len() + 7 * 4, 0);
+    }
+    let length = u16::try_from(info.len()).expect("a small version resource");
+    info[..2].copy_from_slice(&length.to_le_bytes());
+
+    // The resource tree: type 16 (RT_VERSION) → id 1 → language 0x409.
+    let mut rsrc = Vec::new();
+    let directory = |out: &mut Vec<u8>, id: u32, target: u32| {
+        out.resize(out.len() + 14, 0);
+        word(out, 1);
+        dword(out, id);
+        dword(out, target);
+    };
+    directory(&mut rsrc, 16, 0x8000_0000 | 24);
+    directory(&mut rsrc, 1, 0x8000_0000 | 48);
+    directory(&mut rsrc, 0x409, 72);
+    dword(&mut rsrc, RSRC_RVA + 88);
+    dword(
+        &mut rsrc,
+        u32::try_from(info.len()).expect("a small version resource"),
+    );
+    rsrc.resize(88, 0);
+    rsrc.extend_from_slice(&info);
+    let rsrc_size = u32::try_from(rsrc.len()).expect("a small resource section");
+
+    let mut exe = vec![0u8; 0x40];
+    exe[..2].copy_from_slice(b"MZ");
+    exe[0x3C..0x40].copy_from_slice(&0x40u32.to_le_bytes());
+    exe.extend_from_slice(b"PE\0\0");
+    // COFF header: AMD64, one section, a PE32+ optional header.
+    word(&mut exe, 0x8664);
+    word(&mut exe, 1);
+    exe.resize(exe.len() + 12, 0);
+    word(&mut exe, 240);
+    word(&mut exe, 0x22);
+    let optional = exe.len();
+    exe.resize(optional + 240, 0);
+    exe[optional..optional + 2].copy_from_slice(&0x20Bu16.to_le_bytes());
+    exe[optional + 108..optional + 112].copy_from_slice(&16u32.to_le_bytes());
+    exe[optional + 128..optional + 132].copy_from_slice(&RSRC_RVA.to_le_bytes());
+    exe[optional + 132..optional + 136].copy_from_slice(&rsrc_size.to_le_bytes());
+    exe.extend_from_slice(b".rsrc\0\0\0");
+    for value in [rsrc_size, RSRC_RVA, rsrc_size, RSRC_OFFSET as u32] {
+        dword(&mut exe, value);
+    }
+    exe.resize(exe.len() + 16, 0);
+    exe.resize(RSRC_OFFSET, 0);
+    exe.extend_from_slice(&rsrc);
+    exe
+}
+
 /// A clock stopped at one instant until a test moves it. Clones share the
 /// same instant, so a test can move the clock the core holds.
 #[derive(Debug, Clone)]

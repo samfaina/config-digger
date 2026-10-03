@@ -8,7 +8,7 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{HomeSource, ScannedEntry, ScannedReadFailure, Snapshot};
-use crate::{explain, locator, paths};
+use crate::{explain, installations, locator, paths};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,12 @@ pub(crate) fn resolve(
         .iter()
         .map(|home| {
             let definition = &definitions[home.agent_index];
+            let (installations, notes) =
+                installations::of_home(definition, &snapshot.installations, home);
             api::Home {
+                installations,
+                last_ran: home.last_ran.clone(),
+                notes,
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
                 home: home.home.clone(),

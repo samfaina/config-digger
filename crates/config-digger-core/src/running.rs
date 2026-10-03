@@ -11,7 +11,7 @@ use crate::explain;
 use crate::paths;
 use crate::plan::PlannedFile;
 use crate::ports::{Ports, RunningProcess};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// What the running Agents mean for an Operation's writes.
@@ -45,10 +45,12 @@ impl RunningReader<'_> {
 }
 
 /// Checks the readers of `files`, and the Agents with switches in them,
-/// against the processes running now.
+/// against the processes running now. Only the Agent homes in `installed`,
+/// which an Installation found reads, can have their Agent running.
 pub(crate) fn check(
     definitions: &[AgentDefinition],
     ports: &Ports,
+    installed: &BTreeSet<(usize, String)>,
     files: &[PlannedFile],
 ) -> RunningCheck {
     let mut processes: Option<Vec<RunningProcess>> = None;
@@ -69,10 +71,12 @@ pub(crate) fn check(
         for (agent_index, home, class) in locations.chain(switches) {
             let definition = &definitions[agent_index];
             let running = *detected.entry((agent_index, home)).or_insert_with(|| {
-                definition.process(home).is_some_and(|process| {
-                    let processes = processes.get_or_insert_with(|| ports.processes.running());
-                    is_running(process, processes, ports)
-                })
+                let found = installed.contains(&(agent_index, home.to_owned()));
+                found
+                    && definition.process(home).is_some_and(|process| {
+                        let processes = processes.get_or_insert_with(|| ports.processes.running());
+                        is_running(process, processes, ports)
+                    })
             });
             if !running {
                 continue;

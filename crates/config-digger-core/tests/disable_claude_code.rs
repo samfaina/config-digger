@@ -314,8 +314,15 @@ fn claude_code_cli() -> RunningProcess {
     }
 }
 
-/// A core over `fs` with `versioned` in the git index and `running` running.
+/// A core over `fs` with `versioned` in the git index and `running` running,
+/// from the native Installation of Claude Code that `fs` then holds.
 fn core_with(fs: &FakeFileSystem, versioned: &[PathBuf], running: &[RunningProcess]) -> Core {
+    if !running.is_empty() {
+        fs.put_file(
+            r"C:\Users\fixture\.local\bin\claude.exe",
+            fake::executable(Some([2, 1, 286, 0])),
+        );
+    }
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     let mut ports = fake::ports(fs.clone(), env);
     ports.git = Box::new(versioned.iter().fold(FakeGitIndex::default(), |git, path| {

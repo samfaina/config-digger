@@ -2,8 +2,8 @@
 //! Agent homes and Projects the user adds, hides and forgets.
 
 use super::{
-    BOLD, Cli, DIM, Failure, INDENT, column_widths, last_column_width, plain_line, print_json,
-    table_line,
+    BOLD, Cli, DIM, Failure, INDENT, WARNING, column_widths, last_column_width, plain_line,
+    print_json, table_line,
 };
 use crate::terminal::{self, Line};
 use anstyle::Style;
@@ -271,16 +271,17 @@ fn render_homes(homes: &[api::Home], width: Option<usize>) -> String {
         })
         .collect();
     let header = [("AGENT", DIM), ("HOME", DIM), ("SOURCE", DIM)];
-    home_table(homes, &header, &rows, width)
+    home_table(homes, &header, &rows, width, |_| Vec::new())
 }
 
 /// A table with one row of `cells` per home, then its folder, and under it
-/// any note.
+/// any note, then the lines `more` adds for it.
 fn home_table<const N: usize>(
     homes: &[api::Home],
     header: &[(&str, Style); N],
     rows: &[[(&str, Style); N]],
     width: Option<usize>,
+    more: impl Fn(&api::Home) -> Vec<String>,
 ) -> String {
     let widths = column_widths(header, rows);
     let folder_width = last_column_width(&widths, width);
@@ -295,6 +296,9 @@ fn home_table<const N: usize>(
                 .render(),
         );
         out.push_str(&home_notes(home, width));
+        for line in more(home) {
+            out.push_str(&plain_line(&format!("{INDENT}{INDENT}{line}"), width));
+        }
     }
     out
 }
@@ -336,21 +340,66 @@ fn render_agents(agents: &[api::Agent], width: Option<usize>) -> String {
             continue;
         }
         let sources: Vec<String> = agent.homes.iter().map(home_source).collect();
-        let rows: Vec<[(&str, Style); 2]> = agent
+        let installed: Vec<String> = agent.homes.iter().map(installed).collect();
+        let tested = match &agent.tested {
+            Some(range) if range.min == range.max => range.min.clone(),
+            Some(range) => format!("{}-{}", range.min, range.max),
+            None => "untested".to_owned(),
+        };
+        let rows: Vec<[(&str, Style); 4]> = agent
             .homes
             .iter()
             .zip(&sources)
-            .map(|(home, source)| {
+            .zip(&installed)
+            .map(|((home, source), installed)| {
+                let out_of_range = home.installations.iter().any(|i| i.out_of_range);
                 [
                     (home_id(home), Style::new()),
                     (source.as_str(), Style::new()),
+                    (
+                        installed.as_str(),
+                        if out_of_range { WARNING } else { Style::new() },
+                    ),
+                    (tested.as_str(), Style::new()),
                 ]
             })
             .collect();
-        let header = [("HOME", DIM), ("SOURCE", DIM)];
-        out.push_str(&home_table(&agent.homes, &header, &rows, width));
+        let header = [
+            ("HOME", DIM),
+            ("SOURCE", DIM),
+            ("INSTALLED", DIM),
+            ("TESTED", DIM),
+        ];
+        out.push_str(&home_table(&agent.homes, &header, &rows, width, |home| {
+            let last_ran = home
+                .last_ran
+                .iter()
+                .map(|version| format!("Last ran with {version}."));
+            last_ran
+                .chain(home.notes.iter().map(|note| note.sentence.clone()))
+                .collect()
+        }));
     }
     out
+}
+
+/// The versions of the Installations that read an Agent home, as `agents`
+/// shows them: each marked `!` when outside the tested range, `unknown`
+/// when it cannot be read, and `none` without any Installation.
+fn installed(home: &api::Home) -> String {
+    if home.installations.is_empty() {
+        return "none".to_owned();
+    }
+    let versions: Vec<String> = home
+        .installations
+        .iter()
+        .map(|installation| {
+            let version = installation.version.as_deref().unwrap_or("unknown");
+            let mark = if installation.out_of_range { "!" } else { "" };
+            format!("{version}{mark}")
+        })
+        .collect();
+    versions.join(", ")
 }
 
 /// One table of Projects: where each came from, then its path.

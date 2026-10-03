@@ -14,6 +14,17 @@ impl FileSystem for RealFileSystem {
         std::fs::read(path)
     }
 
+    fn read_at(&self, path: &Path, offset: u64, length: usize) -> io::Result<Vec<u8>> {
+        use std::io::{Read, Seek, SeekFrom};
+
+        let mut file = File::open(path)?;
+        file.seek(SeekFrom::Start(offset))?;
+        let mut bytes = Vec::new();
+        file.take(u64::try_from(length).unwrap_or(u64::MAX))
+            .read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }

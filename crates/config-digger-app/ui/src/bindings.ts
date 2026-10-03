@@ -29,6 +29,31 @@ export type AgentFlagCode =
 /**  The Agent refuses to start in the context. */
 "cannot_start";
 
+/**
+ *  Something about an Agent's versions in one Agent home, which changes
+ *  no State and blocks nothing.
+ */
+export type AgentNote = {
+	code: AgentNoteCode,
+	/**  The executable of the Installation it is about, if it is about one. */
+	installation: string | null,
+	/**  The note as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type AgentNoteCode = 
+/**
+ *  An Installation's version is newer or older than the definition's
+ *  tested range.
+ */
+"version_outside_tested_range" | 
+/**  An Installation's version cannot be read. */
+"version_unreadable" | 
+/**  No Installation that reads the Agent home was found. */
+"no_installation_found" | 
+/**  The definition has no tested range. */
+"definition_untested";
+
 /**  Something that makes a State less certain than it looks. */
 export type Caveat = {
 	code: CaveatCode,
@@ -271,6 +296,16 @@ export type Home = {
 	no_configuration: string | null,
 	/**  The Agent's Scopes, in display order. */
 	scopes: string[],
+	/**  Each Installation that reads it, with its version as read at this scan. */
+	installations: Installation[],
+	/**  The version that last ran against it, as the Agent records it. */
+	last_ran: string | null,
+	/**
+	 *  What to know about the Agent's versions here, such as one outside
+	 *  the definition's tested range. None of them changes a State or
+	 *  blocks a write.
+	 */
+	notes: AgentNote[],
 };
 
 /**  Where an Agent home came from. */
@@ -279,6 +314,20 @@ export type HomeSource =
 { kind: "default" } | 
 /**  The user added it, and no definition location finds it. */
 { kind: "added" };
+
+/**  A launchable copy of an Agent, with its own version. */
+export type Installation = {
+	/**  The id of the definition's installation, such as `native`. */
+	id: string,
+	/**  Its executable. */
+	path: string,
+	/**  `None` when it cannot be read. */
+	version: string | null,
+	/**  The file or registry key the version was read from. */
+	version_from: string | null,
+	/**  Its version is outside the definition's tested range. */
+	out_of_range: boolean,
+};
 
 /**  Every Item found, with the Agent homes they belong to. */
 export type Inventory = {

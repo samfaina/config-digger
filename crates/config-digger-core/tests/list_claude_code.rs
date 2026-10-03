@@ -42,7 +42,14 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
-            "scopes": ["local", "project", "user"]
+            "scopes": ["local", "project", "user"],
+            "installations": [],
+            "last_ran": null,
+            "notes": [{
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            }]
         }])
     );
     assert_eq!(

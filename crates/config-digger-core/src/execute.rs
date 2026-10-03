@@ -66,7 +66,7 @@ pub(crate) fn execute(
     // Held until this function returns, after Verify and the History write.
     let _lock = history::lock(ports, &data)?;
     // An Agent may have started since the plan: check again before writing.
-    let running = running::check(definitions, ports, &planned.files);
+    let running = running::check(definitions, ports, &planned.installed, &planned.files);
     if !running.blocks.is_empty() {
         return Err(blocked(&running.blocks));
     }
