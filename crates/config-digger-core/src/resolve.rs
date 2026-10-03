@@ -47,16 +47,13 @@ pub(crate) fn resolve(
                     HomeSource::Added => api::HomeSource::Added,
                 },
                 hidden: home.hidden,
-                not_read: home.skipped.as_ref().map(|skipped| {
-                    let instead = skipped.instead.as_ref();
-                    api::NotRead {
-                        read_instead: instead.map(|(id, _)| id.clone()),
-                        sentence: explain::home_not_read(
-                            &definition.agent.name,
-                            &home.folder,
-                            instead.map(|(_, folder)| folder.as_path()),
-                        ),
-                    }
+                not_read: home.skipped.as_ref().map(|skipped| api::NotRead {
+                    read_instead: skipped.instead.clone(),
+                    sentence: explain::home_not_read(
+                        &definition.agent.name,
+                        &home.folder,
+                        skipped.folder.as_deref(),
+                    ),
                 }),
                 no_configuration: (!home.configured)
                     .then(|| explain::no_configuration(&definition.agent.name)),
@@ -262,9 +259,10 @@ pub(crate) fn resolve(
                     let location = definition.location(&entry.location);
                     let gate_caveats = gate_caveats(definition, snapshot, entry);
                     if let Some(home) = skipped_home(snapshot, entry) {
-                        let instead = home.skipped.as_ref().and_then(|skipped| {
-                            skipped.instead.as_ref().map(|(_, folder)| folder.as_path())
-                        });
+                        let instead = home
+                            .skipped
+                            .as_ref()
+                            .and_then(|skipped| skipped.folder.as_deref());
                         let reason =
                             explain::lookup_order_skips_home(agent_name, &home.folder, instead);
                         return unread_entry(
@@ -1010,7 +1008,7 @@ fn gates(
                         };
                         snapshot.settings_for(entry, location.kind, owner, project)
                     })
-                    .find(|value| value.value.as_ref().is_some_and(PolicyField::set))?;
+                    .find(|value| value.value.as_ref().is_some_and(PolicyField::keeps_out))?;
                 let key = set.key_path.last().map_or("", String::as_str);
                 let mut reason = explain::policy_field(key, &set.path, agent_name);
                 reason.switch = Some(locator::render(&set.path, &set.key_path));
@@ -1138,12 +1136,14 @@ fn remove(
         .declared_plugins(&plugin.plugins)
         .expect("validation declares the plugins a location reads")
         .uninstall(&plugin.id, plugin.scope.as_deref());
+    // An extension goes by the name its Agent's settings show it under, a
+    // plugin by the id its uninstall command takes.
     let (code, sentence) = match location.provenance {
         Provenance::Extension => (
             api::RemoveNotOffered::Extension,
             explain::extension_not_removed(&plugin.name, agent_name),
         ),
-        _ => (
+        Provenance::Plugin | Provenance::File | Provenance::Managed | Provenance::CloudMirror => (
             api::RemoveNotOffered::Plugin,
             explain::plugin_not_removed(&plugin.id, agent_name),
         ),

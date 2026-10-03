@@ -8,9 +8,14 @@ verified = { min = "2.16120", max = "2.16120" }
 # The data folder Claude Desktop reads, `<userData>`, is the first of these
 # that exists [bundle]. `CLAUDE_USER_DATA_DIR` sets it outright [bundle].
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
-# share [bundle]. That a classic `%APPDATA%\Claude` beside a package's
-# `LocalCache` takes precedence for the packaged app too is inferred.
-lookup_order = ["user-data-dir", "claude-data", "classic", "msix", "msix-anthropicpbc"]
+# share [bundle]. Each package's app ends with its own `LocalCache`, which
+# no other app sees [docs]. That a classic `%APPDATA%\Claude` beside a
+# package's `LocalCache` takes precedence for the packaged app too is
+# inferred.
+lookup_orders = [
+  ["user-data-dir", "claude-data", "classic", "msix"],
+  ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc"],
+]
 
 [agent]
 id = "claude-desktop"
@@ -171,13 +176,14 @@ shape = { block = "fields", one_of = ["command"], types = { command = "string", 
 # `Claude Extensions\<id>`; any folder there with a `manifest.json` counts as
 # installed [bundle]. `extensions-installations.json` records how each was
 # installed [bundle]. An extension's server goes by its manifest's
-# `display_name`, or else its `name` [bundle]; that a second extension with
-# the same name goes by its id is not read. Extensions are uninstalled in
+# `display_name`, or else its `name`; a second extension with the same name
+# goes by its id [bundle]. Extensions are uninstalled in
 # Settings > Extensions [docs].
 [[plugins]]
 id = "extensions"
 registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = "manifest.json", records = { anchor = { block = "home", root = "installations" }, root = ["extensions"], version = "version" } }
 name = [{ file = "manifest.json", key_path = ["display_name"] }, { file = "manifest.json", key_path = ["name"] }]
+unique_names = true
 
 # The one server of an extension, in its manifest's `server.mcp_config`
 # [docs]. `${__dirname}` stands for the extension's folder, and

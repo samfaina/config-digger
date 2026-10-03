@@ -6,7 +6,7 @@ pub(crate) mod pe;
 
 use crate::api;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
-use crate::definitions::{AgentDefinition, AgentNote};
+use crate::definitions::{AgentDefinition, DefinitionNote};
 use crate::ports::Ports;
 use crate::scan::{ScannedHome, Snapshot};
 use crate::version::{Standing, Version};
@@ -49,7 +49,7 @@ pub(crate) fn of_home(
     }
     for &noted in &definition.agent.notes {
         notes.push(match noted {
-            AgentNote::CloudConnectorsNotOnDisk => note(
+            DefinitionNote::CloudConnectorsNotOnDisk => note(
                 api::AgentNoteCode::CloudConnectorsNotOnDisk,
                 None,
                 explain::cloud_connectors_not_on_disk(agent_name),
@@ -149,11 +149,7 @@ fn reads(
     let Some(homes) = &declared.homes else {
         return true;
     };
-    let laid_out_as = if definition.homes.iter().any(|known| known.id == home.home) {
-        &home.home
-    } else {
-        &definition.homes[0].id
-    };
+    let laid_out_as = home.declared.as_ref().unwrap_or(&definition.homes[0].id);
     homes.contains(laid_out_as)
 }
 

@@ -60,11 +60,14 @@
         "$ref": "#/$defs/HomeDefinition"
       }
     },
-    "lookup_order": {
-      "description": "The ids of the homes the Agent picks one of, in its order, such as\nthe candidates for Claude Desktop's data folder: it reads the first\nwhose `when` holds and whose folder exists, or that it uses before\nit exists, and skips the others, which are shown as not read. A home\noutside the order is read wherever it is found.",
+    "lookup_orders": {
+      "description": "The orders in which a launch of the Agent picks one of its homes,\neach a list of home ids, such as the candidates for Claude Desktop's\ndata folder of each of its packages: it reads the first whose `when`\nholds and whose folder exists, or that it uses before it exists. A\nhome some order holds and none picks is skipped, and shown as not\nread. A home outside every order is read wherever it is found.",
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       },
       "default": []
     },
@@ -163,7 +166,7 @@
           "description": "What every Agent home of the Agent notes, such as configuration it\nkeeps only in the user's account.",
           "type": "array",
           "items": {
-            "$ref": "#/$defs/AgentNote"
+            "$ref": "#/$defs/DefinitionNote"
           }
         }
       },
@@ -173,7 +176,7 @@
         "name"
       ]
     },
-    "AgentNote": {
+    "DefinitionNote": {
       "description": "Something every Agent home of an Agent notes, from a closed set.",
       "oneOf": [
         {
@@ -753,7 +756,7 @@
           ]
         },
         {
-          "description": "The values of a key in the Windows registry, each one setting, such as\nClaude Desktop's policy under `HKLM\\SOFTWARE\\Policies\\Claude`. A string\nvalue reads as a string, and a DWORD as `true` when it is 1 and `false`\nwhen it is 0, as Windows policies store switches, and as its number\notherwise. It is shown as `<HKLM|HKCU>\\<key>`.",
+          "description": "The values of a key in the Windows registry, each one setting, such as\nClaude Desktop's policy under `HKLM\\SOFTWARE\\Policies\\Claude`. A string\nvalue reads as a string, and a DWORD as `true` when it is 1 and `false`\nwhen it is 0, as Windows policies store switches, and as its number\notherwise; a value of another type reads as `null`, holding a setting\nconfig-digger does not read. It is shown as `<HKLM|HKCU>\\<key>`.",
           "type": "object",
           "properties": {
             "hive": {
@@ -884,6 +887,11 @@
             "string",
             "null"
           ]
+        },
+        "unique_names": {
+          "description": "Whether the Agent names a plugin by its id when one before it, in\nthe registry's order, has its name, as Claude Desktop does with\nextensions, so that their Entries never share a name.",
+          "type": "boolean",
+          "default": false
         },
         "uninstall": {
           "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out. Without it,\nthe Agent uninstalls a plugin only through its own interface.",

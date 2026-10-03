@@ -5,7 +5,7 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    Anchor, Anchored, DisableMechanism, DisableReason, Disables, MechanismContext, MechanismTarget,
+    Anchored, DisableMechanism, DisableReason, Disables, MechanismContext, MechanismTarget,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
@@ -13,7 +13,6 @@ use crate::explain;
 use crate::locator;
 use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
 use serde_json::Value;
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// The context's Project as Disable needs it.
@@ -261,7 +260,7 @@ pub(crate) fn choose(
         let folder = project
             .map(|project| project.path)
             .filter(|_| switch.anchor.in_project());
-        let Some(path) = switch_path(&switch.anchor, roots, folder, entry) else {
+        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
             continue;
         };
         if snapshot.versioned.contains(&path) {
@@ -346,7 +345,7 @@ pub(crate) fn failed_switch_files(
             }
             _ => None,
         };
-        let Some(path) = switch_path(&switch.anchor, roots, folder, entry) else {
+        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
             continue;
         };
         if snapshot.unreadable_switches.contains(&path) && !files.contains(&path) {
@@ -354,22 +353,4 @@ pub(crate) fn failed_switch_files(
         }
     }
     files
-}
-
-/// The file `anchor` names for `entry`: the file of its plugin for an
-/// anchor per plugin, its own for an anchor per Entry, and in `folder`,
-/// the Project folder, for an anchor in a Project.
-pub(crate) fn switch_path(
-    anchor: &Anchor,
-    roots: &BTreeMap<String, PathBuf>,
-    folder: Option<&Path>,
-    entry: &ScannedEntry,
-) -> Option<PathBuf> {
-    if let Some(beside) = anchor.entry() {
-        return beside.of(&entry.path);
-    }
-    if anchor.per_plugin() {
-        return anchor.plugin_path(roots, &entry.plugin.as_ref()?.id);
-    }
-    anchor.path(roots, folder)
 }

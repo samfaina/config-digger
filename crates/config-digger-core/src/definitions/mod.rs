@@ -88,13 +88,14 @@ pub(crate) struct AgentDefinition {
     pub process: Option<ProcessDefinition>,
     /// The Agent homes this Agent can have.
     pub homes: Vec<HomeDefinition>,
-    /// The ids of the homes the Agent picks one of, in its order, such as
-    /// the candidates for Claude Desktop's data folder: it reads the first
-    /// whose `when` holds and whose folder exists, or that it uses before
-    /// it exists, and skips the others, which are shown as not read. A home
-    /// outside the order is read wherever it is found.
+    /// The orders in which a launch of the Agent picks one of its homes,
+    /// each a list of home ids, such as the candidates for Claude Desktop's
+    /// data folder of each of its packages: it reads the first whose `when`
+    /// holds and whose folder exists, or that it uses before it exists. A
+    /// home some order holds and none picks is skipped, and shown as not
+    /// read. A home outside every order is read wherever it is found.
     #[serde(default)]
-    pub lookup_order: Vec<String>,
+    pub lookup_orders: Vec<Vec<String>>,
     /// The Scopes this Agent applies Entries at, in display order. A Scope is
     /// only a label: precedence comes from the order of locations in `items`.
     pub scopes: Vec<ScopeDefinition>,
@@ -160,13 +161,13 @@ pub(crate) struct AgentInfo {
     /// What every Agent home of the Agent notes, such as configuration it
     /// keeps only in the user's account.
     #[serde(default)]
-    pub notes: Vec<AgentNote>,
+    pub notes: Vec<DefinitionNote>,
 }
 
 /// Something every Agent home of an Agent notes, from a closed set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum AgentNote {
+pub(crate) enum DefinitionNote {
     /// The Agent's connectors live in the user's account, with no copy on
     /// disk to list, such as Claude Desktop's.
     CloudConnectorsNotOnDisk,
@@ -340,6 +341,11 @@ pub(crate) struct PluginsDefinition {
     /// The text that ends a plugin's name in its id, such as the `@` before
     /// a marketplace. Without it, a plugin with no name is named by its id.
     pub id_separator: Option<String>,
+    /// Whether the Agent names a plugin by its id when one before it, in
+    /// the registry's order, has its name, as Claude Desktop does with
+    /// extensions, so that their Entries never share a name.
+    #[serde(default)]
+    pub unique_names: bool,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -705,6 +711,11 @@ impl AgentDefinition {
             .or(self.process.as_ref())
     }
 
+    /// Whether a lookup order holds the home `id`.
+    pub fn in_lookup_order(&self, id: &str) -> bool {
+        self.lookup_orders.iter().flatten().any(|known| known == id)
+    }
+
     /// The Feature gate named `name`, if the definition declares one.
     pub fn feature_gate(&self, name: &str) -> Option<&FeatureGateDefinition> {
         self.feature_gates.iter().find(|gate| gate.name == name)
@@ -761,23 +772,21 @@ impl AgentDefinition {
                     .validate()
                     .map_err(|e| format!("home `{}` when: {e}", home.id))?;
             }
-            if !home.when.is_empty() && !self.lookup_order.contains(&home.id) {
+            if !home.when.is_empty() && !self.in_lookup_order(&home.id) {
                 return Err(format!(
-                    "home `{}` takes `when` only in the lookup order",
+                    "home `{}` takes `when` only in a lookup order",
                     home.id
                 ));
             }
         }
-        unique(
-            "lookup order home",
-            self.lookup_order.iter().map(String::as_str),
-        )?;
-        if let Some(id) = self
-            .lookup_order
-            .iter()
-            .find(|id| !self.homes.iter().any(|home| home.id == **id))
-        {
-            return Err(format!("lookup_order names undeclared home `{id}`"));
+        for order in &self.lookup_orders {
+            unique("lookup order home", order.iter().map(String::as_str))?;
+            if let Some(id) = order
+                .iter()
+                .find(|id| !self.homes.iter().any(|home| home.id == **id))
+            {
+                return Err(format!("lookup_orders names undeclared home `{id}`"));
+            }
         }
 
         if let Some(verified) = &self.verified {
@@ -2503,10 +2512,10 @@ locations = {locations}
     }
 
     #[test]
-    fn a_lookup_order_names_declared_homes_and_only_its_homes_take_conditions() {
+    fn lookup_orders_name_declared_homes_and_only_their_homes_take_conditions() {
         let ordered = VALID.replace(
             "format_version = 1\n",
-            "format_version = 1\nlookup_order = [\"default\"]\n",
+            "format_version = 1\nlookup_orders = [[\"default\"]]\n",
         );
         let when = "roots.state = \".test.json\"\nwhen = [{ block = \"unc-variable\", variable = \"APPDATA\" }]\n";
         let text = ordered.replace("roots.state = \".test.json\"\n", when);
@@ -2514,13 +2523,13 @@ locations = {locations}
 
         let text = VALID.replace("roots.state = \".test.json\"\n", when);
         assert!(
-            error(&text).contains("takes `when` only in the lookup order"),
+            error(&text).contains("takes `when` only in a lookup order"),
             "{}",
             error(&text)
         );
         let text = ordered.replace("[\"default\"]", "[\"other\"]");
         assert!(
-            error(&text).contains("lookup_order names undeclared home `other`"),
+            error(&text).contains("lookup_orders names undeclared home `other`"),
             "{}",
             error(&text)
         );

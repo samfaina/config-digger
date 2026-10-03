@@ -9,7 +9,7 @@ use crate::definitions::blocks::{
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::scan::{ScannedEntry, ScannedSetting, SettingOwner, Snapshot};
-use crate::{disable, explain, locator, mask};
+use crate::{explain, locator, mask};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -320,9 +320,7 @@ pub(crate) fn failed_files(
                 .and_then(|project| anchor.path(roots, Some(project)))
                 .into_iter()
                 .collect(),
-            None => disable::switch_path(anchor, roots, None, entry)
-                .into_iter()
-                .collect(),
+            None => entry.file_of(anchor, roots, None).into_iter().collect(),
         };
         for path in paths {
             if snapshot.unreadable_settings.contains(&path) && !files.contains(&path) {

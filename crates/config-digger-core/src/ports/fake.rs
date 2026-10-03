@@ -638,11 +638,20 @@ impl FakeEnvironment {
     }
 
     /// A `REG_DWORD` value, such as a policy switch.
-    pub fn with_registry_dword(mut self, hive: Hive, key: &str, name: &str, value: u32) -> Self {
-        self.registry.insert(
-            (hive, key.to_owned(), name.to_owned()),
-            RegistryData::Dword(value),
-        );
+    pub fn with_registry_dword(self, hive: Hive, key: &str, name: &str, value: u32) -> Self {
+        self.with_registry_data(hive, key, name, RegistryData::Dword(value))
+    }
+
+    /// A value of any type.
+    pub fn with_registry_data(
+        mut self,
+        hive: Hive,
+        key: &str,
+        name: &str,
+        data: RegistryData,
+    ) -> Self {
+        self.registry
+            .insert((hive, key.to_owned(), name.to_owned()), data);
         self
     }
 }
@@ -662,7 +671,7 @@ impl Environment for FakeEnvironment {
             .get(&(hive, key.to_owned(), name.to_owned()))?
         {
             RegistryData::String(value) => Some(value.clone()),
-            RegistryData::Dword(_) => None,
+            RegistryData::Dword(_) | RegistryData::Other => None,
         }
     }
 

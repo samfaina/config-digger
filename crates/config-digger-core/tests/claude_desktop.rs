@@ -9,7 +9,7 @@ use config_digger_core::api::{
     Action, Context, Core, Entry, Home, Inventory, Item, ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeProcesses};
-use config_digger_core::ports::{Hive, RunningProcess};
+use config_digger_core::ports::{Hive, RegistryData, RunningProcess};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -682,6 +682,51 @@ fn claude_code_is_not_claude_desktop_though_both_are_claude_exe() {
 }
 
 #[test]
+fn a_second_extension_with_the_same_name_goes_by_its_id() {
+    let inventory = inventory(&store().with_file(
+        extension("local.mcpb.acme.weather").join("manifest.json"),
+        r#"{ "name": "files-too", "display_name": "Files", "server": { "mcp_config": { "command": "files-too" } } }"#,
+    ));
+
+    let files = item(&inventory, "Files");
+    assert_eq!(files.entries.len(), 1);
+    assert_eq!(files.entries[0].config["command"], "node");
+    let second = item(&inventory, "local.mcpb.acme.weather");
+    assert_eq!(json(second.state), "effective");
+    assert_eq!(second.entries[0].config["command"], "files-too");
+}
+
+#[test]
+fn machine_policy_that_turns_off_extensions_blocks_them() {
+    let env =
+        env().with_registry_dword(Hive::LocalMachine, POLICIES, "isDesktopExtensionEnabled", 0);
+    let inventory = inventory_with(&store(), env);
+
+    let files = item(&inventory, "Files");
+    assert_eq!(json(files.state), "blocked");
+    assert_eq!(
+        json(files.entries[0].reason.as_ref().unwrap().code),
+        "policy"
+    );
+    assert_eq!(json(item(&inventory, "notes").state), "effective");
+}
+
+#[test]
+fn a_machine_policy_value_of_any_type_hides_the_user_s_policy() {
+    let env = env()
+        .with_registry_dword(Hive::CurrentUser, POLICIES, "isDesktopExtensionEnabled", 0)
+        .with_registry_data(
+            Hive::LocalMachine,
+            POLICIES,
+            "skillBundles",
+            RegistryData::Other,
+        );
+    let inventory = inventory_with(&store(), env);
+
+    assert_eq!(json(item(&inventory, "Files").state), "effective");
+}
+
+#[test]
 fn a_folder_without_a_manifest_is_no_extension() {
     let fs = store().with_file(
         msix().join(r"Claude Extensions\local.mcpb.acme.half\server\index.js"),
@@ -708,4 +753,46 @@ fn a_package_signed_as_anthropic_pbc_is_found_too() {
         home(&inventory, "msix-anthropicpbc").folder,
         msix_folder(ANTHROPIC_PBC_FAMILY)
     );
+}
+
+#[test]
+fn each_package_reads_its_own_local_cache_when_both_are_installed() {
+    let both = load(
+        store(),
+        &fixture_folder("msix"),
+        &msix_folder(ANTHROPIC_PBC_FAMILY),
+    );
+    let packages = inventory(&both);
+
+    assert_eq!(home(&packages, "msix").not_read, None);
+    assert_eq!(home(&packages, "msix-anthropicpbc").not_read, None);
+    let states: Vec<Value> = item(&packages, "notes")
+        .entries
+        .iter()
+        .map(|entry| json(entry.state))
+        .collect();
+    assert_eq!(states, ["effective"]);
+    let items = packages
+        .items
+        .iter()
+        .filter(|item| item.name == "notes" && json(item.state) == "effective")
+        .count();
+    assert_eq!(items, 2, "one Item per home");
+
+    let with_classic = with_classic_at(both, Path::new(CLASSIC));
+    let classic_too = inventory(&with_classic);
+    for skipped in ["msix", "msix-anthropicpbc"] {
+        let not_read = home(&classic_too, skipped).not_read.as_ref().unwrap();
+        assert_eq!(not_read.read_instead.as_deref(), Some("classic"));
+    }
+}
+
+#[test]
+fn read_instead_names_only_a_home_that_is_listed() {
+    let fs = store().with_folder(CLASSIC);
+    let inventory = inventory(&fs);
+
+    let not_read = home(&inventory, "msix").not_read.as_ref().unwrap();
+    assert_eq!(not_read.read_instead, None);
+    assert!(not_read.sentence.contains(CLASSIC), "{}", not_read.sentence);
 }

@@ -391,6 +391,10 @@ pub(crate) struct ScannedHome {
     /// Index of the Agent definition in the definitions the snapshot was scanned with.
     pub agent_index: usize,
     pub home: String,
+    /// The id of the definition's home it was found as, `None` for one
+    /// the user added. It differs from `home` when the home's folder glob
+    /// matches several folders, each a home with its folder as its id.
+    pub declared: Option<String>,
     /// The folder its roots are in.
     pub folder: PathBuf,
     /// The path of each of its roots, by name.
@@ -409,9 +413,10 @@ pub(crate) struct ScannedHome {
 /// An Agent home the Agent's lookup order skips: the Agent never reads it.
 #[derive(Clone)]
 pub(crate) struct Skipped {
-    /// The id and folder of the home the order picks, `None` when it picks
-    /// none that is there.
-    pub instead: Option<(String, PathBuf)>,
+    /// The id of the home the order picks, when it is listed.
+    pub instead: Option<String>,
+    /// The folder the order picks, `None` when it picks none that is there.
+    pub folder: Option<PathBuf>,
 }
 
 /// Where an Agent home came from.
@@ -489,6 +494,20 @@ pub(crate) struct ManagerMatch {
     pub strength: Strength,
 }
 
+impl ScannedEntry {
+    /// The file `anchor` names for this Entry, as [`Anchor::path_for`]
+    /// finds it, given the roots of its Agent home and the Project folder.
+    pub fn file_of(
+        &self,
+        anchor: &Anchor,
+        roots: &BTreeMap<String, PathBuf>,
+        folder: Option<&Path>,
+    ) -> Option<PathBuf> {
+        let plugin = self.plugin.as_ref().map(|plugin| plugin.id.as_str());
+        anchor.path_for(roots, folder, plugin, &self.path)
+    }
+}
+
 /// Where the link or junction at a Linked Entry's location points.
 #[derive(Clone)]
 pub(crate) struct ScannedLink {
@@ -540,6 +559,9 @@ pub(crate) enum ScanError {
 struct FoundHome {
     agent_index: usize,
     home: String,
+    /// The id of the definition's home it was found as, `None` for one
+    /// the user added.
+    declared: Option<String>,
     folder: PathBuf,
     /// Its roots by name, and the machine-wide paths of its definition by
     /// the text that names them.
@@ -746,6 +768,7 @@ pub(crate) fn scan_as_if(
             .map(|(home, last_ran)| ScannedHome {
                 last_ran,
                 skipped: home.skipped,
+                declared: home.declared,
                 configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
                     hidden.agent == definitions[home.agent_index].agent.id
@@ -1333,7 +1356,7 @@ fn find_homes(
         // Each home with its folders, each folder with the home's id there:
         // a home whose glob matches several folders has one per folder,
         // each with its folder as its id.
-        let mut located: Vec<(&HomeDefinition, Vec<(String, PathBuf)>)> = Vec::new();
+        let mut located: Vec<(&HomeDefinition, Vec<HomeFolder>)> = Vec::new();
         for home in &definition.homes {
             let folders = home.folder.folders(ports.env.as_ref(), fs);
             if folders.is_empty() && home.folder.in_home_folder() {
@@ -1356,14 +1379,28 @@ fn find_homes(
                 .collect();
             located.push((home, folders));
         }
-        let picked = lookup_order(definition, &located, ports);
+        // What each lookup order picks.
+        let picked: Vec<(&Vec<String>, Option<HomeFolder>)> = definition
+            .lookup_orders
+            .iter()
+            .map(|order| (order, pick(order, &located, ports)))
+            .collect();
+        let start = found.len();
         for (home, folders) in located {
-            let in_order = definition.lookup_order.contains(&home.id);
             for (id, folder) in folders {
                 definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
-                let skipped = (in_order && picked.as_ref().is_none_or(|(picked, _)| *picked != id))
-                    .then(|| Skipped {
-                        instead: picked.clone(),
+                // Skipped when an order holds it and none picks it, for
+                // what the first order that holds it picks.
+                let picks_it = picked
+                    .iter()
+                    .any(|(_, pick)| pick.as_ref().is_some_and(|(pick, _)| *pick == id));
+                let skipped = picked
+                    .iter()
+                    .find(|(order, _)| order.contains(&home.id))
+                    .filter(|_| !picks_it)
+                    .map(|(_, pick)| Skipped {
+                        instead: pick.as_ref().map(|(id, _)| id.clone()),
+                        folder: pick.as_ref().map(|(_, folder)| folder.clone()),
                     });
                 let mut roots = home.roots_in(&folder);
                 // A definition home the user added keeps its id, so that it is
@@ -1382,12 +1419,30 @@ fn find_homes(
                 found.push(FoundHome {
                     agent_index,
                     home: id,
+                    declared: Some(home.id.clone()),
                     folder,
                     roots,
                     source,
                     configured,
                     skipped,
                 });
+            }
+        }
+        // The home an order picks is named only when it is listed.
+        let listed: Vec<String> = found[start..]
+            .iter()
+            .map(|home| home.home.clone())
+            .collect();
+        for skipped in found[start..]
+            .iter_mut()
+            .filter_map(|home| home.skipped.as_mut())
+        {
+            if skipped
+                .instead
+                .as_ref()
+                .is_some_and(|id| !listed.contains(id))
+            {
+                skipped.instead = None;
             }
         }
     }
@@ -1416,21 +1471,25 @@ fn find_homes(
             roots,
             source: HomeSource::Added,
             configured,
+            declared: None,
             skipped: None,
         });
     }
     Ok(found)
 }
 
-/// The id and folder of the home the lookup order of `definition` picks
-/// among the `located` folders of its homes: the first whose conditions
-/// hold and whose folder exists, or that the Agent uses before it exists.
-fn lookup_order(
-    definition: &AgentDefinition,
-    located: &[(&HomeDefinition, Vec<(String, PathBuf)>)],
+/// A folder of a home, with the home's id there.
+type HomeFolder = (String, PathBuf);
+
+/// The id and folder of the home `order` picks among the `located` folders
+/// of the homes of a definition: the first whose conditions hold and whose
+/// folder exists, or that the Agent uses before it exists.
+fn pick(
+    order: &[String],
+    located: &[(&HomeDefinition, Vec<HomeFolder>)],
     ports: &Ports,
-) -> Option<(String, PathBuf)> {
-    definition.lookup_order.iter().find_map(|id| {
+) -> Option<HomeFolder> {
+    order.iter().find_map(|id| {
         let (home, folders) = located.iter().find(|(home, _)| home.id == *id)?;
         if !home
             .when
@@ -1602,6 +1661,12 @@ impl Scanner<'_> {
                 let name = separator.and_then(|separator| id.split_once(separator));
                 name.map_or(id, |(name, _)| name).to_owned()
             });
+            let taken = found.iter().any(|known: &ScannedPlugin| known.name == name);
+            let name = if plugins.unique_names && taken {
+                record.id.clone()
+            } else {
+                name
+            };
             found.push(ScannedPlugin {
                 plugins: plugins.id.clone(),
                 id: record.id,

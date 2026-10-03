@@ -1757,14 +1757,16 @@ fn provenance_label(entry: &api::Entry) -> String {
         (api::Provenance::File, _) => "file".to_owned(),
         (api::Provenance::Managed, _) => "managed".to_owned(),
         (api::Provenance::CloudMirror, _) => "cloud-mirror".to_owned(),
-        (api::Provenance::Plugin, _) => match &entry.plugin {
-            Some(plugin) => format!("plugin ({})", plugin.id),
-            None => "plugin".to_owned(),
-        },
-        (api::Provenance::Extension, _) => match &entry.plugin {
-            Some(plugin) => format!("extension ({})", plugin.id),
-            None => "extension".to_owned(),
-        },
+        (api::Provenance::Plugin, _) => owned_by("plugin", entry),
+        (api::Provenance::Extension, _) => owned_by("extension", entry),
+    }
+}
+
+/// `label`, with the id of the plugin or extension the Entry is part of.
+fn owned_by(label: &str, entry: &api::Entry) -> String {
+    match &entry.plugin {
+        Some(plugin) => format!("{label} ({})", plugin.id),
+        None => label.to_owned(),
     }
 }
 

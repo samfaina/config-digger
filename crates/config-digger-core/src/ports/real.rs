@@ -378,17 +378,15 @@ impl Environment for RealEnvironment {
         Some(
             key.enum_values()
                 .filter_map(Result::ok)
-                .filter_map(|(name, value)| {
+                .map(|(name, value)| {
                     let data = match value.vtype {
-                        RegType::REG_SZ | RegType::REG_EXPAND_SZ => {
-                            RegistryData::String(String::from_reg_value(&value).ok()?)
-                        }
-                        RegType::REG_DWORD => {
-                            RegistryData::Dword(u32::from_reg_value(&value).ok()?)
-                        }
-                        _ => return None,
+                        RegType::REG_SZ | RegType::REG_EXPAND_SZ => String::from_reg_value(&value)
+                            .map_or(RegistryData::Other, RegistryData::String),
+                        RegType::REG_DWORD => u32::from_reg_value(&value)
+                            .map_or(RegistryData::Other, RegistryData::Dword),
+                        _ => RegistryData::Other,
                     };
-                    Some((name, data))
+                    (name, data)
                 })
                 .collect(),
         )

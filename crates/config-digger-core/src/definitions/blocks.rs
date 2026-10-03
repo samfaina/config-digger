@@ -128,6 +128,7 @@ fn validate_variable(name: &str) -> Result<(), String> {
 /// Whether the Agent reads an Agent home it can find, given what holds on
 /// this machine.
 pub(crate) trait HoldsHere {
+    /// Whether it holds, given the environment `env` the Agent starts in.
     fn holds(&self, env: &dyn Environment) -> bool;
 }
 
@@ -217,7 +218,12 @@ impl Validate for PathLocator {
             }
             return self.relative().map(|_| ());
         }
-        paths::validate_glob(&self.path).map_err(|_| self.relative().unwrap_err())
+        paths::validate_glob(&self.path).map_err(|_| {
+            format!(
+                "path `{}` must be `~`, or start with `~/`, `%NAME%` or a drive",
+                self.path
+            )
+        })
     }
 }
 
@@ -731,6 +737,26 @@ impl Anchor {
         }
     }
 
+    /// The file it names for the Entry at `entry`, part of the plugin with
+    /// the id `plugin` if any: the Entry's own for an anchor per Entry, its
+    /// plugin's for an anchor per plugin, and in `folder`, the Project
+    /// folder, for an anchor in a Project.
+    pub fn path_for(
+        &self,
+        roots: &BTreeMap<String, PathBuf>,
+        folder: Option<&Path>,
+        plugin: Option<&str>,
+        entry: &Path,
+    ) -> Option<PathBuf> {
+        if let Some(beside) = self.entry() {
+            return beside.of(entry);
+        }
+        if self.per_plugin() {
+            return self.plugin_path(roots, plugin?);
+        }
+        self.path(roots, folder)
+    }
+
     /// The file it names for the plugin with the id `plugin`, given the
     /// roots of the Agent home; `None` when it names no file per plugin.
     pub fn plugin_path(&self, roots: &BTreeMap<String, PathBuf>, plugin: &str) -> Option<PathBuf> {
@@ -771,7 +797,8 @@ impl Validate for SettingsSource {
 /// Claude Desktop's policy under `HKLM\SOFTWARE\Policies\Claude`. A string
 /// value reads as a string, and a DWORD as `true` when it is 1 and `false`
 /// when it is 0, as Windows policies store switches, and as its number
-/// otherwise. It is shown as `<HKLM|HKCU>\<key>`.
+/// otherwise; a value of another type reads as `null`, holding a setting
+/// config-digger does not read. It is shown as `<HKLM|HKCU>\<key>`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegistryKeySource {
@@ -804,6 +831,7 @@ impl RegistryKeySource {
                     RegistryData::Dword(0) => Value::from(false),
                     RegistryData::Dword(1) => Value::from(true),
                     RegistryData::Dword(number) => Value::from(number),
+                    RegistryData::Other => Value::Null,
                 };
                 (name, value)
             })
@@ -2959,8 +2987,7 @@ impl Gate {
     pub fn covers(&self, id: &str) -> bool {
         match self {
             Gate::ManagedExclusive(block) => block.covers(id),
-            Gate::ApprovalList(block) => block.locations.iter().any(|location| location == id),
-            Gate::PolicyField(block) => block.locations.iter().any(|location| location == id),
+            Gate::ApprovalList(_) | Gate::PolicyField(_) => self.locations().contains(&id),
         }
     }
 
@@ -3009,7 +3036,7 @@ impl Validate for PolicyField {
 
 impl PolicyField {
     /// Whether `value`, what a source holds, keeps the Entry out.
-    pub fn set(value: &Value) -> bool {
+    pub fn keeps_out(value: &Value) -> bool {
         !matches!(value, Value::Null | Value::Bool(false))
             && value.as_str().is_none_or(|text| !text.is_empty())
     }
