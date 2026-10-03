@@ -28,8 +28,16 @@ export type Error = {
 	message: string,
 	/**  What an ambiguous selector could mean, one locator per Item or Entry. */
 	candidates: string[],
-	/**  The backup folder of an Operation that needs manual recovery. */
+	/**
+	 *  The backup folder of an Operation that needs manual recovery, or of
+	 *  one whose Undo was refused.
+	 */
 	backup: string | null,
+	/**
+	 *  For a refused Undo, a unified diff from each backed-up file to what
+	 *  it holds now.
+	 */
+	diff: string | null,
 };
 
 export type ErrorCode = "unexpected" | 
@@ -53,7 +61,9 @@ export type ErrorCode = "unexpected" |
  *  Some files were written and the Operation did not complete, so it
  *  needs manual recovery from its backup.
  */
-"needs_recovery";
+"needs_recovery" | 
+/**  What the Operation to undo touched changed since it ran. */
+"undo_refused";
 
 /**  An Agent home found on this machine. */
 export type Home = {

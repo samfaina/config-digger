@@ -3,10 +3,10 @@
 //! backs it up and checks the copy, writes atomically, verifies, and records
 //! the Operation in History.
 
-use crate::api::{Difference, Error, Outcome, Verify, WarningClass};
+use crate::api::{Difference, Error, OperationStatus, Outcome, Verify, WarningClass};
 use crate::definitions::AgentDefinition;
 use crate::edit::EditableFile;
-use crate::history::{self, EditRecord, LocationRecord, Manifest, Status, VerifyRecord};
+use crate::history::{self, EditRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::Ports;
 use crate::{explain, resolve, scan};
@@ -15,8 +15,9 @@ use std::path::{Path, PathBuf};
 /// One file about to be written.
 struct PendingWrite<'p> {
     file: &'p PlannedFile,
-    /// The bytes read under the lock, which the backup holds.
-    current: Vec<u8>,
+    /// The bytes read under the lock, which the backup holds, or `None` for
+    /// a file the plan creates.
+    current: Option<Vec<u8>>,
     /// The bytes to write.
     bytes: Vec<u8>,
 }
@@ -42,13 +43,18 @@ pub(crate) fn execute(
         .fs
         .create_dir_all(&data)
         .map_err(|error| Error::unexpected(format!("cannot create {}: {error}", data.display())))?;
-    let lock = history::lock_file(&data);
     // Held until this function returns, after Verify and the History write.
-    let _lock = ports
-        .fs
-        .try_lock(&lock)
-        .map_err(|error| Error::unexpected(format!("cannot lock {}: {error}", lock.display())))?
-        .ok_or_else(|| Error::locked(&lock))?;
+    let _lock = history::lock(ports, &data)?;
+    if let Some(undone) = &planned.preview.undo_of {
+        // Another Undo of the same Operation may have run since the plan.
+        let manifests = history::load_all(ports)?;
+        if let Some(reason) = history::not_undoable(history::find(&manifests, undone)?, &manifests)
+        {
+            return Err(Error::stale(format!(
+                "Operation {undone} cannot be undone any more: {reason}"
+            )));
+        }
+    }
 
     let writes = planned
         .files
@@ -57,15 +63,23 @@ pub(crate) fn execute(
         .collect::<Result<Vec<_>, _>>()?;
 
     let now = ports.clock.now();
+    let sequence = history::next_sequence(ports)?;
     let (id, folder) = operation_folder(ports, &data, now)?;
-    let mut manifest = Manifest::new(id.clone(), now, &planned.preview);
+    let mut manifest = Manifest::new(id.clone(), sequence, now, &planned.preview);
     for (index, write) in writes.iter().enumerate() {
-        let backup = backup_name(index, &write.file.path);
-        back_up(ports, &folder.join(&backup), &write.current)?;
+        let backup = match &write.current {
+            Some(current) => {
+                let backup = backup_name(index, &write.file.path);
+                back_up(ports, &folder.join(&backup), current)?;
+                Some(backup)
+            }
+            None => None,
+        };
         manifest.locations.push(LocationRecord {
             path: write.file.path.clone(),
+            syntax: write.file.syntax,
             backup,
-            sha256_before: history::sha256(&write.current),
+            sha256_before: write.current.as_deref().map(history::sha256),
             sha256_after: history::sha256(&write.bytes),
             edits: write
                 .file
@@ -80,7 +94,7 @@ pub(crate) fn execute(
                 .collect(),
         });
     }
-    record(ports, &folder, &manifest).map_err(Error::backup_failed)?;
+    history::record(ports, &folder, &manifest).map_err(Error::backup_failed)?;
 
     for (index, write) in writes.iter().enumerate() {
         if let Err(error) = ports.fs.write_atomic(&write.file.path, &write.bytes) {
@@ -98,20 +112,26 @@ pub(crate) fn execute(
     } else {
         Verify::VerifiedWithDifferences
     };
-    manifest.status = Status::Applied;
+    manifest.status = OperationStatus::Applied;
     manifest.verify = Some(VerifyRecord {
         verify,
         differences: differences.clone(),
     });
     // The files are written and verified: a History write that fails now is
     // logged, not reported as a failed Operation.
-    if let Err(error) = record(ports, &folder, &manifest) {
+    if let Err(error) = history::record(ports, &folder, &manifest) {
         tracing::error!(operation = %id, %error, "cannot record the applied Operation");
     }
     tracing::info!(operation = %id, files = writes.len(), ?verify, "operation applied");
     Ok(Outcome {
         verify,
-        sentence: explain::outcome(planned.action, planned.entries, &id, verify),
+        sentence: explain::outcome(
+            planned.action,
+            planned.entries,
+            planned.preview.undo_of.as_deref(),
+            &id,
+            verify,
+        ),
         operation: id,
         differences,
         backup: folder,
@@ -122,12 +142,25 @@ pub(crate) fn execute(
 /// the edits are applied again to what it holds now, as long as every key
 /// they depend on still holds the value the plan saw.
 fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, Error> {
+    if file.created {
+        if ports.fs.exists(&file.path) {
+            return Err(Error::stale(format!(
+                "{} appeared since the preview",
+                file.path.display()
+            )));
+        }
+        return Ok(PendingWrite {
+            file,
+            bytes: file.edited.bytes.clone(),
+            current: None,
+        });
+    }
     let current = plan::read(ports, &file.path)?;
     if current == file.read {
         return Ok(PendingWrite {
             file,
             bytes: file.edited.bytes.clone(),
-            current,
+            current: Some(current),
         });
     }
     let edits: Vec<_> = file
@@ -157,7 +190,7 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, 
     Ok(PendingWrite {
         file,
         bytes: edited.bytes,
-        current,
+        current: Some(current),
     })
 }
 
@@ -214,14 +247,6 @@ fn back_up(ports: &Ports, copy: &Path, bytes: &[u8]) -> Result<(), Error> {
     Ok(())
 }
 
-fn record(ports: &Ports, folder: &Path, manifest: &Manifest) -> Result<(), String> {
-    let path = folder.join("manifest.json");
-    ports
-        .fs
-        .write_atomic(&path, &manifest.to_json())
-        .map_err(|error| format!("cannot write {}: {error}", path.display()))
-}
-
 /// Records a failed Operation and the error to report. There is no Rollback
 /// yet, so an Operation that wrote anything needs manual recovery.
 fn fail(
@@ -232,12 +257,12 @@ fn fail(
     cause: String,
 ) -> Error {
     manifest.status = if written {
-        Status::NeedsAttention
+        OperationStatus::NeedsAttention
     } else {
-        Status::Failed
+        OperationStatus::Failed
     };
     manifest.cause = Some(cause.clone());
-    if let Err(error) = record(ports, folder, manifest) {
+    if let Err(error) = history::record(ports, folder, manifest) {
         tracing::error!(operation = %manifest.id, %error, "cannot record the failed Operation");
     }
     tracing::error!(operation = %manifest.id, %cause, "operation failed");

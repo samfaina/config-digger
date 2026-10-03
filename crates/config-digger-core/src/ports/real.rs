@@ -31,6 +31,16 @@ impl FileSystem for RealFileSystem {
         })
     }
 
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
+        std::fs::read_dir(path)?
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect()
+    }
+
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()> {
+        std::fs::remove_dir_all(path)
+    }
+
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         std::fs::create_dir_all(path)
     }

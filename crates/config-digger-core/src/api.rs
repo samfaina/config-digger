@@ -6,8 +6,8 @@ use crate::definitions::blocks::Provenance as DefinitionProvenance;
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::Ports;
-use crate::{execute, plan, resolve, scan, select};
-use serde::Serialize;
+use crate::{execute, history, plan, resolve, scan, select};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// The version of every JSON document config-digger emits.
@@ -106,14 +106,47 @@ impl Core {
     pub fn execute(&self, plan: Plan, acknowledged: &[WarningClass]) -> Result<Outcome, Error> {
         execute::execute(&self.definitions, &self.ports, plan.0, acknowledged)
     }
+
+    /// Plans the Undo of the Operation `id`: the inverse of each of its
+    /// edits, applied to the files as they are now, in the context it ran
+    /// in. It is refused when what the Operation touched changed since.
+    pub fn plan_undo(&self, id: &str) -> Result<Plan, Error> {
+        plan::plan_undo(&self.definitions, &self.ports, id).map(Plan)
+    }
+
+    /// Every Operation in History, newest first, across restarts.
+    pub fn history(&self) -> Result<Vec<OperationSummary>, Error> {
+        Ok(history::summaries(
+            &self.ports,
+            &history::load_all(&self.ports)?,
+        ))
+    }
+
+    /// Prunes History, as the front-ends do at startup: it keeps at least the
+    /// last 50 Operations and every one from the last 30 days, never prunes
+    /// one that needs attention, and removes an Operation with its backup.
+    /// Returns the ids pruned, oldest first. It fails with `Locked` while
+    /// another Operation holds the global lock.
+    pub fn prune_history(&self) -> Result<Vec<String>, Error> {
+        history::prune(&self.ports)
+    }
+
+    /// One Operation in History, with the edits it made and the files it
+    /// copied to its backup.
+    pub fn history_show(&self, id: &str) -> Result<OperationDetail, Error> {
+        history::detail(&self.ports, id)
+    }
 }
 
 /// What an Operation does to the Entries it targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     /// Deletes each Entry from where it lives, for every Agent that reads it.
     Remove,
+    /// Applies the inverse of every edit of an earlier Operation to the files
+    /// as they are now.
+    Undo,
 }
 
 /// The Entries an action targets.
@@ -147,6 +180,8 @@ pub struct Preview {
     pub action: Action,
     /// What the Operation does, as a title such as "Remove 2 Entries".
     pub title: String,
+    /// The Operation this one undoes, when it is an Undo.
+    pub undo_of: Option<String>,
     /// The context's Project, as in [`Inventory::project`].
     pub project: Option<PathBuf>,
     /// One row per (Agent, Entry, Project) whose State the Operation changes.
@@ -161,7 +196,7 @@ pub struct Preview {
 }
 
 /// An Entry's State in one Agent and context, before and after an Operation.
-#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Change {
     pub agent: String,
     pub agent_name: String,
@@ -171,12 +206,12 @@ pub struct Change {
     pub path: PathBuf,
     pub locator: String,
     pub project: Option<PathBuf>,
-    pub before: State,
+    pub before: StateAfter,
     pub after: StateAfter,
 }
 
-/// An Entry's State after an Operation, or that it no longer exists.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+/// An Entry's State before or after an Operation, or that it does not exist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum StateAfter {
     Effective,
@@ -295,7 +330,7 @@ pub struct Outcome {
 }
 
 /// What Verify found once every edit had landed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Verify {
     /// Every State after is the one the preview predicted.
@@ -305,13 +340,80 @@ pub enum Verify {
 }
 
 /// An Entry whose State after an Operation is not the one predicted.
-#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Difference {
     pub agent: String,
     pub home: String,
     pub locator: String,
     pub predicted: StateAfter,
     pub actual: StateAfter,
+}
+
+/// Where an Operation got to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationStatus {
+    /// Backed up and being written, or interrupted while it was.
+    InProgress,
+    Applied,
+    /// Failed before any write.
+    Failed,
+    /// Failed after some writes; the backup is needed to recover.
+    NeedsAttention,
+}
+
+/// One Operation as History lists it.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct OperationSummary {
+    /// Such as `20261001-143012-a3f`.
+    pub id: String,
+    /// When it started, in RFC 3339.
+    pub created_at: String,
+    pub action: Action,
+    /// What it does, as its preview titled it.
+    pub title: String,
+    pub status: OperationStatus,
+    /// The status as History shows it, such as "Applied", rendered by the core.
+    pub status_text: String,
+    /// The Operation this one undoes, when it is an Undo.
+    pub undo_of: Option<String>,
+    /// The Undo of this Operation, while that Undo is in effect.
+    pub undone_by: Option<String>,
+    /// The names of the Agents whose States it changed.
+    pub agents: Vec<String>,
+    /// The files it touched.
+    pub locations: Vec<PathBuf>,
+    pub undoable: bool,
+    /// Why it cannot be undone, as a sentence, when it cannot.
+    pub not_undoable: Option<String>,
+}
+
+/// One Operation as `history show` details it.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct OperationDetail {
+    pub summary: OperationSummary,
+    /// The context's Project, as in [`Preview::project`].
+    pub project: Option<PathBuf>,
+    /// The States its preview predicted.
+    pub changes: Vec<Change>,
+    pub locations: Vec<OperationLocation>,
+    /// The folder holding its backup and manifest.
+    pub backup: PathBuf,
+    /// Why it did not complete.
+    pub cause: Option<String>,
+    pub verify: Option<Verify>,
+    /// Where the States after differed from the prediction.
+    pub differences: Vec<Difference>,
+}
+
+/// One file an Operation touched.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct OperationLocation {
+    pub path: PathBuf,
+    /// Its copy as it was before the Operation, or `None` when the Operation
+    /// created the file.
+    pub backup: Option<PathBuf>,
+    pub edits: Vec<EditSummary>,
 }
 
 /// Every Item found, with the Agent homes they belong to.
@@ -420,7 +522,7 @@ impl From<DefinitionProvenance> for Provenance {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     Effective,
@@ -483,8 +585,12 @@ pub struct Error {
     pub message: String,
     /// What an ambiguous selector could mean, one locator per Item or Entry.
     pub candidates: Vec<String>,
-    /// The backup folder of an Operation that needs manual recovery.
+    /// The backup folder of an Operation that needs manual recovery, or of
+    /// one whose Undo was refused.
     pub backup: Option<PathBuf>,
+    /// For a refused Undo, a unified diff from each backed-up file to what
+    /// it holds now.
+    pub diff: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -510,6 +616,8 @@ pub enum ErrorCode {
     /// Some files were written and the Operation did not complete, so it
     /// needs manual recovery from its backup.
     NeedsRecovery,
+    /// What the Operation to undo touched changed since it ran.
+    UndoRefused,
 }
 
 impl Error {
@@ -519,6 +627,7 @@ impl Error {
             message,
             candidates: Vec::new(),
             backup: None,
+            diff: None,
         }
     }
 
@@ -604,6 +713,26 @@ impl Error {
             ErrorCode::WriteFailed,
             format!("{message}; nothing was written"),
         )
+    }
+
+    /// No Operation in History has the id `id`.
+    pub(crate) fn no_operation(id: &str) -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            format!("no Operation `{id}` in History"),
+        )
+    }
+
+    pub(crate) fn undo_refused(message: String, backup: PathBuf, diff: String) -> Self {
+        Self {
+            message: format!(
+                "{message}, so the Undo is refused; the files as they were before the Operation are in {}",
+                backup.display()
+            ),
+            backup: Some(backup),
+            diff: Some(diff),
+            ..Self::new(ErrorCode::UndoRefused, String::new())
+        }
     }
 
     pub(crate) fn needs_recovery(message: String, backup: PathBuf) -> Self {

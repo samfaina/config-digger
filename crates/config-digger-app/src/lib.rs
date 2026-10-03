@@ -8,6 +8,8 @@
 mod commands;
 mod logging;
 
+use config_digger_core::api::Core;
+use config_digger_core::ports::Ports;
 use specta_typescript::Typescript;
 use std::path::Path;
 
@@ -30,6 +32,13 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
     // Dropping the guard flushes the log, so it lives until the app exits.
     let _log = logging::init();
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "app started");
+    // History is pruned at startup, off the UI thread. It is best-effort: a
+    // held lock or a failure leaves it for the next start.
+    std::thread::spawn(|| {
+        if let Err(error) = Core::new(Ports::real()).and_then(|core| core.prune_history()) {
+            tracing::warn!(%error, "history not pruned");
+        }
+    });
 
     tauri::Builder::default()
         .invoke_handler(specta_builder().invoke_handler())
