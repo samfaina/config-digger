@@ -75,50 +75,14 @@ enum Command {
     ///
     /// Prints the preview, asks for confirmation, then backs up each touched
     /// file, writes, verifies and records the Operation in History.
-    Remove {
-        /// Each one an Item name with a single Entry, or the
-        /// `<path>#<key path>` locator of an Entry. Together they form one
-        /// Operation, applied entirely or not at all.
-        #[arg(required = true)]
-        selectors: Vec<String>,
-        /// Target every Entry of the one Item each selector names.
-        #[arg(long)]
-        all: bool,
-        /// Confirm the Operation without asking.
-        #[arg(long)]
-        yes: bool,
-        /// Acknowledge one class of warning without asking. Repeat for several.
-        #[arg(long, value_enum, value_name = "CLASS")]
-        ack: Vec<Ack>,
-        /// Print the plan and write nothing.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    Remove(EntryWrite),
     /// Disable Entries through each Agent's own machine-local switch, keeping them.
     ///
     /// Disable never writes a git-versioned file: it skips a switch in one for
     /// the Agent's next machine-local switch, and when there is none, it is not
     /// offered and exits 5 with the reason. `show` says which switch it would
     /// write. This release does not write Disable switches yet.
-    Disable {
-        /// Each one an Item name with a single Entry, or the
-        /// `<path>#<key path>` locator of an Entry. Together they form one
-        /// Operation, applied entirely or not at all.
-        #[arg(required = true)]
-        selectors: Vec<String>,
-        /// Target every Entry of the one Item each selector names.
-        #[arg(long)]
-        all: bool,
-        /// Confirm the Operation without asking.
-        #[arg(long)]
-        yes: bool,
-        /// Acknowledge one class of warning without asking. Repeat for several.
-        #[arg(long, value_enum, value_name = "CLASS")]
-        ack: Vec<Ack>,
-        /// Print the plan and write nothing.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    Disable(EntryWrite),
     /// List past Operations, newest first, and whether each can be undone.
     History {
         #[command(subcommand)]
@@ -148,6 +112,28 @@ enum Command {
         #[arg(value_enum)]
         shell: Shell,
     },
+}
+
+/// The Entries a write targets, and the flags every write takes.
+#[derive(clap::Args)]
+struct EntryWrite {
+    /// Each one an Item name with a single Entry, or the
+    /// `<path>#<key path>` locator of an Entry. Together they form one
+    /// Operation, applied entirely or not at all.
+    #[arg(required = true)]
+    selectors: Vec<String>,
+    /// Target every Entry of the one Item each selector names.
+    #[arg(long)]
+    all: bool,
+    /// Confirm the Operation without asking.
+    #[arg(long)]
+    yes: bool,
+    /// Acknowledge one class of warning without asking. Repeat for several.
+    #[arg(long, value_enum, value_name = "CLASS")]
+    ack: Vec<Ack>,
+    /// Print the plan and write nothing.
+    #[arg(long)]
+    dry_run: bool,
 }
 
 #[derive(Subcommand)]
@@ -439,42 +425,8 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
-        Command::Remove {
-            selectors,
-            all,
-            yes,
-            ack,
-            dry_run,
-        }
-        | Command::Disable {
-            selectors,
-            all,
-            yes,
-            ack,
-            dry_run,
-        } => {
-            let action = match &cli.command {
-                Command::Disable { .. } => Action::Disable,
-                _ => Action::Remove,
-            };
-            let scanned = scanned(cli, &core)?;
-            let targets = Targets {
-                selectors: selectors.clone(),
-                all: *all,
-            };
-            let plan = core.plan(&scanned.snapshot, &scanned.context, action, &targets)?;
-            confirm_and_execute(
-                cli,
-                &core,
-                plan,
-                Some(&project_line(&scanned.inventory, width)),
-                &WriteFlags {
-                    yes: *yes,
-                    ack: ack.clone(),
-                    dry_run: *dry_run,
-                },
-            )
-        }
+        Command::Remove(write) => write_entries(cli, &core, Action::Remove, write),
+        Command::Disable(write) => write_entries(cli, &core, Action::Disable, write),
         Command::History { command: None } => {
             let operations = core.history()?;
             if cli.json {
@@ -567,6 +519,34 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         }
         Command::Completions { .. } => unreachable!("completions run without a core"),
     }
+}
+
+/// Plans `action` on the Entries `write` targets in the context the flags
+/// ask for, then confirms and executes it.
+fn write_entries(
+    cli: &Cli,
+    core: &Core,
+    action: Action,
+    write: &EntryWrite,
+) -> Result<(), Failure> {
+    let scanned = scanned(cli, core)?;
+    let targets = Targets {
+        selectors: write.selectors.clone(),
+        all: write.all,
+    };
+    let plan = core.plan(&scanned.snapshot, &scanned.context, action, &targets)?;
+    let width = terminal::output_width(cli.wide);
+    confirm_and_execute(
+        cli,
+        core,
+        plan,
+        Some(&project_line(&scanned.inventory, width)),
+        &WriteFlags {
+            yes: write.yes,
+            ack: write.ack.clone(),
+            dry_run: write.dry_run,
+        },
+    )
 }
 
 fn completions(cli: &Cli, shell: Shell) -> Result<(), Failure> {
@@ -1037,17 +1017,8 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let location = location_cell(entry, location_width);
         let line = table_line(cells, &widths, location, Style::new());
         out.push_str(&line.fit(width).render());
-        let disable = match (&entry.disable.target, &entry.disable.unavailable) {
-            (Some(target), _) => Some(&target.sentence),
-            (None, Some(unavailable)) => Some(&unavailable.sentence),
-            (None, None) => None,
-        };
-        for sentence in entry
-            .reason
-            .iter()
-            .map(|reason| &reason.sentence)
-            .chain(disable)
-        {
+        let reason = entry.reason.as_ref().map(|reason| reason.sentence.as_str());
+        for sentence in reason.into_iter().chain([entry.disable.sentence()]) {
             for text in terminal::wrap(sentence, reason_width) {
                 let mut line = Line::default();
                 line.push(reason_indent.as_str(), Style::new())

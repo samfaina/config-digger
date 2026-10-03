@@ -407,7 +407,7 @@
           "$ref": "#/$defs/Competition"
         },
         "disable": {
-          "description": "How the Agent switches an Entry off, in its order of preference.\nDisable uses the first that covers the Entry and applies in the\ncontext, skipping any whose target is git-versioned.",
+          "description": "How the Agent Disables an Entry, in its order of preference.\nDisable uses the first that covers the Entry and applies in the\ncontext, skipping any whose target is git-versioned.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/DisableMechanism"
@@ -440,7 +440,7 @@
       ]
     },
     "DisableMechanism": {
-      "description": "How an Agent switches an Entry off. An Item kind lists its mechanisms in\nthe Agent's order of preference.",
+      "description": "How an Agent Disables an Entry. An Item kind lists its mechanisms in\nthe Agent's order of preference.",
       "oneOf": [
         {
           "description": "A list of names in a JSON file: the Agent skips every Entry of an Item\nwhose name is in it.",
@@ -451,7 +451,7 @@
               "$ref": "#/$defs/Target"
             },
             "locations": {
-              "description": "The ids of the locations whose Entries it switches off. Omitted, it\nswitches off Entries of every location of the Item kind.",
+              "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
               "type": "array",
               "items": {
                 "type": "string"

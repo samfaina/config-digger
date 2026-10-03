@@ -558,23 +558,24 @@ impl Compete for ExactName {
 
 // --- Disable mechanisms -----------------------------------------------------
 
-/// A switch the Agent itself reads to skip an Entry while keeping it.
-pub(crate) trait Mechanism {
+/// Disables Entries through a switch the Agent itself reads to skip an
+/// Entry while keeping it.
+pub(crate) trait Disables {
     /// Where the switch is written.
     fn target(&self) -> &Target;
 
-    /// The ids of the locations whose Entries it switches off, empty for
+    /// The ids of the locations whose Entries it Disables, empty for
     /// every location of the Item kind.
     fn locations(&self) -> &[String];
 
-    /// Whether it switches off the Entries of the location `id`.
+    /// Whether it Disables the Entries of the location `id`.
     fn covers(&self, id: &str) -> bool {
         let locations = self.locations();
         locations.is_empty() || locations.iter().any(|location| location == id)
     }
 }
 
-/// How an Agent switches an Entry off. An Item kind lists its mechanisms in
+/// How an Agent Disables an Entry. An Item kind lists its mechanisms in
 /// the Agent's order of preference.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
@@ -590,7 +591,7 @@ impl Validate for DisableMechanism {
     }
 }
 
-impl Mechanism for DisableMechanism {
+impl Disables for DisableMechanism {
     fn target(&self) -> &Target {
         match self {
             DisableMechanism::JsonNameList(block) => block.target(),
@@ -611,8 +612,8 @@ impl Mechanism for DisableMechanism {
 pub(crate) struct JsonNameList {
     /// The list.
     pub target: Target,
-    /// The ids of the locations whose Entries it switches off. Omitted, it
-    /// switches off Entries of every location of the Item kind.
+    /// The ids of the locations whose Entries it Disables. Omitted, it
+    /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
 }
@@ -623,7 +624,7 @@ impl Validate for JsonNameList {
     }
 }
 
-impl Mechanism for JsonNameList {
+impl Disables for JsonNameList {
     fn target(&self) -> &Target {
         &self.target
     }

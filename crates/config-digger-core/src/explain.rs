@@ -71,16 +71,10 @@ pub(crate) fn backup_note(folder: &Path) -> String {
 
 /// The warning of a plan that edits the git-versioned `files`.
 pub(crate) fn git_versioned(files: &[&Path]) -> String {
-    let names: Vec<String> = files
-        .iter()
-        .map(|file| file.display().to_string())
-        .collect();
-    let (what, verb) = match names.as_slice() {
-        [name] => (name.clone(), "is"),
-        _ => (names.join(", "), "are"),
-    };
+    let verb = if files.len() == 1 { "is" } else { "are" };
     format!(
-        "{what} {verb} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it."
+        "{} {verb} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it.",
+        path_list(files)
     )
 }
 
@@ -95,15 +89,22 @@ pub(crate) fn disable_target(name: &str, list: &str, path: &Path, per_project: b
 }
 
 /// Why Disable is not offered when every switch of `agent_name` that could
-/// take the Entry off is in one of the git-versioned `files`.
-pub(crate) fn disable_only_in_versioned(agent_name: &str, files: &[PathBuf]) -> String {
-    let names: Vec<String> = files
-        .iter()
-        .map(|file| file.display().to_string())
-        .collect();
+/// Disable the Entry is in one of the git-versioned `files`. `needs_project`
+/// says it also has switches per Project, and there is no Project.
+pub(crate) fn disable_only_in_versioned(
+    agent_name: &str,
+    files: &[PathBuf],
+    needs_project: bool,
+) -> String {
+    let files: Vec<&Path> = files.iter().map(PathBuf::as_path).collect();
+    let also = if needs_project {
+        " Its other switches apply per Project, and there is no Project in this context."
+    } else {
+        ""
+    };
     format!(
-        "Disable is not offered: {agent_name}'s switches for this Entry are only in git-versioned files ({}), where a change reaches every clone.",
-        names.join(", ")
+        "Disable is not offered: {agent_name}'s switches for this Entry are in git-versioned files ({}), where a change reaches every clone.{also}",
+        path_list(&files)
     )
 }
 
@@ -112,11 +113,20 @@ pub(crate) fn disable_only_in_versioned(agent_name: &str, files: &[PathBuf]) -> 
 pub(crate) fn no_disable_mechanism(agent_name: &str, needs_project: bool) -> String {
     if needs_project {
         format!(
-            "Disable is not offered: {agent_name} switches this Entry off per Project, and there is no Project in this context."
+            "Disable is not offered: {agent_name} Disables this Entry per Project, and there is no Project in this context."
         )
     } else {
         format!("Disable is not offered: {agent_name} has no switch for this Entry here.")
     }
+}
+
+/// Paths as a sentence lists them, separated by commas.
+fn path_list(paths: &[&Path]) -> String {
+    let names: Vec<String> = paths
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    names.join(", ")
 }
 
 /// What the preview of a Delete backup says in place of the backup note.

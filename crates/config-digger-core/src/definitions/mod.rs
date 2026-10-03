@@ -4,7 +4,7 @@
 pub(crate) mod blocks;
 
 use blocks::{
-    Anchor, Anchored, Competition, DisableMechanism, Format, Interpolation, Locator, Mechanism,
+    Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
     Provenance, Register, Registry, Validate,
 };
 use schemars::JsonSchema;
@@ -192,7 +192,7 @@ pub(crate) struct ItemRules {
     /// Location ids of this kind, highest precedence first.
     pub precedence: Vec<String>,
     pub competition: Competition,
-    /// How the Agent switches an Entry off, in its order of preference.
+    /// How the Agent Disables an Entry, in its order of preference.
     /// Disable uses the first that covers the Entry and applies in the
     /// context, skipping any whose target is git-versioned.
     #[serde(default)]

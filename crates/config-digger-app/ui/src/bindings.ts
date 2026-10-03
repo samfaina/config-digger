@@ -21,44 +21,35 @@ export type DiffUnavailable =
 /**  No Agent reads the file any more, so nothing says where its Secrets are. */
 "no_reader";
 
-/**
- *  What Disable would do to an Entry in its context: either the switch it
- *  would write, or why it is not offered.
- */
-export type DisableOption = {
-	/**  Where Disable writes, when it is offered. */
-	target: DisableTarget | null,
-	/**  Why Disable is not offered, when it is not. */
-	unavailable: DisableUnavailable | null,
-};
-
-/**
- *  The switch Disable would write: that of the Agent's first mechanism, in
- *  its order of preference, that covers the Entry in the context and whose
- *  file is machine-local, not git-versioned.
- */
-export type DisableTarget = {
-	/**  The file the switch is in. */
-	path: string,
-	/**  What Disable writes, as a sentence rendered by the core. */
-	sentence: string,
-};
-
 /**  Why Disable is not offered for an Entry. */
-export type DisableUnavailable = {
-	code: DisableUnavailableCode,
-	/**  The reason as a sentence, rendered by the core. */
-	sentence: string,
-};
-
-export type DisableUnavailableCode = 
+export type DisableNotOffered = 
 /**
- *  Every switch that could take the Entry off is in a git-versioned
- *  file, where a change reaches every clone.
+ *  Every switch of the Agent that could Disable the Entry is in a
+ *  git-versioned file, where a change reaches every clone.
  */
 "git_versioned" | 
-/**  The Agent has no switch for the Entry in this context. */
+/**  The Agent has no switch that Disables the Entry in this context. */
 "no_mechanism";
+
+/**
+ *  What Disable would do to an Entry in its context: write the Agent's own
+ *  switch for it, or nothing, with the reason.
+ */
+export type DisableOption = 
+/**
+ *  Disable writes the switch of the Agent's first mechanism, in its
+ *  order of preference, that covers the Entry in the context and whose
+ *  file is machine-local, not git-versioned.
+ */
+{ status: "offered"; 
+/**  The file the switch is in. */
+path: string; 
+/**  What Disable writes, as a sentence rendered by the core. */
+sentence: string } | 
+/**  Disable is not offered. */
+{ status: "not_offered"; code: DisableNotOffered; 
+/**  The reason as a sentence, rendered by the core. */
+sentence: string };
 
 export type Entry = {
 	path: string,

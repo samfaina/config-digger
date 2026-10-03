@@ -51,10 +51,7 @@ pub(crate) fn resolve(
     let project_key = project.as_ref().map(|(_, key)| key);
     let context_project = project.as_ref().map(|(path, key)| ContextProject {
         path,
-        exists: snapshot
-            .projects
-            .iter()
-            .any(|project| project.key == *key && project.exists),
+        exists: snapshot.project_exists(key),
     });
 
     // Entries compete when they share an Agent home, an Item kind and a
@@ -86,12 +83,6 @@ pub(crate) fn resolve(
             let effective = locator::render(&entries[0].path, &entries[0].key_path);
             let effective_scope = &definition.location(&entries[0].location).scope;
             let effective_rank = rank(entries[0]);
-            let roots = &snapshot
-                .homes
-                .iter()
-                .find(|found| found.agent_index == agent && found.home == home)
-                .expect("a scanned Entry comes from a found home")
-                .roots;
             let entries: Vec<api::Entry> = entries
                 .iter()
                 .enumerate()
@@ -121,11 +112,9 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable: disable::option(
                             definition,
-                            roots,
-                            location,
-                            &entry.name,
+                            snapshot,
+                            entry,
                             context_project.as_ref(),
-                            &snapshot.versioned,
                         ),
                     }
                 })

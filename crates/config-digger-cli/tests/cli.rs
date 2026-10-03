@@ -1585,7 +1585,8 @@ fn disable_where_every_switch_is_versioned_exits_5_with_the_reason() {
         "{}",
         show.stdout
     );
-    let unavailable = &json.document()["item"]["entries"][0]["disable"]["unavailable"];
+    let unavailable = &json.document()["item"]["entries"][0]["disable"];
+    assert_eq!(unavailable["status"], "not_offered");
     assert_eq!(unavailable["code"], "git_versioned");
     assert_eq!(disable.code, 5, "{}", disable.stdout);
     assert_eq!(disable.document()["error"]["code"], "blocked");

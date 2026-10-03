@@ -3,8 +3,8 @@
 //! predicts the States after them, and lists what must be acknowledged.
 
 use crate::api::{
-    self, Action, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets,
+    self, Action, Change, Context, DiffUnavailable, DisableOption, EditSummary, EffectiveChange,
+    Error, FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets,
     Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
@@ -116,7 +116,7 @@ pub(crate) fn plan(
             apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
         files.push(PlannedFile {
             readers: snapshot.readers_of(&path),
-            git_versioned: ports.git.is_versioned(&path),
+            git_versioned: snapshot.versioned.contains(&path),
             path,
             syntax,
             read,
@@ -156,17 +156,15 @@ pub(crate) fn plan(
 /// Why the Entry cannot be Disabled: Disable is not offered for it, or this
 /// release does not write Disable mechanisms yet.
 fn disable_blocked(entry: &api::Entry) -> Error {
-    match (&entry.disable.unavailable, &entry.disable.target) {
-        (Some(unavailable), _) => Error::blocked(format!(
-            "cannot Disable {}: {}",
-            entry.locator, unavailable.sentence
-        )),
-        (None, Some(target)) => Error::blocked(format!(
-            "cannot Disable {}: this release does not write Disable mechanisms yet. {}",
-            entry.locator, target.sentence
-        )),
-        (None, None) => Error::unexpected("a Disable option is either offered or not"),
-    }
+    let why = match &entry.disable {
+        DisableOption::Offered { .. } => "this release does not write Disable mechanisms yet. ",
+        DisableOption::NotOffered { .. } => "",
+    };
+    Error::blocked(format!(
+        "cannot Disable {}: {why}{}",
+        entry.locator,
+        entry.disable.sentence()
+    ))
 }
 
 /// Plans the Undo of the Operation `id` in History: the inverse of each of
@@ -201,7 +199,7 @@ pub(crate) fn plan_undo(
     })?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
-        file.git_versioned = ports.git.is_versioned(&file.path);
+        file.git_versioned = snapshot.versioned.contains(&file.path);
     }
 
     let before = resolve::resolve(definitions, &snapshot, &context);

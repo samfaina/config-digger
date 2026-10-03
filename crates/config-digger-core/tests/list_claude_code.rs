@@ -22,11 +22,9 @@ fn list(fs: FakeFileSystem) -> Value {
 /// is per Project.
 fn no_project_switch() -> Value {
     json!({
-        "target": null,
-        "unavailable": {
-            "code": "no_mechanism",
-            "sentence": "Disable is not offered: Claude Code switches this Entry off per Project, and there is no Project in this context."
-        }
+        "status": "not_offered",
+        "code": "no_mechanism",
+        "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and there is no Project in this context."
     })
 }
 

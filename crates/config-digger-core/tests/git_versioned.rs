@@ -3,7 +3,8 @@
 //! and the Disable mechanism a versioned target rules out.
 
 use config_digger_core::api::{
-    Action, Context, Core, Entry, ErrorCode, Inventory, ScanOptions, Targets, WarningClass,
+    Action, Context, Core, DisableOption, Entry, ErrorCode, Inventory, ScanOptions, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeGitIndex};
 use std::path::PathBuf;
@@ -207,18 +208,16 @@ fn a_remove_in_a_versioned_file_writes_nothing_until_acknowledged() {
 
 /// The file Disable would write for the Entry of `name`, or why it is not offered.
 fn disable(inventory: &Inventory, name: &str) -> Result<PathBuf, (String, String)> {
-    let option = entry(inventory, name).disable;
-    match (option.target, option.unavailable) {
-        (Some(target), None) => Ok(target.path),
-        (None, Some(unavailable)) => Err((
-            serde_json::to_value(unavailable.code)
+    match entry(inventory, name).disable {
+        DisableOption::Offered { path, .. } => Ok(path),
+        DisableOption::NotOffered { code, sentence } => Err((
+            serde_json::to_value(code)
                 .unwrap()
                 .as_str()
                 .unwrap()
                 .to_owned(),
-            unavailable.sentence,
+            sentence,
         )),
-        other => panic!("`{name}` is both offered and not, or neither: {other:?}"),
     }
 }
 
@@ -303,4 +302,41 @@ fn a_disable_that_is_not_offered_is_blocked_with_the_reason() {
 
     assert_eq!(error.code, ErrorCode::Blocked);
     assert!(error.message.contains(&sentence), "{}", error.message);
+}
+
+#[test]
+fn a_target_deleted_from_the_working_tree_but_in_the_index_is_still_versioned() {
+    // Writing it would put it back, which shows in the git diff.
+    let fs = fixture().with_folder(PathBuf::from(PROJECT).join(".claude"));
+    let core = core(&fs, &[mcp_json(), claude_json(), settings_local()]);
+
+    let inventory = inventory(&core, &in_project());
+
+    let (code, _) = disable(&inventory, "linear").unwrap_err();
+    assert_eq!(code, "git_versioned");
+}
+
+#[test]
+fn the_undo_of_a_remove_in_a_versioned_file_warns_too() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+    let plan = core
+        .plan(
+            &snapshot,
+            &in_project(),
+            Action::Remove,
+            &targets(&["linear"]),
+        )
+        .unwrap();
+    let outcome = core.execute(plan, &[WarningClass::GitVersioned]).unwrap();
+
+    let undo = core.plan_undo(&outcome.operation).unwrap();
+
+    let classes: Vec<WarningClass> = undo.warnings().iter().map(|w| w.class).collect();
+    assert_eq!(classes, [WarningClass::GitVersioned]);
 }

@@ -94,7 +94,7 @@ fn at_locator(selector: &str) -> impl Fn(&&Entry) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{DisableOption, Entry, ItemKind, Provenance, State};
+    use crate::api::{DisableNotOffered, DisableOption, Entry, ItemKind, Provenance, State};
     use std::path::PathBuf;
 
     fn item(home: &str, name: &str) -> Item {
@@ -117,9 +117,9 @@ mod tests {
                 reason: None,
                 config: serde_json::json!({}),
                 masked: Vec::new(),
-                disable: DisableOption {
-                    target: None,
-                    unavailable: None,
+                disable: DisableOption::NotOffered {
+                    code: DisableNotOffered::NoMechanism,
+                    sentence: String::new(),
                 },
             }],
         }

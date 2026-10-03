@@ -3,11 +3,11 @@
 //! never writes a git-versioned file, so a target that is one is skipped for
 //! the next mechanism in the definition's order of preference.
 
-use crate::api::{DisableOption, DisableTarget, DisableUnavailable, DisableUnavailableCode};
-use crate::definitions::blocks::{Anchored, Mechanism};
-use crate::definitions::{AgentDefinition, LocationDefinition};
+use crate::api::{DisableNotOffered, DisableOption};
+use crate::definitions::AgentDefinition;
+use crate::definitions::blocks::{Anchored, Disables};
 use crate::explain;
-use std::collections::{BTreeMap, BTreeSet};
+use crate::scan::{ScannedEntry, Snapshot};
 use std::path::{Path, PathBuf};
 
 /// The context's Project as Disable needs it.
@@ -17,18 +17,16 @@ pub(crate) struct ContextProject<'p> {
     pub exists: bool,
 }
 
-/// What Disable would do to the Entry `name` of `location` in an Agent home
-/// whose roots are `roots`. `versioned` holds the git-versioned files.
+/// What Disable would do to `entry` in the context of `project`.
 pub(crate) fn option(
     definition: &AgentDefinition,
-    roots: &BTreeMap<String, PathBuf>,
-    location: &LocationDefinition,
-    name: &str,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
     project: Option<&ContextProject>,
-    versioned: &BTreeSet<PathBuf>,
 ) -> DisableOption {
-    let agent = &definition.agent.name;
-    let mut skipped: Vec<PathBuf> = Vec::new();
+    let location = definition.location(&entry.location);
+    let roots = snapshot.roots(entry.agent_index, &entry.home);
+    let mut versioned: Vec<PathBuf> = Vec::new();
     let mut needs_project = false;
     for mechanism in &definition.rules(location.kind).disable {
         if !mechanism.covers(&location.id) {
@@ -48,32 +46,26 @@ pub(crate) fn option(
         let Some(path) = target.anchor.path(roots, folder) else {
             continue;
         };
-        if versioned.contains(&path) {
-            skipped.push(path);
+        if snapshot.versioned.contains(&path) {
+            versioned.push(path);
             continue;
         }
         let list = target.key_path.last().expect("validation requires a key");
-        return DisableOption {
-            target: Some(DisableTarget {
-                sentence: explain::disable_target(name, list, &path, target.per_project()),
-                path,
-            }),
-            unavailable: None,
+        return DisableOption::Offered {
+            sentence: explain::disable_target(&entry.name, list, &path, target.per_project()),
+            path,
         };
     }
-    let (code, sentence) = if skipped.is_empty() {
-        (
-            DisableUnavailableCode::NoMechanism,
-            explain::no_disable_mechanism(agent, needs_project),
-        )
+    let agent = &definition.agent.name;
+    if versioned.is_empty() {
+        DisableOption::NotOffered {
+            code: DisableNotOffered::NoMechanism,
+            sentence: explain::no_disable_mechanism(agent, needs_project),
+        }
     } else {
-        (
-            DisableUnavailableCode::GitVersioned,
-            explain::disable_only_in_versioned(agent, &skipped),
-        )
-    };
-    DisableOption {
-        target: None,
-        unavailable: Some(DisableUnavailable { code, sentence }),
+        DisableOption::NotOffered {
+            code: DisableNotOffered::GitVersioned,
+            sentence: explain::disable_only_in_versioned(agent, &versioned, needs_project),
+        }
     }
 }

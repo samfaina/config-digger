@@ -700,42 +700,46 @@ pub struct Entry {
     pub disable: DisableOption,
 }
 
-/// What Disable would do to an Entry in its context: either the switch it
-/// would write, or why it is not offered.
+/// What Disable would do to an Entry in its context: write the Agent's own
+/// switch for it, or nothing, with the reason.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
-pub struct DisableOption {
-    /// Where Disable writes, when it is offered.
-    pub target: Option<DisableTarget>,
-    /// Why Disable is not offered, when it is not.
-    pub unavailable: Option<DisableUnavailable>,
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum DisableOption {
+    /// Disable writes the switch of the Agent's first mechanism, in its
+    /// order of preference, that covers the Entry in the context and whose
+    /// file is machine-local, not git-versioned.
+    Offered {
+        /// The file the switch is in.
+        path: PathBuf,
+        /// What Disable writes, as a sentence rendered by the core.
+        sentence: String,
+    },
+    /// Disable is not offered.
+    NotOffered {
+        code: DisableNotOffered,
+        /// The reason as a sentence, rendered by the core.
+        sentence: String,
+    },
 }
 
-/// The switch Disable would write: that of the Agent's first mechanism, in
-/// its order of preference, that covers the Entry in the context and whose
-/// file is machine-local, not git-versioned.
-#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
-pub struct DisableTarget {
-    /// The file the switch is in.
-    pub path: PathBuf,
-    /// What Disable writes, as a sentence rendered by the core.
-    pub sentence: String,
+impl DisableOption {
+    /// What Disable writes, or why it is not offered.
+    pub fn sentence(&self) -> &str {
+        match self {
+            DisableOption::Offered { sentence, .. }
+            | DisableOption::NotOffered { sentence, .. } => sentence,
+        }
+    }
 }
 
 /// Why Disable is not offered for an Entry.
-#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
-pub struct DisableUnavailable {
-    pub code: DisableUnavailableCode,
-    /// The reason as a sentence, rendered by the core.
-    pub sentence: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
-pub enum DisableUnavailableCode {
-    /// Every switch that could take the Entry off is in a git-versioned
-    /// file, where a change reaches every clone.
+pub enum DisableNotOffered {
+    /// Every switch of the Agent that could Disable the Entry is in a
+    /// git-versioned file, where a change reaches every clone.
     GitVersioned,
-    /// The Agent has no switch for the Entry in this context.
+    /// The Agent has no switch that Disables the Entry in this context.
     NoMechanism,
 }
 

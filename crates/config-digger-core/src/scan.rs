@@ -3,7 +3,7 @@
 //! decides a State.
 
 use crate::api::ReadFailureKind;
-use crate::definitions::blocks::{Anchored, Locate, Mechanism, Parse, Register};
+use crate::definitions::blocks::{Anchored, Disables, Locate, Parse, Register};
 use crate::definitions::{AgentDefinition, LocationDefinition, PROJECT_KEY};
 use crate::ports::Ports;
 use crate::{mask, paths};
@@ -22,8 +22,10 @@ pub(crate) struct Snapshot {
     pub read_failures: Vec<ScannedReadFailure>,
     /// Every location read, existing or not, once per Agent home.
     pub readers: Vec<LocationReader>,
-    /// The files holding Entries, and the existing targets of Disable
-    /// mechanisms, that are in the index of their git repo.
+    /// The location files and Disable targets that are in the index of
+    /// their git repo. A location file is asked about when it exists, and a
+    /// target when its folder does, since a target in the index can be
+    /// missing from the working tree.
     pub versioned: BTreeSet<PathBuf>,
 }
 
@@ -57,6 +59,24 @@ impl Snapshot {
             .filter(|reader| reader.path == path)
             .cloned()
             .collect()
+    }
+
+    /// The roots of the Agent home `home` of the Agent at `agent_index`,
+    /// which the scan found.
+    pub fn roots(&self, agent_index: usize, home: &str) -> &BTreeMap<String, PathBuf> {
+        &self
+            .homes
+            .iter()
+            .find(|found| found.agent_index == agent_index && found.home == home)
+            .expect("Entries come from found homes")
+            .roots
+    }
+
+    /// Whether the Project with the key `key` was scanned and its folder exists.
+    pub fn project_exists(&self, key: &str) -> bool {
+        self.projects
+            .iter()
+            .any(|project| project.key == key && project.exists)
     }
 }
 
@@ -193,15 +213,16 @@ pub(crate) fn scan_as_if(
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
     let targets = disable_targets(definitions, &found, &projects);
-    let existing_targets = targets.iter().filter(|path| ports.fs.exists(path));
-    let versioned = versioned(
-        ports,
-        scanner
-            .entries
-            .iter()
-            .map(|entry| entry.path.as_path())
-            .chain(existing_targets.map(PathBuf::as_path)),
-    );
+    let locations = scanner
+        .readers
+        .iter()
+        .map(|reader| reader.path.as_path())
+        .filter(|path| ports.fs.exists(path));
+    let targets = targets
+        .iter()
+        .map(PathBuf::as_path)
+        .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
+    let versioned = versioned(ports, locations.chain(targets));
     Ok(Snapshot {
         read_at,
         homes: found
