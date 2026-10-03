@@ -5,7 +5,10 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	/**  Reads every Agent home and resolves its Items with no Project. */
+	/**
+	 *  Reads every Agent home and resolves its Items with no Project, leaving
+	 *  out the Agent homes and Projects the user hid.
+	 */
 	readInventory: () => typedError<Inventory, Error>(__TAURI_INVOKE("read_inventory")),
 };
 
@@ -201,7 +204,12 @@ export type ErrorCode = "unexpected" |
  */
 "rollback_incomplete" | 
 /**  What the Operation to undo touched changed since it ran. */
-"undo_refused";
+"undo_refused" | 
+/**
+ *  A path given to add is not an existing folder, or `.code-workspace`
+ *  file for a Project.
+ */
+"invalid_path";
 
 /**  An Operation that failed after it was recorded in History. */
 export type FailedOperation = {
@@ -237,14 +245,35 @@ export type FileDiff = {
 	changed_lines: number,
 };
 
-/**  An Agent home found on this machine. */
+/**  An Agent home found on this machine, or added by the user. */
 export type Home = {
 	agent: string,
 	agent_name: string,
+	/**
+	 *  The home's id: the definition's name for it, or its folder when the
+	 *  user added it.
+	 */
 	home: string,
+	/**  The folder its configuration is in. */
+	folder: string,
+	source: HomeSource,
+	/**  The user hid it, so it is listed only when hidden ones are asked for. */
+	hidden: boolean,
+	/**
+	 *  When none of the files the Agent reads there exists, the sentence
+	 *  saying so, rendered by the core.
+	 */
+	no_configuration: string | null,
 	/**  The Agent's Scopes, in display order. */
 	scopes: string[],
 };
+
+/**  Where an Agent home came from. */
+export type HomeSource = 
+/**  The location the Agent definition gives. */
+{ kind: "default" } | 
+/**  The user added it, and no definition location finds it. */
+{ kind: "added" };
 
 /**  Every Item found, with the Agent homes they belong to. */
 export type Inventory = {
@@ -309,11 +338,23 @@ export type Position = {
 
 /**  What an Agent can be started on. */
 export type Project = {
-	/**  The folder's real path, or its lexical normalisation when it is missing. */
+	/**
+	 *  The real path of the folder or `.code-workspace` file, or its lexical
+	 *  normalisation when it is missing.
+	 */
 	path: string,
 	missing: boolean,
-	/**  The Agents whose registries record it. Empty when it was only asked for. */
+	/**  It is a `.code-workspace` file rather than a folder. */
+	workspace_file: boolean,
+	/**
+	 *  The Agents whose registries record it. Empty when it was only added
+	 *  or asked for.
+	 */
 	registered_by: string[],
+	/**  The user added it. */
+	added: boolean,
+	/**  The user hid it, so it is listed only when hidden ones are asked for. */
+	hidden: boolean,
 };
 
 /**  How an Entry got where it is, which decides how it can be taken away. */

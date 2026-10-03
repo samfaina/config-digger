@@ -172,8 +172,8 @@ fn every_spelling_of_one_folder_is_one_project() {
     assert_eq!(
         inventory["projects"],
         json!([
-            { "path": r"E:\projects\gone", "missing": true, "registered_by": ["claude-code"] },
-            { "path": PETME, "missing": false, "registered_by": ["claude-code"] },
+            { "path": r"E:\projects\gone", "missing": true, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false },
+            { "path": PETME, "missing": false, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false },
         ])
     );
 }
@@ -332,7 +332,7 @@ fn registry_keys_that_are_not_absolute_paths_are_not_projects() {
 
     assert_eq!(
         inventory["projects"],
-        json!([{ "path": PETME, "missing": false, "registered_by": ["claude-code"] }])
+        json!([{ "path": PETME, "missing": false, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false }])
     );
     assert_eq!(inventory["items"], json!([]));
 }

@@ -1,6 +1,7 @@
 //! The `config-digger` console binary: parses input, calls the core `api` and
 //! renders its output as text or as one JSON document.
 
+mod homes_and_projects;
 mod terminal;
 
 use anstyle::{AnsiColor, Style};
@@ -53,6 +54,10 @@ struct Cli {
     /// Resolve with no Project: only Entries that apply everywhere take part.
     #[arg(long, global = true)]
     no_project: bool,
+
+    /// Also list the Agent homes and Projects you hid, and the Items of those homes.
+    #[arg(long, global = true)]
+    include_hidden: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -115,6 +120,18 @@ enum Command {
         /// Print the plan and write nothing.
         #[arg(long)]
         dry_run: bool,
+    },
+    /// List the loaded Agent definitions and the Agent homes found for each.
+    Agents,
+    /// List, add, hide and forget Agent homes.
+    Homes {
+        #[command(subcommand)]
+        command: homes_and_projects::HomesCommand,
+    },
+    /// List, add, hide and forget Projects.
+    Projects {
+        #[command(subcommand)]
+        command: homes_and_projects::ProjectsCommand,
     },
     /// Print a completion script for a shell.
     Completions {
@@ -282,6 +299,7 @@ impl From<api::Error> for Failure {
     fn from(error: api::Error) -> Self {
         let exit = match error.code {
             api::ErrorCode::Unexpected => Exit::Unexpected,
+            api::ErrorCode::InvalidPath => Exit::Usage,
             api::ErrorCode::NoMatch | api::ErrorCode::Ambiguous => Exit::Selector,
             api::ErrorCode::AckRequired => Exit::NotConfirmed,
             api::ErrorCode::Blocked => Exit::Blocked,
@@ -405,7 +423,12 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     let width = terminal::output_width(cli.wide);
     match &cli.command {
         Command::List { selector } => {
-            let mut inventory = scanned(cli, &core)?.inventory;
+            let inventory = scanned(cli, &core)?.inventory;
+            let mut inventory = if cli.include_hidden {
+                inventory
+            } else {
+                inventory.without_hidden()
+            };
             if let Some(selector) = selector {
                 let selected: Vec<api::Item> =
                     inventory.select(selector).into_iter().cloned().collect();
@@ -528,6 +551,9 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                 },
             )
         }
+        Command::Agents => homes_and_projects::agents(cli, &core),
+        Command::Homes { command } => homes_and_projects::homes(cli, &core, command),
+        Command::Projects { command } => homes_and_projects::projects(cli, &core, command),
         Command::Completions { .. } => unreachable!("completions run without a core"),
     }
 }

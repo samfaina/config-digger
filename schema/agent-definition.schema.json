@@ -162,7 +162,7 @@
       "description": "Where one root of an Agent home lives.",
       "oneOf": [
         {
-          "description": "A fixed path below the user's home folder, written `~/<relative path>`.",
+          "description": "The user's home folder, written `~`, or a fixed path below it, written\n`~/<relative path>`.",
           "type": "object",
           "properties": {
             "path": {
@@ -187,11 +187,15 @@
         "id": {
           "type": "string"
         },
+        "folder": {
+          "description": "The folder the home's roots are in.",
+          "$ref": "#/$defs/Locator"
+        },
         "roots": {
-          "description": "Named roots of the home. The home is found when any root exists.",
+          "description": "Named roots of the home, each a `/`-separated path relative to its\nfolder. The home is found when any root exists. An Agent home the\nuser adds is laid out like the definition's first home.",
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/Locator"
+            "type": "string"
           }
         },
         "process": {
@@ -209,6 +213,7 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "folder",
         "roots"
       ]
     },

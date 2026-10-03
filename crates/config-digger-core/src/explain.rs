@@ -616,3 +616,37 @@ pub(crate) fn read_failure_target(path: &Path, failure: &str) -> String {
         path.display()
     )
 }
+
+/// An Agent home where none of the files the Agent reads exists.
+pub(crate) fn no_configuration(agent_name: &str) -> String {
+    format!("No configuration found for {agent_name}")
+}
+
+/// Why `path` cannot be added: it is not an existing folder, or
+/// `.code-workspace` file when `workspace` is allowed.
+pub(crate) fn not_existing(path: &Path, workspace: bool) -> String {
+    let what = if workspace {
+        "an existing folder or .code-workspace file"
+    } else {
+        "an existing folder"
+    };
+    format!("{} is not {what}", path.display())
+}
+
+/// Why the Agent home `home` of `agent_name`, which the definition finds,
+/// cannot be forgotten, and how to hide it instead.
+pub(crate) fn forget_refused_home(home: &str, agent_name: &str) -> String {
+    format!(
+        "Agent home {home} of {agent_name} is found without you, so forgetting it would not take it off the list; hide it with `config-digger homes hide`"
+    )
+}
+
+/// Why the Project at `path`, which the registries of `agent_names`
+/// record, cannot be forgotten, and how to hide it instead.
+pub(crate) fn forget_refused_project(path: &Path, agent_names: &[&str]) -> String {
+    format!(
+        "Project {} is recorded by {}, so forgetting it would not take it off the list; hide it with `config-digger projects hide`",
+        path.display(),
+        agent_names.join(", ")
+    )
+}

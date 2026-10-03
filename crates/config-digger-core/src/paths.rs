@@ -76,6 +76,11 @@ pub(crate) fn canonical(fs: &dyn FileSystem, spelling: &Path) -> (PathBuf, bool)
     }
 }
 
+/// The key of the path a spelling names, as [`canonical`] finds it.
+pub(crate) fn canonical_key(fs: &dyn FileSystem, spelling: &Path) -> String {
+    key(&canonical(fs, spelling).0)
+}
+
 /// The key two normalised paths are compared by.
 pub(crate) fn key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()

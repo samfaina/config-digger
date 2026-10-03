@@ -6,7 +6,7 @@ use crate::definitions::blocks::Provenance as DefinitionProvenance;
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::Ports;
-use crate::{execute, history, plan, resolve, scan, select, skill};
+use crate::{execute, explain, history, paths, plan, resolve, scan, select, skill, user_list};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -17,6 +17,8 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub struct Core {
     ports: Ports,
     definitions: Vec<AgentDefinition>,
+    /// How many of `definitions`, at their start, are built in.
+    built_in: usize,
 }
 
 /// What [`Core::scan`] read. Resolve it as often as needed without reading the disk again.
@@ -46,7 +48,11 @@ impl Core {
     /// Loads the built-in Agent definitions.
     pub fn new(ports: Ports) -> Result<Self, Error> {
         let definitions = definitions::built_in().map_err(Error::unexpected)?;
-        Ok(Self { ports, definitions })
+        Ok(Self {
+            ports,
+            built_in: definitions.len(),
+            definitions,
+        })
     }
 
     /// Loads the built-in Agent definitions plus the extra ones in `files`,
@@ -55,10 +61,15 @@ impl Core {
     /// rejected whole.
     pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
         let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
+        let built_in = definitions.len();
         for (file, text) in files {
             definitions.push(definitions::parse(file, text).map_err(Error::unexpected)?);
         }
-        Ok(Self { ports, definitions })
+        Ok(Self {
+            ports,
+            definitions,
+            built_in,
+        })
     }
 
     /// Reads every location of every found Agent home and Project.
@@ -163,6 +174,182 @@ impl Core {
     /// any other. It is refused for any other Operation.
     pub fn dismiss(&self, id: &str) -> Result<OperationSummary, Error> {
         history::dismiss(&self.ports, id)
+    }
+
+    /// Every loaded Agent definition, in load order, with the Agent homes
+    /// `inventory` lists for it.
+    pub fn agents(&self, inventory: &Inventory) -> Vec<Agent> {
+        self.definitions
+            .iter()
+            .enumerate()
+            .map(|(index, definition)| Agent {
+                id: definition.agent.id.clone(),
+                name: definition.agent.name.clone(),
+                built_in: index < self.built_in,
+                homes: inventory
+                    .homes
+                    .iter()
+                    .filter(|home| home.agent == definition.agent.id)
+                    .cloned()
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Adds the existing folder `folder` as an Agent home of the Agent
+    /// `agent`, laid out like the Agent's first home, with no other check:
+    /// a home with none of the files the Agent reads is listed as such.
+    /// Returns the home as it is now listed.
+    pub fn add_home(&self, folder: &Path, agent: &str) -> Result<Home, Error> {
+        let (agent, folder) = user_list::add_home(&self.definitions, &self.ports, folder, agent)?;
+        self.find_home(
+            &self.listing()?,
+            &folder.display().to_string(),
+            Some(&agent),
+        )
+        .cloned()
+    }
+
+    /// Hides the Agent home `home`, discovered or added: it is listed
+    /// only when hidden ones are asked for. `home` is its id or its folder,
+    /// and `agent` narrows it down to one Agent's homes.
+    pub fn hide_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
+        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        user_list::hide_home(&self.ports, &found.agent, &found.home)?;
+        Ok(Home {
+            hidden: true,
+            ..found
+        })
+    }
+
+    /// Lists the hidden Agent home `home` again, as [`Core::hide_home`] names it.
+    pub fn unhide_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
+        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        if !found.hidden {
+            return Err(Error::not_hidden(home));
+        }
+        user_list::unhide_home(&self.ports, &found.agent, &found.home)?;
+        Ok(Home {
+            hidden: false,
+            ..found
+        })
+    }
+
+    /// Adds the existing folder or `.code-workspace` file `path` as a
+    /// Project. Returns the Project as it is now listed.
+    pub fn add_project(&self, path: &Path) -> Result<Project, Error> {
+        let path = user_list::add_project(&self.ports, path)?;
+        self.find_project(&self.listing()?, &path).cloned()
+    }
+
+    /// Hides the Project `path`, discovered or added, in any spelling: it
+    /// is listed only when hidden ones are asked for, and still evaluated
+    /// when picked as the context.
+    pub fn hide_project(&self, path: &Path) -> Result<Project, Error> {
+        let found = self.find_project(&self.listing()?, path)?.clone();
+        user_list::hide_project(&self.ports, &found.path)?;
+        Ok(Project {
+            hidden: true,
+            ..found
+        })
+    }
+
+    /// Lists the hidden Project `path` again.
+    pub fn unhide_project(&self, path: &Path) -> Result<Project, Error> {
+        let found = self.find_project(&self.listing()?, path)?.clone();
+        if !found.hidden {
+            return Err(Error::not_hidden(&path.display().to_string()));
+        }
+        user_list::unhide_project(&self.ports, &found.path)?;
+        Ok(Project {
+            hidden: false,
+            ..found
+        })
+    }
+
+    /// Forgets the Agent home `home`, as [`Core::hide_home`] names it, that
+    /// the user added. It is refused for a home found without the user,
+    /// which only hiding takes off the list.
+    pub fn forget_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
+        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        if found.source != HomeSource::Added {
+            return Err(Error::blocked(explain::forget_refused_home(
+                &found.home,
+                &found.agent_name,
+            )));
+        }
+        user_list::forget_home(&self.ports, &found.agent, &found.home, &found.folder)?;
+        Ok(found)
+    }
+
+    /// Forgets the Project `path` that the user added. It is refused for a
+    /// Project an Agent's registry records, which only hiding takes off the
+    /// list.
+    pub fn forget_project(&self, path: &Path) -> Result<Project, Error> {
+        let found = self.find_project(&self.listing()?, path)?.clone();
+        if !found.registered_by.is_empty() {
+            let names: Vec<&str> = found
+                .registered_by
+                .iter()
+                .filter_map(|id| self.definitions.iter().find(|d| d.agent.id == *id))
+                .map(|definition| definition.agent.name.as_str())
+                .collect();
+            return Err(Error::blocked(explain::forget_refused_project(
+                &found.path,
+                &names,
+            )));
+        }
+        if !found.added {
+            return Err(Error::no_project(path));
+        }
+        user_list::forget_project(&self.ports, &found.path)?;
+        Ok(found)
+    }
+
+    /// Every Agent home and Project, hidden ones included, with no Project
+    /// as context.
+    fn listing(&self) -> Result<Inventory, Error> {
+        Ok(self.resolve(&self.scan(&ScanOptions::default())?, &Context::default()))
+    }
+
+    /// The one home of `inventory` whose id or folder is `selector`, among
+    /// the homes of `agent` when it is given.
+    fn find_home<'i>(
+        &self,
+        inventory: &'i Inventory,
+        selector: &str,
+        agent: Option<&str>,
+    ) -> Result<&'i Home, Error> {
+        let fs = self.ports.fs.as_ref();
+        let folder = paths::canonical_key(fs, Path::new(selector));
+        let found: Vec<&Home> = inventory
+            .homes
+            .iter()
+            .filter(|home| agent.is_none_or(|agent| home.agent.eq_ignore_ascii_case(agent)))
+            .filter(|home| {
+                home.home.eq_ignore_ascii_case(selector)
+                    || paths::canonical_key(fs, &home.folder) == folder
+            })
+            .collect();
+        match found.as_slice() {
+            [home] => Ok(home),
+            [] => Err(Error::no_home(selector)),
+            homes => Err(Error::ambiguous_homes(selector, homes)),
+        }
+    }
+
+    /// The Project of `inventory` that `path` names, in any spelling.
+    fn find_project<'i>(
+        &self,
+        inventory: &'i Inventory,
+        path: &Path,
+    ) -> Result<&'i Project, Error> {
+        let key = paths::canonical_key(self.ports.fs.as_ref(), path);
+        inventory
+            .projects
+            .iter()
+            .find(|project| paths::key(&project.path) == key)
+            .ok_or_else(|| Error::no_project(path))
     }
 
     /// What the skill folder at `folder` holds, as a skill Entry shows it:
@@ -701,26 +888,91 @@ impl Inventory {
             items => Err(Error::ambiguous(selector, items)),
         }
     }
+
+    /// The inventory as it is listed by default: without the Agent homes
+    /// the user hid, their Items, Read failures and flags, nor the Projects
+    /// the user hid. The context stays as it was resolved, its Entries
+    /// included, even when its Project is hidden, since it was picked.
+    pub fn without_hidden(mut self) -> Inventory {
+        let hidden: Vec<(String, String)> = self
+            .homes
+            .iter()
+            .filter(|home| home.hidden)
+            .map(|home| (home.agent.clone(), home.home.clone()))
+            .collect();
+        let is_hidden = |agent: &str, home: &str| {
+            hidden
+                .iter()
+                .any(|(hidden_agent, hidden_home)| hidden_agent == agent && hidden_home == home)
+        };
+        self.homes.retain(|home| !home.hidden);
+        self.items
+            .retain(|item| !is_hidden(&item.agent, &item.home));
+        self.read_failures
+            .retain(|failure| !is_hidden(&failure.agent, &failure.home));
+        self.agent_flags
+            .retain(|flag| !is_hidden(&flag.agent, &flag.home));
+        self.projects.retain(|project| !project.hidden);
+        self
+    }
 }
 
 /// What an Agent can be started on.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Project {
-    /// The folder's real path, or its lexical normalisation when it is missing.
+    /// The real path of the folder or `.code-workspace` file, or its lexical
+    /// normalisation when it is missing.
     pub path: PathBuf,
     pub missing: bool,
-    /// The Agents whose registries record it. Empty when it was only asked for.
+    /// It is a `.code-workspace` file rather than a folder.
+    pub workspace_file: bool,
+    /// The Agents whose registries record it. Empty when it was only added
+    /// or asked for.
     pub registered_by: Vec<String>,
+    /// The user added it.
+    pub added: bool,
+    /// The user hid it, so it is listed only when hidden ones are asked for.
+    pub hidden: bool,
 }
 
-/// An Agent home found on this machine.
+/// A loaded Agent definition and the Agent homes listed for it.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Agent {
+    pub id: String,
+    pub name: String,
+    /// The definition ships with config-digger, rather than being loaded from a file.
+    pub built_in: bool,
+    pub homes: Vec<Home>,
+}
+
+/// An Agent home found on this machine, or added by the user.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Home {
     pub agent: String,
     pub agent_name: String,
+    /// The home's id: the definition's name for it, or its folder when the
+    /// user added it.
     pub home: String,
+    /// The folder its configuration is in.
+    pub folder: PathBuf,
+    pub source: HomeSource,
+    /// The user hid it, so it is listed only when hidden ones are asked for.
+    pub hidden: bool,
+    /// When none of the files the Agent reads there exists, the sentence
+    /// saying so, rendered by the core.
+    pub no_configuration: Option<String>,
     /// The Agent's Scopes, in display order.
     pub scopes: Vec<String>,
+}
+
+/// Where an Agent home came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum HomeSource {
+    /// The location the Agent definition gives.
+    Default,
+    /// The user added it, and no definition location finds it.
+    Added,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
@@ -1160,6 +1412,9 @@ pub enum ErrorCode {
     RollbackIncomplete,
     /// What the Operation to undo touched changed since it ran.
     UndoRefused,
+    /// A path given to add is not an existing folder, or `.code-workspace`
+    /// file for a Project.
+    InvalidPath,
 }
 
 impl ErrorCode {
@@ -1180,6 +1435,7 @@ impl ErrorCode {
             ErrorCode::ReadFailureIntroduced => "read_failure_introduced",
             ErrorCode::RollbackIncomplete => "rollback_incomplete",
             ErrorCode::UndoRefused => "undo_refused",
+            ErrorCode::InvalidPath => "invalid_path",
         }
     }
 }
@@ -1199,6 +1455,62 @@ impl Error {
     /// A failure the caller cannot act on, such as a bug or a lost worker thread.
     pub fn unexpected(error: impl std::fmt::Display) -> Self {
         Self::new(ErrorCode::Unexpected, error.to_string())
+    }
+
+    /// No loaded Agent definition has the id `agent`.
+    pub(crate) fn no_agent(agent: &str) -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            format!("no Agent `{agent}`; `config-digger agents` lists them"),
+        )
+    }
+
+    /// A path given to add is not what it must be, as `message` says.
+    pub(crate) fn invalid_path(message: String) -> Self {
+        Self::new(ErrorCode::InvalidPath, message)
+    }
+
+    /// No Agent home has the id or folder `selector`.
+    pub(crate) fn no_home(selector: &str) -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            format!(
+                "no Agent home `{selector}`; `config-digger homes list --include-hidden` lists them"
+            ),
+        )
+    }
+
+    /// Each candidate is a home's Agent and id.
+    pub(crate) fn ambiguous_homes(selector: &str, homes: &[&Home]) -> Self {
+        Self {
+            candidates: homes
+                .iter()
+                .map(|home| format!("{} --agent {}", home.home, home.agent))
+                .collect(),
+            ..Self::new(
+                ErrorCode::Ambiguous,
+                format!(
+                    "`{selector}` matches {} Agent homes; name the Agent with --agent",
+                    homes.len()
+                ),
+            )
+        }
+    }
+
+    /// No Project is at `path`.
+    pub(crate) fn no_project(path: &Path) -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            format!(
+                "no Project {}; `config-digger projects list --include-hidden` lists them",
+                path.display()
+            ),
+        )
+    }
+
+    /// `what`, an Agent home or a Project, is not hidden.
+    pub(crate) fn not_hidden(what: &str) -> Self {
+        Self::new(ErrorCode::NoMatch, format!("{what} is not hidden"))
     }
 
     /// A selector that matched no Item in the context.

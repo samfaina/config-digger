@@ -5,7 +5,8 @@ use config_digger_core::api::{self, Context, Core, Inventory, ScanOptions};
 use config_digger_core::ports::Ports;
 use std::time::Instant;
 
-/// Reads every Agent home and resolves its Items with no Project.
+/// Reads every Agent home and resolves its Items with no Project, leaving
+/// out the Agent homes and Projects the user hid.
 #[tauri::command]
 #[specta::specta]
 pub async fn read_inventory() -> Result<Inventory, api::Error> {
@@ -13,7 +14,9 @@ pub async fn read_inventory() -> Result<Inventory, api::Error> {
     let result = tauri::async_runtime::spawn_blocking(|| {
         let core = Core::new(Ports::real())?;
         let snapshot = core.scan(&ScanOptions::default())?;
-        Ok(core.resolve(&snapshot, &Context::default()))
+        Ok(core
+            .resolve(&snapshot, &Context::default())
+            .without_hidden())
     })
     .await
     .unwrap_or_else(|error| Err(api::Error::unexpected(error)));

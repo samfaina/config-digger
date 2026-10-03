@@ -38,6 +38,10 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "agent": "claude-code",
             "agent_name": "Claude Code",
             "home": "default",
+            "folder": HOME,
+            "source": {"kind": "default"},
+            "hidden": false,
+            "no_configuration": null,
             "scopes": ["local", "project", "user"]
         }])
     );
