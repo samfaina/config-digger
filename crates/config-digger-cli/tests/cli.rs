@@ -429,7 +429,8 @@ fn list_json_prints_one_document_with_schema_version() {
             "agent": "claude-code",
             "agent_name": "Claude Code",
             "home": "default",
-            "folder": real_path(&harness.home).display().to_string(),
+            // As `%USERPROFILE%` spells it, like the locators of its roots.
+            "folder": harness.home.display().to_string(),
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
