@@ -47,6 +47,7 @@ impl Snapshot {
 #[derive(Clone, PartialEq)]
 pub(crate) struct LocationReader {
     pub agent_index: usize,
+    pub home: String,
     pub location: String,
     pub path: PathBuf,
 }
@@ -348,6 +349,7 @@ impl Scanner<'_> {
     ) {
         let reader = LocationReader {
             agent_index: home.agent_index,
+            home: home.home.clone(),
             location: location.id.clone(),
             path: path.clone(),
         };

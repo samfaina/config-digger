@@ -55,6 +55,9 @@ pub struct RunningProcess {
     pub image: String,
     /// The executable's full path, when the OS lets us read it.
     pub path: Option<PathBuf>,
+    /// The command line, its arguments joined by spaces; empty when the OS
+    /// hides it.
+    pub cmdline: String,
 }
 
 /// The processes running on this machine.

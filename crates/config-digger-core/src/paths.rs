@@ -1,7 +1,7 @@
 //! Windows path normalisation. A folder that exists is compared by its real
 //! path, one that does not by lexical normalisation, always case-insensitively.
 
-use crate::ports::FileSystem;
+use crate::ports::{Environment, FileSystem};
 use std::path::{Path, PathBuf};
 
 /// The lexical normalisation of a path spelling: `/` becomes `\`, a leading
@@ -84,6 +84,92 @@ pub(crate) fn key(path: &Path) -> String {
 /// The key of a spelling's lexical normalisation, for comparing without the disk.
 pub(crate) fn lexical_key(spelling: &Path) -> String {
     key(&lexical(spelling))
+}
+
+/// Checks a path glob of an Agent definition: it starts with `~/`, `%NAME%`
+/// or a drive, and each `{` closes before the next one opens.
+pub(crate) fn validate_glob(glob: &str) -> Result<(), String> {
+    if !(glob.starts_with("~/") || is_drive(glob) || variable_prefix(glob).is_some()) {
+        return Err(format!(
+            "path glob `{glob}` must start with `~/`, `%NAME%` or a drive"
+        ));
+    }
+    let mut open = false;
+    for c in glob.chars() {
+        match c {
+            '{' if !open => open = true,
+            '}' if open => open = false,
+            '{' | '}' => return Err(format!("path glob `{glob}` has unbalanced braces")),
+            _ => {}
+        }
+    }
+    if open {
+        return Err(format!("path glob `{glob}` has unbalanced braces"));
+    }
+    Ok(())
+}
+
+/// Whether `path` matches a glob that [`validate_glob`] accepts, its `~/`
+/// or `%NAME%` start expanded from `env`, compared case-insensitively. `*`
+/// and `?` stay within one folder name, and `{a,b}` is either.
+pub(crate) fn glob_matches(glob: &str, path: &Path, env: &dyn Environment) -> bool {
+    let expanded = if let Some(rest) = glob.strip_prefix("~/") {
+        let Some(home) = env.home_dir() else {
+            return false;
+        };
+        format!("{}\\{rest}", home.display())
+    } else if let Some((name, rest)) = variable_prefix(glob) {
+        let Some(value) = env.var(name) else {
+            return false;
+        };
+        format!("{value}{rest}")
+    } else {
+        glob.to_owned()
+    };
+    let pattern = key(&lexical(Path::new(&expanded)));
+    let path: Vec<char> = key(&lexical(path)).chars().collect();
+    alternatives(&pattern).iter().any(|pattern| {
+        let pattern: Vec<char> = pattern.chars().collect();
+        wildcard(&pattern, &path)
+    })
+}
+
+/// The variable name and the rest of a glob that starts with `%NAME%`.
+fn variable_prefix(glob: &str) -> Option<(&str, &str)> {
+    let (name, rest) = glob.strip_prefix('%')?.split_once('%')?;
+    let is_name = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '(' | ')'));
+    is_name.then_some((name, rest))
+}
+
+/// Every pattern a glob's `{a,b}` groups stand for.
+fn alternatives(pattern: &str) -> Vec<String> {
+    let Some(open) = pattern.find('{') else {
+        return vec![pattern.to_owned()];
+    };
+    let Some(close) = pattern[open..].find('}').map(|close| open + close) else {
+        return vec![pattern.to_owned()];
+    };
+    let (head, tail) = (&pattern[..open], &pattern[close + 1..]);
+    pattern[open + 1..close]
+        .split(',')
+        .flat_map(|choice| alternatives(&format!("{head}{choice}{tail}")))
+        .collect()
+}
+
+/// Whether `text` matches `pattern`, where `*` is any run and `?` any one
+/// character, neither of them a `\`.
+fn wildcard(pattern: &[char], text: &[char]) -> bool {
+    match pattern.split_first() {
+        None => text.is_empty(),
+        Some(('*', rest)) => (0..=text.len())
+            .take_while(|&skipped| skipped == 0 || text[skipped - 1] != '\\')
+            .any(|skipped| wildcard(rest, &text[skipped..])),
+        Some(('?', rest)) => text.first().is_some_and(|&c| c != '\\') && wildcard(rest, &text[1..]),
+        Some((&c, rest)) => text.first() == Some(&c) && wildcard(rest, &text[1..]),
+    }
 }
 
 #[cfg(test)]

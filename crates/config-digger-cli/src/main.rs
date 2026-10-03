@@ -649,8 +649,21 @@ fn confirm_and_execute(
     if !cli.json {
         anstream::print!(
             "{}",
-            render_preview(project_line, &preview, &warnings, width)
+            render_preview(project_line, &preview, plan.blocks(), &warnings, width)
         );
+    }
+    // No acknowledgement lifts a block, so nothing is asked.
+    if !plan.blocks().is_empty() {
+        let sentences: Vec<&str> = plan
+            .blocks()
+            .iter()
+            .map(|block| block.sentence.as_str())
+            .collect();
+        return Err(Failure::new(
+            "blocked",
+            format!("nothing was written: {}", sentences.join(" ")),
+            Exit::Blocked,
+        ));
     }
     if flags.dry_run {
         if cli.json {
@@ -1086,11 +1099,12 @@ fn elide_locator(locator: &str, path: &Path, width: Option<usize>) -> String {
 
 /// A write's preview: the State before and after of each (Agent, Entry,
 /// Project) it changes, which Entry is Effective afterwards, the files diff,
-/// the warnings and where the backup goes. A Delete backup lists the copies
-/// it deletes instead.
+/// what blocks it, the warnings and where the backup goes. A Delete backup
+/// lists the copies it deletes instead.
 fn render_preview(
     project_line: Option<&str>,
     preview: &api::Preview,
+    blocks: &[api::Block],
     warnings: &[api::Warning],
     width: Option<usize>,
 ) -> String {
@@ -1135,6 +1149,17 @@ fn render_preview(
         }
     }
 
+    if !blocks.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Blocked", BOLD, width));
+        for block in blocks {
+            let text = format!("{INDENT}{}", block.sentence);
+            for line in terminal::wrap(&text, width) {
+                out.push_str(&plain_line(&line, width));
+            }
+        }
+    }
+
     if !warnings.is_empty() {
         out.push('\n');
         out.push_str(&styled_line("Warnings", BOLD, width));
@@ -1159,6 +1184,11 @@ fn render_outcome(action: Action, outcome: &api::Outcome, width: Option<usize>) 
     let mut out = String::from("\n");
     for line in terminal::wrap(&outcome.sentence, width) {
         out.push_str(&plain_line(&line, width));
+    }
+    for hint in &outcome.hints {
+        for line in terminal::wrap(hint, width) {
+            out.push_str(&plain_line(&line, width));
+        }
     }
     for difference in &outcome.differences {
         out.push_str(&plain_line(

@@ -380,21 +380,34 @@ impl FileSystem for FakeFileSystem {
     }
 }
 
+/// Processes held in memory. Clones share them, so a test can start a
+/// process after the core was built.
 #[derive(Debug, Clone, Default)]
 pub struct FakeProcesses {
-    running: Vec<RunningProcess>,
+    running: Arc<Mutex<Vec<RunningProcess>>>,
 }
 
 impl FakeProcesses {
-    pub fn with_process(mut self, process: RunningProcess) -> Self {
-        self.running.push(process);
+    pub fn with_process(self, process: RunningProcess) -> Self {
+        self.start(process);
         self
+    }
+
+    /// The process runs from now on.
+    pub fn start(&self, process: RunningProcess) {
+        self.processes().push(process);
+    }
+
+    fn processes(&self) -> MutexGuard<'_, Vec<RunningProcess>> {
+        self.running
+            .lock()
+            .expect("no test panics while holding the fake processes")
     }
 }
 
 impl Processes for FakeProcesses {
     fn running(&self) -> Vec<RunningProcess> {
-        self.running.clone()
+        self.processes().clone()
     }
 }
 

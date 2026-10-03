@@ -3,9 +3,9 @@
 //! predicts the States after them, and lists what must be acknowledged.
 
 use crate::api::{
-    self, Action, Change, Context, DiffUnavailable, DisableOption, EditSummary, EffectiveChange,
-    Error, FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets,
-    Warning, WarningClass,
+    self, Action, Block, Change, Context, DiffUnavailable, DisableOption, EditSummary,
+    EffectiveChange, Error, FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions,
+    StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -13,7 +13,7 @@ use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot};
-use crate::{explain, history, resolve, scan, select};
+use crate::{explain, history, resolve, running, scan, select};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -28,6 +28,8 @@ pub(crate) struct Planned {
     pub files: Vec<PlannedFile>,
     pub preview: Preview,
     pub warnings: Vec<Warning>,
+    /// Why it cannot execute, whatever is acknowledged.
+    pub blocks: Vec<Block>,
     /// The Read failures before the Operation: Verify fails it when a
     /// written file no longer parses for a reader that could read it.
     pub read_failures: Vec<ReadFailure>,
@@ -141,12 +143,14 @@ pub(crate) fn plan(
         &after,
         &files,
     )?;
+    let running = running::check(definitions, ports, &files);
     Ok(Planned {
         action,
         entries: targeted.len(),
         context: context.clone(),
         scan_options: scan_options.clone(),
-        warnings: warnings(&files),
+        warnings: warnings(&files, running.warning),
+        blocks: running.blocks,
         files,
         preview,
         read_failures: before.read_failures,
@@ -219,12 +223,14 @@ pub(crate) fn plan_undo(
         &after,
         &files,
     )?;
+    let running = running::check(definitions, ports, &files);
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
         context,
         scan_options,
-        warnings: warnings(&files),
+        warnings: warnings(&files, running.warning),
+        blocks: running.blocks,
         files,
         preview,
         read_failures: before.read_failures,
@@ -273,6 +279,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         files: Vec::new(),
         preview,
         warnings,
+        blocks: Vec::new(),
         read_failures: Vec::new(),
     })
 }
@@ -598,20 +605,19 @@ fn preview(
 }
 
 /// What a plan that edits `files` must have acknowledged: one warning for
-/// every git-versioned file among them.
-fn warnings(files: &[PlannedFile]) -> Vec<Warning> {
+/// the git-versioned files among them, and `running`, the warning for the
+/// running Agents that read them.
+fn warnings(files: &[PlannedFile], running: Option<Warning>) -> Vec<Warning> {
     let versioned: Vec<&Path> = files
         .iter()
         .filter(|file| file.git_versioned)
         .map(|file| file.path.as_path())
         .collect();
-    if versioned.is_empty() {
-        return Vec::new();
-    }
-    vec![Warning {
+    let versioned = (!versioned.is_empty()).then(|| Warning {
         class: WarningClass::GitVersioned,
         sentence: explain::git_versioned(&versioned),
-    }]
+    });
+    versioned.into_iter().chain(running).collect()
 }
 
 /// The syntax an Entry's location is edited in.

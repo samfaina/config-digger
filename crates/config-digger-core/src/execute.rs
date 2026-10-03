@@ -6,7 +6,7 @@
 //! History.
 
 use crate::api::{
-    Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome, RollbackLocation,
+    Block, Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome, RollbackLocation,
     RollbackOutcome, Verify, WarningClass,
 };
 use crate::definitions::AgentDefinition;
@@ -15,7 +15,7 @@ use crate::history::{self, EditRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::mask::{self, Side};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::Ports;
-use crate::{explain, resolve, scan};
+use crate::{explain, resolve, running, scan};
 use serde_json::Value;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -36,6 +36,10 @@ pub(crate) fn execute(
     planned: Planned,
     acknowledged: &[WarningClass],
 ) -> Result<Outcome, Error> {
+    // No acknowledgement lifts a block.
+    if !planned.blocks.is_empty() {
+        return Err(blocked(&planned.blocks));
+    }
     let mut missing: Vec<WarningClass> = Vec::new();
     for warning in &planned.warnings {
         if !acknowledged.contains(&warning.class) && !missing.contains(&warning.class) {
@@ -61,6 +65,11 @@ pub(crate) fn execute(
         .map_err(|error| Error::unexpected(format!("cannot create {}: {error}", data.display())))?;
     // Held until this function returns, after Verify and the History write.
     let _lock = history::lock(ports, &data)?;
+    // An Agent may have started since the plan: check again before writing.
+    let running = running::check(definitions, ports, &planned.files);
+    if !running.blocks.is_empty() {
+        return Err(blocked(&running.blocks));
+    }
     if let Some(undone) = &planned.preview.undo_of {
         // Another Undo of the same Operation may have run since the plan.
         let manifests = history::load_all(ports)?;
@@ -172,7 +181,14 @@ pub(crate) fn execute(
         operation: id,
         differences,
         backup: folder,
+        hints: running.hints,
     })
+}
+
+/// The refusal of a plan with `blocks`, each sentence saying what to do.
+fn blocked(blocks: &[Block]) -> Error {
+    let sentences: Vec<&str> = blocks.iter().map(|block| block.sentence.as_str()).collect();
+    Error::blocked(sentences.join(" "))
 }
 
 /// Reads a touched file again under the lock. When it changed since the plan,

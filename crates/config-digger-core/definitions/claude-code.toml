@@ -8,6 +8,15 @@ format_version = 1
 id = "claude-code"
 name = "Claude Code"
 
+# The native CLI runs as `claude.exe` from `~/.local/bin`. Claude Desktop is
+# also `claude.exe`, so the path tells them apart. Each running session keeps
+# `~/.claude/sessions/<pid>.json`, which also covers an npm install in
+# `node.exe`; only its name is read, since it holds a `peerToken`.
+[process]
+images = ["claude.exe"]
+paths = ["~/.local/bin/claude.exe"]
+session_files = { block = "pid-named", folder = { block = "path", path = "~/.claude/sessions" }, extension = "json" }
+
 [[homes]]
 id = "default"
 
@@ -40,6 +49,8 @@ root = ["projects", "{project}", "mcpServers"]
 kind = "mcp"
 scope = "local"
 provenance = "file"
+# Claude Code rewrites `~/.claude.json` every few minutes while it runs.
+store_class = "rewritten-while-running"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
 
@@ -53,6 +64,7 @@ root = ["mcpServers"]
 kind = "mcp"
 scope = "project"
 provenance = "file"
+store_class = "plain"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
 
@@ -64,6 +76,7 @@ root = ["mcpServers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
+store_class = "rewritten-while-running"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
 # Keys of `~/.claude.json` outside any Entry that hold a Secret: an API key
@@ -80,11 +93,11 @@ competition = { block = "exact-name" }
 # Claude Code skips in that Project whatever file declares them.
 [[items.mcp.disable]]
 block = "json-name-list"
-target = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpServers"] }
+target = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpServers"], store_class = "rewritten-while-running" }
 
 # `disabledMcpjsonServers` in any settings file skips `.mcp.json` servers by
 # name [docs]. The local settings file is the one meant to stay out of git.
 [[items.mcp.disable]]
 block = "json-name-list"
-target = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"] }
+target = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
 locations = ["project-mcp"]

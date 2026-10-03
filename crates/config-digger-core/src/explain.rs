@@ -78,6 +78,47 @@ pub(crate) fn git_versioned(files: &[&Path]) -> String {
     )
 }
 
+/// The block of a plan that writes the SQLite stores `files` while
+/// `agent_name`, which holds them open, runs.
+pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> String {
+    format!(
+        "{agent_name} is running and holds {} open in SQLite, so nothing can be written there while it runs. Close {agent_name} and retry.",
+        path_list(files)
+    )
+}
+
+/// The strong warning of a plan that writes `files`, which `agent_name`
+/// rewrites while it runs.
+pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> String {
+    format!(
+        "{agent_name} is running and rewrites {} while it runs: it may overwrite this change. Close {agent_name} first to be safe.",
+        path_list(files)
+    )
+}
+
+/// The warning of a plan that writes `files`, which the running
+/// `agent_name` reads.
+pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> String {
+    format!(
+        "{agent_name} is running and reads {}: it may not see this change until it restarts.",
+        path_list(files)
+    )
+}
+
+/// What the result says to do once a running `agent_name` reads a written file.
+pub(crate) fn restart_hint(agent_name: &str) -> String {
+    format!("Restart {agent_name} so that it reads the change.")
+}
+
+/// What the result says of a written file `path` that the running
+/// `agent_name` rewrites while it runs.
+pub(crate) fn may_be_overwritten(path: &Path, agent_name: &str) -> String {
+    format!(
+        "{} may be overwritten while {agent_name} runs.",
+        path.display()
+    )
+}
+
 /// What Disable would write for the Entry `name`: add it to the list `list`
 /// in `path`, for the context's Project when `per_project`.
 pub(crate) fn disable_target(name: &str, list: &str, path: &Path, per_project: bool) -> String {
