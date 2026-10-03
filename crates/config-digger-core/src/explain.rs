@@ -2,7 +2,7 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{Action, OperationStatus, Reason, ReasonCode, Verify};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// A Shadowed Entry's reason, pointing at the Effective Entry `effective`.
 /// `tied` says the two have the same precedence, as under two spellings of
@@ -42,6 +42,7 @@ pub(crate) fn effective_after(
 /// What an Operation does, as a title: "Remove 2 Entries".
 pub(crate) fn operation_title(action: Action, entries: usize) -> String {
     let verb = match action {
+        Action::Disable => "Disable",
         Action::Remove => "Remove",
         Action::Undo => "Undo",
         Action::DeleteBackup => "Delete the backup of",
@@ -66,6 +67,56 @@ pub(crate) fn backup_note(folder: &Path) -> String {
         "Each touched file is copied to {} before anything is written.",
         folder.display()
     )
+}
+
+/// The warning of a plan that edits the git-versioned `files`.
+pub(crate) fn git_versioned(files: &[&Path]) -> String {
+    let names: Vec<String> = files
+        .iter()
+        .map(|file| file.display().to_string())
+        .collect();
+    let (what, verb) = match names.as_slice() {
+        [name] => (name.clone(), "is"),
+        _ => (names.join(", "), "are"),
+    };
+    format!(
+        "{what} {verb} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it."
+    )
+}
+
+/// What Disable would write for the Entry `name`: add it to the list `list`
+/// in `path`, for the context's Project when `per_project`.
+pub(crate) fn disable_target(name: &str, list: &str, path: &Path, per_project: bool) -> String {
+    let scope = if per_project { " for this Project" } else { "" };
+    format!(
+        "Disable adds `{name}` to `{list}` in {}{scope}.",
+        path.display()
+    )
+}
+
+/// Why Disable is not offered when every switch of `agent_name` that could
+/// take the Entry off is in one of the git-versioned `files`.
+pub(crate) fn disable_only_in_versioned(agent_name: &str, files: &[PathBuf]) -> String {
+    let names: Vec<String> = files
+        .iter()
+        .map(|file| file.display().to_string())
+        .collect();
+    format!(
+        "Disable is not offered: {agent_name}'s switches for this Entry are only in git-versioned files ({}), where a change reaches every clone.",
+        names.join(", ")
+    )
+}
+
+/// Why Disable is not offered when `agent_name` has no switch for the Entry
+/// in the context. `needs_project` says it has one per Project.
+pub(crate) fn no_disable_mechanism(agent_name: &str, needs_project: bool) -> String {
+    if needs_project {
+        format!(
+            "Disable is not offered: {agent_name} switches this Entry off per Project, and there is no Project in this context."
+        )
+    } else {
+        format!("Disable is not offered: {agent_name} has no switch for this Entry here.")
+    }
 }
 
 /// What the preview of a Delete backup says in place of the backup note.
@@ -94,6 +145,7 @@ pub(crate) fn outcome(
     verify: Verify,
 ) -> String {
     let done = match action {
+        Action::Disable => format!("Disabled {}", count(entries)),
         Action::Remove => format!("Removed {}", count(entries)),
         Action::Undo => format!("Undid {}", undo_of.unwrap_or("an Operation")),
         Action::DeleteBackup => {

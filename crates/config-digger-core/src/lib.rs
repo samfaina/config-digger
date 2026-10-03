@@ -6,6 +6,7 @@ pub mod definitions;
 pub mod edit;
 pub mod ports;
 
+mod disable;
 mod execute;
 mod explain;
 mod history;

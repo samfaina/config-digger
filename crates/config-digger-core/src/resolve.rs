@@ -4,6 +4,7 @@
 use crate::api::{self, Context};
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Compete;
+use crate::disable::{self, ContextProject};
 use crate::scan::{ScannedEntry, Snapshot};
 use crate::{explain, locator, paths};
 use std::collections::BTreeMap;
@@ -48,6 +49,13 @@ pub(crate) fn resolve(
 
     let project = context_project(snapshot, context);
     let project_key = project.as_ref().map(|(_, key)| key);
+    let context_project = project.as_ref().map(|(path, key)| ContextProject {
+        path,
+        exists: snapshot
+            .projects
+            .iter()
+            .any(|project| project.key == *key && project.exists),
+    });
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
@@ -78,6 +86,12 @@ pub(crate) fn resolve(
             let effective = locator::render(&entries[0].path, &entries[0].key_path);
             let effective_scope = &definition.location(&entries[0].location).scope;
             let effective_rank = rank(entries[0]);
+            let roots = &snapshot
+                .homes
+                .iter()
+                .find(|found| found.agent_index == agent && found.home == home)
+                .expect("a scanned Entry comes from a found home")
+                .roots;
             let entries: Vec<api::Entry> = entries
                 .iter()
                 .enumerate()
@@ -100,10 +114,19 @@ pub(crate) fn resolve(
                         locator: locator::render(&entry.path, &entry.key_path),
                         scope: location.scope.clone(),
                         provenance: location.provenance.into(),
+                        git_versioned: snapshot.versioned.contains(&entry.path),
                         state,
                         reason,
                         config: entry.config.clone(),
                         masked: entry.masked.clone(),
+                        disable: disable::option(
+                            definition,
+                            roots,
+                            location,
+                            &entry.name,
+                            context_project.as_ref(),
+                            &snapshot.versioned,
+                        ),
                     }
                 })
                 .collect();

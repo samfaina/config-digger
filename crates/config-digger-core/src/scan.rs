@@ -3,7 +3,7 @@
 //! decides a State.
 
 use crate::api::ReadFailureKind;
-use crate::definitions::blocks::{Anchored, Locate, Parse, Register};
+use crate::definitions::blocks::{Anchored, Locate, Mechanism, Parse, Register};
 use crate::definitions::{AgentDefinition, LocationDefinition, PROJECT_KEY};
 use crate::ports::Ports;
 use crate::{mask, paths};
@@ -22,6 +22,9 @@ pub(crate) struct Snapshot {
     pub read_failures: Vec<ScannedReadFailure>,
     /// Every location read, existing or not, once per Agent home.
     pub readers: Vec<LocationReader>,
+    /// The files holding Entries, and the existing targets of Disable
+    /// mechanisms, that are in the index of their git repo.
+    pub versioned: BTreeSet<PathBuf>,
 }
 
 impl Snapshot {
@@ -63,6 +66,8 @@ pub(crate) struct ScannedHome {
     /// Index of the Agent definition in the definitions the snapshot was scanned with.
     pub agent_index: usize,
     pub home: String,
+    /// The path of each of its roots, by name.
+    pub roots: BTreeMap<String, PathBuf>,
 }
 
 /// A Project, found in a registry or asked for.
@@ -187,6 +192,16 @@ pub(crate) fn scan_as_if(
 
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
+    let targets = disable_targets(definitions, &found, &projects);
+    let existing_targets = targets.iter().filter(|path| ports.fs.exists(path));
+    let versioned = versioned(
+        ports,
+        scanner
+            .entries
+            .iter()
+            .map(|entry| entry.path.as_path())
+            .chain(existing_targets.map(PathBuf::as_path)),
+    );
     Ok(Snapshot {
         read_at,
         homes: found
@@ -194,13 +209,52 @@ pub(crate) fn scan_as_if(
             .map(|home| ScannedHome {
                 agent_index: home.agent_index,
                 home: home.home,
+                roots: home.roots,
             })
             .collect(),
         projects,
         entries: scanner.entries,
         readers: scanner.readers,
         read_failures: scanner.reader.failures,
+        versioned,
     })
+}
+
+/// The file of every Disable mechanism's target, for each found Agent
+/// home, and for a target in a Project, in each existing Project folder.
+fn disable_targets(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    projects: &[ScannedProject],
+) -> BTreeSet<PathBuf> {
+    let mut targets = BTreeSet::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for rules in definition.items.values() {
+            for mechanism in &rules.disable {
+                let anchor = &mechanism.target().anchor;
+                if !anchor.in_project() {
+                    targets.extend(anchor.path(&home.roots, None));
+                    continue;
+                }
+                for project in projects.iter().filter(|project| project.exists) {
+                    targets.extend(anchor.path(&home.roots, Some(&project.path)));
+                }
+            }
+        }
+    }
+    targets
+}
+
+/// The files among `paths` that are in the index of their git repo, asking
+/// once per file. Ignored and untracked files are not.
+fn versioned<'a>(ports: &Ports, paths: impl Iterator<Item = &'a Path>) -> BTreeSet<PathBuf> {
+    let paths: BTreeSet<&Path> = paths.collect();
+    paths
+        .into_iter()
+        .filter(|path| ports.git.is_versioned(path))
+        .map(Path::to_path_buf)
+        .collect()
 }
 
 fn find_homes(definitions: &[AgentDefinition], ports: &Ports) -> Result<Vec<FoundHome>, ScanError> {

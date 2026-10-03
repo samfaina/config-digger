@@ -4,8 +4,8 @@
 pub(crate) mod blocks;
 
 use blocks::{
-    Anchor, Anchored, Competition, Format, Interpolation, Locator, Provenance, Register, Registry,
-    Validate,
+    Anchor, Anchored, Competition, DisableMechanism, Format, Interpolation, Locator, Mechanism,
+    Provenance, Register, Registry, Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -192,6 +192,11 @@ pub(crate) struct ItemRules {
     /// Location ids of this kind, highest precedence first.
     pub precedence: Vec<String>,
     pub competition: Competition,
+    /// How the Agent switches an Entry off, in its order of preference.
+    /// Disable uses the first that covers the Entry and applies in the
+    /// context, skipping any whose target is git-versioned.
+    #[serde(default)]
+    pub disable: Vec<DisableMechanism>,
 }
 
 impl AgentDefinition {
@@ -305,6 +310,19 @@ impl AgentDefinition {
             }
             if let Some(id) = declared.difference(&ranked).next() {
                 return Err(context(format!("precedence leaves out location `{id}`")));
+            }
+            for (index, mechanism) in rules.disable.iter().enumerate() {
+                let context = |e: String| context(format!("disable[{index}]: {e}"));
+                mechanism.validate().map_err(context)?;
+                self.validate_home_root(&mechanism.target().anchor)
+                    .map_err(context)?;
+                if let Some(id) = mechanism
+                    .locations()
+                    .iter()
+                    .find(|id| !declared.contains(id.as_str()))
+                {
+                    return Err(context(format!("`{id}` is not a location of this kind")));
+                }
             }
         }
         Ok(())
@@ -602,6 +620,46 @@ provenance = "file"
     fn precedence_must_not_name_unknown_locations() {
         let text = VALID.replace(r#"["user-mcp"]"#, r#"["user-mcp", "ghost"]"#);
         assert!(error(&text).contains("`ghost`"), "{}", error(&text));
+    }
+
+    /// `VALID` with `mechanism` as the one Disable mechanism of its servers.
+    fn with_disable(mechanism: &str) -> String {
+        format!(
+            "{VALID}disable = [{mechanism}]
+"
+        )
+    }
+
+    #[test]
+    fn a_disable_mechanism_loads() {
+        let text = with_disable(
+            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "off"] }, locations = ["user-mcp"] }"#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_disable_mechanism_for_an_unknown_location_is_rejected() {
+        let text = with_disable(
+            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"] }, locations = ["ghost"] }"#,
+        );
+        assert!(
+            error(&text).contains("`ghost` is not a location of this kind"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_disable_target_in_a_project_cannot_be_keyed_by_project() {
+        let text = with_disable(
+            r#"{ block = "json-name-list", target = { anchor = { block = "project", path = ".test.json" }, key_path = ["{project}", "off"] } }"#,
+        );
+        assert!(
+            error(&text).contains("cannot be keyed by `{project}`"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

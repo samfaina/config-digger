@@ -222,6 +222,9 @@ pub enum SkillFileChangeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
+    /// Makes each Entry stop taking effect for one Agent while keeping it,
+    /// through the Agent's own machine-local switch.
+    Disable,
     /// Deletes each Entry from where it lives, for every Agent that reads it.
     Remove,
     /// Applies the inverse of every edit of an earlier Operation to the files
@@ -335,6 +338,9 @@ pub struct EffectiveChange {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct FileChange {
     pub path: PathBuf,
+    /// The file is in the index of its git repo, so the edits show in the
+    /// git diff.
+    pub git_versioned: bool,
     pub edits: Vec<EditSummary>,
     /// A unified diff of the whole file, before and after every edit, as
     /// [`FileDiff::diff`] has it.
@@ -345,9 +351,10 @@ pub struct FileChange {
 }
 
 impl FileChange {
-    pub(crate) fn new(edits: Vec<EditSummary>, diff: FileDiff) -> Self {
+    pub(crate) fn new(edits: Vec<EditSummary>, diff: FileDiff, git_versioned: bool) -> Self {
         Self {
             path: diff.path,
+            git_versioned,
             edits,
             diff: diff.diff,
             diff_unavailable: diff.diff_unavailable,
@@ -676,6 +683,9 @@ pub struct Entry {
     pub locator: String,
     pub scope: String,
     pub provenance: Provenance,
+    /// Its file is in the index of its git repo, so a change to it shows in
+    /// the git diff and reaches every clone once committed.
+    pub git_versioned: bool,
     pub state: State,
     /// Why the Entry has its State, when it is not Effective.
     pub reason: Option<Reason>,
@@ -686,6 +696,47 @@ pub struct Entry {
     /// masked, so that a mask can be told from a literal. An array item's
     /// key is its index.
     pub masked: Vec<Vec<String>>,
+    /// What Disable would do to it in this context.
+    pub disable: DisableOption,
+}
+
+/// What Disable would do to an Entry in its context: either the switch it
+/// would write, or why it is not offered.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct DisableOption {
+    /// Where Disable writes, when it is offered.
+    pub target: Option<DisableTarget>,
+    /// Why Disable is not offered, when it is not.
+    pub unavailable: Option<DisableUnavailable>,
+}
+
+/// The switch Disable would write: that of the Agent's first mechanism, in
+/// its order of preference, that covers the Entry in the context and whose
+/// file is machine-local, not git-versioned.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct DisableTarget {
+    /// The file the switch is in.
+    pub path: PathBuf,
+    /// What Disable writes, as a sentence rendered by the core.
+    pub sentence: String,
+}
+
+/// Why Disable is not offered for an Entry.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct DisableUnavailable {
+    pub code: DisableUnavailableCode,
+    /// The reason as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DisableUnavailableCode {
+    /// Every switch that could take the Entry off is in a git-versioned
+    /// file, where a change reaches every clone.
+    GitVersioned,
+    /// The Agent has no switch for the Entry in this context.
+    NoMechanism,
 }
 
 /// How an Entry got where it is, which decides how it can be taken away.

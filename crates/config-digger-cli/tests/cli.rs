@@ -1438,3 +1438,180 @@ fn a_refused_undo_masks_secrets_in_its_diffs() {
     );
     assert!(!json.stdout.contains(SECRET), "{}", json.stdout);
 }
+
+/// Runs git in the folder the binary runs in.
+fn git(harness: &Harness, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(harness.root.path())
+        .args([
+            "-c",
+            "user.name=fixture",
+            "-c",
+            "user.email=fixture@example.com",
+        ])
+        .args(["-c", "commit.gpgsign=false"])
+        .args(args)
+        .output()
+        .expect("git runs");
+    assert!(output.status.success(), "git {args:?} failed");
+    String::from_utf8(output.stdout).unwrap()
+}
+
+/// The folder the binary runs in as a git repo, with `committed` (paths
+/// relative to it) in its one commit.
+fn in_git_repo(harness: &Harness, committed: &[&str]) {
+    git(harness, &["init", "--quiet"]);
+    git(harness, &[&["add", "--"][..], committed].concat());
+    git(
+        harness,
+        &["commit", "--quiet", "--allow-empty", "-m", "fixture"],
+    );
+}
+
+/// User `notes`, and `linear` in a `.mcp.json` of the current folder.
+fn versioned_fixture() -> Harness {
+    Harness::new()
+        .with_file(
+            ".claude.json",
+            r#"{"mcpServers": {"notes": {"command": "notes-mcp"}}}"#,
+        )
+        .with_cwd_file(
+            ".mcp.json",
+            "{\n  \"mcpServers\": {\n    \"linear\": { \"url\": \"https://mcp.linear.app/mcp\" }\n  }\n}\n",
+        )
+}
+
+#[test]
+fn list_and_show_tag_an_entry_in_a_versioned_file() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json"]);
+
+    let list = harness.run(&["list", "--wide"]);
+    let show = harness.run(&["show", "linear", "--wide"]);
+    let json = harness.run(&["show", "linear", "--json"]);
+
+    assert_eq!(list.code, 0, "{}", list.stderr);
+    let line = |out: &str, name: &str| {
+        out.lines()
+            .find(|line| line.contains(name))
+            .unwrap_or_else(|| panic!("no line for {name}:\n{out}"))
+            .to_owned()
+    };
+    assert!(
+        line(&list.stdout, "linear").ends_with("[git-versioned]"),
+        "{}",
+        list.stdout
+    );
+    assert!(
+        !line(&list.stdout, "notes").contains("git-versioned"),
+        "{}",
+        list.stdout
+    );
+    assert!(
+        line(&show.stdout, ".mcp.json").ends_with("[git-versioned]"),
+        "{}",
+        show.stdout
+    );
+    assert_eq!(json.document()["item"]["entries"][0]["git_versioned"], true);
+}
+
+#[test]
+fn an_untracked_file_is_not_tagged() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[]);
+
+    let json = harness.run(&["show", "linear", "--json"]);
+
+    assert_eq!(
+        json.document()["item"]["entries"][0]["git_versioned"],
+        false
+    );
+}
+
+#[test]
+fn remove_in_a_versioned_file_without_a_tty_needs_ack_git_versioned() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json"]);
+    let before = read(&harness.cwd().join(".mcp.json"));
+
+    let run = harness.run(&["remove", "linear", "--yes"]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    assert!(run.stdout.contains("[git-versioned]"), "{}", run.stdout);
+    assert!(run.stdout.contains("git diff"), "{}", run.stdout);
+    assert!(run.stderr.contains("--ack git-versioned"), "{}", run.stderr);
+    assert_eq!(read(&harness.cwd().join(".mcp.json")), before);
+}
+
+#[test]
+fn remove_in_a_versioned_file_never_stages_or_commits() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json"]);
+
+    let run = harness.run(&[
+        "remove",
+        "linear",
+        "--yes",
+        "--ack",
+        "git-versioned",
+        "--json",
+    ]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["warnings"][0]["class"], "git-versioned");
+    assert_eq!(document["warnings"][0]["acknowledged"], true);
+    assert_eq!(document["plan"]["files"][0]["git_versioned"], true);
+    assert!(!read(&harness.cwd().join(".mcp.json")).contains("linear"));
+    // The removal shows in the git diff, unstaged, and nothing was committed.
+    assert_eq!(git(&harness, &["diff", "--name-only"]), ".mcp.json\n");
+    assert_eq!(git(&harness, &["diff", "--cached", "--name-only"]), "");
+    assert_eq!(git(&harness, &["rev-list", "--count", "HEAD"]), "1\n");
+}
+
+#[test]
+fn disable_where_every_switch_is_versioned_exits_5_with_the_reason() {
+    // A home folder kept in the repo, as a dotfiles repo would.
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json", "home/.claude.json"]);
+
+    let show = harness.run(&["show", "notes", "--wide"]);
+    let json = harness.run(&["show", "notes", "--json"]);
+    let disable = harness.run(&["disable", "notes", "--yes", "--json"]);
+
+    assert!(
+        show.stdout.contains("Disable is not offered"),
+        "{}",
+        show.stdout
+    );
+    let unavailable = &json.document()["item"]["entries"][0]["disable"]["unavailable"];
+    assert_eq!(unavailable["code"], "git_versioned");
+    assert_eq!(disable.code, 5, "{}", disable.stdout);
+    assert_eq!(disable.document()["error"]["code"], "blocked");
+    assert!(
+        disable.document()["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains(unavailable["sentence"].as_str().unwrap()),
+        "{}",
+        disable.stdout
+    );
+}
+
+#[test]
+fn show_names_the_machine_local_switch_disable_would_write() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json"]);
+
+    let show = harness.run(&["show", "linear", "--wide"]);
+
+    let claude_json = harness.path(".claude.json").display().to_string();
+    assert!(
+        show.stdout.contains(&format!(
+            "Disable adds `linear` to `disabledMcpServers` in {claude_json} for this Project."
+        )),
+        "{}",
+        show.stdout
+    );
+}

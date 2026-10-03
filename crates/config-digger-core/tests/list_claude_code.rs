@@ -18,6 +18,18 @@ fn list(fs: FakeFileSystem) -> Value {
     serde_json::to_value(core.resolve(&snapshot, &Context::default())).unwrap()
 }
 
+/// What Disable says of a user server with no Project: Claude Code's switch
+/// is per Project.
+fn no_project_switch() -> Value {
+    json!({
+        "target": null,
+        "unavailable": {
+            "code": "no_mechanism",
+            "sentence": "Disable is not offered: Claude Code switches this Entry off per Project, and there is no Project in this context."
+        }
+    })
+}
+
 #[test]
 fn each_user_server_is_an_effective_item_of_the_default_home() {
     let inventory = list(FakeFileSystem::new().with_file(in_home(".claude.json"), CLAUDE_JSON));
@@ -46,6 +58,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "locator": r"C:\Users\fixture\.claude.json#mcpServers.cd-throwaway-github",
                     "scope": "user",
                     "provenance": "file",
+                    "git_versioned": false,
                     "state": "effective",
                     "reason": null,
                     "config": {
@@ -54,7 +67,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                         "args": ["-y", "@modelcontextprotocol/server-github"],
                         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "••••" }
                     },
-                    "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]]
+                    "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]],
+                    "disable": no_project_switch()
                 }]
             },
             {
@@ -69,10 +83,12 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "locator": r"C:\Users\fixture\.claude.json#mcpServers.linear",
                     "scope": "user",
                     "provenance": "file",
+                    "git_versioned": false,
                     "state": "effective",
                     "reason": null,
                     "config": { "type": "http", "url": "https://mcp.linear.app/mcp" },
-                    "masked": []
+                    "masked": [],
+                    "disable": no_project_switch()
                 }]
             }
         ])

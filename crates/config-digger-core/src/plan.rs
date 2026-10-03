@@ -46,6 +46,9 @@ pub(crate) struct PlannedFile {
     /// The locations that read the file, whose Entries say where its
     /// Secrets are.
     pub readers: Vec<LocationReader>,
+    /// The file is in the index of its git repo, so the edits show in the
+    /// git diff.
+    pub git_versioned: bool,
 }
 
 /// A file with every edit of an Operation applied, in order.
@@ -85,6 +88,7 @@ pub(crate) fn plan(
             Action::Remove => Edit::Remove {
                 key_path: entry.key_path.clone(),
             },
+            Action::Disable => return Err(disable_blocked(entry)),
             Action::Undo => {
                 return Err(Error::unexpected(
                     "an Undo targets an Operation, not Entries: plan it with plan_undo",
@@ -112,6 +116,7 @@ pub(crate) fn plan(
             apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
         files.push(PlannedFile {
             readers: snapshot.readers_of(&path),
+            git_versioned: ports.git.is_versioned(&path),
             path,
             syntax,
             read,
@@ -141,11 +146,27 @@ pub(crate) fn plan(
         entries: targeted.len(),
         context: context.clone(),
         scan_options: scan_options.clone(),
+        warnings: warnings(&files),
         files,
         preview,
-        warnings: Vec::new(),
         read_failures: before.read_failures,
     })
+}
+
+/// Why the Entry cannot be Disabled: Disable is not offered for it, or this
+/// release does not write Disable mechanisms yet.
+fn disable_blocked(entry: &api::Entry) -> Error {
+    match (&entry.disable.unavailable, &entry.disable.target) {
+        (Some(unavailable), _) => Error::blocked(format!(
+            "cannot Disable {}: {}",
+            entry.locator, unavailable.sentence
+        )),
+        (None, Some(target)) => Error::blocked(format!(
+            "cannot Disable {}: this release does not write Disable mechanisms yet. {}",
+            entry.locator, target.sentence
+        )),
+        (None, None) => Error::unexpected("a Disable option is either offered or not"),
+    }
 }
 
 /// Plans the Undo of the Operation `id` in History: the inverse of each of
@@ -180,6 +201,7 @@ pub(crate) fn plan_undo(
     })?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
+        file.git_versioned = ports.git.is_versioned(&file.path);
     }
 
     let before = resolve::resolve(definitions, &snapshot, &context);
@@ -204,9 +226,9 @@ pub(crate) fn plan_undo(
         entries: preview.changes.len(),
         context,
         scan_options,
+        warnings: warnings(&files),
         files,
         preview,
-        warnings: Vec::new(),
         read_failures: before.read_failures,
     })
 }
@@ -383,8 +405,8 @@ impl From<Error> for UndoBlocked<'_> {
 
 /// The files of an Operation with the inverse of its edits applied to each
 /// one as it is now, or why its Undo is refused. History runs the same
-/// check to say whether the Operation can be undone. The files' readers are
-/// left for the caller to fill in.
+/// check to say whether the Operation can be undone. The files' readers, and
+/// whether each is git-versioned, are left for the caller to fill in.
 pub(crate) fn undo_files<'m>(
     ports: &'m Ports,
     manifest: &'m history::Manifest,
@@ -401,6 +423,7 @@ pub(crate) fn undo_files<'m>(
                 created,
                 edited,
                 readers: Vec::new(),
+                git_versioned: false,
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
                 location,
@@ -567,13 +590,30 @@ fn preview(
                         name: "after the Operation",
                     },
                 );
-                FileChange::new(edits, diff)
+                FileChange::new(edits, diff, file.git_versioned)
             })
             .collect(),
         deleted: Vec::new(),
         backup_note: explain::backup_note(&backup_folder),
         backup_folder,
     })
+}
+
+/// What a plan that edits `files` must have acknowledged: one warning for
+/// every git-versioned file among them.
+fn warnings(files: &[PlannedFile]) -> Vec<Warning> {
+    let versioned: Vec<&Path> = files
+        .iter()
+        .filter(|file| file.git_versioned)
+        .map(|file| file.path.as_path())
+        .collect();
+    if versioned.is_empty() {
+        return Vec::new();
+    }
+    vec![Warning {
+        class: WarningClass::GitVersioned,
+        sentence: explain::git_versioned(&versioned),
+    }]
 }
 
 /// The syntax an Entry's location is edited in.

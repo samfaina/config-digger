@@ -169,6 +169,11 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
           {effective.scope} · {effective.locator}
         </span>
       </span>
+      {effective.git_versioned && (
+        <span className="tag" title="A change to this file shows in the git diff">
+          git-versioned
+        </span>
+      )}
       <span className="item-count">{entries}</span>
       <StatePill item={item} />
     </button>

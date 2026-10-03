@@ -556,6 +556,125 @@ impl Compete for ExactName {
     }
 }
 
+// --- Disable mechanisms -----------------------------------------------------
+
+/// A switch the Agent itself reads to skip an Entry while keeping it.
+pub(crate) trait Mechanism {
+    /// Where the switch is written.
+    fn target(&self) -> &Target;
+
+    /// The ids of the locations whose Entries it switches off, empty for
+    /// every location of the Item kind.
+    fn locations(&self) -> &[String];
+
+    /// Whether it switches off the Entries of the location `id`.
+    fn covers(&self, id: &str) -> bool {
+        let locations = self.locations();
+        locations.is_empty() || locations.iter().any(|location| location == id)
+    }
+}
+
+/// How an Agent switches an Entry off. An Item kind lists its mechanisms in
+/// the Agent's order of preference.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum DisableMechanism {
+    JsonNameList(JsonNameList),
+}
+
+impl Validate for DisableMechanism {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.validate(),
+        }
+    }
+}
+
+impl Mechanism for DisableMechanism {
+    fn target(&self) -> &Target {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.target(),
+        }
+    }
+
+    fn locations(&self) -> &[String] {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.locations(),
+        }
+    }
+}
+
+/// A list of names in a JSON file: the Agent skips every Entry of an Item
+/// whose name is in it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonNameList {
+    /// The list.
+    pub target: Target,
+    /// The ids of the locations whose Entries it switches off. Omitted, it
+    /// switches off Entries of every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
+}
+
+impl Validate for JsonNameList {
+    fn validate(&self) -> Result<(), String> {
+        self.target.validate()
+    }
+}
+
+impl Mechanism for JsonNameList {
+    fn target(&self) -> &Target {
+        &self.target
+    }
+
+    fn locations(&self) -> &[String] {
+        &self.locations
+    }
+}
+
+/// The key a mechanism writes, in a file outside or inside a Project.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Target {
+    pub anchor: Anchor,
+    /// The key path of the value written. One segment may be `{project}`:
+    /// the context's Project key, so that the switch applies only there.
+    pub key_path: Vec<String>,
+}
+
+impl Validate for Target {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
+            return Err("a target needs a key path, with no empty key".into());
+        }
+        let project_keys = self
+            .key_path
+            .iter()
+            .filter(|key| *key == super::PROJECT_KEY);
+        match project_keys.count() {
+            0 => Ok(()),
+            1 if self.anchor.in_project() => Err(format!(
+                "a target in a Project cannot be keyed by `{}`",
+                super::PROJECT_KEY
+            )),
+            1 => Ok(()),
+            _ => Err(format!(
+                "a target key path holds `{}` twice",
+                super::PROJECT_KEY
+            )),
+        }
+    }
+}
+
+impl Target {
+    /// Whether the switch applies in one Project only, so that it needs one.
+    pub fn per_project(&self) -> bool {
+        self.anchor.in_project() || self.key_path.iter().any(|key| key == super::PROJECT_KEY)
+    }
+}
+
 // --- Paths ------------------------------------------------------------------
 
 /// A `/`-separated path must stay below the folder it is relative to.

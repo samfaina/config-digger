@@ -1,0 +1,306 @@
+//! Git-versioned Entries through the core `api`, with a fake git index: the
+//! tag on each Entry, the acknowledgement a Remove in a versioned file needs,
+//! and the Disable mechanism a versioned target rules out.
+
+use config_digger_core::api::{
+    Action, Context, Core, Entry, ErrorCode, Inventory, ScanOptions, Targets, WarningClass,
+};
+use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeGitIndex};
+use std::path::PathBuf;
+
+const HOME: &str = r"C:\Users\fixture";
+const LOCAL_APP_DATA: &str = r"C:\Users\fixture\AppData\Local";
+const PROJECT: &str = r"E:\projects\petme-app";
+
+fn claude_json() -> PathBuf {
+    PathBuf::from(HOME).join(".claude.json")
+}
+
+fn mcp_json() -> PathBuf {
+    PathBuf::from(PROJECT).join(".mcp.json")
+}
+
+fn settings_local() -> PathBuf {
+    PathBuf::from(PROJECT).join(r".claude\settings.local.json")
+}
+
+/// A user `notes` in `~/.claude.json`, which also registers [`PROJECT`].
+const CLAUDE_JSON: &str = r#"{
+  "mcpServers": {
+    "notes": { "command": "notes-mcp" }
+  },
+  "projects": {
+    "E:/projects/petme-app": {}
+  }
+}
+"#;
+
+/// A project `linear` and `github` in [`PROJECT`]'s `.mcp.json`.
+const MCP_JSON: &str = r#"{
+  "mcpServers": {
+    "linear": { "url": "https://mcp.linear.app/mcp" },
+    "github": { "command": "github-mcp" }
+  }
+}
+"#;
+
+fn fixture() -> FakeFileSystem {
+    FakeFileSystem::new()
+        .with_folder(PROJECT)
+        .with_file(claude_json(), CLAUDE_JSON)
+        .with_file(mcp_json(), MCP_JSON)
+}
+
+/// A core over `fs` whose git index holds `versioned`.
+fn core(fs: &FakeFileSystem, versioned: &[PathBuf]) -> Core {
+    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let mut ports = fake::ports(fs.clone(), env);
+    ports.git = Box::new(versioned.iter().fold(FakeGitIndex::default(), |git, path| {
+        git.with_versioned(path)
+    }));
+    Core::new(ports).unwrap()
+}
+
+fn in_project() -> Context {
+    Context {
+        project: Some(PathBuf::from(PROJECT)),
+    }
+}
+
+fn targets(selectors: &[&str]) -> Targets {
+    Targets {
+        selectors: selectors.iter().map(|s| (*s).to_owned()).collect(),
+        all: false,
+    }
+}
+
+fn inventory(core: &Core, context: &Context) -> Inventory {
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: context.project.iter().cloned().collect(),
+        })
+        .unwrap();
+    core.resolve(&snapshot, context)
+}
+
+/// The one Entry of the Item `name`.
+fn entry(inventory: &Inventory, name: &str) -> Entry {
+    let item = inventory
+        .items
+        .iter()
+        .find(|item| item.name == name)
+        .unwrap_or_else(|| panic!("no Item `{name}`"));
+    assert_eq!(item.entries.len(), 1, "`{name}` has one Entry");
+    item.entries[0].clone()
+}
+
+#[test]
+fn an_entry_in_a_versioned_file_is_tagged_git_versioned() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+
+    let inventory = inventory(&core, &in_project());
+
+    assert!(entry(&inventory, "linear").git_versioned);
+    assert!(entry(&inventory, "github").git_versioned);
+    assert!(!entry(&inventory, "notes").git_versioned);
+}
+
+#[test]
+fn an_untracked_or_ignored_file_is_an_ordinary_file() {
+    // The fake index holds only tracked files, as the real one answers.
+    let fs = fixture();
+    let core = core(&fs, &[]);
+
+    let inventory = inventory(&core, &in_project());
+
+    assert!(!entry(&inventory, "linear").git_versioned);
+}
+
+#[test]
+fn a_remove_in_a_versioned_file_warns_that_it_shows_in_the_git_diff() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+
+    let plan = core
+        .plan(
+            &snapshot,
+            &in_project(),
+            Action::Remove,
+            &targets(&["linear"]),
+        )
+        .unwrap();
+
+    let warnings = plan.warnings();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(warnings[0].class, WarningClass::GitVersioned);
+    let sentence = &warnings[0].sentence;
+    assert!(
+        sentence.contains(&mcp_json().display().to_string()),
+        "{sentence}"
+    );
+    assert!(sentence.contains("git diff"), "{sentence}");
+    assert!(plan.preview().files[0].git_versioned);
+}
+
+#[test]
+fn a_remove_in_an_ordinary_file_has_no_git_versioned_warning() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+
+    let plan = core
+        .plan(
+            &snapshot,
+            &in_project(),
+            Action::Remove,
+            &targets(&["notes"]),
+        )
+        .unwrap();
+
+    assert!(plan.warnings().is_empty());
+    assert!(!plan.preview().files[0].git_versioned);
+}
+
+#[test]
+fn a_remove_in_a_versioned_file_writes_nothing_until_acknowledged() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+    let plan = |core: &Core| {
+        let snapshot = core
+            .scan(&ScanOptions {
+                projects: vec![PathBuf::from(PROJECT)],
+            })
+            .unwrap();
+        core.plan(
+            &snapshot,
+            &in_project(),
+            Action::Remove,
+            &targets(&["linear"]),
+        )
+        .unwrap()
+    };
+
+    let refused = core.execute(plan(&core), &[]).unwrap_err();
+    assert_eq!(refused.code, ErrorCode::AckRequired);
+    assert!(
+        refused.message.contains("git-versioned"),
+        "{}",
+        refused.message
+    );
+    assert_eq!(fs.contents(mcp_json()).unwrap(), MCP_JSON.as_bytes());
+
+    core.execute(plan(&core), &[WarningClass::GitVersioned])
+        .unwrap();
+    let after = String::from_utf8(fs.contents(mcp_json()).unwrap()).unwrap();
+    assert!(!after.contains("linear"), "{after}");
+}
+
+/// The file Disable would write for the Entry of `name`, or why it is not offered.
+fn disable(inventory: &Inventory, name: &str) -> Result<PathBuf, (String, String)> {
+    let option = entry(inventory, name).disable;
+    match (option.target, option.unavailable) {
+        (Some(target), None) => Ok(target.path),
+        (None, Some(unavailable)) => Err((
+            serde_json::to_value(unavailable.code)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned(),
+            unavailable.sentence,
+        )),
+        other => panic!("`{name}` is both offered and not, or neither: {other:?}"),
+    }
+}
+
+#[test]
+fn disable_of_a_versioned_entry_uses_the_machine_local_switch() {
+    // `/mcp` writes `disabledMcpServers` in `~/.claude.json`, outside the repo.
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+
+    let inventory = inventory(&core, &in_project());
+
+    assert_eq!(disable(&inventory, "linear"), Ok(claude_json()));
+    assert_eq!(disable(&inventory, "notes"), Ok(claude_json()));
+}
+
+#[test]
+fn disable_skips_a_versioned_target_for_the_next_machine_local_one() {
+    // A home folder kept in a dotfiles repo versions `~/.claude.json`.
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json(), claude_json()]);
+
+    let inventory = inventory(&core, &in_project());
+
+    assert_eq!(disable(&inventory, "linear"), Ok(settings_local()));
+}
+
+#[test]
+fn disable_is_not_offered_when_every_target_is_versioned() {
+    let fs = fixture().with_file(settings_local(), "{}\n");
+    let core = core(&fs, &[mcp_json(), claude_json(), settings_local()]);
+
+    let inventory = inventory(&core, &in_project());
+
+    let (code, sentence) = disable(&inventory, "linear").unwrap_err();
+    assert_eq!(code, "git_versioned");
+    assert!(
+        sentence.contains(&claude_json().display().to_string()),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains(&settings_local().display().to_string()),
+        "{sentence}"
+    );
+    // A user server has no project-settings switch to fall back to.
+    let (code, _) = disable(&inventory, "notes").unwrap_err();
+    assert_eq!(code, "git_versioned");
+}
+
+#[test]
+fn disable_is_not_offered_where_the_agent_has_no_switch() {
+    // Claude Code's switch is per Project, so there is none without one.
+    let fs = fixture();
+    let core = core(&fs, &[]);
+
+    let inventory = inventory(&core, &Context::default());
+
+    let (code, sentence) = disable(&inventory, "notes").unwrap_err();
+    assert_eq!(code, "no_mechanism");
+    assert!(sentence.contains("Claude Code"), "{sentence}");
+}
+
+#[test]
+fn a_disable_that_is_not_offered_is_blocked_with_the_reason() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json(), claude_json()]);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+    let (_, sentence) = disable(&core.resolve(&snapshot, &in_project()), "notes").unwrap_err();
+
+    let error = core
+        .plan(
+            &snapshot,
+            &in_project(),
+            Action::Disable,
+            &targets(&["notes"]),
+        )
+        .err()
+        .expect("Disable is not offered");
+
+    assert_eq!(error.code, ErrorCode::Blocked);
+    assert!(error.message.contains(&sentence), "{}", error.message);
+}
