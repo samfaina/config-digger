@@ -7,7 +7,7 @@ pub mod skill_managers;
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
-    Gate, GateLookup, Holds, Interpolation, ListInstalls, Locator, LookUp, MechanismTarget,
+    Gate, GateLookup, Holds, Interpolation, ListPlugins, Locator, LookUp, MechanismTarget,
     PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles,
     SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
@@ -303,8 +303,11 @@ pub(crate) struct PluginsDefinition {
     /// loads that folder, such as a version it superseded.
     pub superseded_marker: Option<String>,
     /// Where a plugin's name is. Without it, or when the plugin's folder
-    /// does not hold one, its name is its id up to `@`.
+    /// does not hold one, its name is its id up to `id_separator`.
     pub name: Option<PluginName>,
+    /// The text that ends a plugin's name in its id, such as the `@` before
+    /// a marketplace. Without it, a plugin with no name is named by its id.
+    pub id_separator: Option<String>,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -337,6 +340,9 @@ impl PluginsDefinition {
         if let Some(name) = &self.name {
             blocks::validate_relative(&name.file)?;
             blocks::validate_key_path(&name.key_path)?;
+        }
+        if self.id_separator.as_ref().is_some_and(String::is_empty) {
+            return Err("id_separator must not be empty".into());
         }
         if !self.uninstall.contains(PLUGIN_ID) {
             return Err(format!("uninstall must name the plugin with `{PLUGIN_ID}`"));
@@ -2224,7 +2230,7 @@ roots.plugins = "plugins"
 
 [[plugins]]
 id = "installed"
-registry = { block = "json-installs", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }
+registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }
 uninstall = "agent plugin uninstall {id} --scope {scope}"
 
 [[locations]]
@@ -2272,7 +2278,7 @@ locations = {locations}
 
     #[test]
     fn plugins_and_their_switch_load() {
-        let text = with_plugins(&plugin_switch("plugin", "{plugin}", r#"["plugin-mcp"]"#));
+        let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", r#"["plugin-mcp"]"#));
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
@@ -2301,7 +2307,7 @@ locations = {locations}
 
     #[test]
     fn the_plugin_target_and_a_switch_keyed_by_plugin_go_together() {
-        let text = with_plugins(&plugin_switch("name", "{plugin}", r#"["plugin-mcp"]"#));
+        let text = with_plugins(&plugin_switch("name", "{plugin_id}", r#"["plugin-mcp"]"#));
         assert!(
             error(&text).contains("exactly when the target is `plugin`"),
             "{}",
@@ -2317,13 +2323,13 @@ locations = {locations}
 
     #[test]
     fn the_plugin_target_covers_locations_in_plugins_only() {
-        let text = with_plugins(&plugin_switch("plugin", "{plugin}", r#"["user-mcp"]"#));
+        let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", r#"["user-mcp"]"#));
         assert!(
             error(&text).contains("locations in plugins only"),
             "{}",
             error(&text)
         );
-        let text = with_plugins(&plugin_switch("plugin", "{plugin}", "[]"));
+        let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", "[]"));
         assert!(
             error(&text).contains("needs its locations listed"),
             "{}",

@@ -636,8 +636,8 @@ impl Register for JsonKeys {
 
 // --- Plugin registries ------------------------------------------------------
 
-/// One install of a plugin, as the Agent records it.
-pub(crate) struct Install {
+/// What the Agent records of a plugin it installed, at one Scope.
+pub(crate) struct PluginRecord {
     /// The plugin's id, such as `supabase@claude-plugins-official`.
     pub id: String,
     /// The folder the plugin's files are in, as recorded.
@@ -646,69 +646,70 @@ pub(crate) struct Install {
     pub scope: Option<String>,
     /// The Project it applies in, as recorded; `None` when it applies in every one.
     pub project: Option<String>,
+    /// Its version, as recorded.
     pub version: Option<String>,
 }
 
 /// Lists the plugins an Agent installed.
-pub(crate) trait ListInstalls {
+pub(crate) trait ListPlugins {
     /// Where the registry lives.
     fn anchor(&self) -> &Anchor;
 
-    /// The installs the registry's text records, in its order.
-    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError>;
+    /// The records the registry's text holds, in its order.
+    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError>;
 }
 
 /// Where an Agent records the plugins it installed.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum PluginRegistry {
-    JsonInstalls(JsonInstalls),
+    JsonPluginRecords(JsonPluginRecords),
 }
 
 impl Validate for PluginRegistry {
     fn validate(&self) -> Result<(), String> {
         match self {
-            PluginRegistry::JsonInstalls(block) => block.validate(),
+            PluginRegistry::JsonPluginRecords(block) => block.validate(),
         }
     }
 }
 
-impl ListInstalls for PluginRegistry {
+impl ListPlugins for PluginRegistry {
     fn anchor(&self) -> &Anchor {
         match self {
-            PluginRegistry::JsonInstalls(block) => block.anchor(),
+            PluginRegistry::JsonPluginRecords(block) => block.anchor(),
         }
     }
 
-    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError> {
+    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError> {
         match self {
-            PluginRegistry::JsonInstalls(block) => block.installs(text),
+            PluginRegistry::JsonPluginRecords(block) => block.records(text),
         }
     }
 }
 
 /// An object in a strict JSON file whose keys are plugin ids, each holding
-/// the plugin's installs: an array of objects, one per Scope it is
-/// installed at, or one object. An install without a folder is skipped.
+/// the plugin's records: an array of objects, one per Scope it is
+/// installed at, or one object. A record without a folder is skipped.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct JsonInstalls {
+pub(crate) struct JsonPluginRecords {
     /// Where the file is, in the Agent home.
     pub anchor: Anchor,
     /// The key path of the object whose keys are plugin ids.
     pub root: Vec<String>,
-    /// The field of an install that holds its folder.
+    /// The field of a record that holds its folder.
     pub folder: String,
-    /// The field of an install that holds the Scope it is installed at.
+    /// The field of a record that holds the Scope it is installed at.
     pub scope: Option<String>,
-    /// The field of an install that holds the path of the one Project it
-    /// applies in. Without it, an install applies in every Project.
+    /// The field of a record that holds the path of the one Project it
+    /// applies in. Without it, a record applies in every Project.
     pub project: Option<String>,
-    /// The field of an install that holds its version.
+    /// The field of a record that holds its version.
     pub version: Option<String>,
 }
 
-impl Validate for JsonInstalls {
+impl Validate for JsonPluginRecords {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
         self.anchor.one_file()?;
@@ -731,12 +732,12 @@ impl Validate for JsonInstalls {
     }
 }
 
-impl ListInstalls for JsonInstalls {
+impl ListPlugins for JsonPluginRecords {
     fn anchor(&self) -> &Anchor {
         &self.anchor
     }
 
-    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError> {
+    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError> {
         let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
@@ -745,29 +746,29 @@ impl ListInstalls for JsonInstalls {
         let Some(Value::Object(plugins)) = root else {
             return Ok(Vec::new());
         };
-        let text_of = |install: &Value, field: Option<&String>| {
-            install.get(field?)?.as_str().map(str::to_owned)
+        let text_of = |record: &Value, field: Option<&String>| {
+            record.get(field?)?.as_str().map(str::to_owned)
         };
-        let mut installs = Vec::new();
+        let mut records = Vec::new();
         for (id, value) in plugins {
             let each = match value {
                 Value::Array(each) => each.iter().collect(),
                 value => vec![value],
             };
-            for install in each {
-                let Some(folder) = text_of(install, Some(&self.folder)) else {
+            for record in each {
+                let Some(folder) = text_of(record, Some(&self.folder)) else {
                     continue;
                 };
-                installs.push(Install {
+                records.push(PluginRecord {
                     id: id.clone(),
                     folder,
-                    scope: text_of(install, self.scope.as_ref()),
-                    project: text_of(install, self.project.as_ref()),
-                    version: text_of(install, self.version.as_ref()),
+                    scope: text_of(record, self.scope.as_ref()),
+                    project: text_of(record, self.project.as_ref()),
+                    version: text_of(record, self.version.as_ref()),
                 });
             }
         }
-        Ok(installs)
+        Ok(records)
     }
 }
 
@@ -1622,6 +1623,12 @@ pub(crate) trait Disables {
     /// Enable lifting it.
     fn enable_offered(&self) -> bool;
 
+    /// Whether its switch is one layer of a setting the Agent merges across
+    /// files: among the layered mechanisms of the Item kind, in the
+    /// definition's order, the first whose switch holds a value for the
+    /// Entry decides, and the others are ignored.
+    fn layered(&self) -> bool;
+
     fn locations(&self) -> &[String];
 
     /// Whether it Disables the Entries of the location `id`.
@@ -1707,6 +1714,13 @@ impl Disables for DisableMechanism {
         }
     }
 
+    fn layered(&self) -> bool {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.layered(),
+            DisableMechanism::JsonField(block) => block.layered(),
+        }
+    }
+
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
         match self {
             DisableMechanism::JsonNameList(block) => block.disables(value, name),
@@ -1746,7 +1760,7 @@ pub(crate) enum MechanismTarget {
     /// Every Entry of the Item it covers, since they share the name.
     Name,
     /// Every Entry of the plugin the Entry is part of, of every Item kind.
-    /// The switch's key path names the plugin with `{plugin}`, and it
+    /// The switch's key path names the plugin with `{plugin_id}`, and it
     /// covers locations in plugins only.
     Plugin,
 }
@@ -1855,6 +1869,11 @@ impl Disables for JsonNameList {
         self.enable_offered
     }
 
+    /// The Agent concatenates name lists rather than layering them.
+    fn layered(&self) -> bool {
+        false
+    }
+
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
         occurrences(value, name) > 0
     }
@@ -1923,6 +1942,12 @@ pub(crate) struct JsonField {
     /// file shared with a team or applying to every Project.
     #[serde(default = "offered")]
     pub enable_offered: bool,
+    /// Whether the field is one layer of a setting the Agent merges across
+    /// files, such as Claude Code's `enabledPlugins`: among the layered
+    /// mechanisms of the Item kind, in the definition's order, the first
+    /// whose field holds a value for the Entry decides.
+    #[serde(default)]
+    pub layered: bool,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -1973,6 +1998,10 @@ impl Disables for JsonField {
     }
     fn enable_offered(&self) -> bool {
         self.enable_offered
+    }
+
+    fn layered(&self) -> bool {
+        self.layered
     }
 
     fn disables(&self, value: Option<&Value>, _name: &str) -> bool {
@@ -2041,7 +2070,7 @@ pub(crate) struct Switch {
     /// The key path of the value written. One segment may be `{project}`:
     /// the context's Project key, in the Agent's own spelling, so that the
     /// switch applies only there. One segment after it may be `{name}`,
-    /// the Entry's name, or `{plugin}`, the id of the plugin it is part of.
+    /// the Entry's name, or `{plugin_id}`, the id of the plugin it is part of.
     pub key_path: Vec<String>,
     /// How the switch's file behaves while the Agent runs.
     pub store_class: StoreClass,
@@ -2052,7 +2081,7 @@ pub(crate) const NAME_KEY: &str = "{name}";
 
 /// The switch `key_path` segment that stands for the id of the plugin the
 /// Entry is part of.
-pub(crate) const PLUGIN_KEY: &str = "{plugin}";
+pub(crate) const PLUGIN_KEY: &str = "{plugin_id}";
 
 /// Whether a switch `key_path` segment stands for what the switch holds an
 /// Entry by: its name, or its plugin's id.
@@ -2112,7 +2141,7 @@ impl Switch {
         self.key_path.iter().any(|key| key == NAME_KEY)
     }
 
-    /// Whether its key path holds `{plugin}`, so that it holds one value per plugin.
+    /// Whether its key path holds `{plugin_id}`, so that it holds one value per plugin.
     pub fn plugins(&self) -> bool {
         self.key_path.iter().any(|key| key == PLUGIN_KEY)
     }

@@ -746,7 +746,7 @@
           ]
         },
         "name": {
-          "description": "Where a plugin's name is. Without it, or when the plugin's folder\ndoes not hold one, its name is its id up to `@`.",
+          "description": "Where a plugin's name is. Without it, or when the plugin's folder\ndoes not hold one, its name is its id up to `id_separator`.",
           "anyOf": [
             {
               "$ref": "#/$defs/PluginName"
@@ -754,6 +754,13 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "id_separator": {
+          "description": "The text that ends a plugin's name in its id, such as the `@` before\na marketplace. Without it, a plugin with no name is named by its id.",
+          "type": [
+            "string",
+            "null"
           ]
         },
         "uninstall": {
@@ -772,7 +779,7 @@
       "description": "Where an Agent records the plugins it installed.",
       "oneOf": [
         {
-          "description": "An object in a strict JSON file whose keys are plugin ids, each holding\nthe plugin's installs: an array of objects, one per Scope it is\ninstalled at, or one object. An install without a folder is skipped.",
+          "description": "An object in a strict JSON file whose keys are plugin ids, each holding\nthe plugin's records: an array of objects, one per Scope it is\ninstalled at, or one object. A record without a folder is skipped.",
           "type": "object",
           "properties": {
             "anchor": {
@@ -787,25 +794,25 @@
               }
             },
             "folder": {
-              "description": "The field of an install that holds its folder.",
+              "description": "The field of a record that holds its folder.",
               "type": "string"
             },
             "scope": {
-              "description": "The field of an install that holds the Scope it is installed at.",
+              "description": "The field of a record that holds the Scope it is installed at.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "project": {
-              "description": "The field of an install that holds the path of the one Project it\napplies in. Without it, an install applies in every Project.",
+              "description": "The field of a record that holds the path of the one Project it\napplies in. Without it, a record applies in every Project.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "version": {
-              "description": "The field of an install that holds its version.",
+              "description": "The field of a record that holds its version.",
               "type": [
                 "string",
                 "null"
@@ -813,7 +820,7 @@
             },
             "block": {
               "type": "string",
-              "const": "json-installs"
+              "const": "json-plugin-records"
             }
           },
           "additionalProperties": false,
@@ -1601,6 +1608,11 @@
               "type": "boolean",
               "default": true
             },
+            "layered": {
+              "description": "Whether the field is one layer of a setting the Agent merges across\nfiles, such as Claude Code's `enabledPlugins`: among the layered\nmechanisms of the Item kind, in the definition's order, the first\nwhose field holds a value for the Entry decides.",
+              "type": "boolean",
+              "default": false
+            },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
               "type": "array",
@@ -1635,7 +1647,7 @@
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
-          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`,\nthe Entry's name, or `{plugin}`, the id of the plugin it is part of.",
+          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`,\nthe Entry's name, or `{plugin_id}`, the id of the plugin it is part of.",
           "type": "array",
           "items": {
             "type": "string"
@@ -1667,7 +1679,7 @@
           "const": "name"
         },
         {
-          "description": "Every Entry of the plugin the Entry is part of, of every Item kind.\nThe switch's key path names the plugin with `{plugin}`, and it\ncovers locations in plugins only.",
+          "description": "Every Entry of the plugin the Entry is part of, of every Item kind.\nThe switch's key path names the plugin with `{plugin_id}`, and it\ncovers locations in plugins only.",
           "type": "string",
           "const": "plugin"
         }

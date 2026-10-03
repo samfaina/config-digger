@@ -237,7 +237,9 @@ pub(crate) fn resolve(
                     definition
                         .rules(kind)
                         .competition
-                        .by_endpoint(&entries[index].location),
+                        .by_endpoint(&entries[index].location)
+                        && blocks::endpoint(&entries[index].config)
+                            == blocks::endpoint(&entries[winner].config),
                 )
             };
             let api_entries: Vec<api::Entry> = entries
@@ -649,7 +651,21 @@ fn item_key(
     if !competition.by_endpoint(&location.id) {
         return by_name(entry);
     }
-    let Some(endpoint) = blocks::endpoint(&entry.config) else {
+    // Of same-named Entries that compete by endpoint, such as a plugin's
+    // servers in two of its files, the Agent keeps the one it ranks
+    // highest: they compete with the others by its endpoint.
+    let same_name = in_context
+        .iter()
+        .filter(|other| {
+            other.agent_index == entry.agent_index
+                && other.home == entry.home
+                && other.name == entry.name
+                && competition.by_endpoint(&other.location)
+        })
+        .min_by_key(|other| definition.rank(definition.location(&other.location)))
+        .copied()
+        .unwrap_or(entry);
+    let Some(endpoint) = blocks::endpoint(&same_name.config) else {
         return by_name(entry);
     };
     let named = in_context

@@ -97,7 +97,7 @@ id = "project"
 [[scopes]]
 id = "user"
 
-# What a plugin carries, whatever Scope the plugin is installed at.
+# The Scope Claude Code applies a plugin's servers and skills at [docs].
 [[scopes]]
 id = "plugin"
 
@@ -109,18 +109,20 @@ registries = [
 ]
 
 # Plugins installed from a marketplace [docs, disk]. `installed_plugins.json`
-# maps each `<name>@<marketplace>` to an array of installs, one per Scope,
-# each with its folder in the plugin cache; a `local` or `project` install
-# records the one Project it applies in. When Claude Code updates a plugin
-# it marks the version it supersedes with `.orphaned_at` and deletes it 14
-# days later; it no longer loads it. A plugin is named by its manifest's
-# `name`, the manifest being optional [docs]. `claude plugin uninstall`
-# also deletes the plugin's data folder [docs].
+# maps each `<name>@<marketplace>` to an array of records, one per Scope it
+# is installed at, each with its folder in the plugin cache; a `local` or
+# `project` record names the one Project it applies in. When Claude Code
+# updates a plugin it marks the version it supersedes with `.orphaned_at`
+# and deletes it 14 days later; it no longer loads it. A plugin is named by
+# its manifest's `name`, the manifest being optional [docs], or else by its
+# id up to `@`. `claude plugin uninstall` also deletes the plugin's data
+# folder [docs].
 [[plugins]]
 id = "installed"
-registry = { block = "json-installs", anchor = { block = "home", root = "plugins", path = "installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath", version = "version" }
+registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath", version = "version" }
 superseded_marker = ".orphaned_at"
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
+id_separator = "@"
 uninstall = "claude plugin uninstall {id} --scope {scope}"
 
 # Servers an administrator deploys to the machine [docs]. config-digger
@@ -229,8 +231,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 
 # The servers a plugin's manifest declares in `mcpServers` [docs, disk]:
 # inline, as a path to a file of the plugin shaped like `.mcp.json`, or a
-# list of either. Claude Code reads them after the plugin's `.mcp.json`
-# [docs]. `.mcpb` bundles are not read.
+# list of either. Claude Code reads them after the plugin's `.mcp.json`,
+# and a server name declared later replaces an earlier one [docs], so this
+# location ranks above it. `.mcpb` bundles, and paths written with
+# `${CLAUDE_PLUGIN_ROOT}`, are not read.
 [[locations]]
 id = "plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
@@ -253,7 +257,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # and a trailing slash, or the same command, and loses to any other server
 # [docs]. Which of two plugins with the same endpoint wins is not known.
 [items.mcp]
-precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-mcp", "plugin-manifest-mcp"]
+precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-manifest-mcp", "plugin-mcp"]
 competition = { block = "exact-name", by_endpoint = ["plugin-mcp", "plugin-manifest-mcp"] }
 # An exclusive `managed-mcp.json` suppresses the other servers, and an
 # unapproved server is not loaded: neither competes. The allow and deny
@@ -386,44 +390,48 @@ enable_offered = false
 # A plugin is on or off as a whole, with every server and skill it carries,
 # by `enabledPlugins["<name>@<marketplace>"]` in a settings file, which
 # `claude plugin disable --scope local|project|user` writes [docs, disk].
-# Settings merge the key across files, local over Project over user [docs],
-# but any `false` is read as turning the plugin off. A plugin missing from
-# every file is taken as on. Disable writes `false` to the local settings in
+# Settings merge the key across files, local over Project over user [docs]:
+# the first of these switches that holds the plugin decides. The managed
+# settings, which force a plugin on or off [docs], are not read. A plugin
+# missing from every file is taken as on. Disable writes `false` to the local settings in
 # a Project, and to the user settings otherwise; Enable sets `true`. The
 # shared Project settings belong to the team, so config-digger only reads
 # them. These switches are repeated for skills below.
 [[items.mcp.disable]]
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "project"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-mcp", "plugin-manifest-mcp"]
 
 [[items.mcp.disable]]
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "project"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-mcp", "plugin-manifest-mcp"]
 enable_offered = false
 
 [[items.mcp.disable]]
 block = "json-field"
-switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "all"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-mcp", "plugin-manifest-mcp"]
 
 # Skills are folders holding a `SKILL.md`, read one level down only [docs].
@@ -568,36 +576,39 @@ enable_offered = false
 # A plugin's switches, as for its servers above.
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "project"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-skills"]
 
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "project"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-skills"]
 enable_offered = false
 
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "all"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
+layered = true
 locations = ["plugin-skills"]
 
 # Claude Code fetches GrowthBook features for the signed-in account and

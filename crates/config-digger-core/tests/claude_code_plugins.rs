@@ -548,7 +548,7 @@ id = "plugin"
 
 [[plugins]]
 id = "claude-code"
-registry = { block = "json-installs", anchor = { block = "home", root = "plugins", path = "installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath" }
+registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath" }
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
 uninstall = "claude plugin uninstall {id}"
 
@@ -572,7 +572,7 @@ checks = ["disable", "precedence"]
 
 [[items.mcp.disable]]
 block = "json-field"
-switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "all"
 enable_action = "set"
@@ -666,5 +666,60 @@ fn skill_overrides_does_not_turn_off_a_plugin_skill() {
     assert_eq!(
         code(item(&inventory, "supabase:supabase-postgres").state),
         "effective"
+    );
+}
+
+#[test]
+fn a_more_local_settings_file_turns_a_plugin_back_on() {
+    // The user settings turn superpowers off; petme's local settings turn
+    // it on, and Claude Code merges the key local over Project over user.
+    let fs = fixture().with_file(
+        petme_local_settings(),
+        r#"{ "enabledPlugins": { "superpowers@claude-plugins-official": true } }"#,
+    );
+
+    let in_petme = inventory(&core(&fs), &in_petme());
+    assert_eq!(
+        code(item(&in_petme, "superpowers:brainstorming").state),
+        "effective"
+    );
+    let elsewhere = no_project(&fs);
+    assert_eq!(
+        code(item(&elsewhere, "superpowers:brainstorming").state),
+        "disabled"
+    );
+}
+
+#[test]
+fn a_server_the_manifest_declares_replaces_the_same_named_one_of_the_plugins_mcp_json() {
+    let fs = fixture().with_file(
+        in_cache(r"claude-plugins-official\context7\1.0.0\.claude-plugin\plugin.json"),
+        r#"{ "name": "context7", "mcpServers": { "context7": { "url": "https://context7.example/v2" } } }"#,
+    );
+
+    let inventory = no_project(&fs);
+
+    let manifest = in_cache(r"claude-plugins-official\context7\1.0.0\.claude-plugin\plugin.json");
+    let context7 = item(&inventory, "plugin:context7:context7");
+    let states: Vec<(&Path, String)> = context7
+        .entries
+        .iter()
+        .map(|entry| (entry.path.as_path(), code(entry.state)))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (manifest.as_path(), "effective".to_owned()),
+            (
+                in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json").as_path(),
+                "shadowed".to_owned()
+            ),
+        ]
+    );
+    let reason = context7.entries[1].reason.as_ref().unwrap();
+    assert!(
+        !reason.sentence.contains("same endpoint"),
+        "{}",
+        reason.sentence
     );
 }

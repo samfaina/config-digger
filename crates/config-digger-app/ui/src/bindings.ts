@@ -455,6 +455,7 @@ export type Plugin = {
 	name: string,
 	/**  The Scope it is installed at, as the Agent records it. */
 	scope: string | null,
+	/**  Its version, as the Agent records it. */
 	version: string | null,
 	/**  The folder its files are in. */
 	folder: string,

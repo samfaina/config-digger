@@ -1419,6 +1419,7 @@ pub struct Plugin {
     pub name: String,
     /// The Scope it is installed at, as the Agent records it.
     pub scope: Option<String>,
+    /// Its version, as the Agent records it.
     pub version: Option<String>,
     /// The folder its files are in.
     pub folder: PathBuf,

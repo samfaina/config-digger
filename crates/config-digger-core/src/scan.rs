@@ -5,7 +5,7 @@
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bypasses, Cached, Disables, Format, Gate, GateStore, JsonFormat,
-    ListInstalls, Locate, LookUp, NameFrom, Parse, ProjectWalk, Register, SettingsSource,
+    ListPlugins, Locate, LookUp, NameFrom, Parse, ProjectWalk, Register, SettingsSource,
     SkillDefect, SkillFolder, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
@@ -58,7 +58,7 @@ pub(crate) struct Snapshot {
     pub unreadable_settings: BTreeSet<PathBuf>,
 }
 
-/// One install of a plugin an Agent home loads.
+/// A plugin an Agent home loads, as one of its records says.
 #[derive(Clone)]
 pub(crate) struct ScannedPlugin {
     /// The id of the `[[plugins]]` that lists it.
@@ -73,6 +73,7 @@ pub(crate) struct ScannedPlugin {
     pub scope: Option<String>,
     /// The key of the one Project it applies in, `None` when it applies in every one.
     pub project: Option<String>,
+    /// Its version, as the Agent records it.
     pub version: Option<String>,
 }
 
@@ -203,9 +204,9 @@ pub(crate) struct ScannedSwitch {
     /// The key of the Project it applies in, or `None` when it applies in every context.
     pub project: Option<String>,
     /// Its key path, `{project}` replaced by the Project key in the Agent's
-    /// own spelling, `{name}` or `{plugin}` left in place.
+    /// own spelling, `{name}` or `{plugin_id}` left in place.
     pub key_path: Vec<String>,
-    /// What the file holds at the key path, up to `{name}` or `{plugin}`
+    /// What the file holds at the key path, up to `{name}` or `{plugin_id}`
     /// when it has one:
     /// `None` when the file or key is missing.
     pub value: Option<serde_json::Value>,
@@ -1320,9 +1321,9 @@ impl Scanner<'_> {
         }
     }
 
-    /// The plugins of `plugins` that the Agent home installed, each install
+    /// The plugins of `plugins` that the Agent home installed, each record
     /// once, leaving out those whose folder carries the superseded marker.
-    /// The Project an install applies in is recorded as a Project.
+    /// The Project a record applies in is recorded as a Project.
     fn read_plugins(
         &mut self,
         home: &FoundHome,
@@ -1335,8 +1336,8 @@ impl Scanner<'_> {
         let Some(text) = self.reader.text(home, &path, None) else {
             return Vec::new();
         };
-        let installs = match registry.installs(text) {
-            Ok(installs) => installs,
+        let records = match registry.records(text) {
+            Ok(records) => records,
             Err(error) => {
                 self.reader
                     .fail(home, &path, None, ReadFailureKind::Parse, error.position);
@@ -1344,10 +1345,10 @@ impl Scanner<'_> {
             }
         };
         let mut found = Vec::new();
-        for install in installs {
-            let folder = paths::lexical(Path::new(&install.folder));
+        for record in records {
+            let folder = paths::lexical(Path::new(&record.folder));
             if !paths::is_absolute(&folder) {
-                tracing::debug!(plugin = %install.id, "plugin folder is not absolute");
+                tracing::debug!(plugin = %record.id, "plugin folder is not absolute");
                 continue;
             }
             let superseded = plugins.superseded_marker.as_ref().is_some_and(|marker| {
@@ -1356,10 +1357,10 @@ impl Scanner<'_> {
                     .exists(&blocks::join_relative(&folder, marker))
             });
             if superseded {
-                tracing::debug!(plugin = %install.id, "plugin folder superseded");
+                tracing::debug!(plugin = %record.id, "plugin folder superseded");
                 continue;
             }
-            let project = match &install.project {
+            let project = match &record.project {
                 Some(spelling) => match self.projects.add(Path::new(spelling), None) {
                     Some(key) => Some(key),
                     // Bound to something that is not a Project path: no context loads it.
@@ -1375,17 +1376,19 @@ impl Scanner<'_> {
                 (!named.is_empty()).then(|| named.to_owned())
             });
             let name = named.unwrap_or_else(|| {
-                let id = install.id.as_str();
-                id.split_once('@').map_or(id, |(name, _)| name).to_owned()
+                let id = record.id.as_str();
+                let separator = plugins.id_separator.as_deref();
+                let name = separator.and_then(|separator| id.split_once(separator));
+                name.map_or(id, |(name, _)| name).to_owned()
             });
             found.push(ScannedPlugin {
                 plugins: plugins.id.clone(),
-                id: install.id,
+                id: record.id,
                 name,
                 folder,
-                scope: install.scope,
+                scope: record.scope,
                 project,
-                version: install.version,
+                version: record.version,
             });
         }
         found
