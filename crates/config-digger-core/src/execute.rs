@@ -750,6 +750,96 @@ mod tests {
         );
     }
 
+    /// An Agent that reads the servers at `ROOT` in `~/.claude.json` too, as
+    /// JSONC with trailing commas.
+    const JSONC_READER: &str = r#"
+format_version = 1
+
+[agent]
+id = "jsonc-reader"
+name = "JSONC Reader"
+
+[[homes]]
+id = "default"
+roots.state = { block = "path", path = "~/.claude.json" }
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "state" }
+format = { block = "json", dialect = "jsonc" }
+root = ["ROOT"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.mcp]
+precedence = ["user-mcp"]
+competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
+"#;
+
+    /// Executes the plan to remove the one `linear` with the JSONC Reader
+    /// reading the servers at `root`, writing `bytes` in place of what the
+    /// edit computed.
+    fn execute_writing_with_jsonc_reader(
+        fs: &FakeFileSystem,
+        root: &str,
+        bytes: &str,
+    ) -> Result<crate::api::Outcome, crate::api::Error> {
+        let env = FakeEnvironment::with_home(r"C:\Users\fixture")
+            .with_var("LOCALAPPDATA", r"C:\Users\fixture\AppData\Local");
+        let core = Core::with_extra_definitions(
+            fake::ports(fs.clone(), env),
+            &[("jsonc-reader.toml", &JSONC_READER.replace("ROOT", root))],
+        )
+        .unwrap();
+        let snapshot = core.scan(&ScanOptions::default()).unwrap();
+        let targets = Targets {
+            selectors: vec!["linear".to_owned()],
+            all: false,
+        };
+        let mut plan = core
+            .plan(&snapshot, &Context::default(), Action::Remove, &targets)
+            .unwrap();
+        plan.0.files[0].edited.bytes = bytes.as_bytes().to_vec();
+        core.execute(plan, &[])
+    }
+
+    #[test]
+    fn a_write_that_leaves_a_read_failure_for_a_stricter_reader_is_rolled_back() {
+        let fs = FakeFileSystem::new().with_file(CLAUDE_JSON, SERVERS);
+
+        // The JSONC Reader still reads it; Claude Code, in strict JSON, no
+        // longer does.
+        let error =
+            execute_writing_with_jsonc_reader(&fs, "otherServers", r#"{"mcpServers": {},}"#)
+                .unwrap_err();
+
+        assert_eq!(error.code, ErrorCode::ReadFailureIntroduced);
+        assert!(error.message.contains("Claude Code"), "{}", error.message);
+        assert!(!error.message.contains("JSONC Reader"), "{}", error.message);
+        assert_eq!(fs.contents(CLAUDE_JSON).unwrap(), SERVERS.as_bytes());
+    }
+
+    #[test]
+    fn a_reader_that_could_not_read_the_file_before_does_not_fail_verify() {
+        let before = "{\n  // mine\n  \"mcpServers\": {\"linear\": {\"url\": \"https://x\"}}\n}";
+        let fs = FakeFileSystem::new().with_file(CLAUDE_JSON, before);
+
+        let outcome = execute_writing_with_jsonc_reader(
+            &fs,
+            "mcpServers",
+            "{\n  // mine\n  \"mcpServers\": {}\n}",
+        );
+
+        assert!(outcome.is_ok(), "{outcome:?}");
+    }
+
     #[test]
     fn a_write_its_reader_cannot_parse_any_more_is_rolled_back() {
         let fs = FakeFileSystem::new().with_file(CLAUDE_JSON, SERVERS);

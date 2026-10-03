@@ -4,8 +4,8 @@
 
 use crate::api::{
     self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, State, StateAfter, Targets,
-    Warning, WarningClass,
+    FileChange, FileDiff, Info, InfoCode, Inventory, Preview, ReadFailure, ReadFailureKind,
+    ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -349,6 +349,7 @@ impl Targeted<'_> {
             changes,
             effective,
             &files,
+            &self.before.read_failures,
         )?;
         let running = running::check(self.definitions, self.ports, &files);
         let mut warnings = warnings(&files, running.warning);
@@ -429,6 +430,7 @@ pub(crate) fn plan_undo(
         changes,
         effective,
         &files,
+        &before.read_failures,
     )?;
     let running = running::check(definitions, ports, &files);
     Ok(Planned {
@@ -473,6 +475,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         project: None,
         changes: Vec::new(),
         effective: Vec::new(),
+        info: Vec::new(),
         files: Vec::new(),
         deleted,
         backup_note: explain::delete_backup_note(id),
@@ -785,8 +788,10 @@ fn preview(
     changes: Vec<Change>,
     effective: Vec<EffectiveChange>,
     files: &[PlannedFile],
+    read_failures: &[ReadFailure],
 ) -> Result<Preview, Error> {
     let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
+    let info = info(read_failures, &changes, files)?;
     Ok(Preview {
         action,
         title,
@@ -795,6 +800,7 @@ fn preview(
         project,
         changes,
         effective,
+        info,
         files: files
             .iter()
             .map(|file| {
@@ -824,6 +830,52 @@ fn preview(
         backup_note: explain::backup_note(&backup_folder),
         backup_folder,
     })
+}
+
+/// What the preview of a plan that writes `files` and changes the States
+/// `changes` says about `read_failures`, which the scan met: that an Agent
+/// still rejects a file it writes, and that a location which could change
+/// the outcome cannot be read. A file it writes that cannot be opened or
+/// decoded refuses the plan: config-digger never repairs one.
+fn info(
+    read_failures: &[ReadFailure],
+    changes: &[Change],
+    files: &[PlannedFile],
+) -> Result<Vec<Info>, Error> {
+    let mut info = Vec::new();
+    for failure in read_failures {
+        if files.iter().any(|file| file.path == failure.path) {
+            if failure.kind != ReadFailureKind::Parse {
+                return Err(Error::blocked(explain::read_failure_target(
+                    &failure.path,
+                    &failure.sentence,
+                )));
+            }
+            info.push(Info {
+                code: InfoCode::StillRejected,
+                path: failure.path.clone(),
+                sentence: explain::still_rejected(
+                    &failure.agent_name,
+                    &failure.path,
+                    &failure.sentence,
+                ),
+            });
+            continue;
+        }
+        let could_change = changes.iter().any(|change| {
+            change.agent == failure.agent
+                && change.home == failure.home
+                && (failure.project.is_none() || failure.project == change.project)
+        });
+        if could_change {
+            info.push(Info {
+                code: InfoCode::UnreadableLocation,
+                path: failure.path.clone(),
+                sentence: explain::outcome_may_differ(&failure.agent_name, &failure.path),
+            });
+        }
+    }
+    Ok(info)
 }
 
 /// What a plan that edits `files` must have acknowledged: one warning for

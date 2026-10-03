@@ -589,3 +589,30 @@ pub(crate) fn unreadable_switch(path: &Path) -> String {
         path.display()
     )
 }
+
+/// The info row of a plan that writes `path`, which `agent_name` rejects
+/// before and after it, as `failure` says.
+pub(crate) fn still_rejected(agent_name: &str, path: &Path, failure: &str) -> String {
+    format!(
+        "{agent_name} still rejects {} after this change: {failure}",
+        path.display()
+    )
+}
+
+/// The info row of a plan whose States after could differ, since `path`,
+/// which `agent_name` could read, cannot be read.
+pub(crate) fn outcome_may_differ(agent_name: &str, path: &Path) -> String {
+    format!(
+        "{agent_name} couldn't read {}, so its States after this change may differ.",
+        path.display()
+    )
+}
+
+/// Why a plan that must write `path`, a Read failure as `failure` says, is
+/// refused.
+pub(crate) fn read_failure_target(path: &Path, failure: &str) -> String {
+    format!(
+        "{} is a Read failure, and config-digger never writes a file it cannot read: {failure}",
+        path.display()
+    )
+}

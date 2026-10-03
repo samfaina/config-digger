@@ -2,7 +2,9 @@
 //! parsed in each reader's dialect, broken fixture files per dialect, and
 //! what each Agent does about a location it cannot read.
 
-use config_digger_core::api::{Context, Core, ScanOptions};
+use config_digger_core::api::{
+    Action, Context, Core, Error, ErrorCode, Plan, ScanOptions, Targets,
+};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -537,4 +539,90 @@ fn an_unreadable_disable_store_resolves_with_defaults_and_a_caveat() {
     assert_eq!(github["disable"]["path"], json!(in_home(".claude.json")));
     // The store only covers `.mcp.json` servers.
     assert_eq!(inventory["items"][1]["entries"][0]["caveats"], json!([]));
+}
+
+/// The core over `fs`, with `definitions` loaded besides the built-in ones.
+fn core(fs: FakeFileSystem, definitions: &[(&str, &str)]) -> Core {
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("LOCALAPPDATA", r"C:\Users\fixture\AppData\Local");
+    Core::with_extra_definitions(fake::ports(fs, env), definitions).unwrap()
+}
+
+/// Plans `action` on `selector` in the Project.
+fn plan(core: &Core, action: Action, selector: &str) -> Result<Plan, Error> {
+    let options = ScanOptions {
+        projects: vec![PathBuf::from(PROJECT)],
+    };
+    let snapshot = core.scan(&options).unwrap();
+    let context = Context {
+        project: Some(PathBuf::from(PROJECT)),
+    };
+    let targets = Targets {
+        selectors: vec![selector.to_owned()],
+        all: false,
+    };
+    core.plan(&snapshot, &context, action, &targets)
+}
+
+#[test]
+fn disable_is_refused_when_every_switch_store_is_a_read_failure() {
+    let fs = with_mcp_json(r#"{"mcpServers": {"github": {"command": "gh"}}}"#)
+        .with_file(in_home(".claude.json"), BROKEN_JSON)
+        .with_file(
+            PathBuf::from(PROJECT).join(r".claude\settings.local.json"),
+            BROKEN_JSON,
+        );
+
+    let error = plan(&core(fs, &[]), Action::Disable, "github")
+        .err()
+        .unwrap();
+
+    assert_eq!(error.code, ErrorCode::Blocked);
+    assert!(error.message.contains("cannot read"), "{}", error.message);
+}
+
+#[test]
+fn a_read_failure_that_could_change_the_outcome_adds_an_info_row_with_no_ack() {
+    let fs = FakeFileSystem::new()
+        .with_file(
+            in_home(".claude.json"),
+            r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}}"#,
+        )
+        .with_file(mcp_json(), BROKEN_JSON);
+
+    let plan = plan(&core(fs, &[]), Action::Remove, "linear").unwrap();
+
+    assert_eq!(
+        serde_json::to_value(&plan.preview().info).unwrap(),
+        json!([{
+            "code": "unreadable_location",
+            "path": mcp_json(),
+            "sentence": r"Claude Code couldn't read E:\work\app\.mcp.json, so its States after this change may differ."
+        }])
+    );
+    assert_eq!(plan.warnings(), []);
+    assert_eq!(plan.blocks(), []);
+}
+
+#[test]
+fn writing_a_file_another_reader_rejects_notes_that_it_still_rejects_it() {
+    let fs = with_mcp_json(
+        "{\n  // the team's servers\n  \"mcpServers\": { \"github\": { \"command\": \"gh\" } }\n}\n",
+    );
+
+    let plan = plan(
+        &core(fs, &[("jsonc-agent.toml", JSONC_AGENT)]),
+        Action::Remove,
+        "github",
+    )
+    .unwrap();
+
+    assert_eq!(
+        serde_json::to_value(&plan.preview().info).unwrap(),
+        json!([{
+            "code": "still_rejected",
+            "path": mcp_json(),
+            "sentence": r"Claude Code still rejects E:\work\app\.mcp.json after this change: Claude Code cannot parse E:\work\app\.mcp.json as strict JSON (line 2, column 3), so it reads no Entries from it."
+        }])
+    );
 }

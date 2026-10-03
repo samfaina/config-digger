@@ -312,6 +312,9 @@ pub struct Preview {
     pub changes: Vec<Change>,
     /// For each Item that keeps Entries, which one is Effective afterwards.
     pub effective: Vec<EffectiveChange>,
+    /// What to know before applying it, with nothing to acknowledge, such
+    /// as a location that could change the outcome and cannot be read.
+    pub info: Vec<Info>,
     pub files: Vec<FileChange>,
     /// The backed-up copies a Delete backup deletes for good.
     pub deleted: Vec<PathBuf>,
@@ -320,6 +323,28 @@ pub struct Preview {
     pub backup_folder: PathBuf,
     /// The same, as a sentence.
     pub backup_note: String,
+}
+
+/// Something a preview says before an Operation is applied, which needs no
+/// acknowledgement.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Info {
+    pub code: InfoCode,
+    /// The location it is about.
+    pub path: PathBuf,
+    /// What to know, as a sentence rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum InfoCode {
+    /// A location that could change the States after the Operation is a
+    /// Read failure, so they may differ from the prediction.
+    UnreadableLocation,
+    /// A file the Operation writes is a Read failure for an Agent, which
+    /// still rejects it afterwards.
+    StillRejected,
 }
 
 /// An Entry's State in one Agent and context, before and after an Operation.
