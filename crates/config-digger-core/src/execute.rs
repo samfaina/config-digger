@@ -11,10 +11,11 @@ use crate::api::{
 };
 use crate::definitions::AgentDefinition;
 use crate::edit::EditableFile;
-use crate::history::{self, EditRecord, LocationRecord, Manifest, VerifyRecord};
+use crate::folders::{self, FolderOp, PlannedFolder};
+use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::mask::{self, Side};
 use crate::plan::{self, Planned, PlannedFile};
-use crate::ports::Ports;
+use crate::ports::{FileSystem, Ports};
 use crate::{explain, resolve, running, scan};
 use serde_json::Value;
 use std::io;
@@ -94,6 +95,9 @@ pub(crate) fn execute(
         .iter()
         .map(|file| reread(ports, file))
         .collect::<Result<Vec<_>, _>>()?;
+    for folder in &planned.folders {
+        check_folder(ports, folder)?;
+    }
 
     let now = ports.clock.now();
     let sequence = history::next_sequence(ports)?;
@@ -128,6 +132,21 @@ pub(crate) fn execute(
             deleted_edits: Vec::new(),
         });
     }
+    let mut pending = Vec::new();
+    for (index, touched) in planned.folders.iter().enumerate() {
+        let name = backup_name(writes.len() + index, &touched.path);
+        manifest.folders.push(FolderRecord::new(
+            &touched.path,
+            &touched.op,
+            touched.size,
+            &name,
+        ));
+        let backup = (touched.op == FolderOp::MoveToBackup).then(|| folder.join(&name));
+        pending.push(PendingFolder {
+            folder: touched,
+            backup,
+        });
+    }
     history::record(ports, &folder, &manifest).map_err(Error::backup_failed)?;
 
     let mut written = 0;
@@ -149,14 +168,28 @@ pub(crate) fn execute(
         }
         written += 1;
     }
+    let mut done = 0;
+    if failure.is_none() {
+        for touched in &pending {
+            if let Err(error) = do_folder(ports, touched) {
+                failure = Some(Failure::new(
+                    ErrorCode::WriteFailed,
+                    explain::folder_failed(&touched.folder.op, &touched.folder.path, &error),
+                ));
+                break;
+            }
+            done += 1;
+        }
+    }
     let verified = match failure {
         Some(failure) => Err(failure),
-        None => verify(definitions, ports, &planned, &writes),
+        None => verify(definitions, ports, &planned, &writes, &pending),
     };
     let differences = match verified {
         Ok(differences) => differences,
         Err(failure) => {
-            let rollback = roll_back(ports, &writes, written);
+            let mut rollback = roll_back(ports, &writes, written);
+            rollback.extend(roll_back_folders(ports, &pending, done));
             return Err(fail(
                 definitions,
                 ports,
@@ -262,6 +295,163 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, 
     })
 }
 
+/// One skill folder's location about to be touched.
+struct PendingFolder<'p> {
+    folder: &'p PlannedFolder,
+    /// Where a folder moved into the backup goes.
+    backup: Option<PathBuf>,
+}
+
+/// Checks under the lock that a skill folder's location is still as the
+/// plan saw it.
+fn check_folder(ports: &Ports, folder: &PlannedFolder) -> Result<(), Error> {
+    let fs = ports.fs.as_ref();
+    let path = &folder.path;
+    let unchanged = match &folder.op {
+        FolderOp::MoveToBackup => folders::holds(fs, path, folder.size),
+        FolderOp::RemoveLink { target } => folders::links_to(fs, path, target),
+        FolderOp::MoveBack { from } => !folders::taken(fs, path) && fs.exists(from),
+        FolderOp::CreateLink { .. } => !folders::taken(fs, path),
+    };
+    if unchanged {
+        return Ok(());
+    }
+    Err(Error::stale(format!(
+        "{} changed since the preview",
+        path.display()
+    )))
+}
+
+/// Moves, removes or creates what the plan says at one skill folder's location.
+fn do_folder(ports: &Ports, touched: &PendingFolder) -> io::Result<()> {
+    let fs = ports.fs.as_ref();
+    let path = &touched.folder.path;
+    match (&touched.folder.op, &touched.backup) {
+        (FolderOp::MoveToBackup, Some(backup)) => fs.move_folder(path, backup),
+        (FolderOp::MoveToBackup, None) => Err(io::Error::other("no backup to move it to")),
+        (FolderOp::RemoveLink { .. }, _) => fs.remove_link(path),
+        (FolderOp::MoveBack { from }, _) => {
+            parent(fs, path).and_then(|()| fs.move_folder(from, path))
+        }
+        (FolderOp::CreateLink { target }, _) => {
+            parent(fs, path).and_then(|()| fs.create_link(path, target))
+        }
+    }
+}
+
+/// Creates the folder `path` goes in, if it is missing.
+fn parent(fs: &dyn FileSystem, path: &Path) -> io::Result<()> {
+    path.parent()
+        .map_or(Ok(()), |parent| fs.create_dir_all(parent))
+}
+
+/// Verify of one skill folder's location: a folder moved into the backup
+/// is gone and its copy holds as many files of the same total size; a link
+/// removed is gone and its target is intact; a folder moved back holds its
+/// files again; a link created points to its target.
+fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> {
+    let fs = ports.fs.as_ref();
+    let folder = touched.folder;
+    let path = &folder.path;
+    let failed = |cause: String| Err(Failure::new(ErrorCode::VerifyFailed, cause));
+    let size = explain::folder_size(folder.size);
+    match (&folder.op, &touched.backup) {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
+            failed(format!("{} is still there", path.display()))
+        }
+        (FolderOp::MoveToBackup, Some(backup)) if !folders::holds(fs, backup, folder.size) => {
+            failed(format!(
+                "the copy of {} in the backup does not hold its {size}",
+                path.display()
+            ))
+        }
+        (FolderOp::RemoveLink { target }, _)
+            // The target may be a link itself, measured through.
+            if folder.size.files > 0
+                && folders::measure(fs, target).ok() != Some(folder.size) =>
+        {
+            failed(format!(
+                "the target {} of the link {} no longer holds its {size}",
+                target.display(),
+                path.display()
+            ))
+        }
+        (FolderOp::MoveBack { from }, _) if !folders::holds(fs, path, folder.size) || fs.exists(from) => {
+            failed(format!(
+                "the skill folder {} does not hold its {size} again",
+                path.display()
+            ))
+        }
+        (FolderOp::CreateLink { target }, _) if !folders::links_to(fs, path, target) => failed(format!(
+            "the link {} does not point to {}",
+            path.display(),
+            target.display()
+        )),
+        _ => Ok(()),
+    }
+}
+
+/// Rollback of the skill folders' locations: each of the first `done` is
+/// put back as it was, unless something else is there since.
+fn roll_back_folders(
+    ports: &Ports,
+    folders: &[PendingFolder],
+    done: usize,
+) -> Vec<RollbackLocation> {
+    folders
+        .iter()
+        .enumerate()
+        .map(|(index, touched)| {
+            let (outcome, reason) = if index < done {
+                restore_folder(ports, touched)
+            } else {
+                (RollbackOutcome::NotWritten, None)
+            };
+            RollbackLocation {
+                path: touched.folder.path.clone(),
+                outcome,
+                reason,
+            }
+        })
+        .collect()
+}
+
+/// Rolls one skill folder's location back, and says why when it is not restored.
+fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, Option<String>) {
+    let fs = ports.fs.as_ref();
+    let path = &touched.folder.path;
+    let not_restored = |reason: String| (RollbackOutcome::NotRestored, Some(reason));
+    let occupied =
+        || not_restored("Something else is there since config-digger touched it.".into());
+    let restored = match (&touched.folder.op, &touched.backup) {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
+            return occupied();
+        }
+        (FolderOp::MoveToBackup, Some(backup)) => {
+            parent(fs, path).and_then(|()| fs.move_folder(backup, path))
+        }
+        (FolderOp::MoveToBackup, None) => return (RollbackOutcome::NotWritten, None),
+        (FolderOp::RemoveLink { target }, _) => {
+            parent(fs, path).and_then(|()| fs.create_link(path, target))
+        }
+        (FolderOp::MoveBack { from }, _) if folders::taken(fs, from) => return occupied(),
+        (FolderOp::MoveBack { from }, _) => fs.move_folder(path, from),
+        (FolderOp::CreateLink { target }, _) if folders::links_to(fs, path, target) => {
+            fs.remove_link(path)
+        }
+        (FolderOp::CreateLink { .. }, _) => {
+            return (
+                RollbackOutcome::LeftAlone,
+                Some("It changed after config-digger created it, so it is left as it is.".into()),
+            );
+        }
+    };
+    match restored {
+        Ok(()) => (RollbackOutcome::Restored, None),
+        Err(error) => not_restored(format!("Cannot put it back: {error}.")),
+    }
+}
+
 /// Creates the Operation's folder under a fresh id.
 fn operation_folder(
     ports: &Ports,
@@ -327,17 +517,22 @@ impl Failure {
     }
 }
 
-/// Verify: each edit landed, and every written file still parses for each
-/// reader that could read it before. Then it scans and resolves the context
+/// Verify: each edit landed, every written file still parses for each
+/// reader that could read it before, and each skill folder moved whole or
+/// link removed or created as planned. Then it scans and resolves the context
 /// again and compares each predicted State with the actual one.
 fn verify(
     definitions: &[AgentDefinition],
     ports: &Ports,
     planned: &Planned,
     writes: &[PendingWrite],
+    folders: &[PendingFolder],
 ) -> Result<Vec<Difference>, Failure> {
     for write in writes {
         verify_file(ports, planned, write)?;
+    }
+    for touched in folders {
+        verify_folder(ports, touched)?;
     }
     let snapshot =
         scan::scan(definitions, ports, &planned.scan_options.projects).map_err(|error| {

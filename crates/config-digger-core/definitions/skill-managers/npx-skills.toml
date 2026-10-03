@@ -1,0 +1,50 @@
+#:schema ../../../../schema/skill-manager-definition.schema.json
+# `npx skills` (vercel-labs/skills). Facts from docs/research/skill-managers.md
+# on research/skill-managers (verified against 1.7.0).
+
+format_version = 1
+
+[manager]
+id = "npx-skills"
+name = "npx skills"
+
+# It keeps one copy per skill in `.agents/skills` and junctions it into the
+# folders of Agents that do not read `.agents/skills` [disk].
+[[detectors]]
+block = "link-target-glob"
+glob = ".agents/skills/*"
+strength = "strong"
+
+# The copy itself, or a copy it wrote when the junction failed or in copy
+# mode, looks like any folder there or any folder named like a locked skill
+# [disk]. Its lock files key skills by their original name, which it turns
+# into the folder name [source].
+[[detectors]]
+block = "location-glob"
+glob = ".agents/skills/*"
+strength = "weak"
+
+# User Scope installs from a remote source.
+[[detectors]]
+block = "lock-file-entry"
+file = "~/.agents/.skill-lock.json"
+key_path = ["skills"]
+sanitize = "lowercase-hyphens-dots"
+strength = "weak"
+
+# The same, when `XDG_STATE_HOME` moves the user lock.
+[[detectors]]
+block = "lock-file-entry"
+file = "%XDG_STATE_HOME%/skills/.skill-lock.json"
+key_path = ["skills"]
+sanitize = "lowercase-hyphens-dots"
+strength = "weak"
+
+# Project Scope installs, locked in the Project folder, three folders up
+# from a skill in `.agents/skills` or `.claude/skills`.
+[[detectors]]
+block = "lock-file-entry"
+file = "../../../skills-lock.json"
+key_path = ["skills"]
+sanitize = "lowercase-hyphens-dots"
+strength = "weak"

@@ -9,6 +9,7 @@ pub mod ports;
 mod disable;
 mod execute;
 mod explain;
+mod folders;
 mod history;
 mod installations;
 mod locator;

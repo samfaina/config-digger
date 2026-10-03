@@ -2,10 +2,12 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{
-    Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, State, Verify,
+    Action, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
+    State, Verify,
 };
 use crate::definitions::blocks::{FieldType, Malformed, SkillDefect};
 use crate::edit::Edit;
+use crate::folders::{FolderOp, FolderSize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -43,6 +45,19 @@ pub(crate) fn project_missing(agent_name: &str, project: &Path) -> Reason {
         sentence: format!(
             "{agent_name} never reads it: it is keyed to the Project {}, whose folder no longer exists. It can only be Removed.",
             project.display()
+        ),
+    }
+}
+
+/// An Unread Linked Entry's reason: its link points to `target`, which is gone.
+pub(crate) fn link_broken(agent_name: &str, target: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::LinkBroken,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} reads nothing here: the link points to {}, which is gone. It can only be Removed.",
+            target.display()
         ),
     }
 }
@@ -778,7 +793,97 @@ pub(crate) fn read_only_remove(locator: &str) -> String {
     format!("cannot Remove {locator}: {READ_ONLY}")
 }
 
-/// Why Remove is refused for the skill folder at `locator`.
-pub(crate) fn skill_remove_not_offered(locator: &str) -> String {
-    format!("cannot Remove {locator}: Remove of a skill folder is not available yet")
+/// What an Operation does at the skill folder's location `path`, whose
+/// folder, or the link's `target`, has `size`.
+pub(crate) fn folder_change(
+    change: FolderChangeKind,
+    path: &Path,
+    target: Option<&PathBuf>,
+    size: FolderSize,
+) -> String {
+    let target = target.map_or_else(String::new, |target| target.display().to_string());
+    let size = folder_size(size);
+    let path = path.display();
+    match change {
+        FolderChangeKind::MovedToBackup => {
+            format!("Moves the skill folder {path} ({size}) into the backup.")
+        }
+        FolderChangeKind::LinkRemoved => {
+            format!("Removes the link {path} only; its target {target} ({size}) stays as it is.")
+        }
+        FolderChangeKind::MovedBack => {
+            format!("Moves the skill folder {path} ({size}) back from the backup.")
+        }
+        FolderChangeKind::LinkCreated => format!("Creates the link {path} to {target} again."),
+    }
+}
+
+/// A folder's size as "2 files, 80 bytes".
+pub(crate) fn folder_size(size: FolderSize) -> String {
+    let files = match size.files {
+        1 => "1 file".to_owned(),
+        n => format!("{n} files"),
+    };
+    let bytes = match size.bytes {
+        1 => "1 byte".to_owned(),
+        n => format!("{n} bytes"),
+    };
+    format!("{files}, {bytes}")
+}
+
+/// The `breaks-links` warning: each folder moved into the backup leaves
+/// the Linked Entries that point into it broken. Each pair is a link and
+/// the folder it points into.
+pub(crate) fn breaks_links(broken: &[(&Path, &Path)]) -> String {
+    let mut folders: Vec<&Path> = Vec::new();
+    for (_, folder) in broken {
+        if !folders.contains(folder) {
+            folders.push(folder);
+        }
+    }
+    let sentences: Vec<String> = folders
+        .iter()
+        .map(|folder| {
+            let links: Vec<&Path> = broken
+                .iter()
+                .filter(|(_, into)| into == folder)
+                .map(|(link, _)| *link)
+                .collect();
+            let (noun, rest) = match links.len() {
+                1 => (
+                    "link",
+                    "It stays, as an Unread Entry, until it is Removed on its own.",
+                ),
+                _ => (
+                    "links",
+                    "They stay, as Unread Entries, until each is Removed on its own.",
+                ),
+            };
+            format!(
+                "Removing {} leaves the {noun} {} pointing to nothing. {rest}",
+                folder.display(),
+                path_list(&links)
+            )
+        })
+        .collect();
+    sentences.join(" ")
+}
+
+/// Why an Operation could not do `op` at the skill folder's location `path`.
+pub(crate) fn folder_failed(op: &FolderOp, path: &Path, error: &std::io::Error) -> String {
+    let path = path.display();
+    match op {
+        FolderOp::MoveToBackup => format!("cannot move {path} into the backup: {error}"),
+        FolderOp::RemoveLink { .. } => format!("cannot remove the link {path}: {error}"),
+        FolderOp::MoveBack { .. } => format!("cannot move {path} back: {error}"),
+        FolderOp::CreateLink { .. } => format!("cannot create the link {path}: {error}"),
+    }
+}
+
+/// The note on a skill whose skill manager, `manager`, is recognised only
+/// by a weak detector.
+pub(crate) fn provenance_by_name_only(manager: &str) -> String {
+    format!(
+        "config-digger takes it to be installed by {manager} from its name or where it is alone, which a folder made by hand matches too."
+    )
 }

@@ -7,9 +7,11 @@ use crate::definitions::blocks::{
     Anchored, Disables, Format, JsonFormat, Locate, NAME_KEY, NameFrom, Parse, ProjectWalk,
     Register, SkillDefect, SkillFolder, StoreClass,
 };
+use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
+use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
-use crate::ports::Ports;
+use crate::ports::{FileSystem, Ports};
 use crate::user_list::{self, UserList};
 use crate::{mask, paths, skill};
 use std::collections::{BTreeMap, BTreeSet};
@@ -262,6 +264,36 @@ pub(crate) struct ScannedEntry {
     pub depth: usize,
     /// For a skill, why the Agent may not read its `SKILL.md` as written.
     pub defect: Option<SkillDefect>,
+    /// For a Linked Entry, where its link points.
+    pub link: Option<ScannedLink>,
+    /// For a skill, the skill manager that installed it, as far as one's
+    /// definition recognises it.
+    pub manager: Option<ManagerMatch>,
+}
+
+/// The skill manager whose detectors match a skill folder most strongly.
+#[derive(Clone, Copy)]
+pub(crate) struct ManagerMatch {
+    /// Index of its definition among the built-in skill manager definitions.
+    pub manager: usize,
+    pub strength: Strength,
+}
+
+/// Where the link or junction at a Linked Entry's location points.
+#[derive(Clone)]
+pub(crate) struct ScannedLink {
+    /// The path the link holds, made absolute: what Remove checks it still
+    /// points to, and Undo points it to again.
+    pub target: PathBuf,
+    /// The real path the link leads to, through any further links; `None`
+    /// when the target is gone, so the Agent reads nothing there.
+    pub real: Option<PathBuf>,
+}
+
+impl ScannedLink {
+    pub fn broken(&self) -> bool {
+        self.real.is_none()
+    }
 }
 
 #[derive(Clone)]
@@ -313,24 +345,27 @@ pub(crate) fn scan(
     ports: &Ports,
     extra_projects: &[PathBuf],
 ) -> Result<Snapshot, ScanError> {
-    scan_as_if(definitions, ports, extra_projects, &[])
+    scan_as_if(definitions, ports, extra_projects, &[], &[])
 }
 
 /// Scans as [`scan`] does, as if each file in `written` held the bytes paired
-/// with it, so that a plan can predict what a scan will read once it is done.
+/// with it and `folders` were done, so that a plan can predict what a scan
+/// will read once it is done.
 pub(crate) fn scan_as_if(
     definitions: &[AgentDefinition],
     ports: &Ports,
     extra_projects: &[PathBuf],
     written: &[(PathBuf, Vec<u8>)],
+    folders: &[PlannedFolder],
 ) -> Result<Snapshot, ScanError> {
+    let as_if = AsIf::new(ports.fs.as_ref(), folders);
     let read_at = ports.clock.now();
     // Without the list, hidden homes and Projects would show again and added
     // ones vanish without a word, so a list that cannot be read stops the scan.
     let user_list = user_list::load(ports).map_err(|error| ScanError::UserList(error.message))?;
     let found = find_homes(definitions, ports, &user_list)?;
     let mut scanner = Scanner {
-        reader: Reader::new(ports, written),
+        reader: Reader::new(&as_if, written),
         projects: Projects::new(ports),
         entries: Vec::new(),
         readers: Vec::new(),
@@ -394,6 +429,13 @@ pub(crate) fn scan_as_if(
         read_switches(definitions, &found, &projects, &mut scanner.reader);
     let switch_files = switch_files(definitions, &found, &projects);
     scanner.entries = one_per_entry(definitions, scanner.entries);
+    let managers = skill_managers::built_in().unwrap_or_default();
+    for entry in &mut scanner.entries {
+        let location = definitions[entry.agent_index].location(&entry.location);
+        if location.format.skill_folder().is_some() {
+            entry.manager = manager_of(managers, &mut scanner.reader, ports, entry);
+        }
+    }
     // A skill folder is git-versioned when a file below it is.
     let skill_folders = scanner
         .entries
@@ -872,6 +914,8 @@ impl Scanner<'_> {
                     masked: masked.key_paths,
                     depth,
                     defect: None,
+                    link: None,
+                    manager: None,
                 });
             }
         }
@@ -892,7 +936,7 @@ impl Scanner<'_> {
         project: Option<String>,
         depth: usize,
     ) {
-        let fs = self.reader.ports.fs.as_ref();
+        let fs = self.reader.fs;
         let mut folders = vec![root.to_path_buf()];
         // A link back to a folder already read would never end.
         let mut seen = BTreeSet::new();
@@ -923,7 +967,35 @@ impl Scanner<'_> {
                 let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
                     continue;
                 };
-                if name.starts_with('.') || fs.read_dir(&child).is_err() {
+                if name.starts_with('.') {
+                    continue;
+                }
+                // A link whose target is gone is still an Entry, which
+                // only Remove takes away.
+                if let Some(target) = fs.link_target(&child)
+                    && !fs.exists(&child)
+                {
+                    self.entries.push(ScannedEntry {
+                        agent_index: home.agent_index,
+                        home: home.home.clone(),
+                        location: location.id.clone(),
+                        path: real.join(name),
+                        key_path: Vec::new(),
+                        name: format.sanitize(name),
+                        project: project.clone(),
+                        config: serde_json::Value::Object(serde_json::Map::new()),
+                        masked: Vec::new(),
+                        depth,
+                        defect: None,
+                        link: Some(ScannedLink {
+                            target: paths::lexical(&target),
+                            real: None,
+                        }),
+                        manager: None,
+                    });
+                    continue;
+                }
+                if fs.read_dir(&child).is_err() {
                     continue;
                 }
                 let skill_md = child.join(SKILL_MD);
@@ -938,6 +1010,12 @@ impl Scanner<'_> {
                 };
                 let skill = read_skill(format, name, text);
                 tracing::debug!(location = %location.id, skill = %skill.name, "read skill");
+                // A link at the skill's own location is an Entry apart from
+                // its target.
+                let link = fs.link_target(&child).map(|target| ScannedLink {
+                    target: paths::lexical(&target),
+                    real: fs.real_path(&child).map(|real| paths::lexical(&real)),
+                });
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
@@ -950,8 +1028,69 @@ impl Scanner<'_> {
                     masked: Vec::new(),
                     depth,
                     defect: skill.defect,
+                    link,
+                    manager: None,
                 });
             }
+        }
+    }
+}
+
+/// The skill manager whose detectors match the skill folder of `entry`
+/// most strongly, the first one loaded among equals.
+fn manager_of(
+    managers: &[SkillManagerDefinition],
+    reader: &mut Reader,
+    ports: &Ports,
+    entry: &ScannedEntry,
+) -> Option<ManagerMatch> {
+    let mut best: Option<ManagerMatch> = None;
+    for (manager, definition) in managers.iter().enumerate() {
+        for detector in &definition.detectors {
+            let strength = detector.strength();
+            if best.is_some_and(|best| best.strength >= strength) {
+                continue;
+            }
+            if detects(detector, reader, ports, entry) {
+                best = Some(ManagerMatch { manager, strength });
+            }
+        }
+    }
+    best
+}
+
+/// Whether `detector` matches the skill folder of `entry`.
+fn detects(detector: &Detector, reader: &mut Reader, ports: &Ports, entry: &ScannedEntry) -> bool {
+    match detector {
+        Detector::LinkTargetGlob(block) => entry.link.as_ref().is_some_and(|link| {
+            let real = link.real.iter();
+            std::iter::once(&link.target)
+                .chain(real)
+                .any(|target| paths::tail_matches(&block.glob, target))
+        }),
+        Detector::MarkerFile(block) => reader.fs.exists(&entry.path.join(&block.file)),
+        Detector::LocationGlob(block) => paths::tail_matches(&block.glob, &entry.path),
+        Detector::LockFileEntry(block) => {
+            let anchored = block.file.starts_with("~/") || block.file.starts_with('%');
+            let lock = if anchored {
+                paths::expand(&block.file, ports.env.as_ref())
+            } else {
+                Some(paths::lexical(&entry.path.join(&block.file)))
+            };
+            let Some(Ok(Some(text))) = lock.as_deref().map(|lock| reader.peek(lock)) else {
+                return false;
+            };
+            let Ok(document) = JsonFormat::STRICT.parse(text) else {
+                return false;
+            };
+            let folder = entry.path.file_name().unwrap_or_default().to_string_lossy();
+            let keys = lookup(&document, &block.key_path).and_then(serde_json::Value::as_object);
+            keys.into_iter().flat_map(serde_json::Map::keys).any(|key| {
+                let name = block
+                    .sanitize
+                    .map_or_else(|| key.clone(), |sanitize| sanitize.apply(key));
+                name.eq_ignore_ascii_case(&folder)
+            })
         }
     }
 }
@@ -1058,7 +1197,8 @@ pub(crate) fn find_objects<'v>(
 
 /// Reads each file once per scan, and reports each Read failure once per Agent home.
 struct Reader<'p> {
-    ports: &'p Ports,
+    /// The file system as the scan reads it.
+    fs: &'p dyn FileSystem,
     /// Files read as holding these bytes instead of what is on disk.
     written: &'p [(PathBuf, Vec<u8>)],
     files: BTreeMap<PathBuf, Result<Option<String>, ReadFailureKind>>,
@@ -1067,9 +1207,9 @@ struct Reader<'p> {
 }
 
 impl<'p> Reader<'p> {
-    fn new(ports: &'p Ports, written: &'p [(PathBuf, Vec<u8>)]) -> Self {
+    fn new(fs: &'p dyn FileSystem, written: &'p [(PathBuf, Vec<u8>)]) -> Self {
         Self {
-            ports,
+            fs,
             written,
             files: BTreeMap::new(),
             reported: BTreeSet::new(),
@@ -1107,7 +1247,7 @@ impl<'p> Reader<'p> {
     fn read(&self, path: &Path) -> Result<Option<String>, ReadFailureKind> {
         match self.written.iter().find(|(written, _)| written == path) {
             Some((_, bytes)) => decode(bytes.clone()).map(Some),
-            None => read(self.ports, path),
+            None => read(self.fs, path),
         }
     }
 
@@ -1136,8 +1276,8 @@ impl<'p> Reader<'p> {
 }
 
 /// A file's text, `None` when it is missing.
-fn read(ports: &Ports, path: &Path) -> Result<Option<String>, ReadFailureKind> {
-    let bytes = match ports.fs.read(path) {
+fn read(fs: &dyn FileSystem, path: &Path) -> Result<Option<String>, ReadFailureKind> {
+    let bytes = match fs.read(path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {

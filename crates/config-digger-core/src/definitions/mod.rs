@@ -2,6 +2,7 @@
 //! [`blocks`]. Deserialisation plus `validate()` is the only validation path.
 
 pub(crate) mod blocks;
+pub mod skill_managers;
 
 use crate::version::{Standing, Version};
 use blocks::{

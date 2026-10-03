@@ -172,6 +172,11 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
       {effective.git_versioned && (
         <span className="tag">git-versioned</span>
       )}
+      {effective.link && (
+        <span className="tag" title={effective.link.target}>
+          {effective.link.broken ? "junction, broken" : "junction"}
+        </span>
+      )}
       <span className="item-count">{entries}</span>
       <StatePill item={item} />
     </button>

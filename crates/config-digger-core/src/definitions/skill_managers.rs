@@ -1,0 +1,302 @@
+//! Skill manager definitions: TOML data that says how a skill manager, such
+//! as `npx skills`, lays out the skills it installs, so that the Provenance
+//! of a skill Entry can be recognised in any Agent. Each one is a list of
+//! detectors from the closed set in [`Detector`], each strong or weak.
+
+use super::DefinitionError;
+use super::blocks::Validate;
+use schemars::JsonSchema;
+use serde::Deserialize;
+use std::sync::OnceLock;
+
+/// The skill manager definitions that ship inside config-digger, embedded
+/// at compile time, in the order a tie between them is settled.
+const BUILT_IN: &[(&str, &str)] = &[
+    (
+        "npx-skills.toml",
+        include_str!("../../definitions/skill-managers/npx-skills.toml"),
+    ),
+    (
+        "skillfish.toml",
+        include_str!("../../definitions/skill-managers/skillfish.toml"),
+    ),
+    (
+        "openskills.toml",
+        include_str!("../../definitions/skill-managers/openskills.toml"),
+    ),
+];
+
+/// The only `format_version` this release reads.
+const FORMAT_VERSION: u32 = 1;
+
+/// The JSON Schema of a skill manager definition file.
+pub fn json_schema() -> String {
+    let schema = schemars::schema_for!(SkillManagerDefinition);
+    let mut json = serde_json::to_string_pretty(&schema).expect("a schema serialises");
+    json.push('\n');
+    json
+}
+
+/// The built-in skill manager definitions, loaded once.
+pub(crate) fn built_in() -> Result<&'static [SkillManagerDefinition], &'static DefinitionError> {
+    static LOADED: OnceLock<Result<Vec<SkillManagerDefinition>, DefinitionError>> = OnceLock::new();
+    LOADED
+        .get_or_init(|| {
+            BUILT_IN
+                .iter()
+                .map(|(file, text)| parse(file, text))
+                .collect()
+        })
+        .as_deref()
+}
+
+pub(crate) fn parse(file: &str, text: &str) -> Result<SkillManagerDefinition, DefinitionError> {
+    let error = |message: String| DefinitionError {
+        file: file.to_owned(),
+        message,
+    };
+    let definition: SkillManagerDefinition =
+        toml::from_str(text).map_err(|e| error(e.to_string()))?;
+    definition.validate().map_err(error)?;
+    Ok(definition)
+}
+
+/// How a skill manager lays out the skills it installs.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(title = "config-digger skill manager definition")]
+pub(crate) struct SkillManagerDefinition {
+    /// The version of this file format. Must be 1.
+    pub format_version: u32,
+    pub manager: ManagerInfo,
+    /// What tells a skill folder it installed apart. A folder is the
+    /// manager's when any detector matches; across managers, the strongest
+    /// match wins, then the first manager loaded.
+    pub detectors: Vec<Detector>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ManagerInfo {
+    /// A stable id, such as `npx-skills`.
+    pub id: String,
+    /// The display name, such as `npx skills`.
+    pub name: String,
+}
+
+/// How much a detector's match says about who installed a folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Strength {
+    /// A folder made by hand can match it too, such as one named like a
+    /// skill in the manager's lock file: the Entry gets a
+    /// `provenance_by_name_only` note.
+    Weak,
+    /// Only the manager leaves it, such as its marker file.
+    Strong,
+}
+
+/// One sign that a skill folder was installed by the manager.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Detector {
+    LinkTargetGlob(LinkTargetGlob),
+    MarkerFile(MarkerFile),
+    LocationGlob(LocationGlob),
+    LockFileEntry(LockFileEntry),
+}
+
+impl Detector {
+    pub fn strength(&self) -> Strength {
+        match self {
+            Detector::LinkTargetGlob(block) => block.strength,
+            Detector::MarkerFile(block) => block.strength,
+            Detector::LocationGlob(block) => block.strength,
+            Detector::LockFileEntry(block) => block.strength,
+        }
+    }
+}
+
+impl Validate for Detector {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Detector::LinkTargetGlob(block) => validate_tail_glob(&block.glob),
+            Detector::MarkerFile(block) => block.validate(),
+            Detector::LocationGlob(block) => validate_tail_glob(&block.glob),
+            Detector::LockFileEntry(block) => block.validate(),
+        }
+    }
+}
+
+/// The skill folder is a link or junction whose target matches a glob.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LinkTargetGlob {
+    /// A `/`-separated glob matched against the last folder names of the
+    /// target, such as `.agents/skills/*`; `*` and `?` stay within one
+    /// name. Compared case-insensitively.
+    pub glob: String,
+    pub strength: Strength,
+}
+
+/// The skill folder holds a file the manager writes into each copy.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MarkerFile {
+    /// The file's name, such as `.skillfish.json`.
+    pub file: String,
+    pub strength: Strength,
+}
+
+impl Validate for MarkerFile {
+    fn validate(&self) -> Result<(), String> {
+        if self.file.is_empty() || self.file.contains(['/', '\\']) || self.file == ".." {
+            return Err(format!("marker file `{}` must be one file name", self.file));
+        }
+        Ok(())
+    }
+}
+
+/// The skill folder's own location matches a glob.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LocationGlob {
+    /// A `/`-separated glob matched against the last folder names of the
+    /// skill folder's path, as in `link-target-glob`.
+    pub glob: String,
+    pub strength: Strength,
+}
+
+/// A JSON lock file of the manager has a key named like the skill folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LockFileEntry {
+    /// The lock file: a path starting with `~/` or `%NAME%`, or one
+    /// relative to the skill folder, such as `../../skills-lock.json`.
+    pub file: String,
+    /// The key path of the object whose keys are skills.
+    pub key_path: Vec<String>,
+    /// How the manager turns a key into a folder name, if it does.
+    pub sanitize: Option<KeySanitize>,
+    pub strength: Strength,
+}
+
+impl Validate for LockFileEntry {
+    fn validate(&self) -> Result<(), String> {
+        if self.file.is_empty() {
+            return Err("lock file must not be empty".into());
+        }
+        super::blocks::validate_key_path(&self.key_path)
+    }
+}
+
+/// How a skill manager turns a lock file key into a folder name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum KeySanitize {
+    /// Lower case, each run of characters other than `a`-`z`, `0`-`9`, `.`
+    /// and `_` replaced by one `-`, with no `.` or `-` at either end, as
+    /// `npx skills` names folders.
+    LowercaseHyphensDots,
+}
+
+impl KeySanitize {
+    pub fn apply(self, key: &str) -> String {
+        match self {
+            KeySanitize::LowercaseHyphensDots => {
+                let mut sanitized = String::new();
+                for c in key.chars().flat_map(char::to_lowercase) {
+                    if c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_') {
+                        sanitized.push(c);
+                    } else if !sanitized.ends_with('-') {
+                        sanitized.push('-');
+                    }
+                }
+                sanitized.trim_matches(['.', '-']).to_owned()
+            }
+        }
+    }
+}
+
+/// Checks a glob matched against the last folder names of a path.
+fn validate_tail_glob(glob: &str) -> Result<(), String> {
+    let anchored = glob.starts_with(['/', '\\', '~', '%']) || glob.contains(':');
+    if glob.is_empty() || anchored || glob.split('/').any(|part| part.is_empty() || part == "..") {
+        return Err(format!(
+            "glob `{glob}` must be relative folder names separated by `/`"
+        ));
+    }
+    Ok(())
+}
+
+impl SkillManagerDefinition {
+    fn validate(&self) -> Result<(), String> {
+        if self.format_version != FORMAT_VERSION {
+            return Err(format!(
+                "format_version {} is not supported; expected {FORMAT_VERSION}",
+                self.format_version
+            ));
+        }
+        super::non_empty("manager id", &self.manager.id)?;
+        super::non_empty("manager name", &self.manager.name)?;
+        if self.detectors.is_empty() {
+            return Err("a skill manager needs detectors".into());
+        }
+        self.detectors.iter().try_for_each(Validate::validate)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn built_in_skill_manager_definitions_load() {
+        let ids: Vec<&str> = built_in()
+            .unwrap()
+            .iter()
+            .map(|definition| definition.manager.id.as_str())
+            .collect();
+        assert_eq!(ids, ["npx-skills", "skillfish", "openskills"]);
+    }
+
+    fn error(detector: &str) -> String {
+        let text = format!(
+            "format_version = 1\nmanager = {{ id = \"m\", name = \"M\" }}\n[[detectors]]\n{detector}\n"
+        );
+        parse("m.toml", &text).unwrap_err().message
+    }
+
+    #[test]
+    fn a_glob_is_relative_folder_names() {
+        for glob in ["~/.agents/*", "C:/x", "/x", "a//b", "../x"] {
+            let message = error(&format!(
+                "block = \"location-glob\"\nglob = \"{glob}\"\nstrength = \"weak\""
+            ));
+            assert!(
+                message.contains("relative folder names"),
+                "{glob}: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_marker_file_is_one_file_name() {
+        let message = error("block = \"marker-file\"\nfile = \"a/.marker\"\nstrength = \"strong\"");
+        assert!(message.contains("one file name"), "{message}");
+    }
+
+    #[test]
+    fn unknown_detectors_are_rejected() {
+        let message = error("block = \"guess\"\nstrength = \"strong\"");
+        assert!(message.contains("unknown variant"), "{message}");
+    }
+
+    #[test]
+    fn a_lock_key_is_sanitised_as_npx_skills_names_folders() {
+        let sanitize = KeySanitize::LowercaseHyphensDots;
+        assert_eq!(sanitize.apply("ce:review"), "ce-review");
+        assert_eq!(sanitize.apply("My Skill_v1.2"), "my-skill_v1.2");
+        assert_eq!(sanitize.apply("..odd--"), "odd");
+    }
+}

@@ -3,8 +3,9 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    Compete, Conform, JsonFormat, Malformed, Parse, SkillDefect, SkillFallback,
+    Compete, Conform, JsonFormat, Malformed, Parse, Provenance, SkillDefect, SkillFallback,
 };
+use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
@@ -12,7 +13,7 @@ use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{HomeSource, ScannedEntry, ScannedReadFailure, Snapshot};
 use crate::{explain, installations, locator, paths};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub(crate) fn resolve(
     definitions: &[AgentDefinition],
@@ -82,7 +83,9 @@ pub(crate) fn resolve(
             .iter()
             .any(|known| known.key == *key && !known.exists)
     });
-    let unread = |entry: &ScannedEntry| missing.is_some() && entry.project.is_some();
+    // Nor does it read anything through a link whose target is gone.
+    let unread =
+        |entry: &ScannedEntry| (missing.is_some() && entry.project.is_some()) || is_broken(entry);
 
     let reactions: Vec<Reaction> = snapshot
         .read_failures
@@ -185,9 +188,15 @@ pub(crate) fn resolve(
                 .enumerate()
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
-                    if let (true, Some((path, _))) = (unread(entry), missing) {
-                        return unread_entry(snapshot, entry, location, agent_name, path);
+                    if let Some(link) = entry.link.as_ref().filter(|link| link.broken()) {
+                        let reason = explain::link_broken(agent_name, &link.target);
+                        return unread_entry(snapshot, entry, location, reason);
                     }
+                    if let (true, Some((path, _))) = (unread(entry), missing) {
+                        let reason = explain::project_missing(agent_name, path);
+                        return unread_entry(snapshot, entry, location, reason);
+                    }
+                    let origin = origin(location, entry);
                     let (disabling, partial) = &hits[index];
                     // Each check the Entry fails, in the Agent's order.
                     let mut failed: Vec<(api::State, api::Reason)> = Vec::new();
@@ -279,8 +288,10 @@ pub(crate) fn resolve(
                         key_path: entry.key_path.clone(),
                         locator: locator::render(&entry.path, &entry.key_path),
                         scope: location.scope.clone(),
-                        provenance: location.provenance.into(),
+                        provenance: origin.provenance,
+                        skill_manager: origin.skill_manager,
                         git_versioned: snapshot.versioned.contains(&entry.path),
+                        link: link(entry),
                         state,
                         reason,
                         secondary: failed.map(|(_, reason)| reason).collect(),
@@ -301,6 +312,7 @@ pub(crate) fn resolve(
                                 switch: Some(hit.locator()),
                                 sentence: explain::partial_switch(&hit.holds(), agent_name),
                             }))
+                            .chain(origin.by_name_only)
                             .collect(),
                         config: entry.config.clone(),
                         masked: entry.masked.clone(),
@@ -466,27 +478,34 @@ pub(crate) fn leftovers(
         .collect()
 }
 
-/// An Entry keyed to the missing Project `project`, which the Agent never
-/// reads: it competes with nothing and can only be Removed.
+/// Whether the Entry is a link whose target is gone.
+fn is_broken(entry: &ScannedEntry) -> bool {
+    entry.link.as_ref().is_some_and(|link| link.broken())
+}
+
+/// An Entry the Agent never reads, for `reason`, such as one keyed to a
+/// missing Project: it competes with nothing and can only be Removed.
 fn unread_entry(
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     location: &LocationDefinition,
-    agent_name: &str,
-    project: &Path,
+    reason: api::Reason,
 ) -> api::Entry {
+    let origin = origin(location, entry);
     api::Entry {
         path: entry.path.clone(),
         key_path: entry.key_path.clone(),
         locator: locator::render(&entry.path, &entry.key_path),
         scope: location.scope.clone(),
-        provenance: location.provenance.into(),
+        provenance: origin.provenance,
+        skill_manager: origin.skill_manager,
         git_versioned: snapshot.versioned.contains(&entry.path),
+        link: link(entry),
         state: api::State::Unread,
-        reason: Some(explain::project_missing(agent_name, project)),
+        reason: Some(reason),
         secondary: Vec::new(),
         what_if: None,
-        notes: Vec::new(),
+        notes: origin.by_name_only.into_iter().collect(),
         config: entry.config.clone(),
         masked: entry.masked.clone(),
         disable: api::DisableOption::NotOffered {
@@ -571,4 +590,53 @@ pub(crate) fn context_project(snapshot: &Snapshot, context: &Context) -> Option<
             None => (lexical, spelling),
         },
     )
+}
+
+/// Where the link at a Linked Entry's location points.
+fn link(entry: &ScannedEntry) -> Option<api::Link> {
+    entry.link.as_ref().map(|link| api::Link {
+        target: link.target.clone(),
+        broken: link.broken(),
+    })
+}
+
+/// How an Entry got where it is, as an Entry shows it.
+struct Origin {
+    provenance: api::Provenance,
+    skill_manager: Option<api::SkillManager>,
+    /// The note that the skill manager is recognised only by a weak
+    /// detector, such as the folder's name.
+    by_name_only: Option<api::Note>,
+}
+
+/// The Provenance of `entry`: a skill manager's when one's definition
+/// recognises it as having installed the skill, and its location's
+/// Provenance is a file's; else its location's.
+fn origin(location: &LocationDefinition, entry: &ScannedEntry) -> Origin {
+    let found = entry
+        .manager
+        .filter(|_| location.provenance == Provenance::File)
+        .and_then(|found| {
+            let managers = skill_managers::built_in().ok()?;
+            Some((&managers[found.manager], found.strength))
+        });
+    let Some((definition, strength)) = found else {
+        return Origin {
+            provenance: location.provenance.into(),
+            skill_manager: None,
+            by_name_only: None,
+        };
+    };
+    Origin {
+        provenance: api::Provenance::SkillManager,
+        skill_manager: Some(api::SkillManager {
+            id: definition.manager.id.clone(),
+            name: definition.manager.name.clone(),
+        }),
+        by_name_only: (strength == Strength::Weak).then(|| api::Note {
+            code: api::NoteCode::ProvenanceByNameOnly,
+            switch: None,
+            sentence: explain::provenance_by_name_only(&definition.manager.name),
+        }),
+    }
 }

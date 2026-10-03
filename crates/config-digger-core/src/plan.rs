@@ -11,6 +11,8 @@ use crate::definitions::AgentDefinition;
 use crate::disable::{self, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
+use crate::folders::{self, FolderOp, FolderSize, PlannedFolder};
+use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot, SwitchStore};
@@ -28,6 +30,8 @@ pub(crate) struct Planned {
     /// What Verify scans with.
     pub scan_options: ScanOptions,
     pub files: Vec<PlannedFile>,
+    /// The skill folders and links it moves, removes or puts back.
+    pub folders: Vec<PlannedFolder>,
     pub preview: Preview,
     pub warnings: Vec<Warning>,
     /// Why it cannot execute, whatever is acknowledged.
@@ -169,12 +173,20 @@ struct Targeted<'a> {
 }
 
 impl Targeted<'_> {
-    /// A Remove: each Entry's key goes from its file.
+    /// A Remove: each Entry's key goes from its file, each skill folder
+    /// into the backup, and each Linked Entry's link away.
     fn remove(&self) -> Result<Planned, Error> {
         // The edits of each file, in the order its Entries were selected.
         let mut by_file: Vec<(PathBuf, Syntax, Vec<Edit>)> = Vec::new();
+        let mut planned_folders = Vec::new();
         for entry in self.entries {
-            let syntax = removable_syntax(self.definitions, self.snapshot, entry)?;
+            let syntax = match removal(self.definitions, self.snapshot, entry)? {
+                Removal::Key(syntax) => syntax,
+                Removal::Folder => {
+                    planned_folders.push(self.removed_folder(entry)?);
+                    continue;
+                }
+            };
             let edit = Edit::Remove {
                 key_path: entry.key_path.clone(),
             };
@@ -194,12 +206,29 @@ impl Targeted<'_> {
             files.push(self.planned_file(path, syntax, read, false, edited));
         }
 
-        let removed: Vec<(PathBuf, Vec<String>)> = self
-            .entries
-            .iter()
-            .map(|entry| (entry.path.clone(), entry.key_path.clone()))
-            .collect();
-        let without = self.snapshot.without(&removed);
+        // A folder moved away takes the Entries of every link into it
+        // with it, so the States after come from a scan as if it were gone.
+        let without = if planned_folders.is_empty() {
+            let removed: Vec<(PathBuf, Vec<String>)> = self
+                .entries
+                .iter()
+                .map(|entry| (entry.path.clone(), entry.key_path.clone()))
+                .collect();
+            self.snapshot.without(&removed)
+        } else {
+            let written: Vec<(PathBuf, Vec<u8>)> = files
+                .iter()
+                .map(|file| (file.path.clone(), file.edited.bytes.clone()))
+                .collect();
+            scan::scan_as_if(
+                self.definitions,
+                self.ports,
+                &self.scan_options.projects,
+                &written,
+                &planned_folders,
+            )
+            .map_err(Error::unexpected)?
+        };
         let after = resolve::resolve(self.definitions, &without, self.context);
         let (mut changes, effective) = predict(self.before, &after);
         // A leftover of another missing Project goes in that Project's context.
@@ -218,7 +247,62 @@ impl Targeted<'_> {
             let after = resolve::resolve(self.definitions, &without, &context);
             changes.extend(predict(&before, &after).0);
         }
-        self.planned(files, changes, effective, None)
+        let breaks = self.breaks_links(&planned_folders);
+        self.planned(files, planned_folders, changes, effective, breaks)
+    }
+
+    /// What Remove does at the location of the skill Entry `entry`: it
+    /// removes a Linked Entry's link, or else moves the folder into the
+    /// backup, each measured for Verify.
+    fn removed_folder(&self, entry: &api::Entry) -> Result<PlannedFolder, Error> {
+        let fs = self.ports.fs.as_ref();
+        let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+        let (op, size) = match &scanned.link {
+            Some(link) => {
+                let size = match &link.real {
+                    Some(real) => folders::measure(fs, real)?,
+                    None => FolderSize { files: 0, bytes: 0 },
+                };
+                let target = link.target.clone();
+                (FolderOp::RemoveLink { target }, size)
+            }
+            None => (FolderOp::MoveToBackup, folders::measure(fs, &entry.path)?),
+        };
+        Ok(PlannedFolder {
+            path: entry.path.clone(),
+            op,
+            size,
+            git_versioned: entry.git_versioned,
+        })
+    }
+
+    /// The `breaks-links` warning when a folder moved into the backup is
+    /// the target of Linked Entries the Remove does not target: they are
+    /// left pointing to nothing, as Unread Entries, and not Removed with it.
+    fn breaks_links(&self, planned: &[PlannedFolder]) -> Option<Warning> {
+        let mut broken: Vec<(&Path, &Path)> = Vec::new();
+        let moved = planned
+            .iter()
+            .filter(|folder| folder.op == FolderOp::MoveToBackup);
+        for folder in moved {
+            for entry in &self.snapshot.entries {
+                let Some(real) = entry.link.as_ref().and_then(|link| link.real.as_ref()) else {
+                    continue;
+                };
+                let into = folders::below(real, &folder.path).is_some();
+                let targeted = self
+                    .entries
+                    .iter()
+                    .any(|targeted| targeted.path == entry.path);
+                if into && !targeted && !broken.iter().any(|(path, _)| *path == entry.path) {
+                    broken.push((&entry.path, &folder.path));
+                }
+            }
+        }
+        (!broken.is_empty()).then(|| Warning {
+            class: WarningClass::BreaksLinks,
+            sentence: explain::breaks_links(&broken),
+        })
     }
 
     /// A Disable or an Enable: each Entry's switch is set or lifted, which
@@ -318,11 +402,12 @@ impl Targeted<'_> {
             self.ports,
             &self.scan_options.projects,
             &written,
+            &[],
         )
         .map_err(Error::unexpected)?;
         let (changes, effective) = self.reach(&after);
         let wide = self.wide_reach(&changes);
-        self.planned(files, changes, effective, wide)
+        self.planned(files, Vec::new(), changes, effective, wide)
     }
 
     /// What a write reaches: the States it changes in the context, then in
@@ -397,14 +482,16 @@ impl Targeted<'_> {
         }
     }
 
-    /// The plan that writes `files`, whose preview shows `changes` and
-    /// `effective`, with `wide`, its `wide-reach` warning if it has one.
+    /// The plan that writes `files` and touches `folders`, whose preview
+    /// shows `changes` and `effective`, with `action_warning`, the warning of its
+    /// own action if it has one.
     fn planned(
         &self,
         files: Vec<PlannedFile>,
+        folders: Vec<PlannedFolder>,
         changes: Vec<Change>,
         effective: Vec<EffectiveChange>,
-        wide: Option<Warning>,
+        action_warning: Option<Warning>,
     ) -> Result<Planned, Error> {
         let title = explain::operation_title(self.action, self.entries.len());
         let preview = preview(
@@ -417,13 +504,14 @@ impl Targeted<'_> {
             changes,
             effective,
             &files,
+            &folders,
             &self.before.read_failures,
             &self.before.homes,
         )?;
         let installed = installations::installed_homes(self.definitions, self.snapshot);
         let running = running::check(self.definitions, self.ports, &installed, &files);
-        let mut warnings = warnings(&files, running.warning);
-        warnings.extend(wide);
+        let mut warnings = warnings(&files, &folders, running.warning);
+        warnings.extend(action_warning);
         Ok(Planned {
             action: self.action,
             entries: self.entries.len(),
@@ -432,6 +520,7 @@ impl Targeted<'_> {
             warnings,
             blocks: running.blocks,
             files,
+            folders,
             preview,
             read_failures: self.before.read_failures.clone(),
             installed,
@@ -468,15 +557,16 @@ pub(crate) fn plan_undo(
     let context = Context {
         project: manifest.project.clone(),
     };
-    let scan = |written: &[(PathBuf, Vec<u8>)]| {
-        scan::scan_as_if(definitions, ports, &scan_options.projects, written)
+    let scan = |written: &[(PathBuf, Vec<u8>)], folders: &[PlannedFolder]| {
+        scan::scan_as_if(definitions, ports, &scan_options.projects, written, folders)
             .map_err(Error::unexpected)
     };
-    let snapshot = scan(&[])?;
+    let snapshot = scan(&[], &[])?;
     let mut files = undo_files(ports, manifest).map_err(|blocked| match blocked {
         UndoBlocked::Refused(refused) => refused.into_error(definitions, &snapshot),
         UndoBlocked::Other(error) => error,
     })?;
+    let folders = undo_folders(ports, manifest)?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
         file.switches = snapshot.switch_stores_of(&file.path);
@@ -488,7 +578,7 @@ pub(crate) fn plan_undo(
         .iter()
         .map(|file| (file.path.clone(), file.edited.bytes.clone()))
         .collect();
-    let after_snapshot = scan(&written)?;
+    let after_snapshot = scan(&written, &folders)?;
     let after = resolve::resolve(definitions, &after_snapshot, &context);
     let title = explain::undo_title(id, &manifest.title);
     let (mut changes, effective) = predict(&before, &after);
@@ -518,6 +608,7 @@ pub(crate) fn plan_undo(
         changes,
         effective,
         &files,
+        &folders,
         &before.read_failures,
         &before.homes,
     )?;
@@ -528,9 +619,10 @@ pub(crate) fn plan_undo(
         entries: preview.changes.len(),
         context,
         scan_options,
-        warnings: warnings(&files, running.warning),
+        warnings: warnings(&files, &folders, running.warning),
         blocks: running.blocks,
         files,
+        folders,
         preview,
         read_failures: before.read_failures,
         installed,
@@ -568,6 +660,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         effective: Vec::new(),
         info: Vec::new(),
         files: Vec::new(),
+        folders: Vec::new(),
         deleted,
         backup_note: explain::delete_backup_note(id),
         backup_folder: folder,
@@ -578,6 +671,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         context: Context::default(),
         scan_options: ScanOptions::default(),
         files: Vec::new(),
+        folders: Vec::new(),
         preview,
         warnings,
         blocks: Vec::new(),
@@ -776,6 +870,77 @@ pub(crate) fn undo_files<'m>(
     Ok(files)
 }
 
+/// The skill folders and links of an Operation, each with the inverse of
+/// what it did there, last first, or why its Undo is refused: something is
+/// at a location it emptied, its copy in the backup is gone, or what it
+/// put back changed since. History runs the same check.
+pub(crate) fn undo_folders(
+    ports: &Ports,
+    manifest: &history::Manifest,
+) -> Result<Vec<PlannedFolder>, Error> {
+    let fs = ports.fs.as_ref();
+    let folder = history::operation_folder(ports, &manifest.id)?;
+    let refused = |what: String| Error::undo_refused(what, folder.clone(), Vec::new());
+    let mut planned = Vec::new();
+    for record in manifest.folders.iter().rev() {
+        let path = &record.path;
+        let (op, size) = match &record.op {
+            FolderOpRecord::MovedToBackup { backup } => {
+                let from = folder.join(backup);
+                if !fs.exists(&from) {
+                    return Err(refused(format!(
+                        "the copy of {} in the backup is gone",
+                        path.display()
+                    )));
+                }
+                (FolderOp::MoveBack { from }, record.size)
+            }
+            FolderOpRecord::LinkRemoved { target } => (
+                FolderOp::CreateLink {
+                    target: target.clone(),
+                },
+                record.size,
+            ),
+            FolderOpRecord::MovedBack { .. } => {
+                if !folders::holds(fs, path, record.size) {
+                    return Err(refused(format!(
+                        "the skill folder {} changed since the Operation",
+                        path.display()
+                    )));
+                }
+                (FolderOp::MoveToBackup, record.size)
+            }
+            FolderOpRecord::LinkCreated { target } => {
+                if !folders::links_to(fs, path, target) {
+                    return Err(refused(format!(
+                        "the link {} changed since the Operation",
+                        path.display()
+                    )));
+                }
+                let target = target.clone();
+                (FolderOp::RemoveLink { target }, record.size)
+            }
+        };
+        let empties = matches!(
+            record.op,
+            FolderOpRecord::MovedToBackup { .. } | FolderOpRecord::LinkRemoved { .. }
+        );
+        if empties && folders::taken(fs, path) {
+            return Err(refused(format!(
+                "something is at {} again since the Operation",
+                path.display()
+            )));
+        }
+        planned.push(PlannedFolder {
+            git_versioned: ports.git.is_versioned(path),
+            path: path.clone(),
+            op,
+            size,
+        });
+    }
+    Ok(planned)
+}
+
 /// A touched file whose Undo is refused.
 struct ChangedFile<'m> {
     location: &'m history::LocationRecord,
@@ -880,6 +1045,7 @@ fn preview(
     changes: Vec<Change>,
     effective: Vec<EffectiveChange>,
     files: &[PlannedFile],
+    folders: &[PlannedFolder],
     read_failures: &[ReadFailure],
     homes: &[Home],
 ) -> Result<Preview, Error> {
@@ -921,6 +1087,7 @@ fn preview(
                 FileChange::new(edits, diff, file.git_versioned)
             })
             .collect(),
+        folders: folders.iter().map(PlannedFolder::change).collect(),
         deleted: Vec::new(),
         backup_note: explain::backup_note(&backup_folder),
         backup_folder,
@@ -1042,14 +1209,24 @@ fn version_info(
     info
 }
 
-/// What a plan that edits `files` must have acknowledged: one warning for
-/// the git-versioned files among them, and `running`, the warning for the
-/// running Agents that read them.
-fn warnings(files: &[PlannedFile], running: Option<Warning>) -> Vec<Warning> {
+/// What a plan that edits `files` and touches `folders` must have
+/// acknowledged: one warning for the git-versioned ones among them, and
+/// `running`, the warning for the running Agents that read them.
+fn warnings(
+    files: &[PlannedFile],
+    folders: &[PlannedFolder],
+    running: Option<Warning>,
+) -> Vec<Warning> {
     let versioned: Vec<&Path> = files
         .iter()
         .filter(|file| file.git_versioned)
         .map(|file| file.path.as_path())
+        .chain(
+            folders
+                .iter()
+                .filter(|folder| folder.git_versioned)
+                .map(|folder| folder.path.as_path()),
+        )
         .collect();
     let versioned = (!versioned.is_empty()).then(|| Warning {
         class: WarningClass::GitVersioned,
@@ -1058,24 +1235,30 @@ fn warnings(files: &[PlannedFile], running: Option<Warning>) -> Vec<Warning> {
     versioned.into_iter().chain(running).collect()
 }
 
-/// The syntax the location of an Entry to Remove is edited in. Or why it
-/// cannot be Removed: config-digger only reads it, or it is a skill folder.
-fn removable_syntax(
+/// How an Entry is Removed.
+enum Removal {
+    /// Its key goes from a file edited in this syntax.
+    Key(Syntax),
+    /// Its skill folder goes into the backup, or its link away.
+    Folder,
+}
+
+/// How the Entry `entry` is Removed, or why it cannot be: config-digger
+/// only reads it.
+fn removal(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,
     entry: &api::Entry,
-) -> Result<Syntax, Error> {
+) -> Result<Removal, Error> {
     let scanned = snapshot.entry(&entry.path, &entry.key_path);
     let location = definitions[scanned.agent_index].location(&scanned.location);
     if location.provenance.read_only() {
         return Err(Error::blocked(explain::read_only_remove(&entry.locator)));
     }
-    match location.format.file() {
-        Some(format) => Ok(format.syntax()),
-        None => Err(Error::blocked(explain::skill_remove_not_offered(
-            &entry.locator,
-        ))),
-    }
+    Ok(match location.format.file() {
+        Some(format) => Removal::Key(format.syntax()),
+        None => Removal::Folder,
+    })
 }
 
 /// A touched file's bytes. It held the Entry when it was scanned, so a file

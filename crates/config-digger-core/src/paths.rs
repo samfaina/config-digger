@@ -219,6 +219,25 @@ fn variable_prefix(glob: &str) -> Option<(&str, &str)> {
     is_name.then_some((name, rest))
 }
 
+/// Whether the last folder names of `path` match a `/`-separated glob of
+/// folder names, such as `.agents/skills/*`, compared case-insensitively:
+/// `*` and `?` stay within one name.
+pub(crate) fn tail_matches(glob: &str, path: &Path) -> bool {
+    let names: Vec<String> = lexical(path)
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().to_lowercase())
+        .collect();
+    let parts: Vec<&str> = glob.split('/').collect();
+    let Some(tail) = names.len().checked_sub(parts.len()).map(|at| &names[at..]) else {
+        return false;
+    };
+    parts.iter().zip(tail).all(|(part, name)| {
+        let pattern: Vec<char> = part.to_lowercase().chars().collect();
+        let name: Vec<char> = name.chars().collect();
+        wildcard(&pattern, &name)
+    })
+}
+
 /// Every pattern a glob's `{a,b}` groups stand for.
 fn alternatives(pattern: &str) -> Vec<String> {
     let Some(open) = pattern.find('{') else {
