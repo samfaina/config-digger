@@ -241,8 +241,15 @@ fn load(ports: &Ports, folder: &Path) -> Result<Manifest, String> {
         .fs
         .read(&path)
         .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|error| format!("cannot parse {}: {error}", path.display()))
+    // serde_json's message can quote an edit's value, which may be a Secret.
+    serde_json::from_slice(&bytes).map_err(|error| {
+        format!(
+            "cannot parse {} (parse error at {}:{})",
+            path.display(),
+            error.line(),
+            error.column()
+        )
+    })
 }
 
 /// The sequence number of the next Operation recorded.
@@ -269,7 +276,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
     let not_undoable = not_undoable(manifest, manifests).or_else(|| {
         plan::undo_files(ports, manifest)
             .err()
-            .map(|error| error.message)
+            .map(|blocked| blocked.message())
     });
     let mut agents: Vec<String> = Vec::new();
     for change in &manifest.changes {
@@ -520,4 +527,32 @@ pub(crate) fn prune(ports: &Ports) -> Result<Vec<String>, Error> {
         tracing::info!(operations = pruned.len(), "history pruned");
     }
     Ok(pruned)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+
+    #[test]
+    fn a_manifest_that_does_not_parse_is_reported_without_quoting_it() {
+        let folder = PathBuf::from(r"C:\data\backups\20261001-143012-a3f");
+        // An edit value where a list belongs: serde_json would quote it.
+        let fs = FakeFileSystem::new().with_file(
+            folder.join(MANIFEST),
+            r#"{"manifest_version": 1, "locations": "not-a-real-secret"}"#,
+        );
+        let ports = fake::ports(fs, FakeEnvironment::with_home(r"C:\Users\fixture"));
+
+        let message = load(&ports, &folder).unwrap_err();
+
+        assert!(!message.contains("not-a-real-secret"), "{message}");
+        assert_eq!(
+            message,
+            format!(
+                "cannot parse {} (parse error at 1:56)",
+                folder.join(MANIFEST).display()
+            )
+        );
+    }
 }

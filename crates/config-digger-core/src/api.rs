@@ -6,9 +6,9 @@ use crate::definitions::blocks::Provenance as DefinitionProvenance;
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::Ports;
-use crate::{execute, history, plan, resolve, scan, select};
+use crate::{execute, history, plan, resolve, scan, select, skill};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The version of every JSON document config-digger emits.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -152,6 +152,70 @@ impl Core {
     pub fn dismiss(&self, id: &str) -> Result<OperationSummary, Error> {
         history::dismiss(&self.ports, id)
     }
+
+    /// What the skill folder at `folder` holds, as a skill Entry shows it:
+    /// each file's relative path and size, and the `name` and `description`
+    /// of its `SKILL.md` frontmatter. File content is never shown, since a
+    /// skill folder can hold Secrets, such as a `.env` file.
+    pub fn skill_content(&self, folder: &Path) -> Result<SkillContent, Error> {
+        skill::content(self.ports.fs.as_ref(), folder)
+    }
+
+    /// How the skill folder at `after` differs from the one at `before`,
+    /// such as a backed-up copy and the folder as it is now: each file
+    /// added, removed or changed, with its sizes and never its content. A
+    /// missing folder holds no files.
+    pub fn compare_skill_folders(
+        &self,
+        before: &Path,
+        after: &Path,
+    ) -> Result<Vec<SkillFileChange>, Error> {
+        skill::compare(self.ports.fs.as_ref(), before, after)
+    }
+}
+
+/// A skill folder as config-digger shows it, without any file's content.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct SkillContent {
+    /// The `name` of the `SKILL.md` frontmatter.
+    pub name: Option<String>,
+    /// The `description` of the `SKILL.md` frontmatter.
+    pub description: Option<String>,
+    /// Every file in the folder and below it, by path.
+    pub files: Vec<SkillFile>,
+}
+
+/// One file of a skill folder.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct SkillFile {
+    /// Relative to the skill folder, `/`-separated.
+    pub path: String,
+    /// In bytes.
+    #[specta(type = f64)]
+    pub size: u64,
+}
+
+/// A file that differs between two versions of a skill folder.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct SkillFileChange {
+    /// Relative to the skill folder, `/`-separated.
+    pub path: String,
+    pub change: SkillFileChangeKind,
+    /// In bytes, `None` when the file is added.
+    #[specta(type = Option<f64>)]
+    pub size_before: Option<u64>,
+    /// In bytes, `None` when the file is removed.
+    #[specta(type = Option<f64>)]
+    pub size_after: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillFileChangeKind {
+    Added,
+    Removed,
+    /// Its content differs, which is never shown.
+    Changed,
 }
 
 /// What an Operation does to the Entries it targets.
@@ -272,8 +336,53 @@ pub struct EffectiveChange {
 pub struct FileChange {
     pub path: PathBuf,
     pub edits: Vec<EditSummary>,
-    /// A unified diff of the whole file, before and after every edit.
-    pub diff: String,
+    /// A unified diff of the whole file, before and after every edit, as
+    /// [`FileDiff::diff`] has it.
+    pub diff: Option<String>,
+    pub diff_unavailable: Option<DiffUnavailable>,
+    pub diff_note: Option<String>,
+    pub changed_lines: u32,
+}
+
+impl FileChange {
+    pub(crate) fn new(edits: Vec<EditSummary>, diff: FileDiff) -> Self {
+        Self {
+            path: diff.path,
+            edits,
+            diff: diff.diff,
+            diff_unavailable: diff.diff_unavailable,
+            diff_note: diff.diff_note,
+            changed_lines: diff.changed_lines,
+        }
+    }
+}
+
+/// A diff of two versions of one file, with every Secret masked in both,
+/// or why it cannot be shown.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct FileDiff {
+    pub path: PathBuf,
+    /// A unified diff, computed on the real text and shown with every Secret
+    /// masked, context lines and other Entries included. A line whose only
+    /// change is a Secret shows the same on both sides and is followed by
+    /// the line `\ secret value changed`. `None` when it cannot be shown.
+    pub diff: Option<String>,
+    /// Why there is no diff.
+    pub diff_unavailable: Option<DiffUnavailable>,
+    /// Why there is no diff, as a sentence rendered by the core.
+    pub diff_note: Option<String>,
+    /// How many lines differ, whether or not the diff can be shown.
+    pub changed_lines: u32,
+}
+
+/// Why a diff cannot be shown with its Secrets masked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DiffUnavailable {
+    /// One side does not parse in the dialect of an Agent that reads the file.
+    Parse,
+    /// No Agent reads the file any more, so nothing says where its Secrets are.
+    Unread,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -566,6 +675,13 @@ pub struct Entry {
     pub state: State,
     /// Why the Entry has its State, when it is not Effective.
     pub reason: Option<Reason>,
+    /// The Entry's value as declared, with every Secret masked as `••••`.
+    #[specta(type = JsonValue)]
+    pub config: serde_json::Value,
+    /// The key paths in `config`, relative to the Entry, whose values were
+    /// masked, so that a mask can be told from a literal. An array item's
+    /// key is its index.
+    pub masked: Vec<Vec<String>>,
 }
 
 /// How an Entry got where it is, which decides how it can be taken away.
@@ -658,9 +774,9 @@ pub struct Error {
     /// The backup folder of a failed Operation, or of one whose Undo was
     /// refused.
     pub backup: Option<PathBuf>,
-    /// For a refused Undo, or a Rollback that is incomplete, a unified diff
-    /// from each backed-up file to what it holds now.
-    pub diff: Option<String>,
+    /// For a refused Undo, or a Rollback that is incomplete, a diff from
+    /// each backed-up file to what it holds now, with every Secret masked.
+    pub diffs: Vec<FileDiff>,
     /// The Operation that failed, once it was recorded in History.
     pub failed: Option<Box<FailedOperation>>,
 }
@@ -741,7 +857,7 @@ impl Error {
             message,
             candidates: Vec::new(),
             backup: None,
-            diff: None,
+            diffs: Vec::new(),
             failed: None,
         }
     }
@@ -831,20 +947,20 @@ impl Error {
         )
     }
 
-    pub(crate) fn undo_refused(message: String, backup: PathBuf, diff: String) -> Self {
+    pub(crate) fn undo_refused(message: String, backup: PathBuf, diffs: Vec<FileDiff>) -> Self {
         Self {
             message: format!(
                 "{message}, so the Undo is refused; the files as they were before the Operation are in {}",
                 backup.display()
             ),
             backup: Some(backup),
-            diff: Some(diff),
+            diffs,
             ..Self::new(ErrorCode::UndoRefused, String::new())
         }
     }
 
     /// The Operation `operation` failed with `cause`, and its Rollback left
-    /// each file as `rollback` says. `diff` goes from each backed-up file it
+    /// each file as `rollback` says. `diffs` go from each backed-up file it
     /// could not restore to what that file holds now.
     pub(crate) fn rolled_back(
         cause: ErrorCode,
@@ -852,7 +968,7 @@ impl Error {
         operation: String,
         backup: PathBuf,
         rollback: Vec<RollbackLocation>,
-        diff: String,
+        diffs: Vec<FileDiff>,
     ) -> Self {
         let not_restored = rollback
             .iter()
@@ -884,8 +1000,22 @@ impl Error {
                 "{message}; the Rollback of Operation {operation} could not restore {files}, which need manual recovery: the files as they were before it are in {}",
                 backup.display()
             ),
-            diff: Some(diff),
+            diffs,
             ..failure
         }
     }
+}
+
+/// A JSON value as the TypeScript bindings type it: its numbers are
+/// JavaScript numbers. Only the bindings use it; values are `serde_json`'s.
+#[derive(Serialize, specta::Type)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum JsonValue {
+    Null(()),
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Array(Vec<JsonValue>),
+    Object(std::collections::BTreeMap<String, JsonValue>),
 }

@@ -114,6 +114,8 @@ mod tests {
                 provenance: Provenance::File,
                 state: State::Effective,
                 reason: None,
+                config: serde_json::json!({}),
+                masked: Vec::new(),
             }],
         }
     }

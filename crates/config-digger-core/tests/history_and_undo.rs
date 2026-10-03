@@ -249,7 +249,7 @@ fn an_undo_is_refused_when_what_the_operation_touched_changed_since() {
         error.message
     );
     assert_eq!(error.backup, Some(backups().join(&undo.operation)));
-    let diff = error.diff.unwrap();
+    let diff = error.diffs[0].diff.clone().unwrap();
     assert!(
         diff.contains("+      \"url\": \"https://rotated\""),
         "{diff}"

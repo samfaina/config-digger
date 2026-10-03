@@ -256,6 +256,21 @@
         "provenance": {
           "description": "The base Provenance of the location's Entries.",
           "$ref": "#/$defs/Provenance"
+        },
+        "interpolation": {
+          "description": "How the Agent writes references in this location's values. Without\nit, every value is literal text.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Interpolation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secrets": {
+          "description": "Fields of this location's Entries that hold Secrets, or that never\ndo, beyond what the core masks by default.",
+          "$ref": "#/$defs/SecretFields"
         }
       },
       "additionalProperties": false,
@@ -303,6 +318,69 @@
           "const": "file"
         }
       ]
+    },
+    "Interpolation": {
+      "description": "How an Agent writes a reference to a value it reads elsewhere, such as an\nenvironment variable. A value made only of references is not a Secret.",
+      "oneOf": [
+        {
+          "description": "`${NAME}`, where `NAME` is a letter or `_` followed by letters, digits\nand `_`, plus `${namespace:argument}` for each listed namespace, and\n`${NAME<separator>default}` when a default separator is set, whose\ndefault is literal text.",
+          "type": "object",
+          "properties": {
+            "namespaces": {
+              "description": "Such as `env` and `input` for `${env:NAME}` and `${input:id}`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "default_separator": {
+              "description": "Such as `:-` for `${NAME:-default}`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "braces"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
+      ]
+    },
+    "SecretFields": {
+      "description": "Key paths below an Entry, one key per segment, where `*` stands for any\nkey or array index.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Fields whose values are Secrets. Below an object or array, every\nvalue is.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
+        },
+        "variable_names": {
+          "description": "Fields that hold the name of a variable, such as Codex's\n`bearer_token_env_var`: never a Secret, whatever else says so.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
     },
     "ItemRules": {
       "type": "object",

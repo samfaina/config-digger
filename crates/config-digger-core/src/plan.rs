@@ -3,15 +3,16 @@
 //! predicts the States after them, and lists what must be acknowledged.
 
 use crate::api::{
-    self, Action, Change, Context, EditSummary, EffectiveChange, Error, FileChange, Inventory,
-    Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning, WarningClass,
+    self, Action, Change, Context, EditSummary, EffectiveChange, Error, FileChange, FileDiff,
+    Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
+use crate::mask::{self, Side};
 use crate::ports::Ports;
-use crate::scan::Snapshot;
-use crate::{edit, explain, history, resolve, scan, select};
+use crate::scan::{LocationReader, Snapshot};
+use crate::{explain, history, resolve, scan, select};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -41,13 +42,15 @@ pub(crate) struct PlannedFile {
     /// The file is missing and the plan creates it.
     pub created: bool,
     pub edited: EditedFile,
+    /// The locations that read the file, whose Entries say where its
+    /// Secrets are.
+    pub readers: Vec<LocationReader>,
 }
 
 /// A file with every edit of an Operation applied, in order.
 pub(crate) struct EditedFile {
     pub bytes: Vec<u8>,
     pub edits: Vec<AppliedEdit>,
-    pub diff: String,
 }
 
 pub(crate) struct AppliedEdit {
@@ -104,9 +107,10 @@ pub(crate) fn plan(
     let mut files = Vec::new();
     for (path, syntax, edits) in by_file {
         let read = read(ports, &path)?;
-        let edited = apply_edits(&path, &read, syntax, &edits)
-            .map_err(|failure| failure.into_error(&path))?;
+        let edited =
+            apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
         files.push(PlannedFile {
+            readers: snapshot.readers_of(&path),
             path,
             syntax,
             read,
@@ -121,7 +125,16 @@ pub(crate) fn plan(
         .collect();
     let after = resolve::resolve(definitions, &snapshot.without(&removed), context);
     let title = explain::operation_title(action, targeted.len());
-    let preview = preview(ports, action, title, None, &before, &after, &files)?;
+    let preview = preview(
+        definitions,
+        ports,
+        action,
+        title,
+        None,
+        &before,
+        &after,
+        &files,
+    )?;
     Ok(Planned {
         action,
         entries: targeted.len(),
@@ -149,8 +162,6 @@ pub(crate) fn plan_undo(
             "Operation {id} cannot be undone: {reason}"
         )));
     }
-    let files = undo_files(ports, manifest)?;
-
     let scan_options = ScanOptions {
         projects: manifest.project.iter().cloned().collect(),
     };
@@ -159,17 +170,26 @@ pub(crate) fn plan_undo(
     };
     let scan = |written: &[(PathBuf, Vec<u8>)]| {
         scan::scan_as_if(definitions, ports, &scan_options.projects, written)
-            .map(|snapshot| resolve::resolve(definitions, &snapshot, &context))
             .map_err(Error::unexpected)
     };
-    let before = scan(&[])?;
+    let snapshot = scan(&[])?;
+    let mut files = undo_files(ports, manifest).map_err(|blocked| match blocked {
+        UndoBlocked::Refused(refused) => refused.into_error(definitions, &snapshot),
+        UndoBlocked::Other(error) => error,
+    })?;
+    for file in &mut files {
+        file.readers = snapshot.readers_of(&file.path);
+    }
+
+    let before = resolve::resolve(definitions, &snapshot, &context);
     let written: Vec<(PathBuf, Vec<u8>)> = files
         .iter()
         .map(|file| (file.path.clone(), file.edited.bytes.clone()))
         .collect();
-    let after = scan(&written)?;
+    let after = resolve::resolve(definitions, &scan(&written)?, &context);
     let title = explain::undo_title(id, &manifest.title);
     let preview = preview(
+        definitions,
         ports,
         Action::Undo,
         title,
@@ -281,8 +301,7 @@ enum UndoFailure {
 fn undo_edits(bytes: &[u8], location: &history::LocationRecord) -> Result<EditedFile, UndoFailure> {
     let read_only = |reason| UndoFailure::Other(EditFailure::ReadOnly(reason));
     let edit_error = |error| UndoFailure::Other(EditFailure::Edit(error));
-    let original = EditableFile::decode(bytes, location.syntax).map_err(read_only)?;
-    let mut file = original.clone();
+    let mut file = EditableFile::decode(bytes, location.syntax).map_err(read_only)?;
     let mut edited = bytes.to_vec();
     let mut applied_edits = Vec::new();
     for record in location.edits.iter().rev() {
@@ -310,7 +329,6 @@ fn undo_edits(bytes: &[u8], location: &history::LocationRecord) -> Result<Edited
     Ok(EditedFile {
         bytes: edited,
         edits: applied_edits,
-        diff: original.unified_diff(&file, &location.path.display().to_string()),
     })
 }
 
@@ -339,13 +357,37 @@ fn with_parents(file: &EditableFile, edit: &Edit) -> Result<Edit, EditError> {
     Ok(edit.clone())
 }
 
+/// Why an Operation cannot be undone, as [`undo_files`] finds it.
+pub(crate) enum UndoBlocked<'m> {
+    /// What the Operation touched changed since it ran.
+    Refused(Refused<'m>),
+    Other(Error),
+}
+
+impl UndoBlocked<'_> {
+    /// Why, as a sentence.
+    pub fn message(&self) -> String {
+        match self {
+            UndoBlocked::Refused(refused) => refused.message(),
+            UndoBlocked::Other(error) => error.message.clone(),
+        }
+    }
+}
+
+impl From<Error> for UndoBlocked<'_> {
+    fn from(error: Error) -> Self {
+        UndoBlocked::Other(error)
+    }
+}
+
 /// The files of an Operation with the inverse of its edits applied to each
 /// one as it is now, or why its Undo is refused. History runs the same
-/// check to say whether the Operation can be undone.
-pub(crate) fn undo_files(
-    ports: &Ports,
-    manifest: &history::Manifest,
-) -> Result<Vec<PlannedFile>, Error> {
+/// check to say whether the Operation can be undone. The files' readers are
+/// left for the caller to fill in.
+pub(crate) fn undo_files<'m>(
+    ports: &'m Ports,
+    manifest: &'m history::Manifest,
+) -> Result<Vec<PlannedFile>, UndoBlocked<'m>> {
     let mut files = Vec::new();
     let mut changed = Vec::new();
     for location in &manifest.locations {
@@ -357,6 +399,7 @@ pub(crate) fn undo_files(
                 read,
                 created,
                 edited,
+                readers: Vec::new(),
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
                 location,
@@ -369,14 +412,20 @@ pub(crate) fn undo_files(
                     key_path.join("."),
                     location.path.display(),
                     manifest.id
-                )));
+                ))
+                .into());
             }
-            Err(UndoFailure::Other(failure)) => return Err(failure.into_error(&location.path)),
+            Err(UndoFailure::Other(failure)) => {
+                return Err(failure.into_error(&location.path).into());
+            }
         }
     }
     if !changed.is_empty() {
-        let folder = history::operation_folder(ports, &manifest.id)?;
-        return Err(refused(ports, &folder, &changed));
+        return Err(UndoBlocked::Refused(Refused {
+            folder: history::operation_folder(ports, &manifest.id)?,
+            changed,
+            ports,
+        }));
     }
     Ok(files)
 }
@@ -390,45 +439,92 @@ struct ChangedFile<'m> {
     current: Option<Vec<u8>>,
 }
 
-/// The refusal of an Undo whose files changed since the Operation: what
-/// changed, and a diff from each backed-up file to what it holds now.
-fn refused(ports: &Ports, folder: &Path, changed: &[ChangedFile]) -> Error {
-    let what: Vec<String> = changed
-        .iter()
-        .map(|file| match file.current {
-            Some(_) => format!(
-                "`{}` in {} changed",
-                file.key_path.join("."),
-                file.location.path.display()
-            ),
-            None => format!("{} was deleted", file.location.path.display()),
-        })
-        .collect();
-    let diff: String = changed
-        .iter()
-        .map(|file| {
-            let label = file.location.path.display().to_string();
-            let current = file.current.as_deref().unwrap_or_default();
-            // A file the Operation created had nothing to back up.
-            let Some(backup) = &file.location.backup else {
-                return edit::unified_diff_bytes(b"", current, &label);
-            };
-            let backup = folder.join(backup);
-            match ports.fs.read(&backup) {
-                Ok(backed_up) => edit::unified_diff_bytes(&backed_up, current, &label),
-                Err(error) => format!("cannot read the backup {}: {error}\n", backup.display()),
-            }
-        })
-        .collect();
-    Error::undo_refused(
-        format!("{} since the Operation", what.join("; ")),
-        folder.to_path_buf(),
-        diff,
-    )
+/// The refusal of an Undo whose files changed since the Operation.
+pub(crate) struct Refused<'m> {
+    /// The Operation's folder, which holds its backup.
+    folder: PathBuf,
+    changed: Vec<ChangedFile<'m>>,
+    ports: &'m Ports,
+}
+
+impl Refused<'_> {
+    /// What changed, as a sentence.
+    fn message(&self) -> String {
+        Error::undo_refused(self.what(), self.folder.clone(), Vec::new()).message
+    }
+
+    fn what(&self) -> String {
+        let what: Vec<String> = self
+            .changed
+            .iter()
+            .map(|file| match file.current {
+                Some(_) => format!(
+                    "`{}` in {} changed",
+                    file.key_path.join("."),
+                    file.location.path.display()
+                ),
+                None => format!("{} was deleted", file.location.path.display()),
+            })
+            .collect();
+        format!("{} since the Operation", what.join("; "))
+    }
+
+    /// The refusal, with a diff from each backed-up file to what it holds
+    /// now, masked for the locations of `snapshot` that read it.
+    fn into_error(self, definitions: &[AgentDefinition], snapshot: &Snapshot) -> Error {
+        let diffs = self
+            .changed
+            .iter()
+            .map(|file| {
+                let path = &file.location.path;
+                // A file the Operation created had nothing to back up.
+                let backed_up = match &file.location.backup {
+                    Some(backup) => {
+                        let backup = self.folder.join(backup);
+                        match self.ports.fs.read(&backup) {
+                            Ok(bytes) => Some(bytes),
+                            Err(error) => return unreadable_backup(path, &backup, &error),
+                        }
+                    }
+                    None => None,
+                };
+                mask::diff(
+                    definitions,
+                    &snapshot.readers_of(path),
+                    path,
+                    Side {
+                        bytes: backed_up.as_deref(),
+                        name: "in the backup",
+                    },
+                    Side {
+                        bytes: file.current.as_deref(),
+                        name: "as it is now",
+                    },
+                )
+            })
+            .collect();
+        Error::undo_refused(self.what(), self.folder, diffs)
+    }
+}
+
+/// No diff of a file whose backup cannot be read.
+fn unreadable_backup(path: &Path, backup: &Path, error: &io::Error) -> FileDiff {
+    FileDiff {
+        path: path.to_path_buf(),
+        diff: None,
+        diff_unavailable: None,
+        diff_note: Some(format!(
+            "Can't read the backup {}: {error}.",
+            backup.display()
+        )),
+        changed_lines: 0,
+    }
 }
 
 /// What a plan shows before it is confirmed.
+#[allow(clippy::too_many_arguments)]
 fn preview(
+    definitions: &[AgentDefinition],
     ports: &Ports,
     action: Action,
     title: String,
@@ -449,15 +545,27 @@ fn preview(
         effective,
         files: files
             .iter()
-            .map(|file| FileChange {
-                path: file.path.clone(),
-                edits: file
+            .map(|file| {
+                let edits = file
                     .edited
                     .edits
                     .iter()
                     .map(|applied| EditSummary::from(&applied.edit))
-                    .collect(),
-                diff: file.edited.diff.clone(),
+                    .collect();
+                let diff = mask::diff(
+                    definitions,
+                    &file.readers,
+                    &file.path,
+                    Side {
+                        bytes: (!file.created).then_some(file.read.as_slice()),
+                        name: "before the Operation",
+                    },
+                    Side {
+                        bytes: Some(&file.edited.bytes),
+                        name: "after the Operation",
+                    },
+                );
+                FileChange::new(edits, diff)
             })
             .collect(),
         deleted: Vec::new(),
@@ -490,13 +598,11 @@ pub(crate) fn read(ports: &Ports, path: &Path) -> Result<Vec<u8>, Error> {
 
 /// Applies `edits` to a file's bytes one after the other.
 pub(crate) fn apply_edits(
-    path: &Path,
     bytes: &[u8],
     syntax: Syntax,
     edits: &[Edit],
 ) -> Result<EditedFile, EditFailure> {
-    let original = EditableFile::decode(bytes, syntax).map_err(EditFailure::ReadOnly)?;
-    let mut file = original.clone();
+    let mut file = EditableFile::decode(bytes, syntax).map_err(EditFailure::ReadOnly)?;
     let mut edited = bytes.to_vec();
     let mut applied_edits = Vec::new();
     for edit in edits {
@@ -512,7 +618,6 @@ pub(crate) fn apply_edits(
     Ok(EditedFile {
         bytes: edited,
         edits: applied_edits,
-        diff: original.unified_diff(&file, &path.display().to_string()),
     })
 }
 

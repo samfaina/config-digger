@@ -102,6 +102,8 @@ pub(crate) fn resolve(
                         provenance: location.provenance.into(),
                         state,
                         reason,
+                        config: entry.config.clone(),
+                        masked: entry.masked.clone(),
                     }
                 })
                 .collect();

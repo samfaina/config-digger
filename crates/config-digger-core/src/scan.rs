@@ -5,8 +5,8 @@
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{Anchored, Locate, Parse, Register};
 use crate::definitions::{AgentDefinition, LocationDefinition, PROJECT_KEY};
-use crate::paths;
 use crate::ports::Ports;
+use crate::{mask, paths};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -20,6 +20,8 @@ pub(crate) struct Snapshot {
     pub projects: Vec<ScannedProject>,
     pub entries: Vec<ScannedEntry>,
     pub read_failures: Vec<ScannedReadFailure>,
+    /// Every location read, existing or not, once per Agent home.
+    pub readers: Vec<LocationReader>,
 }
 
 impl Snapshot {
@@ -33,6 +35,25 @@ impl Snapshot {
                 .any(|(path, key_path)| entry.path == *path && entry.key_path == *key_path)
         });
         snapshot
+    }
+}
+
+/// A location of an Agent that reads a file.
+#[derive(Clone, PartialEq)]
+pub(crate) struct LocationReader {
+    pub agent_index: usize,
+    pub location: String,
+    pub path: PathBuf,
+}
+
+impl Snapshot {
+    /// The locations that read the file at `path`.
+    pub fn readers_of(&self, path: &Path) -> Vec<LocationReader> {
+        self.readers
+            .iter()
+            .filter(|reader| reader.path == path)
+            .cloned()
+            .collect()
     }
 }
 
@@ -70,6 +91,10 @@ pub(crate) struct ScannedEntry {
     pub name: String,
     /// The key of the Project the Entry applies in, or `None` when it applies in every context.
     pub project: Option<String>,
+    /// Its value with every Secret masked. The real value never leaves the scan.
+    pub config: serde_json::Value,
+    /// The key paths below the Entry whose values were masked.
+    pub masked: Vec<Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -117,6 +142,7 @@ pub(crate) fn scan_as_if(
         reader: Reader::new(ports, written),
         projects: Projects::new(ports),
         entries: Vec::new(),
+        readers: Vec::new(),
     };
 
     for home in &found {
@@ -172,6 +198,7 @@ pub(crate) fn scan_as_if(
             .collect(),
         projects,
         entries: scanner.entries,
+        readers: scanner.readers,
         read_failures: scanner.reader.failures,
     })
 }
@@ -209,6 +236,7 @@ struct Scanner<'p> {
     reader: Reader<'p>,
     projects: Projects<'p>,
     entries: Vec<ScannedEntry>,
+    readers: Vec<LocationReader>,
 }
 
 impl Scanner<'_> {
@@ -243,6 +271,14 @@ impl Scanner<'_> {
         path: PathBuf,
         project: Option<String>,
     ) {
+        let reader = LocationReader {
+            agent_index: home.agent_index,
+            location: location.id.clone(),
+            path: path.clone(),
+        };
+        if !self.readers.contains(&reader) {
+            self.readers.push(reader);
+        }
         let Some(text) = self.reader.text(home, &path) else {
             return;
         };
@@ -271,9 +307,10 @@ impl Scanner<'_> {
                 },
                 None => project.clone(),
             };
-            for name in object.entries.keys() {
+            for (name, value) in object.entries {
                 let mut key_path = object.key_path.clone();
                 key_path.push(name.clone());
+                let masked = mask::entry(location, value);
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
@@ -282,6 +319,8 @@ impl Scanner<'_> {
                     key_path,
                     name: name.clone(),
                     project: project.clone(),
+                    config: masked.value,
+                    masked: masked.key_paths,
                 });
             }
         }
@@ -289,15 +328,15 @@ impl Scanner<'_> {
 }
 
 /// An object whose keys are Entries.
-struct RootObject<'v> {
-    key_path: Vec<String>,
+pub(crate) struct RootObject<'v> {
+    pub key_path: Vec<String>,
     /// The Project key it sits under, in the Agent's spelling.
-    project: Option<String>,
-    entries: &'v serde_json::Map<String, serde_json::Value>,
+    pub project: Option<String>,
+    pub entries: &'v serde_json::Map<String, serde_json::Value>,
 }
 
 /// The objects at `root` below `value`. Below `{project}`, every key is a Project.
-fn find_objects<'v>(
+pub(crate) fn find_objects<'v>(
     value: &'v serde_json::Value,
     root: &[String],
     key_path: Vec<String>,

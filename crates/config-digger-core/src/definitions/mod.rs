@@ -4,7 +4,8 @@
 pub(crate) mod blocks;
 
 use blocks::{
-    Anchor, Anchored, Competition, Format, Locator, Provenance, Register, Registry, Validate,
+    Anchor, Anchored, Competition, Format, Interpolation, Locator, Provenance, Register, Registry,
+    Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -125,6 +126,28 @@ pub(crate) struct LocationDefinition {
     pub scope: String,
     /// The base Provenance of the location's Entries.
     pub provenance: Provenance,
+    /// How the Agent writes references in this location's values. Without
+    /// it, every value is literal text.
+    pub interpolation: Option<Interpolation>,
+    /// Fields of this location's Entries that hold Secrets, or that never
+    /// do, beyond what the core masks by default.
+    #[serde(default)]
+    pub secrets: SecretFields,
+}
+
+/// Key paths below an Entry, one key per segment, where `*` stands for any
+/// key or array index.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SecretFields {
+    /// Fields whose values are Secrets. Below an object or array, every
+    /// value is.
+    #[serde(default)]
+    pub fields: Vec<Vec<String>>,
+    /// Fields that hold the name of a variable, such as Codex's
+    /// `bearer_token_env_var`: never a Secret, whatever else says so.
+    #[serde(default)]
+    pub variable_names: Vec<Vec<String>>,
 }
 
 impl LocationDefinition {
@@ -212,6 +235,21 @@ impl AgentDefinition {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
             location.format.validate().map_err(context)?;
+            if let Some(interpolation) = &location.interpolation {
+                interpolation.validate().map_err(context)?;
+            }
+            for field in location
+                .secrets
+                .fields
+                .iter()
+                .chain(&location.secrets.variable_names)
+            {
+                if field.is_empty() || field.iter().any(String::is_empty) {
+                    return Err(context(format!(
+                        "secret field {field:?} needs keys, none of them empty"
+                    )));
+                }
+            }
             self.validate_home_root(&location.anchor).map_err(context)?;
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {

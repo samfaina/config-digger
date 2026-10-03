@@ -915,3 +915,37 @@ fn untagged(value: &Value) -> Option<(&str, &str)> {
         .find(|known| known == tag)?;
     Some((tag, text.as_str()?))
 }
+
+/// The span of the value at `key_path`, where an array item's key is its index.
+pub(super) fn value_span(text: &str, key_path: &[String]) -> Option<Range<usize>> {
+    let document = Document::parse(text.to_owned()).ok()?;
+    let (first, rest) = key_path.split_first()?;
+    item_span(document.as_table().get(first)?, rest)
+}
+
+fn item_span(item: &Item, key_path: &[String]) -> Option<Range<usize>> {
+    let Some((key, rest)) = key_path.split_first() else {
+        return item.as_value()?.span();
+    };
+    match item {
+        Item::Table(table) => item_span(table.get(key)?, rest),
+        Item::ArrayOfTables(tables) => {
+            let table = tables.get(key.parse().ok()?)?;
+            let (key, rest) = rest.split_first()?;
+            item_span(table.get(key)?, rest)
+        }
+        Item::Value(value) => value_span_in(value, key_path),
+        Item::None => None,
+    }
+}
+
+fn value_span_in(value: &toml_edit::Value, key_path: &[String]) -> Option<Range<usize>> {
+    let Some((key, rest)) = key_path.split_first() else {
+        return value.span();
+    };
+    match value {
+        toml_edit::Value::InlineTable(table) => value_span_in(table.get(key)?, rest),
+        toml_edit::Value::Array(array) => value_span_in(array.get(key.parse().ok()?)?, rest),
+        _ => None,
+    }
+}

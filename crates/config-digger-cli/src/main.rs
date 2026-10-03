@@ -227,10 +227,10 @@ struct Failure {
     #[serde(skip_serializing_if = "Option::is_none")]
     backup: Option<Box<Path>>,
     /// For a refused Undo or an incomplete Rollback, a diff from each
-    /// backed-up file to what it holds now. A boxed `str` keeps every
-    /// `Result<_, Failure>` small.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    diff: Option<Box<str>>,
+    /// backed-up file to what it holds now, with every Secret masked. A
+    /// boxed slice keeps every `Result<_, Failure>` small.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    diffs: Box<[api::FileDiff]>,
     /// The Operation that failed, its id, the failure that started an
     /// incomplete Rollback, and where the Rollback left each file.
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
@@ -246,7 +246,7 @@ impl Failure {
             message: message.into(),
             candidates: Vec::new(),
             backup: None,
-            diff: None,
+            diffs: Box::default(),
             failed: None,
             exit,
         }
@@ -277,7 +277,7 @@ impl From<api::Error> for Failure {
         Failure {
             candidates: error.candidates,
             backup: error.backup.map(PathBuf::into_boxed_path),
-            diff: error.diff.map(String::into_boxed_str),
+            diffs: error.diffs.into_boxed_slice(),
             failed: error.failed,
             ..Failure::new(error.code.code(), error.message, exit)
         }
@@ -328,8 +328,11 @@ fn main() -> ExitCode {
                 if let Some(failed) = &failure.failed {
                     anstream::eprint!("{}", render_rollback(&failed.rollback, INDENT));
                 }
-                if let Some(diff) = &failure.diff {
-                    anstream::eprint!("{}", render_diff(diff));
+                for diff in &failure.diffs {
+                    anstream::eprint!(
+                        "{}",
+                        render_file_diff(diff.diff.as_deref(), diff.diff_note.as_deref(), None)
+                    );
                 }
                 if let (Exit::RollbackIncomplete, Some(failed)) = (failure.exit, &failure.failed) {
                     anstream::eprintln!(
@@ -1011,6 +1014,13 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
                 out.push_str(&line.fit(width).render());
             }
         }
+        // The configuration as the core masked it, wrapped rather than cut.
+        for text in terminal::wrap(&entry.config.to_string(), reason_width) {
+            let mut line = Line::default();
+            line.push(reason_indent.as_str(), Style::new())
+                .push(text, DIM);
+            out.push_str(&line.fit(width).render());
+        }
     }
     out
 }
@@ -1096,7 +1106,11 @@ fn render_preview(
         out.push('\n');
         out.push_str(&styled_line("Files", BOLD, width));
         for file in &preview.files {
-            out.push_str(&render_diff(&file.diff));
+            out.push_str(&render_file_diff(
+                file.diff.as_deref(),
+                file.diff_note.as_deref(),
+                width,
+            ));
         }
     }
 
@@ -1145,6 +1159,18 @@ fn render_outcome(action: Action, outcome: &api::Outcome, width: Option<usize>) 
     out
 }
 
+/// A file's masked diff, or the core's note on why it cannot be shown.
+fn render_file_diff(diff: Option<&str>, note: Option<&str>, width: Option<usize>) -> String {
+    match (diff, note) {
+        (Some(diff), _) => render_diff(diff),
+        (None, Some(note)) => terminal::wrap(&format!("{INDENT}{note}"), width)
+            .iter()
+            .map(|line| plain_line(line, width))
+            .collect(),
+        (None, None) => String::new(),
+    }
+}
+
 /// A unified diff, coloured line by line. A diff line is never cut: a hidden
 /// change is worse than a long line.
 fn render_diff(diff: &str) -> String {
@@ -1154,6 +1180,8 @@ fn render_diff(diff: &str) -> String {
             Some(b'+') if !line.starts_with("+++") => AnsiColor::Green.on_default(),
             Some(b'-') if !line.starts_with("---") => AnsiColor::Red.on_default(),
             Some(b'@') => AnsiColor::Cyan.on_default(),
+            // A note, such as `\ secret value changed`.
+            Some(b'\\') => DIM,
             _ => Style::new(),
         };
         out.push_str(&format!("{style}{line}{style:#}\n"));

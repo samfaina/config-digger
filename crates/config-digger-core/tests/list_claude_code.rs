@@ -47,7 +47,14 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "scope": "user",
                     "provenance": "file",
                     "state": "effective",
-                    "reason": null
+                    "reason": null,
+                    "config": {
+                        "type": "stdio",
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-github"],
+                        "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "••••" }
+                    },
+                    "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]]
                 }]
             },
             {
@@ -63,7 +70,9 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "scope": "user",
                     "provenance": "file",
                     "state": "effective",
-                    "reason": null
+                    "reason": null,
+                    "config": { "type": "http", "url": "https://mcp.linear.app/mcp" },
+                    "masked": []
                 }]
             }
         ])
