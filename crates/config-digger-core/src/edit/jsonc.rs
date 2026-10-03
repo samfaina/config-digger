@@ -606,3 +606,26 @@ fn input(value: &Value) -> CstInputValue {
         ),
     }
 }
+
+/// The span of the value at `key_path`, where an array item's key is its index.
+pub(super) fn value_span(text: &str, key_path: &[String]) -> Option<Range<usize>> {
+    let ast =
+        jsonc_parser::parse_to_ast(text, &CollectOptions::default(), &ParseOptions::default())
+            .ok()?;
+    let mut value = ast.value?;
+    for key in key_path {
+        value = match value {
+            ast::Value::Object(object) => {
+                object
+                    .properties
+                    .into_iter()
+                    .find(|prop| prop.name.as_str() == key)?
+                    .value
+            }
+            ast::Value::Array(array) => array.elements.into_iter().nth(key.parse().ok()?)?,
+            _ => return None,
+        };
+    }
+    let range = value.range();
+    Some(range.start..range.end)
+}

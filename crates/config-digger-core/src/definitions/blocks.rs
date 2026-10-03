@@ -290,13 +290,20 @@ pub(crate) enum Provenance {
 
 // --- Formats ----------------------------------------------------------------
 
-/// Why a format could not read a location's text.
+/// Why a format could not read a location's text: where, and nothing of
+/// what the text holds there, since parser messages can quote a Secret.
 #[derive(Debug)]
-pub(crate) struct ParseError;
+pub(crate) struct ParseError {
+    /// The 1-based line and column, when the parser knows them.
+    pub position: Option<(usize, usize)>,
+}
 
 /// Parses a location's text in the reader's dialect.
 pub(crate) trait Parse {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError>;
+
+    /// The dialect, as a sentence names it, such as "strict JSON".
+    fn dialect(&self) -> &'static str;
 
     /// The syntax a location in this format is edited in.
     fn syntax(&self) -> Syntax;
@@ -324,6 +331,12 @@ impl Parse for Format {
         }
     }
 
+    fn dialect(&self) -> &'static str {
+        match self {
+            Format::Json(block) => block.dialect(),
+        }
+    }
+
     fn syntax(&self) -> Syntax {
         match self {
             Format::Json(block) => block.syntax(),
@@ -344,13 +357,155 @@ impl Validate for JsonFormat {
 
 impl Parse for JsonFormat {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
-        serde_json::from_str(text).map_err(|_| ParseError)
+        serde_json::from_str(text).map_err(|error| ParseError {
+            position: (error.line() > 0).then(|| (error.line(), error.column())),
+        })
+    }
+
+    fn dialect(&self) -> &'static str {
+        "strict JSON"
     }
 
     /// Strict JSON is edited as JSONC, which accepts it as it is.
     fn syntax(&self) -> Syntax {
         Syntax::Jsonc
     }
+}
+
+// --- Interpolation ----------------------------------------------------------
+
+/// One run of a value's text: a reference the Agent replaces with a value
+/// it reads elsewhere, or literal text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Run<'t> {
+    pub text: &'t str,
+    pub reference: bool,
+}
+
+/// Splits a value into references and literal text.
+pub(crate) trait Interpolate {
+    /// The runs of `text`, in order. Together they are exactly `text`.
+    fn runs<'t>(&self, text: &'t str) -> Vec<Run<'t>>;
+}
+
+/// How an Agent writes a reference to a value it reads elsewhere, such as an
+/// environment variable. A value made only of references is not a Secret.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Interpolation {
+    Braces(Braces),
+}
+
+impl Validate for Interpolation {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Interpolation::Braces(block) => block.validate(),
+        }
+    }
+}
+
+impl Interpolate for Interpolation {
+    fn runs<'t>(&self, text: &'t str) -> Vec<Run<'t>> {
+        match self {
+            Interpolation::Braces(block) => block.runs(text),
+        }
+    }
+}
+
+/// `${NAME}`, where `NAME` is a letter or `_` followed by letters, digits
+/// and `_`, plus `${namespace:argument}` for each listed namespace, and
+/// `${NAME<separator>default}` when a default separator is set, whose
+/// default is literal text.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Braces {
+    /// Such as `env` and `input` for `${env:NAME}` and `${input:id}`.
+    #[serde(default)]
+    pub namespaces: Vec<String>,
+    /// Such as `:-` for `${NAME:-default}`.
+    pub default_separator: Option<String>,
+}
+
+impl Validate for Braces {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(namespace) = self.namespaces.iter().find(|ns| !is_name(ns)) {
+            return Err(format!("namespace `{namespace}` is not a name"));
+        }
+        if self.default_separator.as_deref() == Some("") {
+            return Err("default_separator must not be empty".into());
+        }
+        Ok(())
+    }
+}
+
+impl Interpolate for Braces {
+    fn runs<'t>(&self, text: &'t str) -> Vec<Run<'t>> {
+        let mut runs = Vec::new();
+        let mut literal = 0;
+        let mut at = 0;
+        while let Some(found) = text[at..].find("${") {
+            let start = at + found;
+            let Some(close) = text[start..].find('}').map(|close| start + close) else {
+                break;
+            };
+            let inner = &text[start + 2..close];
+            let reference = match self.default_separator.as_deref() {
+                Some(separator) => match inner.split_once(separator) {
+                    Some((name, _)) if is_name(name) => {
+                        Some(start + 2 + name.len() + separator.len())
+                    }
+                    _ => None,
+                },
+                None => None,
+            };
+            match reference {
+                // `${NAME<separator>` and `}` are references; the default between them is not.
+                Some(default) => {
+                    push_run(&mut runs, &text[literal..start], false);
+                    push_run(&mut runs, &text[start..default], true);
+                    push_run(&mut runs, &text[default..close], false);
+                    push_run(&mut runs, &text[close..close + 1], true);
+                    literal = close + 1;
+                }
+                None if self.is_reference(inner) => {
+                    push_run(&mut runs, &text[literal..start], false);
+                    push_run(&mut runs, &text[start..close + 1], true);
+                    literal = close + 1;
+                }
+                None => {}
+            }
+            at = close + 1;
+        }
+        push_run(&mut runs, &text[literal..], false);
+        runs
+    }
+}
+
+impl Braces {
+    fn is_reference(&self, inner: &str) -> bool {
+        match inner.split_once(':') {
+            Some((namespace, argument)) => {
+                self.namespaces.iter().any(|ns| ns == namespace) && !argument.is_empty()
+            }
+            None => is_name(inner),
+        }
+    }
+}
+
+/// Appends a non-empty run.
+fn push_run<'t>(runs: &mut Vec<Run<'t>>, text: &'t str, reference: bool) {
+    if !text.is_empty() {
+        runs.push(Run { text, reference });
+    }
+}
+
+/// A letter or `_`, then letters, digits and `_`.
+fn is_name(text: &str) -> bool {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 // --- Competition rules ------------------------------------------------------

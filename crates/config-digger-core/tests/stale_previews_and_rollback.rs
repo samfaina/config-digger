@@ -304,7 +304,7 @@ fn a_restore_that_fails_leaves_the_rollback_incomplete() {
     assert!(failed(&error).rollback[0].reason.is_some());
     let operation = failed(&error).operation.clone();
     assert_eq!(error.backup, Some(backups().join(&operation)));
-    let diff = error.diff.clone().unwrap();
+    let diff = error.diffs[0].diff.clone().unwrap();
     assert!(diff.contains("-{\"mcpServers\": {\"linear\""), "{diff}");
     assert!(diff.contains("+{\"mcpServers\": {}}"), "{diff}");
 }

@@ -4,7 +4,8 @@
 pub(crate) mod blocks;
 
 use blocks::{
-    Anchor, Anchored, Competition, Format, Locator, Provenance, Register, Registry, Validate,
+    Anchor, Anchored, Competition, Format, Interpolation, Locator, Provenance, Register, Registry,
+    Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -125,6 +126,51 @@ pub(crate) struct LocationDefinition {
     pub scope: String,
     /// The base Provenance of the location's Entries.
     pub provenance: Provenance,
+    /// How the Agent writes references in this location's values. Without
+    /// it, every value is literal text.
+    pub interpolation: Option<Interpolation>,
+    /// Fields of this location's Entries that hold Secrets, or that never
+    /// do, beyond what the core masks by default.
+    #[serde(default)]
+    pub secrets: SecretFields,
+}
+
+/// Key paths below an Entry, one key per segment, where `*` stands for any
+/// key or array index.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SecretFields {
+    /// Fields whose values are Secrets. Below an object or array, every
+    /// value is.
+    #[serde(default)]
+    pub fields: Vec<Vec<String>>,
+    /// Fields that hold the name of a variable, such as Codex's
+    /// `bearer_token_env_var`: never a Secret, whatever else says so.
+    #[serde(default)]
+    pub variable_names: Vec<Vec<String>>,
+    /// Key paths from the root of the file, outside any Entry, whose values
+    /// are Secrets, such as an API key stored next to the Entries. They are
+    /// masked wherever the file's text is shown, as in a diff's context lines.
+    #[serde(default)]
+    pub file_fields: Vec<Vec<String>>,
+}
+
+impl Validate for SecretFields {
+    fn validate(&self) -> Result<(), String> {
+        for field in self
+            .fields
+            .iter()
+            .chain(&self.variable_names)
+            .chain(&self.file_fields)
+        {
+            if field.is_empty() || field.iter().any(String::is_empty) {
+                return Err(format!(
+                    "secret field {field:?} needs keys, none of them empty"
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl LocationDefinition {
@@ -212,6 +258,10 @@ impl AgentDefinition {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
             location.format.validate().map_err(context)?;
+            if let Some(interpolation) = &location.interpolation {
+                interpolation.validate().map_err(context)?;
+            }
+            location.secrets.validate().map_err(context)?;
             self.validate_home_root(&location.anchor).map_err(context)?;
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
@@ -425,6 +475,37 @@ provenance = "file"
         let text = with_projects(STATE, STATE, r#"["{project}", "{project}"]"#);
         assert!(
             error(&text).contains("`{project}` twice"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_declares_its_interpolation_and_secret_fields() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\ninterpolation = { block = \"braces\", namespaces = [\"env\"], default_separator = \":-\" }\nsecrets.fields = [[\"auth\", \"*\"]]\nsecrets.variable_names = [[\"token_env_var\"]]\n",
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_empty_secret_field_key_is_rejected() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\nsecrets.fields = [[\"auth\", \"\"]]\n",
+        );
+        assert!(error(&text).contains("secret field"), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_interpolation_namespace_must_be_a_name() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\ninterpolation = { block = \"braces\", namespaces = [\"e:nv\"] }\n",
+        );
+        assert!(
+            error(&text).contains("namespace `e:nv`"),
             "{}",
             error(&text)
         );

@@ -97,14 +97,22 @@ impl Applied {
     }
 }
 
-/// A unified diff between two versions of a file, as text, whatever their
-/// encoding: bytes that are not UTF-8 show as replacement characters.
-pub fn unified_diff_bytes(before: &[u8], after: &[u8], label: &str) -> String {
-    unified_diff(
-        &String::from_utf8_lossy(before),
-        &String::from_utf8_lossy(after),
-        label,
-    )
+/// The span of the value at `key_path` in a file's text, where an array
+/// item's key is its index: `None` when the text does not parse or holds
+/// no value there.
+pub(crate) fn value_span(syntax: Syntax, text: &str, key_path: &[String]) -> Option<Range<usize>> {
+    match syntax {
+        Syntax::Jsonc => jsonc::value_span(text, key_path),
+        Syntax::Toml => toml::value_span(text, key_path),
+    }
+}
+
+/// A string value as a syntax writes it.
+pub(crate) fn string_literal(syntax: Syntax, text: &str) -> String {
+    match syntax {
+        Syntax::Jsonc => Value::String(text.to_owned()).to_string(),
+        Syntax::Toml => toml_edit::Value::from(text).to_string(),
+    }
 }
 
 fn unified_diff(before: &str, after: &str, label: &str) -> String {
@@ -174,12 +182,6 @@ impl EditableFile {
             bom,
             text: text.to_owned(),
         })
-    }
-
-    /// A unified diff from this file to `after`, as text, with `label` as the
-    /// file name in its header.
-    pub fn unified_diff(&self, after: &EditableFile, label: &str) -> String {
-        unified_diff(&self.text, &after.text, label)
     }
 
     /// Parses the file and prints it again without editing it.
@@ -313,7 +315,7 @@ pub enum EditError {
         key_path: Vec<String>,
         expected: &'static str,
     },
-    #[error("the list `{}` holds no {value}", .key_path.join("."))]
+    #[error("the list `{}` does not hold the item to remove", .key_path.join("."))]
     ItemNotFound { key_path: Vec<String>, value: Value },
     #[error("the file's syntax cannot hold the value of `{}`", .key_path.join("."))]
     Unrepresentable { key_path: Vec<String> },
@@ -467,4 +469,54 @@ fn dominant_ending(endings: &[&'static str]) -> &'static str {
     let crlf = endings.iter().filter(|ending| **ending == "\r\n").count();
     let lf = endings.iter().filter(|ending| **ending == "\n").count();
     if crlf > lf { "\r\n" } else { "\n" }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn spanned<'t>(syntax: Syntax, text: &'t str, key_path: &[&str]) -> Option<&'t str> {
+        let key_path: Vec<String> = key_path.iter().map(|key| key.to_string()).collect();
+        value_span(syntax, text, &key_path).map(|span| &text[span])
+    }
+
+    #[test]
+    fn a_value_span_reaches_into_tables_inline_tables_and_arrays() {
+        let text = "[mcp_servers.github]\nargs = [\"-y\", \"--token\", \"t\"]\nenv = { TOKEN = \"s\" }\n\n[[hooks]]\ncommand = \"c\"\n";
+
+        assert_eq!(
+            spanned(Syntax::Toml, text, &["mcp_servers", "github", "args", "2"]),
+            Some("\"t\"")
+        );
+        assert_eq!(
+            spanned(
+                Syntax::Toml,
+                text,
+                &["mcp_servers", "github", "env", "TOKEN"]
+            ),
+            Some("\"s\"")
+        );
+        assert_eq!(
+            spanned(Syntax::Toml, text, &["hooks", "0", "command"]),
+            Some("\"c\"")
+        );
+        assert_eq!(spanned(Syntax::Toml, text, &["mcp_servers", "x"]), None);
+    }
+
+    #[test]
+    fn a_value_span_reaches_into_jsonc_objects_and_arrays() {
+        let text = "{\n  // servers\n  \"s\": { \"args\": [\"a\", \"t\"], },\n}\n";
+
+        assert_eq!(
+            spanned(Syntax::Jsonc, text, &["s", "args", "1"]),
+            Some("\"t\"")
+        );
+        assert_eq!(spanned(Syntax::Jsonc, text, &["s", "env"]), None);
+    }
+
+    #[test]
+    fn a_string_literal_is_written_in_the_syntax() {
+        assert_eq!(string_literal(Syntax::Jsonc, "a\"b"), r#""a\"b""#);
+        assert_eq!(string_literal(Syntax::Toml, "••••"), "\"••••\"");
+    }
 }

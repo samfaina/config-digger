@@ -10,6 +10,17 @@ export const commands = {
 };
 
 /* Types */
+/**  Why a diff cannot be shown with its Secrets masked. */
+export type DiffUnavailable = 
+/**  One side does not parse in the dialect of an Agent that reads the file. */
+"parse" | 
+/**  One side is not UTF-8 text. */
+"decode" | 
+/**  One side cannot be read, such as a backup copy that is gone. */
+"io" | 
+/**  No Agent reads the file any more, so nothing says where its Secrets are. */
+"no_reader";
+
 export type Entry = {
 	path: string,
 	key_path: string[],
@@ -20,6 +31,14 @@ export type Entry = {
 	state: State,
 	/**  Why the Entry has its State, when it is not Effective. */
 	reason: Reason | null,
+	/**  The Entry's value as declared, with every Secret masked as `••••`. */
+	config: JsonValue,
+	/**
+	 *  The key paths in `config`, relative to the Entry, whose values were
+	 *  masked, so that a mask can be told from a literal. An array item's
+	 *  key is its index.
+	 */
+	masked: string[][],
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
@@ -34,10 +53,10 @@ export type Error = {
 	 */
 	backup: string | null,
 	/**
-	 *  For a refused Undo, or a Rollback that is incomplete, a unified diff
-	 *  from each backed-up file to what it holds now.
+	 *  For a refused Undo, or a Rollback that is incomplete, a diff from
+	 *  each backed-up file to what it holds now, with every Secret masked.
 	 */
-	diff: string | null,
+	diffs: FileDiff[],
 	/**  The Operation that failed, once it was recorded in History. */
 	failed: FailedOperation | null,
 };
@@ -92,6 +111,27 @@ export type FailedOperation = {
 	rollback: RollbackLocation[],
 };
 
+/**
+ *  A diff of two versions of one file, with every Secret masked in both,
+ *  or why it cannot be shown.
+ */
+export type FileDiff = {
+	path: string,
+	/**
+	 *  A unified diff, computed on the real text and shown with every Secret
+	 *  masked, context lines and other Entries included. A line whose only
+	 *  change is a Secret shows the same on both sides and is followed by
+	 *  the line `\ secret value changed`. `None` when it cannot be shown.
+	 */
+	diff: string | null,
+	/**  Why there is no diff. */
+	diff_unavailable: DiffUnavailable | null,
+	/**  Why there is no diff, as a sentence rendered by the core. */
+	diff_note: string | null,
+	/**  How many lines differ, whether or not the diff can be shown. */
+	changed_lines: number,
+};
+
 /**  An Agent home found on this machine. */
 export type Home = {
 	agent: string,
@@ -126,6 +166,12 @@ export type Item = {
 };
 
 export type ItemKind = "mcp";
+
+/**
+ *  A JSON value as the TypeScript bindings type it: its numbers are
+ *  JavaScript numbers. Only the bindings use it; values are `serde_json`'s.
+ */
+export type JsonValue = null | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
 /**  What an Agent can be started on. */
 export type Project = {

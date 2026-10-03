@@ -1106,7 +1106,10 @@ fn undo_refused_because_the_entry_changed_exits_8_with_the_backup_and_a_diff() {
     assert_eq!(error["code"], "undo_refused");
     assert_eq!(error["backup"], backup);
     assert!(
-        error["diff"].as_str().unwrap().contains("rotated"),
+        error["diffs"][0]["diff"]
+            .as_str()
+            .unwrap()
+            .contains("rotated"),
         "{error}"
     );
     assert_eq!(read(&harness.path(".claude.json")), rotated);
@@ -1337,4 +1340,101 @@ fn delete_backup_of_an_operation_that_needs_attention_needs_its_own_ack() {
     assert_eq!(acked.code, 0, "{}", acked.stderr);
     assert!(!harness.backup_copy(&removed).exists());
     assert_eq!(history["operations"][0]["needs_attention"], false);
+}
+
+// Secrets.
+
+/// The fake Secret, the only one fixtures hold.
+const SECRET: &str = "not-a-real-secret";
+
+/// A user server `github` whose token is a Secret, next to `linear`.
+const SERVERS_WITH_A_SECRET: &str = r#"{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "env": {
+        "GITHUB_TOKEN": "ghp_not-a-real-secret"
+      }
+    },
+    "linear": {
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}
+"#;
+
+#[test]
+fn show_prints_the_entry_configuration_with_its_secrets_masked() {
+    let harness = Harness::new().with_file(".claude.json", SERVERS_WITH_A_SECRET);
+
+    let text = harness.run(&["--no-project", "show", "github"]);
+    let json = harness.run(&["--no-project", "show", "github", "--json"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout
+            .contains(r#"{"command":"npx","env":{"GITHUB_TOKEN":"ghp_••••"}}"#),
+        "{}",
+        text.stdout
+    );
+    assert!(!text.stdout.contains(SECRET), "{}", text.stdout);
+    let entry = &json.document()["item"]["entries"][0];
+    assert_eq!(entry["config"]["env"]["GITHUB_TOKEN"], "ghp_••••");
+    assert_eq!(entry["masked"], json!([["env", "GITHUB_TOKEN"]]));
+    assert!(!json.stdout.contains(SECRET), "{}", json.stdout);
+}
+
+#[test]
+fn a_remove_preview_masks_secrets_in_its_diff() {
+    let harness = Harness::new().with_file(".claude.json", SERVERS_WITH_A_SECRET);
+
+    let text = harness.run(&["--no-project", "remove", "github", "--dry-run"]);
+    let json = harness.run(&["--no-project", "remove", "github", "--dry-run", "--json"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout
+            .contains(r#"-        "GITHUB_TOKEN": "ghp_••••""#),
+        "{}",
+        text.stdout
+    );
+    assert!(!text.stdout.contains(SECRET), "{}", text.stdout);
+    let file = &json.document()["plan"]["files"][0];
+    assert!(
+        file["diff"].as_str().unwrap().contains("ghp_••••"),
+        "{file}"
+    );
+    assert_eq!(file["diff_unavailable"], Value::Null);
+    assert!(!json.stdout.contains(SECRET), "{}", json.stdout);
+}
+
+#[test]
+fn a_refused_undo_masks_secrets_in_its_diffs() {
+    let harness = Harness::new().with_file(".claude.json", SERVERS_WITH_A_SECRET);
+    let removed = harness.removed("github");
+    let undo = harness.run(&["--no-project", "undo", &removed, "--yes", "--json"]);
+    let undo = undo.document()["result"]["operation"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let rotated = read(&harness.path(".claude.json")).replace(SECRET, "not-a-real-secret-2");
+    std::fs::write(harness.path(".claude.json"), &rotated).unwrap();
+
+    let text = harness.run(&["undo", &undo, "--yes"]);
+    let json = harness.run(&["undo", &undo, "--yes", "--json"]);
+
+    assert_eq!(text.code, 8, "{}", text.stderr);
+    assert!(
+        text.stderr
+            .contains(r#"+        "GITHUB_TOKEN": "ghp_••••""#),
+        "{}",
+        text.stderr
+    );
+    assert!(!text.stderr.contains(SECRET), "{}", text.stderr);
+    let diff = &json.document()["error"]["diffs"][0];
+    assert!(
+        diff["diff"].as_str().unwrap().contains("ghp_••••"),
+        "{diff}"
+    );
+    assert!(!json.stdout.contains(SECRET), "{}", json.stdout);
 }

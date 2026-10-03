@@ -10,8 +10,9 @@ use crate::api::{
     RollbackOutcome, Verify, WarningClass,
 };
 use crate::definitions::AgentDefinition;
-use crate::edit::{self, EditableFile};
+use crate::edit::EditableFile;
 use crate::history::{self, EditRecord, LocationRecord, Manifest, VerifyRecord};
+use crate::mask::{self, Side};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::Ports;
 use crate::{explain, resolve, scan};
@@ -133,6 +134,7 @@ pub(crate) fn execute(
         Err(failure) => {
             let rollback = roll_back(ports, &writes, written);
             return Err(fail(
+                definitions,
                 ports,
                 &folder,
                 &mut manifest,
@@ -204,7 +206,7 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, 
         .iter()
         .map(|applied| applied.edit.clone())
         .collect();
-    let edited = plan::apply_edits(&file.path, &current, file.syntax, &edits)
+    let edited = plan::apply_edits(&current, file.syntax, &edits)
         .map_err(|failure| failure.into_error(&file.path))?;
     let unchanged = edited
         .edits
@@ -553,6 +555,7 @@ fn put_back(ports: &Ports, path: &Path, bytes: &[u8]) -> Result<(), String> {
 /// error to report: the failure itself when the Rollback is complete, or
 /// `RollbackIncomplete` with a diff of each file it could not restore.
 fn fail(
+    definitions: &[AgentDefinition],
     ports: &Ports,
     folder: &Path,
     manifest: &mut Manifest,
@@ -580,14 +583,25 @@ fn fail(
         complete,
         "operation failed"
     );
-    let diff: String = writes
+    let diffs = writes
         .iter()
         .zip(&rollback)
         .filter(|(_, location)| location.outcome == RollbackOutcome::NotRestored)
         .map(|(write, _)| {
-            let current = ports.fs.read(&write.file.path).unwrap_or_default();
-            let before = write.current.as_deref().unwrap_or_default();
-            edit::unified_diff_bytes(before, &current, &write.file.path.display().to_string())
+            let current = ports.fs.read(&write.file.path).ok();
+            mask::diff(
+                definitions,
+                &write.file.readers,
+                &write.file.path,
+                Side {
+                    bytes: write.current.as_deref(),
+                    name: "before the Operation",
+                },
+                Side {
+                    bytes: current.as_deref(),
+                    name: "as it is now",
+                },
+            )
         })
         .collect();
     Error::rolled_back(
@@ -596,7 +610,7 @@ fn fail(
         manifest.id.clone(),
         folder.to_path_buf(),
         rollback,
-        diff,
+        diffs,
     )
 }
 
