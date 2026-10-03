@@ -4,13 +4,14 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    Anchored, Disables, JsonFormat, Locate, NAME_KEY, Parse, Register, StoreClass,
+    Anchored, Disables, Format, JsonFormat, Locate, NAME_KEY, NameFrom, Parse, ProjectWalk,
+    Register, SkillDefect, SkillFolder, StoreClass,
 };
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::Ports;
 use crate::user_list::{self, UserList};
-use crate::{mask, paths};
+use crate::{mask, paths, skill};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -256,6 +257,11 @@ pub(crate) struct ScannedEntry {
     pub config: serde_json::Value,
     /// The key paths below the Entry whose values were masked.
     pub masked: Vec<Vec<String>>,
+    /// How many folders up from the Project folder its location was read,
+    /// 0 outside a Project.
+    pub depth: usize,
+    /// For a skill, why the Agent may not read its `SKILL.md` as written.
+    pub defect: Option<SkillDefect>,
 }
 
 #[derive(Clone)]
@@ -293,8 +299,12 @@ struct FoundHome {
     agent_index: usize,
     home: String,
     folder: PathBuf,
+    /// Its roots by name, and the machine-wide paths of its definition by
+    /// the text that names them.
     roots: BTreeMap<String, PathBuf>,
     source: HomeSource,
+    /// Any of its own roots exists.
+    configured: bool,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -344,7 +354,7 @@ pub(crate) fn scan_as_if(
                 continue;
             }
             if let Some(path) = location.anchor.path(&home.roots, None) {
-                scanner.read_location(home, definition, location, path, None);
+                scanner.read_location(home, definition, location, path, None, 0);
             }
         }
     }
@@ -361,9 +371,12 @@ pub(crate) fn scan_as_if(
             if !location.anchor.in_project() {
                 continue;
             }
-            for (folder, key) in &folders {
-                if let Some(path) = location.anchor.path(&home.roots, Some(folder)) {
-                    scanner.read_location(home, definition, location, path, Some(key.clone()));
+            for (project_folder, key) in &folders {
+                for (folder, depth) in folders_read(ports, project_folder, location.anchor.walk()) {
+                    if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
+                        let key = Some(key.clone());
+                        scanner.read_location(home, definition, location, path, key, depth);
+                    }
                 }
             }
         }
@@ -380,11 +393,19 @@ pub(crate) fn scan_as_if(
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
     let switch_files = switch_files(definitions, &found, &projects);
+    scanner.entries = one_per_entry(definitions, scanner.entries);
+    // A skill folder is git-versioned when a file below it is.
+    let skill_folders = scanner
+        .entries
+        .iter()
+        .filter(|entry| entry.key_path.is_empty())
+        .map(|entry| entry.path.as_path());
     let locations = scanner
         .readers
         .iter()
         .map(|reader| reader.path.as_path())
-        .filter(|path| ports.fs.exists(path));
+        .filter(|path| ports.fs.exists(path))
+        .chain(skill_folders);
     let switch_files = switch_files
         .iter()
         .map(PathBuf::as_path)
@@ -412,7 +433,7 @@ pub(crate) fn scan_as_if(
             .zip(last_ran)
             .map(|(home, last_ran)| ScannedHome {
                 last_ran,
-                configured: home.roots.values().any(|root| ports.fs.exists(root)),
+                configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
                     hidden.agent == definitions[home.agent_index].agent.id
                         && hidden.home.eq_ignore_ascii_case(&home.home)
@@ -622,7 +643,7 @@ fn find_homes(
                         home: home.id.clone(),
                     })?;
             definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
-            let roots = home.roots_in(&folder);
+            let mut roots = home.roots_in(&folder);
             // A definition home the user added keeps its id, so that it is
             // the same home before and after its files appear.
             let source = if roots.values().any(|root| fs.exists(root)) {
@@ -634,12 +655,15 @@ fn find_homes(
                 continue;
             };
             tracing::debug!(agent = %definition.agent.id, home = %home.id, "home found");
+            let configured = source == HomeSource::Default;
+            roots.extend(machine_paths(definition, ports));
             found.push(FoundHome {
                 agent_index,
                 home: home.id.clone(),
                 folder,
                 roots,
                 source,
+                configured,
             });
         }
     }
@@ -657,15 +681,84 @@ fn find_homes(
         if definition_folders.contains(&(agent_index, key)) {
             continue;
         }
+        let definition = &definitions[agent_index];
+        let mut roots = definition.homes[0].roots_in(&added.folder);
+        let configured = roots.values().any(|root| fs.exists(root));
+        roots.extend(machine_paths(definition, ports));
         found.push(FoundHome {
             agent_index,
             home: added.folder.display().to_string(),
             folder: added.folder.clone(),
-            roots: definitions[agent_index].homes[0].roots_in(&added.folder),
+            roots,
             source: HomeSource::Added,
+            configured,
         });
     }
     Ok(found)
+}
+
+/// The machine-wide paths a definition's locations name, each by the text
+/// that names it, as far as the environment says where they are.
+fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String, PathBuf> {
+    definition
+        .locations
+        .iter()
+        .filter_map(|location| location.anchor.machine())
+        .filter_map(|text| Some((text.to_owned(), paths::expand(text, ports.env.as_ref())?)))
+        .collect()
+}
+
+/// The folders a location in the Project folder `folder` is read in, with
+/// how many levels up each one is.
+fn folders_read(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf, usize)> {
+    let fs = ports.fs.as_ref();
+    match walk {
+        ProjectWalk::None => vec![(folder.to_path_buf(), 0)],
+        ProjectWalk::UpToRepoRoot => {
+            let up: Vec<&Path> = folder.ancestors().collect();
+            match up.iter().position(|parent| fs.exists(&parent.join(".git"))) {
+                Some(root) => up[..=root]
+                    .iter()
+                    .enumerate()
+                    .map(|(depth, parent)| (parent.to_path_buf(), depth))
+                    .collect(),
+                None => vec![(folder.to_path_buf(), 0)],
+            }
+        }
+    }
+}
+
+/// The Entries, each one once: an Entry several locations of an Agent home
+/// reach, such as a skill folder through a linked folder, is
+/// kept once, from the location the Agent ranks highest, and the nearest
+/// Project folder among equals. An Entry keyed to one Project and another
+/// keyed to a second Project are not the same.
+fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) -> Vec<ScannedEntry> {
+    let rank = |entry: &ScannedEntry| {
+        let definition = &definitions[entry.agent_index];
+        (
+            definition.rank(definition.location(&entry.location)),
+            entry.depth,
+        )
+    };
+    let mut kept: Vec<ScannedEntry> = Vec::new();
+    for entry in entries {
+        let same = kept.iter().position(|known| {
+            known.agent_index == entry.agent_index
+                && known.home == entry.home
+                && known.path == entry.path
+                && known.key_path == entry.key_path
+                && (known.project.is_none()
+                    || entry.project.is_none()
+                    || known.project == entry.project)
+        });
+        match same {
+            Some(index) if rank(&entry) < rank(&kept[index]) => kept[index] = entry,
+            Some(_) => {}
+            None => kept.push(entry),
+        }
+    }
+    kept
 }
 
 /// What a scan has gathered so far.
@@ -710,6 +803,7 @@ impl Scanner<'_> {
         location: &LocationDefinition,
         path: PathBuf,
         project: Option<String>,
+        depth: usize,
     ) {
         let reader = LocationReader {
             agent_index: home.agent_index,
@@ -720,10 +814,17 @@ impl Scanner<'_> {
         if !self.readers.contains(&reader) {
             self.readers.push(reader);
         }
+        let format: &dyn Parse = match &location.format {
+            Format::Json(format) => format,
+            Format::Toml(format) => format,
+            Format::SkillFolder(folder) => {
+                return self.read_skills(home, location, folder, &path, project, depth);
+            }
+        };
         let Some(text) = self.reader.text(home, &path, project.as_deref()) else {
             return;
         };
-        let document = match location.format.parse(text) {
+        let document = match format.parse(text) {
             Ok(document) => document,
             Err(error) => {
                 let project = project.as_deref();
@@ -769,9 +870,137 @@ impl Scanner<'_> {
                     project: project.clone(),
                     config: masked.value,
                     masked: masked.key_paths,
+                    depth,
+                    defect: None,
                 });
             }
         }
+    }
+}
+
+impl Scanner<'_> {
+    /// Adds a skill Entry for each folder holding a `SKILL.md` below the
+    /// folder `root`, at the real path its parent folders lead to. A folder
+    /// named with a leading `.` is never read, and one without `SKILL.md`
+    /// only when the location is recursive.
+    fn read_skills(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        format: &SkillFolder,
+        root: &Path,
+        project: Option<String>,
+        depth: usize,
+    ) {
+        let fs = self.reader.ports.fs.as_ref();
+        let mut folders = vec![root.to_path_buf()];
+        // A link back to a folder already read would never end.
+        let mut seen = BTreeSet::new();
+        while let Some(folder) = folders.pop() {
+            if !seen.insert(paths::canonical_key(fs, &folder)) {
+                continue;
+            }
+            let mut children = match fs.read_dir(&folder) {
+                Ok(children) => children,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    let kind = match error.kind() {
+                        io::ErrorKind::PermissionDenied => ReadFailureKind::Permission,
+                        _ => ReadFailureKind::Io,
+                    };
+                    self.reader
+                        .fail(home, &folder, project.as_deref(), kind, None);
+                    continue;
+                }
+            };
+            children.sort();
+            // Links in the parent folders are resolved, so that a skill
+            // reached through a linked folder is one Entry.
+            let real = fs
+                .real_path(&folder)
+                .map_or(folder, |real| paths::lexical(&real));
+            for child in children {
+                let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                if name.starts_with('.') || fs.read_dir(&child).is_err() {
+                    continue;
+                }
+                let skill_md = child.join(SKILL_MD);
+                if !fs.exists(&skill_md) {
+                    if format.recursive {
+                        folders.push(child);
+                    }
+                    continue;
+                }
+                let Some(text) = self.reader.text(home, &skill_md, project.as_deref()) else {
+                    continue;
+                };
+                let skill = read_skill(format, name, text);
+                tracing::debug!(location = %location.id, skill = %skill.name, "read skill");
+                self.entries.push(ScannedEntry {
+                    agent_index: home.agent_index,
+                    home: home.home.clone(),
+                    location: location.id.clone(),
+                    path: real.join(name),
+                    key_path: Vec::new(),
+                    name: skill.name,
+                    project: project.clone(),
+                    config: skill.config,
+                    masked: Vec::new(),
+                    depth,
+                    defect: skill.defect,
+                });
+            }
+        }
+    }
+}
+
+/// The file that makes a folder a skill.
+const SKILL_MD: &str = "SKILL.md";
+
+/// A skill as its Agent reads it.
+struct ReadSkill {
+    /// The name the Agent gives it, which it competes by.
+    name: String,
+    /// The frontmatter's `name` and `description`, as far as it has them.
+    config: serde_json::Value,
+    /// Why the Agent may not read its `SKILL.md` as written.
+    defect: Option<SkillDefect>,
+}
+
+/// The skill in the folder named `folder`, whose `SKILL.md` holds `text`,
+/// as an Agent that reads skill folders as `format` says reads it.
+fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
+    let mut config = serde_json::Map::new();
+    let mut defect = None;
+    let mut named = None;
+    match skill::frontmatter(text) {
+        Ok(keys) => {
+            for key in ["name", "description"] {
+                if let Some(value) = keys.get(key) {
+                    config.insert(key.to_owned(), value.clone().into());
+                }
+            }
+            named = keys.get("name").filter(|name| !name.is_empty()).cloned();
+        }
+        Err(found) => defect = Some(found),
+    }
+    let name = match (format.name_from, named) {
+        (NameFrom::Frontmatter, Some(name)) => name,
+        (NameFrom::Frontmatter, None) => {
+            defect.get_or_insert(SkillDefect::NoName);
+            folder.to_owned()
+        }
+        (NameFrom::Folder, _) => folder.to_owned(),
+    };
+    if format.is_reserved(folder) {
+        defect = Some(SkillDefect::Reserved);
+    }
+    ReadSkill {
+        name: format.sanitize(&name),
+        config: config.into(),
+        defect,
     }
 }
 

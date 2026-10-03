@@ -105,6 +105,14 @@ pub(crate) trait Anchored {
 
     /// Whether the location lies in a Project folder, so that there is one per Project.
     fn in_project(&self) -> bool;
+
+    /// The machine-wide folder or file this anchor names, as written, such
+    /// as `%ProgramFiles%/ClaudeCode`. Its expansion is among the roots
+    /// `path` is given, under that text.
+    fn machine(&self) -> Option<&str>;
+
+    /// How far up from the Project folder the location is read.
+    fn walk(&self) -> ProjectWalk;
 }
 
 /// What a location's path is relative to.
@@ -113,6 +121,7 @@ pub(crate) trait Anchored {
 pub(crate) enum Anchor {
     Home(HomeAnchor),
     Project(ProjectAnchor),
+    Machine(MachineAnchor),
 }
 
 impl Validate for Anchor {
@@ -120,6 +129,7 @@ impl Validate for Anchor {
         match self {
             Anchor::Home(block) => block.validate(),
             Anchor::Project(block) => block.validate(),
+            Anchor::Machine(block) => block.validate(),
         }
     }
 }
@@ -129,6 +139,7 @@ impl Anchored for Anchor {
         match self {
             Anchor::Home(block) => block.path(roots, project),
             Anchor::Project(block) => block.path(roots, project),
+            Anchor::Machine(block) => block.path(roots, project),
         }
     }
 
@@ -136,6 +147,7 @@ impl Anchored for Anchor {
         match self {
             Anchor::Home(block) => block.home_root(),
             Anchor::Project(block) => block.home_root(),
+            Anchor::Machine(block) => block.home_root(),
         }
     }
 
@@ -143,8 +155,38 @@ impl Anchored for Anchor {
         match self {
             Anchor::Home(block) => block.in_project(),
             Anchor::Project(block) => block.in_project(),
+            Anchor::Machine(block) => block.in_project(),
         }
     }
+
+    fn machine(&self) -> Option<&str> {
+        match self {
+            Anchor::Home(block) => block.machine(),
+            Anchor::Project(block) => block.machine(),
+            Anchor::Machine(block) => block.machine(),
+        }
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        match self {
+            Anchor::Home(block) => block.walk(),
+            Anchor::Project(block) => block.walk(),
+            Anchor::Machine(block) => block.walk(),
+        }
+    }
+}
+
+/// How far up from the Project folder a location in a Project is read.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ProjectWalk {
+    /// In the Project folder only.
+    #[default]
+    None,
+    /// In the Project folder and each parent up to the root of its git
+    /// repo, the folder holding `.git`. Outside a repo, in the Project
+    /// folder only.
+    UpToRepoRoot,
 }
 
 /// A root of the Agent home, or a path below it.
@@ -182,14 +224,26 @@ impl Anchored for HomeAnchor {
     fn in_project(&self) -> bool {
         false
     }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
 }
 
-/// A path in the Project folder itself.
+/// A path in the Project folder, and with `walk`, in its parents too.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProjectAnchor {
     /// A `/`-separated path relative to the Project folder.
     pub path: String,
+    /// Which folders the path is read in, from the Project folder up.
+    /// Only a location can walk.
+    #[serde(default)]
+    pub walk: ProjectWalk,
 }
 
 impl Validate for ProjectAnchor {
@@ -199,6 +253,8 @@ impl Validate for ProjectAnchor {
 }
 
 impl Anchored for ProjectAnchor {
+    /// `project` is the folder read: the Project folder, or a parent of it
+    /// the walk reaches.
     fn path(&self, _roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
         Some(join_relative(project?, &self.path))
     }
@@ -209,6 +265,66 @@ impl Anchored for ProjectAnchor {
 
     fn in_project(&self) -> bool {
         true
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        self.walk
+    }
+}
+
+/// A fixed path outside any Agent home or Project, read once for every
+/// home of the Agent, such as a folder an organisation deploys to every
+/// user of the machine.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MachineAnchor {
+    /// Starts with `%NAME%`, expanded from the environment, or a drive;
+    /// `/`-separated, without wildcards.
+    pub path: String,
+}
+
+impl Validate for MachineAnchor {
+    fn validate(&self) -> Result<(), String> {
+        paths::validate_glob(&self.path)?;
+        if self.path.starts_with("~/") {
+            return Err(format!(
+                "machine path `{}` must start with `%NAME%` or a drive",
+                self.path
+            ));
+        }
+        if self.path.contains(['*', '?', '{', '}']) {
+            return Err(format!(
+                "machine path `{}` cannot hold wildcards",
+                self.path
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Anchored for MachineAnchor {
+    fn path(&self, roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        roots.get(&self.path).cloned()
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+
+    fn machine(&self) -> Option<&str> {
+        Some(&self.path)
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
     }
 }
 
@@ -268,6 +384,9 @@ impl Validate for JsonKeys {
         if self.anchor.in_project() {
             return Err("a project registry must not lie in a Project".into());
         }
+        if self.anchor.machine().is_some() {
+            return Err("a project registry must lie in the Agent home".into());
+        }
         if self.root.is_empty() {
             return Err("a project registry needs a root key path".into());
         }
@@ -299,8 +418,26 @@ impl Register for JsonKeys {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Provenance {
-    /// A key someone wrote into a configuration file, by hand or through the Agent.
+    /// A key someone wrote into a configuration file, or a skill folder
+    /// someone put there, by hand or through the Agent.
     File,
+    /// Configuration an organisation deploys to the machine, such as
+    /// enterprise skills. config-digger only reads it.
+    Managed,
+    /// A copy the Agent keeps of configuration held in the user's account,
+    /// such as skills synced from claude.ai. config-digger only reads it.
+    CloudMirror,
+}
+
+impl Provenance {
+    /// Whether config-digger only reads the Entries: it never Disables,
+    /// Enables or Removes them.
+    pub fn read_only(self) -> bool {
+        match self {
+            Provenance::File => false,
+            Provenance::Managed | Provenance::CloudMirror => true,
+        }
+    }
 }
 
 // --- Store classes ----------------------------------------------------------
@@ -421,12 +558,14 @@ pub(crate) trait Parse {
     fn syntax(&self) -> Syntax;
 }
 
-/// The file format and dialect a location is read in.
+/// The format a location is read in: a file in a dialect, or a folder of
+/// skill folders.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Format {
     Json(JsonFormat),
     Toml(TomlFormat),
+    SkillFolder(SkillFolder),
 }
 
 impl Validate for Format {
@@ -434,29 +573,147 @@ impl Validate for Format {
         match self {
             Format::Json(block) => block.validate(),
             Format::Toml(block) => block.validate(),
+            Format::SkillFolder(block) => block.validate(),
         }
     }
 }
 
-impl Parse for Format {
-    fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
+impl Format {
+    /// How a file location is parsed, `None` for a folder of skill folders.
+    pub fn file(&self) -> Option<&dyn Parse> {
         match self {
-            Format::Json(block) => block.parse(text),
-            Format::Toml(block) => block.parse(text),
+            Format::Json(block) => Some(block),
+            Format::Toml(block) => Some(block),
+            Format::SkillFolder(_) => None,
         }
     }
 
-    fn dialect(&self) -> &'static str {
+    /// How a folder of skill folders is read, `None` for a file location.
+    pub fn skill_folder(&self) -> Option<&SkillFolder> {
         match self {
-            Format::Json(block) => block.dialect(),
-            Format::Toml(block) => block.dialect(),
+            Format::SkillFolder(block) => Some(block),
+            Format::Json(_) | Format::Toml(_) => None,
+        }
+    }
+}
+
+/// A folder whose subfolders holding a `SKILL.md` are skills, each one an
+/// Entry. A folder whose name starts with `.` is never read, and one
+/// without `SKILL.md` is not an Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SkillFolder {
+    /// Whether a subfolder without `SKILL.md` is read in turn, at any depth.
+    /// A skill folder's own subfolders never are.
+    #[serde(default)]
+    pub recursive: bool,
+    /// Where a skill's name comes from.
+    pub name_from: NameFrom,
+    /// How the Agent rewrites a name into the one it uses, if it does.
+    pub sanitize: Option<Sanitize>,
+    /// Folder names the Agent never loads a skill from, compared
+    /// case-insensitively, such as a name it keeps for itself.
+    #[serde(default)]
+    pub reserved: Vec<String>,
+    /// What the Agent does with a `SKILL.md` that does not open with a
+    /// `---` frontmatter.
+    pub no_frontmatter: SkillFallback,
+    /// What the Agent does with a frontmatter that is not YAML it reads.
+    pub malformed_frontmatter: SkillFallback,
+    /// What the Agent does with a frontmatter without a `name`, when
+    /// `name_from` is `frontmatter`.
+    pub no_name: SkillFallback,
+}
+
+/// Where a skill's name comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum NameFrom {
+    /// The skill folder's name.
+    Folder,
+    /// The `name` of the `SKILL.md` frontmatter.
+    Frontmatter,
+}
+
+/// How an Agent rewrites a skill's name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Sanitize {
+    /// Lower case, each run of characters other than `a`-`z` and `0`-`9`
+    /// replaced by one `-`, with no `-` at either end.
+    LowercaseHyphens,
+}
+
+/// What an Agent does with a skill whose `SKILL.md` it cannot fully read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SkillFallback {
+    /// It skips the skill, which is Invalid.
+    Skip,
+    /// It loads the skill under its folder's name, with no other
+    /// frontmatter field: Effective, with a note.
+    FolderName,
+}
+
+/// Why an Agent may not read a skill's `SKILL.md` as it is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SkillDefect {
+    /// It does not open with a `---` frontmatter.
+    NoFrontmatter,
+    /// Its frontmatter is not YAML the Agent reads.
+    MalformedFrontmatter,
+    /// Its frontmatter has no `name`, which the Agent names it by.
+    NoName,
+    /// Its folder has a name the Agent keeps for itself.
+    Reserved,
+}
+
+impl Validate for SkillFolder {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(name) = self
+            .reserved
+            .iter()
+            .find(|name| name.is_empty() || name.contains(['/', '\\']))
+        {
+            return Err(format!("reserved name `{name}` must be one folder name"));
+        }
+        Ok(())
+    }
+}
+
+impl SkillFolder {
+    /// What the Agent does with a skill with `defect`.
+    pub fn fallback(&self, defect: SkillDefect) -> SkillFallback {
+        match defect {
+            SkillDefect::NoFrontmatter => self.no_frontmatter,
+            SkillDefect::MalformedFrontmatter => self.malformed_frontmatter,
+            SkillDefect::NoName => self.no_name,
+            SkillDefect::Reserved => SkillFallback::Skip,
         }
     }
 
-    fn syntax(&self) -> Syntax {
-        match self {
-            Format::Json(block) => block.syntax(),
-            Format::Toml(block) => block.syntax(),
+    /// Whether the Agent keeps the folder name `folder` for itself.
+    pub fn is_reserved(&self, folder: &str) -> bool {
+        self.reserved
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(folder))
+    }
+
+    /// The name `name` as the Agent uses it.
+    pub fn sanitize(&self, name: &str) -> String {
+        match self.sanitize {
+            None => name.to_owned(),
+            Some(Sanitize::LowercaseHyphens) => {
+                let mut sanitized = String::new();
+                for c in name.chars().flat_map(char::to_lowercase) {
+                    if c.is_ascii_lowercase() || c.is_ascii_digit() {
+                        sanitized.push(c);
+                    } else if !sanitized.is_empty() && !sanitized.ends_with('-') {
+                        sanitized.push('-');
+                    }
+                }
+                sanitized.trim_end_matches('-').to_owned()
+            }
         }
     }
 }
@@ -1346,6 +1603,9 @@ impl Validate for Switch {
             if count(template) > 1 {
                 return Err(format!("a switch key path holds `{template}` twice"));
             }
+        }
+        if self.anchor.walk() != ProjectWalk::None {
+            return Err("a switch cannot walk up from the Project folder".into());
         }
         if position(super::PROJECT_KEY).is_some() && self.anchor.in_project() {
             return Err(format!(

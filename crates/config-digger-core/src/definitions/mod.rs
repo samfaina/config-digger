@@ -6,7 +6,8 @@ pub(crate) mod blocks;
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate, VersionSource,
+    ProjectWalk, Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate,
+    VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -253,7 +254,8 @@ pub(crate) struct LocationDefinition {
     pub format: Format,
     /// The key path of the object whose keys are Entries. One segment may be
     /// `{project}`: each key there is a Project path, and the Entries below it
-    /// apply only in that Project.
+    /// apply only in that Project. Omitted for a folder of skill folders.
+    #[serde(default)]
     pub root: Vec<String>,
     pub kind: ItemKind,
     /// The id of a declared Scope.
@@ -332,6 +334,13 @@ pub(crate) struct SecretFields {
     pub file_fields: Vec<Vec<String>>,
 }
 
+impl SecretFields {
+    /// Whether it names no field at all.
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty() && self.variable_names.is_empty() && self.file_fields.is_empty()
+    }
+}
+
 impl Validate for SecretFields {
     fn validate(&self) -> Result<(), String> {
         for field in self
@@ -361,6 +370,7 @@ impl LocationDefinition {
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ItemKind {
     Mcp,
+    Skill,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -394,6 +404,10 @@ pub(crate) enum Check {
     /// Required when a location of the kind declares a shape, and refused
     /// otherwise.
     Shape,
+    /// The Agent skips the skill because of its `SKILL.md` or its folder's
+    /// name: Invalid. Required when a location of the kind is a folder of
+    /// skill folders, and refused otherwise.
+    Frontmatter,
 }
 
 impl AgentDefinition {
@@ -532,6 +546,34 @@ impl AgentDefinition {
                     "a location in a Project cannot be keyed by `{PROJECT_KEY}`"
                 )));
             }
+            if location.anchor.walk() != ProjectWalk::None && location.keyed_by_project() {
+                return Err(context(format!(
+                    "a location that walks cannot be keyed by `{PROJECT_KEY}`"
+                )));
+            }
+            match (location.format.skill_folder(), location.kind) {
+                (Some(_), ItemKind::Skill) => {
+                    if !location.root.is_empty() {
+                        return Err(context("a folder of skill folders has no root".into()));
+                    }
+                    if location.interpolation.is_some()
+                        || location.shape.is_some()
+                        || !location.secrets.is_empty()
+                    {
+                        return Err(context(
+                            "a folder of skill folders takes no interpolation, secrets or shape"
+                                .into(),
+                        ));
+                    }
+                }
+                (None, ItemKind::Mcp) => {}
+                (Some(_), ItemKind::Mcp) => {
+                    return Err(context("kind `mcp` needs a file format".into()));
+                }
+                (None, ItemKind::Skill) => {
+                    return Err(context("kind `skill` needs the skill-folder format".into()));
+                }
+            }
             if !self.scopes.iter().any(|scope| scope.id == location.scope) {
                 return Err(context(format!("undeclared scope `{}`", location.scope)));
             }
@@ -598,6 +640,33 @@ impl AgentDefinition {
                     ));
                 }
             }
+            let folders = self
+                .locations
+                .iter()
+                .any(|location| location.kind == *kind && location.format.skill_folder().is_some());
+            match (
+                rules
+                    .checks
+                    .iter()
+                    .filter(|known| **known == Check::Frontmatter)
+                    .count(),
+                folders,
+            ) {
+                (1, true) | (0, false) => {}
+                (0, true) => {
+                    return Err(context(
+                        "checks leaves out `frontmatter`, which a folder of skill folders needs"
+                            .into(),
+                    ));
+                }
+                (_, true) => return Err(context("checks holds `frontmatter` twice".into())),
+                (_, false) => {
+                    return Err(context(
+                        "checks holds `frontmatter`, but no location is a folder of skill folders"
+                            .into(),
+                    ));
+                }
+            }
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
@@ -642,6 +711,7 @@ impl ItemKind {
     pub fn id(self) -> &'static str {
         match self {
             ItemKind::Mcp => "mcp",
+            ItemKind::Skill => "skill",
         }
     }
 }
@@ -652,6 +722,7 @@ impl Check {
             Check::Disable => "disable",
             Check::Precedence => "precedence",
             Check::Shape => "shape",
+            Check::Frontmatter => "frontmatter",
         }
     }
 }
@@ -1260,5 +1331,126 @@ homes = ["default"]"#;
             "{}",
             error(&text)
         );
+    }
+
+    const SKILL_FORMAT: &str = r#"{ block = "skill-folder", name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "skip" }"#;
+
+    /// `VALID` plus a folder of skill folders at `anchor`, read as `format`,
+    /// with `checks` for its skills.
+    fn with_skills(anchor: &str, format: &str, checks: &str) -> String {
+        format!(
+            r#"{VALID}
+[[locations]]
+id = "user-skills"
+anchor = {anchor}
+format = {format}
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["user-skills"]
+competition = {{ block = "exact-name" }}
+checks = {checks}
+"#
+        )
+    }
+
+    const CHECKS: &str = r#"["frontmatter", "disable", "precedence"]"#;
+
+    #[test]
+    fn a_folder_of_skill_folders_loads_in_the_home_a_project_or_the_machine() {
+        for anchor in [
+            r#"{ block = "home", root = "state", path = "skills" }"#,
+            r#"{ block = "project", path = ".test/skills", walk = "up-to-repo-root" }"#,
+            r#"{ block = "machine", path = "%ProgramFiles%/Test/skills" }"#,
+            r#"{ block = "machine", path = "C:/Test/skills" }"#,
+        ] {
+            let text = with_skills(anchor, SKILL_FORMAT, CHECKS);
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        }
+    }
+
+    #[test]
+    fn a_machine_path_starts_from_a_variable_or_a_drive_without_wildcards() {
+        for (path, message) in [
+            ("~/skills", "`%NAME%` or a drive"),
+            ("skills", "must start with"),
+            ("%ProgramFiles%/*/skills", "wildcards"),
+        ] {
+            let anchor = format!(r#"{{ block = "machine", path = "{path}" }}"#);
+            let text = with_skills(&anchor, SKILL_FORMAT, CHECKS);
+            assert!(error(&text).contains(message), "{path}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn skills_and_the_skill_folder_format_go_together() {
+        let anchor = r#"{ block = "home", root = "state" }"#;
+        let text = with_skills(anchor, r#"{ block = "json", dialect = "strict" }"#, CHECKS);
+        assert!(
+            error(&text).contains("kind `skill` needs the skill-folder format"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(r#"{ block = "json", dialect = "strict" }"#, SKILL_FORMAT);
+        assert!(
+            error(&text).contains("kind `mcp` needs a file format"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_folder_of_skill_folders_has_no_root() {
+        let text = with_skills(
+            r#"{ block = "home", root = "state" }"#,
+            SKILL_FORMAT,
+            CHECKS,
+        )
+        .replace("kind = \"skill\"", "root = [\"skills\"]\nkind = \"skill\"");
+        assert!(error(&text).contains("has no root"), "{}", error(&text));
+    }
+
+    #[test]
+    fn skills_need_the_frontmatter_check_and_only_skills_take_it() {
+        let anchor = r#"{ block = "home", root = "state" }"#;
+        let text = with_skills(anchor, SKILL_FORMAT, r#"["disable", "precedence"]"#);
+        assert!(
+            error(&text).contains("leaves out `frontmatter`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            r#"checks = ["frontmatter", "disable", "precedence"]"#,
+        );
+        assert!(
+            error(&text).contains("no location is a folder of skill folders"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_reserved_skill_name_is_one_folder_name() {
+        let format = SKILL_FORMAT.replace(" }", r#", reserved = ["a/b"] }"#);
+        let text = with_skills(r#"{ block = "home", root = "state" }"#, &format, CHECKS);
+        assert!(
+            error(&text).contains("reserved name `a/b`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_disable_switch_cannot_walk() {
+        let text = with_disable(&name_list(false, "").replace(
+            r#"{ block = "home", root = "state" }"#,
+            r#"{ block = "project", path = ".test.json", walk = "up-to-repo-root" }"#,
+        ));
+        assert!(error(&text).contains("cannot walk"), "{}", error(&text));
     }
 }

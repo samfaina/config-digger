@@ -335,7 +335,7 @@ fn a_partial_switch_leaves_the_entry_effective_with_a_note() {
     assert_eq!(code(note.code), "partial_switch");
     assert_eq!(
         note.switch,
-        format!("{}#servers.beta.enabled", home_file().display())
+        Some(format!("{}#servers.beta.enabled", home_file().display()))
     );
     assert!(note.sentence.contains("tools-only"), "{}", note.sentence);
     assert_eq!(disable_path(&beta[0]), home_file());

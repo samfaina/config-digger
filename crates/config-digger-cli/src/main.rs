@@ -75,6 +75,9 @@ enum Command {
         /// Agent never reads. With --project, only that Project's.
         #[arg(long, conflicts_with = "selector")]
         leftovers: bool,
+        /// Only the Items of this kind.
+        #[arg(long, value_enum, value_name = "KIND")]
+        kind: Option<Kind>,
     },
     /// Show one Item with every Entry in precedence order, and why each has its State.
     Show {
@@ -228,6 +231,24 @@ enum HistoryCommand {
         #[arg(long)]
         dry_run: bool,
     },
+}
+
+/// The Item kinds `list --kind` filters by.
+#[derive(Clone, Copy, ValueEnum)]
+enum Kind {
+    /// MCP servers.
+    Mcp,
+    /// Skills.
+    Skill,
+}
+
+impl From<Kind> for api::ItemKind {
+    fn from(kind: Kind) -> Self {
+        match kind {
+            Kind::Mcp => api::ItemKind::Mcp,
+            Kind::Skill => api::ItemKind::Skill,
+        }
+    }
 }
 
 /// The shells `completions` writes a script for.
@@ -458,7 +479,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         Command::List {
             leftovers: true, ..
         } => list_leftovers(cli, &core, width),
-        Command::List { selector, .. } => {
+        Command::List { selector, kind, .. } => {
             let inventory = scanned(cli, &core)?.inventory;
             let mut inventory = if cli.include_hidden {
                 inventory
@@ -472,6 +493,11 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                     return Err(api::Error::no_match(selector).into());
                 }
                 inventory.items = selected;
+            }
+            if let Some(kind) = kind {
+                inventory
+                    .items
+                    .retain(|item| item.kind == api::ItemKind::from(*kind));
             }
             if cli.json {
                 print_json(&inventory);
@@ -1670,6 +1696,8 @@ fn state_style(state: api::State) -> Style {
 fn provenance_label(provenance: api::Provenance) -> &'static str {
     match provenance {
         api::Provenance::File => "file",
+        api::Provenance::Managed => "managed",
+        api::Provenance::CloudMirror => "cloud-mirror",
     }
 }
 

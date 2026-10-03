@@ -8,7 +8,6 @@ use crate::api::{
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
-use crate::definitions::blocks::Parse;
 use crate::disable::{self, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
@@ -175,13 +174,13 @@ impl Targeted<'_> {
         // The edits of each file, in the order its Entries were selected.
         let mut by_file: Vec<(PathBuf, Syntax, Vec<Edit>)> = Vec::new();
         for entry in self.entries {
+            let syntax = removable_syntax(self.definitions, self.snapshot, entry)?;
             let edit = Edit::Remove {
                 key_path: entry.key_path.clone(),
             };
             match by_file.iter_mut().find(|(path, ..)| *path == entry.path) {
                 Some((_, _, edits)) => edits.push(edit),
                 None => {
-                    let syntax = syntax(self.definitions, self.snapshot, entry);
                     by_file.push((entry.path.clone(), syntax, vec![edit]));
                 }
             }
@@ -270,7 +269,8 @@ impl Targeted<'_> {
                     if disabling.is_empty() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
-                    if let Err(sentence) = disable::enable(&disabling) {
+                    let location = definition.location(&scanned.location);
+                    if let Err(sentence) = disable::enable(location, &disabling) {
                         return Err(Error::blocked(explain::enable_refused(
                             &entry.locator,
                             &sentence,
@@ -1058,17 +1058,24 @@ fn warnings(files: &[PlannedFile], running: Option<Warning>) -> Vec<Warning> {
     versioned.into_iter().chain(running).collect()
 }
 
-/// The syntax an Entry's location is edited in.
-fn syntax(definitions: &[AgentDefinition], snapshot: &Snapshot, entry: &api::Entry) -> Syntax {
-    let scanned = snapshot
-        .entries
-        .iter()
-        .find(|scanned| scanned.path == entry.path && scanned.key_path == entry.key_path)
-        .expect("a resolved Entry comes from the snapshot");
-    definitions[scanned.agent_index]
-        .location(&scanned.location)
-        .format
-        .syntax()
+/// The syntax the location of an Entry to Remove is edited in. Or why it
+/// cannot be Removed: config-digger only reads it, or it is a skill folder.
+fn removable_syntax(
+    definitions: &[AgentDefinition],
+    snapshot: &Snapshot,
+    entry: &api::Entry,
+) -> Result<Syntax, Error> {
+    let scanned = snapshot.entry(&entry.path, &entry.key_path);
+    let location = definitions[scanned.agent_index].location(&scanned.location);
+    if location.provenance.read_only() {
+        return Err(Error::blocked(explain::read_only_remove(&entry.locator)));
+    }
+    match location.format.file() {
+        Some(format) => Ok(format.syntax()),
+        None => Err(Error::blocked(explain::skill_remove_not_offered(
+            &entry.locator,
+        ))),
+    }
 }
 
 /// A touched file's bytes. It held the Entry when it was scanned, so a file

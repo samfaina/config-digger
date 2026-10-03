@@ -112,7 +112,12 @@ export type DisableNotOffered =
  *  The Entry is Unread: the Agent never reads it, so it can only be
  *  Removed.
  */
-"unread";
+"unread" | 
+/**
+ *  The Entry is managed, or a copy of the user's account, and
+ *  config-digger only reads it.
+ */
+"read_only";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
@@ -368,7 +373,7 @@ export type Item = {
 	caveats: Caveat[],
 };
 
-export type ItemKind = "mcp";
+export type ItemKind = "mcp" | "skill";
 
 /**
  *  A JSON value as the TypeScript bindings type it: its numbers are
@@ -379,15 +384,17 @@ export type JsonValue = null | boolean | number | null | string | JsonValue[] | 
 /**  Something about an Entry that does not change its State. */
 export type Note = {
 	code: NoteCode,
-	/**  The `<path>#<key path>` locator of the switch it comes from. */
-	switch: string,
+	/**  The `<path>#<key path>` locator of the switch it comes from, if one does. */
+	switch: string | null,
 	/**  The note as a sentence, rendered by the core. */
 	sentence: string,
 };
 
 export type NoteCode = 
 /**  A partial switch limits part of the Entry, and the Agent still uses it. */
-"partial_switch";
+"partial_switch" | 
+/**  The Agent loads the skill through a fallback, under its folder's name. */
+"skill_fallback";
 
 /**  A place in a file's text. */
 export type Position = {
@@ -420,8 +427,18 @@ export type Project = {
 
 /**  How an Entry got where it is, which decides how it can be taken away. */
 export type Provenance = 
-/**  A key in a configuration file. */
-"file";
+/**  A key in a configuration file, or a skill folder someone put there. */
+"file" | 
+/**
+ *  Configuration an organisation deploys to the machine, which
+ *  config-digger only reads.
+ */
+"managed" | 
+/**
+ *  A copy the Agent keeps of configuration in the user's account, such as
+ *  skills synced from claude.ai, which config-digger only reads.
+ */
+"cloud_mirror";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {
@@ -511,6 +528,8 @@ export type ReasonCode =
 "disabled_natively" | 
 /**  The Entry lacks the minimal shape the Agent requires of it. */
 "malformed_entry" | 
+/**  The Agent skips the skill because of its `SKILL.md` or its folder's name. */
+"malformed_skill" | 
 /**  The Entry is keyed to a Project whose folder no longer exists. */
 "project_missing";
 

@@ -1148,12 +1148,14 @@ pub struct Item {
 #[serde(rename_all = "snake_case")]
 pub enum ItemKind {
     Mcp,
+    Skill,
 }
 
 impl From<DefinitionItemKind> for ItemKind {
     fn from(kind: DefinitionItemKind) -> Self {
         match kind {
             DefinitionItemKind::Mcp => ItemKind::Mcp,
+            DefinitionItemKind::Skill => ItemKind::Skill,
         }
     }
 }
@@ -1210,8 +1212,8 @@ pub struct WhatIf {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Note {
     pub code: NoteCode,
-    /// The `<path>#<key path>` locator of the switch it comes from.
-    pub switch: String,
+    /// The `<path>#<key path>` locator of the switch it comes from, if one does.
+    pub switch: Option<String>,
     /// The note as a sentence, rendered by the core.
     pub sentence: String,
 }
@@ -1221,6 +1223,8 @@ pub struct Note {
 pub enum NoteCode {
     /// A partial switch limits part of the Entry, and the Agent still uses it.
     PartialSwitch,
+    /// The Agent loads the skill through a fallback, under its folder's name.
+    SkillFallback,
 }
 
 /// What Disable would do to an Entry in its context: write the Agent's own
@@ -1273,20 +1277,31 @@ pub enum DisableNotOffered {
     /// The Entry is Unread: the Agent never reads it, so it can only be
     /// Removed.
     Unread,
+    /// The Entry is managed, or a copy of the user's account, and
+    /// config-digger only reads it.
+    ReadOnly,
 }
 
 /// How an Entry got where it is, which decides how it can be taken away.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Provenance {
-    /// A key in a configuration file.
+    /// A key in a configuration file, or a skill folder someone put there.
     File,
+    /// Configuration an organisation deploys to the machine, which
+    /// config-digger only reads.
+    Managed,
+    /// A copy the Agent keeps of configuration in the user's account, such as
+    /// skills synced from claude.ai, which config-digger only reads.
+    CloudMirror,
 }
 
 impl From<DefinitionProvenance> for Provenance {
     fn from(provenance: DefinitionProvenance) -> Self {
         match provenance {
             DefinitionProvenance::File => Provenance::File,
+            DefinitionProvenance::Managed => Provenance::Managed,
+            DefinitionProvenance::CloudMirror => Provenance::CloudMirror,
         }
     }
 }
@@ -1331,6 +1346,8 @@ pub enum ReasonCode {
     DisabledNatively,
     /// The Entry lacks the minimal shape the Agent requires of it.
     MalformedEntry,
+    /// The Agent skips the skill because of its `SKILL.md` or its folder's name.
+    MalformedSkill,
     /// The Entry is keyed to a Project whose folder no longer exists.
     ProjectMissing,
 }
