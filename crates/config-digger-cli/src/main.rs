@@ -278,6 +278,7 @@ enum Ack {
     WideReach,
     RunningAgent,
     NeedsAttention,
+    BreaksLinks,
 }
 
 impl From<Ack> for WarningClass {
@@ -287,6 +288,7 @@ impl From<Ack> for WarningClass {
             Ack::WideReach => WarningClass::WideReach,
             Ack::RunningAgent => WarningClass::RunningAgent,
             Ack::NeedsAttention => WarningClass::NeedsAttention,
+            Ack::BreaksLinks => WarningClass::BreaksLinks,
         }
     }
 }
@@ -1217,16 +1219,18 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
     let ranks: Vec<String> = (1..=item.entries.len())
         .map(|rank| format!("{rank}."))
         .collect();
+    let provenances: Vec<String> = item.entries.iter().map(provenance_label).collect();
     let rows: Vec<[(&str, Style); 4]> = item
         .entries
         .iter()
         .zip(&ranks)
-        .map(|(entry, rank)| {
+        .enumerate()
+        .map(|(index, (entry, rank))| {
             [
                 (rank.as_str(), Style::new()),
                 (entry.scope.as_str(), Style::new()),
                 (state_label(entry.state), state_style(entry.state)),
-                (provenance_label(entry.provenance), Style::new()),
+                (provenances[index].as_str(), Style::new()),
             ]
         })
         .collect();
@@ -1317,14 +1321,30 @@ fn location(entry: &api::Entry, width: Option<usize>) -> String {
 /// What follows the locator of an Entry in a git-versioned file.
 const GIT_VERSIONED_TAG: &str = " [git-versioned]";
 
+/// What follows the locator of a Linked Entry: its location is a junction
+/// or symlink.
+const JUNCTION_TAG: &str = " [junction]";
+
+/// What follows the locator of a Linked Entry whose target is gone.
+const BROKEN_JUNCTION_TAG: &str = " [junction, broken]";
+
 /// An Entry's location column: its locator, shortened to `width` as
-/// [`location`] does, then a tag when its file is git-versioned.
+/// [`location`] does, then a tag when its file is git-versioned and one
+/// when it is a Linked Entry.
 fn location_cell(entry: &api::Entry, width: Option<usize>) -> String {
-    if !entry.git_versioned {
-        return location(entry, width);
-    }
-    let width = width.map(|width| width.saturating_sub(columns(GIT_VERSIONED_TAG)));
-    format!("{}{GIT_VERSIONED_TAG}", location(entry, width))
+    let git = if entry.git_versioned {
+        GIT_VERSIONED_TAG
+    } else {
+        ""
+    };
+    let link = match &entry.link {
+        Some(link) if link.broken => BROKEN_JUNCTION_TAG,
+        Some(_) => JUNCTION_TAG,
+        None => "",
+    };
+    let tags = format!("{git}{link}");
+    let width = width.map(|width| width.saturating_sub(columns(&tags)));
+    format!("{}{tags}", location(entry, width))
 }
 
 /// The locator of an Entry in the file at `path`, shortened like [`location`].
@@ -1396,6 +1416,21 @@ fn render_preview(
                 file.diff_note.as_deref(),
                 width,
             ));
+        }
+        if !preview.folders.is_empty() {
+            out.push('\n');
+            out.push_str(&styled_line("Folders", BOLD, width));
+            for folder in &preview.folders {
+                let tag = if folder.git_versioned {
+                    GIT_VERSIONED_TAG
+                } else {
+                    ""
+                };
+                let text = format!("{INDENT}{}{tag}", folder.sentence);
+                for line in terminal::wrap(&text, width) {
+                    out.push_str(&plain_line(&line, width));
+                }
+            }
         }
     }
 
@@ -1693,11 +1728,16 @@ fn state_style(state: api::State) -> Style {
     }
 }
 
-fn provenance_label(provenance: api::Provenance) -> &'static str {
-    match provenance {
-        api::Provenance::File => "file",
-        api::Provenance::Managed => "managed",
-        api::Provenance::CloudMirror => "cloud-mirror",
+/// An Entry's Provenance, with the skill manager that installed it.
+fn provenance_label(entry: &api::Entry) -> String {
+    match (entry.provenance, &entry.skill_manager) {
+        (api::Provenance::SkillManager, Some(manager)) => {
+            format!("skill-manager ({})", manager.name)
+        }
+        (api::Provenance::SkillManager, None) => "skill-manager".to_owned(),
+        (api::Provenance::File, _) => "file".to_owned(),
+        (api::Provenance::Managed, _) => "managed".to_owned(),
+        (api::Provenance::CloudMirror, _) => "cloud-mirror".to_owned(),
     }
 }
 

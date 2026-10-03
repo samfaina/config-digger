@@ -103,7 +103,13 @@ impl FakeFileSystem {
         self
     }
 
-    /// Below `folder`, every write stores bytes other than those it was given.
+    /// Whether a link or junction is at `path` itself.
+    pub fn is_link(&self, path: impl AsRef<Path>) -> bool {
+        self.files().link_at(path.as_ref()).is_some()
+    }
+
+    /// Below `folder`, every write stores bytes other than those it was
+    /// given, and a folder moved there has one file changed.
     pub fn corrupting_writes_below(self, folder: impl Into<PathBuf>) -> Self {
         self.files().corrupting.push(folder.into());
         self
@@ -187,16 +193,48 @@ impl FakeFileSystem {
 }
 
 impl FakeFiles {
-    /// `path` with a link at its start replaced by the link's target.
+    /// `path` with each link at its start replaced by the link's target,
+    /// until none is left, as a link to a folder holding a link is followed
+    /// through both.
     fn follow(&self, path: &Path) -> PathBuf {
-        for (link, target) in &self.links {
-            if let Some(rest) = strip_prefix(path, link) {
-                return rest
-                    .iter()
-                    .fold(target.clone(), |path, part| path.join(part));
-            }
+        let mut path = path.to_path_buf();
+        // A loop of links would never end.
+        for _ in 0..32 {
+            let Some(followed) = self.links.iter().find_map(|(link, target)| {
+                let rest = strip_prefix(&path, link)?;
+                Some(
+                    rest.iter()
+                        .fold(target.clone(), |path, part| path.join(part)),
+                )
+            }) else {
+                break;
+            };
+            path = followed;
         }
-        path.to_path_buf()
+        path
+    }
+
+    /// The index in `links` of the link at `path` itself, its parent
+    /// folders followed.
+    fn link_at(&self, path: &Path) -> Option<usize> {
+        let (parent, name) = (path.parent()?, path.file_name()?);
+        let at = self.follow(parent).join(name);
+        self.links
+            .iter()
+            .position(|(link, _)| strip_prefix(&at, link).is_some_and(|rest| rest.is_empty()))
+    }
+
+    /// `path` with its parent folders followed and not itself, in a folder
+    /// that exists.
+    fn unfollowed(&self, path: &Path) -> io::Result<PathBuf> {
+        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+            return Err(io::ErrorKind::InvalidInput.into());
+        };
+        let parent = self.follow(parent);
+        if self.real_path(&parent).is_none() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        Ok(parent.join(name))
     }
 
     /// The file at a followed path, with its spelling on disk.
@@ -284,6 +322,14 @@ impl FileSystem for FakeFileSystem {
         files.real_path(&files.follow(path))
     }
 
+    fn link_target(&self, path: &Path) -> Option<PathBuf> {
+        self.count_access();
+        let files = self.files();
+        files
+            .link_at(path)
+            .map(|index| files.links[index].1.clone())
+    }
+
     fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
         self.count_access();
         let files = self.files();
@@ -295,7 +341,8 @@ impl FileSystem for FakeFileSystem {
             return Err(io::ErrorKind::NotFound.into());
         }
         let mut children: Vec<PathBuf> = Vec::new();
-        for known in files.files.keys().chain(&files.folders) {
+        let links = files.links.iter().map(|(link, _)| link);
+        for known in files.files.keys().chain(&files.folders).chain(links) {
             let Some(rest) = strip_prefix(known, &followed) else {
                 continue;
             };
@@ -345,6 +392,88 @@ impl FileSystem for FakeFileSystem {
         if files.real_path(&path).is_none() {
             files.folders.insert(path);
         }
+        Ok(())
+    }
+
+    fn remove_link(&self, path: &Path) -> io::Result<()> {
+        self.count_access();
+        let mut files = self.files();
+        match files.link_at(path) {
+            Some(index) => {
+                files.links.remove(index);
+                Ok(())
+            }
+            None if files.real_path(&files.follow(path)).is_some() => {
+                Err(io::ErrorKind::InvalidInput.into())
+            }
+            None => Err(io::ErrorKind::NotFound.into()),
+        }
+    }
+
+    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+        self.count_access();
+        let mut files = self.files();
+        let at = files.unfollowed(link)?;
+        if files.link_at(link).is_some() || files.real_path(&at).is_some() {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+        files.links.push((at, target.to_path_buf()));
+        Ok(())
+    }
+
+    fn move_folder(&self, from: &Path, to: &Path) -> io::Result<()> {
+        self.count_access();
+        let mut files = self.files();
+        if files.link_at(from).is_some() {
+            return Err(io::Error::other("this fake moves no link"));
+        }
+        let from = files.unfollowed(from)?;
+        let to = files.unfollowed(to)?;
+        if files.find_file(&from).is_some() {
+            return Err(io::Error::other("is a file"));
+        }
+        if files.real_path(&from).is_none() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        if files.real_path(&to).is_some()
+            || files
+                .links
+                .iter()
+                .any(|(link, _)| strip_prefix(link, &to).is_some_and(|rest| rest.is_empty()))
+        {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+        let moved = |path: &Path| {
+            strip_prefix(path, &from)
+                .map(|rest| rest.iter().fold(to.clone(), |to, part| to.join(part)))
+        };
+        let mut corrupt = FakeFiles::is_below(&files.corrupting, &to);
+        files.files = std::mem::take(&mut files.files)
+            .into_iter()
+            .map(|(path, mut bytes)| match moved(&path) {
+                Some(path) => {
+                    if std::mem::take(&mut corrupt) {
+                        bytes.push(b'!');
+                    }
+                    (path, bytes)
+                }
+                None => (path, bytes),
+            })
+            .collect();
+        files.folders = std::mem::take(&mut files.folders)
+            .into_iter()
+            .map(|path| moved(&path).unwrap_or(path))
+            .collect();
+        for (link, _) in &mut files.links {
+            if let Some(path) = moved(link) {
+                *link = path;
+            }
+        }
+        // The folder it leaves stays, as on a disk.
+        if let Some(parent) = from.parent() {
+            files.folders.insert(parent.to_path_buf());
+        }
+        files.folders.insert(to);
         Ok(())
     }
 

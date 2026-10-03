@@ -147,11 +147,18 @@ export type Entry = {
 	locator: string,
 	scope: string,
 	provenance: Provenance,
+	/**  For `skill_manager` Provenance, the skill manager that installed it. */
+	skill_manager: SkillManager | null,
 	/**
 	 *  Its file is in the index of its git repo, so a change to it shows in
 	 *  the git diff and reaches every clone once committed.
 	 */
 	git_versioned: boolean,
+	/**
+	 *  For a Linked Entry, a junction or symlink at its own location, where
+	 *  it points. Removing it removes the link, never its target.
+	 */
+	link: Link | null,
 	state: State,
 	/**
 	 *  Why the Entry has its State, when it is not Effective: the first of
@@ -381,6 +388,17 @@ export type ItemKind = "mcp" | "skill";
  */
 export type JsonValue = null | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
+/**  Where the junction or symlink of a Linked Entry points. */
+export type Link = {
+	/**  The target's real path, or the path the link holds when it is gone. */
+	target: string,
+	/**
+	 *  The target is gone, so the Agent reads nothing there and the Entry
+	 *  is Unread.
+	 */
+	broken: boolean,
+};
+
 /**  Something about an Entry that does not change its State. */
 export type Note = {
 	code: NoteCode,
@@ -394,7 +412,12 @@ export type NoteCode =
 /**  A partial switch limits part of the Entry, and the Agent still uses it. */
 "partial_switch" | 
 /**  The Agent loads the skill through a fallback, under its folder's name. */
-"skill_fallback";
+"skill_fallback" | 
+/**
+ *  The skill manager is recognised only by the folder's name or where it
+ *  is, which a folder made by hand there matches too.
+ */
+"provenance_by_name_only";
 
 /**  A place in a file's text. */
 export type Position = {
@@ -438,7 +461,12 @@ export type Provenance =
  *  A copy the Agent keeps of configuration in the user's account, such as
  *  skills synced from claude.ai, which config-digger only reads.
  */
-"cloud_mirror";
+"cloud_mirror" | 
+/**
+ *  A skill folder a skill manager installed, as its definition
+ *  recognises it. Remove touches that folder or link alone.
+ */
+"skill_manager";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {
@@ -531,7 +559,12 @@ export type ReasonCode =
 /**  The Agent skips the skill because of its `SKILL.md` or its folder's name. */
 "malformed_skill" | 
 /**  The Entry is keyed to a Project whose folder no longer exists. */
-"project_missing";
+"project_missing" | 
+/**
+ *  The Entry is a link whose target is gone, so the Agent reads nothing
+ *  there.
+ */
+"link_broken";
 
 export type RiskCode = 
 /**  The Agent may offer to reset the file, losing what it holds. */
@@ -574,6 +607,12 @@ export type RollbackOutcome =
  *  restored. It needs manual recovery from the backup.
  */
 "not_restored";
+
+/**  A skill manager, such as `npx skills`, as its definition names it. */
+export type SkillManager = {
+	id: string,
+	name: string,
+};
 
 export type State = "effective" | "shadowed" | 
 /**

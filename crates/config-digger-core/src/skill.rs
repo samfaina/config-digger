@@ -76,7 +76,10 @@ fn files_or_none(fs: &dyn FileSystem, folder: &Path) -> Result<BTreeMap<String, 
 }
 
 /// Every file below `folder`, by its `/`-separated path relative to it.
-fn files(fs: &dyn FileSystem, folder: &Path) -> Result<BTreeMap<String, Vec<u8>>, Error> {
+pub(crate) fn files(
+    fs: &dyn FileSystem,
+    folder: &Path,
+) -> Result<BTreeMap<String, Vec<u8>>, Error> {
     let mut files = BTreeMap::new();
     let mut folders = vec![(folder.to_path_buf(), String::new())];
     // A link back to a folder already read would never end.

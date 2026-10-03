@@ -2588,3 +2588,134 @@ fn remove_leftovers_needs_a_project_and_no_selector() {
     assert_eq!(with_selector.code, 2, "{}", with_selector.stderr);
     assert_eq!(existing.code, 3, "{}", existing.stderr);
 }
+
+/// A junction at `link` to the folder `target`, as `npx skills` makes one.
+#[cfg(windows)]
+fn junction(link: &Path, target: &Path) {
+    let backslashed = |path: &Path| path.display().to_string().replace('/', "\\");
+    let output = Command::new("cmd")
+        .args(["/D", "/C", "mklink", "/J"])
+        .arg(backslashed(link))
+        .arg(backslashed(target))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+}
+
+/// A home where `npx skills` installed `deploy` for Claude Code: its copy
+/// in `~/.agents/skills`, junctioned into `~/.claude/skills`.
+#[cfg(windows)]
+fn junctioned_deploy() -> Harness {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_file(".agents/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+    std::fs::create_dir_all(harness.path(".claude/skills")).unwrap();
+    junction(
+        &harness.path(".claude/skills/deploy"),
+        &harness.path(".agents/skills/deploy"),
+    );
+    harness
+}
+
+#[cfg(windows)]
+#[test]
+fn show_tags_a_junctioned_skill_and_names_its_skill_manager() {
+    let harness = junctioned_deploy();
+
+    let run = harness.run(&["show", "deploy"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let link = real_path(&harness.path(".claude/skills"))
+        .join("deploy")
+        .display()
+        .to_string();
+    let row: Vec<&str> = run
+        .stdout
+        .lines()
+        .find(|line| line.contains(&link))
+        .unwrap_or_else(|| panic!("no row for the junction:\n{}", run.stdout))
+        .split_whitespace()
+        .collect();
+    assert_eq!(
+        row,
+        [
+            "1.",
+            "user",
+            "Effective",
+            "skill-manager",
+            "(npx",
+            "skills)",
+            link.as_str(),
+            "[junction]"
+        ]
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn remove_of_a_junctioned_skill_removes_the_junction_only_and_undo_creates_it_again() {
+    let harness = junctioned_deploy();
+    let link = harness.path(".claude/skills/deploy");
+    let selector = real_path(&harness.path(".claude/skills"))
+        .join("deploy")
+        .display()
+        .to_string();
+
+    let removed = harness.run(&["remove", &selector, "--yes", "--json"]);
+
+    assert_eq!(removed.code, 0, "{}", removed.stdout);
+    let document = removed.document();
+    assert_eq!(document["plan"]["folders"][0]["change"], "link_removed");
+    assert_eq!(document["result"]["verify"], "verified");
+    assert!(std::fs::symlink_metadata(&link).is_err());
+    assert!(harness.path(".agents/skills/deploy/SKILL.md").exists());
+
+    let operation = document["result"]["operation"].as_str().unwrap();
+    let undone = harness.run(&["undo", operation, "--yes"]);
+
+    assert_eq!(undone.code, 0, "{}{}", undone.stdout, undone.stderr);
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(link.join("SKILL.md").exists());
+}
+
+#[test]
+fn remove_of_a_skill_folder_moves_it_into_the_backup_and_undo_moves_it_back() {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\n---\n")
+        .with_file(".claude/skills/deploy/scripts/run.ps1", "Write-Output run");
+    let folder = harness.path(".claude/skills/deploy");
+
+    let removed = harness.run(&["remove", "deploy", "--yes"]);
+
+    assert_eq!(removed.code, 0, "{}{}", removed.stdout, removed.stderr);
+    assert!(removed.stdout.contains("Folders"), "{}", removed.stdout);
+    assert!(!folder.exists());
+    let operation = std::fs::read_dir(harness.backups())
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert_eq!(
+        std::fs::read_to_string(operation.join("1-deploy").join("scripts").join("run.ps1"))
+            .unwrap(),
+        "Write-Output run"
+    );
+
+    let id = operation
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let undone = harness.run(&["undo", &id, "--yes"]);
+
+    assert_eq!(undone.code, 0, "{}{}", undone.stdout, undone.stderr);
+    assert!(folder.join("SKILL.md").exists());
+    assert!(!operation.join("1-deploy").exists());
+}

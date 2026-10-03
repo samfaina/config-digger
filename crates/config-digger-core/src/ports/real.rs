@@ -32,13 +32,25 @@ impl FileSystem for RealFileSystem {
     /// `canonicalize` asks Windows through `GetFinalPathNameByHandle`, which
     /// answers with a verbatim path whose `\\?\` prefix is dropped here.
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
-        let real = std::fs::canonicalize(path).ok()?;
-        let Some(text) = real.to_str() else {
-            return Some(real);
-        };
-        Some(match text.strip_prefix(r"\\?\UNC\") {
-            Some(share) => PathBuf::from(format!(r"\\{share}")),
-            None => PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(text)),
+        std::fs::canonicalize(path)
+            .ok()
+            .map(without_verbatim_prefix)
+    }
+
+    /// Windows counts a junction as a symlink here, both being
+    /// name-surrogate reparse points, and `read_link` reads either.
+    fn link_target(&self, path: &Path) -> Option<PathBuf> {
+        if !std::fs::symlink_metadata(path)
+            .ok()?
+            .file_type()
+            .is_symlink()
+        {
+            return None;
+        }
+        let target = without_verbatim_prefix(std::fs::read_link(path).ok()?);
+        Some(match path.parent() {
+            Some(parent) if target.is_relative() => parent.join(target),
+            _ => target,
         })
     }
 
@@ -58,6 +70,66 @@ impl FileSystem for RealFileSystem {
 
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         std::fs::create_dir_all(path)
+    }
+
+    /// Windows removes a junction or a folder symlink as a folder, which
+    /// takes the link alone; elsewhere a symlink is removed as a file.
+    fn remove_link(&self, path: &Path) -> io::Result<()> {
+        if self.link_target(path).is_none() {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a link"));
+        }
+        if cfg!(windows) {
+            std::fs::remove_dir(path).or_else(|_| std::fs::remove_file(path))
+        } else {
+            std::fs::remove_file(path)
+        }
+    }
+
+    /// The standard library creates no junction, and this crate forbids
+    /// the unsafe code that would, so `mklink /J` creates it.
+    #[cfg(windows)]
+    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+        if std::fs::symlink_metadata(link).is_ok() {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+        // `mklink` reads a `/` as the start of a switch.
+        let backslashed = |path: &Path| path.as_os_str().to_string_lossy().replace('/', "\\");
+        let output = Command::new("cmd")
+            .args(["/D", "/C", "mklink", "/J"])
+            .arg(backslashed(link))
+            .arg(backslashed(target))
+            .stdin(Stdio::null())
+            .output()?;
+        if output.status.success() && self.link_target(link).is_some() {
+            return Ok(());
+        }
+        Err(io::Error::other(format!(
+            "mklink /J failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )))
+    }
+
+    #[cfg(not(windows))]
+    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+        std::os::unix::fs::symlink(target, link)
+    }
+
+    /// A rename, or across volumes, where no rename works, a copy that is
+    /// removed again when it fails, then the removal of the original.
+    fn move_folder(&self, from: &Path, to: &Path) -> io::Result<()> {
+        if std::fs::symlink_metadata(to).is_ok() {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+        match std::fs::rename(from, to) {
+            Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
+                if let Err(error) = copy_folder(from, to) {
+                    let _ = std::fs::remove_dir_all(to);
+                    return Err(error);
+                }
+                std::fs::remove_dir_all(from)
+            }
+            moved => moved,
+        }
     }
 
     /// The temporary file sits next to the target, so that the rename stays
@@ -97,6 +169,37 @@ impl FileSystem for RealFileSystem {
             Err(TryLockError::WouldBlock) => Ok(None),
             Err(TryLockError::Error(error)) => Err(error),
         }
+    }
+}
+
+/// Copies the folder `from` and everything below it to `to`.
+fn copy_folder(from: &Path, to: &Path) -> io::Result<()> {
+    std::fs::create_dir(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_folder(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
+/// A path without the `\\?\` or `\??\` prefix Windows answers some calls
+/// with, a `\\?\UNC\` share back to `\\`.
+fn without_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    match text.strip_prefix(r"\\?\UNC\") {
+        Some(share) => PathBuf::from(format!(r"\\{share}")),
+        None => PathBuf::from(
+            text.strip_prefix(r"\\?\")
+                .or_else(|| text.strip_prefix(r"\??\"))
+                .unwrap_or(text),
+        ),
     }
 }
 

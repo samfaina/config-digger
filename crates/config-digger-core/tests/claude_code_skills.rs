@@ -870,19 +870,3 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
         remove.message
     );
 }
-
-#[test]
-fn remove_of_a_skill_folder_is_refused_for_now() {
-    let fs = deploy_in_project("{}");
-    let core = core(&fs);
-
-    let refused = plan(&core, &in_project(), Action::Remove, &["deploy"])
-        .err()
-        .unwrap();
-
-    assert_eq!(code(refused.code), "blocked");
-    assert!(
-        fs.contents(in_home(r".claude\skills\deploy\SKILL.md"))
-            .is_some()
-    );
-}

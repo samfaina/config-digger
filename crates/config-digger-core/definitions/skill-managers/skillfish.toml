@@ -1,0 +1,16 @@
+#:schema ../../../../schema/skill-manager-definition.schema.json
+# skillfish. Facts from docs/research/skill-managers.md on
+# research/skill-managers (verified against 1.0.39).
+
+format_version = 1
+
+[manager]
+id = "skillfish"
+name = "skillfish"
+
+# It copies each skill into every Agent folder and writes `.skillfish.json`
+# into each copy [disk].
+[[detectors]]
+block = "marker-file"
+file = ".skillfish.json"
+strength = "strong"

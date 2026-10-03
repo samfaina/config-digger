@@ -7,6 +7,7 @@ use crate::api::{
     OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
 };
 use crate::edit::{Dependency, Edit, Syntax};
+use crate::folders::{FolderOp, FolderSize};
 use crate::ports::{Environment, HeldLock, Ports};
 use crate::{explain, plan};
 use serde::{Deserialize, Serialize};
@@ -105,6 +106,9 @@ pub(crate) struct Manifest {
     /// The States the preview predicted.
     pub changes: Vec<Change>,
     pub locations: Vec<LocationRecord>,
+    /// The skill folders and links it moved, removed or put back.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<FolderRecord>,
     pub verify: Option<VerifyRecord>,
     /// Where the Rollback of a failed Operation left each touched file.
     #[serde(default)]
@@ -132,6 +136,7 @@ impl Manifest {
             project: preview.project.clone(),
             changes: preview.changes.clone(),
             locations: Vec::new(),
+            folders: Vec::new(),
             verify: None,
             rollback: Vec::new(),
             dismissed_at: None,
@@ -179,6 +184,61 @@ impl LocationRecord {
             .iter()
             .map(|record| EditSummary::from(&record.edit))
             .collect()
+    }
+}
+
+/// One skill folder's location an Operation touched.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct FolderRecord {
+    pub path: PathBuf,
+    pub op: FolderOpRecord,
+    /// The size of the folder it moved, or of the link's target.
+    pub size: FolderSize,
+}
+
+/// What an Operation did at a skill folder's location, with what Undo needs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum FolderOpRecord {
+    /// It moved the folder into its backup, under the name `backup`.
+    MovedToBackup { backup: String },
+    /// It removed the link, which pointed to `target`.
+    LinkRemoved { target: PathBuf },
+    /// It moved the folder back from `from`, in an earlier Operation's backup.
+    MovedBack { from: PathBuf },
+    /// It created the link to `target`.
+    LinkCreated { target: PathBuf },
+}
+
+impl FolderRecord {
+    /// The record of `op` done at `path`, a folder moved into the backup
+    /// going under the name `backup`.
+    pub fn new(path: &Path, op: &FolderOp, size: FolderSize, backup: &str) -> Self {
+        let op = match op {
+            FolderOp::MoveToBackup => FolderOpRecord::MovedToBackup {
+                backup: backup.to_owned(),
+            },
+            FolderOp::RemoveLink { target } => FolderOpRecord::LinkRemoved {
+                target: target.clone(),
+            },
+            FolderOp::MoveBack { from } => FolderOpRecord::MovedBack { from: from.clone() },
+            FolderOp::CreateLink { target } => FolderOpRecord::LinkCreated {
+                target: target.clone(),
+            },
+        };
+        Self {
+            path: path.to_path_buf(),
+            op,
+            size,
+        }
+    }
+
+    /// The name of the folder's copy in the Operation's backup, if it moved one there.
+    pub fn backup(&self) -> Option<&str> {
+        match &self.op {
+            FolderOpRecord::MovedToBackup { backup } => Some(backup),
+            _ => None,
+        }
     }
 }
 
@@ -277,6 +337,11 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         plan::undo_files(ports, manifest)
             .err()
             .map(|blocked| blocked.message())
+            .or_else(|| {
+                plan::undo_folders(ports, manifest)
+                    .err()
+                    .map(|error| error.message)
+            })
     });
     let mut agents: Vec<String> = Vec::new();
     for change in &manifest.changes {
@@ -307,6 +372,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
             .locations
             .iter()
             .map(|location| location.path.clone())
+            .chain(manifest.folders.iter().map(|folder| folder.path.clone()))
             .collect(),
         undoable: not_undoable.is_none(),
         not_undoable,
@@ -364,6 +430,16 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
                     .map(|backup| folder.join(backup)),
                 edits: location.edit_summaries(),
             })
+            .chain(manifest.folders.iter().map(|record| {
+                OperationLocation {
+                    path: record.path.clone(),
+                    backup: record
+                        .backup()
+                        .filter(|_| manifest.backup_deleted_at.is_none())
+                        .map(|backup| folder.join(backup)),
+                    edits: Vec::new(),
+                }
+            }))
             .collect(),
         cause: manifest.cause.clone(),
         rollback: manifest.rollback.clone(),
@@ -410,7 +486,8 @@ pub(crate) fn backup_copies(ports: &Ports, folder: &Path, manifest: &Manifest) -
     manifest
         .locations
         .iter()
-        .filter_map(|location| location.backup.as_ref())
+        .filter_map(|location| location.backup.as_deref())
+        .chain(manifest.folders.iter().filter_map(FolderRecord::backup))
         .map(|backup| folder.join(backup))
         .filter(|copy| ports.fs.exists(copy))
         .collect()
@@ -468,7 +545,7 @@ pub(crate) fn delete_backup(
 
     let left: Vec<String> = copies
         .iter()
-        .filter_map(|copy| match ports.fs.remove_file(copy) {
+        .filter_map(|copy| match remove_copy(ports, copy, &folder, &manifest) {
             Ok(()) if !ports.fs.exists(copy) => None,
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
             Ok(()) => Some(format!("{} is still there", copy.display())),
@@ -490,6 +567,21 @@ pub(crate) fn delete_backup(
         sentence: explain::outcome(Action::DeleteBackup, 0, None, id, Verify::Verified),
         hints: Vec::new(),
     })
+}
+
+/// Deletes one copy of the backup in `folder`: a skill folder moved there
+/// whole, or a file.
+fn remove_copy(ports: &Ports, copy: &Path, folder: &Path, manifest: &Manifest) -> io::Result<()> {
+    let moved_folder = manifest
+        .folders
+        .iter()
+        .filter_map(FolderRecord::backup)
+        .any(|backup| folder.join(backup) == copy);
+    if moved_folder {
+        ports.fs.remove_dir_all(copy)
+    } else {
+        ports.fs.remove_file(copy)
+    }
 }
 
 /// History keeps at least this many Operations…

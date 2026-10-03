@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "config-digger skill manager definition",
+  "description": "How a skill manager lays out the skills it installs.",
+  "type": "object",
+  "properties": {
+    "format_version": {
+      "description": "The version of this file format. Must be 1.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "manager": {
+      "$ref": "#/$defs/ManagerInfo"
+    },
+    "detectors": {
+      "description": "What tells a skill folder it installed apart. A folder is the\nmanager's when any detector matches; across managers, the strongest\nmatch wins, then the first manager loaded.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Detector"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "manager",
+    "detectors"
+  ],
+  "$defs": {
+    "ManagerInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "A stable id, such as `npx-skills`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The display name, such as `npx skills`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Detector": {
+      "description": "One sign that a skill folder was installed by the manager.",
+      "oneOf": [
+        {
+          "description": "The skill folder is a link or junction whose target matches a glob.",
+          "type": "object",
+          "properties": {
+            "glob": {
+              "description": "A `/`-separated glob matched against the last folder names of the\ntarget, such as `.agents/skills/*`; `*` and `?` stay within one\nname. Compared case-insensitively.",
+              "type": "string"
+            },
+            "strength": {
+              "$ref": "#/$defs/Strength"
+            },
+            "block": {
+              "type": "string",
+              "const": "link-target-glob"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "glob",
+            "strength"
+          ]
+        },
+        {
+          "description": "The skill folder holds a file the manager writes into each copy.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "The file's name, such as `.skillfish.json`.",
+              "type": "string"
+            },
+            "strength": {
+              "$ref": "#/$defs/Strength"
+            },
+            "block": {
+              "type": "string",
+              "const": "marker-file"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "file",
+            "strength"
+          ]
+        },
+        {
+          "description": "The skill folder's own location matches a glob.",
+          "type": "object",
+          "properties": {
+            "glob": {
+              "description": "A `/`-separated glob matched against the last folder names of the\nskill folder's path, as in `link-target-glob`.",
+              "type": "string"
+            },
+            "strength": {
+              "$ref": "#/$defs/Strength"
+            },
+            "block": {
+              "type": "string",
+              "const": "location-glob"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "glob",
+            "strength"
+          ]
+        },
+        {
+          "description": "A JSON lock file of the manager has a key named like the skill folder.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "The lock file: a path starting with `~/` or `%NAME%`, or one\nrelative to the skill folder, such as `../../skills-lock.json`.",
+              "type": "string"
+            },
+            "key_path": {
+              "description": "The key path of the object whose keys are skills.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sanitize": {
+              "description": "How the manager turns a key into a folder name, if it does.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/KeySanitize"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "strength": {
+              "$ref": "#/$defs/Strength"
+            },
+            "block": {
+              "type": "string",
+              "const": "lock-file-entry"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "file",
+            "key_path",
+            "strength"
+          ]
+        }
+      ]
+    },
+    "Strength": {
+      "description": "How much a detector's match says about who installed a folder.",
+      "oneOf": [
+        {
+          "description": "A folder made by hand can match it too, such as one named like a\nskill in the manager's lock file: the Entry gets a\n`provenance_by_name_only` note.",
+          "type": "string",
+          "const": "weak"
+        },
+        {
+          "description": "Only the manager leaves it, such as its marker file.",
+          "type": "string",
+          "const": "strong"
+        }
+      ]
+    },
+    "KeySanitize": {
+      "description": "How a skill manager turns a lock file key into a folder name.",
+      "oneOf": [
+        {
+          "description": "Lower case, each run of characters other than `a`-`z`, `0`-`9`, `.`\nand `_` replaced by one `-`, with no `.` or `-` at either end, as\n`npx skills` names folders.",
+          "type": "string",
+          "const": "lowercase-hyphens-dots"
+        }
+      ]
+    }
+  }
+}

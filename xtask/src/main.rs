@@ -1,9 +1,10 @@
 //! Repository tasks, run as `cargo xtask <task>`.
 //!
-//! - `schema`: writes the Agent definition JSON Schema generated from the block enums.
+//! - `schema`: writes the Agent definition and skill manager definition JSON
+//!   Schemas generated from the block enums.
 //! - `bindings`: writes the app's TypeScript types and command wrappers generated from the api DTOs.
 //!
-//! With `--check`, a task writes nothing and fails when the committed file is stale.
+//! With `--check`, a task writes nothing and fails when a committed file is stale.
 
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
@@ -16,24 +17,31 @@ struct Generated {
     generate: fn() -> Result<String, String>,
 }
 
-const SCHEMA: Generated = Generated {
-    task: "schema",
-    path: "schema/agent-definition.schema.json",
-    generate: || Ok(config_digger_core::definitions::json_schema()),
-};
+const SCHEMAS: &[Generated] = &[
+    Generated {
+        task: "schema",
+        path: "schema/agent-definition.schema.json",
+        generate: || Ok(config_digger_core::definitions::json_schema()),
+    },
+    Generated {
+        task: "schema",
+        path: "schema/skill-manager-definition.schema.json",
+        generate: || Ok(config_digger_core::definitions::skill_managers::json_schema()),
+    },
+];
 
-const BINDINGS: Generated = Generated {
+const BINDINGS: &[Generated] = &[Generated {
     task: "bindings",
     path: "crates/config-digger-app/ui/src/bindings.ts",
     generate: generate_bindings,
-};
+}];
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
-    let (generated, check) = match args.as_slice() {
-        ["schema"] => (SCHEMA, false),
-        ["schema", "--check"] => (SCHEMA, true),
+    let (task, check) = match args.as_slice() {
+        ["schema"] => (SCHEMAS, false),
+        ["schema", "--check"] => (SCHEMAS, true),
         ["bindings"] => (BINDINGS, false),
         ["bindings", "--check"] => (BINDINGS, true),
         _ => {
@@ -41,18 +49,25 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let contents = match (generated.generate)() {
-        Ok(contents) => contents,
-        Err(error) => {
-            eprintln!("cannot generate {}: {error}", generated.path);
-            return ExitCode::FAILURE;
+    let mut code = ExitCode::SUCCESS;
+    for generated in task {
+        let contents = match (generated.generate)() {
+            Ok(contents) => contents,
+            Err(error) => {
+                eprintln!("cannot generate {}: {error}", generated.path);
+                return ExitCode::FAILURE;
+            }
+        };
+        let done = if check {
+            check_current(generated, &contents)
+        } else {
+            write(generated, &contents)
+        };
+        if done != ExitCode::SUCCESS {
+            code = done;
         }
-    };
-    if check {
-        check_current(&generated, &contents)
-    } else {
-        write(&generated, &contents)
     }
+    code
 }
 
 fn repo_file(path: &str) -> PathBuf {

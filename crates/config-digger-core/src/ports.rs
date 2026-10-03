@@ -35,8 +35,14 @@ pub trait FileSystem: Send + Sync {
     /// exists at `path`.
     fn real_path(&self, path: &Path) -> Option<PathBuf>;
 
-    /// The paths of the files and folders directly in a folder, in no
-    /// particular order. A missing folder is an error of kind `NotFound`.
+    /// The target of the link or junction at `path` itself, made absolute,
+    /// whether or not it exists; `None` when `path` is no link. Links in
+    /// its parent folders are followed and do not count.
+    fn link_target(&self, path: &Path) -> Option<PathBuf>;
+
+    /// The paths of the files and folders directly in a folder, links
+    /// included, in no particular order. A missing folder is an error of
+    /// kind `NotFound`.
     fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>>;
 
     /// Deletes a folder and everything below it.
@@ -47,6 +53,19 @@ pub trait FileSystem: Send + Sync {
 
     /// Creates a folder and any missing parent folders.
     fn create_dir_all(&self, path: &Path) -> io::Result<()>;
+
+    /// Deletes the link or junction at `path` itself, never what it points
+    /// to. Anything else at `path` is an error of kind `InvalidInput`.
+    fn remove_link(&self, path: &Path) -> io::Result<()>;
+
+    /// Creates a link to the folder `target` at `link`, where nothing is,
+    /// in an existing folder: a junction on Windows, which needs no
+    /// privilege, and a symlink elsewhere.
+    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()>;
+
+    /// Moves the folder at `from`, and everything below it, to `to`, where
+    /// nothing is, in an existing folder.
+    fn move_folder(&self, from: &Path, to: &Path) -> io::Result<()>;
 
     /// Replaces the file at `path` with `bytes` through a temporary file and a
     /// rename, so that readers see either the old file or the new one. A link

@@ -47,6 +47,7 @@ pub struct Context {
 impl Core {
     /// Loads the built-in Agent definitions.
     pub fn new(ports: Ports) -> Result<Self, Error> {
+        definitions::skill_managers::built_in().map_err(Error::unexpected)?;
         let definitions = definitions::built_in().map_err(Error::unexpected)?;
         Ok(Self {
             ports,
@@ -60,6 +61,7 @@ impl Core {
     /// development and tests (ADR 0005). A file that fails to load is
     /// rejected whole.
     pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
+        definitions::skill_managers::built_in().map_err(Error::unexpected)?;
         let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
         let built_in = definitions.len();
         for (file, text) in files {
@@ -533,6 +535,8 @@ pub struct Preview {
     /// as a location that could change the outcome and cannot be read.
     pub info: Vec<Info>,
     pub files: Vec<FileChange>,
+    /// The skill folders and links it moves, removes or puts back.
+    pub folders: Vec<FolderChange>,
     /// The backed-up copies a Delete backup deletes for good.
     pub deleted: Vec<PathBuf>,
     /// Where each touched file is copied before anything is written, or for
@@ -669,6 +673,40 @@ impl FileChange {
     }
 }
 
+/// What an Operation does at one skill folder's location. A folder is
+/// moved whole, never copied, so the file count and size say what moves.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct FolderChange {
+    pub path: PathBuf,
+    pub change: FolderChangeKind,
+    /// Where the link points, for a link removed or created.
+    pub target: Option<PathBuf>,
+    /// How many files the folder moved holds, or the link's target.
+    #[specta(type = f64)]
+    pub files: u64,
+    /// Their total size in bytes.
+    #[specta(type = f64)]
+    pub size: u64,
+    /// The folder is in the index of its git repo, so the change shows in
+    /// the git diff.
+    pub git_versioned: bool,
+    /// The change as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum FolderChangeKind {
+    /// The skill folder is moved into the Operation's backup.
+    MovedToBackup,
+    /// The link is removed, and its target left as it is.
+    LinkRemoved,
+    /// The skill folder is moved back from an earlier Operation's backup.
+    MovedBack,
+    /// The link is created again.
+    LinkCreated,
+}
+
 /// A diff of two versions of one file, with every Secret masked in both,
 /// or why it cannot be shown.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
@@ -756,6 +794,9 @@ pub enum WarningClass {
     /// The backup a Delete backup deletes is the only copy for the manual
     /// recovery of an Operation that needs attention.
     NeedsAttention,
+    /// A skill folder moved into the backup is the target of Linked Entries
+    /// the Operation leaves broken.
+    BreaksLinks,
 }
 
 impl WarningClass {
@@ -766,6 +807,7 @@ impl WarningClass {
             WarningClass::WideReach => "wide-reach",
             WarningClass::RunningAgent => "running-agent",
             WarningClass::NeedsAttention => "needs-attention",
+            WarningClass::BreaksLinks => "breaks-links",
         }
     }
 }
@@ -1168,9 +1210,14 @@ pub struct Entry {
     pub locator: String,
     pub scope: String,
     pub provenance: Provenance,
+    /// For `skill_manager` Provenance, the skill manager that installed it.
+    pub skill_manager: Option<SkillManager>,
     /// Its file is in the index of its git repo, so a change to it shows in
     /// the git diff and reaches every clone once committed.
     pub git_versioned: bool,
+    /// For a Linked Entry, a junction or symlink at its own location, where
+    /// it points. Removing it removes the link, never its target.
+    pub link: Option<Link>,
     pub state: State,
     /// Why the Entry has its State, when it is not Effective: the first of
     /// the Agent's checks that it fails.
@@ -1196,6 +1243,16 @@ pub struct Entry {
     /// What makes its State less certain, such as a Disable switch that
     /// cannot be read.
     pub caveats: Vec<Caveat>,
+}
+
+/// Where the junction or symlink of a Linked Entry points.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Link {
+    /// The target's real path, or the path the link holds when it is gone.
+    pub target: PathBuf,
+    /// The target is gone, so the Agent reads nothing there and the Entry
+    /// is Unread.
+    pub broken: bool,
 }
 
 /// The State a Disabled Entry would have once Enabled.
@@ -1225,6 +1282,9 @@ pub enum NoteCode {
     PartialSwitch,
     /// The Agent loads the skill through a fallback, under its folder's name.
     SkillFallback,
+    /// The skill manager is recognised only by the folder's name or where it
+    /// is, which a folder made by hand there matches too.
+    ProvenanceByNameOnly,
 }
 
 /// What Disable would do to an Entry in its context: write the Agent's own
@@ -1294,6 +1354,16 @@ pub enum Provenance {
     /// A copy the Agent keeps of configuration in the user's account, such as
     /// skills synced from claude.ai, which config-digger only reads.
     CloudMirror,
+    /// A skill folder a skill manager installed, as its definition
+    /// recognises it. Remove touches that folder or link alone.
+    SkillManager,
+}
+
+/// A skill manager, such as `npx skills`, as its definition names it.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct SkillManager {
+    pub id: String,
+    pub name: String,
 }
 
 impl From<DefinitionProvenance> for Provenance {
@@ -1350,6 +1420,9 @@ pub enum ReasonCode {
     MalformedSkill,
     /// The Entry is keyed to a Project whose folder no longer exists.
     ProjectMissing,
+    /// The Entry is a link whose target is gone, so the Agent reads nothing
+    /// there.
+    LinkBroken,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.
