@@ -49,7 +49,8 @@ impl Locate for Locator {
     }
 }
 
-/// A fixed path below the user's home folder, written `~/<relative path>`.
+/// The user's home folder, written `~`, or a fixed path below it, written
+/// `~/<relative path>`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PathLocator {
@@ -57,24 +58,34 @@ pub(crate) struct PathLocator {
 }
 
 impl PathLocator {
-    fn relative(&self) -> Option<&str> {
-        self.path.strip_prefix("~/")
+    /// The path below the user's home folder, `None` for the folder itself.
+    fn relative(&self) -> Result<Option<&str>, String> {
+        if self.path == "~" {
+            return Ok(None);
+        }
+        match self.path.strip_prefix("~/") {
+            Some(relative) => validate_relative(relative).map(|()| Some(relative)),
+            None => Err(format!(
+                "path `{}` must be `~` or start with `~/`",
+                self.path
+            )),
+        }
     }
 }
 
 impl Validate for PathLocator {
     fn validate(&self) -> Result<(), String> {
-        match self.relative() {
-            Some(relative) => validate_relative(relative),
-            None => Err(format!("path `{}` must start with `~/`", self.path)),
-        }
+        self.relative().map(|_| ())
     }
 }
 
 impl Locate for PathLocator {
     fn locate(&self, env: &dyn Environment) -> Option<PathBuf> {
-        let relative = self.relative()?;
-        Some(join_relative(&env.home_dir()?, relative))
+        let home = env.home_dir()?;
+        match self.relative().ok()? {
+            Some(relative) => Some(join_relative(&home, relative)),
+            None => Some(home),
+        }
     }
 }
 
@@ -1366,7 +1377,7 @@ impl Switch {
 // --- Paths ------------------------------------------------------------------
 
 /// A `/`-separated path must stay below the folder it is relative to.
-fn validate_relative(path: &str) -> Result<(), String> {
+pub(crate) fn validate_relative(path: &str) -> Result<(), String> {
     let normal = !path.is_empty()
         && Path::new(path)
             .components()
@@ -1381,7 +1392,7 @@ fn validate_relative(path: &str) -> Result<(), String> {
 }
 
 /// Joins a `/`-separated relative path so the result uses native separators.
-fn join_relative(base: &Path, relative: &str) -> PathBuf {
+pub(crate) fn join_relative(base: &Path, relative: &str) -> PathBuf {
     relative
         .split('/')
         .fold(base.to_path_buf(), |path, part| path.join(part))

@@ -524,15 +524,14 @@ fn find_homes(definitions: &[AgentDefinition], ports: &Ports) -> Result<Vec<Foun
     let mut found = Vec::new();
     for (agent_index, definition) in definitions.iter().enumerate() {
         for home in &definition.homes {
-            let roots = home
-                .roots
-                .iter()
-                .map(|(name, locator)| Some((name.clone(), locator.locate(ports.env.as_ref())?)))
-                .collect::<Option<BTreeMap<_, _>>>()
-                .ok_or_else(|| ScanError::HomeUnknown {
-                    agent: definition.agent.name.clone(),
-                    home: home.id.clone(),
-                })?;
+            let folder =
+                home.folder
+                    .locate(ports.env.as_ref())
+                    .ok_or_else(|| ScanError::HomeUnknown {
+                        agent: definition.agent.name.clone(),
+                        home: home.id.clone(),
+                    })?;
+            let roots = home.roots_in(&folder);
             if !roots.values().any(|root| ports.fs.exists(root)) {
                 tracing::debug!(agent = %definition.agent.id, home = %home.id, "home not found");
                 continue;

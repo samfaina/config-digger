@@ -761,7 +761,8 @@ name = "JSONC Reader"
 
 [[homes]]
 id = "default"
-roots.state = { block = "path", path = "~/.claude.json" }
+folder = { block = "path", path = "~" }
+roots.state = ".claude.json"
 
 [[scopes]]
 id = "user"

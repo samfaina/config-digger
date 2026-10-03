@@ -23,7 +23,8 @@ name = "JSONC Agent"
 
 [[homes]]
 id = "default"
-roots.state = { block = "path", path = "~/.jsonc-agent" }
+folder = { block = "path", path = "~" }
+roots.state = ".jsonc-agent"
 
 [[scopes]]
 id = "project"
@@ -133,7 +134,8 @@ name = "User Agent"
 
 [[homes]]
 id = "default"
-roots.config = {{ block = "path", path = "~/{file}" }}
+folder = {{ block = "path", path = "~" }}
+roots.config = "{file}"
 
 [[scopes]]
 id = "user"
@@ -466,7 +468,7 @@ fn entries_keep_their_states_when_another_file_stops_the_agent() {
         "[[locations]]",
         "[[locations]]\nid = \"extra-mcp\"\nanchor = { block = \"home\", root = \"extra\" }\nformat = { block = \"json\", dialect = \"strict\" }\nroot = [\"servers\"]\nkind = \"mcp\"\nscope = \"user\"\nprovenance = \"file\"\nstore_class = \"plain\"\non_read_failure = \"ignores_file\"\n\n[[locations]]",
     )
-    .replace("roots.config = ", "roots.extra = { block = \"path\", path = \"~/extra.json\" }\nroots.config = ")
+    .replace("roots.config = ", "roots.extra = \"extra.json\"\nroots.config = ")
     .replace(r#"precedence = ["user-mcp"]"#, r#"precedence = ["extra-mcp", "user-mcp"]"#);
     let fs = FakeFileSystem::new()
         .with_file(in_home("agent.json"), UNPARSABLE_JSON)

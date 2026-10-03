@@ -257,7 +257,8 @@ images = ["store.exe"]
 
 [[homes]]
 id = "default"
-roots.state = { block = "path", path = "~/.store/state.vscdb" }
+folder = { block = "path", path = "~" }
+roots.state = ".store/state.vscdb"
 
 [[scopes]]
 id = "user"
@@ -472,7 +473,7 @@ fn an_agent_that_starts_after_the_preview_needs_a_fresh_preview() {
 fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
     let definition = plain_agent("[process]\nimages = [\"store.exe\"]\n").replace(
         "[[scopes]]",
-        "[[homes]]\nid = \"other\"\nroots.state = { block = \"path\", path = \"~/.other/state.vscdb\" }\n\n[[scopes]]",
+        "[[homes]]\nid = \"other\"\nfolder = { block = \"path\", path = \"~\" }\nroots.state = \".other/state.vscdb\"\n\n[[scopes]]",
     );
     let other = PathBuf::from(HOME).join(r".other\state.vscdb");
     let fs = FakeFileSystem::new()

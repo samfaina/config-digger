@@ -142,7 +142,8 @@ name = "Competing Agent"
 
 [[homes]]
 id = "default"
-roots.config = { block = "path", path = "~/agent.json" }
+folder = { block = "path", path = "~" }
+roots.config = "agent.json"
 
 [[scopes]]
 id = "project"

@@ -20,16 +20,13 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 
 [[homes]]
 id = "default"
+folder = { block = "path", path = "~" }
 
+[homes.roots]
 # `~/.claude.json` holds user and local Scope MCP servers.
-[homes.roots.state_file]
-block = "path"
-path = "~/.claude.json"
-
+state_file = ".claude.json"
 # The user settings, which hold Disable switches but no Entries.
-[homes.roots.settings_file]
-block = "path"
-path = "~/.claude/settings.json"
+settings_file = ".claude/settings.json"
 
 [[scopes]]
 id = "local"

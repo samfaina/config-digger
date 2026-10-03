@@ -10,6 +10,7 @@ use blocks::{
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 /// The definitions that ship inside config-digger, embedded at compile time.
 const BUILT_IN: &[(&str, &str)] = &[(
@@ -92,8 +93,12 @@ pub(crate) struct AgentInfo {
 #[serde(deny_unknown_fields)]
 pub(crate) struct HomeDefinition {
     pub id: String,
-    /// Named roots of the home. The home is found when any root exists.
-    pub roots: BTreeMap<String, Locator>,
+    /// The folder the home's roots are in.
+    pub folder: Locator,
+    /// Named roots of the home, each a `/`-separated path relative to its
+    /// folder. The home is found when any root exists. An Agent home the
+    /// user adds is laid out like the definition's first home.
+    pub roots: BTreeMap<String, String>,
     /// How to tell that the Agent of this home is running, in place of the
     /// definition's `[process]`, such as for a home read by another
     /// Installation of the Agent.
@@ -378,9 +383,11 @@ impl AgentDefinition {
             if home.roots.is_empty() {
                 return Err(format!("home `{}` declares no roots", home.id));
             }
-            for (name, locator) in &home.roots {
-                locator
-                    .validate()
+            home.folder
+                .validate()
+                .map_err(|e| format!("home `{}` folder: {e}", home.id))?;
+            for (name, path) in &home.roots {
+                blocks::validate_relative(path)
                     .map_err(|e| format!("home `{}` root `{name}`: {e}", home.id))?;
             }
             if let Some(process) = &home.process {
@@ -502,6 +509,16 @@ impl AgentDefinition {
     }
 }
 
+impl HomeDefinition {
+    /// The path of each root of the home whose folder is `folder`, by name.
+    pub fn roots_in(&self, folder: &Path) -> BTreeMap<String, PathBuf> {
+        self.roots
+            .iter()
+            .map(|(name, path)| (name.clone(), blocks::join_relative(folder, path)))
+            .collect()
+    }
+}
+
 impl AgentDefinition {
     /// Every home must declare the root an anchor needs.
     fn validate_home_root(&self, anchor: &Anchor) -> Result<(), String> {
@@ -564,7 +581,8 @@ name = "Test Agent"
 
 [[homes]]
 id = "default"
-roots.state = { block = "path", path = "~/.test.json" }
+folder = { block = "path", path = "~" }
+roots.state = ".test.json"
 
 [[scopes]]
 id = "user"
@@ -817,10 +835,10 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     }
 
     #[test]
-    fn a_home_path_outside_the_user_folder_is_rejected() {
-        let text = VALID.replace("~/.test.json", "C:/test.json");
+    fn a_home_folder_outside_the_user_folder_is_rejected() {
+        let text = VALID.replace(r#"path = "~" }"#, r#"path = "C:/test" }"#);
         assert!(
-            error(&text).contains("must start with `~/`"),
+            error(&text).contains("must be `~` or start with `~/`"),
             "{}",
             error(&text)
         );
@@ -828,7 +846,7 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 
     #[test]
     fn a_relative_path_that_climbs_out_is_rejected() {
-        let text = VALID.replace("~/.test.json", "~/../other/.test.json");
+        let text = VALID.replace(r#"".test.json""#, r#""../other/.test.json""#);
         assert!(
             error(&text).contains("without `.` or `..`"),
             "{}",

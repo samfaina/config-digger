@@ -27,7 +27,8 @@ name = "Test Agent"
 
 [[homes]]
 id = "default"
-roots.state = { block = "path", path = "~/.test-agent.json" }
+folder = { block = "path", path = "~" }
+roots.state = ".test-agent.json"
 
 [[scopes]]
 id = "project"
