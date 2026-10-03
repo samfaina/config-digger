@@ -10,7 +10,7 @@ use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{HomeSource, ScannedEntry, ScannedReadFailure, Snapshot};
 use crate::{explain, locator, paths};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn resolve(
     definitions: &[AgentDefinition],
@@ -65,6 +65,14 @@ pub(crate) fn resolve(
     let context_project = project
         .as_ref()
         .map(|(path, key)| ContextProject { path, key });
+    // The Agent never reads the Entries keyed to a Project whose folder is gone.
+    let missing = project.as_ref().filter(|(_, key)| {
+        snapshot
+            .projects
+            .iter()
+            .any(|known| known.key == *key && !known.exists)
+    });
+    let unread = |entry: &ScannedEntry| missing.is_some() && entry.project.is_some();
 
     let reactions: Vec<Reaction> = snapshot
         .read_failures
@@ -95,7 +103,10 @@ pub(crate) fn resolve(
             let rank = |entry: &ScannedEntry| definition.rank(definition.location(&entry.location));
             // Entries of equal rank, such as under two spellings of one Project
             // key, are ordered by key path so that the choice is stable.
-            entries.sort_by(|a, b| (rank(a), &a.key_path).cmp(&(rank(b), &b.key_path)));
+            // Unread Entries come last, so that they never name the Item.
+            entries.sort_by(|a, b| {
+                (unread(a), rank(a), &a.key_path).cmp(&(unread(b), rank(b), &b.key_path))
+            });
             // An Item is named after the Entry that would be Effective
             // without Disables.
             let name = entries[0].name.clone();
@@ -114,14 +125,16 @@ pub(crate) fn resolve(
                     shape.malformed(&entry.config)
                 })
                 .collect();
-            // An Invalid Entry competes only where the Agent still lists it.
+            // An Invalid Entry competes only where the Agent still lists it,
+            // and an Unread one never does.
             let competes = |index: usize| {
-                malformed[index].is_none()
-                    || definition
-                        .location(&entries[index].location)
-                        .shape
-                        .as_ref()
-                        .is_some_and(Conform::still_competes)
+                !unread(entries[index])
+                    && (malformed[index].is_none()
+                        || definition
+                            .location(&entries[index].location)
+                            .shape
+                            .as_ref()
+                            .is_some_and(Conform::still_competes))
             };
             // The Agent skips a Disabled Entry, and an Invalid one that does
             // not compete, so the highest of the others wins.
@@ -140,6 +153,9 @@ pub(crate) fn resolve(
                 .enumerate()
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
+                    if let (true, Some((path, _))) = (unread(entry), missing) {
+                        return unread_entry(snapshot, entry, location, agent_name, path);
+                    }
                     let (disabling, partial) = &hits[index];
                     // Each check the Entry fails, in the Agent's order.
                     let mut failed: Vec<(api::State, api::Reason)> = Vec::new();
@@ -363,6 +379,71 @@ pub(crate) fn resolve(
         items,
         read_failures,
         agent_flags,
+    }
+}
+
+/// The Unread Entries of each missing Project that has any, sorted by its
+/// path, each resolved in its Project's context.
+pub(crate) fn leftovers(
+    definitions: &[AgentDefinition],
+    snapshot: &Snapshot,
+) -> Vec<api::Leftovers> {
+    snapshot
+        .projects
+        .iter()
+        .filter(|project| !project.exists)
+        .filter_map(|project| {
+            let context = Context {
+                project: Some(project.path.clone()),
+            };
+            let mut items = resolve(definitions, snapshot, &context).items;
+            for item in &mut items {
+                item.entries.retain(|entry| {
+                    entry
+                        .reason
+                        .as_ref()
+                        .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
+                });
+                item.state = api::State::Unread;
+            }
+            items.retain(|item| !item.entries.is_empty());
+            (!items.is_empty()).then(|| api::Leftovers {
+                project: project.path.clone(),
+                items,
+            })
+        })
+        .collect()
+}
+
+/// An Entry keyed to the missing Project `project`, which the Agent never
+/// reads: it competes with nothing and can only be Removed.
+fn unread_entry(
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    location: &LocationDefinition,
+    agent_name: &str,
+    project: &Path,
+) -> api::Entry {
+    api::Entry {
+        path: entry.path.clone(),
+        key_path: entry.key_path.clone(),
+        locator: locator::render(&entry.path, &entry.key_path),
+        scope: location.scope.clone(),
+        provenance: location.provenance.into(),
+        git_versioned: snapshot.versioned.contains(&entry.path),
+        state: api::State::Unread,
+        reason: Some(explain::project_missing(agent_name, project)),
+        secondary: Vec::new(),
+        what_if: None,
+        notes: Vec::new(),
+        config: entry.config.clone(),
+        masked: entry.masked.clone(),
+        disable: api::DisableOption::NotOffered {
+            code: api::DisableNotOffered::Unread,
+            sentence: explain::unread_option(),
+        },
+        enable: None,
+        caveats: Vec::new(),
     }
 }
 

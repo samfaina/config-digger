@@ -88,6 +88,14 @@ impl Core {
         resolve::resolve(&self.definitions, &snapshot.scanned, context)
     }
 
+    /// The Unread Entries of every missing Project, by Project: what the
+    /// Agents' user files keep for Projects whose folder is gone. Their
+    /// locators can be Removed together in one Operation, from any context.
+    /// It never reads the disk.
+    pub fn leftovers(&self, snapshot: &Snapshot) -> Vec<Leftovers> {
+        resolve::leftovers(&self.definitions, &snapshot.scanned)
+    }
+
     /// The one Item `selector` names in `context`: an Item name, or the
     /// `<path>#<key path>` locator of any of its Entries.
     pub fn show(
@@ -119,6 +127,24 @@ impl Core {
             context,
             action,
             targets,
+        )
+        .map(Plan)
+    }
+
+    /// Plans the Remove of every leftover of the missing Project `project`,
+    /// in any spelling, as one Operation in that Project's context. It fails
+    /// with `NoMatch` when the Project is not missing or has no leftovers.
+    pub fn plan_remove_leftovers(
+        &self,
+        snapshot: &Snapshot,
+        project: &Path,
+    ) -> Result<Plan, Error> {
+        plan::plan_remove_leftovers(
+            &self.definitions,
+            &self.ports,
+            &snapshot.scanned,
+            &snapshot.options,
+            project,
         )
         .map(Plan)
     }
@@ -557,6 +583,7 @@ pub enum StateAfter {
     Shadowed,
     Disabled,
     Invalid,
+    Unread,
     Removed,
 }
 
@@ -567,6 +594,7 @@ impl From<State> for StateAfter {
             State::Shadowed => StateAfter::Shadowed,
             State::Disabled => StateAfter::Disabled,
             State::Invalid => StateAfter::Invalid,
+            State::Unread => StateAfter::Unread,
         }
     }
 }
@@ -935,6 +963,15 @@ pub struct Project {
     pub hidden: bool,
 }
 
+/// The leftovers of one missing Project: its Unread Entries.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Leftovers {
+    /// The missing Project, as [`Project::path`] has it.
+    pub project: PathBuf,
+    /// Each Item with only its Unread Entries, sorted like [`Inventory::items`].
+    pub items: Vec<Item>,
+}
+
 /// A loaded Agent definition and the Agent homes listed for it.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Agent {
@@ -1115,6 +1152,9 @@ pub enum DisableNotOffered {
     UnreadableSwitch,
     /// The Entry is Disabled already.
     AlreadyDisabled,
+    /// The Entry is Unread: the Agent never reads it, so it can only be
+    /// Removed.
+    Unread,
 }
 
 /// How an Entry got where it is, which decides how it can be taken away.
@@ -1144,6 +1184,9 @@ pub enum State {
     /// The Agent rejects it on its own, such as a server missing what the
     /// Agent requires.
     Invalid,
+    /// The Agent never reads it in any context, such as an Entry keyed to
+    /// a missing Project. It competes with nothing and can only be Removed.
+    Unread,
 }
 
 /// Why an Entry has its State.
@@ -1170,6 +1213,8 @@ pub enum ReasonCode {
     DisabledNatively,
     /// The Entry lacks the minimal shape the Agent requires of it.
     MalformedEntry,
+    /// The Entry is keyed to a Project whose folder no longer exists.
+    ProjectMissing,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.
@@ -1504,6 +1549,17 @@ impl Error {
             format!(
                 "no Project {}; `config-digger projects list --include-hidden` lists them",
                 path.display()
+            ),
+        )
+    }
+
+    /// `project` is not a missing Project with leftovers.
+    pub(crate) fn no_leftovers(project: &Path) -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            format!(
+                "{} is not a missing Project with leftovers; `config-digger list --leftovers` lists them",
+                project.display()
             ),
         )
     }

@@ -2175,3 +2175,233 @@ fn agents_lists_the_loaded_definitions_and_the_homes_found() {
         text.stdout
     );
 }
+
+/// A home whose `.claude.json` keeps local Entries for two Projects whose
+/// folders are gone, `gone` (`old`, and a `linear` under a trust) and
+/// `archive`, next to a user `linear`.
+fn with_missing_projects() -> Harness {
+    let harness = Harness::new();
+    let key = |name: &str| {
+        harness
+            .cwd()
+            .join(name)
+            .display()
+            .to_string()
+            .replace('\\', "/")
+    };
+    let claude_json = json!({
+        "mcpServers": { "linear": { "url": "https://user" } },
+        "projects": {
+            key("gone"): {
+                "hasTrustDialogAccepted": true,
+                "mcpServers": { "old": { "command": "old" }, "linear": { "url": "https://local" } }
+            },
+            key("archive"): { "mcpServers": { "legacy": { "command": "legacy" } } }
+        }
+    });
+    harness.with_file(".claude.json", &claude_json.to_string())
+}
+
+/// The locators of every leftover `list --leftovers --json` lists.
+fn leftover_locators(document: &Value) -> Vec<String> {
+    document["leftovers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|leftovers| leftovers["items"].as_array().unwrap())
+        .flat_map(|item| item["entries"].as_array().unwrap())
+        .map(|entry| entry["locator"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn projects_list_marks_a_missing_project_missing() {
+    let harness = with_missing_projects();
+    let gone = harness.cwd().join("gone").display().to_string();
+
+    let json = harness.run(&["projects", "list", "--json"]);
+    let text = harness.run(&["projects", "list", "--wide"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let project = json.document()["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|project| project["path"] == gone.as_str())
+        .cloned()
+        .unwrap();
+    assert_eq!(project["missing"], true);
+    assert!(
+        text.stdout
+            .contains(&format!("registry of Claude Code, missing  {gone}\n")),
+        "{}",
+        text.stdout
+    );
+}
+
+#[test]
+fn list_of_a_missing_project_in_any_spelling_shows_its_unread_entries() {
+    let harness = with_missing_projects();
+    let gone = harness.cwd().join("gone").display().to_string();
+    let spelling = format!(r"{}\other\..\GONE\", harness.cwd().display());
+
+    let json = harness.run(&["list", "--project", &spelling, "--json"]);
+    let text = harness.run(&["list", "--project", &spelling, "--wide"]);
+    let disable = harness.run(&["disable", "old", "--project", &gone, "--yes"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let document = json.document();
+    assert_eq!(document["project"], gone);
+    assert_eq!(
+        entry_states(&document, "old"),
+        pairs(&[("local", "unread")])
+    );
+    assert_eq!(
+        entry_states(&document, "linear"),
+        pairs(&[("user", "effective"), ("local", "unread")])
+    );
+    assert!(
+        text.stdout
+            .starts_with(&format!("Project: {gone} (missing)\n")),
+        "{}",
+        text.stdout
+    );
+    assert!(
+        text.stdout.contains("  old     local  Unread"),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(disable.code, 5, "{}", disable.stderr);
+}
+
+#[test]
+fn list_leftovers_lists_every_missing_project_and_remove_takes_their_locators_in_one_operation() {
+    let harness = with_missing_projects();
+    let claude_json = harness.path(".claude.json");
+
+    let json = harness.run(&["list", "--leftovers", "--json"]);
+    let text = harness.run(&["list", "--leftovers", "--wide"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let document = json.document();
+    let projects: Vec<&str> = document["leftovers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|leftovers| leftovers["project"].as_str().unwrap())
+        .collect();
+    let archive = harness.cwd().join("archive").display().to_string();
+    let gone = harness.cwd().join("gone").display().to_string();
+    assert_eq!(projects, [archive.as_str(), gone.as_str()]);
+    let locators = leftover_locators(&document);
+    let key = |name: &str| {
+        harness
+            .cwd()
+            .join(name)
+            .display()
+            .to_string()
+            .replace('\\', "/")
+    };
+    let entries: Vec<(&str, &Value)> = document["leftovers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|leftovers| leftovers["items"].as_array().unwrap())
+        .flat_map(|item| item["entries"].as_array().unwrap())
+        .map(|entry| (entry["path"].as_str().unwrap(), &entry["key_path"]))
+        .collect();
+    let claude_json = claude_json.display().to_string();
+    assert_eq!(
+        entries,
+        [
+            (
+                claude_json.as_str(),
+                &json!(["projects", key("archive"), "mcpServers", "legacy"])
+            ),
+            (
+                claude_json.as_str(),
+                &json!(["projects", key("gone"), "mcpServers", "linear"])
+            ),
+            (
+                claude_json.as_str(),
+                &json!(["projects", key("gone"), "mcpServers", "old"])
+            ),
+        ]
+    );
+    assert!(
+        text.stdout
+            .contains(&format!("Project: {gone} (missing)\n")),
+        "{}",
+        text.stdout
+    );
+    assert!(text.stdout.contains(&locators[2]), "{}", text.stdout);
+
+    let mut args = vec!["remove", "--yes", "--json"];
+    args.extend(locators.iter().map(String::as_str));
+    let removed = harness.run(&args);
+
+    assert_eq!(removed.code, 0, "{}", removed.stderr);
+    assert_eq!(removed.document()["result"]["verify"], "verified");
+    assert_eq!(
+        removed.document()["plan"]["changes"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    let history = harness.run(&["history", "--json"]);
+    assert_eq!(
+        history.document()["operations"].as_array().unwrap().len(),
+        1
+    );
+    let after = harness.run(&["list", "--leftovers", "--json"]);
+    assert_eq!(leftover_locators(&after.document()), Vec::<String>::new());
+    let empty = harness.run(&["list", "--leftovers"]);
+    assert_eq!(empty.stdout, "No missing Project has leftovers.\n");
+}
+
+#[test]
+fn remove_leftovers_removes_every_leftover_of_one_missing_project_and_keeps_it_listed() {
+    let harness = with_missing_projects();
+    let gone = harness.cwd().join("gone").display().to_string();
+
+    let removed = harness.run(&["remove", "--leftovers", "--project", &gone, "--yes"]);
+
+    assert_eq!(removed.code, 0, "{}", removed.stderr);
+    assert!(
+        removed
+            .stdout
+            .starts_with(&format!("Project: {gone} (missing)\n\nRemove 2 Entries\n")),
+        "{}",
+        removed.stdout
+    );
+    let claude_json: Value = serde_json::from_str(&read(&harness.path(".claude.json"))).unwrap();
+    let key = gone.replace('\\', "/");
+    assert_eq!(
+        claude_json["projects"][&key],
+        json!({ "hasTrustDialogAccepted": true, "mcpServers": {} })
+    );
+    let left = harness.run(&["list", "--leftovers", "--json"]);
+    assert_eq!(leftover_locators(&left.document()).len(), 1);
+    let projects = harness.run(&["projects", "list", "--json"]);
+    assert!(listed_projects(&projects.document()).contains(&gone));
+}
+
+#[test]
+fn remove_leftovers_needs_a_project_and_no_selector() {
+    let harness = with_missing_projects();
+
+    let without_project = harness.run(&["remove", "--leftovers", "--yes"]);
+    let with_selector = harness.run(&["remove", "--leftovers", "old", "--yes"]);
+    let existing = harness.run(&[
+        "remove",
+        "--leftovers",
+        "--project",
+        &harness.cwd().display().to_string(),
+        "--yes",
+    ]);
+
+    assert_eq!(without_project.code, 2, "{}", without_project.stderr);
+    assert_eq!(with_selector.code, 2, "{}", with_selector.stderr);
+    assert_eq!(existing.code, 3, "{}", existing.stderr);
+}

@@ -6,4 +6,5 @@ export const STATE_LABELS: Record<State, string> = {
   shadowed: "Shadowed",
   disabled: "Disabled",
   invalid: "Invalid",
+  unread: "Unread",
 };

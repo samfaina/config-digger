@@ -33,6 +33,30 @@ pub(crate) fn shadowed_by_precedence(
     }
 }
 
+/// An Unread Entry's reason: it is keyed to `project`, whose folder no
+/// longer exists.
+pub(crate) fn project_missing(agent_name: &str, project: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::ProjectMissing,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} never reads it: it is keyed to the Project {}, whose folder no longer exists. It can only be Removed.",
+            project.display()
+        ),
+    }
+}
+
+/// What Disable says of an Unread Entry.
+pub(crate) fn unread_option() -> String {
+    "Disable is not offered: the Agent never reads the Entry, so it can only be Removed.".to_owned()
+}
+
+/// Why Disable or Enable is refused for the Unread Entry at `locator`.
+pub(crate) fn only_removed(action: &str, locator: &str) -> String {
+    format!("cannot {action} {locator}: the Agent never reads it, so it can only be Removed")
+}
+
 /// Which Entry of an Item is Effective after an Operation that keeps some of
 /// its Entries, if any. `unchanged` says it was Effective before too.
 pub(crate) fn effective_after(

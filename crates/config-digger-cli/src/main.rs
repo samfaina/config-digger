@@ -70,6 +70,11 @@ enum Command {
         /// Only the Items this selects: an Item name, or the
         /// `<path>#<key path>` locator of one of their Entries.
         selector: Option<String>,
+        /// List the leftovers of missing Projects instead: the Entries that
+        /// user files keep for a Project whose folder is gone, which the
+        /// Agent never reads. With --project, only that Project's.
+        #[arg(long, conflicts_with = "selector")]
+        leftovers: bool,
     },
     /// Show one Item with every Entry in precedence order, and why each has its State.
     Show {
@@ -79,8 +84,10 @@ enum Command {
     /// Remove Entries for good, from where they live, for every Agent that reads them.
     ///
     /// Prints the preview, asks for confirmation, then backs up each touched
-    /// file, writes, verifies and records the Operation in History.
-    Remove(EntryWrite),
+    /// file, writes, verifies and records the Operation in History. With
+    /// --leftovers --project <PATH>, it Removes every leftover of that
+    /// missing Project as one Operation.
+    Remove(RemoveWrite),
     /// Disable Entries through each Agent's own machine-local switch, keeping them.
     ///
     /// Writes the switch the Agent's own UI writes, such as Claude Code's
@@ -152,6 +159,32 @@ struct EntryWrite {
     /// Target every Entry of the one Item each selector names.
     #[arg(long)]
     all: bool,
+    #[command(flatten)]
+    confirm: Confirm,
+}
+
+/// The Entries `remove` targets, and the flags every write takes.
+#[derive(clap::Args)]
+struct RemoveWrite {
+    /// Each one an Item name with a single Entry, or the
+    /// `<path>#<key path>` locator of an Entry, such as a leftover's from
+    /// `list --leftovers`. Together they form one Operation, applied
+    /// entirely or not at all.
+    #[arg(required_unless_present = "leftovers")]
+    selectors: Vec<String>,
+    /// Target every Entry of the one Item each selector names.
+    #[arg(long)]
+    all: bool,
+    /// Target every leftover of the missing Project --project names.
+    #[arg(long, conflicts_with_all = ["selectors", "all"])]
+    leftovers: bool,
+    #[command(flatten)]
+    confirm: Confirm,
+}
+
+/// How a write is confirmed.
+#[derive(clap::Args)]
+struct Confirm {
     /// Confirm the Operation without asking.
     #[arg(long)]
     yes: bool,
@@ -422,7 +455,10 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     }
     let width = terminal::output_width(cli.wide);
     match &cli.command {
-        Command::List { selector } => {
+        Command::List {
+            leftovers: true, ..
+        } => list_leftovers(cli, &core, width),
+        Command::List { selector, .. } => {
             let inventory = scanned(cli, &core)?.inventory;
             let mut inventory = if cli.include_hidden {
                 inventory
@@ -458,9 +494,23 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
-        Command::Remove(write) => write_entries(cli, &core, Action::Remove, write),
-        Command::Disable(write) => write_entries(cli, &core, Action::Disable, write),
-        Command::Enable(write) => write_entries(cli, &core, Action::Enable, write),
+        Command::Remove(RemoveWrite {
+            leftovers: true,
+            confirm,
+            ..
+        }) => remove_leftovers(cli, &core, confirm),
+        Command::Remove(write) => {
+            let targets = targets(&write.selectors, write.all);
+            write_entries(cli, &core, Action::Remove, &targets, &write.confirm)
+        }
+        Command::Disable(write) => {
+            let targets = targets(&write.selectors, write.all);
+            write_entries(cli, &core, Action::Disable, &targets, &write.confirm)
+        }
+        Command::Enable(write) => {
+            let targets = targets(&write.selectors, write.all);
+            write_entries(cli, &core, Action::Enable, &targets, &write.confirm)
+        }
         Command::History { command: None } => {
             let operations = core.history()?;
             if cli.json {
@@ -558,32 +608,140 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     }
 }
 
-/// Plans `action` on the Entries `write` targets in the context the flags
+fn targets(selectors: &[String], all: bool) -> Targets {
+    Targets {
+        selectors: selectors.to_vec(),
+        all,
+    }
+}
+
+/// Plans `action` on the Entries `targets` names in the context the flags
 /// ask for, then confirms and executes it.
 fn write_entries(
     cli: &Cli,
     core: &Core,
     action: Action,
-    write: &EntryWrite,
+    targets: &Targets,
+    confirm: &Confirm,
 ) -> Result<(), Failure> {
     let scanned = scanned(cli, core)?;
-    let targets = Targets {
-        selectors: write.selectors.clone(),
-        all: write.all,
-    };
-    let plan = core.plan(&scanned.snapshot, &scanned.context, action, &targets)?;
+    let plan = core.plan(&scanned.snapshot, &scanned.context, action, targets)?;
     let width = terminal::output_width(cli.wide);
     confirm_and_execute(
         cli,
         core,
         plan,
         Some(&project_line(&scanned.inventory, width)),
-        &WriteFlags {
-            yes: write.yes,
-            ack: write.ack.clone(),
-            dry_run: write.dry_run,
-        },
+        &confirm.flags(),
     )
+}
+
+/// `remove --leftovers`: plans the Remove of every leftover of the missing
+/// Project `--project` names, then confirms and executes it.
+fn remove_leftovers(cli: &Cli, core: &Core, confirm: &Confirm) -> Result<(), Failure> {
+    let Some(project) = &cli.project else {
+        return Err(Failure::usage(
+            "remove --leftovers needs the missing Project: name it with --project <PATH>",
+        ));
+    };
+    let scanned = scanned(cli, core)?;
+    let project = std::path::absolute(project).map_err(api::Error::unexpected)?;
+    let plan = core.plan_remove_leftovers(&scanned.snapshot, &project)?;
+    let width = terminal::output_width(cli.wide);
+    confirm_and_execute(
+        cli,
+        core,
+        plan,
+        Some(&project_line(&scanned.inventory, width)),
+        &confirm.flags(),
+    )
+}
+
+/// `list --leftovers --json`: the leftovers of each missing Project.
+#[derive(Serialize)]
+struct LeftoversBody<'a> {
+    leftovers: &'a [api::Leftovers],
+    read_failures: &'a [api::ReadFailure],
+}
+
+/// `list --leftovers`: the leftovers of every missing Project, or with
+/// `--project`, of that one, without those of hidden homes and Projects
+/// unless they are asked for.
+fn list_leftovers(cli: &Cli, core: &Core, width: Option<usize>) -> Result<(), Failure> {
+    if cli.no_project {
+        return Err(Failure::usage(
+            "list --leftovers lists missing Projects; it takes --project, not --no-project",
+        ));
+    }
+    let scanned = scanned(cli, core)?;
+    let inventory = &scanned.inventory;
+    let hidden_home = |item: &api::Item| {
+        inventory
+            .homes
+            .iter()
+            .any(|home| home.hidden && home.agent == item.agent && home.home == item.home)
+    };
+    let hidden_project = |path: &Path| {
+        inventory
+            .projects
+            .iter()
+            .any(|project| project.hidden && project.path == path)
+    };
+    let mut leftovers = core.leftovers(&scanned.snapshot);
+    if cli.project.is_some() {
+        leftovers.retain(|leftovers| inventory.project.as_ref() == Some(&leftovers.project));
+    }
+    if !cli.include_hidden {
+        leftovers.retain(|leftovers| !hidden_project(&leftovers.project));
+        for leftovers in &mut leftovers {
+            leftovers.items.retain(|item| !hidden_home(item));
+        }
+        leftovers.retain(|leftovers| !leftovers.items.is_empty());
+    }
+    if cli.json {
+        print_json(&LeftoversBody {
+            leftovers: &leftovers,
+            read_failures: &inventory.read_failures,
+        });
+    } else {
+        anstream::print!("{}", render_leftovers(inventory, &leftovers, width));
+    }
+    Ok(())
+}
+
+/// The leftovers of each missing Project, as `list` prints a Project's
+/// Items, with one row per Entry, since each has a locator to Remove.
+fn render_leftovers(
+    inventory: &Inventory,
+    leftovers: &[api::Leftovers],
+    width: Option<usize>,
+) -> String {
+    if leftovers.is_empty() {
+        return plain_line("No missing Project has leftovers.", width);
+    }
+    let mut out = String::new();
+    for (index, leftovers) in leftovers.iter().enumerate() {
+        if index > 0 {
+            out.push('\n');
+        }
+        let items = leftovers
+            .items
+            .iter()
+            .flat_map(|item| {
+                item.entries.iter().map(|entry| api::Item {
+                    entries: vec![entry.clone()],
+                    ..item.clone()
+                })
+            })
+            .collect();
+        let project = Inventory {
+            project: Some(leftovers.project.clone()),
+            items,
+            ..inventory.clone()
+        };
+        out.push_str(&render_list(&project, true, width));
+    }
+    out
 }
 
 fn completions(cli: &Cli, shell: Shell) -> Result<(), Failure> {
@@ -730,6 +888,16 @@ fn confirm_and_execute(
         anstream::print!("{}", render_outcome(preview.action, &outcome, width));
     }
     Ok(())
+}
+
+impl Confirm {
+    fn flags(&self) -> WriteFlags {
+        WriteFlags {
+            yes: self.yes,
+            ack: self.ack.clone(),
+            dry_run: self.dry_run,
+        }
+    }
 }
 
 /// The flags every write takes.
@@ -1476,6 +1644,7 @@ fn state_after_label(state: api::StateAfter) -> &'static str {
         api::StateAfter::Shadowed => state_label(api::State::Shadowed),
         api::StateAfter::Disabled => state_label(api::State::Disabled),
         api::StateAfter::Invalid => state_label(api::State::Invalid),
+        api::StateAfter::Unread => state_label(api::State::Unread),
         api::StateAfter::Removed => "removed",
     }
 }
@@ -1486,6 +1655,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
         api::StateAfter::Disabled => state_style(api::State::Disabled),
         api::StateAfter::Invalid => state_style(api::State::Invalid),
+        api::StateAfter::Unread => state_style(api::State::Unread),
         api::StateAfter::Removed => AnsiColor::Red.on_default(),
     }
 }
@@ -1496,16 +1666,19 @@ fn state_label(state: api::State) -> &'static str {
         api::State::Shadowed => "Shadowed",
         api::State::Disabled => "Disabled",
         api::State::Invalid => "Invalid",
+        api::State::Unread => "Unread",
     }
 }
 
-/// The app's State colours: green Effective, grey Shadowed, amber Disabled.
+/// The app's State colours: green Effective, grey Shadowed, amber Disabled,
+/// red Invalid, dim Unread.
 fn state_style(state: api::State) -> Style {
     match state {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
         api::State::Disabled => AnsiColor::Yellow.on_default(),
         api::State::Invalid => AnsiColor::Red.on_default(),
+        api::State::Unread => DIM,
     }
 }
 

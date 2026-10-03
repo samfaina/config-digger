@@ -80,7 +80,12 @@ export type DisableNotOffered =
  */
 "unreadable_switch" | 
 /**  The Entry is Disabled already. */
-"already_disabled";
+"already_disabled" | 
+/**
+ *  The Entry is Unread: the Agent never reads it, so it can only be
+ *  Removed.
+ */
+"unread";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
@@ -449,7 +454,9 @@ export type ReasonCode =
 /**  The Entry's own switch is off. */
 "disabled_natively" | 
 /**  The Entry lacks the minimal shape the Agent requires of it. */
-"malformed_entry";
+"malformed_entry" | 
+/**  The Entry is keyed to a Project whose folder no longer exists. */
+"project_missing";
 
 export type RiskCode = 
 /**  The Agent may offer to reset the file, losing what it holds. */
@@ -503,7 +510,12 @@ export type State = "effective" | "shadowed" |
  *  The Agent rejects it on its own, such as a server missing what the
  *  Agent requires.
  */
-"invalid";
+"invalid" | 
+/**
+ *  The Agent never reads it in any context, such as an Entry keyed to
+ *  a missing Project. It competes with nothing and can only be Removed.
+ */
+"unread";
 
 /**  The State a Disabled Entry would have once Enabled. */
 export type WhatIf = {

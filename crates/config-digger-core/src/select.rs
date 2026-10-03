@@ -1,6 +1,6 @@
 //! Selectors: an Item name, or the `<path>#<key path>` locator of an Entry.
 
-use crate::api::{Entry, Error, Inventory, Item};
+use crate::api::{Entry, Error, ErrorCode, Inventory, Item, Leftovers};
 use crate::{locator, paths};
 use std::collections::BTreeSet;
 
@@ -26,22 +26,31 @@ pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i It
 /// The Entries an action targets, each once, in selector order. Without
 /// `all`, each selector must name exactly one Entry: the one at a locator, or
 /// the only Entry of the Items with a name. With `all`, it must name exactly
-/// one Item, and stands for every Entry of it.
+/// one Item, and stands for every Entry of it. A locator that names no Entry
+/// of the inventory can name one of `leftovers`, the Unread Entries of
+/// missing Projects outside the context.
 pub(crate) fn select_entries<'i>(
     inventory: &'i Inventory,
+    leftovers: &'i [Leftovers],
     selectors: &[String],
     all: bool,
 ) -> Result<Vec<&'i Entry>, Error> {
     let mut selected: Vec<&Entry> = Vec::new();
     for selector in selectors {
-        let entries = if all {
+        let in_context = if all {
             match select(inventory, selector).as_slice() {
-                [item] => item.entries.iter().collect(),
-                [] => return Err(Error::no_match(selector)),
-                items => return Err(Error::ambiguous(selector, items)),
+                [item] => Ok(item.entries.iter().collect()),
+                [] => Err(Error::no_match(selector)),
+                items => Err(Error::ambiguous(selector, items)),
             }
         } else {
-            one_entry(inventory, selector)?
+            one_entry(inventory, selector)
+        };
+        let entries = match in_context {
+            Err(error) if error.code == ErrorCode::NoMatch => {
+                leftover_entries(leftovers, selector, all).ok_or(error)?
+            }
+            entries => entries?,
         };
         for entry in entries {
             if !selected.iter().any(|known| known.locator == entry.locator) {
@@ -75,6 +84,25 @@ fn one_entry<'i>(inventory: &'i Inventory, selector: &str) -> Result<Vec<&'i Ent
         [] => Err(Error::no_match(selector)),
         entries => Err(Error::ambiguous_entries(selector, entries)),
     }
+}
+
+/// The leftover at the locator `selector`, or with `all`, every leftover of
+/// its Item. `None` when no leftover is at it.
+fn leftover_entries<'i>(
+    leftovers: &'i [Leftovers],
+    selector: &str,
+    all: bool,
+) -> Option<Vec<&'i Entry>> {
+    let at_locator = at_locator(selector);
+    let item = leftovers
+        .iter()
+        .flat_map(|leftovers| &leftovers.items)
+        .find(|item| item.entries.iter().any(|entry| at_locator(&entry)))?;
+    Some(if all {
+        item.entries.iter().collect()
+    } else {
+        item.entries.iter().filter(&at_locator).collect()
+    })
 }
 
 /// Whether an Entry is at one of the locators `selector` can be read as.

@@ -4,8 +4,8 @@
 
 use crate::api::{
     self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Info, InfoCode, Inventory, Preview, ReadFailure, ReadFailureKind,
-    ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
+    FileChange, FileDiff, Info, InfoCode, Inventory, Leftovers, Preview, ReadFailure,
+    ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -85,7 +85,10 @@ pub(crate) fn plan(
     targets: &Targets,
 ) -> Result<Planned, Error> {
     let before = resolve::resolve(definitions, snapshot, context);
-    let targeted = select::select_entries(&before, &targets.selectors, targets.all)?;
+    // The leftovers of the context's own Project are in it already.
+    let mut leftovers = resolve::leftovers(definitions, snapshot);
+    leftovers.retain(|leftovers| before.project.as_ref() != Some(&leftovers.project));
+    let targeted = select::select_entries(&before, &leftovers, &targets.selectors, targets.all)?;
     let planned = Targeted {
         definitions,
         ports,
@@ -94,6 +97,7 @@ pub(crate) fn plan(
         context,
         action,
         before: &before,
+        leftovers: &leftovers,
         entries: &targeted,
     };
     match action {
@@ -108,6 +112,49 @@ pub(crate) fn plan(
     }
 }
 
+/// Plans the Remove of every leftover of the missing Project `project`, in
+/// any spelling, as one Operation in that Project's context.
+pub(crate) fn plan_remove_leftovers(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    snapshot: &Snapshot,
+    scan_options: &ScanOptions,
+    project: &Path,
+) -> Result<Planned, Error> {
+    let context = Context {
+        project: Some(project.to_path_buf()),
+    };
+    let found = resolve::context_project(snapshot, &context).and_then(|(path, _)| {
+        resolve::leftovers(definitions, snapshot)
+            .into_iter()
+            .find(|leftovers| leftovers.project == path)
+    });
+    let Some(found) = found else {
+        return Err(Error::no_leftovers(project));
+    };
+    let targets = Targets {
+        selectors: found
+            .items
+            .iter()
+            .flat_map(|item| &item.entries)
+            .map(|entry| entry.locator.clone())
+            .collect(),
+        all: false,
+    };
+    let context = Context {
+        project: Some(found.project),
+    };
+    plan(
+        definitions,
+        ports,
+        snapshot,
+        scan_options,
+        &context,
+        Action::Remove,
+        &targets,
+    )
+}
+
 /// An action on the Entries it targets, about to be planned.
 struct Targeted<'a> {
     definitions: &'a [AgentDefinition],
@@ -118,6 +165,8 @@ struct Targeted<'a> {
     action: Action,
     /// The Items in the context before the Operation.
     before: &'a Inventory,
+    /// The leftovers of the missing Projects other than the context's.
+    leftovers: &'a [Leftovers],
     entries: &'a [&'a api::Entry],
 }
 
@@ -152,12 +201,29 @@ impl Targeted<'_> {
             .iter()
             .map(|entry| (entry.path.clone(), entry.key_path.clone()))
             .collect();
-        let after = resolve::resolve(
-            self.definitions,
-            &self.snapshot.without(&removed),
-            self.context,
-        );
-        let (changes, effective) = predict(self.before, &after);
+        let without = self.snapshot.without(&removed);
+        let after = resolve::resolve(self.definitions, &without, self.context);
+        let (mut changes, effective) = predict(self.before, &after);
+        // A leftover of another missing Project goes in that Project's context.
+        let targeted = |leftovers: &&Leftovers| {
+            leftovers
+                .items
+                .iter()
+                .flat_map(|item| &item.entries)
+                .any(|leftover| {
+                    self.entries
+                        .iter()
+                        .any(|entry| entry.locator == leftover.locator)
+                })
+        };
+        for leftovers in self.leftovers.iter().filter(targeted) {
+            let context = Context {
+                project: Some(leftovers.project.clone()),
+            };
+            let before = resolve::resolve(self.definitions, self.snapshot, &context);
+            let after = resolve::resolve(self.definitions, &without, &context);
+            changes.extend(predict(&before, &after).0);
+        }
         self.planned(files, changes, effective, None)
     }
 
@@ -172,6 +238,16 @@ impl Targeted<'_> {
         let mut by_file: Vec<(PathBuf, Vec<Edit>)> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
         for entry in self.entries {
+            if entry.state == State::Unread {
+                let action = match self.action {
+                    Action::Disable => "Disable",
+                    _ => "Enable",
+                };
+                return Err(Error::blocked(explain::only_removed(
+                    action,
+                    &entry.locator,
+                )));
+            }
             let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
             let definition = &self.definitions[scanned.agent_index];
             match self.action {
