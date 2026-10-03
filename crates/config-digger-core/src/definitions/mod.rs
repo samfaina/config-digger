@@ -1562,14 +1562,20 @@ checks = {checks}
 
     #[test]
     fn a_lookup_lies_in_the_agent_home() {
-        let text = with_gate(
-            &JSON_LOOKUP.replace(
-                r#"{ block = "home", root = "state" }"#,
-                r#"{ block = "project", path = ".test.json" }"#,
-            ),
-            "",
-        );
-        assert!(error(&text).contains("not a Project"), "{}", error(&text));
+        for anchor in [
+            r#"{ block = "project", path = ".test.json" }"#,
+            r#"{ block = "machine", path = "%ProgramData%/Test/flags.json" }"#,
+        ] {
+            let text = with_gate(
+                &JSON_LOOKUP.replace(r#"{ block = "home", root = "state" }"#, anchor),
+                "",
+            );
+            assert!(
+                error(&text).contains("must lie in the Agent home"),
+                "{}",
+                error(&text)
+            );
+        }
         let text = with_gate(
             &JSON_LOOKUP.replace(r#"root = "state""#, r#"root = "cache""#),
             "",

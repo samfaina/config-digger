@@ -1066,6 +1066,7 @@
       ]
     },
     "Condition": {
+      "description": "A condition under which an Agent reads a location.",
       "oneOf": [
         {
           "description": "Holds while a Feature gate of the same definition is on, or with\n`is = false`, while it is off.",
@@ -1424,6 +1425,7 @@
       ]
     },
     "GateLookup": {
+      "description": "Where an Agent caches a Feature gate's value.",
       "oneOf": [
         {
           "description": "A gate's value in a JSON file of the Agent home, such as Claude Code's\n`cachedGrowthBookFeatures` in `~/.claude.json`.",
@@ -1539,6 +1541,7 @@
       ]
     },
     "Bypass": {
+      "description": "When an Agent ignores its cached Feature gate values.",
       "oneOf": [
         {
           "description": "Environment variables that make the Agent ignore its cache, such as\nClaude Code's `DISABLE_GROWTHBOOK`.",
@@ -1613,7 +1616,7 @@
       ]
     },
     "EnvMap": {
-      "description": "A JSON object of variable names and values in a file of the Agent home.",
+      "description": "A JSON object of variable names and string values in a file of the\nAgent home or the machine, such as the `env` of a settings file.",
       "type": "object",
       "properties": {
         "anchor": {

@@ -3,7 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    Compete, Conform, Holds, JsonFormat, Malformed, Parse, Provenance, SkillDefect, SkillFallback,
+    Compete, Condition, Conform, Holds, JsonFormat, Malformed, Parse, Provenance, SkillDefect,
+    SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -694,13 +695,14 @@ fn closed_gate<'d>(
     entry: &ScannedEntry,
 ) -> Option<(&'d str, bool)> {
     let gate_on = |name: &str| gate_on(definition, snapshot, entry, name);
-    definition
+    let condition = definition
         .location(&entry.location)
         .when
         .iter()
-        .find(|condition| !condition.holds(&gate_on))
-        .and_then(Holds::gate)
-        .map(|name| (name, gate_on(name)))
+        .find(|condition| !condition.holds(&gate_on))?;
+    match condition {
+        Condition::FeatureGate(block) => Some((block.gate.as_str(), gate_on(&block.gate))),
+    }
 }
 
 /// A caveat per Feature gate that affects the location of `entry`, saying

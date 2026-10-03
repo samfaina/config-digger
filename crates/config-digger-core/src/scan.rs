@@ -549,9 +549,11 @@ fn read_gates(
     for home in found {
         let definition = &definitions[home.agent_index];
         for gate in &definition.feature_gates {
-            let Some(path) = gate.lookup.anchor().path(&home.roots, None) else {
-                continue;
-            };
+            let path = gate
+                .lookup
+                .anchor()
+                .path(&home.roots, None)
+                .expect("validation puts a lookup in the Agent home");
             let bypassed = gate.bypass.as_ref().and_then(|bypass| {
                 let maps: Vec<serde_json::Map<String, serde_json::Value>> = bypass
                     .env_maps()
@@ -565,11 +567,8 @@ fn read_gates(
                 // A variable in a map replaces the one in the environment.
                 let var = |name: &str| {
                     maps.iter()
-                        .find_map(|map| map.get(name))
-                        .map(|value| match value {
-                            serde_json::Value::String(text) => text.clone(),
-                            other => other.to_string(),
-                        })
+                        .find_map(|map| map.get(name)?.as_str())
+                        .map(str::to_owned)
                         .or_else(|| ports.env.var(name))
                 };
                 bypass.bypassed_by(&var)
@@ -577,20 +576,13 @@ fn read_gates(
             let reading = match bypassed {
                 Some(variable) => GateReading::Bypassed(variable),
                 None => {
-                    let document = match gate.lookup.store() {
-                        GateStore::JsonFile => reader
-                            .peek(&path)
-                            .ok()
-                            .flatten()
-                            .and_then(|text| JsonFormat::STRICT.parse(text).ok()),
-                        GateStore::SqliteItem(key) => reader
-                            .fs
-                            .read_sqlite_item(&path, key)
-                            .ok()
-                            .flatten()
-                            .and_then(|text| JsonFormat::STRICT.parse(&text).ok()),
+                    let text = match gate.lookup.store() {
+                        GateStore::JsonFile => reader.peek(&path).ok().flatten().map(str::to_owned),
+                        GateStore::SqliteItem(key) => {
+                            reader.fs.read_sqlite_item(&path, key).ok().flatten()
+                        }
                     };
-                    document
+                    text.and_then(|text| JsonFormat::STRICT.parse(&text).ok())
                         .and_then(|document| gate.lookup.cached(&document, &gate.name))
                         .map_or(GateReading::Unreadable, GateReading::Cached)
                 }
@@ -838,13 +830,22 @@ fn find_homes(
     Ok(found)
 }
 
-/// The machine-wide paths a definition's locations name, each by the text
-/// that names it, as far as the environment says where they are.
+/// The machine-wide paths a definition's locations and Feature gate env
+/// maps name, each by the text that names it, as far as the environment
+/// says where they are.
 fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String, PathBuf> {
+    let env_maps = definition
+        .feature_gates
+        .iter()
+        .filter_map(|gate| gate.bypass.as_ref())
+        .flat_map(|bypass| bypass.env_maps())
+        .map(|map| &map.anchor);
     definition
         .locations
         .iter()
-        .filter_map(|location| location.anchor.machine())
+        .map(|location| &location.anchor)
+        .chain(env_maps)
+        .filter_map(|anchor| anchor.machine())
         .filter_map(|text| Some((text.to_owned(), paths::expand(text, ports.env.as_ref())?)))
         .collect()
 }

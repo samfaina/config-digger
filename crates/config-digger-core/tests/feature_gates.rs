@@ -455,3 +455,47 @@ fn a_sqlite_store_without_the_key_resolves_with_the_assumed_default() {
         "gate_assumed"
     );
 }
+
+#[test]
+fn a_variable_in_the_managed_settings_env_bypasses_the_cache() {
+    let fs = claude_home(&cached(json!(false))).with_file(
+        r"C:\Program Files\ClaudeCode\managed-settings.json",
+        json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+    );
+    let env = FakeEnvironment::with_home(HOME).with_var("ProgramFiles", r"C:\Program Files");
+
+    let inventory = inventory_with(&fs, env);
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_assumed"),
+        bypassed_by("DISABLE_TELEMETRY")
+    );
+}
+
+#[test]
+fn a_value_in_a_settings_env_that_is_not_a_string_sets_nothing() {
+    let fs = claude_home(&cached(json!(false))).with_file(
+        in_home(r".claude\settings.json"),
+        json!({ "env": { "DISABLE_TELEMETRY": null, "DISABLE_GROWTHBOOK": 1 } }).to_string(),
+    );
+
+    let inventory = inventory(&fs);
+
+    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
+}
+
+#[test]
+fn a_cache_time_may_be_a_fractional_number_of_milliseconds() {
+    let state = json!({
+        "cachedGrowthBookFeatures": { SYNC_GATE: true },
+        "cachedGrowthBookFeaturesAt": 1.7909268e12,
+    });
+
+    let inventory = inventory(&claude_home(&state));
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_cached"),
+        "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+    );
+}

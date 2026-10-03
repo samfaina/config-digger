@@ -1676,6 +1676,7 @@ pub(crate) struct Cached {
     pub at: Option<SystemTime>,
 }
 
+/// Where an Agent caches a Feature gate's value.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum GateLookup {
@@ -1848,7 +1849,8 @@ fn cached_value(
     let on = at_path(key_path)?.as_bool()?;
     let at = cached_at.and_then(at_path).and_then(|value| match value {
         Value::Number(millis) => {
-            SystemTime::UNIX_EPOCH.checked_add(Duration::from_millis(millis.as_u64()?))
+            let millis = millis.as_f64().filter(|millis| *millis >= 0.0)?;
+            SystemTime::UNIX_EPOCH.checked_add(Duration::try_from_secs_f64(millis / 1000.0).ok()?)
         }
         Value::String(text) => humantime::parse_rfc3339_weak(text).ok(),
         _ => None,
@@ -1865,11 +1867,11 @@ pub(crate) fn djb2(name: &str) -> String {
         .to_string()
 }
 
-/// A gate's cache is one file of the Agent home.
+/// A gate's cache is one file of the Agent home, so that it always has a path.
 fn validate_gate_anchor(anchor: &Anchor) -> Result<(), String> {
     anchor.validate()?;
-    if anchor.in_project() {
-        return Err("a lookup must lie in the Agent home, not a Project".into());
+    if anchor.home_root().is_none() {
+        return Err("a lookup must lie in the Agent home".into());
     }
     Ok(())
 }
@@ -1883,10 +1885,12 @@ pub(crate) trait Bypasses {
     fn bypassed_by(&self, var: &dyn Fn(&str) -> Option<String>) -> Option<String>;
 
     /// The files whose maps of variables the Agent applies over its
-    /// environment, highest first, each with the key path of the map.
+    /// environment, highest first, each with the key path of the map. A
+    /// machine-wide file whose path cannot be expanded is skipped.
     fn env_maps(&self) -> &[EnvMap];
 }
 
+/// When an Agent ignores its cached Feature gate values.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Bypass {
@@ -1952,7 +1956,8 @@ pub(crate) enum VariableValues {
     Truthy,
 }
 
-/// A JSON object of variable names and values in a file of the Agent home.
+/// A JSON object of variable names and string values in a file of the
+/// Agent home or the machine, such as the `env` of a settings file.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EnvMap {
@@ -1974,7 +1979,10 @@ impl Validate for EnvBypass {
             }
         }
         for map in &self.env_maps {
-            validate_gate_anchor(&map.anchor).map_err(|e| format!("env map: {e}"))?;
+            map.anchor.validate().map_err(|e| format!("env map: {e}"))?;
+            if map.anchor.in_project() {
+                return Err("an env map must lie in the Agent home or the machine".into());
+            }
             validate_key_path(&map.key_path).map_err(|e| format!("env map: {e}"))?;
         }
         Ok(())
@@ -2015,6 +2023,7 @@ pub(crate) trait Holds {
     fn gate(&self) -> Option<&str>;
 }
 
+/// A condition under which an Agent reads a location.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Condition {
@@ -2051,11 +2060,11 @@ pub(crate) struct GateCondition {
     /// The name of a declared Feature gate.
     pub gate: String,
     /// The value the gate must have. Omitted for on.
-    #[serde(default = "on")]
+    #[serde(default = "gate_on_by_default")]
     pub is: bool,
 }
 
-fn on() -> bool {
+fn gate_on_by_default() -> bool {
     true
 }
 

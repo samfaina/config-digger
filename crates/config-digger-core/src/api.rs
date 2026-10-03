@@ -1419,8 +1419,8 @@ pub enum ReasonCode {
     /// The Entry is a link whose target is gone, so the Agent reads nothing
     /// there.
     LinkBroken,
-    /// The Agent reads its location only while a Feature gate has another
-    /// value than the one it has.
+    /// The Agent reads the Entry's location only while a Feature gate has
+    /// the other value from the one it is resolved with.
     FeatureGate,
 }
 

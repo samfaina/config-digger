@@ -577,8 +577,8 @@ export type ReasonCode =
  */
 "link_broken" | 
 /**
- *  The Agent reads its location only while a Feature gate has another
- *  value than the one it has.
+ *  The Agent reads the Entry's location only while a Feature gate has
+ *  the other value from the one it is resolved with.
  */
 "feature_gate";
 
