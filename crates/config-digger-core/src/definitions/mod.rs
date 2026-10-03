@@ -3,9 +3,10 @@
 
 pub(crate) mod blocks;
 
+use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate,
+    Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -62,7 +63,17 @@ pub(crate) fn parse(file: &str, text: &str) -> Result<AgentDefinition, Definitio
 pub(crate) struct AgentDefinition {
     /// The version of this file format. Must be 1.
     pub format_version: u32,
+    /// The lowest and highest versions of the Agent the real-Agent tests
+    /// passed on. Without it, the definition is untested, which every
+    /// Agent home of it notes.
+    pub verified: Option<VerifiedRange>,
     pub agent: AgentInfo,
+    /// The launchable copies of the Agent, each with its own version.
+    #[serde(default)]
+    pub installations: Vec<InstallationDefinition>,
+    /// Where the Agent records the version that last ran against an Agent
+    /// home, shown next to the Installations.
+    pub last_ran: Option<LastRan>,
     /// How to tell that the Agent is running. Without it, config-digger
     /// never finds it running.
     pub process: Option<ProcessDefinition>,
@@ -87,6 +98,67 @@ pub(crate) struct AgentInfo {
     pub id: String,
     /// The display name, such as `Claude Code`.
     pub name: String,
+}
+
+/// A range of Agent versions, both ends included. Versions compare
+/// numerically, component by component, padded with zeros; a pre-release
+/// suffix counts as the numeric version it follows.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct VerifiedRange {
+    pub min: String,
+    pub max: String,
+}
+
+impl VerifiedRange {
+    /// Where `version` stands against the range.
+    pub fn standing(&self, version: &Version) -> Standing {
+        let parse = |text: &str| Version::parse(text).expect("validation parses the range");
+        crate::version::standing(version, &parse(&self.min), &parse(&self.max))
+    }
+}
+
+impl Validate for VerifiedRange {
+    fn validate(&self) -> Result<(), String> {
+        let parse =
+            |text: &str| Version::parse(text).ok_or_else(|| format!("`{text}` is not a version"));
+        if parse(&self.min)? > parse(&self.max)? {
+            return Err(format!("min {} is above max {}", self.min, self.max));
+        }
+        Ok(())
+    }
+}
+
+/// A launchable copy of the Agent, with its own version. It is found when
+/// its executable exists, once per folder its `folder` glob matches.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct InstallationDefinition {
+    /// A stable id, such as `native`, unique in the definition.
+    pub id: String,
+    /// A glob of the folder it is in, starting with `~/`, `%NAME%` or a
+    /// drive; `*` and `?` stay within one folder name and `{a,b}` is
+    /// either, such as a version folder.
+    pub folder: String,
+    /// The `/`-separated path of its executable, relative to its folder.
+    pub executable: String,
+    /// Where its version is, tried in order: the first one read wins.
+    pub versions: Vec<VersionSource>,
+    /// The ids of the Agent homes it reads. Omitted when it reads every
+    /// one. One that reads the first home also reads the homes the user
+    /// adds, which are laid out like it.
+    pub homes: Option<Vec<String>>,
+}
+
+/// A string in a file of each Agent home: the version that last ran
+/// against it, such as Claude Code's `lastReleaseNotesSeen`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LastRan {
+    /// A JSON file of the Agent home.
+    pub anchor: Anchor,
+    /// The key path of the string, one key per segment.
+    pub key_path: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -395,6 +467,41 @@ impl AgentDefinition {
                     .validate()
                     .map_err(|e| format!("home `{}` process: {e}", home.id))?;
             }
+        }
+
+        if let Some(verified) = &self.verified {
+            verified.validate().map_err(|e| format!("verified: {e}"))?;
+        }
+        unique(
+            "installation",
+            self.installations
+                .iter()
+                .map(|installation| installation.id.as_str()),
+        )?;
+        for installation in &self.installations {
+            let context = |e: String| format!("installation `{}`: {e}", installation.id);
+            crate::paths::validate_glob(&installation.folder).map_err(context)?;
+            blocks::validate_relative(&installation.executable).map_err(context)?;
+            if installation.versions.is_empty() {
+                return Err(context("versions needs at least one source".into()));
+            }
+            for source in &installation.versions {
+                source.validate().map_err(context)?;
+            }
+            for home in installation.homes.iter().flatten() {
+                if !self.homes.iter().any(|known| known.id == *home) {
+                    return Err(context(format!("undeclared home `{home}`")));
+                }
+            }
+        }
+        if let Some(last_ran) = &self.last_ran {
+            let context = |e: String| format!("last_ran: {e}");
+            last_ran.anchor.validate().map_err(context)?;
+            if last_ran.anchor.in_project() {
+                return Err(context("must lie in the Agent home, not a Project".into()));
+            }
+            self.validate_home_root(&last_ran.anchor).map_err(context)?;
+            blocks::validate_key_path(&last_ran.key_path).map_err(context)?;
         }
 
         for (index, registry) in self.projects.registries.iter().enumerate() {
@@ -1054,6 +1161,95 @@ shape = { block = \"fields\" }
             "",
         );
         assert!(error(&text).contains("on_read_failure"), "{}", error(&text));
+    }
+
+    /// `VALID` with `verified` at its top and `installations` before its homes.
+    fn with_installations(verified: &str, installations: &str) -> String {
+        VALID
+            .replace(
+                "format_version = 1\n",
+                &format!("format_version = 1\n{verified}\n"),
+            )
+            .replace("[[homes]]", &format!("{installations}\n\n[[homes]]"))
+    }
+
+    const INSTALLATION: &str = r#"[[installations]]
+id = "native"
+folder = "%LOCALAPPDATA%/Programs/test-*"
+executable = "bin/test.exe"
+versions = [
+  { block = "exe-version" },
+  { block = "appx-identity" },
+  { block = "json-value", file = "*/resources/app/product.json", key_path = ["version"] },
+  { block = "uninstall-key", hive = "current-user", key = "{DADADADA-ADAD}_is1" },
+]
+homes = ["default"]"#;
+
+    #[test]
+    fn installations_and_a_tested_range_load() {
+        let text = with_installations(r#"verified = { min = "1.2", max = "1.4.0" }"#, INSTALLATION)
+            + "\n[last_ran]\nanchor = { block = \"home\", root = \"state\" }\nkey_path = [\"lastVersion\"]\n";
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_tested_range_holds_versions_in_order() {
+        let text = with_installations(r#"verified = { min = "2.0", max = "1.9" }"#, "");
+        assert!(
+            error(&text).contains("min 2.0 is above max 1.9"),
+            "{}",
+            error(&text)
+        );
+        let text = with_installations(r#"verified = { min = "latest", max = "1.9" }"#, "");
+        assert!(error(&text).contains("not a version"), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_installation_reads_declared_homes_from_a_rooted_folder() {
+        let text = with_installations("", &INSTALLATION.replace(r#"["default"]"#, r#"["ghost"]"#));
+        assert!(
+            error(&text).contains("undeclared home `ghost`"),
+            "{}",
+            error(&text)
+        );
+        let text = with_installations("", &INSTALLATION.replace("%LOCALAPPDATA%/", ""));
+        assert!(error(&text).contains("must start with"), "{}", error(&text));
+        let text = with_installations("", &INSTALLATION.replace("bin/test.exe", "../test.exe"));
+        assert!(
+            error(&text).contains("without `.` or `..`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn an_installation_needs_a_known_version_source() {
+        let text = with_installations(
+            "",
+            "[[installations]]\nid = \"x\"\nfolder = \"~/x\"\nexecutable = \"x.exe\"\nversions = []",
+        );
+        assert!(
+            error(&text).contains("at least one source"),
+            "{}",
+            error(&text)
+        );
+        let text = with_installations(
+            "",
+            "[[installations]]\nid = \"x\"\nfolder = \"~/x\"\nexecutable = \"x.exe\"\nversions = [{ block = \"run-version-flag\" }]",
+        );
+        assert!(
+            error(&text).contains("run-version-flag"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn the_last_ran_version_is_in_the_agent_home() {
+        let text = format!(
+            "{VALID}\n[last_ran]\nanchor = {{ block = \"project\", path = \".x.json\" }}\nkey_path = [\"v\"]\n"
+        );
+        assert!(error(&text).contains("not a Project"), "{}", error(&text));
     }
 
     #[test]

@@ -678,3 +678,47 @@ pub(crate) fn forget_refused_project(path: &Path, agent_names: &[&str]) -> Strin
         agent_names.join(", ")
     )
 }
+
+/// The note for an Installation of `agent_name` whose version `version` is
+/// `newer` or older than the range from `min` to `max` it was tested with.
+pub(crate) fn version_outside_tested_range(
+    agent_name: &str,
+    version: &str,
+    newer: bool,
+    min: &str,
+    max: &str,
+) -> String {
+    let side = if newer { "newer" } else { "older" };
+    let range = if min == max {
+        min.to_owned()
+    } else {
+        format!("{min} to {max}")
+    };
+    format!(
+        "{agent_name} {version} is {side} than the versions this definition was tested with ({range})."
+    )
+}
+
+/// The note for the Installation of `agent_name` at `executable`, whose
+/// version cannot be read.
+pub(crate) fn version_unreadable(agent_name: &str, executable: &Path) -> String {
+    format!(
+        "The version of {agent_name} at {} could not be read, so it is not known whether this definition was tested with it.",
+        executable.display()
+    )
+}
+
+/// The note for an Agent home of `agent_name` that no Installation found reads.
+pub(crate) fn no_installation_found(agent_name: &str) -> String {
+    format!(
+        "No installation of {agent_name} that reads this Agent home was found, so its version could not be checked."
+    )
+}
+
+/// The note for an Agent home of `agent_name` whose definition has no
+/// tested range.
+pub(crate) fn definition_untested(agent_name: &str) -> String {
+    format!(
+        "This definition of {agent_name} has no tested version range, so what it says may not match how {agent_name} behaves."
+    )
+}

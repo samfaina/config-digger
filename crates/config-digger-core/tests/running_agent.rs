@@ -45,6 +45,10 @@ const MCP_JSON: &str = r#"{
 fn fixture() -> FakeFileSystem {
     FakeFileSystem::new()
         .with_folder(PROJECT)
+        .with_file(
+            PathBuf::from(HOME).join(r".local\bin\claude.exe"),
+            fake::executable(Some([2, 1, 286, 0])),
+        )
         .with_file(claude_json(), CLAUDE_JSON)
         .with_file(mcp_json(), MCP_JSON)
 }
@@ -252,6 +256,12 @@ format_version = 1
 id = "store-agent"
 name = "Store Agent"
 
+[[installations]]
+id = "default"
+folder = "~/.store"
+executable = "store.exe"
+versions = [{ block = "exe-version" }]
+
 [process]
 images = ["store.exe"]
 
@@ -286,6 +296,14 @@ fn store() -> PathBuf {
     PathBuf::from(HOME).join(r".store\state.vscdb")
 }
 
+/// [`SQLITE_AGENT`]'s store, and its Installation.
+fn store_fs() -> FakeFileSystem {
+    FakeFileSystem::new().with_file(store(), STORE).with_file(
+        PathBuf::from(HOME).join(r".store\store.exe"),
+        fake::executable(None),
+    )
+}
+
 /// A core over `fs` with `definition` loaded besides the built-in ones and `processes` as the
 /// processes on this machine.
 fn core_with(fs: &FakeFileSystem, definition: &str, processes: &FakeProcesses) -> Core {
@@ -306,7 +324,7 @@ fn store_agent() -> RunningProcess {
 
 #[test]
 fn a_write_to_a_sqlite_store_while_its_agent_runs_is_blocked_whatever_is_acknowledged() {
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let processes = FakeProcesses::default().with_process(store_agent());
     let core = core_with(&fs, SQLITE_AGENT, &processes);
 
@@ -339,7 +357,7 @@ fn a_write_to_a_sqlite_store_while_its_agent_runs_is_blocked_whatever_is_acknowl
 
 #[test]
 fn a_write_to_a_sqlite_store_goes_ahead_once_its_agent_is_closed() {
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let core = core_with(&fs, SQLITE_AGENT, &FakeProcesses::default());
 
     let plan = remove(&core, "search");
@@ -351,7 +369,7 @@ fn a_write_to_a_sqlite_store_goes_ahead_once_its_agent_is_closed() {
 
 #[test]
 fn an_agent_that_starts_after_the_preview_still_blocks_its_sqlite_store() {
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let processes = FakeProcesses::default();
     let core = core_with(&fs, SQLITE_AGENT, &processes);
     let plan = remove(&core, "search");
@@ -376,7 +394,7 @@ fn every_cmdline_text_must_match() {
     let definition = plain_agent(
         "[process]\nimages = [\"node.exe\"]\ncmdline_contains = [\"gemini-cli\", \"gemini.js\"]\n",
     );
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let processes = FakeProcesses::default().with_process(process(
         40,
         "node.exe",
@@ -402,7 +420,7 @@ fn a_home_may_override_its_agents_process() {
         "roots.state = ",
         "process = { images = [\"msix.exe\"] }\nroots.state = ",
     );
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let processes = FakeProcesses::default().with_process(process(50, "classic.exe", None, ""));
     let core = core_with(&fs, &definition, &processes);
     assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
@@ -435,7 +453,7 @@ fn an_undo_while_the_agent_runs_gets_the_warning_too() {
 
 #[test]
 fn a_block_wins_over_a_missing_acknowledgement() {
-    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let fs = store_fs();
     let processes = FakeProcesses::default().with_process(store_agent());
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     let mut ports = fake::ports(fs.clone(), env);
@@ -476,9 +494,7 @@ fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
         "[[homes]]\nid = \"other\"\nfolder = { block = \"path\", path = \"~\" }\nroots.state = \".other/state.vscdb\"\n\n[[scopes]]",
     );
     let other = PathBuf::from(HOME).join(r".other\state.vscdb");
-    let fs = FakeFileSystem::new()
-        .with_file(store(), STORE)
-        .with_file(&other, STORE);
+    let fs = store_fs().with_file(&other, STORE);
     let processes = FakeProcesses::default().with_process(store_agent());
     let core = core_with(&fs, &definition, &processes);
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
@@ -499,4 +515,23 @@ fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
         outcome.hints,
         ["Restart Store Agent so that it reads what the Operation wrote."]
     );
+}
+
+#[test]
+fn without_an_installation_a_running_agent_still_blocks_its_sqlite_store_but_never_warns() {
+    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let processes = FakeProcesses::default().with_process(store_agent());
+    let core = core_with(
+        &fs,
+        &plain_agent("[process]\nimages = [\"store.exe\"]\n"),
+        &processes,
+    );
+    assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
+    let core = core_with(&fs, SQLITE_AGENT, &processes);
+
+    let plan = remove(&core, "search");
+
+    let codes: Vec<BlockCode> = plan.blocks().iter().map(|block| block.code).collect();
+    assert_eq!(codes, [BlockCode::RunningAgentSqlite]);
+    assert_eq!(plan.warnings(), []);
 }

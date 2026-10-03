@@ -212,6 +212,10 @@ impl Core {
                 id: definition.agent.id.clone(),
                 name: definition.agent.name.clone(),
                 built_in: index < self.built_in,
+                tested: definition.verified.as_ref().map(|verified| VersionRange {
+                    min: verified.min.clone(),
+                    max: verified.max.clone(),
+                }),
                 homes: inventory
                     .homes
                     .iter()
@@ -543,7 +547,8 @@ pub struct Preview {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Info {
     pub code: InfoCode,
-    /// The location it is about.
+    /// The location it is about: for a note about an Agent's versions, the
+    /// Installation's executable, or else the Agent home's folder.
     pub path: PathBuf,
     /// What to know, as a sentence rendered by the core.
     pub sentence: String,
@@ -558,6 +563,26 @@ pub enum InfoCode {
     /// A file the Operation writes is a Read failure for an Agent, which
     /// still rejects it afterwards.
     StillRejected,
+    /// An Installation of an Agent it touches is outside the definition's
+    /// tested range, as [`AgentNoteCode::VersionOutsideTestedRange`] notes.
+    VersionOutsideTestedRange,
+    /// The version of an Installation of an Agent it touches cannot be read.
+    VersionUnreadable,
+    /// No Installation of an Agent it touches was found.
+    NoInstallationFound,
+    /// The definition of an Agent it touches has no tested range.
+    DefinitionUntested,
+}
+
+impl From<AgentNoteCode> for InfoCode {
+    fn from(code: AgentNoteCode) -> Self {
+        match code {
+            AgentNoteCode::VersionOutsideTestedRange => InfoCode::VersionOutsideTestedRange,
+            AgentNoteCode::VersionUnreadable => InfoCode::VersionUnreadable,
+            AgentNoteCode::NoInstallationFound => InfoCode::NoInstallationFound,
+            AgentNoteCode::DefinitionUntested => InfoCode::DefinitionUntested,
+        }
+    }
 }
 
 /// An Entry's State in one Agent and context, before and after an Operation.
@@ -1008,6 +1033,8 @@ pub struct Agent {
     pub name: String,
     /// The definition ships with config-digger, rather than being loaded from a file.
     pub built_in: bool,
+    /// The versions the definition was tested with, `None` when it is untested.
+    pub tested: Option<VersionRange>,
     pub homes: Vec<Home>,
 }
 
@@ -1029,6 +1056,68 @@ pub struct Home {
     pub no_configuration: Option<String>,
     /// The Agent's Scopes, in display order.
     pub scopes: Vec<String>,
+    /// Each Installation that reads it, with its version as read at this scan.
+    pub installations: Vec<Installation>,
+    /// The version of an Installation that reads it is outside the
+    /// definition's tested range.
+    pub out_of_range: bool,
+    /// The version that last ran against it, as the Agent records it.
+    pub last_ran: Option<String>,
+    /// What to know about the Agent's versions here, such as one outside
+    /// the definition's tested range. None of them changes a State or
+    /// blocks a write.
+    pub notes: Vec<AgentNote>,
+}
+
+/// A launchable copy of an Agent, with its own version.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Installation {
+    /// The id of the definition's installation, such as `native`.
+    pub id: String,
+    /// Its executable.
+    pub path: PathBuf,
+    /// `None` when it cannot be read.
+    pub version: Option<String>,
+    /// The file or registry key the version was read from.
+    pub version_from: Option<String>,
+    /// Its version is outside the definition's tested range.
+    pub out_of_range: bool,
+}
+
+/// Something about an Agent's versions in one Agent home, which changes
+/// no State and blocks nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct AgentNote {
+    /// What it notes, from a closed set.
+    pub code: AgentNoteCode,
+    /// The executable of the Installation it is about, if it is about one.
+    pub installation: Option<PathBuf>,
+    /// The note as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+/// What an Agent note is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentNoteCode {
+    /// An Installation's version is newer or older than the definition's
+    /// tested range.
+    VersionOutsideTestedRange,
+    /// An Installation's version cannot be read.
+    VersionUnreadable,
+    /// No Installation that reads the Agent home was found.
+    NoInstallationFound,
+    /// The definition has no tested range.
+    DefinitionUntested,
+}
+
+/// The versions an Agent definition was tested with, both ends included.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct VersionRange {
+    /// The lowest version tested, as the definition spells it.
+    pub min: String,
+    /// The highest version tested, as the definition spells it.
+    pub max: String,
 }
 
 /// Where an Agent home came from.

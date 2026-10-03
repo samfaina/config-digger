@@ -118,24 +118,87 @@ pub(crate) fn validate_glob(glob: &str) -> Result<(), String> {
 /// or `%NAME%` start expanded from `env`, compared case-insensitively. `*`
 /// and `?` stay within one folder name, and `{a,b}` is either.
 pub(crate) fn glob_matches(glob: &str, path: &Path, env: &dyn Environment) -> bool {
-    let expanded = if let Some(rest) = glob.strip_prefix("~/") {
-        let Some(home) = env.home_dir() else {
-            return false;
-        };
-        format!("{}\\{rest}", home.display())
-    } else if let Some((name, rest)) = variable_prefix(glob) {
-        let Some(value) = env.var(name) else {
-            return false;
-        };
-        format!("{value}{rest}")
-    } else {
-        glob.to_owned()
+    let Some(expanded) = expand_start(glob, env) else {
+        return false;
     };
     let pattern = key(&lexical(Path::new(&expanded)));
     let path: Vec<char> = key(&lexical(path)).chars().collect();
     alternatives(&pattern).iter().any(|pattern| {
         let pattern: Vec<char> = pattern.chars().collect();
         wildcard(&pattern, &path)
+    })
+}
+
+/// The existing files and folders a glob that [`validate_glob`] accepts
+/// names, as [`glob_matches`] matches them, spelled as on disk where a
+/// wildcard matched, sorted.
+pub(crate) fn expand_glob(glob: &str, fs: &dyn FileSystem, env: &dyn Environment) -> Vec<PathBuf> {
+    let Some(expanded) = expand_start(glob, env) else {
+        return Vec::new();
+    };
+    let lexical = lexical(Path::new(&expanded)).display().to_string();
+    let mut found: Vec<PathBuf> = alternatives(&lexical)
+        .iter()
+        .flat_map(|pattern| {
+            let parts: Vec<&str> = pattern.split('\\').collect();
+            let literal = parts
+                .iter()
+                .position(|part| part.contains(['*', '?']))
+                .unwrap_or(parts.len());
+            let mut base = parts[..literal].join("\\");
+            if base.ends_with(':') {
+                base.push('\\');
+            }
+            walk(fs, vec![PathBuf::from(base)], &parts[literal..])
+        })
+        .collect();
+    found.sort_by_key(|path| key(path));
+    found.dedup_by_key(|path| key(path));
+    found
+}
+
+/// The existing files and folders below `base` that a `/`-separated
+/// relative path names, where `*` and `?` stand for any name, sorted.
+pub(crate) fn expand_relative(fs: &dyn FileSystem, base: &Path, relative: &str) -> Vec<PathBuf> {
+    let parts: Vec<&str> = relative.split('/').collect();
+    let mut found = walk(fs, vec![base.to_path_buf()], &parts);
+    found.sort_by_key(|path| key(path));
+    found
+}
+
+/// The existing paths below `bases` that `parts` name, one folder name each.
+fn walk(fs: &dyn FileSystem, bases: Vec<PathBuf>, parts: &[&str]) -> Vec<PathBuf> {
+    let mut paths = bases;
+    for part in parts {
+        if !part.contains(['*', '?']) {
+            paths = paths.into_iter().map(|path| path.join(part)).collect();
+            continue;
+        }
+        let pattern: Vec<char> = part.to_lowercase().chars().collect();
+        paths = paths
+            .iter()
+            .flat_map(|folder| fs.read_dir(folder).unwrap_or_default())
+            .filter(|child| {
+                child.file_name().is_some_and(|name| {
+                    let name: Vec<char> = name.to_string_lossy().to_lowercase().chars().collect();
+                    wildcard(&pattern, &name)
+                })
+            })
+            .collect();
+    }
+    paths.retain(|path| fs.exists(path));
+    paths
+}
+
+/// A glob with its `~/` or `%NAME%` start expanded from `env`, `None` when
+/// `env` does not say what it stands for.
+fn expand_start(glob: &str, env: &dyn Environment) -> Option<String> {
+    Some(if let Some(rest) = glob.strip_prefix("~/") {
+        format!("{}\\{rest}", env.home_dir()?.display())
+    } else if let Some((name, rest)) = variable_prefix(glob) {
+        format!("{}{rest}", env.var(name)?)
+    } else {
+        glob.to_owned()
     })
 }
 

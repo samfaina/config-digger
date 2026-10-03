@@ -6,7 +6,10 @@
 //! that must handle it.
 
 use crate::edit::{Edit, Syntax};
-use crate::ports::{Environment, FileSystem};
+use crate::installations::pe;
+use crate::paths;
+use crate::ports::{Environment, FileSystem, Hive, Ports};
+use crate::version::Version;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -1374,7 +1377,250 @@ impl Switch {
     }
 }
 
+// --- Version sources --------------------------------------------------------
+
+/// Reads an Installation's version from a file or the registry, never by
+/// running the Agent.
+pub(crate) trait ReadVersion {
+    /// The version and where it was read from, `None` when it cannot be read.
+    fn read(&self, installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead>;
+}
+
+/// Where an Installation is.
+pub(crate) struct InstallationPaths<'a> {
+    pub folder: &'a Path,
+    pub executable: &'a Path,
+}
+
+/// A version as read, which starts with a number.
+#[derive(Clone)]
+pub(crate) struct VersionRead {
+    pub text: String,
+    /// The file or registry key it was read from.
+    pub from: String,
+}
+
+impl VersionRead {
+    /// `text` read from `from`, `None` when it does not start with a number.
+    fn new(text: &str, from: String) -> Option<Self> {
+        let text = text.trim();
+        Version::parse(text)?;
+        Some(Self {
+            text: text.to_owned(),
+            from,
+        })
+    }
+}
+
+/// Where an Installation's version is.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum VersionSource {
+    ExeVersion(ExeVersion),
+    AppxIdentity(AppxIdentity),
+    JsonValue(JsonValue),
+    UninstallKey(UninstallKey),
+}
+
+impl Validate for VersionSource {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            VersionSource::ExeVersion(block) => block.validate(),
+            VersionSource::AppxIdentity(block) => block.validate(),
+            VersionSource::JsonValue(block) => block.validate(),
+            VersionSource::UninstallKey(block) => block.validate(),
+        }
+    }
+}
+
+impl ReadVersion for VersionSource {
+    fn read(&self, installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead> {
+        match self {
+            VersionSource::ExeVersion(block) => block.read(installation, ports),
+            VersionSource::AppxIdentity(block) => block.read(installation, ports),
+            VersionSource::JsonValue(block) => block.read(installation, ports),
+            VersionSource::UninstallKey(block) => block.read(installation, ports),
+        }
+    }
+}
+
+/// The product version in the version resource of an executable, such as
+/// `claude.exe` or `Code.exe`. A fourth component of 0 is left out.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExeVersion {
+    /// A `/`-separated path relative to the Installation's folder, where
+    /// `*` and `?` stand for any name. Omitted for its executable.
+    pub file: Option<String>,
+}
+
+impl Validate for ExeVersion {
+    fn validate(&self) -> Result<(), String> {
+        self.file.as_deref().map_or(Ok(()), validate_relative)
+    }
+}
+
+impl ReadVersion for ExeVersion {
+    fn read(&self, installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead> {
+        files(installation, self.file.as_deref(), ports)
+            .into_iter()
+            .find_map(|path| {
+                let [a, b, c, d] = pe::product_version(ports.fs.as_ref(), &path)?;
+                let text = match d {
+                    0 => format!("{a}.{b}.{c}"),
+                    d => format!("{a}.{b}.{c}.{d}"),
+                };
+                VersionRead::new(&text, path.display().to_string())
+            })
+    }
+}
+
+/// The `Version` of the `<Identity>` in an MSIX package's manifest.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AppxIdentity {
+    /// A `/`-separated path relative to the Installation's folder, where
+    /// `*` and `?` stand for any name. Omitted for `AppxManifest.xml`.
+    pub file: Option<String>,
+}
+
+impl Validate for AppxIdentity {
+    fn validate(&self) -> Result<(), String> {
+        self.file.as_deref().map_or(Ok(()), validate_relative)
+    }
+}
+
+impl ReadVersion for AppxIdentity {
+    fn read(&self, installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead> {
+        let file = self.file.as_deref().unwrap_or("AppxManifest.xml");
+        files(installation, Some(file), ports)
+            .into_iter()
+            .find_map(|path| {
+                let text = String::from_utf8(ports.fs.read(&path).ok()?).ok()?;
+                VersionRead::new(identity_version(&text)?, path.display().to_string())
+            })
+    }
+}
+
+/// The `Version` attribute of the first `<Identity>` element of `xml`.
+fn identity_version(xml: &str) -> Option<&str> {
+    let start = xml.find("<Identity")? + "<Identity".len();
+    let element = &xml[start..start + xml[start..].find('>')?];
+    let mut rest = element;
+    while let Some(at) = rest.find("Version=") {
+        let before = rest[..at].chars().next_back();
+        let value = &rest[at + "Version=".len()..];
+        if before.is_some_and(char::is_whitespace) {
+            let quote = value.chars().next()?;
+            let value = value.strip_prefix(['"', '\''])?;
+            return Some(&value[..value.find(quote)?]);
+        }
+        rest = value;
+    }
+    None
+}
+
+/// A string in a JSON file, such as `version` in a `package.json`, a
+/// `product.json` or Codex's `codex-package.json`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonValue {
+    /// A `/`-separated path relative to the Installation's folder, where
+    /// `*` and `?` stand for any name, such as a commit folder.
+    pub file: String,
+    /// The key path of the string, one key per segment.
+    pub key_path: Vec<String>,
+}
+
+impl Validate for JsonValue {
+    fn validate(&self) -> Result<(), String> {
+        validate_relative(&self.file)?;
+        validate_key_path(&self.key_path)
+    }
+}
+
+impl ReadVersion for JsonValue {
+    fn read(&self, installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead> {
+        files(installation, Some(&self.file), ports)
+            .into_iter()
+            .find_map(|path| {
+                let text = String::from_utf8(ports.fs.read(&path).ok()?).ok()?;
+                let document = JsonFormat::STRICT
+                    .parse(text.trim_start_matches('\u{feff}'))
+                    .ok()?;
+                let value = self
+                    .key_path
+                    .iter()
+                    .try_fold(&document, |value, key| value.get(key))?;
+                VersionRead::new(value.as_str()?, path.display().to_string())
+            })
+    }
+}
+
+/// `DisplayVersion` in an uninstall key, such as an Inno Setup
+/// `{<AppId>}_is1`: a fallback for an Installation whose files say nothing.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UninstallKey {
+    /// The hive the key is in, for an install per user or per machine.
+    pub hive: RegistryHive,
+    /// The key's name under `Software\Microsoft\Windows\CurrentVersion\Uninstall`.
+    pub key: String,
+}
+
+/// A Windows registry hive.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum RegistryHive {
+    CurrentUser,
+    LocalMachine,
+}
+
+impl Validate for UninstallKey {
+    fn validate(&self) -> Result<(), String> {
+        if self.key.trim().is_empty() || self.key.contains(['\\', '/']) {
+            return Err(format!(
+                "uninstall key `{}` must be one key name, without `\\` or `/`",
+                self.key
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ReadVersion for UninstallKey {
+    fn read(&self, _installation: &InstallationPaths, ports: &Ports) -> Option<VersionRead> {
+        let key = format!(
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{}",
+            self.key
+        );
+        let (hive, name) = match self.hive {
+            RegistryHive::CurrentUser => (Hive::CurrentUser, "HKCU"),
+            RegistryHive::LocalMachine => (Hive::LocalMachine, "HKLM"),
+        };
+        let text = ports.env.registry_value(hive, &key, "DisplayVersion")?;
+        VersionRead::new(&text, format!(r"{name}\{key}"))
+    }
+}
+
+/// The files `file` names in the Installation's folder, sorted, or its
+/// executable when `file` is `None`.
+fn files(installation: &InstallationPaths, file: Option<&str>, ports: &Ports) -> Vec<PathBuf> {
+    match file {
+        Some(file) => paths::expand_relative(ports.fs.as_ref(), installation.folder, file),
+        None => vec![installation.executable.to_path_buf()],
+    }
+}
+
 // --- Paths ------------------------------------------------------------------
+
+/// A key path names at least one key, none of them empty.
+pub(crate) fn validate_key_path(key_path: &[String]) -> Result<(), String> {
+    if key_path.is_empty() || key_path.iter().any(String::is_empty) {
+        return Err("key_path needs keys, none of them empty".into());
+    }
+    Ok(())
+}
 
 /// A `/`-separated path must stay below the folder it is relative to.
 pub(crate) fn validate_relative(path: &str) -> Result<(), String> {

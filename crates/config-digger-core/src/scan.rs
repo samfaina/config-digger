@@ -7,6 +7,7 @@ use crate::definitions::blocks::{
     Anchored, Disables, JsonFormat, Locate, NAME_KEY, Parse, Register, StoreClass,
 };
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
+use crate::installations::{self, ScannedInstallation};
 use crate::ports::Ports;
 use crate::user_list::{self, UserList};
 use crate::{mask, paths};
@@ -19,6 +20,8 @@ use std::time::SystemTime;
 pub(crate) struct Snapshot {
     pub read_at: SystemTime,
     pub homes: Vec<ScannedHome>,
+    /// Every Installation found, with its version as read at this scan.
+    pub installations: Vec<ScannedInstallation>,
     /// Sorted by path.
     pub projects: Vec<ScannedProject>,
     pub entries: Vec<ScannedEntry>,
@@ -196,6 +199,8 @@ pub(crate) struct ScannedHome {
     pub configured: bool,
     /// The user hid it.
     pub hidden: bool,
+    /// The version that last ran against it, as the Agent records it.
+    pub last_ran: Option<String>,
 }
 
 /// Where an Agent home came from.
@@ -385,6 +390,10 @@ pub(crate) fn scan_as_if(
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
     let versioned = versioned(ports, locations.chain(switch_files));
+    let last_ran: Vec<Option<String>> = found
+        .iter()
+        .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
+        .collect();
     // A file that is a Read failure for an Agent home yields it no Entries,
     // even from a location of it that did parse.
     let failures = scanner.reader.failures;
@@ -397,9 +406,12 @@ pub(crate) fn scan_as_if(
     });
     Ok(Snapshot {
         read_at,
+        installations: installations::find(definitions, ports),
         homes: found
             .into_iter()
-            .map(|home| ScannedHome {
+            .zip(last_ran)
+            .map(|(home, last_ran)| ScannedHome {
+                last_ran,
                 configured: home.roots.values().any(|root| ports.fs.exists(root)),
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
                     hidden.agent == definitions[home.agent_index].agent.id
@@ -420,6 +432,17 @@ pub(crate) fn scan_as_if(
         switches,
         unreadable_switches,
     })
+}
+
+/// The version that last ran against `home`, as the string its definition's
+/// `last_ran` points to; `None` when there is none or it cannot be read.
+fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader) -> Option<String> {
+    let last_ran = definition.last_ran.as_ref()?;
+    let path = last_ran.anchor.path(&home.roots, None)?;
+    let text = reader.peek(&path).ok()??;
+    let document = JsonFormat::STRICT.parse(text).ok()?;
+    let value = lookup(&document, &last_ran.key_path)?;
+    Some(value.as_str()?.to_owned())
 }
 
 /// Every place each Disable mechanism's switch is, for each found Agent

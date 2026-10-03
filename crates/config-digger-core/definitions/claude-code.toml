@@ -3,10 +3,49 @@
 # (verified against 2.1.286).
 
 format_version = 1
+verified = { min = "2.1.286", max = "2.1.286" }
 
 [agent]
 id = "claude-code"
 name = "Claude Code"
+
+# The native installer's launcher. It is a copy of the newest file in
+# `~/.local/share/claude/versions`, whose older files are not Installations.
+[[installations]]
+id = "native"
+folder = "~/.local/bin"
+executable = "claude.exe"
+versions = [{ block = "exe-version" }]
+
+# `npm i -g @anthropic-ai/claude-code`: the `claude.cmd` shim npm writes, and
+# the package's manifest [docs]. It runs in `node.exe`, which the session
+# files of `[process]` cover.
+[[installations]]
+id = "npm"
+folder = "%APPDATA%/npm"
+executable = "claude.cmd"
+versions = [{ block = "json-value", file = "node_modules/@anthropic-ai/claude-code/package.json", key_path = ["version"] }]
+
+# The copy Claude Desktop downloads, one folder per version, for its classic
+# install [docs] and virtualised into its MSIX package [disk]. 2.1.284 sat in
+# its version folder; 2.1.286 sits one hash-named folder further down [disk].
+[[installations]]
+id = "claude-desktop"
+folder = "%APPDATA%/Claude/claude-code/{*,*/*}"
+executable = "claude.exe"
+versions = [{ block = "exe-version" }]
+
+[[installations]]
+id = "claude-desktop-msix"
+folder = "%LOCALAPPDATA%/Packages/{Claude_pzs8sxrjxfjjc,AnthropicPBC.Claude_fnn82j28hfe8t}/LocalCache/Roaming/Claude/claude-code/{*,*/*}"
+executable = "claude.exe"
+versions = [{ block = "exe-version" }]
+
+# The version whose release notes were last shown: the one that last ran
+# against the home [disk].
+[last_ran]
+anchor = { block = "home", root = "state_file" }
+key_path = ["lastReleaseNotesSeen"]
 
 # The native Installation runs as `claude.exe` from `~/.local/bin`. Claude
 # Desktop is also `claude.exe`, so the path tells them apart. Each running

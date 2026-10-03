@@ -11,7 +11,7 @@ use crate::explain;
 use crate::paths;
 use crate::plan::PlannedFile;
 use crate::ports::{Ports, RunningProcess};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// What the running Agents mean for an Operation's writes.
@@ -32,6 +32,9 @@ pub(crate) struct RunningCheck {
 struct RunningReader<'d> {
     agent_name: &'d str,
     files: BTreeMap<PathBuf, StoreClass>,
+    /// An Installation found reads one of those homes. Without one, its
+    /// SQLite stores still block, but it gets no warning or hint.
+    installed: bool,
 }
 
 impl RunningReader<'_> {
@@ -45,10 +48,13 @@ impl RunningReader<'_> {
 }
 
 /// Checks the readers of `files`, and the Agents with switches in them,
-/// against the processes running now.
+/// against the processes running now. Only an Agent running for a home in
+/// `installed`, which an Installation found reads, gets the warning and the
+/// hints; any running Agent blocks a write to a SQLite store it holds.
 pub(crate) fn check(
     definitions: &[AgentDefinition],
     ports: &Ports,
+    installed: &BTreeSet<(usize, String)>,
     files: &[PlannedFile],
 ) -> RunningCheck {
     let mut processes: Option<Vec<RunningProcess>> = None;
@@ -77,15 +83,13 @@ pub(crate) fn check(
             if !running {
                 continue;
             }
-            let stored = readers
-                .entry(agent_index)
-                .or_insert_with(|| RunningReader {
-                    agent_name: &definition.agent.name,
-                    files: BTreeMap::new(),
-                })
-                .files
-                .entry(file.path.clone())
-                .or_insert(class);
+            let reader = readers.entry(agent_index).or_insert_with(|| RunningReader {
+                agent_name: &definition.agent.name,
+                files: BTreeMap::new(),
+                installed: false,
+            });
+            reader.installed |= installed.contains(&(agent_index, home.to_owned()));
+            let stored = reader.files.entry(file.path.clone()).or_insert(class);
             *stored = (*stored).max(class);
         }
     }
@@ -100,6 +104,9 @@ pub(crate) fn check(
                 code: BlockCode::RunningAgentSqlite,
                 sentence: explain::running_agent_sqlite(reader.agent_name, &sqlite),
             });
+        }
+        if !reader.installed {
+            continue;
         }
         let rewritten = reader.paths(StoreClass::RewrittenWhileRunning);
         if !rewritten.is_empty() {
@@ -120,6 +127,7 @@ pub(crate) fn check(
     RunningCheck {
         agents: readers
             .values()
+            .filter(|reader| reader.installed)
             .map(|reader| reader.agent_name.to_owned())
             .collect(),
         blocks,

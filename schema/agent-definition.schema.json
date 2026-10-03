@@ -10,8 +10,37 @@
       "format": "uint32",
       "minimum": 0
     },
+    "verified": {
+      "description": "The lowest and highest versions of the Agent the real-Agent tests\npassed on. Without it, the definition is untested, which every\nAgent home of it notes.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerifiedRange"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "agent": {
       "$ref": "#/$defs/AgentInfo"
+    },
+    "installations": {
+      "description": "The launchable copies of the Agent, each with its own version.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/InstallationDefinition"
+      }
+    },
+    "last_ran": {
+      "description": "Where the Agent records the version that last ran against an Agent\nhome, shown next to the Installations.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LastRan"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "process": {
       "description": "How to tell that the Agent is running. Without it, config-digger\nnever finds it running.",
@@ -70,6 +99,23 @@
     "items"
   ],
   "$defs": {
+    "VerifiedRange": {
+      "description": "A range of Agent versions, both ends included. Versions compare\nnumerically, component by component, padded with zeros; a pre-release\nsuffix counts as the numeric version it follows.",
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "string"
+        },
+        "max": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "min",
+        "max"
+      ]
+    },
     "AgentInfo": {
       "type": "object",
       "properties": {
@@ -86,6 +132,226 @@
       "required": [
         "id",
         "name"
+      ]
+    },
+    "InstallationDefinition": {
+      "description": "A launchable copy of the Agent, with its own version. It is found when\nits executable exists, once per folder its `folder` glob matches.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "A stable id, such as `native`, unique in the definition.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "A glob of the folder it is in, starting with `~/`, `%NAME%` or a\ndrive; `*` and `?` stay within one folder name and `{a,b}` is\neither, such as a version folder.",
+          "type": "string"
+        },
+        "executable": {
+          "description": "The `/`-separated path of its executable, relative to its folder.",
+          "type": "string"
+        },
+        "versions": {
+          "description": "Where its version is, tried in order: the first one read wins.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VersionSource"
+          }
+        },
+        "homes": {
+          "description": "The ids of the Agent homes it reads. Omitted when it reads every\none. One that reads the first home also reads the homes the user\nadds, which are laid out like it.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "folder",
+        "executable",
+        "versions"
+      ]
+    },
+    "VersionSource": {
+      "description": "Where an Installation's version is.",
+      "oneOf": [
+        {
+          "description": "The product version in the version resource of an executable, such as\n`claude.exe` or `Code.exe`. A fourth component of 0 is left out.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "A `/`-separated path relative to the Installation's folder, where\n`*` and `?` stand for any name. Omitted for its executable.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "exe-version"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        },
+        {
+          "description": "The `Version` of the `<Identity>` in an MSIX package's manifest.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "A `/`-separated path relative to the Installation's folder, where\n`*` and `?` stand for any name. Omitted for `AppxManifest.xml`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "appx-identity"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        },
+        {
+          "description": "A string in a JSON file, such as `version` in a `package.json`, a\n`product.json` or Codex's `codex-package.json`.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "A `/`-separated path relative to the Installation's folder, where\n`*` and `?` stand for any name, such as a commit folder.",
+              "type": "string"
+            },
+            "key_path": {
+              "description": "The key path of the string, one key per segment.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "json-value"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "file",
+            "key_path"
+          ]
+        },
+        {
+          "description": "`DisplayVersion` in an uninstall key, such as an Inno Setup\n`{<AppId>}_is1`: a fallback for an Installation whose files say nothing.",
+          "type": "object",
+          "properties": {
+            "hive": {
+              "description": "The hive the key is in, for an install per user or per machine.",
+              "$ref": "#/$defs/RegistryHive"
+            },
+            "key": {
+              "description": "The key's name under `Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall`.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "uninstall-key"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "hive",
+            "key"
+          ]
+        }
+      ]
+    },
+    "RegistryHive": {
+      "description": "A Windows registry hive.",
+      "type": "string",
+      "enum": [
+        "current-user",
+        "local-machine"
+      ]
+    },
+    "LastRan": {
+      "description": "A string in a file of each Agent home: the version that last ran\nagainst it, such as Claude Code's `lastReleaseNotesSeen`.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "description": "A JSON file of the Agent home.",
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the string, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
+      ]
+    },
+    "Anchor": {
+      "description": "What a location's path is relative to.",
+      "oneOf": [
+        {
+          "description": "A root of the Agent home, or a path below it.",
+          "type": "object",
+          "properties": {
+            "root": {
+              "description": "The name of a root declared by every home of the definition.",
+              "type": "string"
+            },
+            "path": {
+              "description": "A `/`-separated path relative to the root. Omitted when the root is the location.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "home"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "root"
+          ]
+        },
+        {
+          "description": "A path in the Project folder itself.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A `/`-separated path relative to the Project folder.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "project"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
+          ]
+        }
       ]
     },
     "ProcessDefinition": {
@@ -270,56 +536,6 @@
             "block",
             "anchor",
             "root"
-          ]
-        }
-      ]
-    },
-    "Anchor": {
-      "description": "What a location's path is relative to.",
-      "oneOf": [
-        {
-          "description": "A root of the Agent home, or a path below it.",
-          "type": "object",
-          "properties": {
-            "root": {
-              "description": "The name of a root declared by every home of the definition.",
-              "type": "string"
-            },
-            "path": {
-              "description": "A `/`-separated path relative to the root. Omitted when the root is the location.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "block": {
-              "type": "string",
-              "const": "home"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "block",
-            "root"
-          ]
-        },
-        {
-          "description": "A path in the Project folder itself.",
-          "type": "object",
-          "properties": {
-            "path": {
-              "description": "A `/`-separated path relative to the Project folder.",
-              "type": "string"
-            },
-            "block": {
-              "type": "string",
-              "const": "project"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "block",
-            "path"
           ]
         }
       ]

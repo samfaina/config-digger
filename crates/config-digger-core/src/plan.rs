@@ -4,7 +4,7 @@
 
 use crate::api::{
     self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Info, InfoCode, Inventory, Leftovers, Preview, ReadFailure,
+    FileChange, FileDiff, Home, Info, InfoCode, Inventory, Leftovers, Preview, ReadFailure,
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
@@ -15,7 +15,8 @@ use crate::explain::Reached;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot, SwitchStore};
-use crate::{explain, history, resolve, running, scan, select};
+use crate::{explain, history, installations, resolve, running, scan, select};
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -35,6 +36,9 @@ pub(crate) struct Planned {
     /// The Read failures before the Operation: Verify fails it when a
     /// written file no longer parses for a reader that could read it.
     pub read_failures: Vec<ReadFailure>,
+    /// The Agent homes an Installation found reads, by Agent index and
+    /// id: an Agent can run only for them.
+    pub installed: BTreeSet<(usize, String)>,
 }
 
 /// The edits to one file.
@@ -414,8 +418,10 @@ impl Targeted<'_> {
             effective,
             &files,
             &self.before.read_failures,
+            &self.before.homes,
         )?;
-        let running = running::check(self.definitions, self.ports, &files);
+        let installed = installations::installed_homes(self.definitions, self.snapshot);
+        let running = running::check(self.definitions, self.ports, &installed, &files);
         let mut warnings = warnings(&files, running.warning);
         warnings.extend(wide);
         Ok(Planned {
@@ -428,6 +434,7 @@ impl Targeted<'_> {
             files,
             preview,
             read_failures: self.before.read_failures.clone(),
+            installed,
         })
     }
 }
@@ -512,8 +519,10 @@ pub(crate) fn plan_undo(
         effective,
         &files,
         &before.read_failures,
+        &before.homes,
     )?;
-    let running = running::check(definitions, ports, &files);
+    let installed = installations::installed_homes(definitions, &snapshot);
+    let running = running::check(definitions, ports, &installed, &files);
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
@@ -524,6 +533,7 @@ pub(crate) fn plan_undo(
         files,
         preview,
         read_failures: before.read_failures,
+        installed,
     })
 }
 
@@ -572,6 +582,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         warnings,
         blocks: Vec::new(),
         read_failures: Vec::new(),
+        installed: BTreeSet::new(),
     })
 }
 
@@ -870,10 +881,12 @@ fn preview(
     effective: Vec<EffectiveChange>,
     files: &[PlannedFile],
     read_failures: &[ReadFailure],
+    homes: &[Home],
 ) -> Result<Preview, Error> {
     let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
     refuse_read_failure_targets(read_failures, &changes, files)?;
-    let info = read_failure_info(read_failures, &changes, files);
+    let mut info = read_failure_info(read_failures, &changes, files);
+    info.extend(version_info(definitions, homes, &changes, files));
     Ok(Preview {
         action,
         title,
@@ -973,6 +986,56 @@ fn read_failure_info(
                 code: InfoCode::ReadFailure,
                 path: failure.path.clone(),
                 sentence: explain::outcome_may_differ(&failure.agent_name, &failure.path),
+            });
+        }
+    }
+    info
+}
+
+/// What the preview of a plan that writes `files` and changes the States
+/// `changes` says about the versions of the Agents it touches, with nothing
+/// to acknowledge: each note of each Agent home among `homes` whose States
+/// it changes, or that reads or keeps switches in a file it writes, once.
+fn version_info(
+    definitions: &[AgentDefinition],
+    homes: &[Home],
+    changes: &[Change],
+    files: &[PlannedFile],
+) -> Vec<Info> {
+    let readers = files.iter().flat_map(|file| {
+        let locations = file
+            .readers
+            .iter()
+            .map(|reader| (reader.agent_index, &reader.home));
+        let switches = file
+            .switches
+            .iter()
+            .map(|store| (store.agent_index, &store.home));
+        locations
+            .chain(switches)
+            .map(|(agent_index, home)| (definitions[agent_index].agent.id.as_str(), home.as_str()))
+    });
+    let touched: Vec<(&str, &str)> = changes
+        .iter()
+        .map(|change| (change.agent.as_str(), change.home.as_str()))
+        .chain(readers)
+        .collect();
+    let mut info: Vec<Info> = Vec::new();
+    for home in homes {
+        if !touched.contains(&(home.agent.as_str(), home.home.as_str())) {
+            continue;
+        }
+        for note in &home.notes {
+            if info.iter().any(|known| known.sentence == note.sentence) {
+                continue;
+            }
+            info.push(Info {
+                code: note.code.into(),
+                path: note
+                    .installation
+                    .clone()
+                    .unwrap_or_else(|| home.folder.clone()),
+                sentence: note.sentence.clone(),
             });
         }
     }

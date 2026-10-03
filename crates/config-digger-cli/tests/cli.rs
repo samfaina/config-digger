@@ -1,6 +1,7 @@
 //! Black-box tests: the real `config-digger` binary with the real ports,
 //! against a temporary home selected through environment overrides.
 
+use config_digger_core::ports::fake::executable;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -43,6 +44,15 @@ impl Harness {
 
     fn path(&self, relative: &str) -> PathBuf {
         self.home.join(relative)
+    }
+
+    /// The native Installation of Claude Code, at the version its definition
+    /// was tested with.
+    fn with_native_claude_code(self) -> Self {
+        let native = self.path(".local/bin/claude.exe");
+        std::fs::create_dir_all(native.parent().unwrap()).unwrap();
+        std::fs::write(native, executable(Some([2, 1, 286, 0]))).unwrap();
+        self
     }
 
     /// A file in the folder the binary runs in, which is its default Project.
@@ -434,7 +444,15 @@ fn list_json_prints_one_document_with_schema_version() {
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
-            "scopes": ["local", "project", "user"]
+            "scopes": ["local", "project", "user"],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "notes": [{
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            }]
         }])
     );
     let items: Vec<(&str, &str, &str)> = document["items"]
@@ -1663,6 +1681,7 @@ fn claude_code_running() -> Harness {
             &json!({ "mcpServers": { "notes": { "command": "n" } } }).to_string(),
         )
         .with_file(&session, "{}")
+        .with_native_claude_code()
 }
 
 #[test]
@@ -2171,6 +2190,80 @@ fn agents_lists_the_loaded_definitions_and_the_homes_found() {
     assert!(
         text.stdout
             .starts_with("Claude Code (claude-code), built-in definition\n"),
+        "{}",
+        text.stdout
+    );
+}
+
+#[test]
+fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
+    let harness = Harness::new().with_file(
+        ".claude.json",
+        r#"{ "lastReleaseNotesSeen": "2.1.284", "mcpServers": {} }"#,
+    );
+    let native = harness.path(r".local\bin\claude.exe");
+    std::fs::create_dir_all(native.parent().unwrap()).unwrap();
+    std::fs::write(&native, executable(Some([2, 1, 290, 0]))).unwrap();
+
+    let json = harness.run(&["agents", "--json"]);
+    let text = harness.run(&["agents", "--wide"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let agent = &json.document()["agents"][0];
+    assert_eq!(
+        agent["tested"],
+        json!({ "min": "2.1.286", "max": "2.1.286" })
+    );
+    let home = &agent["homes"][0];
+    assert_eq!(home["installations"][0]["version"], "2.1.290");
+    assert_eq!(home["installations"][0]["out_of_range"], true);
+    assert_eq!(home["last_ran"], "2.1.284");
+    assert_eq!(home["notes"][0]["code"], "version_outside_tested_range");
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    let lines: Vec<&str> = text.stdout.lines().collect();
+    let header: Vec<&str> = lines[1].split_whitespace().collect();
+    assert_eq!(header, ["HOME", "SOURCE", "INSTALLED", "TESTED", "FOLDER"]);
+    let row: Vec<&str> = lines[2].split_whitespace().collect();
+    assert_eq!(
+        row[..5],
+        ["default", "definition", "default", "2.1.290!", "2.1.286"]
+    );
+    assert!(
+        text.stdout.contains("Last ran with 2.1.284."),
+        "{}",
+        text.stdout
+    );
+    assert!(
+        text.stdout.contains(
+            "Claude Code 2.1.290 is newer than the versions this definition was tested with (2.1.286)."
+        ),
+        "{}",
+        text.stdout
+    );
+}
+
+#[test]
+fn agents_says_when_no_installation_is_found_and_still_exits_0() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let text = harness.run(&["agents", "--wide"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    let row: Vec<&str> = text
+        .stdout
+        .lines()
+        .nth(2)
+        .unwrap()
+        .split_whitespace()
+        .collect();
+    assert_eq!(
+        row[..5],
+        ["default", "definition", "default", "none", "2.1.286"]
+    );
+    assert!(
+        text.stdout
+            .contains("No installation of Claude Code that reads this Agent home was found"),
         "{}",
         text.stdout
     );

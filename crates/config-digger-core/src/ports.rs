@@ -16,6 +16,17 @@ pub trait FileSystem: Send + Sync {
     /// The bytes of a file. A missing file is an error of kind `NotFound`.
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
 
+    /// Up to `length` bytes of a file from `offset` on, fewer at its end,
+    /// for a large file read in parts, such as an executable's headers.
+    fn read_at(&self, path: &Path, offset: u64, length: usize) -> io::Result<Vec<u8>> {
+        let bytes = self.read(path)?;
+        let start = usize::try_from(offset)
+            .unwrap_or(usize::MAX)
+            .min(bytes.len());
+        let end = start.saturating_add(length).min(bytes.len());
+        Ok(bytes[start..end].to_vec())
+    }
+
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
 
