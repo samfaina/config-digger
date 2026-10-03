@@ -119,7 +119,7 @@ fn a_url_keeps_its_scheme_host_and_path_and_masks_userinfo_and_query_values() {
 }
 
 #[test]
-fn a_url_without_credentials_or_query_is_not_masked() {
+fn a_url_without_userinfo_or_query_is_not_masked() {
     let entry = entry(
         json!({ "api": { "url": "https://mcp.linear.app/mcp" } }),
         "api",
@@ -313,7 +313,7 @@ fn remove_both_linear(fs: &FakeFileSystem) -> Error {
 }
 
 #[test]
-fn a_rollback_diff_shows_a_rotated_token_as_a_secret_value_change() {
+fn a_rollback_diff_shows_a_rotated_secret_as_a_secret_value_change() {
     // `.mcp.json` is written, then rewritten with the edit and a rotated
     // token; `~/.claude.json` fails, and `.mcp.json` cannot be restored.
     let rewritten = PROJECT_SERVERS
@@ -402,7 +402,7 @@ fn a_side_that_does_not_parse_gets_no_diff_but_says_why_and_how_many_lines_diffe
 // A refused Undo's diff.
 
 #[test]
-fn a_refused_undo_diff_masks_the_rotated_token() {
+fn a_refused_undo_diff_masks_the_rotated_secret() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_SERVERS);
     let core = core(&fs);
     let removed = core.execute(plan_remove(&fs, "github"), &[]).unwrap();
@@ -431,4 +431,77 @@ fn a_refused_undo_diff_masks_the_rotated_token() {
         "{text}"
     );
     assert!(!serde_json::to_string(&error).unwrap().contains(SECRET));
+}
+
+#[test]
+fn env_args_keep_the_variable_name_and_mask_its_value() {
+    let entry = entry(
+        json!({ "docker": {
+            "command": "docker",
+            "args": [
+                "run", "-i", "--rm",
+                "-e", format!("GITHUB_TOKEN={SECRET}"),
+                "-e", "GITHUB_HOST",
+                format!("--env=API_KEY={SECRET}"),
+                "ghcr.io/github/github-mcp-server"
+            ]
+        }}),
+        "docker",
+    );
+
+    assert_eq!(
+        entry.config["args"],
+        json!([
+            "run",
+            "-i",
+            "--rm",
+            "-e",
+            "GITHUB_TOKEN=••••",
+            "-e",
+            "GITHUB_HOST",
+            "--env=API_KEY=••••",
+            "ghcr.io/github/github-mcp-server"
+        ])
+    );
+    assert_eq!(entry.masked, key_paths(&[&["args", "4"], &["args", "7"]]));
+}
+
+#[test]
+fn a_url_fragment_with_parameters_is_masked_like_a_query() {
+    let entry = entry(
+        json!({ "api": { "url": format!("https://mcp.example.com/cb#access_token={SECRET}&type=bearer") } }),
+        "api",
+    );
+
+    assert_eq!(
+        entry.config["url"],
+        json!("https://mcp.example.com/cb#access_token=••••&type=••••")
+    );
+}
+
+#[test]
+fn a_preview_diff_masks_secrets_the_definition_marks_outside_any_entry() {
+    let text = r#"{
+  "mcpServers": {
+    "linear": {
+      "url": "https://mcp.linear.app/mcp"
+    }
+  },
+  "primaryApiKey": "sk-ant-not-a-real-secret",
+  "customApiKeyResponses": {
+    "approved": ["not-a-real-secret"]
+  }
+}
+"#;
+    let fs = FakeFileSystem::new().with_file(claude_json(), text);
+
+    let plan = plan_remove(&fs, "linear");
+
+    let diff = plan.preview().files[0].diff.clone().unwrap();
+    assert!(!diff.contains(SECRET), "{diff}");
+    assert!(
+        diff.contains(r#"   "primaryApiKey": "sk-ant-••••","#),
+        "{diff}"
+    );
+    assert!(diff.contains(r#"     "approved": ["••••"]"#), "{diff}");
 }

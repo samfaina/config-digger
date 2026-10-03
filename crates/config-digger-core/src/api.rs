@@ -381,8 +381,12 @@ pub struct FileDiff {
 pub enum DiffUnavailable {
     /// One side does not parse in the dialect of an Agent that reads the file.
     Parse,
+    /// One side is not UTF-8 text.
+    Decode,
+    /// One side cannot be read, such as a backup copy that is gone.
+    Io,
     /// No Agent reads the file any more, so nothing says where its Secrets are.
-    Unread,
+    NoReader,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -949,14 +953,19 @@ impl Error {
 
     pub(crate) fn undo_refused(message: String, backup: PathBuf, diffs: Vec<FileDiff>) -> Self {
         Self {
-            message: format!(
-                "{message}, so the Undo is refused; the files as they were before the Operation are in {}",
-                backup.display()
-            ),
+            message: Self::undo_refused_message(&message, &backup),
             backup: Some(backup),
             diffs,
             ..Self::new(ErrorCode::UndoRefused, String::new())
         }
+    }
+
+    /// Why an Undo is refused, as [`Error::undo_refused`] says it.
+    pub(crate) fn undo_refused_message(message: &str, backup: &Path) -> String {
+        format!(
+            "{message}, so the Undo is refused; the files as they were before the Operation are in {}",
+            backup.display()
+        )
     }
 
     /// The Operation `operation` failed with `cause`, and its Rollback left

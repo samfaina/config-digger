@@ -148,6 +148,29 @@ pub(crate) struct SecretFields {
     /// `bearer_token_env_var`: never a Secret, whatever else says so.
     #[serde(default)]
     pub variable_names: Vec<Vec<String>>,
+    /// Key paths from the root of the file, outside any Entry, whose values
+    /// are Secrets, such as an API key stored next to the Entries. They are
+    /// masked wherever the file's text is shown, as in a diff's context lines.
+    #[serde(default)]
+    pub file_fields: Vec<Vec<String>>,
+}
+
+impl Validate for SecretFields {
+    fn validate(&self) -> Result<(), String> {
+        for field in self
+            .fields
+            .iter()
+            .chain(&self.variable_names)
+            .chain(&self.file_fields)
+        {
+            if field.is_empty() || field.iter().any(String::is_empty) {
+                return Err(format!(
+                    "secret field {field:?} needs keys, none of them empty"
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl LocationDefinition {
@@ -238,18 +261,7 @@ impl AgentDefinition {
             if let Some(interpolation) = &location.interpolation {
                 interpolation.validate().map_err(context)?;
             }
-            for field in location
-                .secrets
-                .fields
-                .iter()
-                .chain(&location.secrets.variable_names)
-            {
-                if field.is_empty() || field.iter().any(String::is_empty) {
-                    return Err(context(format!(
-                        "secret field {field:?} needs keys, none of them empty"
-                    )));
-                }
-            }
+            location.secrets.validate().map_err(context)?;
             self.validate_home_root(&location.anchor).map_err(context)?;
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
@@ -463,6 +475,37 @@ provenance = "file"
         let text = with_projects(STATE, STATE, r#"["{project}", "{project}"]"#);
         assert!(
             error(&text).contains("`{project}` twice"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_declares_its_interpolation_and_secret_fields() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\ninterpolation = { block = \"braces\", namespaces = [\"env\"], default_separator = \":-\" }\nsecrets.fields = [[\"auth\", \"*\"]]\nsecrets.variable_names = [[\"token_env_var\"]]\n",
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_empty_secret_field_key_is_rejected() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\nsecrets.fields = [[\"auth\", \"\"]]\n",
+        );
+        assert!(error(&text).contains("secret field"), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_interpolation_namespace_must_be_a_name() {
+        let text = VALID.replace(
+            "provenance = \"file\"\n",
+            "provenance = \"file\"\ninterpolation = { block = \"braces\", namespaces = [\"e:nv\"] }\n",
+        );
+        assert!(
+            error(&text).contains("namespace `e:nv`"),
             "{}",
             error(&text)
         );

@@ -7,7 +7,7 @@
 
 use crate::api::{Error, SkillContent, SkillFile, SkillFileChange, SkillFileChangeKind};
 use crate::ports::FileSystem;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::Path;
 
@@ -78,7 +78,12 @@ fn files_or_none(fs: &dyn FileSystem, folder: &Path) -> Result<BTreeMap<String, 
 fn files(fs: &dyn FileSystem, folder: &Path) -> Result<BTreeMap<String, Vec<u8>>, Error> {
     let mut files = BTreeMap::new();
     let mut folders = vec![(folder.to_path_buf(), String::new())];
+    // A link back to a folder already read would never end.
+    let mut seen = BTreeSet::new();
     while let Some((path, relative)) = folders.pop() {
+        if !seen.insert(fs.real_path(&path).unwrap_or_else(|| path.clone())) {
+            continue;
+        }
         let children = fs
             .read_dir(&path)
             .map_err(|error| cannot_read(&path, &error))?;

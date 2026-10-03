@@ -3,8 +3,9 @@
 //! predicts the States after them, and lists what must be acknowledged.
 
 use crate::api::{
-    self, Action, Change, Context, EditSummary, EffectiveChange, Error, FileChange, FileDiff,
-    Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning, WarningClass,
+    self, Action, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
+    FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, StateAfter, Targets,
+    Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -450,7 +451,7 @@ pub(crate) struct Refused<'m> {
 impl Refused<'_> {
     /// What changed, as a sentence.
     fn message(&self) -> String {
-        Error::undo_refused(self.what(), self.folder.clone(), Vec::new()).message
+        Error::undo_refused_message(&self.what(), &self.folder)
     }
 
     fn what(&self) -> String {
@@ -512,11 +513,12 @@ fn unreadable_backup(path: &Path, backup: &Path, error: &io::Error) -> FileDiff 
     FileDiff {
         path: path.to_path_buf(),
         diff: None,
-        diff_unavailable: None,
+        diff_unavailable: Some(DiffUnavailable::Io),
         diff_note: Some(format!(
-            "Can't read the backup {}: {error}.",
+            "Can't show a diff: the backup {} cannot be read: {error}.",
             backup.display()
         )),
+        // Nothing says how many lines differ without the backup.
         changed_lines: 0,
     }
 }

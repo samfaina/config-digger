@@ -315,7 +315,7 @@ pub enum EditError {
         key_path: Vec<String>,
         expected: &'static str,
     },
-    #[error("the list `{}` holds no {value}", .key_path.join("."))]
+    #[error("the list `{}` does not hold the item to remove", .key_path.join("."))]
     ItemNotFound { key_path: Vec<String>, value: Value },
     #[error("the file's syntax cannot hold the value of `{}`", .key_path.join("."))]
     Unrepresentable { key_path: Vec<String> },

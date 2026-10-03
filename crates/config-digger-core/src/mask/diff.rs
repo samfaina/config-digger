@@ -54,7 +54,7 @@ pub(crate) fn diff(
     };
     if locations.is_empty() {
         return unavailable(
-            DiffUnavailable::Unread,
+            DiffUnavailable::NoReader,
             format!(
                 "Can't show a masked diff: no Agent reads `{}` any more.",
                 path.display()
@@ -65,11 +65,11 @@ pub(crate) fn diff(
     let new_real: Vec<&str> = text_diff.iter_new_slices().collect();
     let masked = |side: &Side, real: &[&str]| {
         masked_lines(&locations, side.bytes, real)
-            .map_err(|failure| failure.note(path, side.name, changed_lines))
+            .map_err(|failure| (failure.kind(), failure.note(path, side.name, changed_lines)))
     };
     let (old_lines, new_lines) = match (masked(&before, &old_real), masked(&after, &new_real)) {
         (Ok(old_lines), Ok(new_lines)) => (old_lines, new_lines),
-        (Err(note), _) | (_, Err(note)) => return unavailable(DiffUnavailable::Parse, note),
+        (Err((kind, note)), _) | (_, Err((kind, note))) => return unavailable(kind, note),
     };
     let label = path.display().to_string();
     let lines = Lines {
@@ -101,28 +101,50 @@ fn changed_lines(ops: &[DiffOp]) -> u32 {
 }
 
 /// Why a side's Secrets could not be found.
-struct Unparsed {
-    dialect: &'static str,
-    position: Option<(usize, usize)>,
+enum Unparsed {
+    /// It is not UTF-8 text.
+    Decode,
+    /// It does not parse in a reader's dialect.
+    Parse {
+        dialect: &'static str,
+        position: Option<(usize, usize)>,
+    },
 }
 
 impl Unparsed {
+    fn kind(&self) -> DiffUnavailable {
+        match self {
+            Unparsed::Decode => DiffUnavailable::Decode,
+            Unparsed::Parse { .. } => DiffUnavailable::Parse,
+        }
+    }
+
     /// The core's own sentence for it, with the kind and `line:col` only:
     /// a parser's message can quote the text, Secrets included.
     fn note(&self, path: &Path, side: &str, changed_lines: u32) -> String {
-        let at = match self.position {
-            Some((line, column)) => format!(" (parse error at {line}:{column})"),
-            None => String::new(),
-        };
-        let lines = match changed_lines {
-            1 => "1 line differs".to_owned(),
-            n => format!("{n} lines differ"),
+        let why = match self {
+            Unparsed::Decode => "isn't UTF-8 text".to_owned(),
+            Unparsed::Parse { dialect, position } => {
+                let at = match position {
+                    Some((line, column)) => format!(" (parse error at {line}:{column})"),
+                    None => String::new(),
+                };
+                format!("doesn't parse as {dialect}{at}")
+            }
         };
         format!(
-            "Can't show a masked diff: `{}` {side} doesn't parse as {}{at}; {lines}.",
+            "Can't show a masked diff: `{}` {side} {why}; {}.",
             path.display(),
-            self.dialect
+            lines_differ(changed_lines)
         )
+    }
+}
+
+/// How many lines differ, as a sentence says it.
+fn lines_differ(changed_lines: u32) -> String {
+    match changed_lines {
+        1 => "1 line differs".to_owned(),
+        n => format!("{n} lines differ"),
     }
 }
 
@@ -136,11 +158,7 @@ fn masked_lines(
     let Some(bytes) = bytes else {
         return Ok(Vec::new());
     };
-    let dialect = locations[0].format.dialect();
-    let text = std::str::from_utf8(bytes).map_err(|_| Unparsed {
-        dialect,
-        position: None,
-    })?;
+    let text = std::str::from_utf8(bytes).map_err(|_| Unparsed::Decode)?;
     let mut replacements: Vec<(Range<usize>, String)> = Vec::new();
     for location in locations {
         replacements.extend(secret_spans(location, text)?);
@@ -156,7 +174,7 @@ fn secret_spans(
     location: &LocationDefinition,
     text: &str,
 ) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
-    let unparsed = |position| Unparsed {
+    let unparsed = |position| Unparsed::Parse {
         dialect: location.format.dialect(),
         position,
     };
@@ -167,7 +185,8 @@ fn secret_spans(
     let syntax = location.format.syntax();
     let mut objects = Vec::new();
     scan::find_objects(&document, &location.root, Vec::new(), None, &mut objects);
-    let mut spans = Vec::new();
+    // Each Secret's key path from the root of the file, with its mask.
+    let mut secrets = super::file_fields(location, &document);
     for object in objects {
         for (name, value) in object.entries {
             let masked = super::entry(location, value);
@@ -176,14 +195,18 @@ fn secret_spans(
                 key_path.push(name.clone());
                 key_path.extend(relative.iter().cloned());
                 let secret = lookup(&masked.value, relative)
-                    .and_then(Value::as_str)
-                    .expect("a masked value is a string");
-                // The format parsed the text, so its syntax finds every key.
-                let span =
-                    edit::value_span(syntax, text, &key_path).ok_or_else(|| unparsed(None))?;
-                spans.push((span, edit::string_literal(syntax, secret)));
+                    .cloned()
+                    .expect("a masked key path is in the value");
+                secrets.push((key_path, secret));
             }
         }
+    }
+    let mut spans = Vec::new();
+    for (key_path, secret) in secrets {
+        let secret = secret.as_str().expect("a masked value is a string");
+        // The format parsed the text, so its syntax finds every key.
+        let span = edit::value_span(syntax, text, &key_path).ok_or_else(|| unparsed(None))?;
+        spans.push((span, edit::string_literal(syntax, secret)));
     }
     Ok(spans)
 }

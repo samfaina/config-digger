@@ -66,6 +66,10 @@ scope = "user"
 provenance = "file"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
+# Keys of `~/.claude.json` outside any Entry that hold a Secret: an API key
+# Claude Code stores when signed in with one, and the key suffixes it
+# records as approved or rejected.
+secrets.file_fields = [["primaryApiKey"], ["customApiKeyResponses", "*", "*"]]
 
 # Same-named Entries compete whole; the highest location wins.
 [items.mcp]

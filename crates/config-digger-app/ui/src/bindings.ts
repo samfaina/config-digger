@@ -14,8 +14,12 @@ export const commands = {
 export type DiffUnavailable = 
 /**  One side does not parse in the dialect of an Agent that reads the file. */
 "parse" | 
+/**  One side is not UTF-8 text. */
+"decode" | 
+/**  One side cannot be read, such as a backup copy that is gone. */
+"io" | 
 /**  No Agent reads the file any more, so nothing says where its Secrets are. */
-"unread";
+"no_reader";
 
 export type Entry = {
 	path: string,

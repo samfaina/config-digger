@@ -91,6 +91,74 @@ pub(crate) fn entry(location: &LocationDefinition, value: &Value) -> Masked {
     masked
 }
 
+/// The Secrets a location's definition marks outside its Entries in a file
+/// whose whole value is `document`: each one's key path from the root of the
+/// file and its masked value.
+pub(crate) fn file_fields(
+    location: &LocationDefinition,
+    document: &Value,
+) -> Vec<(Vec<String>, Value)> {
+    let rules = Rules { location };
+    let mut found = Vec::new();
+    for field in &location.secrets.file_fields {
+        collect(document, field, &mut Vec::new(), &mut found);
+    }
+    let mut secrets = Vec::new();
+    for (mut path, value) in found {
+        let mut value = value.clone();
+        let mut masked = Vec::new();
+        rules.mask_leaves(&mut value, &mut Vec::new(), &mut masked);
+        for relative in masked {
+            let secret = relative
+                .iter()
+                .try_fold(&value, |value, key| match value {
+                    Value::Object(object) => object.get(key),
+                    Value::Array(array) => array.get(key.parse::<usize>().ok()?),
+                    _ => None,
+                })
+                .cloned()
+                .expect("a masked key path is in the value");
+            let depth = path.len();
+            path.extend(relative);
+            secrets.push((path.clone(), secret));
+            path.truncate(depth);
+        }
+    }
+    secrets
+}
+
+/// The values at a field's key path, where `*` is any key or index.
+fn collect<'v>(
+    value: &'v Value,
+    field: &[String],
+    path: &mut Vec<String>,
+    found: &mut Vec<(Vec<String>, &'v Value)>,
+) {
+    let Some((key, rest)) = field.split_first() else {
+        found.push((path.clone(), value));
+        return;
+    };
+    let children: Vec<(String, &Value)> = match value {
+        Value::Object(object) => object
+            .iter()
+            .filter(|(name, _)| key == "*" || *name == key)
+            .map(|(name, child)| (name.clone(), child))
+            .collect(),
+        Value::Array(array) => array
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| key == "*" || index.to_string() == *key)
+            .map(|(index, child)| (index.to_string(), child))
+            .collect(),
+        _ => return,
+    };
+    for (name, child) in children {
+        path.push(name);
+        collect(child, rest, path, found);
+        path.pop();
+    }
+}
+
 /// Where Secrets are in the Entries of one location.
 struct Rules<'d> {
     location: &'d LocationDefinition,
@@ -135,6 +203,21 @@ impl Rules<'_> {
             return;
         }
         self.children(value, path, masked, Self::mask_all);
+    }
+
+    /// Masks every value at or below `value`, a field outside any Entry.
+    fn mask_leaves(
+        &self,
+        value: &mut Value,
+        path: &mut Vec<String>,
+        masked: &mut Vec<Vec<String>>,
+    ) {
+        if let Some(secret) = self.secret(value) {
+            *value = secret;
+            masked.push(path.clone());
+            return;
+        }
+        self.children(value, path, masked, Self::mask_leaves);
     }
 
     /// Runs `visit` on each value of an object or array.
@@ -236,8 +319,9 @@ impl Rules<'_> {
         Some(out)
     }
 
-    /// A URL with its userinfo and the value of each query parameter
-    /// masked, or `None` when it has neither, or is not a URL.
+    /// A URL with its userinfo and the value of each parameter of its query
+    /// and of a fragment made of parameters masked, or `None` when it has
+    /// none of those, or is not a URL.
     fn url(&self, text: &str) -> Option<String> {
         let authority_start = text.find("://")? + "://".len();
         let (rest, fragment) = match text.find('#') {
@@ -267,29 +351,47 @@ impl Rules<'_> {
         }
         out.push_str(&rest[authority_end..]);
         if let Some(query) = query.strip_prefix('?') {
-            let parameters: Vec<String> = query
-                .split('&')
-                .map(|parameter| match parameter.split_once('=') {
-                    Some((name, value)) => match self.text(value) {
-                        Some(value) => {
-                            masked = true;
-                            format!("{name}={value}")
-                        }
-                        None => parameter.to_owned(),
-                    },
-                    None => parameter.to_owned(),
-                })
-                .collect();
             out.push('?');
-            out.push_str(&parameters.join("&"));
+            out.push_str(&self.parameters(query, &mut masked));
         }
-        out.push_str(fragment);
+        match fragment.strip_prefix('#') {
+            // Such as `#access_token=…` after an OAuth redirect.
+            Some(fragment) if fragment.contains('=') => {
+                out.push('#');
+                out.push_str(&self.parameters(fragment, &mut masked));
+            }
+            _ => out.push_str(fragment),
+        }
         masked.then_some(out)
     }
 
+    /// `name=value` parameters joined by `&`, with each value masked.
+    fn parameters(&self, text: &str, masked: &mut bool) -> String {
+        let parameters: Vec<String> = text
+            .split('&')
+            .map(|parameter| match parameter.split_once('=') {
+                Some((name, value)) => match self.text(value) {
+                    Some(value) => {
+                        *masked = true;
+                        format!("{name}={value}")
+                    }
+                    None => parameter.to_owned(),
+                },
+                None => parameter.to_owned(),
+            })
+            .collect();
+        parameters.join("&")
+    }
+
     /// The value of a token-like flag masked. A header flag's value keeps
-    /// the header's name.
+    /// the header's name, and an environment flag's `NAME=value` keeps the
+    /// variable's name; a bare `NAME` passes a variable through and is not
+    /// a Secret.
     fn flag_value(&self, flag: &str, value: &str) -> Option<String> {
+        if is_env_flag(flag) {
+            let (name, value) = value.split_once('=')?;
+            return self.text(value).map(|secret| format!("{name}={secret}"));
+        }
         let header = flag == "-H" || flag.to_ascii_lowercase().contains("header");
         match value.split_once(':') {
             Some((name, value)) if header && !name.contains(char::is_whitespace) => {
@@ -328,10 +430,16 @@ fn matches(field: &[String], path: &[String]) -> bool {
             .all(|(pattern, key)| pattern == "*" || pattern == key)
 }
 
+/// Whether an arg sets an environment variable as `NAME=value`, as
+/// `docker run -e` does.
+fn is_env_flag(arg: &str) -> bool {
+    arg == "-e" || arg == "--env"
+}
+
 /// Whether an arg is a flag whose value is likely a Secret, such as
 /// `--api-key`, `--token` or `--header`.
 fn is_token_like(arg: &str) -> bool {
-    if arg == "-H" {
+    if arg == "-H" || is_env_flag(arg) {
         return true;
     }
     let Some(name) = arg.strip_prefix("--").or_else(|| arg.strip_prefix('-')) else {

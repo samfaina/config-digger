@@ -1014,13 +1014,9 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
                 out.push_str(&line.fit(width).render());
             }
         }
-        // The configuration as the core masked it, wrapped rather than cut.
-        for text in terminal::wrap(&entry.config.to_string(), reason_width) {
-            let mut line = Line::default();
-            line.push(reason_indent.as_str(), Style::new())
-                .push(text, DIM);
-            out.push_str(&line.fit(width).render());
-        }
+        // The configuration as the core masked it. Like a diff line, it is
+        // never cut: compact JSON has no spaces to wrap at.
+        out.push_str(&format!("{reason_indent}{DIM}{}{DIM:#}\n", entry.config));
     }
     out
 }
@@ -1161,11 +1157,12 @@ fn render_outcome(action: Action, outcome: &api::Outcome, width: Option<usize>) 
 
 /// A file's masked diff, or the core's note on why it cannot be shown.
 fn render_file_diff(diff: Option<&str>, note: Option<&str>, width: Option<usize>) -> String {
+    let note_width = width.map(|width| width.saturating_sub(INDENT.len()));
     match (diff, note) {
         (Some(diff), _) => render_diff(diff),
-        (None, Some(note)) => terminal::wrap(&format!("{INDENT}{note}"), width)
+        (None, Some(note)) => terminal::wrap(note, note_width)
             .iter()
-            .map(|line| plain_line(line, width))
+            .map(|line| plain_line(&format!("{INDENT}{line}"), width))
             .collect(),
         (None, None) => String::new(),
     }

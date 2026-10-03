@@ -378,6 +378,17 @@
             }
           },
           "default": []
+        },
+        "file_fields": {
+          "description": "Key paths from the root of the file, outside any Entry, whose values\nare Secrets, such as an API key stored next to the Entries. They are\nmasked wherever the file's text is shown, as in a diff's context lines.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
         }
       },
       "additionalProperties": false
