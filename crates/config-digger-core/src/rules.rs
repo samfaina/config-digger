@@ -7,7 +7,7 @@ use crate::api::{Reason, State};
 use crate::definitions::blocks::{
     AllowDenyList, Anchored, Gate, GlobalSwitch, ListKind, MatchedBy, Rule, ServerIdentity,
 };
-use crate::definitions::{AgentDefinition, Check, LocationDefinition};
+use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::scan::{ScannedEntry, ScannedSetting, SettingOwner, Snapshot};
 use crate::{explain, locator, mask};
 use serde_json::{Value, json};
@@ -15,8 +15,6 @@ use std::path::{Path, PathBuf};
 
 /// A rule that keeps an Entry out in a context.
 pub(crate) struct RuleHit {
-    /// `policy` for a rule in managed policy, `rules` otherwise.
-    pub check: Check,
     /// Blocked by policy, or Disabled.
     pub state: State,
     pub reason: Reason,
@@ -39,10 +37,10 @@ pub(crate) fn hits(
         if !rule.covers(&location.id) {
             continue;
         }
-        // The values of each source of the rule, in its order.
+        // The values of each setting of the rule, in its order: its
+        // sources, then any setting that changes how it reads them.
         let values: Vec<(bool, &ScannedSetting)> = rule
-            .sources()
-            .iter()
+            .settings()
             .enumerate()
             .flat_map(|(source, setting)| {
                 let owner = SettingOwner::Rule {
@@ -54,16 +52,33 @@ pub(crate) fn hits(
                     .map(move |value| (setting.policy, value))
             })
             .collect();
+        let sources = rule.sources().len();
+        let (values, changes) = values.split_at(
+            values
+                .iter()
+                .position(|(_, value)| source_of(value) >= sources)
+                .unwrap_or(values.len()),
+        );
         match rule {
             Rule::AllowDenyList(block) => match block.list {
                 ListKind::Deny => {
-                    hits.extend(deny(block, location, entry, &values, agent_name));
+                    hits.extend(deny(block, location, entry, values, agent_name));
                 }
                 ListKind::Allow => {
+                    // Only the policy lists count while a policy-only
+                    // setting holds `true`.
+                    let policy_only = changes
+                        .iter()
+                        .any(|(_, value)| value.value == Some(Value::Bool(true)));
+                    let values: Vec<(bool, &ScannedSetting)> = values
+                        .iter()
+                        .copied()
+                        .filter(|(policy, _)| *policy || !policy_only)
+                        .collect();
                     hits.extend(allow(block, location, entry, &values, agent_name));
                 }
             },
-            Rule::GlobalSwitch(block) => hits.extend(global(block, &values, agent_name)),
+            Rule::GlobalSwitch(block) => hits.extend(global(block, values, agent_name)),
         }
     }
     hits
@@ -74,7 +89,6 @@ fn hit(policy: bool, value: &ScannedSetting, sentence: impl FnOnce(bool) -> Reas
     let mut reason = sentence(policy);
     reason.switch = Some(locator::render(&value.path, &value.key_path));
     RuleHit {
-        check: if policy { Check::Policy } else { Check::Rules },
         state: if policy {
             State::Blocked
         } else {
@@ -82,6 +96,13 @@ fn hit(policy: bool, value: &ScannedSetting, sentence: impl FnOnce(bool) -> Reas
         },
         reason,
         holds: explain::setting(key(value), &value.path),
+    }
+}
+
+/// The index of the setting `value` is read for among its rule's settings.
+fn source_of(value: &ScannedSetting) -> usize {
+    match value.owner {
+        SettingOwner::Rule { source, .. } | SettingOwner::Gate { source, .. } => source,
     }
 }
 
@@ -280,7 +301,7 @@ pub(crate) fn failed_files(
         .rules
         .iter()
         .filter(|rule| rule.covers(&location.id))
-        .flat_map(Rule::sources);
+        .flat_map(Rule::settings);
     let gate_sources = item_rules
         .gates
         .iter()

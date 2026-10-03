@@ -336,8 +336,10 @@ impl Anchored for MachineAnchor {
     }
 }
 
-/// The settings a definition's `[[settings]]` names, read from whichever of
-/// its sources applies. Only a location can read them.
+/// The settings a definition's `[[settings]]` names, in every file of each
+/// of its sources. A location reads them all, and lists the Entries of the
+/// sources the Agent skips as Unread; a rule or gate reads only the source
+/// the Agent reads. Where one file is needed, it is refused.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SettingsAnchor {
@@ -1874,6 +1876,16 @@ impl Rule {
         }
     }
 
+    /// Every setting it reads: its sources, in their order, then any
+    /// setting that changes how it reads them.
+    pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
+        let policy_only = match self {
+            Rule::AllowDenyList(block) => block.policy_only.as_ref(),
+            Rule::GlobalSwitch(_) => None,
+        };
+        self.sources().iter().chain(policy_only)
+    }
+
     /// The ids of the locations whose Entries it covers, empty for every
     /// location of the Item kind.
     pub fn locations(&self) -> &[String] {
@@ -1904,6 +1916,9 @@ pub(crate) struct AllowDenyList {
     /// The field of an item that matches each part of a server.
     #[serde(rename = "match")]
     pub matching: ItemFields,
+    /// A setting that, while it holds `true`, leaves only the allow lists
+    /// of policy sources, such as Claude Code's `allowManagedMcpServersOnly`.
+    pub policy_only: Option<SettingPlace>,
     /// When the allow list holds an item matching by command, a server
     /// with a command is allowed only by such an item, and when it holds
     /// one matching by URL, a remote server only by such an item.
@@ -1972,6 +1987,14 @@ impl Validate for AllowDenyList {
         }
         if self.strict && self.list == ListKind::Deny {
             return Err("only an allow list can be strict".into());
+        }
+        if let Some(setting) = &self.policy_only {
+            if self.list == ListKind::Deny {
+                return Err("only an allow list can be policy_only".into());
+            }
+            setting
+                .validate()
+                .map_err(|e| format!("policy_only: {e}"))?;
         }
         Ok(())
     }

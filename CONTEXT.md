@@ -85,7 +85,7 @@ Said of an Entry that supplies some fields of a server the Agent builds by combi
 _Avoid_: Partial, combined, partly Effective
 
 **Disabled**:
-Said of an Entry that the Agent skips because it was Disabled, natively or by config-digger. When the Agent's mechanism works by name, every Entry of the Item is Disabled.
+Said of an Entry that the Agent skips because it was Disabled, natively or by config-digger. When the Agent's mechanism works by name, every Entry of the Item is Disabled. A rule in a file the user writes, such as a deny list, or a setting that turns off everything it covers, Disables too; config-digger never lifts these, so Enable is not offered. The same rule in managed policy Blocks instead.
 _Avoid_: Off, inactive
 
 **Partial switch**:
@@ -123,7 +123,7 @@ Make an Entry stop taking effect for one Agent while keeping it recoverable. The
 _Avoid_: Deactivate, turn off, mute
 
 **Enable**:
-Make a Disabled Entry take effect again for one Agent — the inverse of Disable, whoever disabled it (the Agent itself or config-digger).
+Make a Disabled Entry take effect again for one Agent — the inverse of Disable, whoever disabled it (the Agent itself or config-digger). It lifts switches, never a rule.
 _Avoid_: Re-enable, restore, activate
 
 **Remove**:

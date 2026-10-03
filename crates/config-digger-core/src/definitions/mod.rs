@@ -448,9 +448,9 @@ pub(crate) struct ItemRules {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Check {
-    /// Managed policy keeps the Agent from using the Entry: Blocked, with
-    /// `policy`. Required when a gate of the kind is policy, and refused
-    /// otherwise.
+    /// A managed file takes exclusive control and leaves the Entry out:
+    /// Blocked, with `policy`. A Blocked Entry does not compete. Required
+    /// when a gate of the kind is managed-exclusive, and refused otherwise.
     Policy,
     /// A Disable mechanism's switch is set for the Entry: Disabled.
     Disable,
@@ -458,9 +458,12 @@ pub(crate) enum Check {
     /// Required when a gate of the kind is an approval list, and refused
     /// otherwise.
     Approval,
-    /// A rule outside managed policy keeps the Entry out: Disabled, with
-    /// `disabled_by_rule` or `disabled_globally`. Required when a rule of
-    /// the kind has a source that is not policy, and refused otherwise.
+    /// A rule keeps the Entry out: Blocked, with `policy`, when the rule is
+    /// managed policy, and Disabled, with `disabled_by_rule` or
+    /// `disabled_globally`, otherwise. Before `precedence`, an Entry a rule
+    /// keeps out does not compete; after it, a rule applies to the Entry
+    /// that wins, which still beats the others. Required when the kind has
+    /// rules, and refused otherwise.
     Rules,
     /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
     Precedence,
@@ -771,17 +774,15 @@ impl AgentDefinition {
                     "but no location is a folder of skill folders",
                 )
                 .map_err(context)?;
-            let sources = || rules.rules.iter().flat_map(Rule::sources);
-            let exclusive = rules
-                .gates
-                .iter()
-                .any(|gate| matches!(gate, Gate::ManagedExclusive(_)));
             rules
                 .check_when(
                     Check::Policy,
-                    exclusive || sources().any(|source| source.policy),
-                    "which a policy gate or rule needs",
-                    "but no gate or rule is policy",
+                    rules
+                        .gates
+                        .iter()
+                        .any(|gate| matches!(gate, Gate::ManagedExclusive(_))),
+                    "which a managed-exclusive gate needs",
+                    "but no gate is managed-exclusive",
                 )
                 .map_err(context)?;
             rules
@@ -798,15 +799,15 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::Rules,
-                    sources().any(|source| !source.policy),
-                    "which a rule outside policy needs",
-                    "but every rule is policy",
+                    !rules.rules.is_empty(),
+                    "which a rule needs",
+                    "but the kind has no rule",
                 )
                 .map_err(context)?;
             for (index, rule) in rules.rules.iter().enumerate() {
                 let context = |e: String| context(format!("rules[{index}]: {e}"));
                 rule.validate().map_err(context)?;
-                for source in rule.sources() {
+                for source in rule.settings() {
                     self.validate_setting(&source.anchor).map_err(context)?;
                 }
                 if let Some(id) = rule
@@ -919,14 +920,6 @@ impl ItemKind {
         match self {
             ItemKind::Mcp => "mcp",
             ItemKind::Skill => "skill",
-        }
-    }
-
-    /// Its Items, as a sentence names them.
-    pub fn items(self) -> &'static str {
-        match self {
-            ItemKind::Mcp => "servers",
-            ItemKind::Skill => "skills",
         }
     }
 }
@@ -1942,7 +1935,7 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
         }
         let text = with_policy("", POLICY_CHECKS);
         assert!(
-            error(&text).contains("checks holds `policy`, but no gate or rule is policy"),
+            error(&text).contains("checks holds `policy`, but no gate is managed-exclusive"),
             "{}",
             error(&text)
         );
@@ -1990,6 +1983,18 @@ prompt"#,
         );
         assert!(
             error(&text).contains("only an allow list can be strict"),
+            "{}",
+            error(&text)
+        );
+        let text = with_policy(
+            &RULES_AND_GATES.replace(
+                r#"list = "deny""#,
+                "list = \"deny\"\npolicy_only = { anchor = { block = \"settings\", settings = \"managed\" }, key_path = [\"only\"] }",
+            ),
+            POLICY_CHECKS,
+        );
+        assert!(
+            error(&text).contains("only an allow list can be policy_only"),
             "{}",
             error(&text)
         );

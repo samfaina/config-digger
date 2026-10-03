@@ -201,8 +201,8 @@ fn the_state_comes_from_the_first_failed_check_in_the_definitions_order() {
     let definition = String::from_utf8(BUILT_IN_CLAUDE_CODE.to_vec())
         .unwrap()
         .replace(
-            r#"checks = ["policy", "shape", "rules", "disable", "approval", "precedence"]"#,
-            r#"checks = ["policy", "shape", "rules", "approval", "precedence", "disable"]"#,
+            r#"checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]"#,
+            r#"checks = ["policy", "shape", "approval", "precedence", "disable", "rules"]"#,
         )
         .replace(r#"id = "claude-code""#, r#"id = "claude-code-reordered""#);
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);

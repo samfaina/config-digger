@@ -5,6 +5,7 @@ use crate::api::{
     Action, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
     State, Verify,
 };
+use crate::definitions::ItemKind;
 use crate::definitions::blocks::{ApprovalPrompt, FieldType, Malformed, MatchedBy, SkillDefect};
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
@@ -335,8 +336,12 @@ fn state_name(state: State) -> &'static str {
 }
 
 /// A Blocked Entry's reason: the managed file `path`, which `agent_name`
-/// reads, takes exclusive control of its `items`.
-pub(crate) fn managed_exclusive(agent_name: &str, path: &Path, items: &str) -> Reason {
+/// reads, takes exclusive control of its Items of `kind`.
+pub(crate) fn managed_exclusive(agent_name: &str, path: &Path, kind: ItemKind) -> Reason {
+    let items = match kind {
+        ItemKind::Mcp => "servers",
+        ItemKind::Skill => "skills",
+    };
     Reason {
         code: ReasonCode::Policy,
         effective: None,

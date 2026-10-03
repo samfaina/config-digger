@@ -192,10 +192,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 [items.mcp]
 precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }
-# Policy Blocks an Entry whatever else it fails. A Blocked Entry is taken
-# not to compete, as a Disabled one: whether Claude Code applies its policy
-# before or after precedence is not known.
-checks = ["policy", "shape", "rules", "disable", "approval", "precedence"]
+# An exclusive `managed-mcp.json` suppresses the other servers, and an
+# unapproved server is not loaded: neither competes. The allow and deny
+# lists apply after precedence, to the server that wins [docs].
+checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
 
 # Claude Code loads a `.mcp.json` server only once the user approves it,
 # which it asks about when it starts in the Project [docs]. Approvals are
@@ -240,13 +240,14 @@ sources = [
 # server none of its items names, merged from every settings file [docs]:
 # an empty list keeps out all of them. While it names a server by command,
 # a server with a command passes only by its command, and likewise by URL
-# [docs]. `allowManagedMcpServersOnly`, which leaves only the managed list,
-# is not read.
+# [docs]. `allowManagedMcpServersOnly: true` in the managed settings leaves
+# only the managed lists [docs].
 [[items.mcp.rules]]
 block = "allow-deny-list"
 list = "allow"
 strict = true
 match = { name = "serverName", command = "serverCommand", url = "serverUrl" }
+policy_only = { anchor = { block = "settings", settings = "managed" }, key_path = ["allowManagedMcpServersOnly"], policy = true }
 sources = [
   { anchor = { block = "settings", settings = "managed" }, key_path = ["allowedMcpServers"], policy = true },
   { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["allowedMcpServers"] },
@@ -386,7 +387,7 @@ when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 [items.skill]
 precedence = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 competition = { block = "exact-name" }
-checks = ["policy", "frontmatter", "rules", "disable", "precedence"]
+checks = ["frontmatter", "disable", "precedence", "rules"]
 
 # `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]. Settings
 # files rank managed, local, Project, user [docs]: the highest that holds it

@@ -798,3 +798,112 @@ fn the_highest_file_holding_a_global_switch_decides() {
         pair("effective", "")
     );
 }
+
+#[test]
+fn a_deny_list_applies_after_precedence() {
+    // The local `notes` wins, and is denied by its command: Claude Code
+    // loads neither, and the user `notes` stays Shadowed.
+    let fs = with(
+        project_home(json!({ "mcpServers": { "notes": { "command": "evil-notes" } } })),
+        managed_settings(json!({ "deniedMcpServers": [{ "serverCommand": ["evil-notes"] }] })),
+    );
+
+    let inventory = in_petme(&fs);
+
+    let notes = server(&inventory, "notes");
+    assert_eq!(serde_json::to_value(notes.state).unwrap(), "blocked");
+    let states: Vec<(String, String)> = notes
+        .entries
+        .iter()
+        .map(|entry| {
+            let entry = entry_json(entry);
+            (
+                entry["scope"].as_str().unwrap().to_owned(),
+                entry["state"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        states,
+        [
+            ("local".to_owned(), "blocked".to_owned()),
+            ("project".to_owned(), "blocked".to_owned()),
+            ("user".to_owned(), "shadowed".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn a_later_drop_in_overrides_a_managed_server_of_the_same_name() {
+    let fs = claude_home(&json!({}))
+        .with_file(
+            in_program_files(r"ClaudeCode\managed-settings.json"),
+            managed_server("wiki", "https://mcp.corp.example/wiki"),
+        )
+        .with_file(
+            in_program_files(r"ClaudeCode\managed-settings.d\10-wiki.json"),
+            managed_server("wiki", "https://mcp.corp.example/wiki-v2"),
+        );
+
+    let inventory = inventory(&fs);
+
+    let wiki = server(&inventory, "wiki");
+    assert_eq!(
+        states(wiki),
+        [
+            (
+                r"C:\Program Files\ClaudeCode\managed-settings.d\10-wiki.json#managedMcpServers.wiki"
+                    .to_owned(),
+                "effective".to_owned()
+            ),
+            (
+                r"C:\Program Files\ClaudeCode\managed-settings.json#managedMcpServers.wiki"
+                    .to_owned(),
+                "shadowed".to_owned()
+            ),
+        ]
+    );
+    assert_eq!(
+        entry_json(&wiki.entries[1])["reason"]["sentence"],
+        r"Shadowed by the managed Entry C:\Program Files\ClaudeCode\managed-settings.d\10-wiki.json#managedMcpServers.wiki, which Claude Code ranks higher."
+    );
+}
+
+#[test]
+fn a_later_drop_in_overrides_a_global_switch() {
+    let fs = with(
+        synced_home(),
+        managed_settings(json!({ "syncClaudeAiSkills": false })),
+    )
+    .with_file(
+        in_program_files(r"ClaudeCode\managed-settings.d\10-sync.json"),
+        json!({ "syncClaudeAiSkills": true }).to_string(),
+    );
+
+    assert_eq!(
+        state_and_code(&inventory(&fs), "pdf"),
+        pair("effective", "")
+    );
+}
+
+#[test]
+fn allow_managed_mcp_servers_only_leaves_only_the_managed_allow_list() {
+    let fs = with(
+        with(
+            servers_home(),
+            managed_settings(json!({
+                "allowedMcpServers": [{ "serverName": "linear" }],
+                "allowManagedMcpServersOnly": true,
+            })),
+        ),
+        user_settings(json!({ "allowedMcpServers": [{ "serverName": "notes" }] })),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        state_and_code(&inventory, "notes"),
+        pair("blocked", "policy")
+    );
+    assert_eq!(state_and_code(&inventory, "linear"), pair("effective", ""));
+}

@@ -121,7 +121,13 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            let rank = |entry: &ScannedEntry| definition.rank(definition.location(&entry.location));
+            // A later file of a settings source overrides an earlier one.
+            let rank = |entry: &ScannedEntry| {
+                (
+                    definition.rank(definition.location(&entry.location)),
+                    overridden(definition, snapshot, entry),
+                )
+            };
             // Entries of equal rank, such as under two spellings of one Project
             // key, are ordered by key path so that the choice is stable.
             // Unread Entries come last, so that they never name the Item.
@@ -167,11 +173,7 @@ pub(crate) fn resolve(
                         }
                     })
                     .unzip();
-            // The gates that Block each Entry, each with the check it belongs to.
-            let gated: Vec<Vec<(Check, api::Reason)>> = entries
-                .iter()
-                .map(|entry| gates(definition, snapshot, entry, project_key.map(String::as_str)))
-                .collect();
+            let checks = &definition.rules(kind).checks;
             // The rules that keep each Entry out.
             let ruled: Vec<Vec<rules::RuleHit>> = entries
                 .iter()
@@ -179,6 +181,29 @@ pub(crate) fn resolve(
                     rules::hits(definition, snapshot, entry, project_key.map(String::as_str))
                 })
                 .collect();
+            // The gates and rules that keep each Entry out, each with the
+            // check it belongs to.
+            let kept: Vec<Vec<(Check, api::State, api::Reason)>> = entries
+                .iter()
+                .zip(&ruled)
+                .map(|(entry, ruled)| {
+                    gates(definition, snapshot, entry, project_key.map(String::as_str))
+                        .into_iter()
+                        .map(|(check, reason)| (check, api::State::Blocked, reason))
+                        .chain(
+                            ruled
+                                .iter()
+                                .map(|hit| (Check::Rules, hit.state, hit.reason.clone())),
+                        )
+                        .collect()
+                })
+                .collect();
+            // A gate or rule checked before precedence takes the Entry out of
+            // the competition; one checked after applies to the Entry that wins.
+            let before_precedence = |check: Check| {
+                checks.iter().position(|known| *known == check)
+                    < checks.iter().position(|known| *known == Check::Precedence)
+            };
             // An Invalid Entry competes only where the Agent still lists it,
             // and an Unread one or a skipped skill never does.
             let competes = |index: usize| {
@@ -195,8 +220,9 @@ pub(crate) fn resolve(
             // that does not compete, so the highest of the others wins.
             let free = |index: usize| {
                 hits[index].0.is_empty()
-                    && gated[index].is_empty()
-                    && ruled[index].is_empty()
+                    && !kept[index]
+                        .iter()
+                        .any(|(check, _, _)| before_precedence(*check))
                     && competes(index)
             };
             let winner = (0..entries.len()).find(|&index| free(index));
@@ -240,33 +266,14 @@ pub(crate) fn resolve(
                         .filter(|hit| hit.state == api::State::Disabled)
                         .collect();
                     // Each check the Entry fails, in the Agent's order.
-                    let checks = &definition.rules(kind).checks;
                     let mut failed: Vec<(Check, api::State, api::Reason)> = Vec::new();
                     for &check in checks {
                         match check {
-                            Check::Policy => {
-                                failed.extend(
-                                    gated[index].iter().filter(|(gate, _)| *gate == check).map(
-                                        |(_, reason)| (check, api::State::Blocked, reason.clone()),
-                                    ),
-                                );
-                                failed.extend(
-                                    ruled[index]
-                                        .iter()
-                                        .filter(|hit| hit.check == check)
-                                        .map(|hit| (check, hit.state, hit.reason.clone())),
-                                );
-                            }
-                            Check::Approval => failed.extend(
-                                gated[index].iter().filter(|(gate, _)| *gate == check).map(
-                                    |(_, reason)| (check, api::State::Blocked, reason.clone()),
-                                ),
-                            ),
-                            Check::Rules => failed.extend(
-                                ruled[index]
+                            Check::Policy | Check::Approval | Check::Rules => failed.extend(
+                                kept[index]
                                     .iter()
-                                    .filter(|hit| hit.check == check)
-                                    .map(|hit| (check, hit.state, hit.reason.clone())),
+                                    .filter(|(known, _, _)| *known == check)
+                                    .cloned(),
                             ),
                             Check::Disable => {
                                 failed.extend(disabling.iter().map(|hit| {
@@ -317,8 +324,9 @@ pub(crate) fn resolve(
                                     api::State::Disabled => {
                                         hits[other].0.iter().all(|hit| {
                                             disabling.iter().any(|own| own.same_switch(hit))
-                                        }) && gated[other].is_empty()
-                                            && ruled[other].is_empty()
+                                        }) && !kept[other]
+                                            .iter()
+                                            .any(|(check, _, _)| before_precedence(*check))
                                             && competes(other)
                                     }
                                     _ => free(other),
@@ -779,6 +787,23 @@ fn read_failure_caveats(
     caveats
 }
 
+/// For an Entry of settings, how many files of its source are read after
+/// its own, each overriding it; 0 for any other Entry.
+fn overridden(definition: &AgentDefinition, snapshot: &Snapshot, entry: &ScannedEntry) -> usize {
+    let Some(id) = definition.location(&entry.location).anchor.settings() else {
+        return 0;
+    };
+    snapshot
+        .settings_of(entry.agent_index, id)
+        .sources
+        .iter()
+        .find_map(|files| {
+            let at = files.iter().position(|file| *file == entry.path)?;
+            Some(files.len() - 1 - at)
+        })
+        .unwrap_or(0)
+}
+
 /// For an Entry in a source of settings the Agent skips, the settings' id
 /// and the first file of the source it reads instead.
 fn skipped_source<'s>(
@@ -819,7 +844,7 @@ fn gates(
                     .anchor
                     .path(roots, None)
                     .filter(|path| snapshot.exclusive.contains(path))?;
-                let reason = explain::managed_exclusive(agent_name, &path, location.kind.items());
+                let reason = explain::managed_exclusive(agent_name, &path, location.kind);
                 Some((Check::Policy, reason))
             }
             Gate::ApprovalList(block) => {

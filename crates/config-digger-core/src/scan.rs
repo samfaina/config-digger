@@ -130,11 +130,20 @@ impl ScannedSettings {
 impl Snapshot {
     /// The `[[settings]]` `id` of the Agent at `agent_index`.
     pub fn settings_of(&self, agent_index: usize, id: &str) -> &ScannedSettings {
-        self.settings
-            .iter()
-            .find(|settings| settings.agent_index == agent_index && settings.id == id)
+        settings_named(&self.settings, agent_index, id)
             .expect("validation declares the settings an anchor names")
     }
+}
+
+/// The `[[settings]]` `id` of the Agent at `agent_index` among `settings`.
+fn settings_named<'s>(
+    settings: &'s [ScannedSettings],
+    agent_index: usize,
+    id: &str,
+) -> Option<&'s ScannedSettings> {
+    settings
+        .iter()
+        .find(|known| known.agent_index == agent_index && known.id == id)
 }
 
 /// A Feature gate of one Agent home, as config-digger reads it.
@@ -510,9 +519,7 @@ pub(crate) fn scan_as_if(
             // Every source is read, so that the Entries of those the Agent
             // skips are listed as Unread.
             if let Some(id) = location.anchor.settings() {
-                let found = settings
-                    .iter()
-                    .find(|known| known.agent_index == home.agent_index && known.id == id);
+                let found = settings_named(&settings, home.agent_index, id);
                 for path in found
                     .into_iter()
                     .flat_map(|found| found.sources.iter().flatten())
@@ -881,8 +888,7 @@ fn read_rules(
         for (&kind, rules) in &definition.items {
             let rule_sources = rules.rules.iter().enumerate().flat_map(|(rule, block)| {
                 block
-                    .sources()
-                    .iter()
+                    .settings()
                     .enumerate()
                     .map(move |(source, setting)| (SettingOwner::Rule { rule, source }, setting))
             });
@@ -957,10 +963,11 @@ impl Places<'_> {
     ) -> Vec<Place> {
         let home = self.home;
         let files: Vec<(PathBuf, Option<String>)> = if let Some(id) = anchor.settings() {
-            self.settings
-                .iter()
-                .filter(|known| known.agent_index == home.agent_index && known.id == id)
-                .flat_map(|known| known.read().iter().map(|path| (path.clone(), None)))
+            // A later file of the source overrides an earlier one, so it
+            // comes first.
+            settings_named(self.settings, home.agent_index, id)
+                .into_iter()
+                .flat_map(|known| known.read().iter().rev().map(|path| (path.clone(), None)))
                 .collect()
         } else if anchor.in_project() {
             self.projects
