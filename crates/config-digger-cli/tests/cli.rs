@@ -1893,10 +1893,7 @@ fn a_write_whose_outcome_a_read_failure_could_change_previews_an_info_row() {
         text.stdout
     );
     assert_eq!(json.code, 0, "{}", json.stderr);
-    assert_eq!(
-        json.document()["plan"]["info"][0]["code"],
-        "unreadable_location"
-    );
+    assert_eq!(json.document()["plan"]["info"][0]["code"], "read_failure");
     assert_eq!(json.document()["warnings"], json!([]));
 }
 

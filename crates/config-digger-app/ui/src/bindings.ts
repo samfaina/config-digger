@@ -40,12 +40,12 @@ export type CaveatCode =
  *  A location that could take part in the context is a Read failure,
  *  and what the Agent does about it is not known.
  */
-"unreadable_location" | 
+"read_failure" | 
 /**
  *  A file holding a Disable switch that could apply is a Read failure,
  *  so the Entry is resolved as if the switch were not set.
  */
-"unreadable_switch";
+"switch_read_failure";
 
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 

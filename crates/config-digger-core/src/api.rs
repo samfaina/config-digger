@@ -341,7 +341,7 @@ pub struct Info {
 pub enum InfoCode {
     /// A location that could change the States after the Operation is a
     /// Read failure, so they may differ from the prediction.
-    UnreadableLocation,
+    ReadFailure,
     /// A file the Operation writes is a Read failure for an Agent, which
     /// still rejects it afterwards.
     StillRejected,
@@ -1039,10 +1039,10 @@ pub struct Caveat {
 pub enum CaveatCode {
     /// A location that could take part in the context is a Read failure,
     /// and what the Agent does about it is not known.
-    UnreadableLocation,
+    ReadFailure,
     /// A file holding a Disable switch that could apply is a Read failure,
     /// so the Entry is resolved as if the switch were not set.
-    UnreadableSwitch,
+    SwitchReadFailure,
 }
 
 /// A place in a file's text.
@@ -1059,6 +1059,12 @@ impl ReadFailure {
     /// whatever the kind of failure.
     pub(crate) fn same_reader_and_location(&self, other: &ReadFailure) -> bool {
         self.agent == other.agent && self.home == other.home && self.path == other.path
+    }
+
+    /// Whether it reaches the context of `project`, or of no Project: one
+    /// outside any Project reaches every context.
+    pub(crate) fn reaches(&self, project: Option<&Path>) -> bool {
+        self.project.is_none() || self.project.as_deref() == project
     }
 }
 

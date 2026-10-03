@@ -228,7 +228,7 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
-                        caveats: disable::unreadable_switches(
+                        caveats: disable::failed_switch_files(
                             definition,
                             snapshot,
                             entry,
@@ -236,8 +236,8 @@ pub(crate) fn resolve(
                         )
                         .into_iter()
                         .map(|path| api::Caveat {
-                            code: api::CaveatCode::UnreadableSwitch,
-                            sentence: explain::unreadable_switch(&path),
+                            code: api::CaveatCode::SwitchReadFailure,
+                            sentence: explain::switch_read_failure(&path),
                             path,
                         })
                         .collect(),
@@ -256,14 +256,14 @@ pub(crate) fn resolve(
                 .filter(|(failure, reaction)| {
                     failure.agent_index == agent
                         && failure.home == home
-                        && reaction.reaction == ReadFailureReaction::Unknown
+                        && reaction.strongest == ReadFailureReaction::Unknown
                         && reaction.kinds.contains(&kind)
-                        && reaches(failure, project_key)
+                        && failure.reaches(project_key.map(String::as_str))
                 })
                 .map(|(failure, _)| api::Caveat {
-                    code: api::CaveatCode::UnreadableLocation,
+                    code: api::CaveatCode::ReadFailure,
                     path: failure.path.clone(),
-                    sentence: explain::unreadable_location(agent_name, &failure.path),
+                    sentence: explain::read_failure_caveat(agent_name, &failure.path),
                 })
                 .collect();
             api::Item {
@@ -298,7 +298,7 @@ pub(crate) fn resolve(
                     line: line.try_into().unwrap_or(u32::MAX),
                     column: column.try_into().unwrap_or(u32::MAX),
                 }),
-                reaction: reaction.reaction.into(),
+                reaction: reaction.strongest.into(),
                 sentence: explain::read_failure(
                     &agent.name,
                     &failure.path,
@@ -306,7 +306,7 @@ pub(crate) fn resolve(
                     reaction.dialect,
                     failure.position,
                 ),
-                notes: (reaction.reaction == ReadFailureReaction::AsksUser)
+                notes: (reaction.strongest == ReadFailureReaction::AsksUser)
                     .then(|| explain::asks_user(&agent.name))
                     .into_iter()
                     .collect(),
@@ -328,7 +328,8 @@ pub(crate) fn resolve(
         .iter()
         .zip(&reactions)
         .filter(|(failure, reaction)| {
-            reaction.reaction == ReadFailureReaction::StopsAgent && reaches(failure, project_key)
+            reaction.strongest == ReadFailureReaction::StopsAgent
+                && failure.reaches(project_key.map(String::as_str))
         })
         .map(|(failure, _)| {
             let agent = &definitions[failure.agent_index].agent;
@@ -359,7 +360,7 @@ pub(crate) fn resolve(
 struct Reaction {
     /// The strongest reaction of those locations; a file only a project
     /// registry reads is ignored.
-    reaction: ReadFailureReaction,
+    strongest: ReadFailureReaction,
     risks: BTreeSet<RiskCode>,
     /// The dialect the file is parsed in, as a sentence names it.
     dialect: &'static str,
@@ -380,7 +381,7 @@ fn reaction(
         .map(|reader| definition.location(&reader.location))
         .collect();
     Reaction {
-        reaction: locations
+        strongest: locations
             .iter()
             .map(|location| location.on_read_failure)
             .max()
@@ -396,12 +397,6 @@ fn reaction(
             }),
         kinds: locations.iter().map(|location| location.kind).collect(),
     }
-}
-
-/// Whether a Read failure reaches the context whose Project key is
-/// `project_key`: one outside any Project reaches every context.
-fn reaches(failure: &ScannedReadFailure, project_key: Option<&String>) -> bool {
-    failure.project.is_none() || failure.project.as_ref() == project_key
 }
 
 /// The path of the scanned Project whose key is `key`.

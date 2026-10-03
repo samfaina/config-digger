@@ -1,5 +1,5 @@
 //! Read failures through the core `api`, with fake ports: each location
-//! parsed in each reader's dialect, broken fixture files per dialect, and
+//! parsed in each reader's dialect, fixture files that do not parse in each dialect, and
 //! what each Agent does about a location it cannot read.
 
 use config_digger_core::api::{
@@ -248,7 +248,7 @@ fn toml_yields_entries() {
 }
 
 #[test]
-fn broken_toml_is_a_read_failure_with_its_position_and_no_entries() {
+fn toml_that_does_not_parse_is_a_read_failure_with_its_position_and_no_entries() {
     let inventory = user_inventory(
         "agent.toml",
         TOML,
@@ -304,7 +304,7 @@ fn a_project_key_that_is_not_an_object_is_a_read_failure() {
     let inventory = inventory(
         FakeFileSystem::new().with_file(
             in_home(".claude.json"),
-            r#"{"mcpServers": {"a": {"command": "a"}}, "projects": {"E:/work/app": "broken"}}"#,
+            r#"{"mcpServers": {"a": {"command": "a"}}, "projects": {"E:/work/app": "not an object"}}"#,
         ),
         &[],
     );
@@ -368,12 +368,12 @@ fn project_agent(reaction: &str) -> String {
     )
 }
 
-const BROKEN_JSON: &str = r#"{"mcpServers": {"#;
+const UNPARSABLE_JSON: &str = r#"{"mcpServers": {"#;
 
 #[test]
 fn claude_code_asks_about_a_claude_json_it_cannot_parse_and_may_reset_it() {
     let fs = FakeFileSystem::new()
-        .with_file(in_home(".claude.json"), BROKEN_JSON)
+        .with_file(in_home(".claude.json"), UNPARSABLE_JSON)
         .with_file(
             mcp_json(),
             r#"{"mcpServers": {"github": {"command": "gh"}}}"#,
@@ -407,7 +407,7 @@ fn claude_code_asks_about_a_claude_json_it_cannot_parse_and_may_reset_it() {
 
 #[test]
 fn an_agent_that_ignores_a_file_it_cannot_read_has_no_flag_or_caveat() {
-    let fs = with_mcp_json(BROKEN_JSON);
+    let fs = with_mcp_json(UNPARSABLE_JSON);
     let inventory = inventory(fs, &[("jsonc-agent.toml", &project_agent("ignores_file"))]);
 
     let failure = inventory["read_failures"]
@@ -425,7 +425,7 @@ fn an_agent_that_ignores_a_file_it_cannot_read_has_no_flag_or_caveat() {
 #[test]
 fn a_user_file_that_stops_the_agent_flags_it_in_every_context() {
     let definition = user_agent("agent.json", STRICT, "stops_agent");
-    let fs = || FakeFileSystem::new().with_file(in_home("agent.json"), BROKEN_JSON);
+    let fs = || FakeFileSystem::new().with_file(in_home("agent.json"), UNPARSABLE_JSON);
     let in_project = inventory_in(fs(), &[("user-agent.toml", &definition)], Some(PROJECT));
     let without_project = inventory_in(fs(), &[("user-agent.toml", &definition)], None);
 
@@ -449,8 +449,8 @@ fn a_project_file_that_stops_the_agent_flags_it_in_that_project_only() {
         .iter()
         .map(|(file, text)| (*file, text.as_str()))
         .collect();
-    let in_project = inventory_in(with_mcp_json(BROKEN_JSON), &definitions, Some(PROJECT));
-    let without_project = inventory_in(with_mcp_json(BROKEN_JSON), &definitions, None);
+    let in_project = inventory_in(with_mcp_json(UNPARSABLE_JSON), &definitions, Some(PROJECT));
+    let without_project = inventory_in(with_mcp_json(UNPARSABLE_JSON), &definitions, None);
 
     let flags = in_project["agent_flags"].as_array().unwrap();
     assert_eq!(flags.len(), 1, "{flags:?}");
@@ -469,7 +469,7 @@ fn entries_keep_their_states_when_another_file_stops_the_agent() {
     .replace("roots.config = ", "roots.extra = { block = \"path\", path = \"~/extra.json\" }\nroots.config = ")
     .replace(r#"precedence = ["user-mcp"]"#, r#"precedence = ["extra-mcp", "user-mcp"]"#);
     let fs = FakeFileSystem::new()
-        .with_file(in_home("agent.json"), BROKEN_JSON)
+        .with_file(in_home("agent.json"), UNPARSABLE_JSON)
         .with_file(
             in_home("extra.json"),
             r#"{"servers": {"a": {"command": "a"}}}"#,
@@ -488,7 +488,7 @@ fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_cavea
                 in_home(".claude.json"),
                 r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}}"#,
             )
-            .with_file(mcp_json(), BROKEN_JSON)
+            .with_file(mcp_json(), UNPARSABLE_JSON)
     };
     let in_project = inventory_in(fs(), &[], Some(PROJECT));
     let without_project = inventory_in(fs(), &[], None);
@@ -497,7 +497,7 @@ fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_cavea
     assert_eq!(
         in_project["items"][0]["caveats"],
         json!([{
-            "code": "unreadable_location",
+            "code": "read_failure",
             "path": mcp_json(),
             "sentence": r"A location that could take part couldn't be read: E:\work\app\.mcp.json, so the State shown may not be the one Claude Code has."
         }])
@@ -507,7 +507,7 @@ fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_cavea
 }
 
 #[test]
-fn an_unreadable_disable_store_resolves_with_defaults_and_a_caveat() {
+fn a_disable_store_that_is_a_read_failure_resolves_with_defaults_and_a_caveat() {
     let settings = PathBuf::from(PROJECT).join(r".claude\settings.local.json");
     let fs = FakeFileSystem::new()
         .with_file(
@@ -529,7 +529,7 @@ fn an_unreadable_disable_store_resolves_with_defaults_and_a_caveat() {
     assert_eq!(
         github["caveats"],
         json!([{
-            "code": "unreadable_switch",
+            "code": "switch_read_failure",
             "path": settings,
             "sentence": r"E:\work\app\.claude\settings.local.json couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not."
         }])
@@ -567,10 +567,10 @@ fn plan(core: &Core, action: Action, selector: &str) -> Result<Plan, Error> {
 #[test]
 fn disable_is_refused_when_every_switch_store_is_a_read_failure() {
     let fs = with_mcp_json(r#"{"mcpServers": {"github": {"command": "gh"}}}"#)
-        .with_file(in_home(".claude.json"), BROKEN_JSON)
+        .with_file(in_home(".claude.json"), UNPARSABLE_JSON)
         .with_file(
             PathBuf::from(PROJECT).join(r".claude\settings.local.json"),
-            BROKEN_JSON,
+            UNPARSABLE_JSON,
         );
 
     let error = plan(&core(fs, &[]), Action::Disable, "github")
@@ -588,14 +588,14 @@ fn a_read_failure_that_could_change_the_outcome_adds_an_info_row_with_no_ack() {
             in_home(".claude.json"),
             r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}}"#,
         )
-        .with_file(mcp_json(), BROKEN_JSON);
+        .with_file(mcp_json(), UNPARSABLE_JSON);
 
     let plan = plan(&core(fs, &[]), Action::Remove, "linear").unwrap();
 
     assert_eq!(
         serde_json::to_value(&plan.preview().info).unwrap(),
         json!([{
-            "code": "unreadable_location",
+            "code": "read_failure",
             "path": mcp_json(),
             "sentence": r"Claude Code couldn't read E:\work\app\.mcp.json, so its States after this change may differ."
         }])
@@ -624,5 +624,29 @@ fn writing_a_file_another_reader_rejects_notes_that_it_still_rejects_it() {
             "path": mcp_json(),
             "sentence": r"Claude Code still rejects E:\work\app\.mcp.json after this change: Claude Code cannot parse E:\work\app\.mcp.json as strict JSON (line 2, column 3), so it reads no Entries from it."
         }])
+    );
+}
+
+#[test]
+fn switches_in_a_file_that_is_a_read_failure_for_their_agent_disable_nothing_and_are_not_written() {
+    // Valid JSON, but Claude Code cannot enumerate its servers.
+    let claude_json = in_home(".claude.json");
+    let fs = FakeFileSystem::new()
+        .with_file(
+            &claude_json,
+            r#"{"mcpServers": [], "projects": {"E:/work/app": {"disabledMcpServers": ["github"]}}}"#,
+        )
+        .with_file(mcp_json(), r#"{"mcpServers": {"github": {"command": "gh"}}}"#);
+    let inventory = inventory(fs, &[]);
+
+    assert_eq!(
+        items(&inventory),
+        [item("claude-code", "github", "effective")]
+    );
+    let github = &inventory["items"][0]["entries"][0];
+    assert_eq!(github["caveats"][0]["path"], json!(claude_json));
+    assert_eq!(
+        github["disable"]["path"],
+        json!(PathBuf::from(PROJECT).join(r".claude\settings.local.json"))
     );
 }

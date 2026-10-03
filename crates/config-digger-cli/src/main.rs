@@ -1446,10 +1446,10 @@ fn edit_label(op: api::EditOp) -> &'static str {
 
 fn state_after_label(state: api::StateAfter) -> &'static str {
     match state {
-        api::StateAfter::Effective => "Effective",
-        api::StateAfter::Shadowed => "Shadowed",
-        api::StateAfter::Disabled => "Disabled",
-        api::StateAfter::Invalid => "Invalid",
+        api::StateAfter::Effective => state_label(api::State::Effective),
+        api::StateAfter::Shadowed => state_label(api::State::Shadowed),
+        api::StateAfter::Disabled => state_label(api::State::Disabled),
+        api::StateAfter::Invalid => state_label(api::State::Invalid),
         api::StateAfter::Removed => "removed",
     }
 }

@@ -235,6 +235,14 @@ pub(crate) struct ScannedReadFailure {
     pub position: Option<(usize, usize)>,
 }
 
+impl ScannedReadFailure {
+    /// Whether it reaches the context whose Project key is `project_key`:
+    /// one outside any Project reaches every context.
+    pub fn reaches(&self, project_key: Option<&str>) -> bool {
+        self.project.is_none() || self.project.as_deref() == project_key
+    }
+}
+
 /// Why a scan could not run at all.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ScanError {
@@ -364,7 +372,8 @@ pub(crate) fn scan_as_if(
 /// home: in each existing Project folder for a switch in a Project, under
 /// each spelling of each Project key for a switch keyed by `{project}`, and
 /// once otherwise. A switch file that is missing is read as empty; one that
-/// cannot be read or parsed as JSON is listed apart and has no places.
+/// cannot be read or parsed as JSON, or that is a Read failure for the
+/// Agent home, is listed apart and has no places.
 fn read_switches(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
@@ -396,6 +405,17 @@ fn read_switches(
                         .collect()
                 };
                 for (path, project) in places {
+                    // A file the Agent home cannot read, even one that is
+                    // valid JSON, sets none of its switches.
+                    let failed = reader.failures.iter().any(|failure| {
+                        failure.agent_index == home.agent_index
+                            && failure.home == home.home
+                            && failure.path == path
+                    });
+                    if failed {
+                        unreadable.insert(path);
+                        continue;
+                    }
                     let document = match reader.peek(&path) {
                         Ok(None) => None,
                         Ok(Some(text)) => match JsonFormat::STRICT.parse(text) {

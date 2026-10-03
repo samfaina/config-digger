@@ -791,7 +791,8 @@ fn preview(
     read_failures: &[ReadFailure],
 ) -> Result<Preview, Error> {
     let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
-    let info = info(read_failures, &changes, files)?;
+    refuse_read_failure_targets(read_failures, &changes, files)?;
+    let info = read_failure_info(read_failures, &changes, files);
     Ok(Preview {
         action,
         title,
@@ -832,25 +833,44 @@ fn preview(
     })
 }
 
-/// What the preview of a plan that writes `files` and changes the States
-/// `changes` says about `read_failures`, which the scan met: that an Agent
-/// still rejects a file it writes, and that a location which could change
-/// the outcome cannot be read. A file it writes that cannot be opened or
-/// decoded refuses the plan: config-digger never repairs one.
-fn info(
+/// Refuses a plan that must write a file in `files` that is one of
+/// `read_failures` for an Agent home whose States it changes in `changes`,
+/// or that cannot be opened or decoded at all: config-digger never writes a
+/// file it cannot read.
+fn refuse_read_failure_targets(
     read_failures: &[ReadFailure],
     changes: &[Change],
     files: &[PlannedFile],
-) -> Result<Vec<Info>, Error> {
+) -> Result<(), Error> {
+    for failure in read_failures {
+        if !files.iter().any(|file| file.path == failure.path) {
+            continue;
+        }
+        let acting = changes
+            .iter()
+            .any(|change| change.agent == failure.agent && change.home == failure.home);
+        if acting || failure.kind != ReadFailureKind::Parse {
+            return Err(Error::blocked(explain::read_failure_target(
+                &failure.path,
+                &failure.sentence,
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// What the preview of a plan that writes `files` and changes the States
+/// `changes` says about `read_failures`, with nothing to acknowledge: that
+/// another Agent still rejects a file it writes, and that a Read failure
+/// which could change the outcome may make the States after differ.
+fn read_failure_info(
+    read_failures: &[ReadFailure],
+    changes: &[Change],
+    files: &[PlannedFile],
+) -> Vec<Info> {
     let mut info = Vec::new();
     for failure in read_failures {
         if files.iter().any(|file| file.path == failure.path) {
-            if failure.kind != ReadFailureKind::Parse {
-                return Err(Error::blocked(explain::read_failure_target(
-                    &failure.path,
-                    &failure.sentence,
-                )));
-            }
             info.push(Info {
                 code: InfoCode::StillRejected,
                 path: failure.path.clone(),
@@ -865,17 +885,17 @@ fn info(
         let could_change = changes.iter().any(|change| {
             change.agent == failure.agent
                 && change.home == failure.home
-                && (failure.project.is_none() || failure.project == change.project)
+                && failure.reaches(change.project.as_deref())
         });
         if could_change {
             info.push(Info {
-                code: InfoCode::UnreadableLocation,
+                code: InfoCode::ReadFailure,
                 path: failure.path.clone(),
                 sentence: explain::outcome_may_differ(&failure.agent_name, &failure.path),
             });
         }
     }
-    Ok(info)
+    info
 }
 
 /// What a plan that edits `files` must have acknowledged: one warning for

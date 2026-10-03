@@ -281,7 +281,7 @@ pub(crate) fn choose(
 /// The files of the switches that could Disable `entry` in the context of
 /// `project`, or of none, and cannot be read. The Entry is resolved as if
 /// they set nothing, which the Agent's defaults say.
-pub(crate) fn unreadable_switches(
+pub(crate) fn failed_switch_files(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,

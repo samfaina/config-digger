@@ -533,7 +533,7 @@ pub(crate) fn cannot_start(agent_name: &str, path: &Path) -> String {
 
 /// The caveat of an Item when a location at `path` that could take part
 /// cannot be read, and what `agent_name` does then is not known.
-pub(crate) fn unreadable_location(agent_name: &str, path: &Path) -> String {
+pub(crate) fn read_failure_caveat(agent_name: &str, path: &Path) -> String {
     format!(
         "A location that could take part couldn't be read: {}, so the State shown may not be the one {agent_name} has.",
         path.display()
@@ -583,7 +583,7 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
 
 /// The caveat of an Entry when the file at `path`, holding a switch that
 /// could Disable it, cannot be read.
-pub(crate) fn unreadable_switch(path: &Path) -> String {
+pub(crate) fn switch_read_failure(path: &Path) -> String {
     format!(
         "{} couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not.",
         path.display()
