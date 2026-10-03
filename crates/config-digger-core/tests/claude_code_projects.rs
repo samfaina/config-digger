@@ -229,7 +229,7 @@ fn a_missing_project_is_matched_lexically() {
             ("github", &[("user", "effective")]),
             ("linear", &[("user", "effective")]),
             ("notes", &[("user", "effective")]),
-            ("old", &[("local", "effective")]),
+            ("old", &[("local", "unread")]),
         ])
     );
 }
