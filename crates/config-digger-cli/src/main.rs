@@ -138,6 +138,25 @@ enum HistoryCommand {
         /// The Operation's id, as `history` lists it.
         id: String,
     },
+    /// Delete an Operation's backup for good, such as one holding Secrets.
+    ///
+    /// The Operation stays in History but can no longer be undone. Prints the
+    /// preview and asks for confirmation. When the Operation needs attention,
+    /// its backup is the only copy for manual recovery: that needs its own
+    /// acknowledgement, and deleting it dismisses the Operation.
+    DeleteBackup {
+        /// The Operation's id, as `history` lists it.
+        id: String,
+        /// Confirm the deletion without asking.
+        #[arg(long)]
+        yes: bool,
+        /// Acknowledge one class of warning without asking. Repeat for several.
+        #[arg(long, value_enum, value_name = "CLASS")]
+        ack: Vec<Ack>,
+        /// Print the plan and delete nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// The shells `completions` writes a script for.
@@ -166,6 +185,7 @@ enum Ack {
     GitVersioned,
     WideReach,
     RunningAgent,
+    NeedsAttention,
 }
 
 impl From<Ack> for WarningClass {
@@ -174,6 +194,7 @@ impl From<Ack> for WarningClass {
             Ack::GitVersioned => WarningClass::GitVersioned,
             Ack::WideReach => WarningClass::WideReach,
             Ack::RunningAgent => WarningClass::RunningAgent,
+            Ack::NeedsAttention => WarningClass::NeedsAttention,
         }
     }
 }
@@ -412,7 +433,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                 cli,
                 &core,
                 plan,
-                &project_line(&scanned.inventory, width),
+                Some(&project_line(&scanned.inventory, width)),
                 &WriteFlags {
                     yes: *yes,
                     ack: ack.clone(),
@@ -466,6 +487,29 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
+        Command::History {
+            command:
+                Some(HistoryCommand::DeleteBackup {
+                    id,
+                    yes,
+                    ack,
+                    dry_run,
+                }),
+        } => {
+            let plan = core.plan_delete_backup(id)?;
+            // It resolves no State, so there is no Project to name.
+            confirm_and_execute(
+                cli,
+                &core,
+                plan,
+                None,
+                &WriteFlags {
+                    yes: *yes,
+                    ack: ack.clone(),
+                    dry_run: *dry_run,
+                },
+            )
+        }
         Command::Undo {
             id,
             yes,
@@ -479,7 +523,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                 cli,
                 &core,
                 plan,
-                &project,
+                Some(&project),
                 &WriteFlags {
                     yes: *yes,
                     ack: ack.clone(),
@@ -575,13 +619,13 @@ fn warning_bodies<'a>(
         .collect()
 }
 
-/// Prints a plan's preview under the line naming its Project, gets the
-/// Operation confirmed and its warnings acknowledged, then executes it.
+/// Prints a plan's preview under the line naming its Project, if it has one,
+/// gets the Operation confirmed and its warnings acknowledged, then executes it.
 fn confirm_and_execute(
     cli: &Cli,
     core: &Core,
     plan: Plan,
-    project_line: &str,
+    project_line: Option<&str>,
     flags: &WriteFlags,
 ) -> Result<(), Failure> {
     let preview = plan.preview().clone();
@@ -601,6 +645,8 @@ fn confirm_and_execute(
                 warnings: warning_bodies(&warnings, &acknowledged),
                 result: None,
             });
+        } else if preview.action == Action::DeleteBackup {
+            anstream::println!("\nDry run: nothing was deleted.");
         } else {
             anstream::println!("\nDry run: nothing was written.");
         }
@@ -615,7 +661,7 @@ fn confirm_and_execute(
             result: Some(&outcome),
         });
     } else {
-        anstream::print!("{}", render_outcome(&outcome, width));
+        anstream::print!("{}", render_outcome(preview.action, &outcome, width));
     }
     Ok(())
 }
@@ -1009,30 +1055,49 @@ fn elide_locator(locator: &str, path: &Path, width: Option<usize>) -> String {
 
 /// A write's preview: the State before and after of each (Agent, Entry,
 /// Project) it changes, which Entry is Effective afterwards, the files diff,
-/// the warnings and where the backup goes.
+/// the warnings and where the backup goes. A Delete backup lists the copies
+/// it deletes instead.
 fn render_preview(
-    project_line: &str,
+    project_line: Option<&str>,
     preview: &api::Preview,
     warnings: &[api::Warning],
     width: Option<usize>,
 ) -> String {
-    let mut out = project_line.to_owned();
-    out.push('\n');
+    let mut out = String::new();
+    if let Some(project_line) = project_line {
+        out.push_str(project_line);
+        out.push('\n');
+    }
     out.push_str(&styled_line(&preview.title, BOLD, width));
 
-    out.push_str(&render_changes(&preview.changes, width));
-    let sentence_width = width.map(|width| width.saturating_sub(INDENT.len()));
-    for effective in &preview.effective {
+    if preview.action == Action::DeleteBackup {
         out.push('\n');
-        for text in terminal::wrap(&effective.sentence, sentence_width) {
-            out.push_str(&plain_line(&format!("{INDENT}{text}"), width));
+        out.push_str(&styled_line("Deleted for good", BOLD, width));
+        if preview.deleted.is_empty() {
+            out.push_str(&plain_line(
+                &format!("{INDENT}No file was copied to this backup."),
+                width,
+            ));
         }
-    }
+        // A path is never cut: it names what goes for good.
+        for copy in &preview.deleted {
+            out.push_str(&format!("{INDENT}{}\n", copy.display()));
+        }
+    } else {
+        out.push_str(&render_changes(&preview.changes, width));
+        let sentence_width = width.map(|width| width.saturating_sub(INDENT.len()));
+        for effective in &preview.effective {
+            out.push('\n');
+            for text in terminal::wrap(&effective.sentence, sentence_width) {
+                out.push_str(&plain_line(&format!("{INDENT}{text}"), width));
+            }
+        }
 
-    out.push('\n');
-    out.push_str(&styled_line("Files", BOLD, width));
-    for file in &preview.files {
-        out.push_str(&render_diff(&file.diff));
+        out.push('\n');
+        out.push_str(&styled_line("Files", BOLD, width));
+        for file in &preview.files {
+            out.push_str(&render_diff(&file.diff));
+        }
     }
 
     if !warnings.is_empty() {
@@ -1054,8 +1119,8 @@ fn render_preview(
 }
 
 /// What an executed write did, any State that differs from the prediction,
-/// and where its backup is.
-fn render_outcome(outcome: &api::Outcome, width: Option<usize>) -> String {
+/// and where its backup is, unless it deleted one.
+fn render_outcome(action: Action, outcome: &api::Outcome, width: Option<usize>) -> String {
     let mut out = String::from("\n");
     for line in terminal::wrap(&outcome.sentence, width) {
         out.push_str(&plain_line(&line, width));
@@ -1071,10 +1136,12 @@ fn render_outcome(outcome: &api::Outcome, width: Option<usize>) -> String {
             width,
         ));
     }
-    out.push_str(&plain_line(
-        &format!("Backup: {}", outcome.backup.display()),
-        width,
-    ));
+    if action != Action::DeleteBackup {
+        out.push_str(&plain_line(
+            &format!("Backup: {}", outcome.backup.display()),
+            width,
+        ));
+    }
     out
 }
 
@@ -1201,6 +1268,7 @@ fn render_operation(operation: &api::OperationDetail, width: Option<usize>) -> S
         }
         let backup = match &location.backup {
             Some(backup) => format!("backed up to {}", backup.display()),
+            None if summary.backup_deleted => "its backup was deleted".to_owned(),
             None => "created by this Operation, so nothing was backed up".to_owned(),
         };
         out.push_str(&plain_line(&format!("{INDENT}{INDENT}{backup}"), width));

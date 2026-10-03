@@ -44,6 +44,14 @@ pub(crate) fn execute(
     if !missing.is_empty() {
         return Err(Error::ack_required(&missing));
     }
+    if let Some(operation) = &planned.preview.backup_of {
+        // It deletes copies in History and writes no configuration file.
+        let needed_attention = planned
+            .warnings
+            .iter()
+            .any(|warning| warning.class == WarningClass::NeedsAttention);
+        return history::delete_backup(ports, operation, needed_attention);
+    }
 
     let data = history::data_folder(ports.env.as_ref())?;
     ports
@@ -99,6 +107,7 @@ pub(crate) fn execute(
                     depends_on: applied.depends_on.clone(),
                 })
                 .collect(),
+            deleted_edits: Vec::new(),
         });
     }
     history::record(ports, &folder, &manifest).map_err(Error::backup_failed)?;

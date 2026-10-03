@@ -1198,3 +1198,143 @@ fn dismissing_an_unknown_operation_exits_3() {
 
     assert_eq!(run.code, 3, "{}", run.stderr);
 }
+
+impl Harness {
+    /// The copy of `.claude.json` in the backup of the Operation `id`.
+    fn backup_copy(&self, id: &str) -> PathBuf {
+        self.backups().join(id).join("1-.claude.json")
+    }
+
+    /// Marks the Operation `id` as needing attention, as an incomplete
+    /// Rollback would, which the real file system cannot be made to cause.
+    fn needing_attention(&self, id: &str) {
+        let manifest = self.backups().join(id).join("manifest.json");
+        let mut recorded: Value = serde_json::from_str(&read(&manifest)).unwrap();
+        recorded["status"] = json!("needs_attention");
+        std::fs::write(&manifest, recorded.to_string()).unwrap();
+    }
+}
+
+#[test]
+fn delete_backup_without_a_tty_or_yes_prints_the_preview_and_exits_4() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let copy = harness.backup_copy(&removed);
+
+    let run = harness.run(&["history", "delete-backup", &removed]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    assert!(
+        run.stdout
+            .contains(&format!("Delete the backup of {removed}")),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains(&copy.display().to_string()),
+        "{}",
+        run.stdout
+    );
+    assert!(copy.exists());
+}
+
+#[test]
+fn delete_backup_with_yes_deletes_the_copies_and_history_marks_it_not_undoable() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+
+    let run = harness.run(&["history", "delete-backup", &removed, "--yes"]);
+    let json = harness.run(&["history", "--json"]).document();
+    let text = harness.run(&["history"]);
+    let undo = harness.run(&["undo", &removed, "--yes", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout
+            .contains(&format!("Deleted the backup of {removed}")),
+        "{}",
+        run.stdout
+    );
+    assert!(!harness.backup_copy(&removed).exists());
+    assert_eq!(json["operations"][0]["backup_deleted"], true);
+    assert!(
+        text.stdout
+            .contains("Applied, backup deleted, not undoable"),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(undo.code, 5, "{}", undo.stderr);
+    assert_eq!(undo.document()["error"]["code"], "blocked");
+}
+
+#[test]
+fn delete_backup_json_returns_the_plan_and_the_result() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    let copy = harness.backup_copy(&removed).display().to_string();
+
+    let dry_run = harness.run(&["history", "delete-backup", &removed, "--dry-run", "--json"]);
+    let copy_after_dry_run = harness.backup_copy(&removed).exists();
+    let run = harness.run(&["history", "delete-backup", &removed, "--yes", "--json"]);
+
+    assert_eq!(dry_run.code, 0, "{}", dry_run.stderr);
+    let plan = dry_run.document();
+    assert_eq!(plan["plan"]["action"], "delete_backup");
+    assert_eq!(plan["plan"]["backup_of"], removed.as_str());
+    assert_eq!(plan["plan"]["deleted"], json!([copy]));
+    assert_eq!(plan["warnings"], json!([]));
+    assert_eq!(plan["result"], Value::Null);
+    assert!(copy_after_dry_run);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["result"]["operation"], removed.as_str());
+    assert_eq!(document["result"]["verify"], "verified");
+}
+
+#[test]
+fn delete_backup_of_an_unknown_operation_exits_3() {
+    let run = Harness::new().run(&["history", "delete-backup", "20261001-120000-abc", "--yes"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+}
+
+#[test]
+fn delete_backup_of_an_operation_that_needs_attention_needs_its_own_ack() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    harness.needing_attention(&removed);
+
+    let yes = harness.run(&["history", "delete-backup", &removed, "--yes", "--json"]);
+    let copy_after_yes = harness.backup_copy(&removed).exists();
+    let text = harness.run(&["history", "delete-backup", &removed, "--yes"]);
+    let acked = harness.run(&[
+        "history",
+        "delete-backup",
+        &removed,
+        "--yes",
+        "--ack",
+        "needs-attention",
+    ]);
+    let history = harness.run(&["history", "--json"]).document();
+
+    assert_eq!(yes.code, 4, "{}", yes.stderr);
+    let error = &yes.document()["error"];
+    assert_eq!(error["code"], "ack_required");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap()
+            .contains("--ack needs-attention"),
+        "{error}"
+    );
+    assert!(copy_after_yes);
+    assert!(
+        text.stdout.contains("only copy for manual recovery"),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(acked.code, 0, "{}", acked.stderr);
+    assert!(!harness.backup_copy(&removed).exists());
+    assert_eq!(history["operations"][0]["needs_attention"], false);
+}

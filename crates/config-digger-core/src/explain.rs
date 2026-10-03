@@ -44,6 +44,7 @@ pub(crate) fn operation_title(action: Action, entries: usize) -> String {
     let verb = match action {
         Action::Remove => "Remove",
         Action::Undo => "Undo",
+        Action::DeleteBackup => "Delete the backup of",
     };
     format!("{verb} {}", count(entries))
 }
@@ -51,6 +52,12 @@ pub(crate) fn operation_title(action: Action, entries: usize) -> String {
 /// The title of an Undo: `Undo 20261001-143012-a3f "Remove 1 Entry"`.
 pub(crate) fn undo_title(operation: &str, title: &str) -> String {
     format!("Undo {operation} \"{title}\"")
+}
+
+/// The title of a Delete backup: `Delete the backup of 20261001-143012-a3f
+/// "Remove 1 Entry"`.
+pub(crate) fn delete_backup_title(operation: &str, title: &str) -> String {
+    format!("Delete the backup of {operation} \"{title}\"")
 }
 
 /// Where the preview says the backup goes.
@@ -61,9 +68,24 @@ pub(crate) fn backup_note(folder: &Path) -> String {
     )
 }
 
+/// What the preview of a Delete backup says in place of the backup note.
+pub(crate) fn delete_backup_note(operation: &str) -> String {
+    format!(
+        "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation {operation} can no longer be undone."
+    )
+}
+
+/// The check a Delete backup adds when its Operation needs attention.
+pub(crate) fn only_copy_for_recovery(operation: &str) -> String {
+    format!(
+        "Operation {operation} needs attention: this backup is the only copy for manual recovery of the files its Rollback could not restore. Deleting it also dismisses the Operation."
+    )
+}
+
 /// What an executed Operation did: "Removed 2 Entries. Operation
 /// 20261001-143012-a3f: verified.", or for an Undo of the Operation
-/// `undo_of`: "Undid 20261001-143012-a3f. Operation …: verified."
+/// `undo_of`: "Undid 20261001-143012-a3f. Operation …: verified." A Delete
+/// backup of the Operation `operation` says so and that it is not undoable.
 pub(crate) fn outcome(
     action: Action,
     entries: usize,
@@ -74,6 +96,9 @@ pub(crate) fn outcome(
     let done = match action {
         Action::Remove => format!("Removed {}", count(entries)),
         Action::Undo => format!("Undid {}", undo_of.unwrap_or("an Operation")),
+        Action::DeleteBackup => {
+            return format!("Deleted the backup of {operation}. It can no longer be undone.");
+        }
     };
     let verify = match verify {
         Verify::Verified => "verified",
@@ -84,14 +109,16 @@ pub(crate) fn outcome(
 
 /// An Operation's status as History shows it: "Applied", "Undone by …",
 /// "Undo of …", or both of the last two for an Undo that was undone;
-/// "Failed, rolled back" or "Needs attention" for a failed one.
+/// "Failed, rolled back" or "Needs attention" for a failed one; then
+/// ", backup deleted, not undoable" once its backup was.
 pub(crate) fn operation_status(
     status: OperationStatus,
     dismissed: bool,
     undo_of: Option<&str>,
     undone_by: Option<&str>,
+    backup_deleted: bool,
 ) -> String {
-    match (status, undo_of, undone_by) {
+    let status = match (status, undo_of, undone_by) {
         (OperationStatus::InProgress, ..) => "Incomplete".to_owned(),
         (OperationStatus::Failed, ..) => "Failed, rolled back".to_owned(),
         (OperationStatus::NeedsAttention, ..) if dismissed => {
@@ -104,12 +131,19 @@ pub(crate) fn operation_status(
         (OperationStatus::Applied, Some(undone), Some(undo)) => {
             format!("Undo of {undone}, undone by {undo}")
         }
+    };
+    if backup_deleted {
+        return format!("{status}, backup deleted, not undoable");
     }
+    status
 }
 
 /// Why an Operation with this status cannot be undone, or `None` for an
-/// applied one.
-pub(crate) fn not_undoable(status: OperationStatus) -> Option<String> {
+/// applied one whose backup was not deleted.
+pub(crate) fn not_undoable(status: OperationStatus, backup_deleted: bool) -> Option<String> {
+    if backup_deleted {
+        return Some("Its backup was deleted, with the values its Undo would put back.".to_owned());
+    }
     let reason = match status {
         OperationStatus::Applied => return None,
         OperationStatus::InProgress => "It did not complete; recover its files from its backup.",
