@@ -1838,3 +1838,77 @@ fn enable_of_an_entry_that_is_not_disabled_exits_5() {
     assert_eq!(run.code, 5, "{}", run.stdout);
     assert_eq!(run.document()["error"]["code"], "blocked");
 }
+
+#[test]
+fn list_and_show_print_read_failures_with_their_position_to_stderr_and_exit_0() {
+    let harness = Harness::new()
+        .with_file(
+            ".claude.json",
+            r#"{"mcpServers": {"linear": {"url": "https://user"}}}"#,
+        )
+        .with_cwd_file(".mcp.json", "{\n  \"mcpServers\": {,\n}\n");
+    let mcp_json = harness.cwd().join(".mcp.json");
+
+    let list = harness.run(&["list"]);
+    let show = harness.run(&["show", "linear"]);
+    let json = harness.run(&["list", "--json"]);
+
+    for run in [&list, &show, &json] {
+        assert_eq!(run.code, 0, "{}", run.stderr);
+        assert!(
+            run.stderr.contains(&format!(
+                "Claude Code cannot parse {} as strict JSON (line 2, column 18)",
+                mcp_json.display()
+            )),
+            "{}",
+            run.stderr
+        );
+    }
+    let failure = &json.document()["read_failures"][0];
+    assert_eq!(failure["path"], json!(mcp_json));
+    assert_eq!(failure["agent"], "claude-code");
+    assert_eq!(failure["project"], json!(harness.cwd()));
+    assert_eq!(failure["kind"], "parse");
+    assert_eq!(failure["position"], json!({ "line": 2, "column": 18 }));
+    // Every Item in the context could be beaten by a server in the file.
+    assert!(show.stdout.contains("couldn't be read"), "{}", show.stdout);
+}
+
+#[test]
+fn a_write_whose_outcome_a_read_failure_could_change_previews_an_info_row() {
+    let harness = Harness::new()
+        .with_file(
+            ".claude.json",
+            r#"{"mcpServers": {"linear": {"url": "https://user"}}}"#,
+        )
+        .with_cwd_file(".mcp.json", "{ not json");
+
+    let text = harness.run(&["remove", "linear", "--dry-run"]);
+    let json = harness.run(&["remove", "linear", "--dry-run", "--json"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout.contains("States after this change may differ"),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    assert_eq!(json.document()["plan"]["info"][0]["code"], "read_failure");
+    assert_eq!(json.document()["warnings"], json!([]));
+}
+
+#[test]
+fn a_disable_that_must_write_into_read_failures_exits_5() {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{ not json")
+        .with_cwd_file(
+            ".mcp.json",
+            r#"{"mcpServers": {"github": {"command": "gh"}}}"#,
+        )
+        .with_cwd_file(".claude/settings.local.json", "{ not json");
+
+    let run = harness.run(&["disable", "github", "--yes", "--json"]);
+
+    assert_eq!(run.code, 5, "{}", run.stderr);
+    assert_eq!(run.document()["error"]["code"], "blocked");
+}

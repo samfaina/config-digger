@@ -185,7 +185,8 @@ fn secret_spans(
         .map_err(|error| unparsed(error.position))?;
     let syntax = location.format.syntax();
     let mut objects = Vec::new();
-    scan::find_objects(&document, &location.root, Vec::new(), None, &mut objects);
+    scan::find_objects(&document, &location.root, Vec::new(), None, &mut objects)
+        .map_err(|_| unparsed(None))?;
     // Each Secret's key path from the root of the file, with its mask.
     let mut secrets = super::file_fields(location, &document);
     for object in objects {

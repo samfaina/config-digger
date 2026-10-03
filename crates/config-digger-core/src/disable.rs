@@ -277,3 +277,37 @@ pub(crate) fn choose(
         )
     })
 }
+
+/// The files of the switches that could Disable `entry` in the context of
+/// `project`, or of none, and cannot be read. The Entry is resolved as if
+/// they set nothing, which the Agent's defaults say.
+pub(crate) fn failed_switch_files(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&ContextProject>,
+) -> Vec<PathBuf> {
+    let location = definition.location(&entry.location);
+    let roots = snapshot.roots(entry.agent_index, &entry.home);
+    let mut files: Vec<PathBuf> = Vec::new();
+    for mechanism in &definition.rules(location.kind).disable {
+        if !mechanism.covers(&location.id) {
+            continue;
+        }
+        let switch = mechanism.switch();
+        let folder = match (mechanism.context(), project) {
+            (MechanismContext::Project, None) => continue,
+            (MechanismContext::Project, Some(project)) if switch.anchor.in_project() => {
+                Some(project.path)
+            }
+            _ => None,
+        };
+        let Some(path) = switch.anchor.path(roots, folder) else {
+            continue;
+        };
+        if snapshot.unreadable_switches.contains(&path) && !files.contains(&path) {
+            files.push(path);
+        }
+    }
+    files
+}

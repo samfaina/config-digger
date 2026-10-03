@@ -600,12 +600,14 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
     let context = Context { project };
     let inventory = core.resolve(&snapshot, &context);
     for failure in &inventory.read_failures {
-        anstream::eprintln!(
-            "{WARNING}warning:{WARNING:#} {} cannot read {} ({})",
-            failure.agent_name,
-            failure.path.display(),
-            failure.kind.code()
-        );
+        anstream::eprintln!("{WARNING}warning:{WARNING:#} {}", failure.sentence);
+        let risks = failure.warnings.iter().map(|risk| &risk.sentence);
+        for line in failure.notes.iter().chain(risks) {
+            anstream::eprintln!("{INDENT}{line}");
+        }
+    }
+    for flag in &inventory.agent_flags {
+        anstream::eprintln!("{WARNING}warning:{WARNING:#} {}", flag.sentence);
     }
     Ok(Scanned {
         snapshot,
@@ -1055,6 +1057,7 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
             .map(|reason| format!("Also: {}", reason.sentence));
         let secondary: Vec<String> = secondary.collect();
         let notes = entry.notes.iter().map(|note| note.sentence.as_str());
+        let caveats = entry.caveats.iter().map(|caveat| caveat.sentence.as_str());
         let action = entry
             .enable
             .as_deref()
@@ -1063,6 +1066,7 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
             .chain(what_if)
             .chain(secondary.iter().map(String::as_str))
             .chain(notes)
+            .chain(caveats)
             .chain([action]);
         for sentence in sentences {
             for text in terminal::wrap(sentence, reason_width) {
@@ -1075,6 +1079,14 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         // The configuration as the core masked it. Like a diff line, it is
         // never cut: compact JSON has no spaces to wrap at.
         out.push_str(&format!("{reason_indent}{DIM}{}{DIM:#}\n", entry.config));
+    }
+    // What makes the whole Item less certain, such as a location that could
+    // hold a winning Entry and could not be read.
+    for caveat in &item.caveats {
+        out.push('\n');
+        for line in terminal::wrap(&format!("{INDENT}{}", caveat.sentence), width) {
+            out.push_str(&plain_line(&line, width));
+        }
     }
     out
 }
@@ -1199,6 +1211,16 @@ fn render_preview(
         for warning in warnings {
             let text = format!("{INDENT}[{}] {}", warning.class.code(), warning.sentence);
             for line in terminal::wrap(&text, width) {
+                out.push_str(&plain_line(&line, width));
+            }
+        }
+    }
+
+    if !preview.info.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Good to know", BOLD, width));
+        for info in &preview.info {
+            for line in terminal::wrap(&format!("{INDENT}{}", info.sentence), width) {
                 out.push_str(&plain_line(&line, width));
             }
         }
@@ -1424,9 +1446,10 @@ fn edit_label(op: api::EditOp) -> &'static str {
 
 fn state_after_label(state: api::StateAfter) -> &'static str {
     match state {
-        api::StateAfter::Effective => "Effective",
-        api::StateAfter::Shadowed => "Shadowed",
-        api::StateAfter::Disabled => "Disabled",
+        api::StateAfter::Effective => state_label(api::State::Effective),
+        api::StateAfter::Shadowed => state_label(api::State::Shadowed),
+        api::StateAfter::Disabled => state_label(api::State::Disabled),
+        api::StateAfter::Invalid => state_label(api::State::Invalid),
         api::StateAfter::Removed => "removed",
     }
 }
@@ -1436,6 +1459,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
         api::StateAfter::Effective => state_style(api::State::Effective),
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
         api::StateAfter::Disabled => state_style(api::State::Disabled),
+        api::StateAfter::Invalid => state_style(api::State::Invalid),
         api::StateAfter::Removed => AnsiColor::Red.on_default(),
     }
 }
@@ -1445,6 +1469,7 @@ fn state_label(state: api::State) -> &'static str {
         api::State::Effective => "Effective",
         api::State::Shadowed => "Shadowed",
         api::State::Disabled => "Disabled",
+        api::State::Invalid => "Invalid",
     }
 }
 
@@ -1454,6 +1479,7 @@ fn state_style(state: api::State) -> Style {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
         api::State::Disabled => AnsiColor::Yellow.on_default(),
+        api::State::Invalid => AnsiColor::Red.on_default(),
     }
 }
 

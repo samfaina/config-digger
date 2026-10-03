@@ -312,6 +312,9 @@ pub struct Preview {
     pub changes: Vec<Change>,
     /// For each Item that keeps Entries, which one is Effective afterwards.
     pub effective: Vec<EffectiveChange>,
+    /// What to know before applying it, with nothing to acknowledge, such
+    /// as a location that could change the outcome and cannot be read.
+    pub info: Vec<Info>,
     pub files: Vec<FileChange>,
     /// The backed-up copies a Delete backup deletes for good.
     pub deleted: Vec<PathBuf>,
@@ -320,6 +323,28 @@ pub struct Preview {
     pub backup_folder: PathBuf,
     /// The same, as a sentence.
     pub backup_note: String,
+}
+
+/// Something a preview says before an Operation is applied, which needs no
+/// acknowledgement.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Info {
+    pub code: InfoCode,
+    /// The location it is about.
+    pub path: PathBuf,
+    /// What to know, as a sentence rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum InfoCode {
+    /// A location that could change the States after the Operation is a
+    /// Read failure, so they may differ from the prediction.
+    ReadFailure,
+    /// A file the Operation writes is a Read failure for an Agent, which
+    /// still rejects it afterwards.
+    StillRejected,
 }
 
 /// An Entry's State in one Agent and context, before and after an Operation.
@@ -344,6 +369,7 @@ pub enum StateAfter {
     Effective,
     Shadowed,
     Disabled,
+    Invalid,
     Removed,
 }
 
@@ -353,6 +379,7 @@ impl From<State> for StateAfter {
             State::Effective => StateAfter::Effective,
             State::Shadowed => StateAfter::Shadowed,
             State::Disabled => StateAfter::Disabled,
+            State::Invalid => StateAfter::Invalid,
         }
     }
 }
@@ -653,7 +680,10 @@ pub struct Inventory {
     pub homes: Vec<Home>,
     /// Sorted by Agent, home, Item kind and name.
     pub items: Vec<Item>,
+    /// Every Read failure the scan met, in any context.
     pub read_failures: Vec<ReadFailure>,
+    /// The problems of Agent homes in the context, such as one that cannot start.
+    pub agent_flags: Vec<AgentFlag>,
 }
 
 impl Inventory {
@@ -702,6 +732,9 @@ pub struct Item {
     pub state: State,
     /// In precedence order, highest first.
     pub entries: Vec<Entry>,
+    /// What makes its State less certain, such as a location that could
+    /// take part and could not be read.
+    pub caveats: Vec<Caveat>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -751,6 +784,9 @@ pub struct Entry {
     /// For a Disabled Entry, what Enable writes, as a sentence rendered by
     /// the core.
     pub enable: Option<String>,
+    /// What makes its State less certain, such as a Disable switch that
+    /// cannot be read.
+    pub caveats: Vec<Caveat>,
 }
 
 /// The State a Disabled Entry would have once Enabled.
@@ -853,6 +889,9 @@ pub enum State {
     /// The Agent skips it because a switch Disables it, natively or set by
     /// config-digger.
     Disabled,
+    /// The Agent rejects it on its own, such as a server missing what the
+    /// Agent requires.
+    Invalid,
 }
 
 /// Why an Entry has its State.
@@ -877,6 +916,8 @@ pub enum ReasonCode {
     DisabledByName,
     /// The Entry's own switch is off.
     DisabledNatively,
+    /// The Entry lacks the minimal shape the Agent requires of it.
+    MalformedEntry,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.
@@ -886,7 +927,131 @@ pub struct ReadFailure {
     pub agent_name: String,
     pub home: String,
     pub path: PathBuf,
+    /// The Project whose folder holds the location, or `None` for a
+    /// location outside any Project, which reaches every context.
+    pub project: Option<PathBuf>,
     pub kind: ReadFailureKind,
+    /// Where a parse error is, when the parser knows. A Read failure never
+    /// quotes the file, which can hold a Secret.
+    pub position: Option<Position>,
+    /// What the Agent does about it, as its definition says.
+    pub reaction: ReadFailureReaction,
+    /// The failure as a sentence, rendered by the core.
+    pub sentence: String,
+    /// What else to know, such as that the Agent asks about the file at
+    /// startup, as sentences rendered by the core.
+    pub notes: Vec<String>,
+    /// How the Agent's own recovery may lose configuration if the file is
+    /// not fixed before it starts.
+    pub warnings: Vec<RiskWarning>,
+}
+
+/// What an Agent does with a location it cannot read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFailureReaction {
+    /// It starts without the location's Entries.
+    IgnoresFile,
+    /// It asks about the file at startup, and otherwise starts without its Entries.
+    AsksUser,
+    /// What it does is not known, so every Item in the contexts the
+    /// location reaches gets a caveat.
+    Unknown,
+    /// It refuses to start in the contexts the location reaches, which
+    /// flags it as unable to start there.
+    StopsAgent,
+}
+
+impl From<definitions::ReadFailureReaction> for ReadFailureReaction {
+    fn from(reaction: definitions::ReadFailureReaction) -> Self {
+        match reaction {
+            definitions::ReadFailureReaction::IgnoresFile => ReadFailureReaction::IgnoresFile,
+            definitions::ReadFailureReaction::AsksUser => ReadFailureReaction::AsksUser,
+            definitions::ReadFailureReaction::Unknown => ReadFailureReaction::Unknown,
+            definitions::ReadFailureReaction::StopsAgent => ReadFailureReaction::StopsAgent,
+        }
+    }
+}
+
+/// A way the Agent's own recovery from a Read failure can lose configuration.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct RiskWarning {
+    pub code: RiskCode,
+    /// The risk as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+pub enum RiskCode {
+    /// The Agent may offer to reset the file, losing what it holds.
+    #[serde(rename = "agent_may_reset_file")]
+    ResetFile,
+    /// The Agent may write the file again from empty, dropping its Entries.
+    #[serde(rename = "agent_may_drop_entries")]
+    DropEntries,
+    /// The Agent may clear the sign-in state of servers that vanish.
+    #[serde(rename = "agent_may_clear_auth")]
+    ClearAuth,
+}
+
+impl From<definitions::RiskCode> for RiskCode {
+    fn from(code: definitions::RiskCode) -> Self {
+        match code {
+            definitions::RiskCode::ResetFile => RiskCode::ResetFile,
+            definitions::RiskCode::DropEntries => RiskCode::DropEntries,
+            definitions::RiskCode::ClearAuth => RiskCode::ClearAuth,
+        }
+    }
+}
+
+/// A problem of an Agent home in the context, shown above its Items.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct AgentFlag {
+    pub agent: String,
+    pub agent_name: String,
+    pub home: String,
+    pub code: AgentFlagCode,
+    /// The location that causes it.
+    pub path: PathBuf,
+    /// The problem as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentFlagCode {
+    /// The Agent refuses to start in the context.
+    CannotStart,
+}
+
+/// Something that makes a State less certain than it looks.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Caveat {
+    pub code: CaveatCode,
+    /// The location it is about.
+    pub path: PathBuf,
+    /// The caveat as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum CaveatCode {
+    /// A location that could take part in the context is a Read failure,
+    /// and what the Agent does about it is not known.
+    ReadFailure,
+    /// A file holding a Disable switch that could apply is a Read failure,
+    /// so the Entry is resolved as if the switch were not set.
+    SwitchReadFailure,
+}
+
+/// A place in a file's text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+pub struct Position {
+    /// 1-based.
+    pub line: u32,
+    /// 1-based, in characters.
+    pub column: u32,
 }
 
 impl ReadFailure {
@@ -895,15 +1060,28 @@ impl ReadFailure {
     pub(crate) fn same_reader_and_location(&self, other: &ReadFailure) -> bool {
         self.agent == other.agent && self.home == other.home && self.path == other.path
     }
+
+    /// Whether it reaches the context of `project`, or of no Project: one
+    /// outside any Project reaches every context.
+    pub(crate) fn reaches(&self, project: Option<&Path>) -> bool {
+        self.project.is_none() || self.project.as_deref() == project
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFailureKind {
+    /// The text does not parse in the reader's dialect, or holds a shape
+    /// where Entries are that config-digger cannot enumerate.
     Parse,
+    /// The bytes do not decode into text the way the Agent decodes them.
     Decode,
+    /// The file cannot be opened for lack of permission.
     Permission,
+    /// The file cannot be opened or read for another reason.
     Io,
+    /// A SQLite store cannot be opened or queried.
+    Sqlite,
 }
 
 impl ReadFailureKind {
@@ -914,6 +1092,7 @@ impl ReadFailureKind {
             ReadFailureKind::Decode => "decode",
             ReadFailureKind::Permission => "permission",
             ReadFailureKind::Io => "io",
+            ReadFailureKind::Sqlite => "sqlite",
         }
     }
 }

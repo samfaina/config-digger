@@ -41,22 +41,24 @@ registries = [{ block = "json-keys", anchor = { block = "home", root = "state" }
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".test-agent.json" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["servers"]
 kind = "mcp"
 scope = "project"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 
 [[locations]]
 id = "user-mcp"
 anchor = { block = "home", root = "state" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 
 [items.mcp]
 precedence = ["project-mcp", "user-mcp"]

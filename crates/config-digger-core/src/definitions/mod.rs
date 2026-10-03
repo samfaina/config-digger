@@ -5,7 +5,7 @@ pub(crate) mod blocks;
 
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    Provenance, Register, Registry, SessionFiles, StoreClass, Validate,
+    Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -192,6 +192,47 @@ pub(crate) struct LocationDefinition {
     /// do, beyond what the core masks by default.
     #[serde(default)]
     pub secrets: SecretFields,
+    /// What the Agent does when it cannot open, decode or parse the location.
+    pub on_read_failure: ReadFailureReaction,
+    /// How the Agent's own recovery from a Read failure here can lose
+    /// configuration, shown as warnings on the Read failure.
+    #[serde(default)]
+    pub risks: Vec<RiskCode>,
+    /// The minimal shape the Agent requires of the location's Entries:
+    /// one without it is Invalid. Without it, no Entry here is Invalid.
+    pub shape: Option<Shape>,
+}
+
+/// What an Agent does with a location it cannot read. Declared from the
+/// mildest to the strongest: a file several locations of one Agent read
+/// takes the strongest of their reactions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ReadFailureReaction {
+    /// It starts without the location's Entries.
+    IgnoresFile,
+    /// It asks the user at startup what to do with the file, and otherwise
+    /// starts without its Entries.
+    AsksUser,
+    /// What it does is not known: every Item in the contexts the location
+    /// reaches gets a caveat.
+    Unknown,
+    /// It refuses to start in the contexts the location reaches.
+    StopsAgent,
+}
+
+/// How an Agent's own recovery from a Read failure can lose configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+pub(crate) enum RiskCode {
+    /// It may offer to reset the file, losing what it holds.
+    #[serde(rename = "agent_may_reset_file")]
+    ResetFile,
+    /// It may write the file again from empty, dropping its Entries.
+    #[serde(rename = "agent_may_drop_entries")]
+    DropEntries,
+    /// It may clear the sign-in state of servers that vanish.
+    #[serde(rename = "agent_may_clear_auth")]
+    ClearAuth,
 }
 
 /// Key paths below an Entry, one key per segment, where `*` stands for any
@@ -272,6 +313,10 @@ pub(crate) enum Check {
     Disable,
     /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
     Precedence,
+    /// The Entry lacks the minimal shape its location declares: Invalid.
+    /// Required when a location of the kind declares a shape, and refused
+    /// otherwise.
+    Shape,
 }
 
 impl AgentDefinition {
@@ -360,6 +405,9 @@ impl AgentDefinition {
                 interpolation.validate().map_err(context)?;
             }
             location.secrets.validate().map_err(context)?;
+            if let Some(shape) = &location.shape {
+                shape.validate().map_err(context)?;
+            }
             self.validate_home_root(&location.anchor).map_err(context)?;
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
@@ -411,6 +459,31 @@ impl AgentDefinition {
                     _ => return Err(context(format!("checks holds `{}` twice", check.id()))),
                 }
             }
+            let shaped = self
+                .locations
+                .iter()
+                .any(|location| location.kind == *kind && location.shape.is_some());
+            match (
+                rules
+                    .checks
+                    .iter()
+                    .filter(|known| **known == Check::Shape)
+                    .count(),
+                shaped,
+            ) {
+                (1, true) | (0, false) => {}
+                (0, true) => {
+                    return Err(context(
+                        "checks leaves out `shape`, which a location declares".into(),
+                    ));
+                }
+                (_, true) => return Err(context("checks holds `shape` twice".into())),
+                (_, false) => {
+                    return Err(context(
+                        "checks holds `shape`, but no location declares one".into(),
+                    ));
+                }
+            }
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
@@ -454,6 +527,7 @@ impl Check {
         match self {
             Check::Disable => "disable",
             Check::Precedence => "precedence",
+            Check::Shape => "shape",
         }
     }
 }
@@ -498,12 +572,13 @@ id = "user"
 [[locations]]
 id = "user-mcp"
 anchor = { block = "home", root = "state" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 
 [items.mcp]
 precedence = ["user-mcp"]
@@ -518,12 +593,13 @@ checks = ["disable", "precedence"]
 [[locations]]
 id = "local-mcp"
 anchor = {local_anchor}
-format = {{ block = "json" }}
+format = {{ block = "json", dialect = "strict" }}
 root = {local_root}
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 "#
         );
         VALID
@@ -715,15 +791,18 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     #[test]
     fn unknown_fields_inside_a_block_are_rejected() {
         let text = VALID.replace(
-            r#"{ block = "json" }"#,
-            r#"{ block = "json", comments = true }"#,
+            r#"{ block = "json", dialect = "strict" }"#,
+            r#"{ block = "json", dialect = "strict", comments = true }"#,
         );
         assert!(error(&text).contains("comments"), "{}", error(&text));
     }
 
     #[test]
     fn unknown_blocks_are_rejected() {
-        let text = VALID.replace(r#"{ block = "json" }"#, r#"{ block = "yaml" }"#);
+        let text = VALID.replace(
+            r#"{ block = "json", dialect = "strict" }"#,
+            r#"{ block = "yaml" }"#,
+        );
         assert!(error(&text).contains("yaml"), "{}", error(&text));
     }
 
@@ -909,6 +988,54 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
             r#"checks = ["disable", "precedence", "disable"]"#,
         );
         assert!(error(&text).contains("twice"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_needs_the_shape_check_and_the_shape_check_needs_a_shape() {
+        let shaped = VALID.replace(
+            "on_read_failure = \"ignores_file\"
+",
+            "on_read_failure = \"ignores_file\"
+shape = { block = \"fields\", one_of = [\"command\"] }
+",
+        );
+        assert!(
+            error(&shaped).contains("leaves out `shape`"),
+            "{}",
+            error(&shaped)
+        );
+        let checked = shaped.replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(parse("test.toml", &checked).is_ok(), "{}", error(&checked));
+        let unshaped = VALID.replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(
+            error(&unshaped).contains("no location declares one"),
+            "{}",
+            error(&unshaped)
+        );
+    }
+
+    #[test]
+    fn an_empty_shape_is_rejected() {
+        let text = VALID
+            .replace(
+                "on_read_failure = \"ignores_file\"
+",
+                "on_read_failure = \"ignores_file\"
+shape = { block = \"fields\" }
+",
+            )
+            .replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(error(&text).contains("one_of or types"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_location_needs_a_read_failure_reaction() {
+        let text = VALID.replace(
+            "on_read_failure = \"ignores_file\"
+",
+            "",
+        );
+        assert!(error(&text).contains("on_read_failure"), "{}", error(&text));
     }
 
     #[test]

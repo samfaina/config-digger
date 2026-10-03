@@ -125,7 +125,9 @@ mod tests {
                     sentence: String::new(),
                 },
                 enable: None,
+                caveats: Vec::new(),
             }],
+            caveats: Vec::new(),
         }
     }
 
@@ -137,6 +139,7 @@ mod tests {
             homes: Vec::new(),
             items,
             read_failures: Vec::new(),
+            agent_flags: Vec::new(),
         }
     }
 

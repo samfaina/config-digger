@@ -267,7 +267,7 @@ impl Register for JsonKeys {
     }
 
     fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
-        let document = JsonFormat {}.parse(text)?;
+        let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
             .iter()
@@ -412,12 +412,14 @@ pub(crate) trait Parse {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Format {
     Json(JsonFormat),
+    Toml(TomlFormat),
 }
 
 impl Validate for Format {
     fn validate(&self) -> Result<(), String> {
         match self {
             Format::Json(block) => block.validate(),
+            Format::Toml(block) => block.validate(),
         }
     }
 }
@@ -426,26 +428,45 @@ impl Parse for Format {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
         match self {
             Format::Json(block) => block.parse(text),
+            Format::Toml(block) => block.parse(text),
         }
     }
 
     fn dialect(&self) -> &'static str {
         match self {
             Format::Json(block) => block.dialect(),
+            Format::Toml(block) => block.dialect(),
         }
     }
 
     fn syntax(&self) -> Syntax {
         match self {
             Format::Json(block) => block.syntax(),
+            Format::Toml(block) => block.syntax(),
         }
     }
 }
 
-/// Strict JSON: no comments, no trailing commas.
+/// JSON, in the dialect the Agent reads it in.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct JsonFormat {}
+pub(crate) struct JsonFormat {
+    pub dialect: JsonDialect,
+}
+
+/// How much a reader accepts beyond strict JSON. A file one reader
+/// rejects can still yield Entries for a reader with a looser dialect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum JsonDialect {
+    /// No comments, no trailing commas.
+    Strict,
+    /// `//` and `/* */` comments, and no trailing comma, such as Gemini
+    /// CLI's settings.
+    WithComments,
+    /// Comments and trailing commas, such as Cursor's and VS Code's files.
+    Jsonc,
+}
 
 impl Validate for JsonFormat {
     fn validate(&self) -> Result<(), String> {
@@ -453,21 +474,94 @@ impl Validate for JsonFormat {
     }
 }
 
+impl JsonFormat {
+    /// Strict JSON, as a registry or a Disable switch's file is read.
+    pub const STRICT: JsonFormat = JsonFormat {
+        dialect: JsonDialect::Strict,
+    };
+}
+
 impl Parse for JsonFormat {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
-        serde_json::from_str(text).map_err(|error| ParseError {
-            position: (error.line() > 0).then(|| (error.line(), error.column())),
+        let trailing_commas = match self.dialect {
+            JsonDialect::Strict => {
+                return serde_json::from_str(text).map_err(|error| ParseError {
+                    position: (error.line() > 0).then(|| (error.line(), error.column())),
+                });
+            }
+            JsonDialect::WithComments => false,
+            JsonDialect::Jsonc => true,
+        };
+        let options = jsonc_parser::ParseOptions {
+            allow_comments: true,
+            allow_trailing_commas: trailing_commas,
+            allow_loose_object_property_names: false,
+            allow_missing_commas: false,
+            allow_single_quoted_strings: false,
+            allow_hexadecimal_numbers: false,
+            allow_unary_plus_numbers: false,
+            allow_bare_decimal_point_numbers: false,
+            allow_non_finite_numbers: false,
+            allow_extended_string_escapes: false,
+        };
+        let parsed: Option<serde_json::Value> = jsonc_parser::parse_to_serde_value(text, &options)
+            .map_err(|error| ParseError {
+                position: (error.line_display() > 0)
+                    .then(|| (error.line_display(), error.column_display())),
+            })?;
+        // An empty file holds no JSON value.
+        parsed.ok_or(ParseError { position: None })
+    }
+
+    fn dialect(&self) -> &'static str {
+        match self.dialect {
+            JsonDialect::Strict => "strict JSON",
+            JsonDialect::WithComments => "JSON with comments",
+            JsonDialect::Jsonc => "JSONC with trailing commas",
+        }
+    }
+
+    /// JSON in every dialect is edited as JSONC, which accepts it as it is.
+    fn syntax(&self) -> Syntax {
+        Syntax::Jsonc
+    }
+}
+
+/// TOML.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TomlFormat {}
+
+impl Validate for TomlFormat {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Parse for TomlFormat {
+    fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
+        toml::from_str(text).map_err(|error| ParseError {
+            position: error.span().map(|span| line_and_column(text, span.start)),
         })
     }
 
     fn dialect(&self) -> &'static str {
-        "strict JSON"
+        "TOML"
     }
 
-    /// Strict JSON is edited as JSONC, which accepts it as it is.
     fn syntax(&self) -> Syntax {
-        Syntax::Jsonc
+        Syntax::Toml
     }
+}
+
+/// The 1-based line and column, in characters, of the byte offset `at` in `text`.
+fn line_and_column(text: &str, at: usize) -> (usize, usize) {
+    let before = &text[..at.min(text.len())];
+    let line_start = before.rfind('\n').map_or(0, |newline| newline + 1);
+    (
+        before.matches('\n').count() + 1,
+        before[line_start..].chars().count() + 1,
+    )
 }
 
 // --- Interpolation ----------------------------------------------------------
@@ -651,6 +745,144 @@ impl Validate for ExactName {
 impl Compete for ExactName {
     fn key(&self, name: &str) -> String {
         name.to_owned()
+    }
+}
+
+// --- Shapes -----------------------------------------------------------------
+
+/// Why an Entry does not have the minimal shape its Agent requires.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Malformed {
+    /// The Entry is not an object.
+    NotAnObject,
+    /// It holds none of these fields.
+    Missing(Vec<String>),
+    /// This field holds another type than the Agent reads.
+    WrongType(String, FieldType),
+}
+
+/// Checks an Entry against the minimal shape its Agent requires. Keys the
+/// shape does not name are never flagged.
+pub(crate) trait Conform {
+    /// Why `value` does not conform, if it does not.
+    fn malformed(&self, value: &Value) -> Option<Malformed>;
+
+    /// Whether an Entry that does not conform still competes by name, as
+    /// when the Agent lists it and fails to start it.
+    fn still_competes(&self) -> bool;
+}
+
+/// The minimal shape of the Entries of a location.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Shape {
+    Fields(FieldShape),
+}
+
+impl Validate for Shape {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Shape::Fields(block) => block.validate(),
+        }
+    }
+}
+
+impl Conform for Shape {
+    fn malformed(&self, value: &Value) -> Option<Malformed> {
+        match self {
+            Shape::Fields(block) => block.malformed(value),
+        }
+    }
+
+    fn still_competes(&self) -> bool {
+        match self {
+            Shape::Fields(block) => block.still_competes(),
+        }
+    }
+}
+
+/// An object that holds at least one of some fields, each field it holds
+/// being of the type the Agent reads.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FieldShape {
+    /// The Entry must hold at least one of these, such as `command` or `url`.
+    #[serde(default)]
+    pub one_of: Vec<String>,
+    /// The type of each field, when the Entry holds it.
+    #[serde(default)]
+    pub types: BTreeMap<String, FieldType>,
+    /// Whether an Entry without this shape still competes by name.
+    #[serde(default)]
+    pub still_competes: bool,
+}
+
+/// The type of a field's value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum FieldType {
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    /// A list of strings.
+    StringArray,
+    /// An object whose values are strings.
+    StringMap,
+}
+
+impl FieldType {
+    fn holds(self, value: &Value) -> bool {
+        match self {
+            FieldType::String => value.is_string(),
+            FieldType::Number => value.is_number(),
+            FieldType::Boolean => value.is_boolean(),
+            FieldType::Array => value.is_array(),
+            FieldType::Object => value.is_object(),
+            FieldType::StringArray => value
+                .as_array()
+                .is_some_and(|items| items.iter().all(Value::is_string)),
+            FieldType::StringMap => value
+                .as_object()
+                .is_some_and(|object| object.values().all(Value::is_string)),
+        }
+    }
+}
+
+impl Validate for FieldShape {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(field) = self
+            .one_of
+            .iter()
+            .chain(self.types.keys())
+            .find(|field| field.is_empty())
+        {
+            return Err(format!("a shape field `{field}` must not be empty"));
+        }
+        if self.one_of.is_empty() && self.types.is_empty() {
+            return Err("a shape needs one_of or types".into());
+        }
+        Ok(())
+    }
+}
+
+impl Conform for FieldShape {
+    fn malformed(&self, value: &Value) -> Option<Malformed> {
+        let Value::Object(object) = value else {
+            return Some(Malformed::NotAnObject);
+        };
+        if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
+            return Some(Malformed::Missing(self.one_of.clone()));
+        }
+        self.types.iter().find_map(|(field, &kind)| {
+            let value = object.get(field)?;
+            (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
+        })
+    }
+
+    fn still_competes(&self) -> bool {
+        self.still_competes
     }
 }
 

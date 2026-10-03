@@ -481,12 +481,13 @@ mod tests {
             r#"
 id = "user-mcp"
 anchor = {{ block = "home", root = "state" }}
-format = {{ block = "json" }}
+format = {{ block = "json", dialect = "strict" }}
 root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 {extra}
 "#
         );

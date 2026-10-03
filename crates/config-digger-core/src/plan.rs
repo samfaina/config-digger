@@ -4,8 +4,8 @@
 
 use crate::api::{
     self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, State, StateAfter, Targets,
-    Warning, WarningClass,
+    FileChange, FileDiff, Info, InfoCode, Inventory, Preview, ReadFailure, ReadFailureKind,
+    ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -349,6 +349,7 @@ impl Targeted<'_> {
             changes,
             effective,
             &files,
+            &self.before.read_failures,
         )?;
         let running = running::check(self.definitions, self.ports, &files);
         let mut warnings = warnings(&files, running.warning);
@@ -429,6 +430,7 @@ pub(crate) fn plan_undo(
         changes,
         effective,
         &files,
+        &before.read_failures,
     )?;
     let running = running::check(definitions, ports, &files);
     Ok(Planned {
@@ -473,6 +475,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         project: None,
         changes: Vec::new(),
         effective: Vec::new(),
+        info: Vec::new(),
         files: Vec::new(),
         deleted,
         backup_note: explain::delete_backup_note(id),
@@ -785,8 +788,11 @@ fn preview(
     changes: Vec<Change>,
     effective: Vec<EffectiveChange>,
     files: &[PlannedFile],
+    read_failures: &[ReadFailure],
 ) -> Result<Preview, Error> {
     let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
+    refuse_read_failure_targets(read_failures, &changes, files)?;
+    let info = read_failure_info(read_failures, &changes, files);
     Ok(Preview {
         action,
         title,
@@ -795,6 +801,7 @@ fn preview(
         project,
         changes,
         effective,
+        info,
         files: files
             .iter()
             .map(|file| {
@@ -824,6 +831,71 @@ fn preview(
         backup_note: explain::backup_note(&backup_folder),
         backup_folder,
     })
+}
+
+/// Refuses a plan that must write a file in `files` that is one of
+/// `read_failures` for an Agent home whose States it changes in `changes`,
+/// or that cannot be opened or decoded at all: config-digger never writes a
+/// file it cannot read.
+fn refuse_read_failure_targets(
+    read_failures: &[ReadFailure],
+    changes: &[Change],
+    files: &[PlannedFile],
+) -> Result<(), Error> {
+    for failure in read_failures {
+        if !files.iter().any(|file| file.path == failure.path) {
+            continue;
+        }
+        let acting = changes
+            .iter()
+            .any(|change| change.agent == failure.agent && change.home == failure.home);
+        if acting || failure.kind != ReadFailureKind::Parse {
+            return Err(Error::blocked(explain::read_failure_target(
+                &failure.path,
+                &failure.sentence,
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// What the preview of a plan that writes `files` and changes the States
+/// `changes` says about `read_failures`, with nothing to acknowledge: that
+/// another Agent still rejects a file it writes, and that a Read failure
+/// which could change the outcome may make the States after differ.
+fn read_failure_info(
+    read_failures: &[ReadFailure],
+    changes: &[Change],
+    files: &[PlannedFile],
+) -> Vec<Info> {
+    let mut info = Vec::new();
+    for failure in read_failures {
+        if files.iter().any(|file| file.path == failure.path) {
+            info.push(Info {
+                code: InfoCode::StillRejected,
+                path: failure.path.clone(),
+                sentence: explain::still_rejected(
+                    &failure.agent_name,
+                    &failure.path,
+                    &failure.sentence,
+                ),
+            });
+            continue;
+        }
+        let could_change = changes.iter().any(|change| {
+            change.agent == failure.agent
+                && change.home == failure.home
+                && failure.reaches(change.project.as_deref())
+        });
+        if could_change {
+            info.push(Info {
+                code: InfoCode::ReadFailure,
+                path: failure.path.clone(),
+                sentence: explain::outcome_may_differ(&failure.agent_name, &failure.path),
+            });
+        }
+    }
+    info
 }
 
 /// What a plan that edits `files` must have acknowledged: one warning for

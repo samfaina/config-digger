@@ -2,13 +2,14 @@
 //! to the Items of every Agent home and the State of each Entry.
 
 use crate::api::{self, Context};
-use crate::definitions::AgentDefinition;
-use crate::definitions::Check;
-use crate::definitions::blocks::Compete;
+use crate::definitions::blocks::{Compete, Conform, JsonFormat, Malformed, Parse};
+use crate::definitions::{
+    AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
+};
 use crate::disable::{self, ContextProject, Hit};
-use crate::scan::{ScannedEntry, Snapshot};
+use crate::scan::{ScannedEntry, ScannedReadFailure, Snapshot};
 use crate::{explain, locator, paths};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub(crate) fn resolve(
@@ -54,6 +55,12 @@ pub(crate) fn resolve(
         .as_ref()
         .map(|(path, key)| ContextProject { path, key });
 
+    let reactions: Vec<Reaction> = snapshot
+        .read_failures
+        .iter()
+        .map(|failure| reaction(definitions, snapshot, failure))
+        .collect();
+
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
@@ -88,8 +95,27 @@ pub(crate) fn resolve(
                     disable::hits(definition, snapshot, entry, project_key.map(String::as_str))
                 })
                 .collect();
-            // The Agent skips a Disabled Entry, so the highest of the others wins.
-            let effective = (0..entries.len()).find(|&index| hits[index].0.is_empty());
+            // Why each Entry lacks the minimal shape its location declares.
+            let malformed: Vec<Option<Malformed>> = entries
+                .iter()
+                .map(|entry| {
+                    let shape = definition.location(&entry.location).shape.as_ref()?;
+                    shape.malformed(&entry.config)
+                })
+                .collect();
+            // An Invalid Entry competes only where the Agent still lists it.
+            let competes = |index: usize| {
+                malformed[index].is_none()
+                    || definition
+                        .location(&entries[index].location)
+                        .shape
+                        .as_ref()
+                        .is_some_and(Conform::still_competes)
+            };
+            // The Agent skips a Disabled Entry, and an Invalid one that does
+            // not compete, so the highest of the others wins.
+            let winner =
+                (0..entries.len()).find(|&index| hits[index].0.is_empty() && competes(index));
             let shadowed_by = |index: usize, winner: usize| {
                 explain::shadowed_by_precedence(
                     agent_name,
@@ -113,8 +139,17 @@ pub(crate) fn resolve(
                                     .iter()
                                     .map(|hit| (api::State::Disabled, hit.reason(agent_name))),
                             ),
+                            Check::Shape => {
+                                if let Some(malformed) = &malformed[index] {
+                                    let competes = competes(index);
+                                    failed.push((
+                                        api::State::Invalid,
+                                        explain::malformed_entry(agent_name, malformed, competes),
+                                    ));
+                                }
+                            }
                             Check::Precedence => {
-                                if let Some(winner) = effective.filter(|&winner| winner < index) {
+                                if let Some(winner) = winner.filter(|&winner| winner < index) {
                                     failed.push((api::State::Shadowed, shadowed_by(index, winner)));
                                 }
                             }
@@ -135,21 +170,28 @@ pub(crate) fn resolve(
                                 .all(|hit| disabling.iter().any(|own| own.same_switch(hit)))
                         };
                         let winner = (0..entries.len())
-                            .find(|&other| lifted(other))
-                            .expect("the Entry itself is lifted");
-                        if winner == index {
-                            return api::WhatIf {
-                                state: api::State::Effective,
-                                effective: None,
-                                sentence: explain::what_if(None),
+                            .find(|&other| lifted(other) && competes(other))
+                            .filter(|&winner| winner < index);
+                        let Some(winner) = winner else {
+                            let state = match malformed[index] {
+                                Some(_) => api::State::Invalid,
+                                None => api::State::Effective,
                             };
-                        }
+                            return api::WhatIf {
+                                state,
+                                effective: None,
+                                sentence: explain::what_if(state, None),
+                            };
+                        };
                         let scope = &definition.location(&entries[winner].location).scope;
                         let effective =
                             locator::render(&entries[winner].path, &entries[winner].key_path);
                         api::WhatIf {
                             state: api::State::Shadowed,
-                            sentence: explain::what_if(Some((scope, &effective))),
+                            sentence: explain::what_if(
+                                api::State::Shadowed,
+                                Some((scope, &effective)),
+                            ),
                             effective: Some(effective),
                         }
                     });
@@ -186,15 +228,44 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
+                        caveats: disable::failed_switch_files(
+                            definition,
+                            snapshot,
+                            entry,
+                            context_project.as_ref(),
+                        )
+                        .into_iter()
+                        .map(|path| api::Caveat {
+                            code: api::CaveatCode::SwitchReadFailure,
+                            sentence: explain::switch_read_failure(&path),
+                            path,
+                        })
+                        .collect(),
                     }
                 })
                 .collect();
-            // An Item is in use when one of its Entries is Effective.
-            let state = if effective.is_some() {
-                api::State::Effective
-            } else {
-                api_entries[0].state
-            };
+            // An Item takes the State of the Entry the Agent uses, if any:
+            // Effective, or Invalid when it is malformed and still competes.
+            let state = api_entries[winner.unwrap_or(0)].state;
+            // A location the Agent may or may not read without could hold
+            // an Entry of the Item.
+            let caveats = snapshot
+                .read_failures
+                .iter()
+                .zip(&reactions)
+                .filter(|(failure, reaction)| {
+                    failure.agent_index == agent
+                        && failure.home == home
+                        && reaction.strongest == ReadFailureReaction::Unknown
+                        && reaction.kinds.contains(&kind)
+                        && failure.reaches(project_key.map(String::as_str))
+                })
+                .map(|(failure, _)| api::Caveat {
+                    code: api::CaveatCode::ReadFailure,
+                    path: failure.path.clone(),
+                    sentence: explain::read_failure_caveat(agent_name, &failure.path),
+                })
+                .collect();
             api::Item {
                 agent: definition.agent.id.clone(),
                 home: home.to_owned(),
@@ -202,6 +273,7 @@ pub(crate) fn resolve(
                 name,
                 state,
                 entries: api_entries,
+                caveats,
             }
         })
         .collect();
@@ -209,14 +281,65 @@ pub(crate) fn resolve(
     let read_failures = snapshot
         .read_failures
         .iter()
-        .map(|failure| {
+        .zip(&reactions)
+        .map(|(failure, reaction)| {
             let agent = &definitions[failure.agent_index].agent;
             api::ReadFailure {
                 agent: agent.id.clone(),
                 agent_name: agent.name.clone(),
                 home: failure.home.clone(),
                 path: failure.path.clone(),
+                project: failure
+                    .project
+                    .as_ref()
+                    .map(|key| project_path(snapshot, key)),
                 kind: failure.kind,
+                position: failure.position.map(|(line, column)| api::Position {
+                    line: line.try_into().unwrap_or(u32::MAX),
+                    column: column.try_into().unwrap_or(u32::MAX),
+                }),
+                reaction: reaction.strongest.into(),
+                sentence: explain::read_failure(
+                    &agent.name,
+                    &failure.path,
+                    failure.kind,
+                    reaction.dialect,
+                    failure.position,
+                ),
+                notes: (reaction.strongest == ReadFailureReaction::AsksUser)
+                    .then(|| explain::asks_user(&agent.name))
+                    .into_iter()
+                    .collect(),
+                warnings: reaction
+                    .risks
+                    .iter()
+                    .map(|&code| api::RiskWarning {
+                        code: code.into(),
+                        sentence: explain::risk(&agent.name, code.into()),
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+
+    // An Agent refuses to start in each context a location that stops it reaches.
+    let agent_flags = snapshot
+        .read_failures
+        .iter()
+        .zip(&reactions)
+        .filter(|(failure, reaction)| {
+            reaction.strongest == ReadFailureReaction::StopsAgent
+                && failure.reaches(project_key.map(String::as_str))
+        })
+        .map(|(failure, _)| {
+            let agent = &definitions[failure.agent_index].agent;
+            api::AgentFlag {
+                agent: agent.id.clone(),
+                agent_name: agent.name.clone(),
+                home: failure.home.clone(),
+                code: api::AgentFlagCode::CannotStart,
+                path: failure.path.clone(),
+                sentence: explain::cannot_start(&agent.name, &failure.path),
             }
         })
         .collect();
@@ -228,7 +351,63 @@ pub(crate) fn resolve(
         homes,
         items,
         read_failures,
+        agent_flags,
     }
+}
+
+/// What an Agent home does about a file that is a Read failure for it, as
+/// the definition says of the locations it reads there.
+struct Reaction {
+    /// The strongest reaction of those locations; a file only a project
+    /// registry reads is ignored.
+    strongest: ReadFailureReaction,
+    risks: BTreeSet<RiskCode>,
+    /// The dialect the file is parsed in, as a sentence names it.
+    dialect: &'static str,
+    /// The Item kinds whose Entries the file could hold.
+    kinds: BTreeSet<ItemKind>,
+}
+
+fn reaction(
+    definitions: &[AgentDefinition],
+    snapshot: &Snapshot,
+    failure: &ScannedReadFailure,
+) -> Reaction {
+    let definition = &definitions[failure.agent_index];
+    let locations: Vec<&LocationDefinition> = snapshot
+        .readers_of(&failure.path)
+        .iter()
+        .filter(|reader| reader.agent_index == failure.agent_index && reader.home == failure.home)
+        .map(|reader| definition.location(&reader.location))
+        .collect();
+    Reaction {
+        strongest: locations
+            .iter()
+            .map(|location| location.on_read_failure)
+            .max()
+            .unwrap_or(ReadFailureReaction::IgnoresFile),
+        risks: locations
+            .iter()
+            .flat_map(|location| location.risks.iter().copied())
+            .collect(),
+        dialect: locations
+            .first()
+            .map_or(JsonFormat::STRICT.dialect(), |location| {
+                location.format.dialect()
+            }),
+        kinds: locations.iter().map(|location| location.kind).collect(),
+    }
+}
+
+/// The path of the scanned Project whose key is `key`.
+fn project_path(snapshot: &Snapshot, key: &str) -> PathBuf {
+    snapshot
+        .projects
+        .iter()
+        .find(|project| project.key == key)
+        .expect("a Project key comes from the snapshot")
+        .path
+        .clone()
 }
 
 /// The context's Project path and key: a scanned Project that any spelling of

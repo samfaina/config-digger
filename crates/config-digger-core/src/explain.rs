@@ -1,7 +1,10 @@
 //! Explain: turns reason codes into the sentences the front-ends show.
 //! Definitions carry codes and pointers only, never free text.
 
-use crate::api::{Action, OperationStatus, Reason, ReasonCode, Verify};
+use crate::api::{
+    Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, State, Verify,
+};
+use crate::definitions::blocks::{FieldType, Malformed};
 use crate::edit::Edit;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -234,8 +237,9 @@ pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
 
 /// The State a Disabled Entry would have once Enabled: Effective, or
 /// Shadowed by the `scope` Entry `effective`.
-pub(crate) fn what_if(shadowed_by: Option<(&str, &str)>) -> String {
+pub(crate) fn what_if(state: State, shadowed_by: Option<(&str, &str)>) -> String {
     match shadowed_by {
+        None if state == State::Invalid => "Disabled: would be Invalid once Enabled.".to_owned(),
         None => "Disabled: would be Effective once Enabled.".to_owned(),
         Some((scope, effective)) => {
             format!("Disabled: would be Shadowed by the {scope} Entry {effective} once Enabled.")
@@ -469,4 +473,146 @@ fn count(entries: usize) -> String {
         1 => "1 Entry".to_owned(),
         n => format!("{n} Entries"),
     }
+}
+
+/// What a Read failure of `kind` at `path` means for `agent_name`, which
+/// reads the file in `dialect`. It never quotes the file.
+pub(crate) fn read_failure(
+    agent_name: &str,
+    path: &Path,
+    kind: ReadFailureKind,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    let path = path.display();
+    match kind {
+        ReadFailureKind::Parse => {
+            let at = match position {
+                Some((line, column)) => format!(" (line {line}, column {column})"),
+                None => String::new(),
+            };
+            format!(
+                "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
+            )
+        }
+        ReadFailureKind::Decode => {
+            format!("{path} is not text {agent_name} can decode, so it reads no Entries from it.")
+        }
+        ReadFailureKind::Permission => format!(
+            "config-digger has no permission to read {path}, so it lists no {agent_name} Entries from it."
+        ),
+        ReadFailureKind::Io | ReadFailureKind::Sqlite => format!(
+            "config-digger cannot read {path}, so it lists no {agent_name} Entries from it."
+        ),
+    }
+}
+
+/// The note of a Read failure in a file `agent_name` asks about at startup.
+pub(crate) fn asks_user(agent_name: &str) -> String {
+    format!("{agent_name} will ask about this file at startup.")
+}
+
+/// The warning of a Read failure in a file whose recovery by `agent_name`
+/// can lose configuration.
+pub(crate) fn risk(agent_name: &str, code: RiskCode) -> String {
+    let what = match code {
+        RiskCode::ResetFile => "it may reset the file, losing what it holds",
+        RiskCode::DropEntries => "it may write the file again without its Entries",
+        RiskCode::ClearAuth => "it may clear the sign-in of the servers it no longer sees",
+    };
+    format!("Fix this before starting {agent_name}: {what}.")
+}
+
+/// The flag of an Agent that refuses to start because it cannot read `path`.
+pub(crate) fn cannot_start(agent_name: &str, path: &Path) -> String {
+    format!(
+        "{agent_name} won't start: it cannot read {}.",
+        path.display()
+    )
+}
+
+/// The caveat of an Item when a location at `path` that could take part
+/// cannot be read, and what `agent_name` does then is not known.
+pub(crate) fn read_failure_caveat(agent_name: &str, path: &Path) -> String {
+    format!(
+        "A location that could take part couldn't be read: {}, so the State shown may not be the one {agent_name} has.",
+        path.display()
+    )
+}
+
+/// An Invalid Entry's reason: why it lacks the minimal shape `agent_name`
+/// requires. `competes` says the Agent still lists it, so that it competes
+/// by name.
+pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes: bool) -> Reason {
+    let why = match malformed {
+        Malformed::NotAnObject => "it is not an object".to_owned(),
+        Malformed::Missing(fields) => {
+            let fields: Vec<String> = fields.iter().map(|field| format!("`{field}`")).collect();
+            let fields = match fields.split_last() {
+                Some((last, [])) => last.clone(),
+                Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
+                None => String::new(),
+            };
+            format!("it needs {fields}")
+        }
+        Malformed::WrongType(field, kind) => {
+            let kind = match kind {
+                FieldType::String => "a string",
+                FieldType::Number => "a number",
+                FieldType::Boolean => "true or false",
+                FieldType::Array => "a list",
+                FieldType::Object => "an object",
+                FieldType::StringArray => "a list of strings",
+                FieldType::StringMap => "an object of strings",
+            };
+            format!("`{field}` must be {kind}")
+        }
+    };
+    let sentence = if competes {
+        format!("{agent_name} cannot use this Entry: {why}. It still competes by name.")
+    } else {
+        format!("{agent_name} skips this Entry: {why}.")
+    };
+    Reason {
+        code: ReasonCode::MalformedEntry,
+        effective: None,
+        switch: None,
+        sentence,
+    }
+}
+
+/// The caveat of an Entry when the file at `path`, holding a switch that
+/// could Disable it, cannot be read.
+pub(crate) fn switch_read_failure(path: &Path) -> String {
+    format!(
+        "{} couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not.",
+        path.display()
+    )
+}
+
+/// The info row of a plan that writes `path`, which `agent_name` rejects
+/// before and after it, as `failure` says.
+pub(crate) fn still_rejected(agent_name: &str, path: &Path, failure: &str) -> String {
+    format!(
+        "{agent_name} still rejects {} after this change: {failure}",
+        path.display()
+    )
+}
+
+/// The info row of a plan whose States after could differ, since `path`,
+/// which `agent_name` could read, cannot be read.
+pub(crate) fn outcome_may_differ(agent_name: &str, path: &Path) -> String {
+    format!(
+        "{agent_name} couldn't read {}, so its States after this change may differ.",
+        path.display()
+    )
+}
+
+/// Why a plan that must write `path`, a Read failure as `failure` says, is
+/// refused.
+pub(crate) fn read_failure_target(path: &Path, failure: &str) -> String {
+    format!(
+        "{} is a Read failure, and config-digger never writes a file it cannot read: {failure}",
+        path.display()
+    )
 }

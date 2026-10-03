@@ -51,6 +51,8 @@ struct FakeFiles {
     /// Files an Agent rewrites with other bytes right after the core's next
     /// write to them.
     rewrites: Vec<(PathBuf, Vec<u8>)>,
+    /// The lowercased paths of the files whose reads are denied.
+    denied: BTreeSet<String>,
 }
 
 impl FakeFileSystem {
@@ -104,6 +106,14 @@ impl FakeFileSystem {
     /// Below `folder`, every write stores bytes other than those it was given.
     pub fn corrupting_writes_below(self, folder: impl Into<PathBuf>) -> Self {
         self.files().corrupting.push(folder.into());
+        self
+    }
+
+    /// Every read of the file at `path` is denied, as for a file the user
+    /// has no permission to open.
+    pub fn denying_reads_of(self, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref().to_string_lossy().to_lowercase();
+        self.files().denied.insert(path);
         self
     }
 
@@ -251,6 +261,12 @@ impl FileSystem for FakeFileSystem {
         self.count_access();
         let files = self.files();
         let path = files.follow(path);
+        if files
+            .denied
+            .contains(&path.to_string_lossy().to_lowercase())
+        {
+            return Err(io::ErrorKind::PermissionDenied.into());
+        }
         match files.find_file(&path) {
             Some((_, contents)) => Ok(contents.clone()),
             None if files.real_path(&path).is_some() => Err(io::Error::other("is a folder")),
