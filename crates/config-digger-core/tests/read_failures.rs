@@ -54,6 +54,15 @@ fn mcp_json() -> PathBuf {
     PathBuf::from(PROJECT).join(".mcp.json")
 }
 
+/// `fs` with the Project's shared settings approving every `.mcp.json`
+/// server, which Claude Code otherwise Blocks.
+fn approved(fs: FakeFileSystem) -> FakeFileSystem {
+    fs.with_file(
+        PathBuf::from(PROJECT).join(r".claude\settings.json"),
+        r#"{"enableAllProjectMcpServers": true}"#,
+    )
+}
+
 /// Claude Code's home and the JSONC Agent's, with `.mcp.json` holding `text`.
 fn with_mcp_json(text: &str) -> FakeFileSystem {
     FakeFileSystem::new()
@@ -374,12 +383,14 @@ const UNPARSABLE_JSON: &str = r#"{"mcpServers": {"#;
 
 #[test]
 fn claude_code_asks_about_a_claude_json_it_cannot_parse_and_may_reset_it() {
-    let fs = FakeFileSystem::new()
-        .with_file(in_home(".claude.json"), UNPARSABLE_JSON)
-        .with_file(
-            mcp_json(),
-            r#"{"mcpServers": {"github": {"command": "gh"}}}"#,
-        );
+    let fs = approved(
+        FakeFileSystem::new()
+            .with_file(in_home(".claude.json"), UNPARSABLE_JSON)
+            .with_file(
+                mcp_json(),
+                r#"{"mcpServers": {"github": {"command": "gh"}}}"#,
+            ),
+    );
     let inventory = inventory(fs, &[]);
 
     assert_eq!(
@@ -511,7 +522,7 @@ fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_cavea
 #[test]
 fn a_disable_store_that_is_a_read_failure_resolves_with_defaults_and_a_caveat() {
     let settings = PathBuf::from(PROJECT).join(r".claude\settings.local.json");
-    let fs = FakeFileSystem::new()
+    let fs = approved(FakeFileSystem::new())
         .with_file(
             in_home(".claude.json"),
             r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}, "projects": {"E:/work/app": {}}}"#,
@@ -539,8 +550,16 @@ fn a_disable_store_that_is_a_read_failure_resolves_with_defaults_and_a_caveat() 
     // Disable goes through a switch config-digger can read.
     assert_eq!(github["disable"]["status"], "offered");
     assert_eq!(github["disable"]["path"], json!(in_home(".claude.json")));
-    // The store only covers `.mcp.json` servers.
-    assert_eq!(inventory["items"][1]["entries"][0]["caveats"], json!([]));
+    // The store only Disables `.mcp.json` servers, but the file can hold
+    // allow and deny lists covering every server.
+    assert_eq!(
+        inventory["items"][1]["entries"][0]["caveats"],
+        json!([{
+            "code": "setting_read_failure",
+            "path": settings,
+            "sentence": r"E:\work\app\.claude\settings.local.json couldn't be read, so whether a rule or gate there keeps this Entry out is not known: it is shown as if none did."
+        }])
+    );
 }
 
 /// The core over `fs`, with `definitions` loaded besides the built-in ones.
@@ -642,7 +661,7 @@ fn writing_a_file_another_reader_rejects_notes_that_it_still_rejects_it() {
 fn switches_in_a_file_that_is_a_read_failure_for_their_agent_disable_nothing_and_are_not_written() {
     // Valid JSON, but Claude Code cannot enumerate its servers.
     let claude_json = in_home(".claude.json");
-    let fs = FakeFileSystem::new()
+    let fs = approved(FakeFileSystem::new())
         .with_file(
             &claude_json,
             r#"{"mcpServers": [], "projects": {"E:/work/app": {"disabledMcpServers": ["github"]}}}"#,

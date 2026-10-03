@@ -5,6 +5,7 @@ export const STATE_LABELS: Record<State, string> = {
   effective: "Effective",
   shadowed: "Shadowed",
   disabled: "Disabled",
+  blocked: "Blocked",
   invalid: "Invalid",
   unread: "Unread",
 };

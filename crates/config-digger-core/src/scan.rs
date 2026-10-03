@@ -4,8 +4,9 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    Anchored, Bypasses, Cached, Disables, Format, GateStore, JsonFormat, Locate, LookUp, NAME_KEY,
-    NameFrom, Parse, ProjectWalk, Register, SkillDefect, SkillFolder, StoreClass,
+    Anchor, Anchored, Bypasses, Cached, Disables, Format, Gate, GateStore, JsonFormat, Locate,
+    LookUp, NAME_KEY, NameFrom, Parse, ProjectWalk, Register, SettingsSource, SkillDefect,
+    SkillFolder, StoreClass,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
@@ -43,6 +44,106 @@ pub(crate) struct Snapshot {
     pub unreadable_switches: BTreeSet<PathBuf>,
     /// Every Feature gate of every found Agent home, as far as it can be read.
     pub gates: Vec<ScannedGate>,
+    /// The files of managed-exclusive gates that exist, so that they take
+    /// control.
+    pub exclusive: BTreeSet<PathBuf>,
+    /// Every `[[settings]]` of every definition, with the source the Agent reads.
+    pub settings: Vec<ScannedSettings>,
+    /// Every value a rule reads, at every place.
+    pub setting_values: Vec<ScannedSetting>,
+    /// The files a rule reads that cannot be read or parsed. They set
+    /// nothing.
+    pub unreadable_settings: BTreeSet<PathBuf>,
+}
+
+/// A value a rule or gate reads, at one place, for one Agent home.
+#[derive(Clone)]
+pub(crate) struct ScannedSetting {
+    pub agent_index: usize,
+    pub home: String,
+    pub kind: ItemKind,
+    pub owner: SettingOwner,
+    pub path: PathBuf,
+    /// The key of the Project it applies in, or `None` when it applies in every context.
+    pub project: Option<String>,
+    /// Its key path, `{project}` replaced by the Project key in the Agent's
+    /// own spelling.
+    pub key_path: Vec<String>,
+    /// What the file holds there: `None` when the file or key is missing.
+    pub value: Option<serde_json::Value>,
+}
+
+/// The rule or gate a setting is read for, by its index among those of its
+/// Item kind, and the source among its sources.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SettingOwner {
+    Rule { rule: usize, source: usize },
+    Gate { gate: usize, source: usize },
+}
+
+impl Snapshot {
+    /// The values of `owner` read in the Agent home of `entry` that apply
+    /// in the context of the Project with the key `project`.
+    pub fn settings_for<'s>(
+        &'s self,
+        entry: &'s ScannedEntry,
+        kind: ItemKind,
+        owner: SettingOwner,
+        project: Option<&'s str>,
+    ) -> impl Iterator<Item = &'s ScannedSetting> {
+        self.setting_values.iter().filter(move |value| {
+            value.agent_index == entry.agent_index
+                && value.home == entry.home
+                && value.kind == kind
+                && value.owner == owner
+                && (value.project.is_none() || value.project.as_deref() == project)
+        })
+    }
+}
+
+/// One `[[settings]]` of an Agent, with the files of its sources.
+#[derive(Clone)]
+pub(crate) struct ScannedSettings {
+    pub agent_index: usize,
+    pub id: String,
+    /// The files of each source, highest first. A registry value stands as
+    /// `<HKLM|HKCU>\<key>\<value>`.
+    pub sources: Vec<Vec<PathBuf>>,
+    /// The source the Agent reads: the first that holds any setting.
+    pub selected: Option<usize>,
+}
+
+impl ScannedSettings {
+    /// The files of the source the Agent reads.
+    pub fn read(&self) -> &[PathBuf] {
+        self.selected
+            .map_or(&[], |selected| &self.sources[selected])
+    }
+
+    /// Whether `path` is a file of a source the Agent skips.
+    pub fn skips(&self, path: &Path) -> bool {
+        self.sources.iter().flatten().any(|file| file == path)
+            && !self.read().contains(&path.to_path_buf())
+    }
+}
+
+impl Snapshot {
+    /// The `[[settings]]` `id` of the Agent at `agent_index`.
+    pub fn settings_of(&self, agent_index: usize, id: &str) -> &ScannedSettings {
+        settings_named(&self.settings, agent_index, id)
+            .expect("validation declares the settings an anchor names")
+    }
+}
+
+/// The `[[settings]]` `id` of the Agent at `agent_index` among `settings`.
+fn settings_named<'s>(
+    settings: &'s [ScannedSettings],
+    agent_index: usize,
+    id: &str,
+) -> Option<&'s ScannedSettings> {
+    settings
+        .iter()
+        .find(|known| known.agent_index == agent_index && known.id == id)
 }
 
 /// A Feature gate of one Agent home, as config-digger reads it.
@@ -397,6 +498,7 @@ pub(crate) fn scan_as_if(
         readers: Vec::new(),
     };
 
+    let settings = read_settings(definitions, ports, &mut scanner.reader);
     for home in &found {
         scanner.read_registries(home, &definitions[home.agent_index]);
     }
@@ -412,6 +514,18 @@ pub(crate) fn scan_as_if(
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
             if location.anchor.in_project() {
+                continue;
+            }
+            // Every source is read, so that the Entries of those the Agent
+            // skips are listed as Unread.
+            if let Some(id) = location.anchor.settings() {
+                let found = settings_named(&settings, home.agent_index, id);
+                for path in found
+                    .into_iter()
+                    .flat_map(|found| found.sources.iter().flatten())
+                {
+                    scanner.read_location(home, definition, location, path.clone(), None, 0);
+                }
                 continue;
             }
             if let Some(path) = location.anchor.path(&home.roots, None) {
@@ -453,8 +567,16 @@ pub(crate) fn scan_as_if(
     }
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
+    let (setting_values, unreadable_settings) = read_rules(
+        definitions,
+        &found,
+        &projects,
+        &settings,
+        &mut scanner.reader,
+    );
     let switch_files = switch_files(definitions, &found, &projects);
     let gates = read_gates(definitions, &found, &mut scanner.reader, ports);
+    let exclusive = exclusive_files(definitions, &found, &as_if);
     scanner.entries = one_per_entry(definitions, scanner.entries);
     let managers = skill_managers::built_in().unwrap_or_default();
     for entry in &mut scanner.entries {
@@ -485,8 +607,14 @@ pub(crate) fn scan_as_if(
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
         .collect();
     // A file that is a Read failure for an Agent home yields it no Entries,
-    // even from a location of it that did parse.
-    let failures = scanner.reader.failures;
+    // even from a location of it that did parse. One in a settings source
+    // the Agent skips is no failure of the Agent's.
+    let mut failures = scanner.reader.failures;
+    failures.retain(|failure| {
+        !settings
+            .iter()
+            .any(|known| known.agent_index == failure.agent_index && known.skips(&failure.path))
+    });
     scanner.entries.retain(|entry| {
         !failures.iter().any(|failure| {
             failure.agent_index == entry.agent_index
@@ -522,7 +650,107 @@ pub(crate) fn scan_as_if(
         switches,
         unreadable_switches,
         gates,
+        exclusive,
+        settings,
+        setting_values,
+        unreadable_settings,
     })
+}
+
+/// The files of each source of each `[[settings]]`, and the first source
+/// that holds any setting. A registry value's text is read into `reader`
+/// under the path that stands for it.
+fn read_settings(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    reader: &mut Reader,
+) -> Vec<ScannedSettings> {
+    let mut scanned = Vec::new();
+    for (agent_index, definition) in definitions.iter().enumerate() {
+        for settings in &definition.settings {
+            let sources: Vec<Vec<PathBuf>> = settings
+                .sources
+                .iter()
+                .map(|source| match source {
+                    SettingsSource::RegistryValue(block) => {
+                        let path = block.path();
+                        let text = ports
+                            .env
+                            .registry_value(block.hive(), &block.key, &block.value);
+                        reader.files.insert(path.clone(), Ok(text));
+                        vec![path]
+                    }
+                    SettingsSource::Files(block) => {
+                        let env = ports.env.as_ref();
+                        let mut files: Vec<PathBuf> =
+                            paths::expand(&block.path, env).into_iter().collect();
+                        let drop_ins = block
+                            .drop_ins
+                            .as_deref()
+                            .and_then(|folder| paths::expand(folder, env));
+                        let mut found: Vec<PathBuf> = drop_ins
+                            .and_then(|folder| reader.fs.read_dir(&folder).ok())
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|path| {
+                                path.extension()
+                                    .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+                            })
+                            .collect();
+                        found.sort_by_key(|path| paths::key(path));
+                        files.extend(found);
+                        files
+                    }
+                })
+                .collect();
+            // A file that cannot be read or parsed may hold settings too.
+            let holds = |path: &PathBuf, reader: &mut Reader| match reader.peek(path) {
+                Ok(None) => false,
+                Ok(Some(text)) => JsonFormat::STRICT.parse(text).map_or(true, |document| {
+                    document.as_object().is_none_or(|object| !object.is_empty())
+                }),
+                Err(_) => true,
+            };
+            let selected = sources
+                .iter()
+                .position(|files| files.iter().any(|path| holds(path, reader)));
+            scanned.push(ScannedSettings {
+                agent_index,
+                id: settings.id.clone(),
+                sources,
+                selected,
+            });
+        }
+    }
+    scanned
+}
+
+/// The file of each managed-exclusive gate of each found Agent home that
+/// exists, whatever it holds.
+fn exclusive_files(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    fs: &dyn FileSystem,
+) -> BTreeSet<PathBuf> {
+    let mut files = BTreeSet::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for rules in definition.items.values() {
+            for gate in &rules.gates {
+                let Gate::ManagedExclusive(block) = gate else {
+                    continue;
+                };
+                let location = definition.location(&block.location);
+                files.extend(
+                    location
+                        .anchor
+                        .path(&home.roots, None)
+                        .filter(|path| fs.exists(path)),
+                );
+            }
+        }
+    }
+    files
 }
 
 /// The version that last ran against `home`, as the string its definition's
@@ -618,91 +846,207 @@ fn read_switches(
         for (&kind, rules) in &definition.items {
             for (mechanism, block) in rules.disable.iter().enumerate() {
                 let switch = block.switch();
-                let places: Vec<(PathBuf, Option<String>)> = if switch.anchor.in_project() {
-                    projects
-                        .iter()
-                        .filter(|project| project.is_folder())
-                        .filter_map(|project| {
-                            let path = switch.anchor.path(&home.roots, Some(&project.path))?;
-                            Some((path, Some(project.key.clone())))
-                        })
-                        .collect()
-                } else {
-                    switch
-                        .anchor
-                        .path(&home.roots, None)
-                        .map(|path| (path, None))
-                        .into_iter()
-                        .collect()
+                let places = Places {
+                    home,
+                    projects,
+                    settings: &[],
                 };
-                for (path, project) in places {
-                    // A file the Agent home cannot read, even one that is
-                    // valid JSON, sets none of its switches.
-                    let failed = reader.failures.iter().any(|failure| {
-                        failure.agent_index == home.agent_index
-                            && failure.home == home.home
-                            && failure.path == path
+                for place in places.read(&switch.anchor, &switch.key_path, reader, &mut unreadable)
+                {
+                    switches.push(ScannedSwitch {
+                        agent_index: home.agent_index,
+                        home: home.home.clone(),
+                        kind,
+                        mechanism,
+                        path: place.path,
+                        project: place.project,
+                        value: place.value,
+                        key_path: place.key_path,
+                        store_class: switch.store_class,
                     });
-                    if failed {
-                        unreadable.insert(path);
-                        continue;
-                    }
-                    let document = match reader.peek(&path) {
-                        Ok(None) => None,
-                        Ok(Some(text)) => match JsonFormat::STRICT.parse(text) {
-                            Ok(document) => Some(document),
-                            Err(_) => {
-                                unreadable.insert(path);
-                                continue;
-                            }
-                        },
-                        Err(_) => {
-                            unreadable.insert(path);
-                            continue;
-                        }
-                    };
-                    let place = |project: Option<String>, key_path: Vec<String>| {
-                        let up_to_name = key_path
-                            .iter()
-                            .position(|key| key == NAME_KEY)
-                            .unwrap_or(key_path.len());
-                        ScannedSwitch {
-                            agent_index: home.agent_index,
-                            home: home.home.clone(),
-                            kind,
-                            mechanism,
-                            path: path.clone(),
-                            project,
-                            value: document
-                                .as_ref()
-                                .and_then(|document| lookup(document, &key_path[..up_to_name]))
-                                .cloned(),
-                            key_path,
-                            store_class: switch.store_class,
-                        }
-                    };
-                    let Some(at) = switch.key_path.iter().position(|key| key == PROJECT_KEY) else {
-                        switches.push(place(project, switch.key_path.clone()));
-                        continue;
-                    };
-                    // Each key there is a Project in the Agent's own spelling.
-                    let keyed = document
-                        .as_ref()
-                        .and_then(|document| lookup(document, &switch.key_path[..at]))
-                        .and_then(serde_json::Value::as_object);
-                    for spelling in keyed.into_iter().flat_map(serde_json::Map::keys) {
-                        let Some(project) = project_of(projects, spelling) else {
-                            continue;
-                        };
-                        let mut key_path = switch.key_path.clone();
-                        key_path[at] = spelling.clone();
-                        switches.push(place(Some(project), key_path));
-                    }
                 }
             }
         }
     }
     (switches, unreadable)
+}
+
+/// Every value each rule and gate of each found Agent home reads, at every
+/// place its sources name, as [`read_switches`] reads switches. A file that
+/// cannot be read is listed apart and has no places.
+fn read_rules(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    projects: &[ScannedProject],
+    settings: &[ScannedSettings],
+    reader: &mut Reader,
+) -> (Vec<ScannedSetting>, BTreeSet<PathBuf>) {
+    let mut values = Vec::new();
+    let mut unreadable = BTreeSet::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for (&kind, rules) in &definition.items {
+            let rule_sources = rules.rules.iter().enumerate().flat_map(|(rule, block)| {
+                block
+                    .settings()
+                    .enumerate()
+                    .map(move |(source, setting)| (SettingOwner::Rule { rule, source }, setting))
+            });
+            let gate_sources = rules.gates.iter().enumerate().flat_map(|(gate, block)| {
+                block
+                    .sources()
+                    .iter()
+                    .enumerate()
+                    .map(move |(source, setting)| (SettingOwner::Gate { gate, source }, setting))
+            });
+            for (owner, setting) in rule_sources.chain(gate_sources) {
+                let places = Places {
+                    home,
+                    projects,
+                    settings,
+                };
+                for place in
+                    places.read(&setting.anchor, &setting.key_path, reader, &mut unreadable)
+                {
+                    values.push(ScannedSetting {
+                        agent_index: home.agent_index,
+                        home: home.home.clone(),
+                        kind,
+                        owner,
+                        path: place.path,
+                        project: place.project,
+                        key_path: place.key_path,
+                        value: place.value,
+                    });
+                }
+            }
+        }
+    }
+    (values, unreadable)
+}
+
+/// One place a value is read, for one Agent home and, for a value that
+/// applies per Project, one Project.
+struct Place {
+    path: PathBuf,
+    /// The key of the Project it applies in, or `None` when it applies in every context.
+    project: Option<String>,
+    /// Its key path, `{project}` replaced by the Project key in the
+    /// Agent's own spelling, `{name}` left in place.
+    key_path: Vec<String>,
+    /// What the file holds at the key path, up to `{name}` when it has one.
+    value: Option<serde_json::Value>,
+}
+
+/// Where the values an anchor and a key path name are, for one Agent home.
+struct Places<'a> {
+    home: &'a FoundHome,
+    projects: &'a [ScannedProject],
+    /// The settings a settings anchor reads.
+    settings: &'a [ScannedSettings],
+}
+
+impl Places<'_> {
+    /// Every place `anchor` and `key_path` name: in each existing Project
+    /// folder for an anchor in a Project, in each file of the source the
+    /// Agent reads for a settings anchor, under each spelling of each
+    /// Project key for a key path holding `{project}`, and once otherwise.
+    /// A file that is missing is read as empty; one that cannot be read or
+    /// parsed as JSON, or that is a Read failure for the Agent home, goes
+    /// into `unreadable` and has no places.
+    fn read(
+        &self,
+        anchor: &Anchor,
+        key_path: &[String],
+        reader: &mut Reader,
+        unreadable: &mut BTreeSet<PathBuf>,
+    ) -> Vec<Place> {
+        let home = self.home;
+        let files: Vec<(PathBuf, Option<String>)> = if let Some(id) = anchor.settings() {
+            // A later file of the source overrides an earlier one, so it
+            // comes first.
+            settings_named(self.settings, home.agent_index, id)
+                .into_iter()
+                .flat_map(|known| known.read().iter().rev().map(|path| (path.clone(), None)))
+                .collect()
+        } else if anchor.in_project() {
+            self.projects
+                .iter()
+                .filter(|project| project.is_folder())
+                .filter_map(|project| {
+                    let path = anchor.path(&home.roots, Some(&project.path))?;
+                    Some((path, Some(project.key.clone())))
+                })
+                .collect()
+        } else {
+            anchor
+                .path(&home.roots, None)
+                .map(|path| (path, None))
+                .into_iter()
+                .collect()
+        };
+        let mut places = Vec::new();
+        for (path, project) in files {
+            // A file the Agent home cannot read, even one that is valid
+            // JSON, sets nothing.
+            let failed = reader.failures.iter().any(|failure| {
+                failure.agent_index == home.agent_index
+                    && failure.home == home.home
+                    && failure.path == path
+            });
+            if failed {
+                unreadable.insert(path);
+                continue;
+            }
+            let document = match reader.peek(&path) {
+                Ok(None) => None,
+                Ok(Some(text)) => match JsonFormat::STRICT.parse(text) {
+                    Ok(document) => Some(document),
+                    Err(_) => {
+                        unreadable.insert(path);
+                        continue;
+                    }
+                },
+                Err(_) => {
+                    unreadable.insert(path);
+                    continue;
+                }
+            };
+            let place = |project: Option<String>, key_path: Vec<String>| {
+                let up_to_name = key_path
+                    .iter()
+                    .position(|key| key == NAME_KEY)
+                    .unwrap_or(key_path.len());
+                Place {
+                    path: path.clone(),
+                    project,
+                    value: document
+                        .as_ref()
+                        .and_then(|document| lookup(document, &key_path[..up_to_name]))
+                        .cloned(),
+                    key_path,
+                }
+            };
+            let Some(at) = key_path.iter().position(|key| key == PROJECT_KEY) else {
+                places.push(place(project, key_path.to_vec()));
+                continue;
+            };
+            // Each key there is a Project in the Agent's own spelling.
+            let keyed = document
+                .as_ref()
+                .and_then(|document| lookup(document, &key_path[..at]))
+                .and_then(serde_json::Value::as_object);
+            for spelling in keyed.into_iter().flat_map(serde_json::Map::keys) {
+                let Some(project) = project_of(self.projects, spelling) else {
+                    continue;
+                };
+                let mut key_path = key_path.to_vec();
+                key_path[at] = spelling.clone();
+                places.push(place(Some(project), key_path));
+            }
+        }
+        places
+    }
 }
 
 /// The key of the scanned Project that `spelling` names, if any.

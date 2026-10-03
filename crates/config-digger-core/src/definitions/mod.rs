@@ -7,8 +7,8 @@ pub mod skill_managers;
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
-    GateLookup, Holds, Interpolation, Locator, LookUp, ProjectWalk, Provenance, Register, Registry,
-    SessionFiles, Shape, StoreClass, Validate, VersionSource,
+    Gate, GateLookup, Holds, Interpolation, Locator, LookUp, ProjectWalk, Provenance, Register,
+    Registry, Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -84,6 +84,10 @@ pub(crate) struct AgentDefinition {
     /// The Scopes this Agent applies Entries at, in display order. A Scope is
     /// only a label: precedence comes from the order of locations in `items`.
     pub scopes: Vec<ScopeDefinition>,
+    /// Sets of settings the Agent reads from the first of several sources
+    /// that holds any, such as managed settings.
+    #[serde(default)]
+    pub settings: Vec<SettingsDefinition>,
     /// Where this Agent records the Projects it has been started on.
     #[serde(default)]
     pub projects: ProjectsDefinition,
@@ -114,6 +118,18 @@ pub(crate) struct FeatureGateDefinition {
     pub lookup: GateLookup,
     /// When the Agent ignores its cache and uses its own default.
     pub bypass: Option<Bypass>,
+}
+
+/// One set of settings, which the Agent reads from the first of its
+/// sources that holds any setting, and from no other. Entries in the
+/// others are Unread.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingsDefinition {
+    /// Unique in the definition, such as `managed`.
+    pub id: String,
+    /// Highest first.
+    pub sources: Vec<SettingsSource>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -418,14 +434,37 @@ pub(crate) struct ItemRules {
     /// git-versioned.
     #[serde(default)]
     pub disable: Vec<DisableMechanism>,
+    /// What keeps the Agent from using an Entry whatever it declares, such
+    /// as managed policy: config-digger never lifts these.
+    #[serde(default)]
+    pub gates: Vec<Gate>,
+    /// Settings that keep Entries out by a rule rather than one by one,
+    /// such as deny lists: config-digger never writes them.
+    #[serde(default)]
+    pub rules: Vec<Rule>,
 }
 
 /// One of an Agent's checks that decides an Entry's State.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Check {
+    /// A managed file takes exclusive control and leaves the Entry out:
+    /// Blocked, with `policy`. A Blocked Entry does not compete. Required
+    /// when a gate of the kind is managed-exclusive, and refused otherwise.
+    Policy,
     /// A Disable mechanism's switch is set for the Entry: Disabled.
     Disable,
+    /// The Agent has not approved the Entry: Blocked, with `not_approved`.
+    /// Required when a gate of the kind is an approval list, and refused
+    /// otherwise.
+    Approval,
+    /// A rule keeps the Entry out: Blocked, with `policy`, when the rule is
+    /// managed policy, and Disabled, with `disabled_by_rule` or
+    /// `disabled_globally`, otherwise. Before `precedence`, an Entry a rule
+    /// keeps out does not compete; after it, a rule applies to the Entry
+    /// that wins, which still beats the others. Required when the kind has
+    /// rules, and refused otherwise.
+    Rules,
     /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
     Precedence,
     /// The Entry lacks the minimal shape its location declares: Invalid.
@@ -544,6 +583,7 @@ impl AgentDefinition {
         if let Some(last_ran) = &self.last_ran {
             let context = |e: String| format!("last_ran: {e}");
             last_ran.anchor.validate().map_err(context)?;
+            last_ran.anchor.one_file().map_err(context)?;
             if last_ran.anchor.in_project() {
                 return Err(context("must lie in the Agent home, not a Project".into()));
             }
@@ -556,6 +596,20 @@ impl AgentDefinition {
             registry.validate().map_err(context)?;
             self.validate_home_root(registry.anchor())
                 .map_err(context)?;
+        }
+
+        unique(
+            "settings",
+            self.settings.iter().map(|settings| settings.id.as_str()),
+        )?;
+        for settings in &self.settings {
+            let context = |e: String| format!("settings `{}`: {e}", settings.id);
+            if settings.sources.is_empty() {
+                return Err(context("sources needs at least one source".into()));
+            }
+            for source in &settings.sources {
+                source.validate().map_err(context)?;
+            }
         }
 
         unique(
@@ -597,6 +651,12 @@ impl AgentDefinition {
                 shape.validate().map_err(context)?;
             }
             self.validate_home_root(&location.anchor).map_err(context)?;
+            if let Some(id) = location.anchor.settings() {
+                self.declared_settings(id).map_err(context)?;
+                if location.format.file().is_none() {
+                    return Err(context("settings are read in a file format".into()));
+                }
+            }
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
                 return Err(context(format!("root holds `{PROJECT_KEY}` twice")));
@@ -694,52 +754,108 @@ impl AgentDefinition {
                 .locations
                 .iter()
                 .any(|location| location.kind == *kind && location.shape.is_some());
-            match (
-                rules
-                    .checks
-                    .iter()
-                    .filter(|known| **known == Check::Shape)
-                    .count(),
-                shaped,
-            ) {
-                (1, true) | (0, false) => {}
-                (0, true) => {
-                    return Err(context(
-                        "checks leaves out `shape`, which a location declares".into(),
-                    ));
-                }
-                (_, true) => return Err(context("checks holds `shape` twice".into())),
-                (_, false) => {
-                    return Err(context(
-                        "checks holds `shape`, but no location declares one".into(),
-                    ));
-                }
-            }
+            rules
+                .check_when(
+                    Check::Shape,
+                    shaped,
+                    "which a location declares",
+                    "but no location declares one",
+                )
+                .map_err(context)?;
             let folders = self
                 .locations
                 .iter()
                 .any(|location| location.kind == *kind && location.format.skill_folder().is_some());
-            match (
-                rules
-                    .checks
-                    .iter()
-                    .filter(|known| **known == Check::Frontmatter)
-                    .count(),
-                folders,
-            ) {
-                (1, true) | (0, false) => {}
-                (0, true) => {
-                    return Err(context(
-                        "checks leaves out `frontmatter`, which a folder of skill folders needs"
-                            .into(),
-                    ));
+            rules
+                .check_when(
+                    Check::Frontmatter,
+                    folders,
+                    "which a folder of skill folders needs",
+                    "but no location is a folder of skill folders",
+                )
+                .map_err(context)?;
+            rules
+                .check_when(
+                    Check::Policy,
+                    rules
+                        .gates
+                        .iter()
+                        .any(|gate| matches!(gate, Gate::ManagedExclusive(_))),
+                    "which a managed-exclusive gate needs",
+                    "but no gate is managed-exclusive",
+                )
+                .map_err(context)?;
+            rules
+                .check_when(
+                    Check::Approval,
+                    rules
+                        .gates
+                        .iter()
+                        .any(|gate| matches!(gate, Gate::ApprovalList(_))),
+                    "which an approval gate needs",
+                    "but no gate is an approval",
+                )
+                .map_err(context)?;
+            rules
+                .check_when(
+                    Check::Rules,
+                    !rules.rules.is_empty(),
+                    "which a rule needs",
+                    "but the kind has no rule",
+                )
+                .map_err(context)?;
+            for (index, rule) in rules.rules.iter().enumerate() {
+                let context = |e: String| context(format!("rules[{index}]: {e}"));
+                rule.validate().map_err(context)?;
+                for source in rule.settings() {
+                    self.validate_setting(&source.anchor).map_err(context)?;
                 }
-                (_, true) => return Err(context("checks holds `frontmatter` twice".into())),
-                (_, false) => {
-                    return Err(context(
-                        "checks holds `frontmatter`, but no location is a folder of skill folders"
-                            .into(),
-                    ));
+                if let Some(id) = rule
+                    .locations()
+                    .iter()
+                    .find(|id| !declared.contains(id.as_str()))
+                {
+                    return Err(context(format!("`{id}` is not a location of this kind")));
+                }
+            }
+            for (index, gate) in rules.gates.iter().enumerate() {
+                let context = |e: String| context(format!("gates[{index}]: {e}"));
+                gate.validate().map_err(context)?;
+                match gate {
+                    Gate::ManagedExclusive(block) => {
+                        if !declared.contains(block.location.as_str()) {
+                            return Err(context(format!(
+                                "`{}` is not a location of this kind",
+                                block.location
+                            )));
+                        }
+                        let location = self.location(&block.location);
+                        if location.anchor.in_project() || location.keyed_by_project() {
+                            return Err(context(format!(
+                                "location `{}` must apply in every context",
+                                block.location
+                            )));
+                        }
+                        if let Some(id) = block
+                            .except
+                            .iter()
+                            .find(|id| !declared.contains(id.as_str()))
+                        {
+                            return Err(context(format!("`{id}` is not a location of this kind")));
+                        }
+                    }
+                    Gate::ApprovalList(block) => {
+                        if let Some(id) = block
+                            .locations
+                            .iter()
+                            .find(|id| !declared.contains(id.as_str()))
+                        {
+                            return Err(context(format!("`{id}` is not a location of this kind")));
+                        }
+                    }
+                }
+                for source in gate.sources() {
+                    self.validate_setting(&source.anchor).map_err(context)?;
                 }
             }
             for (index, mechanism) in rules.disable.iter().enumerate() {
@@ -771,6 +887,23 @@ impl HomeDefinition {
 }
 
 impl AgentDefinition {
+    /// The `[[settings]]` with the id `id`, which a settings anchor names.
+    pub fn declared_settings(&self, id: &str) -> Result<&SettingsDefinition, String> {
+        self.settings
+            .iter()
+            .find(|settings| settings.id == id)
+            .ok_or_else(|| format!("undeclared settings `{id}`"))
+    }
+
+    /// A setting's anchor needs the root or the `[[settings]]` it names.
+    fn validate_setting(&self, anchor: &Anchor) -> Result<(), String> {
+        self.validate_home_root(anchor)?;
+        match anchor.settings() {
+            Some(id) => self.declared_settings(id).map(|_| ()),
+            None => Ok(()),
+        }
+    }
+
     /// Every home must declare the root an anchor needs.
     fn validate_home_root(&self, anchor: &Anchor) -> Result<(), String> {
         if let Some(root) = anchor.home_root()
@@ -791,10 +924,36 @@ impl ItemKind {
     }
 }
 
+impl ItemRules {
+    /// `check` appears once when `needed`, `needs` saying why, and not at
+    /// all otherwise, `refused` saying why not.
+    fn check_when(
+        &self,
+        check: Check,
+        needed: bool,
+        needs: &str,
+        refused: &str,
+    ) -> Result<(), String> {
+        let id = check.id();
+        match (
+            self.checks.iter().filter(|known| **known == check).count(),
+            needed,
+        ) {
+            (1, true) | (0, false) => Ok(()),
+            (0, true) => Err(format!("checks leaves out `{id}`, {needs}")),
+            (_, true) => Err(format!("checks holds `{id}` twice")),
+            (_, false) => Err(format!("checks holds `{id}`, {refused}")),
+        }
+    }
+}
+
 impl Check {
     fn id(self) -> &'static str {
         match self {
+            Check::Policy => "policy",
             Check::Disable => "disable",
+            Check::Rules => "rules",
+            Check::Approval => "approval",
             Check::Precedence => "precedence",
             Check::Shape => "shape",
             Check::Frontmatter => "frontmatter",
@@ -1651,6 +1810,219 @@ checks = {checks}
         );
         assert!(
             error(&text).contains("not a variable name"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    /// `VALID` with managed settings, a location reading them, and `items`
+    /// added to the rules of its servers, whose checks are `checks`.
+    fn with_policy(items: &str, checks: &str) -> String {
+        let settings = r#"
+[[settings]]
+id = "managed"
+sources = [
+  { block = "registry-value", hive = "local-machine", key = 'SOFTWARE\Policies\Test', value = "Settings" },
+  { block = "files", path = "%ProgramFiles%/Test/settings.json", drop_ins = "%ProgramFiles%/Test/settings.d" },
+]
+
+[[locations]]
+id = "managed-mcp"
+anchor = { block = "settings", settings = "managed" }
+format = { block = "json", dialect = "strict" }
+root = ["servers"]
+kind = "mcp"
+scope = "user"
+provenance = "managed"
+store_class = "plain"
+on_read_failure = "ignores_file"
+"#;
+        let text = VALID
+            .replace("[items.mcp]", &format!("{settings}\n[items.mcp]"))
+            .replace(r#"["user-mcp"]"#, r#"["managed-mcp", "user-mcp"]"#)
+            .replace(
+                r#"checks = ["disable", "precedence"]"#,
+                &format!("checks = {checks}"),
+            );
+        format!("{text}{items}")
+    }
+
+    const POLICY_CHECKS: &str = r#"["policy", "rules", "disable", "approval", "precedence"]"#;
+
+    const RULES_AND_GATES: &str = r#"
+[[items.mcp.gates]]
+block = "managed-exclusive"
+location = "user-mcp"
+except = ["managed-mcp"]
+
+[[items.mcp.gates]]
+block = "approval-list"
+locations = ["user-mcp"]
+prompt = "on-start"
+sources = [{ anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "approved"] }]
+
+[[items.mcp.rules]]
+block = "allow-deny-list"
+list = "deny"
+match = { name = "name", command = "command", url = "url" }
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["denied"], policy = true },
+  { anchor = { block = "home", root = "state" }, key_path = ["denied"] },
+]
+
+[[items.mcp.rules]]
+block = "global-switch"
+off = false
+locations = ["user-mcp"]
+sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn"] }]
+"#;
+
+    #[test]
+    fn settings_rules_and_gates_load() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_settings_anchor_names_declared_settings() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"settings = "managed" }, key_path = ["denied"]"#,
+            r#"settings = "other" }, key_path = ["denied"]"#,
+        );
+        assert!(
+            error(&text).contains("undeclared settings `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_settings_anchor_cannot_hold_a_disable_switch() {
+        let text = with_disable(&name_list(false, "").replace(
+            r#"{ block = "home", root = "state" }"#,
+            r#"{ block = "settings", settings = "managed" }"#,
+        ));
+        assert!(
+            error(&text).contains("one file is needed"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn settings_need_sources_that_name_a_registry_key_or_machine_files() {
+        let text = with_policy("", r#"["disable", "precedence"]"#)
+            .replace(r#"'SOFTWARE\Policies\Test'"#, r#"'HKLM/SOFTWARE'"#);
+        assert!(error(&text).contains("registry key"), "{}", error(&text));
+        let text = with_policy("", r#"["disable", "precedence"]"#)
+            .replace("%ProgramFiles%/Test/settings.d", "~/settings.d");
+        assert!(
+            error(&text).contains("`%NAME%` or a drive"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn policy_rules_and_approvals_each_need_their_check() {
+        for (check, message) in [
+            ("\"policy\", ", "leaves out `policy`"),
+            ("\"rules\", ", "leaves out `rules`"),
+            ("\"approval\", ", "leaves out `approval`"),
+        ] {
+            let text = with_policy(RULES_AND_GATES, &POLICY_CHECKS.replace(check, ""));
+            assert!(error(&text).contains(message), "{check}: {}", error(&text));
+        }
+        let text = with_policy("", POLICY_CHECKS);
+        assert!(
+            error(&text).contains("checks holds `policy`, but no gate is managed-exclusive"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn rules_and_gates_cover_locations_of_their_kind() {
+        for (from, to) in [
+            (
+                r#"locations = ["user-mcp"]
+sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn"] }]"#,
+                r#"locations = ["ghost"]
+sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn"] }]"#,
+            ),
+            (r#"location = "user-mcp""#, r#"location = "ghost""#),
+            (
+                r#"locations = ["user-mcp"]
+prompt"#,
+                r#"locations = ["ghost"]
+prompt"#,
+            ),
+        ] {
+            let text = with_policy(&RULES_AND_GATES.replace(from, to), POLICY_CHECKS);
+            assert!(
+                error(&text).contains("`ghost` is not a location of this kind"),
+                "{to}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn an_allow_or_deny_list_matches_by_some_field_and_only_an_allow_list_is_strict() {
+        let text = with_policy(
+            &RULES_AND_GATES.replace(
+                r#"match = { name = "name", command = "command", url = "url" }"#,
+                "match = {}",
+            ),
+            POLICY_CHECKS,
+        );
+        assert!(error(&text).contains("match needs"), "{}", error(&text));
+        let text = with_policy(
+            &RULES_AND_GATES.replace(r#"list = "deny""#, "list = \"deny\"\nstrict = true"),
+            POLICY_CHECKS,
+        );
+        assert!(
+            error(&text).contains("only an allow list can be strict"),
+            "{}",
+            error(&text)
+        );
+        let text = with_policy(
+            &RULES_AND_GATES.replace(
+                r#"list = "deny""#,
+                "list = \"deny\"\npolicy_only = { anchor = { block = \"settings\", settings = \"managed\" }, key_path = [\"only\"] }",
+            ),
+            POLICY_CHECKS,
+        );
+        assert!(
+            error(&text).contains("only an allow list can be policy_only"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn an_approval_is_no_policy_and_a_setting_in_a_project_is_not_keyed_by_project() {
+        let text = with_policy(
+            &RULES_AND_GATES.replace(
+                r#"key_path = ["projects", "{project}", "approved"] }"#,
+                r#"key_path = ["approved"], policy = true }"#,
+            ),
+            POLICY_CHECKS,
+        );
+        assert!(
+            error(&text).contains("an approval is no policy"),
+            "{}",
+            error(&text)
+        );
+        let text = with_policy(
+            &RULES_AND_GATES.replace(
+                r#"{ block = "home", root = "state" }, key_path = ["projects", "{project}", "approved"]"#,
+                r#"{ block = "project", path = ".test.json" }, key_path = ["projects", "{project}", "approved"]"#,
+            ),
+            POLICY_CHECKS,
+        );
+        assert!(
+            error(&text).contains("can be keyed by `{project}`"),
             "{}",
             error(&text)
         );

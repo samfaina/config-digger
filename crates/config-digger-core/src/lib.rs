@@ -17,6 +17,7 @@ mod mask;
 mod paths;
 mod plan;
 mod resolve;
+mod rules;
 mod running;
 mod scan;
 mod select;

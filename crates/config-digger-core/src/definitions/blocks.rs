@@ -123,6 +123,7 @@ pub(crate) enum Anchor {
     Home(HomeAnchor),
     Project(ProjectAnchor),
     Machine(MachineAnchor),
+    Settings(SettingsAnchor),
 }
 
 impl Validate for Anchor {
@@ -131,6 +132,7 @@ impl Validate for Anchor {
             Anchor::Home(block) => block.validate(),
             Anchor::Project(block) => block.validate(),
             Anchor::Machine(block) => block.validate(),
+            Anchor::Settings(block) => block.validate(),
         }
     }
 }
@@ -141,6 +143,7 @@ impl Anchored for Anchor {
             Anchor::Home(block) => block.path(roots, project),
             Anchor::Project(block) => block.path(roots, project),
             Anchor::Machine(block) => block.path(roots, project),
+            Anchor::Settings(block) => block.path(roots, project),
         }
     }
 
@@ -149,6 +152,7 @@ impl Anchored for Anchor {
             Anchor::Home(block) => block.home_root(),
             Anchor::Project(block) => block.home_root(),
             Anchor::Machine(block) => block.home_root(),
+            Anchor::Settings(block) => block.home_root(),
         }
     }
 
@@ -157,6 +161,7 @@ impl Anchored for Anchor {
             Anchor::Home(block) => block.in_project(),
             Anchor::Project(block) => block.in_project(),
             Anchor::Machine(block) => block.in_project(),
+            Anchor::Settings(block) => block.in_project(),
         }
     }
 
@@ -165,6 +170,7 @@ impl Anchored for Anchor {
             Anchor::Home(block) => block.machine(),
             Anchor::Project(block) => block.machine(),
             Anchor::Machine(block) => block.machine(),
+            Anchor::Settings(block) => block.machine(),
         }
     }
 
@@ -173,6 +179,7 @@ impl Anchored for Anchor {
             Anchor::Home(block) => block.walk(),
             Anchor::Project(block) => block.walk(),
             Anchor::Machine(block) => block.walk(),
+            Anchor::Settings(block) => block.walk(),
         }
     }
 }
@@ -329,6 +336,155 @@ impl Anchored for MachineAnchor {
     }
 }
 
+/// The settings a definition's `[[settings]]` names, in every file of each
+/// of its sources. A location reads them all, and lists the Entries of the
+/// sources the Agent skips as Unread; a rule or gate reads only the source
+/// the Agent reads. Where one file is needed, it is refused.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingsAnchor {
+    /// The id of a declared `[[settings]]`.
+    pub settings: String,
+}
+
+impl Validate for SettingsAnchor {
+    fn validate(&self) -> Result<(), String> {
+        if self.settings.trim().is_empty() {
+            return Err("a settings anchor needs a settings id".into());
+        }
+        Ok(())
+    }
+}
+
+impl Anchored for SettingsAnchor {
+    /// Settings can be in several files, which the scan lists.
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        None
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
+}
+
+impl Anchor {
+    /// The id of the `[[settings]]` the anchor reads, if it reads settings.
+    pub fn settings(&self) -> Option<&str> {
+        match self {
+            Anchor::Settings(block) => Some(&block.settings),
+            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) => None,
+        }
+    }
+
+    /// Refuses an anchor of settings, where one file is needed.
+    pub fn one_file(&self) -> Result<(), String> {
+        match self.settings() {
+            Some(_) => Err("a settings anchor names several files; one file is needed here".into()),
+            None => Ok(()),
+        }
+    }
+}
+
+// --- Settings sources -------------------------------------------------------
+
+/// Where an Agent can read one set of its settings, such as the managed
+/// settings an organisation deploys.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum SettingsSource {
+    RegistryValue(RegistryValueSource),
+    Files(FilesSource),
+}
+
+impl Validate for SettingsSource {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            SettingsSource::RegistryValue(block) => block.validate(),
+            SettingsSource::Files(block) => block.validate(),
+        }
+    }
+}
+
+/// A string value in the Windows registry holding JSON, such as Claude
+/// Code's `Settings` under `HKLM\SOFTWARE\Policies\ClaudeCode`. It is shown
+/// as `<HKLM|HKCU>\<key>\<value>`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RegistryValueSource {
+    pub hive: RegistryHive,
+    /// The key below the hive, `\`-separated.
+    pub key: String,
+    /// The value's name.
+    pub value: String,
+}
+
+impl Validate for RegistryValueSource {
+    fn validate(&self) -> Result<(), String> {
+        if self.key.trim().is_empty() || self.key.contains('/') || self.key.starts_with('\\') {
+            return Err(format!(
+                "registry key `{}` must be `\\`-separated below its hive",
+                self.key
+            ));
+        }
+        if self.value.trim().is_empty() {
+            return Err("a registry value needs a name".into());
+        }
+        Ok(())
+    }
+}
+
+impl RegistryValueSource {
+    /// The hive as the port knows it.
+    pub fn hive(&self) -> Hive {
+        match self.hive {
+            RegistryHive::CurrentUser => Hive::CurrentUser,
+            RegistryHive::LocalMachine => Hive::LocalMachine,
+        }
+    }
+
+    /// How the value is shown, standing for its path.
+    pub fn path(&self) -> PathBuf {
+        let hive = match self.hive {
+            RegistryHive::CurrentUser => "HKCU",
+            RegistryHive::LocalMachine => "HKLM",
+        };
+        PathBuf::from(format!(r"{hive}\{}\{}", self.key, self.value))
+    }
+}
+
+/// A JSON file on the machine, and the `.json` files of a drop-in folder,
+/// by name, read after it, such as Claude Code's `managed-settings.json`
+/// and `managed-settings.d`. They are one source.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FilesSource {
+    /// Starts with `%NAME%` or a drive; `/`-separated.
+    pub path: String,
+    /// The drop-in folder, written as `path` is.
+    pub drop_ins: Option<String>,
+}
+
+impl Validate for FilesSource {
+    fn validate(&self) -> Result<(), String> {
+        for path in std::iter::once(&self.path).chain(&self.drop_ins) {
+            MachineAnchor { path: path.clone() }.validate()?;
+        }
+        Ok(())
+    }
+}
+
 // --- Project registries -----------------------------------------------------
 
 /// Lists the Projects an Agent has recorded, in the Agent's own spelling.
@@ -382,6 +538,7 @@ pub(crate) struct JsonKeys {
 impl Validate for JsonKeys {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
+        self.anchor.one_file()?;
         if self.anchor.in_project() {
             return Err("a project registry must not lie in a Project".into());
         }
@@ -1595,6 +1752,7 @@ pub(crate) const NAME_KEY: &str = "{name}";
 impl Validate for Switch {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
+        self.anchor.one_file()?;
         if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
             return Err("a switch needs a key path, with no empty key".into());
         }
@@ -1635,6 +1793,426 @@ impl Switch {
     /// Whether its key path holds `{name}`, so that it holds one value per name.
     pub fn names(&self) -> bool {
         self.key_path.iter().any(|key| key == NAME_KEY)
+    }
+}
+
+// --- Settings read by rules and gates ---------------------------------------
+
+/// A value an Agent reads from one of its settings files, such as the list
+/// a rule holds. config-digger only reads it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingPlace {
+    pub anchor: Anchor,
+    /// The key path of the value. One segment may be `{project}`: the
+    /// context's Project key, in the Agent's own spelling, so that the
+    /// value applies only there.
+    pub key_path: Vec<String>,
+    /// The value is managed policy: what it keeps out is Blocked, by
+    /// `policy`, rather than Disabled.
+    #[serde(default)]
+    pub policy: bool,
+}
+
+impl Validate for SettingPlace {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        validate_key_path(&self.key_path)?;
+        if self.anchor.walk() != ProjectWalk::None {
+            return Err("a setting cannot walk up from the Project folder".into());
+        }
+        let projects = self
+            .key_path
+            .iter()
+            .filter(|key| *key == super::PROJECT_KEY)
+            .count();
+        if projects > 1 {
+            return Err(format!(
+                "a setting key path holds `{}` twice",
+                super::PROJECT_KEY
+            ));
+        }
+        if projects == 1 && (self.anchor.in_project() || self.anchor.settings().is_some()) {
+            return Err(format!(
+                "only a setting in a file of the Agent home can be keyed by `{}`",
+                super::PROJECT_KEY
+            ));
+        }
+        if self.key_path.iter().any(|key| key == NAME_KEY) {
+            return Err(format!("a setting key path cannot hold `{NAME_KEY}`"));
+        }
+        Ok(())
+    }
+}
+
+// --- Read-only rules --------------------------------------------------------
+
+/// A setting that keeps Entries out by a rule rather than one by one, such
+/// as a deny list: the Entries it keeps out are Disabled, or Blocked when
+/// the setting is policy. config-digger never writes it, so Enable is not
+/// offered.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Rule {
+    AllowDenyList(AllowDenyList),
+    GlobalSwitch(GlobalSwitch),
+}
+
+impl Validate for Rule {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Rule::AllowDenyList(block) => block.validate(),
+            Rule::GlobalSwitch(block) => block.validate(),
+        }
+    }
+}
+
+impl Rule {
+    /// Where the rule is read, highest first.
+    pub fn sources(&self) -> &[SettingPlace] {
+        match self {
+            Rule::AllowDenyList(block) => &block.sources,
+            Rule::GlobalSwitch(block) => &block.sources,
+        }
+    }
+
+    /// Every setting it reads: its sources, in their order, then any
+    /// setting that changes how it reads them.
+    pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
+        let policy_only = match self {
+            Rule::AllowDenyList(block) => block.policy_only.as_ref(),
+            Rule::GlobalSwitch(_) => None,
+        };
+        self.sources().iter().chain(policy_only)
+    }
+
+    /// The ids of the locations whose Entries it covers, empty for every
+    /// location of the Item kind.
+    pub fn locations(&self) -> &[String] {
+        match self {
+            Rule::AllowDenyList(block) => &block.locations,
+            Rule::GlobalSwitch(block) => &block.locations,
+        }
+    }
+
+    /// Whether it covers the Entries of the location `id`.
+    pub fn covers(&self, id: &str) -> bool {
+        let locations = self.locations();
+        locations.is_empty() || locations.iter().any(|location| location == id)
+    }
+}
+
+/// Lists of servers, each item naming servers by name, command or URL,
+/// merged from every source that holds one. A deny list keeps out every
+/// server an item matches. An allow list, once any source holds one, keeps
+/// out every server no item matches: an empty one keeps out all of them.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AllowDenyList {
+    pub list: ListKind,
+    /// Where the lists are. A server an allow list keeps out is Blocked
+    /// when any allow list is policy.
+    pub sources: Vec<SettingPlace>,
+    /// The field of an item that matches each part of a server.
+    #[serde(rename = "match")]
+    pub matching: ItemFields,
+    /// A setting that, while it holds `true`, leaves only the allow lists
+    /// of policy sources, such as Claude Code's `allowManagedMcpServersOnly`.
+    pub policy_only: Option<SettingPlace>,
+    /// When the allow list holds an item matching by command, a server
+    /// with a command is allowed only by such an item, and when it holds
+    /// one matching by URL, a remote server only by such an item.
+    #[serde(default)]
+    pub strict: bool,
+    /// The ids of the locations whose Entries it covers. Omitted, it covers
+    /// every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
+}
+
+/// Whether a list keeps out what it matches or what it does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ListKind {
+    Allow,
+    Deny,
+}
+
+/// The fields of a list item, each matching one part of a server on the
+/// common server model.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ItemFields {
+    /// Holds a server name, matched exactly.
+    pub name: Option<String>,
+    /// Holds the command and its args as one list, matched exactly.
+    pub command: Option<String>,
+    /// Holds a URL, where `*` stands for any text.
+    pub url: Option<String>,
+}
+
+/// What a list item matched a server by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MatchedBy {
+    Name,
+    Command,
+    Url,
+}
+
+/// A server as a list item matches it: its name, its command and args,
+/// and its URL, as the Entry shows them.
+pub(crate) struct ServerIdentity<'a> {
+    pub name: &'a str,
+    pub command: Option<Vec<&'a str>>,
+    pub url: Option<&'a str>,
+}
+
+impl Validate for AllowDenyList {
+    fn validate(&self) -> Result<(), String> {
+        validate_sources(&self.sources)?;
+        let fields = [
+            &self.matching.name,
+            &self.matching.command,
+            &self.matching.url,
+        ];
+        if fields.iter().all(|field| field.is_none()) {
+            return Err("match needs a name, command or url field".into());
+        }
+        if fields
+            .iter()
+            .flat_map(|field| field.as_deref())
+            .any(str::is_empty)
+        {
+            return Err("a match field must not be empty".into());
+        }
+        if self.strict && self.list == ListKind::Deny {
+            return Err("only an allow list can be strict".into());
+        }
+        if let Some(setting) = &self.policy_only {
+            if self.list == ListKind::Deny {
+                return Err("only an allow list can be policy_only".into());
+            }
+            setting
+                .validate()
+                .map_err(|e| format!("policy_only: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl AllowDenyList {
+    /// What `item`, one item of a list, matches `server` by, if anything.
+    /// `item_command` and `item_url` give an item's command or URL as the
+    /// server's would be shown, so that masked values compare alike.
+    pub fn matches(
+        &self,
+        item: &Value,
+        server: &ServerIdentity,
+        item_command: &dyn Fn(&[&str]) -> Vec<String>,
+        item_url: &dyn Fn(&str) -> String,
+    ) -> Option<MatchedBy> {
+        let field = |name: &Option<String>| item.get(name.as_deref()?);
+        if let Some(name) = field(&self.matching.name).and_then(Value::as_str)
+            && name == server.name
+        {
+            return Some(MatchedBy::Name);
+        }
+        if let (Some(command), Some(own)) = (
+            field(&self.matching.command).and_then(Value::as_array),
+            &server.command,
+        ) {
+            let command: Option<Vec<&str>> = command.iter().map(Value::as_str).collect();
+            if command.is_some_and(|command| item_command(&command) == *own) {
+                return Some(MatchedBy::Command);
+            }
+        }
+        if let (Some(pattern), Some(url)) = (
+            field(&self.matching.url).and_then(Value::as_str),
+            server.url,
+        ) && wildcard_match(&item_url(pattern), url)
+        {
+            return Some(MatchedBy::Url);
+        }
+        None
+    }
+
+    /// Whether `item` names servers by command, and whether by URL.
+    pub fn kinds(&self, item: &Value) -> (bool, bool) {
+        let has =
+            |name: &Option<String>| name.as_deref().is_some_and(|name| item.get(name).is_some());
+        (has(&self.matching.command), has(&self.matching.url))
+    }
+}
+
+/// Whether `text` matches `pattern`, where `*` stands for any text.
+fn wildcard_match(pattern: &str, text: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = text.strip_prefix(first) else {
+        return false;
+    };
+    let parts: Vec<&str> = parts.collect();
+    let Some((last, middle)) = parts.split_last() else {
+        return rest.is_empty();
+    };
+    for part in middle {
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.len() >= last.len() && rest.ends_with(last)
+}
+
+/// A setting that turns off every Entry it covers while it holds `off`,
+/// such as Claude Code's `syncClaudeAiSkills: false`. The first source
+/// that holds it decides; the Entries are Disabled globally, or Blocked
+/// when that source is policy.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GlobalSwitch {
+    /// Highest first.
+    pub sources: Vec<SettingPlace>,
+    /// The value that turns the Entries off.
+    pub off: Value,
+    /// The ids of the locations whose Entries it covers. Omitted, it covers
+    /// every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
+}
+
+impl Validate for GlobalSwitch {
+    fn validate(&self) -> Result<(), String> {
+        validate_sources(&self.sources)
+    }
+}
+
+/// A rule or gate reads at least one source.
+fn validate_sources(sources: &[SettingPlace]) -> Result<(), String> {
+    if sources.is_empty() {
+        return Err("sources needs at least one setting".into());
+    }
+    for (index, source) in sources.iter().enumerate() {
+        source
+            .validate()
+            .map_err(|e| format!("sources[{index}]: {e}"))?;
+    }
+    Ok(())
+}
+
+// --- Gates ------------------------------------------------------------------
+
+/// Something outside an Entry that keeps the Agent from using it, which
+/// Enable cannot lift and config-digger never lifts: the Entry is Blocked.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Gate {
+    ManagedExclusive(ManagedExclusive),
+    ApprovalList(ApprovalList),
+}
+
+impl Validate for Gate {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Gate::ManagedExclusive(block) => block.validate(),
+            Gate::ApprovalList(block) => block.validate(),
+        }
+    }
+}
+
+impl Gate {
+    /// Whether it can Block the Entries of the location `id`.
+    pub fn covers(&self, id: &str) -> bool {
+        match self {
+            Gate::ManagedExclusive(block) => block.covers(id),
+            Gate::ApprovalList(block) => block.locations.iter().any(|location| location == id),
+        }
+    }
+
+    /// The settings it reads.
+    pub fn sources(&self) -> &[SettingPlace] {
+        match self {
+            Gate::ManagedExclusive(_) => &[],
+            Gate::ApprovalList(block) => &block.sources,
+        }
+    }
+}
+
+/// Entries the Agent uses only once the user approves them, such as Claude
+/// Code's `.mcp.json` servers: one no source approves is Blocked, with
+/// `not_approved`. config-digger never approves an Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApprovalList {
+    /// The ids of the locations whose Entries need approval.
+    pub locations: Vec<String>,
+    /// Where approvals are: a list of the names approved, or `true`,
+    /// which approves every Entry.
+    pub sources: Vec<SettingPlace>,
+    /// Where the Agent asks the user to approve an Entry.
+    pub prompt: ApprovalPrompt,
+}
+
+/// Where an Agent asks the user to approve an Entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ApprovalPrompt {
+    /// When it starts in the Project.
+    OnStart,
+}
+
+impl Validate for ApprovalList {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("an approval list needs locations".into());
+        }
+        validate_sources(&self.sources)?;
+        if self.sources.iter().any(|source| source.policy) {
+            return Err("an approval is no policy".into());
+        }
+        Ok(())
+    }
+}
+
+impl ApprovalList {
+    /// Whether `value`, what a source holds, approves the Entry named `name`.
+    pub fn approves(&self, value: &Value, name: &str) -> bool {
+        match value {
+            Value::Bool(all) => *all,
+            Value::Array(names) => names.iter().any(|known| known.as_str() == Some(name)),
+            _ => false,
+        }
+    }
+}
+
+/// A managed file that takes exclusive control while it exists, even
+/// empty: the Agent then loads no Entry of the kind from any other
+/// location but those it exempts, which are Blocked by `policy`. Such as
+/// Claude Code's `managed-mcp.json`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ManagedExclusive {
+    /// The id of the location whose file takes control, outside any Project.
+    pub location: String,
+    /// The ids of the other locations it leaves alone, such as servers the
+    /// managed settings declare.
+    #[serde(default)]
+    pub except: Vec<String>,
+}
+
+impl Validate for ManagedExclusive {
+    fn validate(&self) -> Result<(), String> {
+        if self.location.trim().is_empty() {
+            return Err("a managed-exclusive gate needs a location".into());
+        }
+        Ok(())
+    }
+}
+
+impl ManagedExclusive {
+    /// Whether it Blocks the Entries of the location `id` while it holds.
+    pub fn covers(&self, id: &str) -> bool {
+        self.location != id && !self.except.iter().any(|except| except == id)
     }
 }
 
@@ -1980,6 +2558,7 @@ impl Validate for EnvBypass {
         }
         for map in &self.env_maps {
             map.anchor.validate().map_err(|e| format!("env map: {e}"))?;
+            map.anchor.one_file().map_err(|e| format!("env map: {e}"))?;
             if map.anchor.in_project() {
                 return Err("an env map must lie in the Agent home or the machine".into());
             }

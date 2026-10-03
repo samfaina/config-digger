@@ -69,6 +69,20 @@ settings_file = ".claude/settings.json"
 # Personal skills, one folder each, and the skills synced from claude.ai.
 skills = ".claude/skills"
 
+# The settings an organisation deploys, highest first [docs]. Claude Code
+# reads them only from the first source that holds any setting, unless that
+# source sets `managedSourcesBehavior = "merge"`, which is not read. The
+# HKCU value is user-writable: it applies only when no admin source holds
+# settings. The cache of server-managed settings in
+# `~/.claude/remote-settings.json`, which ranks above them all, is not read.
+[[settings]]
+id = "managed"
+sources = [
+  { block = "registry-value", hive = "local-machine", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings" },
+  { block = "files", path = "%ProgramFiles%/ClaudeCode/managed-settings.json", drop_ins = "%ProgramFiles%/ClaudeCode/managed-settings.d" },
+  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings" },
+]
+
 [[scopes]]
 id = "managed"
 
@@ -87,6 +101,36 @@ id = "user"
 registries = [
   { block = "json-keys", anchor = { block = "home", root = "state_file" }, root = ["projects"] },
 ]
+
+# Servers an administrator deploys to the machine [docs]. config-digger
+# only reads them. What Claude Code does with a file it cannot parse is not
+# known.
+[[locations]]
+id = "managed-mcp"
+anchor = { block = "machine", path = "%ProgramFiles%/ClaudeCode/managed-mcp.json" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-" }
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+
+# Servers the managed settings declare in `managedMcpServers` [docs].
+[[locations]]
+id = "managed-settings-mcp"
+anchor = { block = "settings", settings = "managed" }
+format = { block = "json", dialect = "strict" }
+root = ["managedMcpServers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-" }
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "local-mcp"
@@ -146,9 +190,77 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # skips a malformed Entry with a warning [docs], and a Disabled one, before
 # they compete, so the next one down can win.
 [items.mcp]
-precedence = ["local-mcp", "project-mcp", "user-mcp"]
+precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }
-checks = ["shape", "disable", "precedence"]
+# An exclusive `managed-mcp.json` suppresses the other servers, and an
+# unapproved server is not loaded: neither competes. The allow and deny
+# lists apply after precedence, to the server that wins [docs].
+checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
+
+# Claude Code loads a `.mcp.json` server only once the user approves it,
+# which it asks about when it starts in the Project [docs]. Approvals are
+# names in `enabledMcpjsonServers`, or `enableAllProjectMcpServers: true`,
+# in any settings file [docs, disk], and in the Project's state in
+# `~/.claude.json` [docs]; that the state also holds
+# `enableAllProjectMcpServers` is inferred. `disabledMcpjsonServers` wins
+# over an approval [docs], so it is checked first.
+[[items.mcp.gates]]
+block = "approval-list"
+locations = ["project-mcp"]
+prompt = "on-start"
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["enableAllProjectMcpServers"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enableAllProjectMcpServers"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enableAllProjectMcpServers"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["enableAllProjectMcpServers"] },
+  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enabledMcpjsonServers"] },
+  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enableAllProjectMcpServers"] },
+]
+
+# `deniedMcpServers` keeps out every server one of its items names, by
+# `serverName`, by `serverCommand` (the command and its args) or by
+# `serverUrl` (`*` for any text). It is merged from every settings file and
+# always wins [docs]. In the managed settings it is policy.
+[[items.mcp.rules]]
+block = "allow-deny-list"
+list = "deny"
+match = { name = "serverName", command = "serverCommand", url = "serverUrl" }
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["deniedMcpServers"], policy = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["deniedMcpServers"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["deniedMcpServers"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["deniedMcpServers"] },
+]
+
+# `allowedMcpServers`, once any settings file holds it, keeps out every
+# server none of its items names, merged from every settings file [docs]:
+# an empty list keeps out all of them. While it names a server by command,
+# a server with a command passes only by its command, and likewise by URL
+# [docs]. `allowManagedMcpServersOnly: true` in the managed settings leaves
+# only the managed lists [docs].
+[[items.mcp.rules]]
+block = "allow-deny-list"
+list = "allow"
+strict = true
+match = { name = "serverName", command = "serverCommand", url = "serverUrl" }
+policy_only = { anchor = { block = "settings", settings = "managed" }, key_path = ["allowManagedMcpServersOnly"], policy = true }
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["allowedMcpServers"], policy = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["allowedMcpServers"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["allowedMcpServers"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["allowedMcpServers"] },
+]
+
+# While `managed-mcp.json` exists, even empty, Claude Code loads only its
+# servers and those of the managed settings [docs].
+[[items.mcp.gates]]
+block = "managed-exclusive"
+location = "managed-mcp"
+except = ["managed-settings-mcp"]
 
 # The `/mcp` toggle: names in `projects["<path>"].disabledMcpServers`, which
 # Claude Code skips in that Project whatever file declares them. It is
@@ -275,7 +387,21 @@ when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 [items.skill]
 precedence = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 competition = { block = "exact-name" }
-checks = ["frontmatter", "disable", "precedence"]
+checks = ["frontmatter", "disable", "precedence", "rules"]
+
+# `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]. Settings
+# files rank managed, local, Project, user [docs]: the highest that holds it
+# decides.
+[[items.skill.rules]]
+block = "global-switch"
+off = false
+locations = ["synced-skills"]
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["syncClaudeAiSkills"], policy = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["syncClaudeAiSkills"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["syncClaudeAiSkills"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["syncClaudeAiSkills"] },
+]
 
 # The `/skills` menu: `skillOverrides: {"<name>": "off"}` in the Project's
 # local settings [docs]. `"name-only"` lists only the name to Claude and

@@ -1689,6 +1689,7 @@ fn state_after_label(state: api::StateAfter) -> &'static str {
         api::StateAfter::Effective => state_label(api::State::Effective),
         api::StateAfter::Shadowed => state_label(api::State::Shadowed),
         api::StateAfter::Disabled => state_label(api::State::Disabled),
+        api::StateAfter::Blocked => state_label(api::State::Blocked),
         api::StateAfter::Invalid => state_label(api::State::Invalid),
         api::StateAfter::Unread => state_label(api::State::Unread),
         api::StateAfter::Removed => "removed",
@@ -1700,6 +1701,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
         api::StateAfter::Effective => state_style(api::State::Effective),
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
         api::StateAfter::Disabled => state_style(api::State::Disabled),
+        api::StateAfter::Blocked => state_style(api::State::Blocked),
         api::StateAfter::Invalid => state_style(api::State::Invalid),
         api::StateAfter::Unread => state_style(api::State::Unread),
         api::StateAfter::Removed => AnsiColor::Red.on_default(),
@@ -1711,18 +1713,22 @@ fn state_label(state: api::State) -> &'static str {
         api::State::Effective => "Effective",
         api::State::Shadowed => "Shadowed",
         api::State::Disabled => "Disabled",
+        api::State::Blocked => "Blocked",
         api::State::Invalid => "Invalid",
         api::State::Unread => "Unread",
     }
 }
 
 /// The app's State colours: green Effective, grey Shadowed, amber Disabled,
-/// red Invalid, dim Unread.
+/// orange Blocked, red Invalid, dim Unread.
 fn state_style(state: api::State) -> Style {
     match state {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
         api::State::Disabled => AnsiColor::Yellow.on_default(),
+        api::State::Blocked => {
+            Style::new().fg_color(Some(anstyle::Color::Ansi256(anstyle::Ansi256Color(208))))
+        }
         api::State::Invalid => AnsiColor::Red.on_default(),
         api::State::Unread => DIM,
     }
