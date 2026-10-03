@@ -1,0 +1,13 @@
+{
+  "dxt_version": "0.1",
+  "name": "calendar",
+  "display_name": "Calendar",
+  "version": "2.0.0",
+  "description": "Reads the calendar.",
+  "author": { "name": "Acme" },
+  "server": {
+    "type": "python",
+    "entry_point": "server/main.py",
+    "mcp_config": { "command": "python", "args": ["${__dirname}/server/main.py"] }
+  }
+}

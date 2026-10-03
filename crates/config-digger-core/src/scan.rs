@@ -4,13 +4,15 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bypasses, Cached, Disables, Format, Gate, GateStore, JsonFormat,
-    ListPlugins, Locate, LookUp, NameFrom, Parse, ProjectWalk, Register, SettingsSource,
-    SkillDefect, SkillFolder, StoreClass, is_entry_key,
+    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, Format, Gate, GateStore,
+    HoldsHere, JsonFormat, JsonPluginRecords, Locate, LookUp, NameFrom, Parse, PluginFolders,
+    PluginRecord, PluginRegistry, ProjectWalk, Register, SettingsSource, SkillDefect, SkillFolder,
+    StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
-    AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY, PluginsDefinition, References,
+    AgentDefinition, HomeDefinition, ItemKind, LocationDefinition, PROJECT_KEY, PluginNames,
+    PluginsDefinition, References,
 };
 use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -87,6 +89,8 @@ pub(crate) struct ScannedSetting {
     pub path: PathBuf,
     /// The key of the Project it applies in, or `None` when it applies in every context.
     pub project: Option<String>,
+    /// For a file per plugin or per Entry, which one it is the file of.
+    pub file_of: Option<Owner>,
     /// Its key path, `{project}` replaced by the Project key in the Agent's
     /// own spelling.
     pub key_path: Vec<String>,
@@ -104,7 +108,7 @@ pub(crate) enum SettingOwner {
 
 impl Snapshot {
     /// The values of `owner` read in the Agent home of `entry` that apply
-    /// in the context of the Project with the key `project`.
+    /// to it in the context of the Project with the key `project`.
     pub fn settings_for<'s>(
         &'s self,
         entry: &'s ScannedEntry,
@@ -118,7 +122,27 @@ impl Snapshot {
                 && value.kind == kind
                 && value.owner == owner
                 && (value.project.is_none() || value.project.as_deref() == project)
+                && applies(value.file_of.as_ref(), entry)
         })
+    }
+}
+
+/// What a file read once per plugin, or once per Entry, is the file of.
+#[derive(Clone, PartialEq)]
+pub(crate) enum Owner {
+    /// The plugin with this id.
+    Plugin(String),
+    /// The Entry at this path.
+    Entry(PathBuf),
+}
+
+/// Whether what the file of `file_of` holds applies to `entry`: the file of
+/// its plugin, or its own. What any other file holds applies to every Entry.
+pub(crate) fn applies(file_of: Option<&Owner>, entry: &ScannedEntry) -> bool {
+    match file_of {
+        None => true,
+        Some(Owner::Plugin(id)) => entry.plugin.as_ref().is_some_and(|own| own.id == *id),
+        Some(Owner::Entry(path)) => entry.path == *path,
     }
 }
 
@@ -203,6 +227,8 @@ pub(crate) struct ScannedSwitch {
     pub path: PathBuf,
     /// The key of the Project it applies in, or `None` when it applies in every context.
     pub project: Option<String>,
+    /// For a file per plugin or per Entry, which one it is the file of.
+    pub file_of: Option<Owner>,
     /// Its key path, `{project}` replaced by the Project key in the Agent's
     /// own spelling, `{name}` or `{plugin_id}` left in place.
     pub key_path: Vec<String>,
@@ -210,14 +236,19 @@ pub(crate) struct ScannedSwitch {
     /// when it has one:
     /// `None` when the file or key is missing.
     pub value: Option<serde_json::Value>,
+    /// When the value is a list of objects, the field of each that holds
+    /// the name it stands for.
+    pub named_by: Option<String>,
     /// How the file behaves while the Agent runs.
     pub store_class: StoreClass,
 }
 
 impl ScannedSwitch {
     /// The switch's key path for the Entry it holds by `key`: its name, or
-    /// its plugin's id.
+    /// its plugin's id, or in a list, the index of the item it names.
     pub fn key_path_for(&self, key: &str) -> Vec<String> {
+        let index = self.item(key).map(|(index, _)| index.to_string());
+        let key = index.as_deref().unwrap_or(key);
         self.key_path
             .iter()
             .map(|known| if is_entry_key(known) { key } else { known }.to_owned())
@@ -228,9 +259,25 @@ impl ScannedSwitch {
     pub fn value_for(&self, key: &str) -> Option<&serde_json::Value> {
         let value = self.value.as_ref()?;
         match self.key_path.iter().position(|known| is_entry_key(known)) {
-            Some(at) => lookup(value.get(key)?, &self.key_path[at + 1..]),
+            Some(at) => {
+                let held = match self.item(key) {
+                    Some((_, item)) => item,
+                    None => value.get(key)?,
+                };
+                lookup(held, &self.key_path[at + 1..])
+            }
             None => Some(value),
         }
+    }
+
+    /// In a list named by a field, the item that names `key`, and its index.
+    fn item(&self, key: &str) -> Option<(usize, &serde_json::Value)> {
+        let field = self.named_by.as_deref()?;
+        let items = self.value.as_ref()?.as_array()?;
+        items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.get(field).and_then(serde_json::Value::as_str) == Some(key))
     }
 }
 
@@ -304,6 +351,7 @@ impl Snapshot {
                 && switch.home == entry.home
                 && switch.kind == kind
                 && switch.mechanism == mechanism
+                && applies(switch.file_of.as_ref(), entry)
         })
     }
 
@@ -354,6 +402,16 @@ pub(crate) struct ScannedHome {
     pub hidden: bool,
     /// The version that last ran against it, as the Agent records it.
     pub last_ran: Option<String>,
+    /// When the Agent's lookup order skips it, what it reads instead.
+    pub skipped: Option<Skipped>,
+}
+
+/// An Agent home the Agent's lookup order skips: the Agent never reads it.
+#[derive(Clone)]
+pub(crate) struct Skipped {
+    /// The id and folder of the home the order picks, `None` when it picks
+    /// none that is there.
+    pub instead: Option<(String, PathBuf)>,
 }
 
 /// Where an Agent home came from.
@@ -489,6 +547,7 @@ struct FoundHome {
     source: HomeSource,
     /// Any of its own roots exists.
     configured: bool,
+    skipped: Option<Skipped>,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -535,6 +594,7 @@ pub(crate) fn scan_as_if(
     }
     // Locations keyed by Project can name Projects no registry records, so
     // every one of them is read before any location in a Project folder.
+    let mut installed = Installed::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
         let plugins: Vec<ScannedPlugin> = definition
@@ -542,6 +602,7 @@ pub(crate) fn scan_as_if(
             .iter()
             .flat_map(|plugins| scanner.read_plugins(home, plugins))
             .collect();
+        installed.insert((home.agent_index, home.home.clone()), plugins.clone());
         for location in definition.locations.iter() {
             if location.anchor.in_project() {
                 continue;
@@ -606,16 +667,23 @@ pub(crate) fn scan_as_if(
             .iter()
             .any(|hidden| project.spellings.contains(&paths::lexical_key(hidden)));
     }
-    let (switches, unreadable_switches) =
-        read_switches(definitions, &found, &projects, &mut scanner.reader);
+    let (switches, unreadable_switches) = read_switches(
+        definitions,
+        &found,
+        &projects,
+        &installed,
+        &scanner.entries,
+        &mut scanner.reader,
+    );
     let (setting_values, unreadable_settings) = read_rules(
         definitions,
         &found,
         &projects,
+        &installed,
         &settings,
         &mut scanner.reader,
     );
-    let switch_files = switch_files(definitions, &found, &projects);
+    let switch_files = switch_files(definitions, &found, &projects, &installed, &scanner.entries);
     let gates = read_gates(definitions, &found, &mut scanner.reader, ports);
     let exclusive = exclusive_files(definitions, &found, &as_if);
     scanner.entries = one_per_entry(definitions, scanner.entries);
@@ -649,12 +717,18 @@ pub(crate) fn scan_as_if(
         .collect();
     // A file that is a Read failure for an Agent home yields it no Entries,
     // even from a location of it that did parse. One in a settings source
-    // the Agent skips is no failure of the Agent's.
+    // the Agent skips, or in a home its lookup order skips, is no failure
+    // of the Agent's.
     let mut failures = scanner.reader.failures;
     failures.retain(|failure| {
         !settings
             .iter()
             .any(|known| known.agent_index == failure.agent_index && known.skips(&failure.path))
+            && !found.iter().any(|home| {
+                home.agent_index == failure.agent_index
+                    && home.home == failure.home
+                    && home.skipped.is_some()
+            })
     });
     scanner.entries.retain(|entry| {
         !failures.iter().any(|failure| {
@@ -671,6 +745,7 @@ pub(crate) fn scan_as_if(
             .zip(last_ran)
             .map(|(home, last_ran)| ScannedHome {
                 last_ran,
+                skipped: home.skipped,
                 configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
                     hidden.agent == definitions[home.agent_index].agent.id
@@ -718,6 +793,12 @@ fn read_settings(
                         let text = ports
                             .env
                             .registry_value(block.hive(), &block.key, &block.value);
+                        reader.files.insert(path.clone(), Ok(text));
+                        vec![path]
+                    }
+                    SettingsSource::RegistryKey(block) => {
+                        let path = block.path();
+                        let text = block.text(ports.env.as_ref());
                         reader.files.insert(path.clone(), Ok(text));
                         vec![path]
                     }
@@ -878,6 +959,8 @@ fn read_switches(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
+    installed: &Installed,
+    entries: &[ScannedEntry],
     reader: &mut Reader,
 ) -> (Vec<ScannedSwitch>, BTreeSet<PathBuf>) {
     let mut switches = Vec::new();
@@ -891,6 +974,8 @@ fn read_switches(
                     home,
                     projects,
                     settings: &[],
+                    plugins: plugins_of(installed, home),
+                    entries: covered(definition, entries, home, kind, block),
                 };
                 for place in places.read(&switch.anchor, &switch.key_path, reader, &mut unreadable)
                 {
@@ -901,8 +986,10 @@ fn read_switches(
                         mechanism,
                         path: place.path,
                         project: place.project,
+                        file_of: place.file_of,
                         value: place.value,
                         key_path: place.key_path,
+                        named_by: switch.named_by.clone(),
                         store_class: switch.store_class,
                     });
                 }
@@ -919,6 +1006,7 @@ fn read_rules(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
+    installed: &Installed,
     settings: &[ScannedSettings],
     reader: &mut Reader,
 ) -> (Vec<ScannedSetting>, BTreeSet<PathBuf>) {
@@ -945,6 +1033,8 @@ fn read_rules(
                     home,
                     projects,
                     settings,
+                    plugins: plugins_of(installed, home),
+                    entries: Vec::new(),
                 };
                 for place in
                     places.read(&setting.anchor, &setting.key_path, reader, &mut unreadable)
@@ -956,6 +1046,7 @@ fn read_rules(
                         owner,
                         path: place.path,
                         project: place.project,
+                        file_of: place.file_of,
                         key_path: place.key_path,
                         value: place.value,
                     });
@@ -972,6 +1063,8 @@ struct Place {
     path: PathBuf,
     /// The key of the Project it applies in, or `None` when it applies in every context.
     project: Option<String>,
+    /// For a file per plugin or per Entry, which one it is the file of.
+    file_of: Option<Owner>,
     /// Its key path, `{project}` replaced by the Project key in the
     /// Agent's own spelling, `{name}` left in place.
     key_path: Vec<String>,
@@ -985,16 +1078,51 @@ struct Places<'a> {
     projects: &'a [ScannedProject],
     /// The settings a settings anchor reads.
     settings: &'a [ScannedSettings],
+    /// The plugins of the home, each with a file of an anchor per plugin.
+    plugins: &'a [ScannedPlugin],
+    /// The Entries of the home, each with a file of an anchor per Entry.
+    entries: Vec<&'a ScannedEntry>,
+}
+
+/// The plugins each found Agent home loads, by Agent index and home id.
+type Installed = BTreeMap<(usize, String), Vec<ScannedPlugin>>;
+
+/// The Entries among `entries` of `home`, of the Item kind `kind`, that
+/// `mechanism` covers.
+fn covered<'e>(
+    definition: &AgentDefinition,
+    entries: &'e [ScannedEntry],
+    home: &FoundHome,
+    kind: ItemKind,
+    mechanism: &DisableMechanism,
+) -> Vec<&'e ScannedEntry> {
+    entries
+        .iter()
+        .filter(|entry| {
+            entry.agent_index == home.agent_index
+                && entry.home == home.home
+                && definition.location(&entry.location).kind == kind
+                && mechanism.covers(&entry.location)
+        })
+        .collect()
+}
+
+/// The plugins `home` loads.
+fn plugins_of<'i>(installed: &'i Installed, home: &FoundHome) -> &'i [ScannedPlugin] {
+    installed
+        .get(&(home.agent_index, home.home.clone()))
+        .map_or(&[], Vec::as_slice)
 }
 
 impl Places<'_> {
     /// Every place `anchor` and `key_path` name: in each existing Project
     /// folder for an anchor in a Project, in each file of the source the
-    /// Agent reads for a settings anchor, under each spelling of each
-    /// Project key for a key path holding `{project}`, and once otherwise.
-    /// A file that is missing is read as empty; one that cannot be read or
-    /// parsed as JSON, or that is a Read failure for the Agent home, goes
-    /// into `unreadable` and has no places.
+    /// Agent reads for a settings anchor, in the file of each plugin for an
+    /// anchor per plugin, under each spelling of each Project key for a key
+    /// path holding `{project}`, and once otherwise. A file that is missing
+    /// is read as empty; one that cannot be read or parsed as JSON, or that
+    /// is a Read failure for the Agent home, goes into `unreadable` and has
+    /// no places.
     fn read(
         &self,
         anchor: &Anchor,
@@ -1003,31 +1131,62 @@ impl Places<'_> {
         unreadable: &mut BTreeSet<PathBuf>,
     ) -> Vec<Place> {
         let home = self.home;
-        let files: Vec<(PathBuf, Option<String>)> = if let Some(id) = anchor.settings() {
-            // A later file of the source overrides an earlier one, so it
-            // comes first.
-            settings_named(self.settings, home.agent_index, id)
-                .into_iter()
-                .flat_map(|known| known.read().iter().rev().map(|path| (path.clone(), None)))
-                .collect()
-        } else if anchor.in_project() {
-            self.projects
-                .iter()
-                .filter(|project| project.is_folder())
-                .filter_map(|project| {
-                    let path = anchor.path(&home.roots, Some(&project.path))?;
-                    Some((path, Some(project.key.clone())))
-                })
-                .collect()
-        } else {
-            anchor
-                .path(&home.roots, None)
-                .map(|path| (path, None))
-                .into_iter()
-                .collect()
-        };
+        let files: Vec<(PathBuf, Option<String>, Option<Owner>)> =
+            if let Some(id) = anchor.settings() {
+                // A later file of the source overrides an earlier one, so it
+                // comes first.
+                settings_named(self.settings, home.agent_index, id)
+                    .into_iter()
+                    .flat_map(|known| {
+                        known
+                            .read()
+                            .iter()
+                            .rev()
+                            .map(|path| (path.clone(), None, None))
+                    })
+                    .collect()
+            } else if let Some(beside) = anchor.entry() {
+                let mut files: Vec<(PathBuf, Option<String>, Option<Owner>)> = Vec::new();
+                for entry in &self.entries {
+                    let Some(path) = beside.of(&entry.path) else {
+                        continue;
+                    };
+                    let file_of = Some(Owner::Entry(entry.path.clone()));
+                    if !files.iter().any(|(_, _, known)| *known == file_of) {
+                        files.push((path, entry.project.clone(), file_of));
+                    }
+                }
+                files
+            } else if anchor.per_plugin() {
+                self.plugins
+                    .iter()
+                    .filter_map(|plugin| {
+                        let path = anchor.plugin_path(&home.roots, &plugin.id)?;
+                        Some((
+                            path,
+                            plugin.project.clone(),
+                            Some(Owner::Plugin(plugin.id.clone())),
+                        ))
+                    })
+                    .collect()
+            } else if anchor.in_project() {
+                self.projects
+                    .iter()
+                    .filter(|project| project.is_folder())
+                    .filter_map(|project| {
+                        let path = anchor.path(&home.roots, Some(&project.path))?;
+                        Some((path, Some(project.key.clone()), None))
+                    })
+                    .collect()
+            } else {
+                anchor
+                    .path(&home.roots, None)
+                    .map(|path| (path, None, None))
+                    .into_iter()
+                    .collect()
+            };
         let mut places = Vec::new();
-        for (path, project) in files {
+        for (path, project, file_of) in files {
             // A file the Agent home cannot read, even one that is valid
             // JSON, sets nothing.
             let failed = reader.failures.iter().any(|failure| {
@@ -1061,6 +1220,7 @@ impl Places<'_> {
                 Place {
                     path: path.clone(),
                     project,
+                    file_of: file_of.clone(),
                     value: document
                         .as_ref()
                         .and_then(|document| lookup(document, &key_path[..up_to_name]))
@@ -1105,13 +1265,31 @@ fn switch_files(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
+    installed: &Installed,
+    entries: &[ScannedEntry],
 ) -> BTreeSet<PathBuf> {
     let mut files = BTreeSet::new();
     for home in found {
         let definition = &definitions[home.agent_index];
-        for rules in definition.items.values() {
+        for (&kind, rules) in &definition.items {
             for mechanism in &rules.disable {
                 let anchor = &mechanism.switch().anchor;
+                if let Some(beside) = anchor.entry() {
+                    files.extend(
+                        covered(definition, entries, home, kind, mechanism)
+                            .iter()
+                            .filter_map(|entry| beside.of(&entry.path)),
+                    );
+                    continue;
+                }
+                if anchor.per_plugin() {
+                    files.extend(
+                        plugins_of(installed, home)
+                            .iter()
+                            .filter_map(|plugin| anchor.plugin_path(&home.roots, &plugin.id)),
+                    );
+                    continue;
+                }
                 if !anchor.in_project() {
                     files.extend(anchor.path(&home.roots, None));
                     continue;
@@ -1152,37 +1330,65 @@ fn find_homes(
     let mut found = Vec::new();
     let mut definition_folders = Vec::new();
     for (agent_index, definition) in definitions.iter().enumerate() {
+        // Each home with its folders, each folder with the home's id there:
+        // a home whose glob matches several folders has one per folder,
+        // each with its folder as its id.
+        let mut located: Vec<(&HomeDefinition, Vec<(String, PathBuf)>)> = Vec::new();
         for home in &definition.homes {
-            let folder =
-                home.folder
-                    .locate(ports.env.as_ref())
-                    .ok_or_else(|| ScanError::HomeUnknown {
-                        agent: definition.agent.name.clone(),
-                        home: home.id.clone(),
-                    })?;
-            definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
-            let mut roots = home.roots_in(&folder);
-            // A definition home the user added keeps its id, so that it is
-            // the same home before and after its files appear.
-            let source = if roots.values().any(|root| fs.exists(root)) {
-                HomeSource::Default
-            } else if added_to(&definition.agent.id, &folder) {
-                HomeSource::Added
-            } else {
-                tracing::debug!(agent = %definition.agent.id, home = %home.id, "home not found");
-                continue;
-            };
-            tracing::debug!(agent = %definition.agent.id, home = %home.id, "home found");
-            let configured = source == HomeSource::Default;
-            roots.extend(machine_paths(definition, ports));
-            found.push(FoundHome {
-                agent_index,
-                home: home.id.clone(),
-                folder,
-                roots,
-                source,
-                configured,
-            });
+            let folders = home.folder.folders(ports.env.as_ref(), fs);
+            if folders.is_empty() && home.folder.in_home_folder() {
+                return Err(ScanError::HomeUnknown {
+                    agent: definition.agent.name.clone(),
+                    home: home.id.clone(),
+                });
+            }
+            let several = folders.len() > 1;
+            let folders = folders
+                .into_iter()
+                .map(|folder| {
+                    let id = if several {
+                        folder.display().to_string()
+                    } else {
+                        home.id.clone()
+                    };
+                    (id, folder)
+                })
+                .collect();
+            located.push((home, folders));
+        }
+        let picked = lookup_order(definition, &located, ports);
+        for (home, folders) in located {
+            let in_order = definition.lookup_order.contains(&home.id);
+            for (id, folder) in folders {
+                definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
+                let skipped = (in_order && picked.as_ref().is_none_or(|(picked, _)| *picked != id))
+                    .then(|| Skipped {
+                        instead: picked.clone(),
+                    });
+                let mut roots = home.roots_in(&folder);
+                // A definition home the user added keeps its id, so that it is
+                // the same home before and after its files appear.
+                let source = if roots.values().any(|root| fs.exists(root)) {
+                    HomeSource::Default
+                } else if added_to(&definition.agent.id, &folder) {
+                    HomeSource::Added
+                } else {
+                    tracing::debug!(agent = %definition.agent.id, home = %id, "home not found");
+                    continue;
+                };
+                tracing::debug!(agent = %definition.agent.id, home = %id, "home found");
+                let configured = source == HomeSource::Default;
+                roots.extend(machine_paths(definition, ports));
+                found.push(FoundHome {
+                    agent_index,
+                    home: id,
+                    folder,
+                    roots,
+                    source,
+                    configured,
+                    skipped,
+                });
+            }
         }
     }
     // Any other home the user added is listed even with none of its roots,
@@ -1210,9 +1416,34 @@ fn find_homes(
             roots,
             source: HomeSource::Added,
             configured,
+            skipped: None,
         });
     }
     Ok(found)
+}
+
+/// The id and folder of the home the lookup order of `definition` picks
+/// among the `located` folders of its homes: the first whose conditions
+/// hold and whose folder exists, or that the Agent uses before it exists.
+fn lookup_order(
+    definition: &AgentDefinition,
+    located: &[(&HomeDefinition, Vec<(String, PathBuf)>)],
+    ports: &Ports,
+) -> Option<(String, PathBuf)> {
+    definition.lookup_order.iter().find_map(|id| {
+        let (home, folders) = located.iter().find(|(home, _)| home.id == *id)?;
+        if !home
+            .when
+            .iter()
+            .all(|condition| condition.holds(ports.env.as_ref()))
+        {
+            return None;
+        }
+        folders
+            .iter()
+            .find(|(_, folder)| home.folder.used_before_it_exists() || ports.fs.exists(folder))
+            .cloned()
+    })
 }
 
 /// The machine-wide paths a definition's locations and Feature gate env
@@ -1329,20 +1560,9 @@ impl Scanner<'_> {
         home: &FoundHome,
         plugins: &PluginsDefinition,
     ) -> Vec<ScannedPlugin> {
-        let registry = &plugins.registry;
-        let Some(path) = registry.anchor().path(&home.roots, None) else {
-            return Vec::new();
-        };
-        let Some(text) = self.reader.text(home, &path, None) else {
-            return Vec::new();
-        };
-        let records = match registry.records(text) {
-            Ok(records) => records,
-            Err(error) => {
-                self.reader
-                    .fail(home, &path, None, ReadFailureKind::Parse, error.position);
-                return Vec::new();
-            }
+        let records = match &plugins.registry {
+            PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
+            PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
         };
         let mut found = Vec::new();
         for record in records {
@@ -1368,7 +1588,8 @@ impl Scanner<'_> {
                 },
                 None => None,
             };
-            let named = plugins.name.as_ref().and_then(|name| {
+            let names = plugins.name.iter().flat_map(PluginNames::places);
+            let named = names.into_iter().find_map(|name| {
                 let file = blocks::join_relative(&folder, &name.file);
                 let text = self.reader.peek(&file).ok()??;
                 let document = JsonFormat::STRICT.parse(text).ok()?;
@@ -1394,6 +1615,65 @@ impl Scanner<'_> {
         found
     }
 
+    /// The records of a JSON file of plugin records, in its order.
+    fn plugin_records(&mut self, home: &FoundHome, block: &JsonPluginRecords) -> Vec<PluginRecord> {
+        let Some(path) = block.anchor.path(&home.roots, None) else {
+            return Vec::new();
+        };
+        let Some(text) = self.reader.text(home, &path, None) else {
+            return Vec::new();
+        };
+        match block.records(text) {
+            Ok(records) => records,
+            Err(error) => {
+                self.reader
+                    .fail(home, &path, None, ReadFailureKind::Parse, error.position);
+                Vec::new()
+            }
+        }
+    }
+
+    /// A record for each folder that holds the marker, sorted by name, with
+    /// the version its install record gives.
+    fn plugin_folders(&mut self, home: &FoundHome, block: &PluginFolders) -> Vec<PluginRecord> {
+        let Some(folder) = block.anchor.path(&home.roots, None) else {
+            return Vec::new();
+        };
+        let versions = block
+            .records
+            .as_ref()
+            .and_then(|records| {
+                let path = records.anchor.path(&home.roots, None)?;
+                let text = self.reader.text(home, &path, None)?;
+                match records.versions(text) {
+                    Ok(versions) => Some(versions),
+                    Err(error) => {
+                        self.reader
+                            .fail(home, &path, None, ReadFailureKind::Parse, error.position);
+                        None
+                    }
+                }
+            })
+            .unwrap_or_default();
+        let fs = self.reader.fs;
+        let mut children = fs.read_dir(&folder).unwrap_or_default();
+        children.sort_by_key(|child| paths::key(child));
+        children
+            .into_iter()
+            .filter(|child| fs.exists(&blocks::join_relative(child, &block.marker)))
+            .filter_map(|child| {
+                let id = child.file_name()?.to_str()?.to_owned();
+                Some(PluginRecord {
+                    version: versions.get(&id).cloned(),
+                    folder: child.display().to_string(),
+                    id,
+                    scope: None,
+                    project: None,
+                })
+            })
+            .collect()
+    }
+
     /// Adds the Entries of one location. `project` is the key of the Project
     /// whose folder holds the location, if it lies in one.
     fn read_location(
@@ -1412,6 +1692,29 @@ impl Scanner<'_> {
         let Some(document) = self.document(home, location, &path, project.as_deref()) else {
             return;
         };
+        if location.one_entry {
+            // Named by its plugin, once read.
+            if let Some(value) = lookup(&document, &location.root) {
+                let masked = mask::entry(location, value);
+                self.entries.push(ScannedEntry {
+                    agent_index: home.agent_index,
+                    home: home.home.clone(),
+                    location: location.id.clone(),
+                    path,
+                    key_path: location.root.clone(),
+                    name: String::new(),
+                    project,
+                    config: masked.value,
+                    masked: masked.key_paths,
+                    depth,
+                    defect: None,
+                    link: None,
+                    manager: None,
+                    plugin: None,
+                });
+            }
+            return;
+        }
         let mut objects = Vec::new();
         if find_objects(&document, &location.root, Vec::new(), None, &mut objects).is_err() {
             let project = project.as_deref();
@@ -1446,7 +1749,11 @@ impl Scanner<'_> {
             }
         }
         for entry in &mut self.entries[start..] {
-            entry.name = location.entry_name(&entry.name, &plugin.name);
+            entry.name = if location.one_entry {
+                plugin.name.clone()
+            } else {
+                location.entry_name(&entry.name, &plugin.name)
+            };
             entry.plugin = Some(plugin.clone());
         }
     }

@@ -312,11 +312,17 @@ fn folder_cell(folder: &Path, width: Option<usize>) -> String {
     }
 }
 
-/// What to know about an Agent home, each on its own indented line.
+/// What to know about an Agent home, each on its own indented line: that
+/// the Agent never reads it, and that none of its files exist.
 fn home_notes(home: &api::Home, width: Option<usize>) -> String {
-    home.no_configuration
+    let not_read = home
+        .not_read
         .iter()
-        .map(|note| plain_line(&format!("{INDENT}{INDENT}{note}."), width))
+        .map(|not_read| not_read.sentence.clone());
+    let no_configuration = home.no_configuration.iter().map(|note| format!("{note}."));
+    not_read
+        .chain(no_configuration)
+        .map(|note| plain_line(&format!("{INDENT}{INDENT}{note}"), width))
         .collect()
 }
 

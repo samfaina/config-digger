@@ -1,0 +1,295 @@
+#:schema ../../../schema/agent-definition.schema.json
+# Claude Desktop. Facts from docs/research/claude-desktop.md on
+# research/claude-desktop (verified against 2.16120.0.0).
+
+format_version = 1
+verified = { min = "2.16120", max = "2.16120" }
+
+# The data folder Claude Desktop reads, `<userData>`, is the first of these
+# that exists [bundle]. `CLAUDE_USER_DATA_DIR` sets it outright [bundle].
+# `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
+# share [bundle]. That a classic `%APPDATA%\Claude` beside a package's
+# `LocalCache` takes precedence for the packaged app too is inferred.
+lookup_order = ["user-data-dir", "claude-data", "classic", "msix", "msix-anthropicpbc"]
+
+[agent]
+id = "claude-desktop"
+name = "Claude Desktop"
+# claude.ai connectors live in the account; the app keeps only snapshots of
+# them in its session files [disk, docs].
+notes = ["cloud_connectors_not_on_disk"]
+
+# Each MSIX package installs to its own folder under `WindowsApps`, whose
+# manifest gives its version [disk]. A package's app reads the homes of the
+# lookup order up to its own `LocalCache`, and the third-party home. Where
+# the classic installer puts the app is not known.
+[[installations]]
+id = "msix"
+folder = "%ProgramFiles%/WindowsApps/Claude_*"
+executable = "app/claude.exe"
+versions = [{ block = "appx-identity" }, { block = "exe-version" }]
+homes = ["user-data-dir", "claude-data", "classic", "msix", "third-party"]
+
+[[installations]]
+id = "msix-anthropicpbc"
+folder = "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*"
+executable = "app/claude.exe"
+versions = [{ block = "appx-identity" }, { block = "exe-version" }]
+homes = ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc", "third-party"]
+
+# The app runs as `claude.exe` from its package [disk], as the Claude Code
+# CLI does from `~/.local/bin` and from the copy Claude Desktop downloads
+# into its data folder [disk]: only the path tells them apart.
+[process]
+images = ["claude.exe"]
+paths = [
+  "%ProgramFiles%/WindowsApps/Claude_*/app/claude.exe",
+  "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*/app/claude.exe",
+]
+
+[[homes]]
+id = "user-data-dir"
+folder = { block = "env", variable = "CLAUDE_USER_DATA_DIR" }
+
+[homes.roots]
+# Holds the user's servers in `mcpServers`, next to UI preferences.
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+[[homes]]
+id = "claude-data"
+folder = { block = "path", path = "%LOCALAPPDATA%/Claude-Data" }
+when = [{ block = "unc-variable", variable = "APPDATA" }]
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# The classic installer's data folder [docs].
+[[homes]]
+id = "classic"
+folder = { block = "path", path = "%APPDATA%/Claude" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# An MSIX package virtualises what the app writes to `%APPDATA%\Claude`
+# into its own `LocalCache`, where no other process sees it as
+# `%APPDATA%\Claude` [disk, docs]. The Store package is `Claude_<publisher>`
+# [disk].
+[[homes]]
+id = "msix"
+folder = { block = "path", path = "%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# The app also knows the package family `AnthropicPBC.Claude` [bundle].
+[[homes]]
+id = "msix-anthropicpbc"
+folder = { block = "path", path = "%LOCALAPPDATA%/Packages/AnthropicPBC.Claude_*/LocalCache/Roaming/Claude" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# Deployments that use a third-party inference provider keep a data folder
+# of their own [docs, bundle], outside the lookup order. A package writes it
+# to its real path [disk].
+[[homes]]
+id = "third-party"
+folder = { block = "path", path = "%LOCALAPPDATA%/Claude-3p" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# Device policy, one registry value per setting [docs, bundle]. While the
+# machine's key holds any value, the user's is ignored whole [docs, bundle].
+# Switches are DWORDs [docs]. Policy the organisation sends from the cloud is
+# not on disk.
+[[settings]]
+id = "policy"
+sources = [
+  { block = "registry-key", hive = "local-machine", key = 'SOFTWARE\Policies\Claude' },
+  { block = "registry-key", hive = "current-user", key = 'SOFTWARE\Policies\Claude' },
+]
+
+# Claude Desktop has no project or local Scope [docs].
+[[scopes]]
+id = "user"
+
+# `claude_desktop_config.json` is read with `JSON.parse` [bundle].
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "config" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+# Claude Desktop keeps the file in memory and writes it back whole as its
+# preferences change [bundle].
+store_class = "rewritten-while-running"
+# The app encrypts some values, writing them as `__encrypted__:<ciphertext>`
+# [bundle].
+secrets.encrypted_prefixes = ["__encrypted__:"]
+# It shows "Couldn't load app settings" and starts without the file's
+# servers, and never writes back a file it could not load [bundle].
+on_read_failure = "ignores_file"
+# Each server needs a `command` [bundle]: the file is stdio only, and the app
+# skips a server with a `url` alone, warning that it is not valid.
+shape = { block = "fields", one_of = ["command"], types = { command = "string", args = "string-array", env = "string-map" } }
+
+# Desktop extensions (`.mcpb`, formerly `.dxt`), each unpacked into
+# `Claude Extensions\<id>`; any folder there with a `manifest.json` counts as
+# installed [bundle]. `extensions-installations.json` records how each was
+# installed [bundle]. An extension's server goes by its manifest's
+# `display_name`, or else its `name` [bundle]; that a second extension with
+# the same name goes by its id is not read. Extensions are uninstalled in
+# Settings > Extensions [docs].
+[[plugins]]
+id = "extensions"
+registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = "manifest.json", records = { anchor = { block = "home", root = "installations" }, root = ["extensions"], version = "version" } }
+name = [{ file = "manifest.json", key_path = ["display_name"] }, { file = "manifest.json", key_path = ["name"] }]
+
+# The one server of an extension, in its manifest's `server.mcp_config`
+# [docs]. `${__dirname}` stands for the extension's folder, and
+# `${user_config.<key>}` for a value set in its settings [docs].
+[[locations]]
+id = "extension-mcp"
+anchor = { block = "plugin", plugins = "extensions", path = "manifest.json" }
+one_entry = true
+format = { block = "json", dialect = "strict" }
+root = ["server", "mcp_config"]
+kind = "mcp"
+scope = "user"
+provenance = "extension"
+store_class = "plain"
+interpolation = { block = "braces", namespaces = ["user_config"], namespace_separator = "." }
+secrets.encrypted_prefixes = ["__encrypted__:"]
+# The app counts a folder installed only while its manifest reads [bundle].
+on_read_failure = "ignores_file"
+
+# Extension servers are gathered first, then the user file's, by name: a
+# user server replaces a same-named extension server whole, with no field
+# merge [bundle]. A user server the app skips as invalid leaves the name to
+# the extension, as does a skipped extension to the user server.
+[items.mcp]
+precedence = ["user-mcp", "extension-mcp"]
+competition = { block = "exact-name" }
+checks = ["policy", "rules", "shape", "disable", "precedence"]
+
+# The app loads the user file's servers only while neither the policy nor
+# the file's own `features` sets `isLocalDevMcpEnabled` to false [bundle].
+[[items.mcp.rules]]
+block = "global-switch"
+off = false
+every_source = true
+locations = ["user-mcp"]
+sources = [
+  { anchor = { block = "settings", settings = "policy" }, key_path = ["isLocalDevMcpEnabled"], policy = true },
+  { anchor = { block = "home", root = "config" }, key_path = ["features", "isLocalDevMcpEnabled"] },
+]
+
+# Likewise every extension, by the policy `isDesktopExtensionEnabled`, or
+# its older name `isDxtEnabled`, or the file's `features.isDxtEnabled`
+# [docs, bundle]. Which default a deployment for a third-party provider
+# takes is not known; on is assumed.
+[[items.mcp.rules]]
+block = "global-switch"
+off = false
+every_source = true
+locations = ["extension-mcp"]
+sources = [
+  { anchor = { block = "settings", settings = "policy" }, key_path = ["isDesktopExtensionEnabled"], policy = true },
+  { anchor = { block = "settings", settings = "policy" }, key_path = ["isDxtEnabled"], policy = true },
+  { anchor = { block = "home", root = "config" }, key_path = ["features", "isDxtEnabled"] },
+]
+
+# An extension on the organisation's blocklist gets `orgBlockedReason` in its
+# settings, and the app leaves it out [bundle].
+[[items.mcp.gates]]
+block = "policy-field"
+locations = ["extension-mcp"]
+sources = [
+  { anchor = { block = "home", root = "extension_settings", path = "{plugin_id}.json" }, key_path = ["orgBlockedReason"] },
+]
+
+# The Settings > Extensions toggle: `isEnabled` in the extension's settings.
+# The app loads only an extension that has `isEnabled: true`, so one without
+# a settings file is off [bundle]. config-digger only reads it for now.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "extension_settings", path = "{plugin_id}.json" }, key_path = ["isEnabled"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "disabled_natively"
+locations = ["extension-mcp"]
+enable_offered = false
+
+# Skills exist on disk only as Claude Desktop's mirror of the account's
+# skills, in `skills-plugin/<org>/<account>/skills/<name>` [disk]. They are
+# managed in the account, and the app rewrites the mirror as it syncs, so
+# config-digger only reads them. How the app treats a `SKILL.md` it cannot
+# fully read is not known; the account validates skills on upload.
+[[locations]]
+id = "mirrored-skills"
+anchor = { block = "home", root = "skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["mirrored-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "disable", "precedence"]
+
+# The mirror's `manifest.json`, two folders above each skill, lists every
+# skill of the account with whether it is on, the Customize > Skills toggle
+# [disk]. A mirrored skill takes its State from it; it is changed in the
+# account, never on disk.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "entry", up = 2, path = "manifest.json" }, key_path = ["skills", "{name}", "enabled"], named_by = "name", store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+locations = ["mirrored-skills"]
+enable_offered = false

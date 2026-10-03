@@ -1,0 +1,6 @@
+{
+  "isEnabled": false,
+  "orgBlockedReason": "Blocked by your organization",
+  "enabledBeforeOrgBlock": true,
+  "orgBlockKind": "blocklist"
+}

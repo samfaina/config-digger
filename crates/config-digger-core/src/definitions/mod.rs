@@ -7,9 +7,9 @@ pub mod skill_managers;
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
-    Gate, GateLookup, Holds, Interpolation, ListPlugins, Locator, LookUp, MechanismTarget,
-    PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles,
-    SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locator, LookUp,
+    MechanismTarget, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
+    SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -17,10 +17,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// The definitions that ship inside config-digger, embedded at compile time.
-const BUILT_IN: &[(&str, &str)] = &[(
-    "claude-code.toml",
-    include_str!("../../definitions/claude-code.toml"),
-)];
+const BUILT_IN: &[(&str, &str)] = &[
+    (
+        "claude-code.toml",
+        include_str!("../../definitions/claude-code.toml"),
+    ),
+    (
+        "claude-desktop.toml",
+        include_str!("../../definitions/claude-desktop.toml"),
+    ),
+];
 
 /// The only `format_version` this release reads.
 const FORMAT_VERSION: u32 = 1;
@@ -82,6 +88,13 @@ pub(crate) struct AgentDefinition {
     pub process: Option<ProcessDefinition>,
     /// The Agent homes this Agent can have.
     pub homes: Vec<HomeDefinition>,
+    /// The ids of the homes the Agent picks one of, in its order, such as
+    /// the candidates for Claude Desktop's data folder: it reads the first
+    /// whose `when` holds and whose folder exists, or that it uses before
+    /// it exists, and skips the others, which are shown as not read. A home
+    /// outside the order is read wherever it is found.
+    #[serde(default)]
+    pub lookup_order: Vec<String>,
     /// The Scopes this Agent applies Entries at, in display order. A Scope is
     /// only a label: precedence comes from the order of locations in `items`.
     pub scopes: Vec<ScopeDefinition>,
@@ -144,6 +157,19 @@ pub(crate) struct AgentInfo {
     pub id: String,
     /// The display name, such as `Claude Code`.
     pub name: String,
+    /// What every Agent home of the Agent notes, such as configuration it
+    /// keeps only in the user's account.
+    #[serde(default)]
+    pub notes: Vec<AgentNote>,
+}
+
+/// Something every Agent home of an Agent notes, from a closed set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AgentNote {
+    /// The Agent's connectors live in the user's account, with no copy on
+    /// disk to list, such as Claude Desktop's.
+    CloudConnectorsNotOnDisk,
 }
 
 /// A range of Agent versions, both ends included. Versions compare
@@ -221,6 +247,11 @@ pub(crate) struct HomeDefinition {
     /// definition's `[process]`, such as for a home read by another
     /// Installation of the Agent.
     pub process: Option<ProcessDefinition>,
+    /// Conditions under which the lookup order may pick the home, every one
+    /// of them, such as `%APPDATA%` being on a network share. Only a home
+    /// in the lookup order takes them.
+    #[serde(default)]
+    pub when: Vec<HomeCondition>,
 }
 
 /// How to tell that an Agent is running. It runs when a process matches
@@ -302,17 +333,37 @@ pub(crate) struct PluginsDefinition {
     /// A file whose presence in a plugin's folder means the Agent no longer
     /// loads that folder, such as a version it superseded.
     pub superseded_marker: Option<String>,
-    /// Where a plugin's name is. Without it, or when the plugin's folder
-    /// does not hold one, its name is its id up to `id_separator`.
-    pub name: Option<PluginName>,
+    /// Where a plugin's name is, or a list of places tried in turn, such as
+    /// an extension's `display_name`, then its `name`. When the plugin's
+    /// folder holds none, its name is its id up to `id_separator`.
+    pub name: Option<PluginNames>,
     /// The text that ends a plugin's name in its id, such as the `@` before
     /// a marketplace. Without it, a plugin with no name is named by its id.
     pub id_separator: Option<String>,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
-    /// holding it and an option just before it are left out.
-    pub uninstall: String,
+    /// holding it and an option just before it are left out. Without it,
+    /// the Agent uninstalls a plugin only through its own interface.
+    pub uninstall: Option<String>,
+}
+
+/// Where a plugin's name is: one place, or several tried in turn.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum PluginNames {
+    One(PluginName),
+    Several(Vec<PluginName>),
+}
+
+impl PluginNames {
+    /// The places, in the order they are tried.
+    pub fn places(&self) -> &[PluginName] {
+        match self {
+            PluginNames::One(name) => std::slice::from_ref(name),
+            PluginNames::Several(names) => names,
+        }
+    }
 }
 
 /// A string in a JSON file of a plugin's folder that names the plugin.
@@ -337,24 +388,29 @@ impl PluginsDefinition {
         if let Some(marker) = &self.superseded_marker {
             blocks::validate_relative(marker)?;
         }
-        if let Some(name) = &self.name {
+        for name in self.name.iter().flat_map(PluginNames::places) {
             blocks::validate_relative(&name.file)?;
             blocks::validate_key_path(&name.key_path)?;
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
         }
-        if !self.uninstall.contains(PLUGIN_ID) {
+        if self
+            .uninstall
+            .as_ref()
+            .is_some_and(|uninstall| !uninstall.contains(PLUGIN_ID))
+        {
             return Err(format!("uninstall must name the plugin with `{PLUGIN_ID}`"));
         }
         Ok(())
     }
 
-    /// The command that uninstalls the plugin `id`, installed at `scope`.
-    pub fn uninstall(&self, id: &str, scope: Option<&str>) -> String {
-        let command = self.uninstall.replace(PLUGIN_ID, id);
+    /// The command that uninstalls the plugin `id`, installed at `scope`,
+    /// `None` when the Agent has none.
+    pub fn uninstall(&self, id: &str, scope: Option<&str>) -> Option<String> {
+        let command = self.uninstall.as_ref()?.replace(PLUGIN_ID, id);
         if let Some(scope) = scope {
-            return command.replace(PLUGIN_SCOPE, scope);
+            return Some(command.replace(PLUGIN_SCOPE, scope));
         }
         let mut words: Vec<&str> = Vec::new();
         for word in command.split_whitespace() {
@@ -364,7 +420,7 @@ impl PluginsDefinition {
                 words.pop();
             }
         }
-        words.join(" ")
+        Some(words.join(" "))
     }
 }
 
@@ -382,6 +438,12 @@ pub(crate) struct LocationDefinition {
     /// apply only in that Project. Omitted for a folder of skill folders.
     #[serde(default)]
     pub root: Vec<String>,
+    /// Whether the value at `root` is one Entry rather than an object of
+    /// them, named by the plugin it is part of, such as the server a Claude
+    /// Desktop extension's manifest declares in `server.mcp_config`. Only a
+    /// location in plugins can hold one.
+    #[serde(default)]
+    pub one_entry: bool,
     pub kind: ItemKind,
     /// The id of a declared Scope.
     pub scope: String,
@@ -486,12 +548,28 @@ pub(crate) struct SecretFields {
     /// masked wherever the file's text is shown, as in a diff's context lines.
     #[serde(default)]
     pub file_fields: Vec<Vec<String>>,
+    /// Prefixes the Agent writes before a value it encrypted, such as
+    /// Claude Desktop's `__encrypted__:`. Such a value is a Secret wherever
+    /// it is, in an Entry or anywhere in the file, and keeps its prefix.
+    #[serde(default)]
+    pub encrypted_prefixes: Vec<String>,
 }
 
 impl SecretFields {
     /// Whether it names no field at all.
     pub fn is_empty(&self) -> bool {
-        self.fields.is_empty() && self.variable_names.is_empty() && self.file_fields.is_empty()
+        self.fields.is_empty()
+            && self.variable_names.is_empty()
+            && self.file_fields.is_empty()
+            && self.encrypted_prefixes.is_empty()
+    }
+
+    /// The encrypted prefix `text` starts with, if any.
+    pub fn encrypted_prefix<'t>(&self, text: &'t str) -> Option<&'t str> {
+        self.encrypted_prefixes
+            .iter()
+            .find(|prefix| text.starts_with(prefix.as_str()))
+            .map(|prefix| &text[..prefix.len()])
     }
 }
 
@@ -508,6 +586,9 @@ impl Validate for SecretFields {
                     "secret field {field:?} needs keys, none of them empty"
                 ));
             }
+        }
+        if self.encrypted_prefixes.iter().any(String::is_empty) {
+            return Err("an encrypted prefix must not be empty".into());
         }
         Ok(())
     }
@@ -569,9 +650,10 @@ pub(crate) struct ItemRules {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Check {
-    /// A managed file takes exclusive control and leaves the Entry out:
-    /// Blocked, with `policy`. A Blocked Entry does not compete. Required
-    /// when a gate of the kind is managed-exclusive, and refused otherwise.
+    /// A managed file takes exclusive control and leaves the Entry out, or
+    /// a field the organisation sets keeps it out: Blocked, with `policy`.
+    /// A Blocked Entry does not compete. Required when a gate of the kind
+    /// is managed-exclusive or a policy field, and refused otherwise.
     Policy,
     /// A Disable mechanism's switch is set for the Entry: Disabled.
     Disable,
@@ -674,6 +756,28 @@ impl AgentDefinition {
                     .validate()
                     .map_err(|e| format!("home `{}` process: {e}", home.id))?;
             }
+            for condition in &home.when {
+                condition
+                    .validate()
+                    .map_err(|e| format!("home `{}` when: {e}", home.id))?;
+            }
+            if !home.when.is_empty() && !self.lookup_order.contains(&home.id) {
+                return Err(format!(
+                    "home `{}` takes `when` only in the lookup order",
+                    home.id
+                ));
+            }
+        }
+        unique(
+            "lookup order home",
+            self.lookup_order.iter().map(String::as_str),
+        )?;
+        if let Some(id) = self
+            .lookup_order
+            .iter()
+            .find(|id| !self.homes.iter().any(|home| home.id == **id))
+        {
+            return Err(format!("lookup_order names undeclared home `{id}`"));
         }
 
         if let Some(verified) = &self.verified {
@@ -740,8 +844,9 @@ impl AgentDefinition {
         for plugins in &self.plugins {
             let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
             plugins.validate().map_err(context)?;
-            self.validate_home_root(plugins.registry.anchor())
-                .map_err(context)?;
+            for anchor in plugins.registry.anchors() {
+                self.validate_home_root(anchor).map_err(context)?;
+            }
         }
 
         unique(
@@ -774,6 +879,12 @@ impl AgentDefinition {
         for location in &self.locations {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
+            if location.anchor.per_plugin() || location.anchor.entry().is_some() {
+                return Err(context(
+                    "a location is anchored once per home, not by `{plugin_id}` or beside an Entry"
+                        .into(),
+                ));
+            }
             location.format.validate().map_err(context)?;
             if let Some(interpolation) = &location.interpolation {
                 interpolation.validate().map_err(context)?;
@@ -807,6 +918,21 @@ impl AgentDefinition {
                     return Err(context(format!(
                         "name_template must hold `{ENTRY_NAME}` once"
                     )));
+                }
+            }
+            if location.one_entry {
+                let in_plugin_file =
+                    location.anchor.plugin().is_some() && location.format.file().is_some();
+                if !in_plugin_file || location.root.is_empty() {
+                    return Err(context(
+                        "only a file location in plugins, with a root, holds one Entry".into(),
+                    ));
+                }
+                if location.name_template.is_some() || location.references.is_some() {
+                    return Err(context(
+                        "a location that holds one Entry takes no name_template or references"
+                            .into(),
+                    ));
                 }
             }
             if let Some(references) = &location.references {
@@ -950,12 +1076,11 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::Policy,
-                    rules
-                        .gates
-                        .iter()
-                        .any(|gate| matches!(gate, Gate::ManagedExclusive(_))),
-                    "which a managed-exclusive gate needs",
-                    "but no gate is managed-exclusive",
+                    rules.gates.iter().any(|gate| {
+                        matches!(gate, Gate::ManagedExclusive(_) | Gate::PolicyField(_))
+                    }),
+                    "which a managed-exclusive gate or policy field needs",
+                    "but no gate is managed-exclusive or a policy field",
                 )
                 .map_err(context)?;
             rules
@@ -1017,11 +1142,11 @@ impl AgentDefinition {
                             return Err(context(format!("`{id}` is not a location of this kind")));
                         }
                     }
-                    Gate::ApprovalList(block) => {
-                        if let Some(id) = block
-                            .locations
-                            .iter()
-                            .find(|id| !declared.contains(id.as_str()))
+                    Gate::ApprovalList(_) | Gate::PolicyField(_) => {
+                        if let Some(id) = gate
+                            .locations()
+                            .into_iter()
+                            .find(|id| !declared.contains(id))
                         {
                             return Err(context(format!("`{id}` is not a location of this kind")));
                         }
@@ -1251,7 +1376,7 @@ on_read_failure = "ignores_file"
             .into_iter()
             .map(|definition| definition.agent.id)
             .collect();
-        assert_eq!(ids, ["claude-code"]);
+        assert_eq!(ids, ["claude-code", "claude-desktop"]);
     }
 
     #[test]
@@ -1442,10 +1567,36 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     }
 
     #[test]
-    fn a_home_folder_outside_the_user_folder_is_rejected() {
-        let text = VALID.replace(r#"path = "~" }"#, r#"path = "C:/test" }"#);
+    fn a_home_folder_that_is_not_anchored_is_rejected() {
+        let text = VALID.replace(r#"path = "~" }"#, r#"path = "test/home" }"#);
         assert!(
-            error(&text).contains("must be `~` or start with `~/`"),
+            error(&text).contains("must be `~`, or start with `~/`, `%NAME%` or a drive"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_home_folder_from_a_variable_or_a_drive_loads() {
+        for path in [
+            "%APPDATA%/Test",
+            "C:/test",
+            "%LOCALAPPDATA%/Packages/Test_*/Data",
+        ] {
+            let text = VALID.replace(r#"path = "~" }"#, &format!(r#"path = "{path}" }}"#));
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{path}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn a_home_folder_in_the_user_folder_cannot_hold_wildcards() {
+        let text = VALID.replace(r#"path = "~" }"#, r#"path = "~/.test-*" }"#);
+        assert!(
+            error(&text).contains("cannot hold wildcards"),
             "{}",
             error(&text)
         );
@@ -2342,10 +2493,105 @@ locations = {locations}
         let definition = parse("test.toml", &with_plugins("")).unwrap();
         let plugins = definition.declared_plugins("installed").unwrap();
         assert_eq!(
-            plugins.uninstall("a@m", Some("local")),
-            "agent plugin uninstall a@m --scope local"
+            plugins.uninstall("a@m", Some("local")).as_deref(),
+            Some("agent plugin uninstall a@m --scope local")
         );
-        assert_eq!(plugins.uninstall("a@m", None), "agent plugin uninstall a@m");
+        assert_eq!(
+            plugins.uninstall("a@m", None).as_deref(),
+            Some("agent plugin uninstall a@m")
+        );
+    }
+
+    #[test]
+    fn a_lookup_order_names_declared_homes_and_only_its_homes_take_conditions() {
+        let ordered = VALID.replace(
+            "format_version = 1\n",
+            "format_version = 1\nlookup_order = [\"default\"]\n",
+        );
+        let when = "roots.state = \".test.json\"\nwhen = [{ block = \"unc-variable\", variable = \"APPDATA\" }]\n";
+        let text = ordered.replace("roots.state = \".test.json\"\n", when);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let text = VALID.replace("roots.state = \".test.json\"\n", when);
+        assert!(
+            error(&text).contains("takes `when` only in the lookup order"),
+            "{}",
+            error(&text)
+        );
+        let text = ordered.replace("[\"default\"]", "[\"other\"]");
+        assert!(
+            error(&text).contains("lookup_order names undeclared home `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn only_a_location_in_plugins_holds_one_entry() {
+        let text = VALID.replace(
+            "root = [\"servers\"]\n",
+            "root = [\"server\"]\none_entry = true\n",
+        );
+        assert!(
+            error(&text).contains("only a file location in plugins, with a root, holds one Entry"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_switch_file_per_plugin_counts_as_keyed_by_plugin() {
+        let switch = plugin_switch("plugin", "isEnabled", r#"["plugin-mcp"]"#).replace(
+            r#"{ block = "home", root = "state" }"#,
+            r#"{ block = "home", root = "plugins", path = "settings/{plugin_id}.json" }"#,
+        );
+        let text = with_plugins(&switch);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let text = with_plugins(&switch.replace("\"isEnabled\"", "\"{plugin_id}\""));
+        assert!(
+            error(&text).contains("in its file's path or its key path, not both"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_cannot_have_a_file_per_plugin() {
+        let text = VALID.replace(
+            r#"anchor = { block = "home", root = "state" }"#,
+            r#"anchor = { block = "home", root = "state", path = "{plugin_id}.json" }"#,
+        );
+        assert!(
+            error(&text).contains("anchored once per home"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_switch_named_by_a_list_item_is_only_read() {
+        let mechanism = r#"
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "entry", up = 2, path = "manifest.json" }, key_path = ["items", "{name}", "on"], named_by = "name", store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+enable_offered = false
+"#;
+        let text = format!("{VALID}{mechanism}");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let text = text.replace("enable_offered = false\n", "");
+        assert!(
+            error(&text).contains("enable_offered must be false"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

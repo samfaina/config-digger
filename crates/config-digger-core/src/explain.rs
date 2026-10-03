@@ -60,6 +60,40 @@ pub(crate) fn project_missing(agent_name: &str, project: &Path) -> Reason {
     }
 }
 
+/// Why `agent_name` never reads the Agent home at `folder`: its lookup
+/// order picks the folder `instead`, or none that is there.
+pub(crate) fn home_not_read(agent_name: &str, folder: &Path, instead: Option<&Path>) -> String {
+    match instead {
+        Some(instead) => format!(
+            "{agent_name} never reads {}: its lookup order picks {} first.",
+            folder.display(),
+            instead.display()
+        ),
+        None => format!(
+            "{agent_name} never reads {} on this machine: its lookup order skips it.",
+            folder.display()
+        ),
+    }
+}
+
+/// An Unread Entry's reason: it is in the Agent home at `folder`, which
+/// `agent_name`'s lookup order skips for `instead`, or for none.
+pub(crate) fn lookup_order_skips_home(
+    agent_name: &str,
+    folder: &Path,
+    instead: Option<&Path>,
+) -> Reason {
+    Reason {
+        code: ReasonCode::LookupOrderSkipsHome,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{} It can only be Removed.",
+            home_not_read(agent_name, folder, instead)
+        ),
+    }
+}
+
 /// An Unread Linked Entry's reason: its link points to `target`, which is gone.
 pub(crate) fn link_broken(agent_name: &str, target: &Path) -> Reason {
     Reason {
@@ -271,16 +305,22 @@ pub(crate) fn in_list(name: &str, list: &str, path: &Path, per_project: bool) ->
     )
 }
 
-/// That the field at `key_path` in `path` holds `value`.
+/// That the field at `key_path` in `path` holds `value`, or is missing,
+/// which the Agent takes as `default`.
 pub(crate) fn field_holds(
     key_path: &[String],
     value: Option<&Value>,
+    default: Option<&Value>,
     path: &Path,
     per_project: bool,
 ) -> String {
-    let value = value.map_or_else(|| "missing".to_owned(), Value::to_string);
+    let (value, counts_as) = match (value, default) {
+        (Some(value), _) => (value.to_string(), String::new()),
+        (None, Some(default)) => ("missing".to_owned(), format!(", which counts as {default}")),
+        (None, None) => ("missing".to_owned(), String::new()),
+    };
     format!(
-        "`{}` is {value} in {}{}",
+        "`{}` is {value} in {}{}{counts_as}",
         key_path.join("."),
         path.display(),
         for_project(per_project)
@@ -459,6 +499,12 @@ pub(crate) fn switched_off(
 ) -> Reason {
     let why = format!("`{key}` is {value} in {}", path.display());
     kept_out(policy, ReasonCode::DisabledGlobally, &why, agent_name)
+}
+
+/// The reason of an Entry kept out by policy because `key` in `path` is set.
+pub(crate) fn policy_field(key: &str, path: &Path, agent_name: &str) -> Reason {
+    let why = format!("`{key}` is set in {}", path.display());
+    kept_out(true, ReasonCode::Policy, &why, agent_name)
 }
 
 /// What Enable says of an Entry the rule `holds` keeps out.
@@ -998,6 +1044,13 @@ pub(crate) fn definition_untested(agent_name: &str) -> String {
     )
 }
 
+/// The note of a home of `agent_name`, whose connectors live in the account.
+pub(crate) fn cloud_connectors_not_on_disk(agent_name: &str) -> String {
+    format!(
+        "{agent_name}'s connectors live in your account, with no copy on disk, so they are not listed here."
+    )
+}
+
 /// What is wrong with a skill's `SKILL.md` or folder for `agent_name`, as
 /// the end of a sentence.
 fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
@@ -1056,6 +1109,11 @@ pub(crate) fn read_only_remove_option() -> String {
 /// Why Remove is not offered for an Entry of the plugin `plugin`.
 pub(crate) fn plugin_not_removed(plugin: &str, agent_name: &str) -> String {
     format!("Not in v0.1: uninstall the plugin {plugin} in {agent_name}.")
+}
+
+/// Why Remove is not offered for the Entry of the extension `extension`.
+pub(crate) fn extension_not_removed(extension: &str, agent_name: &str) -> String {
+    format!("Not in v0.1: uninstall the extension {extension} in {agent_name}'s settings.")
 }
 
 /// How to remove an Entry of the plugin `plugin`: uninstall it with `command`.

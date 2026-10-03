@@ -5,8 +5,8 @@
 pub(crate) mod pe;
 
 use crate::api;
-use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
+use crate::definitions::{AgentDefinition, AgentNote};
 use crate::ports::Ports;
 use crate::scan::{ScannedHome, Snapshot};
 use crate::version::{Standing, Version};
@@ -46,6 +46,15 @@ pub(crate) fn of_home(
             None,
             explain::definition_untested(agent_name),
         ));
+    }
+    for &noted in &definition.agent.notes {
+        notes.push(match noted {
+            AgentNote::CloudConnectorsNotOnDisk => note(
+                api::AgentNoteCode::CloudConnectorsNotOnDisk,
+                None,
+                explain::cloud_connectors_not_on_disk(agent_name),
+            ),
+        });
     }
     let reading: Vec<&ScannedInstallation> = installations
         .iter()

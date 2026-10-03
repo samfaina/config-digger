@@ -41,6 +41,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "folder": HOME,
             "source": {"kind": "default"},
             "hidden": false,
+            "not_read": null,
             "no_configuration": null,
             "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],

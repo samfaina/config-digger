@@ -1,0 +1,21 @@
+{
+  "lastUpdated": "2026-10-01T12:03:21.000Z",
+  "skills": [
+    {
+      "skillId": "skill_01",
+      "name": "pdf",
+      "description": "Reads and fills PDF files.",
+      "creatorType": "anthropic",
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "enabled": true
+    },
+    {
+      "skillId": "skill_02",
+      "name": "my-notes",
+      "description": "Writes notes the way I like them.",
+      "creatorType": "user",
+      "updatedAt": "2026-09-20T00:00:00.000Z",
+      "enabled": false
+    }
+  ]
+}

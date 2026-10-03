@@ -124,6 +124,13 @@ pub(crate) fn file_fields(
             path.truncate(depth);
         }
     }
+    let mut encrypted = Vec::new();
+    rules.encrypted_leaves(document, &mut Vec::new(), &mut encrypted);
+    for (path, secret) in encrypted {
+        if !secrets.iter().any(|(known, _)| *known == path) {
+            secrets.push((path, secret));
+        }
+    }
     secrets
 }
 
@@ -165,9 +172,52 @@ struct Rules<'d> {
 }
 
 impl Rules<'_> {
+    /// The value the Agent encrypted that `value` is, masked, if it is one.
+    fn encrypted(&self, value: &Value) -> Option<Value> {
+        let text = value.as_str()?;
+        let prefix = self.location.secrets.encrypted_prefix(text)?;
+        Some(Value::String(format!("{prefix}{MASK}")))
+    }
+
+    /// Every value the Agent encrypted at or below `value`, found at `path`,
+    /// with its masked value.
+    fn encrypted_leaves(
+        &self,
+        value: &Value,
+        path: &mut Vec<String>,
+        out: &mut Vec<(Vec<String>, Value)>,
+    ) {
+        if let Some(secret) = self.encrypted(value) {
+            out.push((path.clone(), secret));
+            return;
+        }
+        let children: Vec<(String, &Value)> = match value {
+            Value::Object(object) => object
+                .iter()
+                .map(|(key, child)| (key.clone(), child))
+                .collect(),
+            Value::Array(array) => array
+                .iter()
+                .enumerate()
+                .map(|(index, child)| (index.to_string(), child))
+                .collect(),
+            _ => return,
+        };
+        for (key, child) in children {
+            path.push(key);
+            self.encrypted_leaves(child, path, out);
+            path.pop();
+        }
+    }
+
     /// Masks every Secret at or below `value`, found at `path` below the Entry.
     fn walk(&self, value: &mut Value, path: &mut Vec<String>, masked: &mut Vec<Vec<String>>) {
         if self.is_variable_name(path) {
+            return;
+        }
+        if let Some(secret) = self.encrypted(value) {
+            *value = secret;
+            masked.push(path.clone());
             return;
         }
         let env_or_header =
@@ -259,6 +309,10 @@ impl Rules<'_> {
             path.push(index.to_string());
             let secret = match arg {
                 _ if self.is_variable_name(path) => None,
+                Value::String(text) if self.location.secrets.encrypted_prefix(text).is_some() => {
+                    flag = None;
+                    self.text(text)
+                }
                 Value::String(text) => match flag.take() {
                     Some(flag) => self.flag_value(&flag, text),
                     None => match text.split_once('=') {
@@ -300,7 +354,10 @@ impl Rules<'_> {
     /// masked, or `None` when there is none, such as a value made only of
     /// references.
     fn text(&self, text: &str) -> Option<String> {
-        let prefix = prefix(text);
+        let prefix = match self.location.secrets.encrypted_prefix(text) {
+            Some(encrypted) => encrypted,
+            None => prefix(text),
+        };
         let rest = &text[prefix.len()..];
         let runs = match &self.location.interpolation {
             Some(interpolation) => interpolation.runs(rest),

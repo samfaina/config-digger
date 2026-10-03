@@ -1761,6 +1761,10 @@ fn provenance_label(entry: &api::Entry) -> String {
             Some(plugin) => format!("plugin ({})", plugin.id),
             None => "plugin".to_owned(),
         },
+        (api::Provenance::Extension, _) => match &entry.plugin {
+            Some(plugin) => format!("extension ({})", plugin.id),
+            None => "extension".to_owned(),
+        },
     }
 }
 

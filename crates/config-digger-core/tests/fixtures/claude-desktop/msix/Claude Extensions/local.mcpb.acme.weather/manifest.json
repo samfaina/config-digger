@@ -1,0 +1,12 @@
+{
+  "manifest_version": "0.2",
+  "name": "weather",
+  "version": "1.0.0",
+  "description": "Forecasts.",
+  "author": { "name": "Acme" },
+  "server": {
+    "type": "binary",
+    "entry_point": "weather.exe",
+    "mcp_config": { "command": "${__dirname}/weather.exe" }
+  }
+}

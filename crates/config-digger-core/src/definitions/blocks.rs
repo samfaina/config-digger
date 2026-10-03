@@ -8,7 +8,7 @@
 use crate::edit::{Edit, Syntax};
 use crate::installations::pe;
 use crate::paths;
-use crate::ports::{Environment, FileSystem, Hive, Ports};
+use crate::ports::{Environment, FileSystem, Hive, Ports, RegistryData};
 use crate::version::Version;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -24,10 +24,20 @@ pub(crate) trait Validate {
 
 // --- Home locators ----------------------------------------------------------
 
-/// Finds one root of an Agent home on this machine.
+/// Finds the folders of an Agent home on this machine.
 pub(crate) trait Locate {
-    /// The root's path, or `None` when the environment cannot say where it is.
-    fn locate(&self, env: &dyn Environment) -> Option<PathBuf>;
+    /// Every folder it names here, in order: none when the environment
+    /// cannot say where it is.
+    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf>;
+
+    /// Whether it lies in the user's home folder, so that nothing can be
+    /// read without knowing where that is.
+    fn in_home_folder(&self) -> bool;
+
+    /// Whether the Agent uses a folder it names even before the folder
+    /// exists, creating it, so that a lookup order picks it as soon as it
+    /// is named.
+    fn used_before_it_exists(&self) -> bool;
 }
 
 /// Where one root of an Agent home lives.
@@ -35,26 +45,144 @@ pub(crate) trait Locate {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Locator {
     Path(PathLocator),
+    Env(EnvLocator),
 }
 
 impl Validate for Locator {
     fn validate(&self) -> Result<(), String> {
         match self {
             Locator::Path(block) => block.validate(),
+            Locator::Env(block) => block.validate(),
         }
     }
 }
 
 impl Locate for Locator {
-    fn locate(&self, env: &dyn Environment) -> Option<PathBuf> {
+    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
         match self {
-            Locator::Path(block) => block.locate(env),
+            Locator::Path(block) => block.folders(env, fs),
+            Locator::Env(block) => block.folders(env, fs),
+        }
+    }
+
+    fn in_home_folder(&self) -> bool {
+        match self {
+            Locator::Path(block) => block.in_home_folder(),
+            Locator::Env(block) => block.in_home_folder(),
+        }
+    }
+
+    fn used_before_it_exists(&self) -> bool {
+        match self {
+            Locator::Path(block) => block.used_before_it_exists(),
+            Locator::Env(block) => block.used_before_it_exists(),
         }
     }
 }
 
+/// The folder an environment variable holds, such as Claude Desktop's
+/// `CLAUDE_USER_DATA_DIR`, while it is set to an absolute path. The Agent
+/// uses it whenever it is set, creating it if needed.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EnvLocator {
+    pub variable: String,
+}
+
+impl Validate for EnvLocator {
+    fn validate(&self) -> Result<(), String> {
+        validate_variable(&self.variable)
+    }
+}
+
+impl Locate for EnvLocator {
+    fn folders(&self, env: &dyn Environment, _fs: &dyn FileSystem) -> Vec<PathBuf> {
+        let Some(value) = env.var(&self.variable) else {
+            return Vec::new();
+        };
+        let folder = paths::lexical(Path::new(value.trim()));
+        if !paths::is_absolute(&folder) {
+            tracing::debug!(variable = %self.variable, "not an absolute path");
+            return Vec::new();
+        }
+        vec![folder]
+    }
+
+    fn in_home_folder(&self) -> bool {
+        false
+    }
+
+    fn used_before_it_exists(&self) -> bool {
+        true
+    }
+}
+
+/// An environment variable's name: not empty, without `=`.
+fn validate_variable(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() || name.contains('=') {
+        return Err(format!("`{name}` is not a variable name"));
+    }
+    Ok(())
+}
+
+/// Whether the Agent reads an Agent home it can find, given what holds on
+/// this machine.
+pub(crate) trait HoldsHere {
+    fn holds(&self, env: &dyn Environment) -> bool;
+}
+
+/// A condition under which an Agent reads a home of its lookup order.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum HomeCondition {
+    UncVariable(UncVariable),
+}
+
+impl Validate for HomeCondition {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            HomeCondition::UncVariable(block) => block.validate(),
+        }
+    }
+}
+
+impl HoldsHere for HomeCondition {
+    fn holds(&self, env: &dyn Environment) -> bool {
+        match self {
+            HomeCondition::UncVariable(block) => block.holds(env),
+        }
+    }
+}
+
+/// Holds while an environment variable holds a path on a network share,
+/// `\\server\share\…`, such as `%APPDATA%` in a redirected roaming profile.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UncVariable {
+    pub variable: String,
+}
+
+impl Validate for UncVariable {
+    fn validate(&self) -> Result<(), String> {
+        validate_variable(&self.variable)
+    }
+}
+
+impl HoldsHere for UncVariable {
+    fn holds(&self, env: &dyn Environment) -> bool {
+        env.var(&self.variable).is_some_and(|value| {
+            let value = value.trim().replace('/', "\\");
+            value.starts_with("\\\\") && !value.starts_with("\\\\?\\")
+        })
+    }
+}
+
 /// The user's home folder, written `~`, or a fixed path below it, written
-/// `~/<relative path>`.
+/// `~/<relative path>`; or a path that starts with `%NAME%`, expanded from
+/// the environment, or a drive, `/`-separated. Outside the user's home
+/// folder, `*` and `?` stay within one folder name and `{a,b}` is either,
+/// such as an MSIX package's folder: the path then names every existing
+/// folder that matches.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PathLocator {
@@ -63,6 +191,7 @@ pub(crate) struct PathLocator {
 
 impl PathLocator {
     /// The path below the user's home folder, `None` for the folder itself.
+    /// An error for a path outside it.
     fn relative(&self) -> Result<Option<&str>, String> {
         if self.path == "~" {
             return Ok(None);
@@ -70,7 +199,7 @@ impl PathLocator {
         match self.path.strip_prefix("~/") {
             Some(relative) => validate_relative(relative).map(|()| Some(relative)),
             None => Err(format!(
-                "path `{}` must be `~` or start with `~/`",
+                "path `{}` must be `~`, or start with `~/`, `%NAME%` or a drive",
                 self.path
             )),
         }
@@ -79,17 +208,42 @@ impl PathLocator {
 
 impl Validate for PathLocator {
     fn validate(&self) -> Result<(), String> {
-        self.relative().map(|_| ())
+        if self.in_home_folder() {
+            if self.path.contains(['*', '?', '{', '}']) {
+                return Err(format!(
+                    "path `{}` in the user's home folder cannot hold wildcards",
+                    self.path
+                ));
+            }
+            return self.relative().map(|_| ());
+        }
+        paths::validate_glob(&self.path).map_err(|_| self.relative().unwrap_err())
     }
 }
 
 impl Locate for PathLocator {
-    fn locate(&self, env: &dyn Environment) -> Option<PathBuf> {
-        let home = env.home_dir()?;
-        match self.relative().ok()? {
-            Some(relative) => Some(join_relative(&home, relative)),
-            None => Some(home),
+    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
+        if self.path.contains(['*', '?', '{']) {
+            return paths::expand_glob(&self.path, fs, env);
         }
+        if !self.in_home_folder() {
+            return paths::expand(&self.path, env).into_iter().collect();
+        }
+        let Some(home) = env.home_dir() else {
+            return Vec::new();
+        };
+        vec![match self.relative() {
+            Ok(Some(relative)) => join_relative(&home, relative),
+            _ => home,
+        }]
+    }
+
+    fn in_home_folder(&self) -> bool {
+        self.path == "~" || self.path.starts_with("~/")
+    }
+
+    fn used_before_it_exists(&self) -> bool {
+        false
     }
 }
 
@@ -125,6 +279,7 @@ pub(crate) enum Anchor {
     Machine(MachineAnchor),
     Settings(SettingsAnchor),
     Plugin(PluginAnchor),
+    Entry(EntryAnchor),
 }
 
 impl Validate for Anchor {
@@ -135,6 +290,7 @@ impl Validate for Anchor {
             Anchor::Machine(block) => block.validate(),
             Anchor::Settings(block) => block.validate(),
             Anchor::Plugin(block) => block.validate(),
+            Anchor::Entry(block) => block.validate(),
         }
     }
 }
@@ -147,6 +303,7 @@ impl Anchored for Anchor {
             Anchor::Machine(block) => block.path(roots, project),
             Anchor::Settings(block) => block.path(roots, project),
             Anchor::Plugin(block) => block.path(roots, project),
+            Anchor::Entry(block) => block.path(roots, project),
         }
     }
 
@@ -157,6 +314,7 @@ impl Anchored for Anchor {
             Anchor::Machine(block) => block.home_root(),
             Anchor::Settings(block) => block.home_root(),
             Anchor::Plugin(block) => block.home_root(),
+            Anchor::Entry(block) => block.home_root(),
         }
     }
 
@@ -167,6 +325,7 @@ impl Anchored for Anchor {
             Anchor::Machine(block) => block.in_project(),
             Anchor::Settings(block) => block.in_project(),
             Anchor::Plugin(block) => block.in_project(),
+            Anchor::Entry(block) => block.in_project(),
         }
     }
 
@@ -177,6 +336,7 @@ impl Anchored for Anchor {
             Anchor::Machine(block) => block.machine(),
             Anchor::Settings(block) => block.machine(),
             Anchor::Plugin(block) => block.machine(),
+            Anchor::Entry(block) => block.machine(),
         }
     }
 
@@ -187,7 +347,60 @@ impl Anchored for Anchor {
             Anchor::Machine(block) => block.walk(),
             Anchor::Settings(block) => block.walk(),
             Anchor::Plugin(block) => block.walk(),
+            Anchor::Entry(block) => block.walk(),
         }
+    }
+}
+
+/// A file in a folder above an Entry's own location, read once per Entry,
+/// such as the `manifest.json` two folders above each skill Claude Desktop
+/// mirrors from the account. Only a Disable switch is anchored here.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EntryAnchor {
+    /// How many folders up from the Entry's location, at least 1: 1 is the
+    /// folder holding it.
+    pub up: usize,
+    /// A `/`-separated path relative to that folder.
+    pub path: String,
+}
+
+impl Validate for EntryAnchor {
+    fn validate(&self) -> Result<(), String> {
+        if self.up == 0 {
+            return Err("an entry anchor goes up at least one folder".into());
+        }
+        validate_relative(&self.path)
+    }
+}
+
+impl Anchored for EntryAnchor {
+    /// There is one path per Entry, which [`EntryAnchor::of`] finds.
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        None
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
+}
+
+impl EntryAnchor {
+    /// The file for the Entry at `entry`.
+    pub fn of(&self, entry: &Path) -> Option<PathBuf> {
+        Some(join_relative(entry.ancestors().nth(self.up)?, &self.path))
     }
 }
 
@@ -210,8 +423,21 @@ pub(crate) enum ProjectWalk {
 pub(crate) struct HomeAnchor {
     /// The name of a root declared by every home of the definition.
     pub root: String,
-    /// A `/`-separated path relative to the root. Omitted when the root is the location.
+    /// A `/`-separated path relative to the root. Omitted when the root is
+    /// the location. In a Disable switch or a setting, `{plugin_id}` may
+    /// stand for the id of a plugin, such as Claude Desktop's
+    /// `Claude Extensions Settings/{plugin_id}.json`: there is then one file
+    /// per plugin, which applies to that plugin's Entries only.
     pub path: Option<String>,
+}
+
+impl HomeAnchor {
+    /// Whether its path names one file per plugin.
+    fn per_plugin(&self) -> bool {
+        self.path
+            .as_deref()
+            .is_some_and(|path| path.contains(PLUGIN_KEY))
+    }
 }
 
 impl Validate for HomeAnchor {
@@ -224,7 +450,11 @@ impl Validate for HomeAnchor {
 }
 
 impl Anchored for HomeAnchor {
+    /// `None` for a path that names one file per plugin.
     fn path(&self, roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        if self.per_plugin() {
+            return None;
+        }
         let root = roots.get(&self.root)?;
         Some(match &self.path {
             Some(path) => join_relative(root, path),
@@ -434,7 +664,11 @@ impl Anchor {
     pub fn settings(&self) -> Option<&str> {
         match self {
             Anchor::Settings(block) => Some(&block.settings),
-            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) | Anchor::Plugin(_) => None,
+            Anchor::Home(_)
+            | Anchor::Project(_)
+            | Anchor::Machine(_)
+            | Anchor::Plugin(_)
+            | Anchor::Entry(_) => None,
         }
     }
 
@@ -443,12 +677,25 @@ impl Anchor {
     pub fn plugin(&self) -> Option<&PluginAnchor> {
         match self {
             Anchor::Plugin(block) => Some(block),
-            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) | Anchor::Settings(_) => None,
+            Anchor::Home(_)
+            | Anchor::Project(_)
+            | Anchor::Machine(_)
+            | Anchor::Settings(_)
+            | Anchor::Entry(_) => None,
         }
     }
 
-    /// Refuses an anchor of settings or plugins, where one file is needed.
+    /// Refuses an anchor of settings, of plugins, or with a file per plugin
+    /// or per Entry, where one file is needed.
     pub fn one_file(&self) -> Result<(), String> {
+        if self.per_plugin() {
+            return Err(format!(
+                "a path holding `{PLUGIN_KEY}` names a file per plugin; one file is needed here"
+            ));
+        }
+        if self.entry().is_some() {
+            return Err("an entry anchor names a file per Entry; one file is needed here".into());
+        }
         match (self.settings(), self.plugin()) {
             (Some(_), _) => {
                 Err("a settings anchor names several files; one file is needed here".into())
@@ -458,6 +705,43 @@ impl Anchor {
             }
             (None, None) => Ok(()),
         }
+    }
+
+    /// Whether it names one file per plugin, by `{plugin_id}` in its path.
+    pub fn per_plugin(&self) -> bool {
+        match self {
+            Anchor::Home(block) => block.per_plugin(),
+            Anchor::Project(_)
+            | Anchor::Machine(_)
+            | Anchor::Settings(_)
+            | Anchor::Plugin(_)
+            | Anchor::Entry(_) => false,
+        }
+    }
+
+    /// Where the file of each Entry is, if it names one per Entry.
+    pub fn entry(&self) -> Option<&EntryAnchor> {
+        match self {
+            Anchor::Entry(block) => Some(block),
+            Anchor::Home(_)
+            | Anchor::Project(_)
+            | Anchor::Machine(_)
+            | Anchor::Settings(_)
+            | Anchor::Plugin(_) => None,
+        }
+    }
+
+    /// The file it names for the plugin with the id `plugin`, given the
+    /// roots of the Agent home; `None` when it names no file per plugin.
+    pub fn plugin_path(&self, roots: &BTreeMap<String, PathBuf>, plugin: &str) -> Option<PathBuf> {
+        let Anchor::Home(block) = self else {
+            return None;
+        };
+        let path = block.path.as_deref().filter(|_| block.per_plugin())?;
+        Some(join_relative(
+            roots.get(&block.root)?,
+            &path.replace(PLUGIN_KEY, plugin),
+        ))
     }
 }
 
@@ -469,6 +753,7 @@ impl Anchor {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum SettingsSource {
     RegistryValue(RegistryValueSource),
+    RegistryKey(RegistryKeySource),
     Files(FilesSource),
 }
 
@@ -476,9 +761,65 @@ impl Validate for SettingsSource {
     fn validate(&self) -> Result<(), String> {
         match self {
             SettingsSource::RegistryValue(block) => block.validate(),
+            SettingsSource::RegistryKey(block) => block.validate(),
             SettingsSource::Files(block) => block.validate(),
         }
     }
+}
+
+/// The values of a key in the Windows registry, each one setting, such as
+/// Claude Desktop's policy under `HKLM\SOFTWARE\Policies\Claude`. A string
+/// value reads as a string, and a DWORD as `true` when it is 1 and `false`
+/// when it is 0, as Windows policies store switches, and as its number
+/// otherwise. It is shown as `<HKLM|HKCU>\<key>`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RegistryKeySource {
+    pub hive: RegistryHive,
+    /// The key below the hive, `\`-separated.
+    pub key: String,
+}
+
+impl Validate for RegistryKeySource {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_key(&self.key)
+    }
+}
+
+impl RegistryKeySource {
+    /// How the key is shown, standing for its path.
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(format!(r"{}\{}", self.hive.short(), self.key))
+    }
+
+    /// The key's values as the text of one JSON object, `None` when the
+    /// key does not exist.
+    pub fn text(&self, env: &dyn Environment) -> Option<String> {
+        let values = env.registry_values(self.hive.port(), &self.key)?;
+        let settings: serde_json::Map<String, Value> = values
+            .into_iter()
+            .map(|(name, data)| {
+                let value = match data {
+                    RegistryData::String(text) => Value::from(text),
+                    RegistryData::Dword(0) => Value::from(false),
+                    RegistryData::Dword(1) => Value::from(true),
+                    RegistryData::Dword(number) => Value::from(number),
+                };
+                (name, value)
+            })
+            .collect();
+        Some(Value::Object(settings).to_string())
+    }
+}
+
+/// A registry key is `\`-separated below its hive.
+fn validate_registry_key(key: &str) -> Result<(), String> {
+    if key.trim().is_empty() || key.contains('/') || key.starts_with('\\') {
+        return Err(format!(
+            "registry key `{key}` must be `\\`-separated below its hive"
+        ));
+    }
+    Ok(())
 }
 
 /// A string value in the Windows registry holding JSON, such as Claude
@@ -496,12 +837,7 @@ pub(crate) struct RegistryValueSource {
 
 impl Validate for RegistryValueSource {
     fn validate(&self) -> Result<(), String> {
-        if self.key.trim().is_empty() || self.key.contains('/') || self.key.starts_with('\\') {
-            return Err(format!(
-                "registry key `{}` must be `\\`-separated below its hive",
-                self.key
-            ));
-        }
+        validate_registry_key(&self.key)?;
         if self.value.trim().is_empty() {
             return Err("a registry value needs a name".into());
         }
@@ -512,19 +848,35 @@ impl Validate for RegistryValueSource {
 impl RegistryValueSource {
     /// The hive as the port knows it.
     pub fn hive(&self) -> Hive {
-        match self.hive {
+        self.hive.port()
+    }
+
+    /// How the value is shown, standing for its path.
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(format!(
+            r"{}\{}\{}",
+            self.hive.short(),
+            self.key,
+            self.value
+        ))
+    }
+}
+
+impl RegistryHive {
+    /// The hive as the port knows it.
+    fn port(self) -> Hive {
+        match self {
             RegistryHive::CurrentUser => Hive::CurrentUser,
             RegistryHive::LocalMachine => Hive::LocalMachine,
         }
     }
 
-    /// How the value is shown, standing for its path.
-    pub fn path(&self) -> PathBuf {
-        let hive = match self.hive {
+    /// Its short name, such as `HKLM`.
+    fn short(self) -> &'static str {
+        match self {
             RegistryHive::CurrentUser => "HKCU",
             RegistryHive::LocalMachine => "HKLM",
-        };
-        PathBuf::from(format!(r"{hive}\{}\{}", self.key, self.value))
+        }
     }
 }
 
@@ -652,11 +1004,8 @@ pub(crate) struct PluginRecord {
 
 /// Lists the plugins an Agent installed.
 pub(crate) trait ListPlugins {
-    /// Where the registry lives.
-    fn anchor(&self) -> &Anchor;
-
-    /// The records the registry's text holds, in its order.
-    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError>;
+    /// The files and folders of the Agent home the registry reads.
+    fn anchors(&self) -> Vec<&Anchor>;
 }
 
 /// Where an Agent records the plugins it installed.
@@ -664,27 +1013,101 @@ pub(crate) trait ListPlugins {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum PluginRegistry {
     JsonPluginRecords(JsonPluginRecords),
+    PluginFolders(PluginFolders),
 }
 
 impl Validate for PluginRegistry {
     fn validate(&self) -> Result<(), String> {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.validate(),
+            PluginRegistry::PluginFolders(block) => block.validate(),
         }
     }
 }
 
 impl ListPlugins for PluginRegistry {
-    fn anchor(&self) -> &Anchor {
+    fn anchors(&self) -> Vec<&Anchor> {
         match self {
-            PluginRegistry::JsonPluginRecords(block) => block.anchor(),
+            PluginRegistry::JsonPluginRecords(block) => block.anchors(),
+            PluginRegistry::PluginFolders(block) => block.anchors(),
         }
     }
+}
 
-    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError> {
-        match self {
-            PluginRegistry::JsonPluginRecords(block) => block.records(text),
+/// The folders, in a folder of the Agent home, that hold a marker file,
+/// each a plugin whose id is the folder's name, such as Claude Desktop's
+/// extensions, each unpacked into `Claude Extensions\<id>` with its
+/// `manifest.json`. A folder without the marker holds no plugin.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginFolders {
+    /// The folder the plugins' folders are in.
+    pub anchor: Anchor,
+    /// A `/`-separated path relative to a plugin's folder.
+    pub marker: String,
+    /// What the Agent records of each plugin it installed, when it does.
+    pub records: Option<InstallRecords>,
+}
+
+/// An object in a strict JSON file of the Agent home whose keys are plugin
+/// ids, each holding what the Agent recorded when it installed the plugin,
+/// such as Claude Desktop's `extensions-installations.json`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct InstallRecords {
+    pub anchor: Anchor,
+    /// The key path of the object whose keys are plugin ids.
+    pub root: Vec<String>,
+    /// The field of a record that holds the version installed.
+    pub version: String,
+}
+
+impl Validate for PluginFolders {
+    fn validate(&self) -> Result<(), String> {
+        for anchor in self.anchors() {
+            anchor.validate()?;
+            anchor.one_file()?;
+            if anchor.home_root().is_none() {
+                return Err("plugin folders and their records must lie in the Agent home".into());
+            }
         }
+        validate_relative(&self.marker)?;
+        if let Some(records) = &self.records {
+            validate_key_path(&records.root)?;
+            if records.version.is_empty() {
+                return Err("a records field must not be empty".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ListPlugins for PluginFolders {
+    fn anchors(&self) -> Vec<&Anchor> {
+        std::iter::once(&self.anchor)
+            .chain(self.records.as_ref().map(|records| &records.anchor))
+            .collect()
+    }
+}
+
+impl InstallRecords {
+    /// The version recorded for each plugin id in the file's text.
+    pub fn versions(&self, text: &str) -> Result<BTreeMap<String, String>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        let root = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        let Some(Value::Object(records)) = root else {
+            return Ok(BTreeMap::new());
+        };
+        Ok(records
+            .iter()
+            .filter_map(|(id, record)| {
+                let version = record.get(&self.version)?.as_str()?;
+                Some((id.clone(), version.to_owned()))
+            })
+            .collect())
     }
 }
 
@@ -733,11 +1156,14 @@ impl Validate for JsonPluginRecords {
 }
 
 impl ListPlugins for JsonPluginRecords {
-    fn anchor(&self) -> &Anchor {
-        &self.anchor
+    fn anchors(&self) -> Vec<&Anchor> {
+        vec![&self.anchor]
     }
+}
 
-    fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError> {
+impl JsonPluginRecords {
+    /// The records the registry's text holds, in its order.
+    pub fn records(&self, text: &str) -> Result<Vec<PluginRecord>, ParseError> {
         let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
@@ -791,6 +1217,10 @@ pub(crate) enum Provenance {
     /// through the plugin's own switch, with every Entry of the plugin, and
     /// never Removes it: uninstalling is up to the Agent.
     Plugin,
+    /// An extension the Agent installed, such as a Claude Desktop `.mcpb`,
+    /// read as a plugin is: config-digger Disables it only through its own
+    /// switch, and never Removes it.
+    Extension,
 }
 
 impl Provenance {
@@ -798,7 +1228,7 @@ impl Provenance {
     /// Enables or Removes them.
     pub fn read_only(self) -> bool {
         match self {
-            Provenance::File | Provenance::Plugin => false,
+            Provenance::File | Provenance::Plugin | Provenance::Extension => false,
             Provenance::Managed | Provenance::CloudMirror => true,
         }
     }
@@ -882,7 +1312,7 @@ impl Validate for PidNamed {
 
 impl Sessions for PidNamed {
     fn pids(&self, fs: &dyn FileSystem, env: &dyn Environment) -> Vec<u32> {
-        let Some(folder) = self.folder.locate(env) else {
+        let Some(folder) = self.folder.folders(env, fs).into_iter().next() else {
             return Vec::new();
         };
         let suffix = format!(".{}", self.extension.to_ascii_lowercase());
@@ -1249,6 +1679,9 @@ pub(crate) struct Braces {
     /// Such as `env` and `input` for `${env:NAME}` and `${input:id}`.
     #[serde(default)]
     pub namespaces: Vec<String>,
+    /// What comes between a namespace and its argument, such as the `.` of
+    /// a Claude Desktop extension's `${user_config.KEY}`. Omitted for `:`.
+    pub namespace_separator: Option<String>,
     /// Such as `:-` for `${NAME:-default}`.
     pub default_separator: Option<String>,
 }
@@ -1260,6 +1693,9 @@ impl Validate for Braces {
         }
         if self.default_separator.as_deref() == Some("") {
             return Err("default_separator must not be empty".into());
+        }
+        if self.namespace_separator.as_deref() == Some("") {
+            return Err("namespace_separator must not be empty".into());
         }
         Ok(())
     }
@@ -1310,7 +1746,7 @@ impl Interpolate for Braces {
 
 impl Braces {
     fn is_reference(&self, inner: &str) -> bool {
-        match inner.split_once(':') {
+        match inner.split_once(self.namespace_separator.as_deref().unwrap_or(":")) {
             Some((namespace, argument)) => {
                 self.namespaces.iter().any(|ns| ns == namespace) && !argument.is_empty()
             }
@@ -1660,7 +2096,7 @@ pub(crate) trait Disables {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
-    JsonField(JsonField),
+    JsonField(Box<JsonField>),
 }
 
 impl Validate for DisableMechanism {
@@ -1830,6 +2266,9 @@ pub(crate) struct JsonNameList {
 impl Validate for JsonNameList {
     fn validate(&self) -> Result<(), String> {
         validate_mechanism(&self.switch, self.target, self.context)?;
+        if self.switch.named_by.is_some() {
+            return Err("a name list takes no named_by".into());
+        }
         if self.switch.names() {
             return Err(format!(
                 "a name list's key path cannot hold `{NAME_KEY}`: the names are its items"
@@ -1933,6 +2372,10 @@ pub(crate) struct JsonField {
     pub disabled_value: Value,
     /// The value Enable sets, with `enable_action = "set"`.
     pub enabled_value: Option<Value>,
+    /// The value the Agent takes while the field, or its file, is missing,
+    /// such as `false` for Claude Desktop's `isEnabled`, which an extension
+    /// without a settings file has. Omitted, a missing field Disables nothing.
+    pub default_value: Option<Value>,
     /// Values that are partial switches, limiting part of the Entry, such
     /// as a skill listed by name only: the Entry stays Effective, with a note.
     #[serde(default)]
@@ -1957,6 +2400,11 @@ pub(crate) struct JsonField {
 impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
         validate_mechanism(&self.switch, self.target, self.context)?;
+        if self.switch.named_by.is_some() && self.enable_offered {
+            return Err(
+                "a switch named_by a list item is only read: enable_offered must be false".into(),
+            );
+        }
         match (self.enable_action, &self.enabled_value) {
             (EnableAction::RemoveItem, _) => {
                 Err("a field's enable_action must be `delete-key` or `set`".into())
@@ -2005,11 +2453,13 @@ impl Disables for JsonField {
     }
 
     fn disables(&self, value: Option<&Value>, _name: &str) -> bool {
-        value == Some(&self.disabled_value)
+        value.or(self.default_value.as_ref()) == Some(&self.disabled_value)
     }
 
     fn partial(&self, value: Option<&Value>) -> bool {
-        value.is_some_and(|value| self.partial_values.contains(value))
+        value
+            .or(self.default_value.as_ref())
+            .is_some_and(|value| self.partial_values.contains(value))
     }
 
     fn disable_edit(&self, key_path: Vec<String>, _value: Option<&Value>, _name: &str) -> Edit {
@@ -2066,12 +2516,19 @@ fn validate_mechanism(
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Switch {
+    /// The file. Its path may name `{plugin_id}` instead of the key path,
+    /// for a file per plugin.
     pub anchor: Anchor,
     /// The key path of the value written. One segment may be `{project}`:
     /// the context's Project key, in the Agent's own spelling, so that the
     /// switch applies only there. One segment after it may be `{name}`,
     /// the Entry's name, or `{plugin_id}`, the id of the plugin it is part of.
     pub key_path: Vec<String>,
+    /// When the value where `{name}` stands is a list of objects rather
+    /// than an object keyed by name, the field of each that holds its name,
+    /// such as `name` in the `skills` of the manifest of Claude Desktop's
+    /// skill mirror. config-digger only reads such a switch.
+    pub named_by: Option<String>,
     /// How the switch's file behaves while the Agent runs.
     pub store_class: StoreClass,
 }
@@ -2092,9 +2549,23 @@ pub(crate) fn is_entry_key(key: &str) -> bool {
 impl Validate for Switch {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
-        self.anchor.one_file()?;
+        if !self.anchor.per_plugin() && self.anchor.entry().is_none() {
+            self.anchor.one_file()?;
+        } else if self.key_path.iter().any(|key| key == PLUGIN_KEY) {
+            return Err(format!(
+                "a switch holds `{PLUGIN_KEY}` in its file's path or its key path, not both"
+            ));
+        }
         if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
             return Err("a switch needs a key path, with no empty key".into());
+        }
+        if let Some(field) = &self.named_by {
+            if field.is_empty() {
+                return Err("named_by must not be empty".into());
+            }
+            if !self.names() {
+                return Err(format!("named_by needs `{NAME_KEY}` in the key path"));
+            }
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();
@@ -2141,9 +2612,10 @@ impl Switch {
         self.key_path.iter().any(|key| key == NAME_KEY)
     }
 
-    /// Whether its key path holds `{plugin_id}`, so that it holds one value per plugin.
+    /// Whether its key path, or its file's path, holds `{plugin_id}`, so
+    /// that it holds one value per plugin.
     pub fn plugins(&self) -> bool {
-        self.key_path.iter().any(|key| key == PLUGIN_KEY)
+        self.key_path.iter().any(|key| key == PLUGIN_KEY) || self.anchor.per_plugin()
     }
 }
 
@@ -2172,8 +2644,8 @@ impl Validate for SettingPlace {
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a setting cannot walk up from the Project folder".into());
         }
-        if self.anchor.plugin().is_some() {
-            return Err("a setting cannot lie in a plugin's folder".into());
+        if self.anchor.plugin().is_some() || self.anchor.entry().is_some() {
+            return Err("a setting cannot lie in a plugin's folder, nor beside an Entry".into());
         }
         let projects = self
             .key_path
@@ -2420,8 +2892,9 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
 
 /// A setting that turns off every Entry it covers while it holds `off`,
 /// such as Claude Code's `syncClaudeAiSkills: false`. The first source
-/// that holds it decides; the Entries are Disabled globally, or Blocked
-/// when that source is policy.
+/// that holds it decides, or with `every_source`, the first that holds
+/// `off`; the Entries are Disabled globally, or Blocked when that source is
+/// policy.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GlobalSwitch {
@@ -2429,6 +2902,11 @@ pub(crate) struct GlobalSwitch {
     pub sources: Vec<SettingPlace>,
     /// The value that turns the Entries off.
     pub off: Value,
+    /// Whether every source must leave the Entries on, as when the Agent
+    /// loads them only while neither its policy nor its own file holds
+    /// `off`, such as Claude Desktop's `isLocalDevMcpEnabled`.
+    #[serde(default)]
+    pub every_source: bool,
     /// The ids of the locations whose Entries it covers. Omitted, it covers
     /// every location of the Item kind.
     #[serde(default)]
@@ -2463,6 +2941,7 @@ fn validate_sources(sources: &[SettingPlace]) -> Result<(), String> {
 pub(crate) enum Gate {
     ManagedExclusive(ManagedExclusive),
     ApprovalList(ApprovalList),
+    PolicyField(PolicyField),
 }
 
 impl Validate for Gate {
@@ -2470,6 +2949,7 @@ impl Validate for Gate {
         match self {
             Gate::ManagedExclusive(block) => block.validate(),
             Gate::ApprovalList(block) => block.validate(),
+            Gate::PolicyField(block) => block.validate(),
         }
     }
 }
@@ -2480,6 +2960,7 @@ impl Gate {
         match self {
             Gate::ManagedExclusive(block) => block.covers(id),
             Gate::ApprovalList(block) => block.locations.iter().any(|location| location == id),
+            Gate::PolicyField(block) => block.locations.iter().any(|location| location == id),
         }
     }
 
@@ -2488,7 +2969,49 @@ impl Gate {
         match self {
             Gate::ManagedExclusive(_) => &[],
             Gate::ApprovalList(block) => &block.sources,
+            Gate::PolicyField(block) => &block.sources,
         }
+    }
+
+    /// The ids of the locations it names.
+    pub fn locations(&self) -> Vec<&str> {
+        match self {
+            Gate::ManagedExclusive(block) => std::iter::once(block.location.as_str())
+                .chain(block.except.iter().map(String::as_str))
+                .collect(),
+            Gate::ApprovalList(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::PolicyField(block) => block.locations.iter().map(String::as_str).collect(),
+        }
+    }
+}
+
+/// A field an organisation sets to keep an Entry out, such as the
+/// `orgBlockedReason` Claude Desktop writes into the settings of an
+/// extension on its organisation's blocklist: while a source holds anything
+/// but `null`, `false` or `""` there, the Entry is Blocked by `policy`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PolicyField {
+    /// The ids of the locations whose Entries it can Block.
+    pub locations: Vec<String>,
+    /// Where the field is.
+    pub sources: Vec<SettingPlace>,
+}
+
+impl Validate for PolicyField {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a policy field needs locations".into());
+        }
+        validate_sources(&self.sources)
+    }
+}
+
+impl PolicyField {
+    /// Whether `value`, what a source holds, keeps the Entry out.
+    pub fn set(value: &Value) -> bool {
+        !matches!(value, Value::Null | Value::Bool(false))
+            && value.as_str().is_none_or(|text| !text.is_empty())
     }
 }
 
@@ -2802,6 +3325,7 @@ pub(crate) fn djb2(name: &str) -> String {
 /// A gate's cache is one file of the Agent home, so that it always has a path.
 fn validate_gate_anchor(anchor: &Anchor) -> Result<(), String> {
     anchor.validate()?;
+    anchor.one_file()?;
     if anchor.home_root().is_none() {
         return Err("a lookup must lie in the Agent home".into());
     }
@@ -2905,9 +3429,7 @@ impl Validate for EnvBypass {
         }
         for variable in &self.variables {
             for name in std::iter::once(&variable.name).chain(&variable.unless) {
-                if name.trim().is_empty() || name.contains('=') {
-                    return Err(format!("`{name}` is not a variable name"));
-                }
+                validate_variable(name)?;
             }
         }
         for map in &self.env_maps {
@@ -3237,12 +3759,10 @@ impl ReadVersion for UninstallKey {
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{}",
             self.key
         );
-        let (hive, name) = match self.hive {
-            RegistryHive::CurrentUser => (Hive::CurrentUser, "HKCU"),
-            RegistryHive::LocalMachine => (Hive::LocalMachine, "HKLM"),
-        };
-        let text = ports.env.registry_value(hive, &key, "DisplayVersion")?;
-        VersionRead::new(&text, format!(r"{name}\{key}"))
+        let text = ports
+            .env
+            .registry_value(self.hive.port(), &key, "DisplayVersion")?;
+        VersionRead::new(&text, format!(r"{}\{key}", self.hive.short()))
     }
 }
 
