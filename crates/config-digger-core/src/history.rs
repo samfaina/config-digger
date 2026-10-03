@@ -488,6 +488,7 @@ pub(crate) fn delete_backup(
         differences: Vec::new(),
         backup: folder,
         sentence: explain::outcome(Action::DeleteBackup, 0, None, id, Verify::Verified),
+        hints: Vec::new(),
     })
 }
 

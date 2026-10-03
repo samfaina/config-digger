@@ -6,7 +6,7 @@
 //! that must handle it.
 
 use crate::edit::Syntax;
-use crate::ports::Environment;
+use crate::ports::{Environment, FileSystem};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -286,6 +286,103 @@ impl Register for JsonKeys {
 pub(crate) enum Provenance {
     /// A key someone wrote into a configuration file, by hand or through the Agent.
     File,
+}
+
+// --- Store classes ----------------------------------------------------------
+
+/// How a store config-digger writes behaves while its Agent runs, which
+/// decides whether a write warns or is blocked then. Declared from the
+/// weakest to the strongest: a file several locations read takes the
+/// strongest of their classes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum StoreClass {
+    /// A file the Agent reads and leaves alone: a write while it runs warns
+    /// that it may not see the change until it restarts.
+    Plain,
+    /// A file the Agent rewrites from memory while it runs, such as
+    /// `~/.claude.json`: a write while it runs warns strongly that the Agent
+    /// may overwrite it.
+    RewrittenWhileRunning,
+    /// A SQLite database the Agent holds open: a write while it runs is
+    /// blocked, whatever is acknowledged.
+    Sqlite,
+}
+
+// --- Session files ----------------------------------------------------------
+
+/// Lists the PIDs an Agent records for its running sessions.
+pub(crate) trait Sessions {
+    /// The PIDs the session files name, alive or not.
+    fn pids(&self, fs: &dyn FileSystem, env: &dyn Environment) -> Vec<u32>;
+}
+
+/// Files an Agent keeps for each running session, naming its PID.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum SessionFiles {
+    PidNamed(PidNamed),
+}
+
+impl Validate for SessionFiles {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            SessionFiles::PidNamed(block) => block.validate(),
+        }
+    }
+}
+
+impl Sessions for SessionFiles {
+    fn pids(&self, fs: &dyn FileSystem, env: &dyn Environment) -> Vec<u32> {
+        match self {
+            SessionFiles::PidNamed(block) => block.pids(fs, env),
+        }
+    }
+}
+
+/// One file per session directly in a folder, named `<pid>.<extension>`,
+/// such as Claude Code's `~/.claude/sessions/<pid>.json`. Only the names are
+/// read, never the content, which can hold a Secret.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PidNamed {
+    pub folder: Locator,
+    /// Such as `json`, without the dot.
+    pub extension: String,
+}
+
+impl Validate for PidNamed {
+    fn validate(&self) -> Result<(), String> {
+        self.folder.validate()?;
+        if self.extension.is_empty() || self.extension.contains(['.', '/', '\\']) {
+            return Err(format!(
+                "extension `{}` must be a name without a dot or separator",
+                self.extension
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Sessions for PidNamed {
+    fn pids(&self, fs: &dyn FileSystem, env: &dyn Environment) -> Vec<u32> {
+        let Some(folder) = self.folder.locate(env) else {
+            return Vec::new();
+        };
+        let suffix = format!(".{}", self.extension.to_ascii_lowercase());
+        fs.read_dir(&folder)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|path| {
+                let name = path.file_name()?.to_str()?.to_ascii_lowercase();
+                let pid = name.strip_suffix(&suffix)?;
+                if pid.is_empty() || !pid.bytes().all(|byte| byte.is_ascii_digit()) {
+                    return None;
+                }
+                pid.parse().ok()
+            })
+            .collect()
+    }
 }
 
 // --- Formats ----------------------------------------------------------------
@@ -642,6 +739,10 @@ pub(crate) struct Target {
     /// The key path of the value written. One segment may be `{project}`:
     /// the context's Project key, so that the switch applies only there.
     pub key_path: Vec<String>,
+    /// How the target's file behaves while the Agent runs.
+    // Read once Disable writes its target.
+    #[allow(dead_code)]
+    pub store_class: StoreClass,
 }
 
 impl Validate for Target {

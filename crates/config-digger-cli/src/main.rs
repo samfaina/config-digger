@@ -603,11 +603,12 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
     })
 }
 
-/// A write's JSON document: the plan, its warnings and, unless it was a dry
-/// run, the result.
+/// A write's JSON document: the plan, what blocks it, its warnings and,
+/// unless it was a dry run, the result.
 #[derive(Serialize)]
 struct WriteBody<'a> {
     plan: &'a api::Preview,
+    blocks: &'a [api::Block],
     warnings: Vec<WarningBody<'a>>,
     result: Option<&'a api::Outcome>,
 }
@@ -643,19 +644,21 @@ fn confirm_and_execute(
     flags: &WriteFlags,
 ) -> Result<(), Failure> {
     let preview = plan.preview().clone();
+    let blocks = plan.blocks().to_vec();
     let warnings = plan.warnings().to_vec();
     let mut acknowledged: Vec<WarningClass> = flags.ack.iter().map(|&ack| ack.into()).collect();
     let width = terminal::output_width(cli.wide);
     if !cli.json {
         anstream::print!(
             "{}",
-            render_preview(project_line, &preview, &warnings, width)
+            render_preview(project_line, &preview, &blocks, &warnings, width)
         );
     }
     if flags.dry_run {
         if cli.json {
             print_json(&WriteBody {
                 plan: &preview,
+                blocks: &blocks,
                 warnings: warning_bodies(&warnings, &acknowledged),
                 result: None,
             });
@@ -666,11 +669,21 @@ fn confirm_and_execute(
         }
         return Ok(());
     }
+    // No acknowledgement lifts a block, so nothing is asked.
+    if !blocks.is_empty() {
+        let sentences: Vec<&str> = blocks.iter().map(|block| block.sentence.as_str()).collect();
+        return Err(Failure::new(
+            "blocked",
+            format!("nothing was written: {}", sentences.join(" ")),
+            Exit::Blocked,
+        ));
+    }
     confirm(cli, &preview.title, flags.yes, &warnings, &mut acknowledged)?;
     let outcome = core.execute(plan, &acknowledged)?;
     if cli.json {
         print_json(&WriteBody {
             plan: &preview,
+            blocks: &blocks,
             warnings: warning_bodies(&warnings, &acknowledged),
             result: Some(&outcome),
         });
@@ -1086,11 +1099,12 @@ fn elide_locator(locator: &str, path: &Path, width: Option<usize>) -> String {
 
 /// A write's preview: the State before and after of each (Agent, Entry,
 /// Project) it changes, which Entry is Effective afterwards, the files diff,
-/// the warnings and where the backup goes. A Delete backup lists the copies
-/// it deletes instead.
+/// what blocks it, the warnings and where the backup goes. A Delete backup
+/// lists the copies it deletes instead.
 fn render_preview(
     project_line: Option<&str>,
     preview: &api::Preview,
+    blocks: &[api::Block],
     warnings: &[api::Warning],
     width: Option<usize>,
 ) -> String {
@@ -1135,6 +1149,17 @@ fn render_preview(
         }
     }
 
+    if !blocks.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Cannot apply", BOLD, width));
+        for block in blocks {
+            let text = format!("{INDENT}{}", block.sentence);
+            for line in terminal::wrap(&text, width) {
+                out.push_str(&plain_line(&line, width));
+            }
+        }
+    }
+
     if !warnings.is_empty() {
         out.push('\n');
         out.push_str(&styled_line("Warnings", BOLD, width));
@@ -1159,6 +1184,11 @@ fn render_outcome(action: Action, outcome: &api::Outcome, width: Option<usize>) 
     let mut out = String::from("\n");
     for line in terminal::wrap(&outcome.sentence, width) {
         out.push_str(&plain_line(&line, width));
+    }
+    for hint in &outcome.hints {
+        for line in terminal::wrap(hint, width) {
+            out.push_str(&plain_line(&line, width));
+        }
     }
     for difference in &outcome.differences {
         out.push_str(&plain_line(

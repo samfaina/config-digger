@@ -49,6 +49,18 @@ impl Core {
         Ok(Self { ports, definitions })
     }
 
+    /// Loads the built-in Agent definitions plus the extra ones in `files`,
+    /// each a file name and its TOML text, as `--definitions` does for
+    /// development and tests (ADR 0005). A file that fails to load is
+    /// rejected whole.
+    pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
+        let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
+        for (file, text) in files {
+            definitions.push(definitions::parse(file, text).map_err(Error::unexpected)?);
+        }
+        Ok(Self { ports, definitions })
+    }
+
     /// Reads every location of every found Agent home and Project.
     pub fn scan(&self, options: &ScanOptions) -> Result<Snapshot, Error> {
         let scanned = scan::scan(&self.definitions, &self.ports, &options.projects)
@@ -258,6 +270,27 @@ impl Plan {
     pub fn warnings(&self) -> &[Warning] {
         &self.0.warnings
     }
+
+    /// Why it cannot execute, whatever is acknowledged. Empty when it can.
+    pub fn blocks(&self) -> &[Block] {
+        &self.0.blocks
+    }
+}
+
+/// Why a plan cannot execute, whatever is acknowledged. The user removes
+/// the cause, such as by closing an Agent, and plans again.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Block {
+    pub code: BlockCode,
+    /// The cause and what to do about it, as a sentence rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockCode {
+    /// The plan writes a SQLite store while the Agent holding it open runs.
+    RunningAgentSqlite,
 }
 
 /// What a plan will change, shown before it is confirmed.
@@ -475,6 +508,9 @@ pub struct Outcome {
     pub backup: PathBuf,
     /// What the Operation did, as a sentence rendered by the core.
     pub sentence: String,
+    /// What to do next, such as restarting a running Agent that reads a
+    /// written file, as sentences rendered by the core.
+    pub hints: Vec<String>,
 }
 
 /// What Verify found once every edit had landed.

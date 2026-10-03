@@ -486,6 +486,7 @@ root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
+store_class = "plain"
 {extra}
 "#
         );

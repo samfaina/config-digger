@@ -13,6 +13,17 @@
     "agent": {
       "$ref": "#/$defs/AgentInfo"
     },
+    "process": {
+      "description": "How to tell that the Agent is running. Without it, config-digger\nnever finds it running.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProcessDefinition"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "homes": {
       "description": "The Agent homes this Agent can have.",
       "type": "array",
@@ -77,24 +88,74 @@
         "name"
       ]
     },
-    "HomeDefinition": {
+    "ProcessDefinition": {
+      "description": "How to tell that an Agent is running. It runs when a process matches\n`images`, `paths` and `cmdline_contains`, or a session file names a PID\nthat is alive. Detection is best-effort: it warns or blocks a write, and\nconfig-digger never closes an Agent.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "images": {
+          "description": "Image names, such as `claude.exe`, compared case-insensitively.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         },
-        "roots": {
-          "description": "Named roots of the home. The home is found when any root exists.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/Locator"
-          }
+        "paths": {
+          "description": "Globs the executable's path must match one of, when set, such as\n`~/.local/bin/claude.exe`: Claude Code and Claude Desktop are both\n`claude.exe`. A glob starts with `~/`, `%NAME%` or a drive; `*` and\n`?` stay within one folder name and `{a,b}` is either. Compared\ncase-insensitively. A process whose path the OS hides matches on its\nimage alone.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "cmdline_contains": {
+          "description": "Text the command line must contain, every one of them, compared\ncase-insensitively, such as Gemini CLI's script in `node.exe`. A\nprocess whose command line the OS hides does not match: unlike a\npath, it narrows down images such as `node.exe` that run much else.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "session_files": {
+          "description": "Files the Agent keeps per running session, each naming a PID that\ncounts only while it is alive.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionFiles"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "roots"
+      "additionalProperties": false
+    },
+    "SessionFiles": {
+      "description": "Files an Agent keeps for each running session, naming its PID.",
+      "oneOf": [
+        {
+          "description": "One file per session directly in a folder, named `<pid>.<extension>`,\nsuch as Claude Code's `~/.claude/sessions/<pid>.json`. Only the names are\nread, never the content, which can hold a Secret.",
+          "type": "object",
+          "properties": {
+            "folder": {
+              "$ref": "#/$defs/Locator"
+            },
+            "extension": {
+              "description": "Such as `json`, without the dot.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "pid-named"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "folder",
+            "extension"
+          ]
+        }
       ]
     },
     "Locator": {
@@ -118,6 +179,37 @@
             "path"
           ]
         }
+      ]
+    },
+    "HomeDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "roots": {
+          "description": "Named roots of the home. The home is found when any root exists.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Locator"
+          }
+        },
+        "process": {
+          "description": "How to tell that the Agent of this home is running, in place of the\ndefinition's `[process]`, such as for a home read by another\nInstallation of the Agent.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessDefinition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "roots"
       ]
     },
     "ScopeDefinition": {
@@ -257,6 +349,10 @@
           "description": "The base Provenance of the location's Entries.",
           "$ref": "#/$defs/Provenance"
         },
+        "store_class": {
+          "description": "How the location's file behaves while the Agent runs.",
+          "$ref": "#/$defs/StoreClass"
+        },
         "interpolation": {
           "description": "How the Agent writes references in this location's values. Without\nit, every value is literal text.",
           "anyOf": [
@@ -281,7 +377,8 @@
         "root",
         "kind",
         "scope",
-        "provenance"
+        "provenance",
+        "store_class"
       ]
     },
     "Format": {
@@ -316,6 +413,26 @@
           "description": "A key someone wrote into a configuration file, by hand or through the Agent.",
           "type": "string",
           "const": "file"
+        }
+      ]
+    },
+    "StoreClass": {
+      "description": "How a store config-digger writes behaves while its Agent runs, which\ndecides whether a write warns or is blocked then. Declared from the\nweakest to the strongest: a file several locations read takes the\nstrongest of their classes.",
+      "oneOf": [
+        {
+          "description": "A file the Agent reads and leaves alone: a write while it runs warns\nthat it may not see the change until it restarts.",
+          "type": "string",
+          "const": "plain"
+        },
+        {
+          "description": "A file the Agent rewrites from memory while it runs, such as\n`~/.claude.json`: a write while it runs warns strongly that the Agent\nmay overwrite it.",
+          "type": "string",
+          "const": "rewritten-while-running"
+        },
+        {
+          "description": "A SQLite database the Agent holds open: a write while it runs is\nblocked, whatever is acknowledged.",
+          "type": "string",
+          "const": "sqlite"
         }
       ]
     },
@@ -484,12 +601,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "store_class": {
+          "description": "How the target's file behaves while the Agent runs.",
+          "$ref": "#/$defs/StoreClass"
         }
       },
       "additionalProperties": false,
       "required": [
         "anchor",
-        "key_path"
+        "key_path",
+        "store_class"
       ]
     }
   }

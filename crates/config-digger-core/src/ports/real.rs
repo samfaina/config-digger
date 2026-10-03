@@ -89,8 +89,9 @@ impl FileSystem for RealFileSystem {
     }
 }
 
-/// Lists processes with `sysinfo`. Detection is best-effort: a process whose
-/// executable path the OS hides still appears, without a path.
+/// Lists processes with `sysinfo`, refreshing processes only. Detection is
+/// best-effort: a process whose executable path or command line the OS hides
+/// still appears, without them.
 pub struct RealProcesses;
 
 impl Processes for RealProcesses {
@@ -101,7 +102,9 @@ impl Processes for RealProcesses {
         system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
-            ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
+            ProcessRefreshKind::nothing()
+                .with_exe(UpdateKind::OnlyIfNotSet)
+                .with_cmd(UpdateKind::OnlyIfNotSet),
         );
         system
             .processes()
@@ -110,6 +113,12 @@ impl Processes for RealProcesses {
                 pid: pid.as_u32(),
                 image: process.name().to_string_lossy().into_owned(),
                 path: process.exe().map(Path::to_path_buf),
+                cmdline: process
+                    .cmd()
+                    .iter()
+                    .map(|arg| arg.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(" "),
             })
             .collect()
     }

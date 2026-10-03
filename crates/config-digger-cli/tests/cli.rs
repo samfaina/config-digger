@@ -1616,3 +1616,82 @@ fn show_names_the_machine_local_switch_disable_would_write() {
         show.stdout
     );
 }
+
+/// A `.claude.json` with a user `notes`, while Claude Code runs: a session
+/// file names this test's own PID, which is alive while it runs.
+fn claude_code_running() -> Harness {
+    let session = format!(".claude/sessions/{}.json", std::process::id());
+    Harness::new()
+        .with_file(
+            ".claude.json",
+            &json!({ "mcpServers": { "notes": { "command": "n" } } }).to_string(),
+        )
+        .with_file(&session, "{}")
+}
+
+#[test]
+fn remove_while_the_agent_runs_without_a_tty_needs_ack_running_agent() {
+    let harness = claude_code_running();
+    let before = read(&harness.path(".claude.json"));
+
+    let run = harness.run(&["remove", "notes", "--yes"]);
+
+    assert_eq!(run.code, 4, "{}", run.stderr);
+    assert!(run.stdout.contains("[running-agent]"), "{}", run.stdout);
+    assert!(
+        run.stdout
+            .contains("may overwrite what this Operation writes"),
+        "{}",
+        run.stdout
+    );
+    assert!(run.stderr.contains("--ack running-agent"), "{}", run.stderr);
+    assert_eq!(read(&harness.path(".claude.json")), before);
+}
+
+#[test]
+fn remove_while_the_agent_runs_with_ack_prints_a_restart_hint() {
+    let harness = claude_code_running();
+
+    let run = harness.run(&["remove", "notes", "--yes", "--ack", "running-agent"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout
+            .contains("Restart Claude Code so that it reads what the Operation wrote."),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout
+            .contains("may be overwritten while Claude Code runs."),
+        "{}",
+        run.stdout
+    );
+    assert!(!read(&harness.path(".claude.json")).contains("notes"));
+}
+
+#[test]
+fn remove_while_the_agent_runs_json_has_the_warning_and_the_hints() {
+    let harness = claude_code_running();
+
+    let run = harness.run(&[
+        "remove",
+        "notes",
+        "--yes",
+        "--ack",
+        "running-agent",
+        "--json",
+    ]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["blocks"], json!([]));
+    assert_eq!(document["warnings"][0]["class"], "running-agent");
+    assert_eq!(document["warnings"][0]["acknowledged"], true);
+    let hints = document["result"]["hints"].as_array().unwrap();
+    assert_eq!(hints.len(), 2, "{hints:?}");
+    assert_eq!(
+        hints[0],
+        "Restart Claude Code so that it reads what the Operation wrote."
+    );
+}

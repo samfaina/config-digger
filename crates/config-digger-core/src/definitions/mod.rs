@@ -5,7 +5,7 @@ pub(crate) mod blocks;
 
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    Provenance, Register, Registry, Validate,
+    Provenance, Register, Registry, SessionFiles, StoreClass, Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -44,7 +44,7 @@ pub(crate) fn built_in() -> Result<Vec<AgentDefinition>, DefinitionError> {
         .collect()
 }
 
-fn parse(file: &str, text: &str) -> Result<AgentDefinition, DefinitionError> {
+pub(crate) fn parse(file: &str, text: &str) -> Result<AgentDefinition, DefinitionError> {
     let error = |message: String| DefinitionError {
         file: file.to_owned(),
         message,
@@ -62,6 +62,9 @@ pub(crate) struct AgentDefinition {
     /// The version of this file format. Must be 1.
     pub format_version: u32,
     pub agent: AgentInfo,
+    /// How to tell that the Agent is running. Without it, config-digger
+    /// never finds it running.
+    pub process: Option<ProcessDefinition>,
     /// The Agent homes this Agent can have.
     pub homes: Vec<HomeDefinition>,
     /// The Scopes this Agent applies Entries at, in display order. A Scope is
@@ -91,6 +94,60 @@ pub(crate) struct HomeDefinition {
     pub id: String,
     /// Named roots of the home. The home is found when any root exists.
     pub roots: BTreeMap<String, Locator>,
+    /// How to tell that the Agent of this home is running, in place of the
+    /// definition's `[process]`, such as for a home read by another
+    /// Installation of the Agent.
+    pub process: Option<ProcessDefinition>,
+}
+
+/// How to tell that an Agent is running. It runs when a process matches
+/// `images`, `paths` and `cmdline_contains`, or a session file names a PID
+/// that is alive. Detection is best-effort: it warns or blocks a write, and
+/// config-digger never closes an Agent.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProcessDefinition {
+    /// Image names, such as `claude.exe`, compared case-insensitively.
+    #[serde(default)]
+    pub images: Vec<String>,
+    /// Globs the executable's path must match one of, when set, such as
+    /// `~/.local/bin/claude.exe`: Claude Code and Claude Desktop are both
+    /// `claude.exe`. A glob starts with `~/`, `%NAME%` or a drive; `*` and
+    /// `?` stay within one folder name and `{a,b}` is either. Compared
+    /// case-insensitively. A process whose path the OS hides matches on its
+    /// image alone.
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Text the command line must contain, every one of them, compared
+    /// case-insensitively, such as Gemini CLI's script in `node.exe`. A
+    /// process whose command line the OS hides does not match: unlike a
+    /// path, it narrows down images such as `node.exe` that run much else.
+    #[serde(default)]
+    pub cmdline_contains: Vec<String>,
+    /// Files the Agent keeps per running session, each naming a PID that
+    /// counts only while it is alive.
+    pub session_files: Option<SessionFiles>,
+}
+
+impl Validate for ProcessDefinition {
+    fn validate(&self) -> Result<(), String> {
+        if self.images.is_empty() && self.session_files.is_none() {
+            return Err("process needs images or session_files".into());
+        }
+        if self.images.is_empty() && !(self.paths.is_empty() && self.cmdline_contains.is_empty()) {
+            return Err("process paths and cmdline_contains need images".into());
+        }
+        for text in self.images.iter().chain(&self.cmdline_contains) {
+            non_empty("process image or cmdline_contains", text)?;
+        }
+        for glob in &self.paths {
+            crate::paths::validate_glob(glob)?;
+        }
+        if let Some(session_files) = &self.session_files {
+            session_files.validate()?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -126,6 +183,8 @@ pub(crate) struct LocationDefinition {
     pub scope: String,
     /// The base Provenance of the location's Entries.
     pub provenance: Provenance,
+    /// How the location's file behaves while the Agent runs.
+    pub store_class: StoreClass,
     /// How the Agent writes references in this location's values. Without
     /// it, every value is literal text.
     pub interpolation: Option<Interpolation>,
@@ -214,6 +273,16 @@ impl AgentDefinition {
             .expect("validation puts every location in its kind's precedence")
     }
 
+    /// How to tell that the Agent of the home `home` is running: the home's
+    /// own process, or else the definition's.
+    pub fn process(&self, home: &str) -> Option<&ProcessDefinition> {
+        self.homes
+            .iter()
+            .find(|found| found.id == home)
+            .and_then(|found| found.process.as_ref())
+            .or(self.process.as_ref())
+    }
+
     pub fn location(&self, id: &str) -> &LocationDefinition {
         self.locations
             .iter()
@@ -233,6 +302,9 @@ impl AgentDefinition {
         if self.homes.is_empty() {
             return Err("at least one home is required".into());
         }
+        if let Some(process) = &self.process {
+            process.validate().map_err(|e| format!("process: {e}"))?;
+        }
         unique("home", self.homes.iter().map(|home| home.id.as_str()))?;
         unique("scope", self.scopes.iter().map(|scope| scope.id.as_str()))?;
         unique(
@@ -249,6 +321,11 @@ impl AgentDefinition {
                 locator
                     .validate()
                     .map_err(|e| format!("home `{}` root `{name}`: {e}", home.id))?;
+            }
+            if let Some(process) = &home.process {
+                process
+                    .validate()
+                    .map_err(|e| format!("home `{}` process: {e}", home.id))?;
             }
         }
 
@@ -394,6 +471,7 @@ root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
+store_class = "plain"
 
 [items.mcp]
 precedence = ["user-mcp"]
@@ -412,6 +490,7 @@ root = {local_root}
 kind = "mcp"
 scope = "user"
 provenance = "file"
+store_class = "plain"
 "#
         );
         VALID
@@ -536,6 +615,67 @@ provenance = "file"
     }
 
     #[test]
+    fn a_location_needs_a_store_class() {
+        let text = VALID.replace("store_class = \"plain\"\n", "");
+        assert!(error(&text).contains("store_class"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_disable_target_needs_a_store_class() {
+        let text = with_disable(
+            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"] } }"#,
+        );
+        assert!(error(&text).contains("store_class"), "{}", error(&text));
+    }
+
+    /// `VALID` with `process` as its `[process]` table.
+    fn with_process(process: &str) -> String {
+        VALID.replace("[[homes]]", &format!("[process]\n{process}\n\n[[homes]]"))
+    }
+
+    #[test]
+    fn a_process_loads() {
+        let text = with_process(
+            r#"images = ["claude.exe"]
+paths = ["~/.local/bin/claude.exe", "%LOCALAPPDATA%/Programs/x/*", "C:/Program Files/WindowsApps/{Claude,AnthropicPBC.Claude}_*/app/*"]
+cmdline_contains = ["claude"]
+session_files = { block = "pid-named", folder = { block = "path", path = "~/.claude/sessions" }, extension = "json" }"#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_home_may_override_the_process() {
+        let text = VALID.replace(
+            "roots.state = ",
+            "process = { images = [\"other.exe\"] }\nroots.state = ",
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_process_needs_images_or_session_files() {
+        let text = with_process("cmdline_contains = [\"x\"]");
+        assert!(error(&text).contains("images"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_path_glob_must_start_from_home_a_variable_or_a_drive() {
+        let text = with_process("images = [\"x.exe\"]\npaths = [\"bin/x.exe\"]");
+        assert!(error(&text).contains("must start with"), "{}", error(&text));
+        let text = with_process("images = [\"x.exe\"]\npaths = [\"C:/{a,b/x.exe\"]");
+        assert!(error(&text).contains("unbalanced"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_session_file_extension_has_no_dot() {
+        let text = with_process(
+            r#"session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }, extension = ".json" }"#,
+        );
+        assert!(error(&text).contains("extension"), "{}", error(&text));
+    }
+
+    #[test]
     fn unknown_fields_are_rejected() {
         let text = VALID.replace("scope = \"user\"\n", "scope = \"user\"\ncolour = \"red\"\n");
         assert!(error(&text).contains("colour"), "{}", error(&text));
@@ -633,7 +773,7 @@ provenance = "file"
     #[test]
     fn a_disable_mechanism_loads() {
         let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "off"] }, locations = ["user-mcp"] }"#,
+            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "off"], store_class = "plain" }, locations = ["user-mcp"] }"#,
         );
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
@@ -641,7 +781,7 @@ provenance = "file"
     #[test]
     fn a_disable_mechanism_for_an_unknown_location_is_rejected() {
         let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"] }, locations = ["ghost"] }"#,
+            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"], store_class = "plain" }, locations = ["ghost"] }"#,
         );
         assert!(
             error(&text).contains("`ghost` is not a location of this kind"),
@@ -653,7 +793,7 @@ provenance = "file"
     #[test]
     fn a_disable_target_in_a_project_cannot_be_keyed_by_project() {
         let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "project", path = ".test.json" }, key_path = ["{project}", "off"] } }"#,
+            r#"{ block = "json-name-list", target = { anchor = { block = "project", path = ".test.json" }, key_path = ["{project}", "off"], store_class = "plain" } }"#,
         );
         assert!(
             error(&text).contains("cannot be keyed by `{project}`"),
