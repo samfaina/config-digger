@@ -133,6 +133,7 @@ impl Harness {
             .env("LOCALAPPDATA", self.local_app_data())
             .env("APPDATA", self.roaming_app_data())
             .env_remove("CLAUDE_CONFIG_DIR")
+            .env_remove("CLAUDE_USER_DATA_DIR")
             .env_remove("RUST_LOG");
         // Variables that make Claude Code ignore its cached Feature gates.
         for variable in [
@@ -551,6 +552,7 @@ fn list_json_prints_one_document_with_schema_version() {
             "folder": harness.home.display().to_string(),
             "source": {"kind": "default"},
             "hidden": false,
+            "not_read": null,
             "no_configuration": null,
             "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],

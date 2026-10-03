@@ -574,13 +574,16 @@ pub enum InfoCode {
     DefinitionUntested,
 }
 
-impl From<AgentNoteCode> for InfoCode {
-    fn from(code: AgentNoteCode) -> Self {
-        match code {
-            AgentNoteCode::VersionOutsideTestedRange => InfoCode::VersionOutsideTestedRange,
-            AgentNoteCode::VersionUnreadable => InfoCode::VersionUnreadable,
-            AgentNoteCode::NoInstallationFound => InfoCode::NoInstallationFound,
-            AgentNoteCode::DefinitionUntested => InfoCode::DefinitionUntested,
+impl AgentNoteCode {
+    /// What a preview says of it, `None` for a note about something else
+    /// than the Agent's versions, which no Operation changes.
+    pub(crate) fn info(self) -> Option<InfoCode> {
+        match self {
+            AgentNoteCode::VersionOutsideTestedRange => Some(InfoCode::VersionOutsideTestedRange),
+            AgentNoteCode::VersionUnreadable => Some(InfoCode::VersionUnreadable),
+            AgentNoteCode::NoInstallationFound => Some(InfoCode::NoInstallationFound),
+            AgentNoteCode::DefinitionUntested => Some(InfoCode::DefinitionUntested),
+            AgentNoteCode::CloudConnectorsNotOnDisk => None,
         }
     }
 }
@@ -1091,6 +1094,9 @@ pub struct Home {
     pub source: HomeSource,
     /// The user hid it, so it is listed only when hidden ones are asked for.
     pub hidden: bool,
+    /// When the Agent's lookup order skips it, so that the Agent never
+    /// reads it and its Entries are Unread, what it reads instead.
+    pub not_read: Option<NotRead>,
     /// When none of the files the Agent reads there exists, the sentence
     /// saying so, rendered by the core.
     pub no_configuration: Option<String>,
@@ -1109,6 +1115,15 @@ pub struct Home {
     pub notes: Vec<AgentNote>,
 }
 
+/// Why the Agent never reads an Agent home: its lookup order picks another.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct NotRead {
+    /// The id of the home the order picks, `None` when it picks none that is there.
+    pub read_instead: Option<String>,
+    /// The reason as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
 /// A launchable copy of an Agent, with its own version.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Installation {
@@ -1124,8 +1139,9 @@ pub struct Installation {
     pub out_of_range: bool,
 }
 
-/// Something about an Agent's versions in one Agent home, which changes
-/// no State and blocks nothing.
+/// Something about an Agent in one Agent home, such as its versions or what
+/// it keeps only in the user's account, which changes no State and blocks
+/// nothing.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct AgentNote {
     /// What it notes, from a closed set.
@@ -1149,6 +1165,9 @@ pub enum AgentNoteCode {
     NoInstallationFound,
     /// The definition has no tested range.
     DefinitionUntested,
+    /// The Agent's connectors live in the user's account, with no copy on
+    /// disk, so they are not listed.
+    CloudConnectorsNotOnDisk,
 }
 
 /// The versions an Agent definition was tested with, both ends included.
@@ -1371,6 +1390,8 @@ pub enum RemoveNotOffered {
     ReadOnly,
     /// The Entry is part of a plugin, which only the Agent uninstalls.
     Plugin,
+    /// The Entry is an extension's, which only the Agent uninstalls.
+    Extension,
 }
 
 /// How to remove an Entry that config-digger does not Remove.
@@ -1401,6 +1422,10 @@ pub enum Provenance {
     /// through its own switch, and Remove is not offered: the Agent
     /// uninstalls it.
     Plugin,
+    /// An extension the Agent installed, such as a Claude Desktop `.mcpb`.
+    /// Disable goes through its own switch, and Remove is not offered: the
+    /// Agent uninstalls it.
+    Extension,
 }
 
 /// A skill manager, such as `npx skills`, as its definition names it.
@@ -1410,7 +1435,7 @@ pub struct SkillManager {
     pub name: String,
 }
 
-/// A plugin an Agent installed, which an Entry is part of.
+/// A plugin or extension an Agent installed, which an Entry is part of.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Plugin {
     /// The id the Agent knows it by, such as `supabase@claude-plugins-official`.
@@ -1432,6 +1457,7 @@ impl From<DefinitionProvenance> for Provenance {
             DefinitionProvenance::Managed => Provenance::Managed,
             DefinitionProvenance::CloudMirror => Provenance::CloudMirror,
             DefinitionProvenance::Plugin => Provenance::Plugin,
+            DefinitionProvenance::Extension => Provenance::Extension,
         }
     }
 }
@@ -1500,6 +1526,9 @@ pub enum ReasonCode {
     MalformedSkill,
     /// The Entry is keyed to a Project whose folder no longer exists.
     ProjectMissing,
+    /// The Entry is in an Agent home the Agent's lookup order skips for
+    /// another, so the Agent never reads it.
+    LookupOrderSkipsHome,
     /// The Entry is a link whose target is gone, so the Agent reads nothing
     /// there.
     LinkBroken,

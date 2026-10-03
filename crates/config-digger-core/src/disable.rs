@@ -83,9 +83,13 @@ impl Hit<'_> {
                 &self.switch.path,
                 per_project,
             ),
-            DisableMechanism::JsonField(_) => {
-                explain::field_holds(&self.key_path, self.value, &self.switch.path, per_project)
-            }
+            DisableMechanism::JsonField(block) => explain::field_holds(
+                &self.key_path,
+                self.value,
+                block.default_value.as_ref(),
+                &self.switch.path,
+                per_project,
+            ),
         }
     }
 
@@ -256,7 +260,7 @@ pub(crate) fn choose(
         let folder = project
             .map(|project| project.path)
             .filter(|_| switch.anchor.in_project());
-        let Some(path) = switch.anchor.path(roots, folder) else {
+        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
             continue;
         };
         if snapshot.versioned.contains(&path) {
@@ -341,7 +345,7 @@ pub(crate) fn failed_switch_files(
             }
             _ => None,
         };
-        let Some(path) = switch.anchor.path(roots, folder) else {
+        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
             continue;
         };
         if snapshot.unreadable_switches.contains(&path) && !files.contains(&path) {

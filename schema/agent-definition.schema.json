@@ -60,6 +60,17 @@
         "$ref": "#/$defs/HomeDefinition"
       }
     },
+    "lookup_orders": {
+      "description": "The orders in which a launch of the Agent picks one of its homes,\neach a list of home ids, such as the candidates for Claude Desktop's\ndata folder of each of its packages: it reads the first whose `when`\nholds and whose folder exists, or that it uses before it exists. A\nhome some order holds and none picks is skipped, and shown as not\nread. A home outside every order is read wherever it is found.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "default": []
+    },
     "scopes": {
       "description": "The Scopes this Agent applies Entries at, in display order. A Scope is\nonly a label: precedence comes from the order of locations in `items`.",
       "type": "array",
@@ -150,12 +161,29 @@
         "name": {
           "description": "The display name, such as `Claude Code`.",
           "type": "string"
+        },
+        "notes": {
+          "description": "What every Agent home of the Agent notes, such as configuration it\nkeeps only in the user's account.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DefinitionNote"
+          }
         }
       },
       "additionalProperties": false,
       "required": [
         "id",
         "name"
+      ]
+    },
+    "DefinitionNote": {
+      "description": "Something every Agent home of an Agent notes, from a closed set.",
+      "oneOf": [
+        {
+          "description": "The Agent's connectors live in the user's account, with no copy on\ndisk to list, such as Claude Desktop's.",
+          "type": "string",
+          "const": "cloud_connectors_not_on_disk"
+        }
       ]
     },
     "InstallationDefinition": {
@@ -340,7 +368,7 @@
               "type": "string"
             },
             "path": {
-              "description": "A `/`-separated path relative to the root. Omitted when the root is the location.",
+              "description": "A `/`-separated path relative to the root. Omitted when the root is\nthe location. In a Disable switch or a setting, `{plugin_id}` may\nstand for the id of a plugin, such as Claude Desktop's\n`Claude Extensions Settings/{plugin_id}.json`: there is then one file\nper plugin, which applies to that plugin's Entries only.",
               "type": [
                 "string",
                 "null"
@@ -441,6 +469,32 @@
             "plugins",
             "path"
           ]
+        },
+        {
+          "description": "A file in a folder above an Entry's own location, read once per Entry,\nsuch as the `manifest.json` two folders above each skill Claude Desktop\nmirrors from the account. Only a Disable switch is anchored here.",
+          "type": "object",
+          "properties": {
+            "up": {
+              "description": "How many folders up from the Entry's location, at least 1: 1 is the\nfolder holding it.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "path": {
+              "description": "A `/`-separated path relative to that folder.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "entry"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "up",
+            "path"
+          ]
         }
       ]
     },
@@ -533,7 +587,7 @@
       "description": "Where one root of an Agent home lives.",
       "oneOf": [
         {
-          "description": "The user's home folder, written `~`, or a fixed path below it, written\n`~/<relative path>`.",
+          "description": "The user's home folder, written `~`, or a fixed path below it, written\n`~/<relative path>`; or a path that starts with `%NAME%`, expanded from\nthe environment, or a drive, `/`-separated. Outside the user's home\nfolder, `*` and `?` stay within one folder name and `{a,b}` is either,\nsuch as an MSIX package's folder: the path then names every existing\nfolder that matches.",
           "type": "object",
           "properties": {
             "path": {
@@ -548,6 +602,24 @@
           "required": [
             "block",
             "path"
+          ]
+        },
+        {
+          "description": "The folder an environment variable holds, such as Claude Desktop's\n`CLAUDE_USER_DATA_DIR`, while it is set to an absolute path. The Agent\nuses it whenever it is set, creating it if needed.",
+          "type": "object",
+          "properties": {
+            "variable": {
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "env"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "variable"
           ]
         }
       ]
@@ -579,6 +651,13 @@
               "type": "null"
             }
           ]
+        },
+        "when": {
+          "description": "Conditions under which the lookup order may pick the home, every one\nof them, such as `%APPDATA%` being on a network share. Only a home\nin the lookup order takes them.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HomeCondition"
+          }
         }
       },
       "additionalProperties": false,
@@ -586,6 +665,29 @@
         "id",
         "folder",
         "roots"
+      ]
+    },
+    "HomeCondition": {
+      "description": "A condition under which an Agent reads a home of its lookup order.",
+      "oneOf": [
+        {
+          "description": "Holds while an environment variable holds a path on a network share,\n`\\\\server\\share\\…`, such as `%APPDATA%` in a redirected roaming profile.",
+          "type": "object",
+          "properties": {
+            "variable": {
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "unc-variable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "variable"
+          ]
+        }
       ]
     },
     "ScopeDefinition": {
@@ -651,6 +753,29 @@
             "hive",
             "key",
             "value"
+          ]
+        },
+        {
+          "description": "The values of a key in the Windows registry, each one setting, such as\nClaude Desktop's policy under `HKLM\\SOFTWARE\\Policies\\Claude`. A string\nvalue reads as a string, and a DWORD as `true` when it is 1 and `false`\nwhen it is 0, as Windows policies store switches, and as its number\notherwise; a value of another type reads as `null`, holding a setting\nconfig-digger does not read. It is shown as `<HKLM|HKCU>\\<key>`.",
+          "type": "object",
+          "properties": {
+            "hive": {
+              "$ref": "#/$defs/RegistryHive"
+            },
+            "key": {
+              "description": "The key below the hive, `\\`-separated.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "registry-key"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "hive",
+            "key"
           ]
         },
         {
@@ -746,10 +871,10 @@
           ]
         },
         "name": {
-          "description": "Where a plugin's name is. Without it, or when the plugin's folder\ndoes not hold one, its name is its id up to `id_separator`.",
+          "description": "Where a plugin's name is, or a list of places tried in turn, such as\nan extension's `display_name`, then its `name`. When the plugin's\nfolder holds none, its name is its id up to `id_separator`.",
           "anyOf": [
             {
-              "$ref": "#/$defs/PluginName"
+              "$ref": "#/$defs/PluginNames"
             },
             {
               "type": "null"
@@ -763,16 +888,23 @@
             "null"
           ]
         },
+        "unique_names": {
+          "description": "Whether the Agent names a plugin by its id when one before it, in\nthe registry's order, has its name, as Claude Desktop does with\nextensions, so that their Entries never share a name.",
+          "type": "boolean",
+          "default": false
+        },
         "uninstall": {
-          "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out.",
-          "type": "string"
+          "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out. Without it,\nthe Agent uninstalls a plugin only through its own interface.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false,
       "required": [
         "id",
-        "registry",
-        "uninstall"
+        "registry"
       ]
     },
     "PluginRegistry": {
@@ -830,6 +962,81 @@
             "root",
             "folder"
           ]
+        },
+        {
+          "description": "The folders, in a folder of the Agent home, that hold a marker file,\neach a plugin whose id is the folder's name, such as Claude Desktop's\nextensions, each unpacked into `Claude Extensions\\<id>` with its\n`manifest.json`. A folder without the marker holds no plugin.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "The folder the plugins' folders are in.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "marker": {
+              "description": "A `/`-separated path relative to a plugin's folder.",
+              "type": "string"
+            },
+            "records": {
+              "description": "What the Agent records of each plugin it installed, when it does.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InstallRecords"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "plugin-folders"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "marker"
+          ]
+        }
+      ]
+    },
+    "InstallRecords": {
+      "description": "An object in a strict JSON file of the Agent home whose keys are plugin\nids, each holding what the Agent recorded when it installed the plugin,\nsuch as Claude Desktop's `extensions-installations.json`.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "root": {
+          "description": "The key path of the object whose keys are plugin ids.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "description": "The field of a record that holds the version installed.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "root",
+        "version"
+      ]
+    },
+    "PluginNames": {
+      "description": "Where a plugin's name is: one place, or several tried in turn.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PluginName"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginName"
+          }
         }
       ]
     },
@@ -874,6 +1081,11 @@
             "type": "string"
           },
           "default": []
+        },
+        "one_entry": {
+          "description": "Whether the value at `root` is one Entry rather than an object of\nthem, named by the plugin it is part of, such as the server a Claude\nDesktop extension's manifest declares in `server.mcp_config`. Only a\nlocation in plugins can hold one.",
+          "type": "boolean",
+          "default": false
         },
         "kind": {
           "$ref": "#/$defs/ItemKind"
@@ -1149,6 +1361,11 @@
           "description": "Part of a plugin the Agent installed. config-digger Disables it only\nthrough the plugin's own switch, with every Entry of the plugin, and\nnever Removes it: uninstalling is up to the Agent.",
           "type": "string",
           "const": "plugin"
+        },
+        {
+          "description": "An extension the Agent installed, such as a Claude Desktop `.mcpb`,\nread as a plugin is: config-digger Disables it only through its own\nswitch, and never Removes it.",
+          "type": "string",
+          "const": "extension"
         }
       ]
     },
@@ -1186,6 +1403,13 @@
                 "type": "string"
               },
               "default": []
+            },
+            "namespace_separator": {
+              "description": "What comes between a namespace and its argument, such as the `.` of\na Claude Desktop extension's `${user_config.KEY}`. Omitted for `:`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "default_separator": {
               "description": "Such as `:-` for `${NAME:-default}`.",
@@ -1240,6 +1464,14 @@
             "items": {
               "type": "string"
             }
+          },
+          "default": []
+        },
+        "encrypted_prefixes": {
+          "description": "Prefixes the Agent writes before a value it encrypted, such as\nClaude Desktop's `__encrypted__:`. Such a value is a Secret wherever\nit is, in an Entry or anywhere in the file, and keeps its prefix.",
+          "type": "array",
+          "items": {
+            "type": "string"
           },
           "default": []
         }
@@ -1481,7 +1713,7 @@
       "description": "One of an Agent's checks that decides an Entry's State.",
       "oneOf": [
         {
-          "description": "A managed file takes exclusive control and leaves the Entry out:\nBlocked, with `policy`. A Blocked Entry does not compete. Required\nwhen a gate of the kind is managed-exclusive, and refused otherwise.",
+          "description": "A managed file takes exclusive control and leaves the Entry out, or\na field the organisation sets keeps it out: Blocked, with `policy`.\nA Blocked Entry does not compete. Required when a gate of the kind\nis managed-exclusive or a policy field, and refused otherwise.",
           "type": "string",
           "const": "policy"
         },
@@ -1597,6 +1829,9 @@
             "enabled_value": {
               "description": "The value Enable sets, with `enable_action = \"set\"`."
             },
+            "default_value": {
+              "description": "The value the Agent takes while the field, or its file, is missing,\nsuch as `false` for Claude Desktop's `isEnabled`, which an extension\nwithout a settings file has. Omitted, a missing field Disables nothing."
+            },
             "partial_values": {
               "description": "Values that are partial switches, limiting part of the Entry, such\nas a skill listed by name only: the Entry stays Effective, with a note.",
               "type": "array",
@@ -1644,6 +1879,7 @@
       "type": "object",
       "properties": {
         "anchor": {
+          "description": "The file. Its path may name `{plugin_id}` instead of the key path,\nfor a file per plugin.",
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
@@ -1652,6 +1888,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "named_by": {
+          "description": "When the value where `{name}` stands is a list of objects rather\nthan an object keyed by name, the field of each that holds its name,\nsuch as `name` in the `skills` of the manifest of Claude Desktop's\nskill mirror. config-digger only reads such a switch.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "store_class": {
           "description": "How the switch's file behaves while the Agent runs.",
@@ -1804,6 +2047,36 @@
             "sources",
             "prompt"
           ]
+        },
+        {
+          "description": "A field an organisation sets to keep an Entry out, such as the\n`orgBlockedReason` Claude Desktop writes into the settings of an\nextension on its organisation's blocklist: while a source holds anything\nbut `null`, `false` or `\"\"` there, the Entry is Blocked by `policy`.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries it can Block.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the field is.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "policy-field"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources"
+          ]
         }
       ]
     },
@@ -1902,7 +2175,7 @@
           ]
         },
         {
-          "description": "A setting that turns off every Entry it covers while it holds `off`,\nsuch as Claude Code's `syncClaudeAiSkills: false`. The first source\nthat holds it decides; the Entries are Disabled globally, or Blocked\nwhen that source is policy.",
+          "description": "A setting that turns off every Entry it covers while it holds `off`,\nsuch as Claude Code's `syncClaudeAiSkills: false`. The first source\nthat holds it decides, or with `every_source`, the first that holds\n`off`; the Entries are Disabled globally, or Blocked when that source is\npolicy.",
           "type": "object",
           "properties": {
             "sources": {
@@ -1914,6 +2187,11 @@
             },
             "off": {
               "description": "The value that turns the Entries off."
+            },
+            "every_source": {
+              "description": "Whether every source must leave the Entries on, as when the Agent\nloads them only while neither its policy nor its own file holds\n`off`, such as Claude Desktop's `isLocalDevMcpEnabled`.",
+              "type": "boolean",
+              "default": false
             },
             "locations": {
               "description": "The ids of the locations whose Entries it covers. Omitted, it covers\nevery location of the Item kind.",

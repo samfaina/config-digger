@@ -30,8 +30,9 @@ export type AgentFlagCode =
 "cannot_start";
 
 /**
- *  Something about an Agent's versions in one Agent home, which changes
- *  no State and blocks nothing.
+ *  Something about an Agent in one Agent home, such as its versions or what
+ *  it keeps only in the user's account, which changes no State and blocks
+ *  nothing.
  */
 export type AgentNote = {
 	/**  What it notes, from a closed set. */
@@ -54,7 +55,12 @@ export type AgentNoteCode =
 /**  No Installation that reads the Agent home was found. */
 "no_installation_found" | 
 /**  The definition has no tested range. */
-"definition_untested";
+"definition_untested" | 
+/**
+ *  The Agent's connectors live in the user's account, with no copy on
+ *  disk, so they are not listed.
+ */
+"cloud_connectors_not_on_disk";
 
 /**  Something that makes a State less certain than it looks. */
 export type Caveat = {
@@ -324,6 +330,11 @@ export type Home = {
 	/**  The user hid it, so it is listed only when hidden ones are asked for. */
 	hidden: boolean,
 	/**
+	 *  When the Agent's lookup order skips it, so that the Agent never
+	 *  reads it and its Entries are Unread, what it reads instead.
+	 */
+	not_read: NotRead | null,
+	/**
 	 *  When none of the files the Agent reads there exists, the sentence
 	 *  saying so, rendered by the core.
 	 */
@@ -427,6 +438,14 @@ export type Link = {
 	broken: boolean,
 };
 
+/**  Why the Agent never reads an Agent home: its lookup order picks another. */
+export type NotRead = {
+	/**  The id of the home the order picks, `None` when it picks none that is there. */
+	read_instead: string | null,
+	/**  The reason as a sentence, rendered by the core. */
+	sentence: string,
+};
+
 /**  Something about an Entry that does not change its State. */
 export type Note = {
 	code: NoteCode,
@@ -447,7 +466,7 @@ export type NoteCode =
  */
 "provenance_by_name_only";
 
-/**  A plugin an Agent installed, which an Entry is part of. */
+/**  A plugin or extension an Agent installed, which an Entry is part of. */
 export type Plugin = {
 	/**  The id the Agent knows it by, such as `supabase@claude-plugins-official`. */
 	id: string,
@@ -514,7 +533,13 @@ export type Provenance =
  *  through its own switch, and Remove is not offered: the Agent
  *  uninstalls it.
  */
-"plugin";
+"plugin" | 
+/**
+ *  An extension the Agent installed, such as a Claude Desktop `.mcpb`.
+ *  Disable goes through its own switch, and Remove is not offered: the
+ *  Agent uninstalls it.
+ */
+"extension";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {
@@ -633,6 +658,11 @@ export type ReasonCode =
 /**  The Entry is keyed to a Project whose folder no longer exists. */
 "project_missing" | 
 /**
+ *  The Entry is in an Agent home the Agent's lookup order skips for
+ *  another, so the Agent never reads it.
+ */
+"lookup_order_skips_home" | 
+/**
  *  The Entry is a link whose target is gone, so the Agent reads nothing
  *  there.
  */
@@ -651,7 +681,9 @@ export type RemoveNotOffered =
  */
 "read_only" | 
 /**  The Entry is part of a plugin, which only the Agent uninstalls. */
-"plugin";
+"plugin" | 
+/**  The Entry is an extension's, which only the Agent uninstalls. */
+"extension";
 
 /**
  *  Whether Remove is offered for an Entry, and if not, why, and what to

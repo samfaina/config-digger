@@ -113,6 +113,17 @@ pub enum Hive {
     LocalMachine,
 }
 
+/// What a registry value holds, as far as the core reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryData {
+    /// A string, `REG_SZ` or `REG_EXPAND_SZ` unexpanded.
+    String(String),
+    /// A 32-bit number, `REG_DWORD`.
+    Dword(u32),
+    /// Any other type, such as `REG_MULTI_SZ`, which the core does not read.
+    Other,
+}
+
 /// The process environment and the Windows registry.
 pub trait Environment: Send + Sync {
     /// An environment variable, if it is set and valid Unicode.
@@ -123,6 +134,10 @@ pub trait Environment: Send + Sync {
 
     /// A string value under `hive\key`, if it exists.
     fn registry_value(&self, hive: Hive, key: &str, name: &str) -> Option<String>;
+
+    /// Every value directly under `hive\key`, by name, in no particular
+    /// order; `None` when the key does not exist.
+    fn registry_values(&self, hive: Hive, key: &str) -> Option<Vec<(String, RegistryData)>>;
 }
 
 /// The current time.

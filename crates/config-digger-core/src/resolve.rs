@@ -4,7 +4,7 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse,
-    Provenance, SkillDefect, SkillFallback,
+    PolicyField, Provenance, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -12,7 +12,8 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedReadFailure, SettingOwner, Snapshot,
+    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedHome, ScannedReadFailure,
+    SettingOwner, Snapshot,
 };
 use crate::{explain, installations, locator, paths, rules};
 use std::collections::{BTreeMap, BTreeSet};
@@ -46,6 +47,14 @@ pub(crate) fn resolve(
                     HomeSource::Added => api::HomeSource::Added,
                 },
                 hidden: home.hidden,
+                not_read: home.skipped.as_ref().map(|skipped| api::NotRead {
+                    read_instead: skipped.instead.clone(),
+                    sentence: explain::home_not_read(
+                        &definition.agent.name,
+                        &home.folder,
+                        skipped.folder.as_deref(),
+                    ),
+                }),
                 no_configuration: (!home.configured)
                     .then(|| explain::no_configuration(&definition.agent.name)),
                 scopes: definition
@@ -89,7 +98,8 @@ pub(crate) fn resolve(
     // Nor does it read anything through a link whose target is gone, nor a
     // location while a Feature gate keeps it closed.
     let unread = |entry: &ScannedEntry| {
-        (missing.is_some() && entry.project.is_some())
+        skipped_home(snapshot, entry).is_some()
+            || (missing.is_some() && entry.project.is_some())
             || is_broken(entry)
             || closed_gate(&definitions[entry.agent_index], snapshot, entry).is_some()
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
@@ -248,6 +258,22 @@ pub(crate) fn resolve(
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
                     let gate_caveats = gate_caveats(definition, snapshot, entry);
+                    if let Some(home) = skipped_home(snapshot, entry) {
+                        let instead = home
+                            .skipped
+                            .as_ref()
+                            .and_then(|skipped| skipped.folder.as_deref());
+                        let reason =
+                            explain::lookup_order_skips_home(agent_name, &home.folder, instead);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
+                    }
                     if let Some(link) = entry.link.as_ref().filter(|link| link.broken()) {
                         let reason = explain::link_broken(agent_name, &link.target);
                         return unread_entry(
@@ -686,6 +712,13 @@ fn item_key(
     }
 }
 
+/// The Agent home of `entry`, when the Agent's lookup order skips it.
+fn skipped_home<'s>(snapshot: &'s Snapshot, entry: &ScannedEntry) -> Option<&'s ScannedHome> {
+    snapshot.homes.iter().find(|home| {
+        home.agent_index == entry.agent_index && home.home == entry.home && home.skipped.is_some()
+    })
+}
+
 /// Whether the Entry is a link whose target is gone.
 fn is_broken(entry: &ScannedEntry) -> bool {
     entry.link.as_ref().is_some_and(|link| link.broken())
@@ -966,6 +999,21 @@ fn gates(
                     explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);
                 (!approved).then_some((Check::Approval, reason))
             }
+            Gate::PolicyField(block) => {
+                let set = (0..block.sources.len())
+                    .flat_map(|source| {
+                        let owner = SettingOwner::Gate {
+                            gate: index,
+                            source,
+                        };
+                        snapshot.settings_for(entry, location.kind, owner, project)
+                    })
+                    .find(|value| value.value.as_ref().is_some_and(PolicyField::keeps_out))?;
+                let key = set.key_path.last().map_or("", String::as_str);
+                let mut reason = explain::policy_field(key, &set.path, agent_name);
+                reason.switch = Some(locator::render(&set.path, &set.key_path));
+                Some((Check::Policy, reason))
+            }
         })
         .collect()
 }
@@ -1066,8 +1114,8 @@ fn plugin(entry: &ScannedEntry) -> Option<api::Plugin> {
 }
 
 /// Whether Remove is offered for `entry` of `location`: not for an Entry
-/// config-digger only reads, nor for one of a plugin, which the Agent
-/// uninstalls with its own command.
+/// config-digger only reads, nor for one of a plugin or extension, which
+/// the Agent uninstalls, with its own command when it has one.
 fn remove(
     definition: &AgentDefinition,
     location: &LocationDefinition,
@@ -1088,10 +1136,22 @@ fn remove(
         .declared_plugins(&plugin.plugins)
         .expect("validation declares the plugins a location reads")
         .uninstall(&plugin.id, plugin.scope.as_deref());
+    // An extension goes by the name its Agent's settings show it under, a
+    // plugin by the id its uninstall command takes.
+    let (code, sentence) = match location.provenance {
+        Provenance::Extension => (
+            api::RemoveNotOffered::Extension,
+            explain::extension_not_removed(&plugin.name, agent_name),
+        ),
+        Provenance::Plugin | Provenance::File | Provenance::Managed | Provenance::CloudMirror => (
+            api::RemoveNotOffered::Plugin,
+            explain::plugin_not_removed(&plugin.id, agent_name),
+        ),
+    };
     api::RemoveOption::NotOffered {
-        code: api::RemoveNotOffered::Plugin,
-        sentence: explain::plugin_not_removed(&plugin.id, agent_name),
-        how_to_remove: Some(api::HowToRemove {
+        code,
+        sentence,
+        how_to_remove: command.map(|command| api::HowToRemove {
             sentence: explain::how_to_remove_plugin(&plugin.id, &command),
             command,
         }),

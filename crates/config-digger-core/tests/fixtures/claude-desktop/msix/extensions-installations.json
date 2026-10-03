@@ -1,0 +1,39 @@
+{
+  "extensions": {
+    "local.mcpb.acme.files": {
+      "id": "local.mcpb.acme.files",
+      "version": "0.3.1",
+      "hash": "a3f1",
+      "installedAt": "2026-09-30T10:00:00.000Z",
+      "source": "local"
+    },
+    "local.mcpb.acme.weather": {
+      "id": "local.mcpb.acme.weather",
+      "version": "1.0.0",
+      "hash": "b4e2",
+      "installedAt": "2026-09-30T10:05:00.000Z",
+      "source": "local"
+    },
+    "local.dxt.acme.calendar": {
+      "id": "local.dxt.acme.calendar",
+      "version": "2.0.0",
+      "hash": "c5d3",
+      "installedAt": "2026-09-30T10:10:00.000Z",
+      "source": "local"
+    },
+    "local.mcpb.acme.todo": {
+      "id": "local.mcpb.acme.todo",
+      "version": "1.1.0",
+      "hash": "d6c4",
+      "installedAt": "2026-09-30T10:15:00.000Z",
+      "source": "local"
+    },
+    "ant.dir.gh.tomtom.tomtom-mcp": {
+      "id": "ant.dir.gh.tomtom.tomtom-mcp",
+      "version": "1.4.0",
+      "hash": "e7b5",
+      "installedAt": "2026-09-30T10:20:00.000Z",
+      "source": "registry"
+    }
+  }
+}

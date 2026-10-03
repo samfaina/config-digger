@@ -1,0 +1,20 @@
+{
+  "manifest_version": "0.2",
+  "name": "files",
+  "display_name": "Files",
+  "version": "0.3.1",
+  "description": "Reads files the user shares.",
+  "author": { "name": "Acme" },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js", "--secret", "__encrypted__:djEwAAAA"],
+      "env": { "FILES_ROOT": "${user_config.root}" }
+    }
+  },
+  "user_config": {
+    "root": { "type": "directory", "title": "Root folder", "required": true }
+  }
+}

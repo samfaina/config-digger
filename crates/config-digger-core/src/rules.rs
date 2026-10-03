@@ -215,14 +215,18 @@ fn by_command_or_url(
     matches(block, location, item, &unnamed).filter(|by| *by != MatchedBy::Name)
 }
 
-/// The first source that holds the switch decides: it keeps the Entries
-/// out when it holds the value that turns them off.
+/// The first source that holds the switch decides, or for a switch every
+/// source must leave on, the first that holds the value that turns them
+/// off: it keeps the Entries out when it holds that value.
 fn global(
     block: &GlobalSwitch,
     values: &[(bool, &ScannedSetting)],
     agent_name: &str,
 ) -> Option<RuleHit> {
-    let (policy, value) = values.iter().find(|(_, value)| value.value.is_some())?;
+    let (policy, value) = values.iter().find(|(_, value)| match &value.value {
+        Some(held) => !block.every_source || *held == block.off,
+        None => false,
+    })?;
     let held = value.value.as_ref()?;
     (*held == block.off).then(|| {
         hit(*policy, value, |policy| {
@@ -316,7 +320,7 @@ pub(crate) fn failed_files(
                 .and_then(|project| anchor.path(roots, Some(project)))
                 .into_iter()
                 .collect(),
-            None => anchor.path(roots, None).into_iter().collect(),
+            None => entry.file_of(anchor, roots, None).into_iter().collect(),
         };
         for path in paths {
             if snapshot.unreadable_settings.contains(&path) && !files.contains(&path) {

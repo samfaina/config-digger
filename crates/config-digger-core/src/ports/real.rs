@@ -1,6 +1,9 @@
 //! Ports backed by this machine.
 
-use super::{Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Processes, RunningProcess};
+use super::{
+    Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Processes, RegistryData,
+    RunningProcess,
+};
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -358,6 +361,39 @@ impl Environment for RealEnvironment {
 
     #[cfg(not(windows))]
     fn registry_value(&self, _hive: Hive, _key: &str, _name: &str) -> Option<String> {
+        None
+    }
+
+    #[cfg(windows)]
+    fn registry_values(&self, hive: Hive, key: &str) -> Option<Vec<(String, RegistryData)>> {
+        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RegType};
+        use winreg::types::FromRegValue;
+
+        let root = RegKey::predef(match hive {
+            Hive::CurrentUser => HKEY_CURRENT_USER,
+            Hive::LocalMachine => HKEY_LOCAL_MACHINE,
+        });
+        let key = root.open_subkey(key).ok()?;
+        Some(
+            key.enum_values()
+                .filter_map(Result::ok)
+                .map(|(name, value)| {
+                    let data = match value.vtype {
+                        RegType::REG_SZ | RegType::REG_EXPAND_SZ => String::from_reg_value(&value)
+                            .map_or(RegistryData::Other, RegistryData::String),
+                        RegType::REG_DWORD => u32::from_reg_value(&value)
+                            .map_or(RegistryData::Other, RegistryData::Dword),
+                        _ => RegistryData::Other,
+                    };
+                    (name, data)
+                })
+                .collect(),
+        )
+    }
+
+    #[cfg(not(windows))]
+    fn registry_values(&self, _hive: Hive, _key: &str) -> Option<Vec<(String, RegistryData)>> {
         None
     }
 }

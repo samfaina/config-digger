@@ -1,7 +1,8 @@
 //! In-memory ports for tests.
 
 use super::{
-    Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Ports, Processes, RunningProcess,
+    Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Ports, Processes, RegistryData,
+    RunningProcess,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -611,7 +612,7 @@ impl GitIndex for FakeGitIndex {
 pub struct FakeEnvironment {
     home: Option<PathBuf>,
     vars: BTreeMap<String, String>,
-    registry: BTreeMap<(Hive, String, String), String>,
+    registry: BTreeMap<(Hive, String, String), RegistryData>,
 }
 
 impl FakeEnvironment {
@@ -629,8 +630,28 @@ impl FakeEnvironment {
     }
 
     pub fn with_registry_value(mut self, hive: Hive, key: &str, name: &str, value: &str) -> Self {
+        self.registry.insert(
+            (hive, key.to_owned(), name.to_owned()),
+            RegistryData::String(value.to_owned()),
+        );
+        self
+    }
+
+    /// A `REG_DWORD` value, such as a policy switch.
+    pub fn with_registry_dword(self, hive: Hive, key: &str, name: &str, value: u32) -> Self {
+        self.with_registry_data(hive, key, name, RegistryData::Dword(value))
+    }
+
+    /// A value of any type.
+    pub fn with_registry_data(
+        mut self,
+        hive: Hive,
+        key: &str,
+        name: &str,
+        data: RegistryData,
+    ) -> Self {
         self.registry
-            .insert((hive, key.to_owned(), name.to_owned()), value.to_owned());
+            .insert((hive, key.to_owned(), name.to_owned()), data);
         self
     }
 }
@@ -645,9 +666,23 @@ impl Environment for FakeEnvironment {
     }
 
     fn registry_value(&self, hive: Hive, key: &str, name: &str) -> Option<String> {
-        self.registry
-            .get(&(hive, key.to_owned(), name.to_owned()))
-            .cloned()
+        match self
+            .registry
+            .get(&(hive, key.to_owned(), name.to_owned()))?
+        {
+            RegistryData::String(value) => Some(value.clone()),
+            RegistryData::Dword(_) | RegistryData::Other => None,
+        }
+    }
+
+    fn registry_values(&self, hive: Hive, key: &str) -> Option<Vec<(String, RegistryData)>> {
+        let values: Vec<(String, RegistryData)> = self
+            .registry
+            .iter()
+            .filter(|((known, known_key, _), _)| *known == hive && known_key == key)
+            .map(|((_, _, name), data)| (name.clone(), data.clone()))
+            .collect();
+        (!values.is_empty()).then_some(values)
     }
 }
 

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "notes": {
+      "command": "notes-mcp",
+      "args": ["--vault", "C:\\Users\\fixture\\notes"]
+    },
+    "remote": {
+      "url": "https://mcp.example.com/mcp"
+    },
+    "weather": {
+      "command": "weather-local"
+    }
+  },
+  "coworkUserFilesPath": "C:\\Users\\fixture\\Documents\\Claude",
+  "preferences": {
+    "localAgentModeTrustedFolders": ["E:\\projects\\petme-app"]
+  }
+}

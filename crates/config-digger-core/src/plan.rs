@@ -1204,11 +1204,14 @@ fn version_info(
             continue;
         }
         for note in &home.notes {
+            let Some(code) = note.code.info() else {
+                continue;
+            };
             if info.iter().any(|known| known.sentence == note.sentence) {
                 continue;
             }
             info.push(Info {
-                code: note.code.into(),
+                code,
                 path: note
                     .installation
                     .clone()
@@ -1269,7 +1272,7 @@ fn removal(
     {
         let message = match code {
             api::RemoveNotOffered::ReadOnly => explain::read_only_remove(&entry.locator),
-            api::RemoveNotOffered::Plugin => {
+            api::RemoveNotOffered::Plugin | api::RemoveNotOffered::Extension => {
                 let how = how_to_remove
                     .as_ref()
                     .map_or("", |how| how.sentence.as_str());
