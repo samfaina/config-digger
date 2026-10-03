@@ -516,9 +516,9 @@ pub(crate) fn asks_user(agent_name: &str) -> String {
 /// can lose configuration.
 pub(crate) fn risk(agent_name: &str, code: RiskCode) -> String {
     let what = match code {
-        RiskCode::AgentMayResetFile => "it may reset the file, losing what it holds",
-        RiskCode::AgentMayDropEntries => "it may write the file again without its Entries",
-        RiskCode::AgentMayClearAuth => "it may clear the sign-in of the servers it no longer sees",
+        RiskCode::ResetFile => "it may reset the file, losing what it holds",
+        RiskCode::DropEntries => "it may write the file again without its Entries",
+        RiskCode::ClearAuth => "it may clear the sign-in of the servers it no longer sees",
     };
     format!("Fix this before starting {agent_name}: {what}.")
 }

@@ -10,6 +10,43 @@ export const commands = {
 };
 
 /* Types */
+/**  A problem of an Agent home in the context, shown above its Items. */
+export type AgentFlag = {
+	agent: string,
+	agent_name: string,
+	home: string,
+	code: AgentFlagCode,
+	/**  The location that causes it. */
+	path: string,
+	/**  The problem as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type AgentFlagCode = 
+/**  The Agent refuses to start in the context. */
+"cannot_start";
+
+/**  Something that makes a State less certain than it looks. */
+export type Caveat = {
+	code: CaveatCode,
+	/**  The location it is about. */
+	path: string,
+	/**  The caveat as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type CaveatCode = 
+/**
+ *  A location that could take part in the context is a Read failure,
+ *  and what the Agent does about it is not known.
+ */
+"unreadable_location" | 
+/**
+ *  A file holding a Disable switch that could apply is a Read failure,
+ *  so the Entry is resolved as if the switch were not set.
+ */
+"unreadable_switch";
+
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
 /**  One side does not parse in the dialect of an Agent that reads the file. */
@@ -102,6 +139,11 @@ export type Entry = {
 	 *  the core.
 	 */
 	enable: string | null,
+	/**
+	 *  What makes its State less certain, such as a Disable switch that
+	 *  cannot be read.
+	 */
+	caveats: Caveat[],
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
@@ -215,7 +257,10 @@ export type Inventory = {
 	homes: Home[],
 	/**  Sorted by Agent, home, Item kind and name. */
 	items: Item[],
+	/**  Every Read failure the scan met, in any context. */
 	read_failures: ReadFailure[],
+	/**  The problems of Agent homes in the context, such as one that cannot start. */
+	agent_flags: AgentFlag[],
 };
 
 export type Item = {
@@ -226,6 +271,11 @@ export type Item = {
 	state: State,
 	/**  In precedence order, highest first. */
 	entries: Entry[],
+	/**
+	 *  What makes its State less certain, such as a location that could
+	 *  take part and could not be read.
+	 */
+	caveats: Caveat[],
 };
 
 export type ItemKind = "mcp";
@@ -249,6 +299,14 @@ export type NoteCode =
 /**  A partial switch limits part of the Entry, and the Agent still uses it. */
 "partial_switch";
 
+/**  A place in a file's text. */
+export type Position = {
+	/**  1-based. */
+	line: number,
+	/**  1-based, in characters. */
+	column: number,
+};
+
 /**  What an Agent can be started on. */
 export type Project = {
 	/**  The folder's real path, or its lexical normalisation when it is missing. */
@@ -269,10 +327,64 @@ export type ReadFailure = {
 	agent_name: string,
 	home: string,
 	path: string,
+	/**
+	 *  The Project whose folder holds the location, or `None` for a
+	 *  location outside any Project, which reaches every context.
+	 */
+	project: string | null,
 	kind: ReadFailureKind,
+	/**
+	 *  Where a parse error is, when the parser knows. A Read failure never
+	 *  quotes the file, which can hold a Secret.
+	 */
+	position: Position | null,
+	/**  What the Agent does about it, as its definition says. */
+	reaction: ReadFailureReaction,
+	/**  The failure as a sentence, rendered by the core. */
+	sentence: string,
+	/**
+	 *  What else to know, such as that the Agent asks about the file at
+	 *  startup, as sentences rendered by the core.
+	 */
+	notes: string[],
+	/**
+	 *  How the Agent's own recovery may lose configuration if the file is
+	 *  not fixed before it starts.
+	 */
+	warnings: RiskWarning[],
 };
 
-export type ReadFailureKind = "parse" | "decode" | "permission" | "io";
+export type ReadFailureKind = 
+/**
+ *  The text does not parse in the reader's dialect, or holds a shape
+ *  where Entries are that config-digger cannot enumerate.
+ */
+"parse" | 
+/**  The bytes do not decode into text the way the Agent decodes them. */
+"decode" | 
+/**  The file cannot be opened for lack of permission. */
+"permission" | 
+/**  The file cannot be opened or read for another reason. */
+"io" | 
+/**  A SQLite store cannot be opened or queried. */
+"sqlite";
+
+/**  What an Agent does with a location it cannot read. */
+export type ReadFailureReaction = 
+/**  It starts without the location's Entries. */
+"ignores_file" | 
+/**  It asks about the file at startup, and otherwise starts without its Entries. */
+"asks_user" | 
+/**
+ *  What it does is not known, so every Item in the contexts the
+ *  location reaches gets a caveat.
+ */
+"unknown" | 
+/**
+ *  It refuses to start in the contexts the location reaches, which
+ *  flags it as unable to start there.
+ */
+"stops_agent";
 
 /**  Why an Entry has its State. */
 export type Reason = {
@@ -294,7 +406,24 @@ export type ReasonCode =
  */
 "disabled_by_name" | 
 /**  The Entry's own switch is off. */
-"disabled_natively";
+"disabled_natively" | 
+/**  The Entry lacks the minimal shape the Agent requires of it. */
+"malformed_entry";
+
+export type RiskCode = 
+/**  The Agent may offer to reset the file, losing what it holds. */
+"agent_may_reset_file" | 
+/**  The Agent may write the file again from empty, dropping its Entries. */
+"agent_may_drop_entries" | 
+/**  The Agent may clear the sign-in state of servers that vanish. */
+"agent_may_clear_auth";
+
+/**  A way the Agent's own recovery from a Read failure can lose configuration. */
+export type RiskWarning = {
+	code: RiskCode,
+	/**  The risk as a sentence, rendered by the core. */
+	sentence: string,
+};
 
 /**  Where a failed Operation's Rollback left one file it touched. */
 export type RollbackLocation = {
@@ -328,7 +457,12 @@ export type State = "effective" | "shadowed" |
  *  The Agent skips it because a switch Disables it, natively or set by
  *  config-digger.
  */
-"disabled";
+"disabled" | 
+/**
+ *  The Agent rejects it on its own, such as a server missing what the
+ *  Agent requires.
+ */
+"invalid";
 
 /**  The State a Disabled Entry would have once Enabled. */
 export type WhatIf = {

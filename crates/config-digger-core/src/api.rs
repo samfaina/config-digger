@@ -982,22 +982,24 @@ pub struct RiskWarning {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
-#[serde(rename_all = "snake_case")]
 pub enum RiskCode {
     /// The Agent may offer to reset the file, losing what it holds.
-    AgentMayResetFile,
+    #[serde(rename = "agent_may_reset_file")]
+    ResetFile,
     /// The Agent may write the file again from empty, dropping its Entries.
-    AgentMayDropEntries,
+    #[serde(rename = "agent_may_drop_entries")]
+    DropEntries,
     /// The Agent may clear the sign-in state of servers that vanish.
-    AgentMayClearAuth,
+    #[serde(rename = "agent_may_clear_auth")]
+    ClearAuth,
 }
 
 impl From<definitions::RiskCode> for RiskCode {
     fn from(code: definitions::RiskCode) -> Self {
         match code {
-            definitions::RiskCode::AgentMayResetFile => RiskCode::AgentMayResetFile,
-            definitions::RiskCode::AgentMayDropEntries => RiskCode::AgentMayDropEntries,
-            definitions::RiskCode::AgentMayClearAuth => RiskCode::AgentMayClearAuth,
+            definitions::RiskCode::ResetFile => RiskCode::ResetFile,
+            definitions::RiskCode::DropEntries => RiskCode::DropEntries,
+            definitions::RiskCode::ClearAuth => RiskCode::ClearAuth,
         }
     }
 }

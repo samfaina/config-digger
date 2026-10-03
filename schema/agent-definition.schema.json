@@ -367,6 +367,28 @@
         "secrets": {
           "description": "Fields of this location's Entries that hold Secrets, or that never\ndo, beyond what the core masks by default.",
           "$ref": "#/$defs/SecretFields"
+        },
+        "on_read_failure": {
+          "description": "What the Agent does when it cannot open, decode or parse the location.",
+          "$ref": "#/$defs/ReadFailureReaction"
+        },
+        "risks": {
+          "description": "How the Agent's own recovery from a Read failure here can lose\nconfiguration, shown as warnings on the Read failure.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RiskCode"
+          }
+        },
+        "shape": {
+          "description": "The minimal shape the Agent requires of the location's Entries:\none without it is Invalid. Without it, no Entry here is Invalid.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Shape"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -378,16 +400,20 @@
         "kind",
         "scope",
         "provenance",
-        "store_class"
+        "store_class",
+        "on_read_failure"
       ]
     },
     "Format": {
       "description": "The file format and dialect a location is read in.",
       "oneOf": [
         {
-          "description": "Strict JSON: no comments, no trailing commas.",
+          "description": "JSON, in the dialect the Agent reads it in.",
           "type": "object",
           "properties": {
+            "dialect": {
+              "$ref": "#/$defs/JsonDialect"
+            },
             "block": {
               "type": "string",
               "const": "json"
@@ -395,8 +421,43 @@
           },
           "additionalProperties": false,
           "required": [
+            "block",
+            "dialect"
+          ]
+        },
+        {
+          "description": "TOML.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "toml"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
             "block"
           ]
+        }
+      ]
+    },
+    "JsonDialect": {
+      "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
+      "oneOf": [
+        {
+          "description": "No comments, no trailing commas.",
+          "type": "string",
+          "const": "strict"
+        },
+        {
+          "description": "`//` and `/* */` comments, and no trailing comma, such as Gemini\nCLI's settings.",
+          "type": "string",
+          "const": "with-comments"
+        },
+        {
+          "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
+          "type": "string",
+          "const": "jsonc"
         }
       ]
     },
@@ -510,6 +571,115 @@
       },
       "additionalProperties": false
     },
+    "ReadFailureReaction": {
+      "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
+      "oneOf": [
+        {
+          "description": "It starts without the location's Entries.",
+          "type": "string",
+          "const": "ignores_file"
+        },
+        {
+          "description": "It asks the user at startup what to do with the file, and otherwise\nstarts without its Entries.",
+          "type": "string",
+          "const": "asks_user"
+        },
+        {
+          "description": "What it does is not known: every Item in the contexts the location\nreaches gets a caveat.",
+          "type": "string",
+          "const": "unknown"
+        },
+        {
+          "description": "It refuses to start in the contexts the location reaches.",
+          "type": "string",
+          "const": "stops_agent"
+        }
+      ]
+    },
+    "RiskCode": {
+      "description": "How an Agent's own recovery from a Read failure can lose configuration.",
+      "oneOf": [
+        {
+          "description": "It may offer to reset the file, losing what it holds.",
+          "type": "string",
+          "const": "agent_may_reset_file"
+        },
+        {
+          "description": "It may write the file again from empty, dropping its Entries.",
+          "type": "string",
+          "const": "agent_may_drop_entries"
+        },
+        {
+          "description": "It may clear the sign-in state of servers that vanish.",
+          "type": "string",
+          "const": "agent_may_clear_auth"
+        }
+      ]
+    },
+    "Shape": {
+      "description": "The minimal shape of the Entries of a location.",
+      "oneOf": [
+        {
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads.",
+          "type": "object",
+          "properties": {
+            "one_of": {
+              "description": "The Entry must hold at least one of these, such as `command` or `url`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "types": {
+              "description": "The type of each field, when the Entry holds it.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/FieldType"
+              }
+            },
+            "still_competes": {
+              "description": "Whether an Entry without this shape still competes by name.",
+              "type": "boolean",
+              "default": false
+            },
+            "block": {
+              "type": "string",
+              "const": "fields"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
+      ]
+    },
+    "FieldType": {
+      "description": "The type of a field's value.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ]
+        },
+        {
+          "description": "A list of strings.",
+          "type": "string",
+          "const": "string-array"
+        },
+        {
+          "description": "An object whose values are strings.",
+          "type": "string",
+          "const": "string-map"
+        }
+      ]
+    },
     "ItemRules": {
       "type": "object",
       "properties": {
@@ -576,6 +746,11 @@
           "description": "A same-named Entry the Agent ranks higher is not Disabled: Shadowed.",
           "type": "string",
           "const": "precedence"
+        },
+        {
+          "description": "The Entry lacks the minimal shape its location declares: Invalid.\nRequired when a location of the kind declares a shape, and refused\notherwise.",
+          "type": "string",
+          "const": "shape"
         }
       ]
     },
