@@ -267,7 +267,7 @@ impl Register for JsonKeys {
     }
 
     fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
-        let document = JsonFormat {}.parse(text)?;
+        let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
             .iter()
@@ -412,12 +412,14 @@ pub(crate) trait Parse {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Format {
     Json(JsonFormat),
+    Toml(TomlFormat),
 }
 
 impl Validate for Format {
     fn validate(&self) -> Result<(), String> {
         match self {
             Format::Json(block) => block.validate(),
+            Format::Toml(block) => block.validate(),
         }
     }
 }
@@ -426,26 +428,45 @@ impl Parse for Format {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
         match self {
             Format::Json(block) => block.parse(text),
+            Format::Toml(block) => block.parse(text),
         }
     }
 
     fn dialect(&self) -> &'static str {
         match self {
             Format::Json(block) => block.dialect(),
+            Format::Toml(block) => block.dialect(),
         }
     }
 
     fn syntax(&self) -> Syntax {
         match self {
             Format::Json(block) => block.syntax(),
+            Format::Toml(block) => block.syntax(),
         }
     }
 }
 
-/// Strict JSON: no comments, no trailing commas.
+/// JSON, in the dialect the Agent reads it in.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct JsonFormat {}
+pub(crate) struct JsonFormat {
+    pub dialect: JsonDialect,
+}
+
+/// How much a reader accepts beyond strict JSON. A file one reader
+/// rejects can still yield Entries for a reader with a looser dialect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum JsonDialect {
+    /// No comments, no trailing commas.
+    Strict,
+    /// `//` and `/* */` comments, and no trailing comma, such as Gemini
+    /// CLI's settings.
+    WithComments,
+    /// Comments and trailing commas, such as Cursor's and VS Code's files.
+    Jsonc,
+}
 
 impl Validate for JsonFormat {
     fn validate(&self) -> Result<(), String> {
@@ -453,21 +474,94 @@ impl Validate for JsonFormat {
     }
 }
 
+impl JsonFormat {
+    /// Strict JSON, as a registry or a Disable switch's file is read.
+    pub const STRICT: JsonFormat = JsonFormat {
+        dialect: JsonDialect::Strict,
+    };
+}
+
 impl Parse for JsonFormat {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
-        serde_json::from_str(text).map_err(|error| ParseError {
-            position: (error.line() > 0).then(|| (error.line(), error.column())),
+        let trailing_commas = match self.dialect {
+            JsonDialect::Strict => {
+                return serde_json::from_str(text).map_err(|error| ParseError {
+                    position: (error.line() > 0).then(|| (error.line(), error.column())),
+                });
+            }
+            JsonDialect::WithComments => false,
+            JsonDialect::Jsonc => true,
+        };
+        let options = jsonc_parser::ParseOptions {
+            allow_comments: true,
+            allow_trailing_commas: trailing_commas,
+            allow_loose_object_property_names: false,
+            allow_missing_commas: false,
+            allow_single_quoted_strings: false,
+            allow_hexadecimal_numbers: false,
+            allow_unary_plus_numbers: false,
+            allow_bare_decimal_point_numbers: false,
+            allow_non_finite_numbers: false,
+            allow_extended_string_escapes: false,
+        };
+        let parsed: Option<serde_json::Value> = jsonc_parser::parse_to_serde_value(text, &options)
+            .map_err(|error| ParseError {
+                position: (error.line_display() > 0)
+                    .then(|| (error.line_display(), error.column_display())),
+            })?;
+        // An empty file holds no JSON value.
+        parsed.ok_or(ParseError { position: None })
+    }
+
+    fn dialect(&self) -> &'static str {
+        match self.dialect {
+            JsonDialect::Strict => "strict JSON",
+            JsonDialect::WithComments => "JSON with comments",
+            JsonDialect::Jsonc => "JSONC with trailing commas",
+        }
+    }
+
+    /// JSON in every dialect is edited as JSONC, which accepts it as it is.
+    fn syntax(&self) -> Syntax {
+        Syntax::Jsonc
+    }
+}
+
+/// TOML.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TomlFormat {}
+
+impl Validate for TomlFormat {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Parse for TomlFormat {
+    fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
+        toml::from_str(text).map_err(|error| ParseError {
+            position: error.span().map(|span| line_and_column(text, span.start)),
         })
     }
 
     fn dialect(&self) -> &'static str {
-        "strict JSON"
+        "TOML"
     }
 
-    /// Strict JSON is edited as JSONC, which accepts it as it is.
     fn syntax(&self) -> Syntax {
-        Syntax::Jsonc
+        Syntax::Toml
     }
+}
+
+/// The 1-based line and column, in characters, of the byte offset `at` in `text`.
+fn line_and_column(text: &str, at: usize) -> (usize, usize) {
+    let before = &text[..at.min(text.len())];
+    let line_start = before.rfind('\n').map_or(0, |newline| newline + 1);
+    (
+        before.matches('\n').count() + 1,
+        before[line_start..].chars().count() + 1,
+    )
 }
 
 // --- Interpolation ----------------------------------------------------------

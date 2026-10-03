@@ -50,7 +50,7 @@ registries = [
 [[locations]]
 id = "local-mcp"
 anchor = { block = "home", root = "state_file" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["projects", "{project}", "mcpServers"]
 kind = "mcp"
 scope = "local"
@@ -59,13 +59,17 @@ provenance = "file"
 store_class = "rewritten-while-running"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
+# When `~/.claude.json` doesn't parse, Claude Code keeps a `.corrupted` copy
+# and asks whether to exit or reset the file [docs].
+on_read_failure = "asks_user"
+risks = ["agent_may_reset_file"]
 
 # Read in the Project folder only: whether Claude Code also looks in parent
 # folders is not known.
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".mcp.json" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
 kind = "mcp"
 scope = "project"
@@ -73,11 +77,13 @@ provenance = "file"
 store_class = "plain"
 # `${VAR}` and `${VAR:-default}` in `command`, `args`, `env`, `url` and `headers`.
 interpolation = { block = "braces", default_separator = ":-" }
+# What Claude Code does with a `.mcp.json` it cannot parse is not known.
+on_read_failure = "unknown"
 
 [[locations]]
 id = "user-mcp"
 anchor = { block = "home", root = "state_file" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
 kind = "mcp"
 scope = "user"
@@ -89,6 +95,8 @@ interpolation = { block = "braces", default_separator = ":-" }
 # Claude Code stores when signed in with one, and the key suffixes it
 # records as approved or rejected.
 secrets.file_fields = [["primaryApiKey"], ["customApiKeyResponses", "*", "*"]]
+on_read_failure = "asks_user"
+risks = ["agent_may_reset_file"]
 
 # Same-named Entries compete whole; the highest location wins. Claude Code
 # skips a Disabled Entry before they compete, so the next one down can win.

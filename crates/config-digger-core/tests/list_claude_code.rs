@@ -71,7 +71,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]],
                     "disable": no_project_switch(),
                     "enable": null
-                }]
+                }],
+                "caveats": []
             },
             {
                 "agent": "claude-code",
@@ -95,7 +96,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "masked": [],
                     "disable": no_project_switch(),
                     "enable": null
-                }]
+                }],
+                "caveats": []
             }
         ])
     );
@@ -151,7 +153,16 @@ fn a_claude_json_that_does_not_parse_is_a_read_failure_with_no_entries() {
             "agent_name": "Claude Code",
             "home": "default",
             "path": r"C:\Users\fixture\.claude.json",
-            "kind": "parse"
+            "project": null,
+            "kind": "parse",
+            "position": { "line": 1, "column": 16 },
+            "reaction": "asks_user",
+            "sentence": r"Claude Code cannot parse C:\Users\fixture\.claude.json as strict JSON (line 1, column 16), so it reads no Entries from it.",
+            "notes": ["Claude Code will ask about this file at startup."],
+            "warnings": [{
+                "code": "agent_may_reset_file",
+                "sentence": "Fix this before starting Claude Code: it may reset the file, losing what it holds."
+            }]
         }])
     );
 }

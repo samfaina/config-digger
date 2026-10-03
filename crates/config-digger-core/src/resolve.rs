@@ -2,13 +2,14 @@
 //! to the Items of every Agent home and the State of each Entry.
 
 use crate::api::{self, Context};
-use crate::definitions::AgentDefinition;
-use crate::definitions::Check;
-use crate::definitions::blocks::Compete;
+use crate::definitions::blocks::{Compete, JsonFormat, Parse};
+use crate::definitions::{
+    AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
+};
 use crate::disable::{self, ContextProject, Hit};
-use crate::scan::{ScannedEntry, Snapshot};
+use crate::scan::{ScannedEntry, ScannedReadFailure, Snapshot};
 use crate::{explain, locator, paths};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub(crate) fn resolve(
@@ -53,6 +54,12 @@ pub(crate) fn resolve(
     let context_project = project
         .as_ref()
         .map(|(path, key)| ContextProject { path, key });
+
+    let reactions: Vec<Reaction> = snapshot
+        .read_failures
+        .iter()
+        .map(|failure| reaction(definitions, snapshot, failure))
+        .collect();
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
@@ -195,6 +202,25 @@ pub(crate) fn resolve(
             } else {
                 api_entries[0].state
             };
+            // A location the Agent may or may not read without could hold
+            // an Entry of the Item.
+            let caveats = snapshot
+                .read_failures
+                .iter()
+                .zip(&reactions)
+                .filter(|(failure, reaction)| {
+                    failure.agent_index == agent
+                        && failure.home == home
+                        && reaction.reaction == ReadFailureReaction::Unknown
+                        && reaction.kinds.contains(&kind)
+                        && reaches(failure, project_key)
+                })
+                .map(|(failure, _)| api::Caveat {
+                    code: api::CaveatCode::UnreadableLocation,
+                    path: failure.path.clone(),
+                    sentence: explain::unreadable_location(agent_name, &failure.path),
+                })
+                .collect();
             api::Item {
                 agent: definition.agent.id.clone(),
                 home: home.to_owned(),
@@ -202,6 +228,7 @@ pub(crate) fn resolve(
                 name,
                 state,
                 entries: api_entries,
+                caveats,
             }
         })
         .collect();
@@ -209,14 +236,64 @@ pub(crate) fn resolve(
     let read_failures = snapshot
         .read_failures
         .iter()
-        .map(|failure| {
+        .zip(&reactions)
+        .map(|(failure, reaction)| {
             let agent = &definitions[failure.agent_index].agent;
             api::ReadFailure {
                 agent: agent.id.clone(),
                 agent_name: agent.name.clone(),
                 home: failure.home.clone(),
                 path: failure.path.clone(),
+                project: failure
+                    .project
+                    .as_ref()
+                    .map(|key| project_path(snapshot, key)),
                 kind: failure.kind,
+                position: failure.position.map(|(line, column)| api::Position {
+                    line: line.try_into().unwrap_or(u32::MAX),
+                    column: column.try_into().unwrap_or(u32::MAX),
+                }),
+                reaction: reaction.reaction.into(),
+                sentence: explain::read_failure(
+                    &agent.name,
+                    &failure.path,
+                    failure.kind,
+                    reaction.dialect,
+                    failure.position,
+                ),
+                notes: (reaction.reaction == ReadFailureReaction::AsksUser)
+                    .then(|| explain::asks_user(&agent.name))
+                    .into_iter()
+                    .collect(),
+                warnings: reaction
+                    .risks
+                    .iter()
+                    .map(|&code| api::RiskWarning {
+                        code: code.into(),
+                        sentence: explain::risk(&agent.name, code.into()),
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+
+    // An Agent refuses to start in each context a location that stops it reaches.
+    let agent_flags = snapshot
+        .read_failures
+        .iter()
+        .zip(&reactions)
+        .filter(|(failure, reaction)| {
+            reaction.reaction == ReadFailureReaction::StopsAgent && reaches(failure, project_key)
+        })
+        .map(|(failure, _)| {
+            let agent = &definitions[failure.agent_index].agent;
+            api::AgentFlag {
+                agent: agent.id.clone(),
+                agent_name: agent.name.clone(),
+                home: failure.home.clone(),
+                code: api::AgentFlagCode::CannotStart,
+                path: failure.path.clone(),
+                sentence: explain::cannot_start(&agent.name, &failure.path),
             }
         })
         .collect();
@@ -228,7 +305,69 @@ pub(crate) fn resolve(
         homes,
         items,
         read_failures,
+        agent_flags,
     }
+}
+
+/// What an Agent home does about a file that is a Read failure for it, as
+/// the definition says of the locations it reads there.
+struct Reaction {
+    /// The strongest reaction of those locations; a file only a project
+    /// registry reads is ignored.
+    reaction: ReadFailureReaction,
+    risks: BTreeSet<RiskCode>,
+    /// The dialect the file is parsed in, as a sentence names it.
+    dialect: &'static str,
+    /// The Item kinds whose Entries the file could hold.
+    kinds: BTreeSet<ItemKind>,
+}
+
+fn reaction(
+    definitions: &[AgentDefinition],
+    snapshot: &Snapshot,
+    failure: &ScannedReadFailure,
+) -> Reaction {
+    let definition = &definitions[failure.agent_index];
+    let locations: Vec<&LocationDefinition> = snapshot
+        .readers_of(&failure.path)
+        .iter()
+        .filter(|reader| reader.agent_index == failure.agent_index && reader.home == failure.home)
+        .map(|reader| definition.location(&reader.location))
+        .collect();
+    Reaction {
+        reaction: locations
+            .iter()
+            .map(|location| location.on_read_failure)
+            .max()
+            .unwrap_or(ReadFailureReaction::IgnoresFile),
+        risks: locations
+            .iter()
+            .flat_map(|location| location.risks.iter().copied())
+            .collect(),
+        dialect: locations
+            .first()
+            .map_or(JsonFormat::STRICT.dialect(), |location| {
+                location.format.dialect()
+            }),
+        kinds: locations.iter().map(|location| location.kind).collect(),
+    }
+}
+
+/// Whether a Read failure reaches the context whose Project key is
+/// `project_key`: one outside any Project reaches every context.
+fn reaches(failure: &ScannedReadFailure, project_key: Option<&String>) -> bool {
+    failure.project.is_none() || failure.project.as_ref() == project_key
+}
+
+/// The path of the scanned Project whose key is `key`.
+fn project_path(snapshot: &Snapshot, key: &str) -> PathBuf {
+    snapshot
+        .projects
+        .iter()
+        .find(|project| project.key == key)
+        .expect("a Project key comes from the snapshot")
+        .path
+        .clone()
 }
 
 /// The context's Project path and key: a scanned Project that any spelling of

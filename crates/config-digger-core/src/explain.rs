@@ -1,7 +1,7 @@
 //! Explain: turns reason codes into the sentences the front-ends show.
 //! Definitions carry codes and pointers only, never free text.
 
-use crate::api::{Action, OperationStatus, Reason, ReasonCode, Verify};
+use crate::api::{Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, Verify};
 use crate::edit::Edit;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -469,4 +469,69 @@ fn count(entries: usize) -> String {
         1 => "1 Entry".to_owned(),
         n => format!("{n} Entries"),
     }
+}
+
+/// What a Read failure of `kind` at `path` means for `agent_name`, which
+/// reads the file in `dialect`. It never quotes the file.
+pub(crate) fn read_failure(
+    agent_name: &str,
+    path: &Path,
+    kind: ReadFailureKind,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    let path = path.display();
+    match kind {
+        ReadFailureKind::Parse => {
+            let at = match position {
+                Some((line, column)) => format!(" (line {line}, column {column})"),
+                None => String::new(),
+            };
+            format!(
+                "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
+            )
+        }
+        ReadFailureKind::Decode => {
+            format!("{path} is not text {agent_name} can decode, so it reads no Entries from it.")
+        }
+        ReadFailureKind::Permission => format!(
+            "config-digger has no permission to read {path}, so it lists no {agent_name} Entries from it."
+        ),
+        ReadFailureKind::Io | ReadFailureKind::Sqlite => format!(
+            "config-digger cannot read {path}, so it lists no {agent_name} Entries from it."
+        ),
+    }
+}
+
+/// The note of a Read failure in a file `agent_name` asks about at startup.
+pub(crate) fn asks_user(agent_name: &str) -> String {
+    format!("{agent_name} will ask about this file at startup.")
+}
+
+/// The warning of a Read failure in a file whose recovery by `agent_name`
+/// can lose configuration.
+pub(crate) fn risk(agent_name: &str, code: RiskCode) -> String {
+    let what = match code {
+        RiskCode::AgentMayResetFile => "it may reset the file, losing what it holds",
+        RiskCode::AgentMayDropEntries => "it may write the file again without its Entries",
+        RiskCode::AgentMayClearAuth => "it may clear the sign-in of the servers it no longer sees",
+    };
+    format!("Fix this before starting {agent_name}: {what}.")
+}
+
+/// The flag of an Agent that refuses to start because it cannot read `path`.
+pub(crate) fn cannot_start(agent_name: &str, path: &Path) -> String {
+    format!(
+        "{agent_name} won't start: it cannot read {}.",
+        path.display()
+    )
+}
+
+/// The caveat of an Item when a location at `path` that could take part
+/// cannot be read, and what `agent_name` does then is not known.
+pub(crate) fn unreadable_location(agent_name: &str, path: &Path) -> String {
+    format!(
+        "A location that could take part couldn't be read: {}, so the State shown may not be the one {agent_name} has.",
+        path.display()
+    )
 }

@@ -227,7 +227,12 @@ pub(crate) struct ScannedReadFailure {
     pub agent_index: usize,
     pub home: String,
     pub path: PathBuf,
+    /// The key of the Project whose folder holds the location, or `None`
+    /// when it reaches every context.
+    pub project: Option<String>,
     pub kind: ReadFailureKind,
+    /// The 1-based line and column of a parse error, when the parser knows them.
+    pub position: Option<(usize, usize)>,
 }
 
 /// Why a scan could not run at all.
@@ -325,6 +330,16 @@ pub(crate) fn scan_as_if(
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
     let versioned = versioned(ports, locations.chain(switch_files));
+    // A file that is a Read failure for an Agent home yields it no Entries,
+    // even from a location of it that did parse.
+    let failures = scanner.reader.failures;
+    scanner.entries.retain(|entry| {
+        !failures.iter().any(|failure| {
+            failure.agent_index == entry.agent_index
+                && failure.home == entry.home
+                && failure.path == entry.path
+        })
+    });
     Ok(Snapshot {
         read_at,
         homes: found
@@ -338,7 +353,7 @@ pub(crate) fn scan_as_if(
         projects,
         entries: scanner.entries,
         readers: scanner.readers,
-        read_failures: scanner.reader.failures,
+        read_failures: failures,
         versioned,
         switches,
         unreadable_switches,
@@ -383,7 +398,7 @@ fn read_switches(
                 for (path, project) in places {
                     let document = match reader.peek(&path) {
                         Ok(None) => None,
-                        Ok(Some(text)) => match (JsonFormat {}).parse(text) {
+                        Ok(Some(text)) => match JsonFormat::STRICT.parse(text) {
                             Ok(document) => Some(document),
                             Err(_) => {
                                 unreadable.insert(path);
@@ -528,7 +543,7 @@ impl Scanner<'_> {
             let Some(path) = registry.anchor().path(&home.roots, None) else {
                 continue;
             };
-            let Some(text) = self.reader.text(home, &path) else {
+            let Some(text) = self.reader.text(home, &path, None) else {
                 continue;
             };
             match registry.spellings(text) {
@@ -538,7 +553,10 @@ impl Scanner<'_> {
                             .add(Path::new(&spelling), Some(home.agent_index));
                     }
                 }
-                Err(_) => self.reader.fail(home, &path, ReadFailureKind::Parse),
+                Err(error) => {
+                    self.reader
+                        .fail(home, &path, None, ReadFailureKind::Parse, error.position)
+                }
             }
         }
     }
@@ -562,18 +580,25 @@ impl Scanner<'_> {
         if !self.readers.contains(&reader) {
             self.readers.push(reader);
         }
-        let Some(text) = self.reader.text(home, &path) else {
+        let Some(text) = self.reader.text(home, &path, project.as_deref()) else {
             return;
         };
         let document = match location.format.parse(text) {
             Ok(document) => document,
-            Err(_) => {
-                self.reader.fail(home, &path, ReadFailureKind::Parse);
+            Err(error) => {
+                let project = project.as_deref();
+                self.reader
+                    .fail(home, &path, project, ReadFailureKind::Parse, error.position);
                 return;
             }
         };
         let mut objects = Vec::new();
-        find_objects(&document, &location.root, Vec::new(), None, &mut objects);
+        if find_objects(&document, &location.root, Vec::new(), None, &mut objects).is_err() {
+            let project = project.as_deref();
+            self.reader
+                .fail(home, &path, project, ReadFailureKind::Parse, None);
+            return;
+        }
         for object in objects {
             tracing::debug!(
                 agent = %definition.agent.id,
@@ -618,16 +643,23 @@ pub(crate) struct RootObject<'v> {
     pub entries: &'v serde_json::Map<String, serde_json::Value>,
 }
 
-/// The objects at `root` below `value`. Below `{project}`, every key is a Project.
+/// Where Entries are, a file holds something other than an object, so
+/// config-digger cannot enumerate them.
+#[derive(Debug)]
+pub(crate) struct NotEnumerable;
+
+/// The objects at `root` below `value`. Below `{project}`, every key is a
+/// Project. A missing key holds no objects; a key on the way that holds
+/// something other than an object fails.
 pub(crate) fn find_objects<'v>(
     value: &'v serde_json::Value,
     root: &[String],
     key_path: Vec<String>,
     project: Option<String>,
     out: &mut Vec<RootObject<'v>>,
-) {
+) -> Result<(), NotEnumerable> {
     let serde_json::Value::Object(object) = value else {
-        return;
+        return Err(NotEnumerable);
     };
     let Some((key, rest)) = root.split_first() else {
         out.push(RootObject {
@@ -635,7 +667,7 @@ pub(crate) fn find_objects<'v>(
             project,
             entries: object,
         });
-        return;
+        return Ok(());
     };
     let children: Vec<(&String, &serde_json::Value)> = if key == PROJECT_KEY {
         object.iter().collect()
@@ -650,8 +682,9 @@ pub(crate) fn find_objects<'v>(
         } else {
             project.clone()
         };
-        find_objects(child, rest, child_key_path, child_project, out);
+        find_objects(child, rest, child_key_path, child_project, out)?;
     }
+    Ok(())
 }
 
 /// Reads each file once per scan, and reports each Read failure once per Agent home.
@@ -675,13 +708,15 @@ impl<'p> Reader<'p> {
         }
     }
 
-    /// A file's text, `None` when it is missing or a Read failure, which is then reported.
-    fn text(&mut self, home: &FoundHome, path: &Path) -> Option<&str> {
+    /// A file's text, `None` when it is missing or a Read failure, which is
+    /// then reported. `project` is the key of the Project whose folder
+    /// holds the file, if one does.
+    fn text(&mut self, home: &FoundHome, path: &Path, project: Option<&str>) -> Option<&str> {
         if !self.files.contains_key(path) {
             self.files.insert(path.to_path_buf(), self.read(path));
         }
         if let Some(kind) = self.files[path].as_ref().err().copied() {
-            self.fail(home, path, kind);
+            self.fail(home, path, project, kind, None);
             return None;
         }
         self.files[path].as_ref().ok()?.as_deref()
@@ -707,7 +742,14 @@ impl<'p> Reader<'p> {
         }
     }
 
-    fn fail(&mut self, home: &FoundHome, path: &Path, kind: ReadFailureKind) {
+    fn fail(
+        &mut self,
+        home: &FoundHome,
+        path: &Path,
+        project: Option<&str>,
+        kind: ReadFailureKind,
+        position: Option<(usize, usize)>,
+    ) {
         let id = (home.agent_index, home.home.clone(), path.to_path_buf());
         if !self.reported.insert(id) {
             return;
@@ -717,7 +759,9 @@ impl<'p> Reader<'p> {
             agent_index: home.agent_index,
             home: home.home.clone(),
             path: path.to_path_buf(),
+            project: project.map(str::to_owned),
             kind,
+            position,
         });
     }
 }

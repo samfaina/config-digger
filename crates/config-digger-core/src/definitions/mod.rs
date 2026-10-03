@@ -192,6 +192,42 @@ pub(crate) struct LocationDefinition {
     /// do, beyond what the core masks by default.
     #[serde(default)]
     pub secrets: SecretFields,
+    /// What the Agent does when it cannot open, decode or parse the location.
+    pub on_read_failure: ReadFailureReaction,
+    /// How the Agent's own recovery from a Read failure here can lose
+    /// configuration, shown as warnings on the Read failure.
+    #[serde(default)]
+    pub risks: Vec<RiskCode>,
+}
+
+/// What an Agent does with a location it cannot read. Declared from the
+/// mildest to the strongest: a file several locations of one Agent read
+/// takes the strongest of their reactions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ReadFailureReaction {
+    /// It starts without the location's Entries.
+    IgnoresFile,
+    /// It asks the user at startup what to do with the file, and otherwise
+    /// starts without its Entries.
+    AsksUser,
+    /// What it does is not known: every Item in the contexts the location
+    /// reaches gets a caveat.
+    Unknown,
+    /// It refuses to start in the contexts the location reaches.
+    StopsAgent,
+}
+
+/// How an Agent's own recovery from a Read failure can lose configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RiskCode {
+    /// It may offer to reset the file, losing what it holds.
+    AgentMayResetFile,
+    /// It may write the file again from empty, dropping its Entries.
+    AgentMayDropEntries,
+    /// It may clear the sign-in state of servers that vanish.
+    AgentMayClearAuth,
 }
 
 /// Key paths below an Entry, one key per segment, where `*` stands for any
@@ -498,12 +534,13 @@ id = "user"
 [[locations]]
 id = "user-mcp"
 anchor = { block = "home", root = "state" }
-format = { block = "json" }
+format = { block = "json", dialect = "strict" }
 root = ["servers"]
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 
 [items.mcp]
 precedence = ["user-mcp"]
@@ -518,12 +555,13 @@ checks = ["disable", "precedence"]
 [[locations]]
 id = "local-mcp"
 anchor = {local_anchor}
-format = {{ block = "json" }}
+format = {{ block = "json", dialect = "strict" }}
 root = {local_root}
 kind = "mcp"
 scope = "user"
 provenance = "file"
 store_class = "plain"
+on_read_failure = "ignores_file"
 "#
         );
         VALID
@@ -715,15 +753,18 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     #[test]
     fn unknown_fields_inside_a_block_are_rejected() {
         let text = VALID.replace(
-            r#"{ block = "json" }"#,
-            r#"{ block = "json", comments = true }"#,
+            r#"{ block = "json", dialect = "strict" }"#,
+            r#"{ block = "json", dialect = "strict", comments = true }"#,
         );
         assert!(error(&text).contains("comments"), "{}", error(&text));
     }
 
     #[test]
     fn unknown_blocks_are_rejected() {
-        let text = VALID.replace(r#"{ block = "json" }"#, r#"{ block = "yaml" }"#);
+        let text = VALID.replace(
+            r#"{ block = "json", dialect = "strict" }"#,
+            r#"{ block = "yaml" }"#,
+        );
         assert!(error(&text).contains("yaml"), "{}", error(&text));
     }
 
