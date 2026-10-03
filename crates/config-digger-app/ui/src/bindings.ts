@@ -18,7 +18,11 @@ export type DiffUnavailable =
 "decode" | 
 /**  One side cannot be read, such as a backup copy that is gone. */
 "io" | 
-/**  No Agent reads the file any more, so nothing says where its Secrets are. */
+/**
+ *  No Agent reads Entries from the file, such as one that only holds
+ *  Disable switches, or none any more, so nothing says where its
+ *  Secrets are.
+ */
 "no_reader";
 
 /**  Why Disable is not offered for an Entry. */
@@ -29,7 +33,14 @@ export type DisableNotOffered =
  */
 "git_versioned" | 
 /**  The Agent has no switch that Disables the Entry in this context. */
-"no_mechanism";
+"no_mechanism" | 
+/**
+ *  Every switch of the Agent that could Disable the Entry is in a file
+ *  config-digger cannot read, so it cannot be written safely.
+ */
+"unreadable_switch" | 
+/**  The Entry is Disabled already. */
+"already_disabled";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
@@ -37,9 +48,10 @@ export type DisableNotOffered =
  */
 export type DisableOption = 
 /**
- *  Disable writes the switch of the Agent's first mechanism, in its
- *  order of preference, that covers the Entry in the context and whose
- *  file is machine-local, not git-versioned.
+ *  Disable writes the switch of the Agent's most specific mechanism that
+ *  covers the Entry in the context, the first in its order of preference
+ *  among equally specific ones, whose file is machine-local, not
+ *  git-versioned, and readable.
  */
 { status: "offered"; 
 /**  The file the switch is in. */
@@ -64,8 +76,17 @@ export type Entry = {
 	 */
 	git_versioned: boolean,
 	state: State,
-	/**  Why the Entry has its State, when it is not Effective. */
+	/**
+	 *  Why the Entry has its State, when it is not Effective: the first of
+	 *  the Agent's checks that it fails.
+	 */
 	reason: Reason | null,
+	/**  The other checks it fails, in the Agent's order. */
+	secondary: Reason[],
+	/**  For a Disabled Entry, the State it would have once Enabled. */
+	what_if: WhatIf | null,
+	/**  Partial switches that limit part of it, leaving its State as it is. */
+	notes: Note[],
 	/**  The Entry's value as declared, with every Secret masked as `••••`. */
 	config: JsonValue,
 	/**
@@ -76,6 +97,11 @@ export type Entry = {
 	masked: string[][],
 	/**  What Disable would do to it in this context. */
 	disable: DisableOption,
+	/**
+	 *  For a Disabled Entry, what Enable writes, as a sentence rendered by
+	 *  the core.
+	 */
+	enable: string | null,
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
@@ -210,6 +236,19 @@ export type ItemKind = "mcp";
  */
 export type JsonValue = null | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
+/**  Something about an Entry that does not change its State. */
+export type Note = {
+	code: NoteCode,
+	/**  The `<path>#<key path>` locator of the switch it comes from. */
+	switch: string,
+	/**  The note as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type NoteCode = 
+/**  A partial switch limits part of the Entry, and the Agent still uses it. */
+"partial_switch";
+
 /**  What an Agent can be started on. */
 export type Project = {
 	/**  The folder's real path, or its lexical normalisation when it is missing. */
@@ -240,13 +279,22 @@ export type Reason = {
 	code: ReasonCode,
 	/**  The locator of the Effective Entry that beats this one, if one does. */
 	effective: string | null,
+	/**  The `<path>#<key path>` locator of the switch that Disables it, if one does. */
+	switch: string | null,
 	/**  The reason as a sentence, rendered by the core. */
 	sentence: string,
 };
 
 export type ReasonCode = 
 /**  A same-named Entry at a location the Agent ranks higher is Effective. */
-"shadowed_by_precedence";
+"shadowed_by_precedence" | 
+/**
+ *  A switch names the Item, so the Agent skips every Entry of it that
+ *  the switch covers.
+ */
+"disabled_by_name" | 
+/**  The Entry's own switch is off. */
+"disabled_natively";
 
 /**  Where a failed Operation's Rollback left one file it touched. */
 export type RollbackLocation = {
@@ -275,7 +323,21 @@ export type RollbackOutcome =
  */
 "not_restored";
 
-export type State = "effective" | "shadowed";
+export type State = "effective" | "shadowed" | 
+/**
+ *  The Agent skips it because a switch Disables it, natively or set by
+ *  config-digger.
+ */
+"disabled";
+
+/**  The State a Disabled Entry would have once Enabled. */
+export type WhatIf = {
+	state: State,
+	/**  The locator of the Entry that would beat it, if one would. */
+	effective: string | null,
+	/**  Such as "Disabled: would be Shadowed by …", rendered by the core. */
+	sentence: string,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

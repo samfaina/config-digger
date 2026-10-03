@@ -3,16 +3,18 @@
 //! predicts the States after them, and lists what must be acknowledged.
 
 use crate::api::{
-    self, Action, Block, Change, Context, DiffUnavailable, DisableOption, EditSummary,
-    EffectiveChange, Error, FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions,
-    StateAfter, Targets, Warning, WarningClass,
+    self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
+    FileChange, FileDiff, Inventory, Preview, ReadFailure, ScanOptions, State, StateAfter, Targets,
+    Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
+use crate::disable::{self, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
+use crate::explain::Reached;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
-use crate::scan::{LocationReader, Snapshot};
+use crate::scan::{LocationReader, Snapshot, SwitchStore};
 use crate::{explain, history, resolve, running, scan, select};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -48,6 +50,8 @@ pub(crate) struct PlannedFile {
     /// The locations that read the file, whose Entries say where its
     /// Secrets are.
     pub readers: Vec<LocationReader>,
+    /// The Agents whose Disable switches are in the file.
+    pub switches: Vec<SwitchStore>,
     /// The file is in the index of its git repo, so the edits show in the
     /// git diff.
     pub git_versioned: bool,
@@ -82,93 +86,293 @@ pub(crate) fn plan(
 ) -> Result<Planned, Error> {
     let before = resolve::resolve(definitions, snapshot, context);
     let targeted = select::select_entries(&before, &targets.selectors, targets.all)?;
+    let planned = Targeted {
+        definitions,
+        ports,
+        snapshot,
+        scan_options,
+        context,
+        action,
+        before: &before,
+        entries: &targeted,
+    };
+    match action {
+        Action::Remove => planned.remove(),
+        Action::Disable | Action::Enable => planned.switch(),
+        Action::Undo => Err(Error::unexpected(
+            "an Undo targets an Operation, not Entries: plan it with plan_undo",
+        )),
+        Action::DeleteBackup => Err(Error::unexpected(
+            "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
+        )),
+    }
+}
 
-    // The edits of each file, in the order its Entries were selected.
-    let mut by_file: Vec<(PathBuf, Syntax, Vec<Edit>)> = Vec::new();
-    for entry in &targeted {
-        let edit = match action {
-            Action::Remove => Edit::Remove {
+/// An action on the Entries it targets, about to be planned.
+struct Targeted<'a> {
+    definitions: &'a [AgentDefinition],
+    ports: &'a Ports,
+    snapshot: &'a Snapshot,
+    scan_options: &'a ScanOptions,
+    context: &'a Context,
+    action: Action,
+    /// The Items in the context before the Operation.
+    before: &'a Inventory,
+    entries: &'a [&'a api::Entry],
+}
+
+impl Targeted<'_> {
+    /// A Remove: each Entry's key goes from its file.
+    fn remove(&self) -> Result<Planned, Error> {
+        // The edits of each file, in the order its Entries were selected.
+        let mut by_file: Vec<(PathBuf, Syntax, Vec<Edit>)> = Vec::new();
+        for entry in self.entries {
+            let edit = Edit::Remove {
                 key_path: entry.key_path.clone(),
-            },
-            Action::Disable => return Err(disable_blocked(entry)),
-            Action::Undo => {
-                return Err(Error::unexpected(
-                    "an Undo targets an Operation, not Entries: plan it with plan_undo",
-                ));
-            }
-            Action::DeleteBackup => {
-                return Err(Error::unexpected(
-                    "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
-                ));
-            }
-        };
-        match by_file.iter_mut().find(|(path, ..)| *path == entry.path) {
-            Some((_, _, edits)) => edits.push(edit),
-            None => {
-                let syntax = syntax(definitions, snapshot, entry);
-                by_file.push((entry.path.clone(), syntax, vec![edit]));
+            };
+            match by_file.iter_mut().find(|(path, ..)| *path == entry.path) {
+                Some((_, _, edits)) => edits.push(edit),
+                None => {
+                    let syntax = syntax(self.definitions, self.snapshot, entry);
+                    by_file.push((entry.path.clone(), syntax, vec![edit]));
+                }
             }
         }
+
+        let mut files = Vec::new();
+        for (path, syntax, edits) in by_file {
+            let read = read(self.ports, &path)?;
+            let edited =
+                apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
+            files.push(self.planned_file(path, syntax, read, false, edited));
+        }
+
+        let removed: Vec<(PathBuf, Vec<String>)> = self
+            .entries
+            .iter()
+            .map(|entry| (entry.path.clone(), entry.key_path.clone()))
+            .collect();
+        let after = resolve::resolve(
+            self.definitions,
+            &self.snapshot.without(&removed),
+            self.context,
+        );
+        let (changes, effective) = predict(self.before, &after);
+        self.planned(files, changes, effective, None)
     }
 
-    let mut files = Vec::new();
-    for (path, syntax, edits) in by_file {
-        let read = read(ports, &path)?;
-        let edited =
-            apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
-        files.push(PlannedFile {
-            readers: snapshot.readers_of(&path),
-            git_versioned: snapshot.versioned.contains(&path),
+    /// A Disable or an Enable: each Entry's switch is set or lifted, which
+    /// can reach other Entries and Projects than those targeted.
+    fn switch(&self) -> Result<Planned, Error> {
+        let project = resolve::context_project(self.snapshot, self.context);
+        let context_project = project
+            .as_ref()
+            .map(|(path, key)| ContextProject { path, key });
+        // The edits of each switch file, in the order its Entries were selected.
+        let mut by_file: Vec<(PathBuf, Vec<Edit>)> = Vec::new();
+        let mut lifted: Vec<Hit> = Vec::new();
+        for entry in self.entries {
+            let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+            let definition = &self.definitions[scanned.agent_index];
+            match self.action {
+                Action::Disable => {
+                    if entry.state == State::Disabled {
+                        return Err(Error::blocked(explain::already_disabled(&entry.locator)));
+                    }
+                    let choice = disable::choose(
+                        definition,
+                        self.snapshot,
+                        scanned,
+                        context_project.as_ref(),
+                    )
+                    .map_err(|(_, sentence)| {
+                        Error::blocked(explain::disable_not_offered(&entry.locator, &sentence))
+                    })?;
+                    // Entries Disabled by one name share its switch.
+                    let shared = by_file
+                        .iter()
+                        .any(|(path, edits)| *path == choice.path && edits.contains(&choice.edit));
+                    if !shared {
+                        add_edit(&mut by_file, choice.path, choice.edit);
+                    }
+                }
+                _ => {
+                    let project = project.as_ref().map(|(_, key)| key.as_str());
+                    let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
+                    if disabling.is_empty() {
+                        return Err(Error::blocked(explain::not_disabled(&entry.locator)));
+                    }
+                    if let Err(sentence) = disable::enable(&disabling) {
+                        return Err(Error::blocked(explain::enable_refused(
+                            &entry.locator,
+                            &sentence,
+                        )));
+                    }
+                    for hit in disabling {
+                        // Entries Disabled by one name share its switch.
+                        if lifted.iter().any(|known| known.same_switch(&hit)) {
+                            continue;
+                        }
+                        for edit in hit.enable_edits() {
+                            add_edit(&mut by_file, hit.switch.path.clone(), edit);
+                        }
+                        lifted.push(hit);
+                    }
+                }
+            }
+        }
+
+        let mut files = Vec::new();
+        for (path, edits) in by_file {
+            let (read, created) = match self.ports.fs.read(&path) {
+                Ok(bytes) => (bytes, false),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    (empty_file(Syntax::Jsonc).to_vec(), true)
+                }
+                Err(error) => {
+                    return Err(Error::blocked(format!(
+                        "cannot read {}: {error}",
+                        path.display()
+                    )));
+                }
+            };
+            let edited = apply_edits(&read, Syntax::Jsonc, &edits)
+                .map_err(|failure| failure.into_error(&path))?;
+            files.push(self.planned_file(path, Syntax::Jsonc, read, created, edited));
+        }
+
+        let written: Vec<(PathBuf, Vec<u8>)> = files
+            .iter()
+            .map(|file| (file.path.clone(), file.edited.bytes.clone()))
+            .collect();
+        let after = scan::scan_as_if(
+            self.definitions,
+            self.ports,
+            &self.scan_options.projects,
+            &written,
+        )
+        .map_err(Error::unexpected)?;
+        let (changes, effective) = self.reach(&after);
+        let wide = self.wide_reach(&changes);
+        self.planned(files, changes, effective, wide)
+    }
+
+    /// What a write reaches: the States it changes in the context, then in
+    /// every other one, each other Project and no Project, as a write to a
+    /// switch can apply beyond the context.
+    fn reach(&self, after: &Snapshot) -> (Vec<Change>, Vec<EffectiveChange>) {
+        let (mut changes, effective) = predict(
+            self.before,
+            &resolve::resolve(self.definitions, after, self.context),
+        );
+        let others = self
+            .before
+            .projects
+            .iter()
+            .map(|project| Some(project.path.clone()))
+            .chain([None])
+            .filter(|project| *project != self.before.project);
+        for project in others {
+            let context = Context { project };
+            let before = resolve::resolve(self.definitions, self.snapshot, &context);
+            let after = resolve::resolve(self.definitions, after, &context);
+            changes.extend(predict(&before, &after).0);
+        }
+        (changes, effective)
+    }
+
+    /// The `wide-reach` warning when the switches written Disable, or lift
+    /// for, Entries the action does not target, or apply in other contexts
+    /// than its own. An Entry that only wins or loses against one that the
+    /// switches reach is not reached itself.
+    fn wide_reach(&self, changes: &[Change]) -> Option<Warning> {
+        let others: Vec<Reached> = changes
+            .iter()
+            .filter(|change| {
+                change.before == StateAfter::Disabled || change.after == StateAfter::Disabled
+            })
+            .filter_map(|change| {
+                let locator = change.locator.clone();
+                if change.project != self.before.project {
+                    return Some(match &change.project {
+                        Some(project) => Reached::InProject(locator, project.clone()),
+                        None => Reached::WithoutProject(locator),
+                    });
+                }
+                let targeted = self.entries.iter().any(|entry| entry.locator == locator);
+                (!targeted).then_some(Reached::Here(locator))
+            })
+            .collect();
+        (!others.is_empty()).then(|| Warning {
+            class: WarningClass::WideReach,
+            sentence: explain::wide_reach(self.action, &others),
+        })
+    }
+
+    fn planned_file(
+        &self,
+        path: PathBuf,
+        syntax: Syntax,
+        read: Vec<u8>,
+        created: bool,
+        edited: EditedFile,
+    ) -> PlannedFile {
+        PlannedFile {
+            readers: self.snapshot.readers_of(&path),
+            switches: self.snapshot.switch_stores_of(&path),
+            git_versioned: self.snapshot.versioned.contains(&path),
             path,
             syntax,
             read,
-            created: false,
+            created,
             edited,
-        });
+        }
     }
 
-    let removed: Vec<(PathBuf, Vec<String>)> = targeted
-        .iter()
-        .map(|entry| (entry.path.clone(), entry.key_path.clone()))
-        .collect();
-    let after = resolve::resolve(definitions, &snapshot.without(&removed), context);
-    let title = explain::operation_title(action, targeted.len());
-    let preview = preview(
-        definitions,
-        ports,
-        action,
-        title,
-        None,
-        &before,
-        &after,
-        &files,
-    )?;
-    let running = running::check(definitions, ports, &files);
-    Ok(Planned {
-        action,
-        entries: targeted.len(),
-        context: context.clone(),
-        scan_options: scan_options.clone(),
-        warnings: warnings(&files, running.warning),
-        blocks: running.blocks,
-        files,
-        preview,
-        read_failures: before.read_failures,
-    })
+    /// The plan that writes `files`, whose preview shows `changes` and
+    /// `effective`, with `wide`, its `wide-reach` warning if it has one.
+    fn planned(
+        &self,
+        files: Vec<PlannedFile>,
+        changes: Vec<Change>,
+        effective: Vec<EffectiveChange>,
+        wide: Option<Warning>,
+    ) -> Result<Planned, Error> {
+        let title = explain::operation_title(self.action, self.entries.len());
+        let preview = preview(
+            self.definitions,
+            self.ports,
+            self.action,
+            title,
+            None,
+            self.before.project.clone(),
+            changes,
+            effective,
+            &files,
+        )?;
+        let running = running::check(self.definitions, self.ports, &files);
+        let mut warnings = warnings(&files, running.warning);
+        warnings.extend(wide);
+        Ok(Planned {
+            action: self.action,
+            entries: self.entries.len(),
+            context: self.context.clone(),
+            scan_options: self.scan_options.clone(),
+            warnings,
+            blocks: running.blocks,
+            files,
+            preview,
+            read_failures: self.before.read_failures.clone(),
+        })
+    }
 }
 
-/// Why the Entry cannot be Disabled: Disable is not offered for it, or this
-/// release does not write Disable mechanisms yet.
-fn disable_blocked(entry: &api::Entry) -> Error {
-    let why = match &entry.disable {
-        DisableOption::Offered { .. } => "this release does not write Disable mechanisms yet. ",
-        DisableOption::NotOffered { .. } => "",
-    };
-    Error::blocked(format!(
-        "cannot Disable {}: {why}{}",
-        entry.locator,
-        entry.disable.sentence()
-    ))
+/// Adds `edit` to the edits of the file at `path`, after those it has.
+fn add_edit(by_file: &mut Vec<(PathBuf, Vec<Edit>)>, path: PathBuf, edit: Edit) {
+    match by_file.iter_mut().find(|(known, _)| *known == path) {
+        Some((_, edits)) => edits.push(edit),
+        None => by_file.push((path, vec![edit])),
+    }
 }
 
 /// Plans the Undo of the Operation `id` in History: the inverse of each of
@@ -203,6 +407,7 @@ pub(crate) fn plan_undo(
     })?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
+        file.switches = snapshot.switch_stores_of(&file.path);
         file.git_versioned = snapshot.versioned.contains(&file.path);
     }
 
@@ -213,14 +418,16 @@ pub(crate) fn plan_undo(
         .collect();
     let after = resolve::resolve(definitions, &scan(&written)?, &context);
     let title = explain::undo_title(id, &manifest.title);
+    let (changes, effective) = predict(&before, &after);
     let preview = preview(
         definitions,
         ports,
         Action::Undo,
         title,
         Some(id.to_owned()),
-        &before,
-        &after,
+        before.project.clone(),
+        changes,
+        effective,
         &files,
     )?;
     let running = running::check(definitions, ports, &files);
@@ -360,13 +567,26 @@ fn undo_edits(bytes: &[u8], location: &history::LocationRecord) -> Result<Edited
     })
 }
 
-/// An insertion whose parent objects are gone becomes a set of the outermost
-/// missing one, holding the rest, so that the file gets back the minimal
-/// structure that holds the key.
+/// An append to a missing list becomes a set of the list holding the item.
+/// An insertion or a set whose parent objects are missing becomes a set of
+/// the outermost missing one, holding the rest, so that the file gets the
+/// minimal structure that holds the key.
 fn with_parents(file: &EditableFile, edit: &Edit) -> Result<Edit, EditError> {
-    let Edit::Insert {
+    let created;
+    let edit = match edit {
+        Edit::Append { key_path, value } if file.value_at(key_path)?.is_none() => {
+            created = Edit::Set {
+                key_path: key_path.clone(),
+                value: serde_json::json!([value]),
+            };
+            &created
+        }
+        edit => edit,
+    };
+    let (Edit::Insert {
         key_path, value, ..
-    } = edit
+    }
+    | Edit::Set { key_path, value }) = edit
     else {
         return Ok(edit.clone());
     };
@@ -410,8 +630,9 @@ impl From<Error> for UndoBlocked<'_> {
 
 /// The files of an Operation with the inverse of its edits applied to each
 /// one as it is now, or why its Undo is refused. History runs the same
-/// check to say whether the Operation can be undone. The files' readers, and
-/// whether each is git-versioned, are left for the caller to fill in.
+/// check to say whether the Operation can be undone. The files' readers, the
+/// switches in them, and whether each is git-versioned, are left for the
+/// caller to fill in.
 pub(crate) fn undo_files<'m>(
     ports: &'m Ports,
     manifest: &'m history::Manifest,
@@ -428,6 +649,7 @@ pub(crate) fn undo_files<'m>(
                 created,
                 edited,
                 readers: Vec::new(),
+                switches: Vec::new(),
                 git_versioned: false,
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
@@ -559,18 +781,18 @@ fn preview(
     action: Action,
     title: String,
     undo_of: Option<String>,
-    before: &Inventory,
-    after: &Inventory,
+    project: Option<PathBuf>,
+    changes: Vec<Change>,
+    effective: Vec<EffectiveChange>,
     files: &[PlannedFile],
 ) -> Result<Preview, Error> {
-    let (changes, effective) = predict(before, after);
     let backup_folder = history::backups_folder(&history::data_folder(ports.env.as_ref())?);
     Ok(Preview {
         action,
         title,
         undo_of,
         backup_of: None,
-        project: before.project.clone(),
+        project,
         changes,
         effective,
         files: files
@@ -652,11 +874,13 @@ pub(crate) fn apply_edits(
     let mut edited = bytes.to_vec();
     let mut applied_edits = Vec::new();
     for edit in edits {
-        let applied = file.apply(edit).map_err(EditFailure::Edit)?;
+        // A key a switch adds may need parents the file does not have yet.
+        let edit = with_parents(&file, edit).map_err(EditFailure::Edit)?;
+        let applied = file.apply(&edit).map_err(EditFailure::Edit)?;
         edited = applied.bytes;
         file = EditableFile::decode(&edited, syntax).map_err(EditFailure::ReadOnly)?;
         applied_edits.push(AppliedEdit {
-            edit: edit.clone(),
+            edit,
             inverse: applied.inverse,
             depends_on: applied.depends_on,
         });
@@ -752,20 +976,26 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
             });
         }
         if let (true, Some(item_before), Some(item_after)) = (changed, item_before, item_after) {
-            let before_locator = &item_before.entries[0].locator;
-            let after_locator = &item_after.entries[0].locator;
+            let effective_in = |item: &api::Item| {
+                item.entries
+                    .iter()
+                    .find(|entry| entry.state == State::Effective)
+                    .map(|entry| entry.locator.clone())
+            };
+            let before_locator = effective_in(item_before);
+            let after_locator = effective_in(item_after);
             effective.push(EffectiveChange {
                 agent: item.agent.clone(),
                 home: item.home.clone(),
                 item: item.name.clone(),
-                before: before_locator.clone(),
-                after: after_locator.clone(),
                 sentence: explain::effective_after(
                     &item.name,
                     agent_name,
-                    after_locator,
+                    after_locator.as_deref(),
                     before_locator == after_locator,
                 ),
+                before: before_locator,
+                after: after_locator,
             });
         }
     }

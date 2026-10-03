@@ -59,6 +59,9 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "git_versioned": false,
                     "state": "effective",
                     "reason": null,
+                    "secondary": [],
+                    "what_if": null,
+                    "notes": [],
                     "config": {
                         "type": "stdio",
                         "command": "npx",
@@ -66,7 +69,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "••••" }
                     },
                     "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]],
-                    "disable": no_project_switch()
+                    "disable": no_project_switch(),
+                    "enable": null
                 }]
             },
             {
@@ -84,9 +88,13 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "git_versioned": false,
                     "state": "effective",
                     "reason": null,
+                    "secondary": [],
+                    "what_if": null,
+                    "notes": [],
                     "config": { "type": "http", "url": "https://mcp.linear.app/mcp" },
                     "masked": [],
-                    "disable": no_project_switch()
+                    "disable": no_project_switch(),
+                    "enable": null
                 }]
             }
         ])

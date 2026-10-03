@@ -6,8 +6,8 @@
 //! History.
 
 use crate::api::{
-    Block, Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome, RollbackLocation,
-    RollbackOutcome, Verify, WarningClass,
+    Block, Context, Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome,
+    RollbackLocation, RollbackOutcome, Verify, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::edit::EditableFile;
@@ -133,7 +133,14 @@ pub(crate) fn execute(
     let mut written = 0;
     let mut failure = None;
     for write in &writes {
-        if let Err(error) = ports.fs.write_atomic(&write.file.path, &write.bytes) {
+        // A switch file Disable creates can be in a folder that is missing too.
+        let folder = write.file.path.parent().filter(|_| write.current.is_none());
+        let written_to = match folder {
+            Some(folder) => ports.fs.create_dir_all(folder),
+            None => Ok(()),
+        }
+        .and_then(|()| ports.fs.write_atomic(&write.file.path, &write.bytes));
+        if let Err(error) = written_to {
             failure = Some(Failure::new(
                 ErrorCode::WriteFailed,
                 format!("cannot write {}: {error}", write.file.path.display()),
@@ -366,7 +373,21 @@ fn verify(
             overwritten(planned, write)
         });
     }
-    Ok(differences(planned, &actual))
+    // A change the Operation reaches in another Project is checked there.
+    let mut contexts: Vec<(Option<PathBuf>, Inventory)> = vec![(actual.project.clone(), actual)];
+    for change in &planned.preview.changes {
+        if !contexts
+            .iter()
+            .any(|(project, _)| *project == change.project)
+        {
+            let context = Context {
+                project: change.project.clone(),
+            };
+            let inventory = resolve::resolve(definitions, &snapshot, &context);
+            contexts.push((change.project.clone(), inventory));
+        }
+    }
+    Ok(differences(planned, &contexts))
 }
 
 /// Verify of one file: it reads back, and every key an edit changed holds the
@@ -484,13 +505,18 @@ fn overwritten(planned: &Planned, write: &PendingWrite) -> Failure {
     )
 }
 
-/// The States after that differ from the preview's prediction.
-fn differences(planned: &Planned, actual: &Inventory) -> Vec<Difference> {
+/// The States after that differ from the preview's prediction, each looked
+/// up in the Items `actual` resolved for its change's Project.
+fn differences(planned: &Planned, actual: &[(Option<PathBuf>, Inventory)]) -> Vec<Difference> {
     planned
         .preview
         .changes
         .iter()
         .filter_map(|change| {
+            let (_, actual) = actual
+                .iter()
+                .find(|(project, _)| *project == change.project)
+                .expect("every change's Project is resolved");
             let state = plan::state_in(actual, &change.agent, &change.home, &change.locator);
             (state != change.after).then(|| Difference {
                 agent: change.agent.clone(),

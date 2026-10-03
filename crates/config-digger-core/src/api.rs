@@ -237,6 +237,9 @@ pub enum Action {
     /// Makes each Entry stop taking effect for one Agent while keeping it,
     /// through the Agent's own machine-local switch.
     Disable,
+    /// Makes each Disabled Entry take effect again, lifting every switch
+    /// that Disables it, whoever set it.
+    Enable,
     /// Deletes each Entry from where it lives, for every Agent that reads it.
     Remove,
     /// Applies the inverse of every edit of an earlier Operation to the files
@@ -340,6 +343,7 @@ pub struct Change {
 pub enum StateAfter {
     Effective,
     Shadowed,
+    Disabled,
     Removed,
 }
 
@@ -348,6 +352,7 @@ impl From<State> for StateAfter {
         match state {
             State::Effective => StateAfter::Effective,
             State::Shadowed => StateAfter::Shadowed,
+            State::Disabled => StateAfter::Disabled,
         }
     }
 }
@@ -359,10 +364,10 @@ pub struct EffectiveChange {
     pub agent: String,
     pub home: String,
     pub item: String,
-    /// The locator of the Effective Entry before.
-    pub before: String,
-    /// The locator of the Effective Entry after.
-    pub after: String,
+    /// The locator of the Effective Entry before, `None` when none was.
+    pub before: Option<String>,
+    /// The locator of the Effective Entry after, `None` when none is.
+    pub after: Option<String>,
     /// The change as a sentence, rendered by the core.
     pub sentence: String,
 }
@@ -425,7 +430,9 @@ pub enum DiffUnavailable {
     Decode,
     /// One side cannot be read, such as a backup copy that is gone.
     Io,
-    /// No Agent reads the file any more, so nothing says where its Secrets are.
+    /// No Agent reads Entries from the file, such as one that only holds
+    /// Disable switches, or none any more, so nothing says where its
+    /// Secrets are.
     NoReader,
 }
 
@@ -723,8 +730,15 @@ pub struct Entry {
     /// the git diff and reaches every clone once committed.
     pub git_versioned: bool,
     pub state: State,
-    /// Why the Entry has its State, when it is not Effective.
+    /// Why the Entry has its State, when it is not Effective: the first of
+    /// the Agent's checks that it fails.
     pub reason: Option<Reason>,
+    /// The other checks it fails, in the Agent's order.
+    pub secondary: Vec<Reason>,
+    /// For a Disabled Entry, the State it would have once Enabled.
+    pub what_if: Option<WhatIf>,
+    /// Partial switches that limit part of it, leaving its State as it is.
+    pub notes: Vec<Note>,
     /// The Entry's value as declared, with every Secret masked as `••••`.
     #[specta(type = JsonValue)]
     pub config: serde_json::Value,
@@ -734,6 +748,36 @@ pub struct Entry {
     pub masked: Vec<Vec<String>>,
     /// What Disable would do to it in this context.
     pub disable: DisableOption,
+    /// For a Disabled Entry, what Enable writes, as a sentence rendered by
+    /// the core.
+    pub enable: Option<String>,
+}
+
+/// The State a Disabled Entry would have once Enabled.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct WhatIf {
+    pub state: State,
+    /// The locator of the Entry that would beat it, if one would.
+    pub effective: Option<String>,
+    /// Such as "Disabled: would be Shadowed by …", rendered by the core.
+    pub sentence: String,
+}
+
+/// Something about an Entry that does not change its State.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Note {
+    pub code: NoteCode,
+    /// The `<path>#<key path>` locator of the switch it comes from.
+    pub switch: String,
+    /// The note as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum NoteCode {
+    /// A partial switch limits part of the Entry, and the Agent still uses it.
+    PartialSwitch,
 }
 
 /// What Disable would do to an Entry in its context: write the Agent's own
@@ -741,9 +785,10 @@ pub struct Entry {
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum DisableOption {
-    /// Disable writes the switch of the Agent's first mechanism, in its
-    /// order of preference, that covers the Entry in the context and whose
-    /// file is machine-local, not git-versioned.
+    /// Disable writes the switch of the Agent's most specific mechanism that
+    /// covers the Entry in the context, the first in its order of preference
+    /// among equally specific ones, whose file is machine-local, not
+    /// git-versioned, and readable.
     Offered {
         /// The file the switch is in.
         path: PathBuf,
@@ -777,6 +822,11 @@ pub enum DisableNotOffered {
     GitVersioned,
     /// The Agent has no switch that Disables the Entry in this context.
     NoMechanism,
+    /// Every switch of the Agent that could Disable the Entry is in a file
+    /// config-digger cannot read, so it cannot be written safely.
+    UnreadableSwitch,
+    /// The Entry is Disabled already.
+    AlreadyDisabled,
 }
 
 /// How an Entry got where it is, which decides how it can be taken away.
@@ -800,6 +850,9 @@ impl From<DefinitionProvenance> for Provenance {
 pub enum State {
     Effective,
     Shadowed,
+    /// The Agent skips it because a switch Disables it, natively or set by
+    /// config-digger.
+    Disabled,
 }
 
 /// Why an Entry has its State.
@@ -808,6 +861,8 @@ pub struct Reason {
     pub code: ReasonCode,
     /// The locator of the Effective Entry that beats this one, if one does.
     pub effective: Option<String>,
+    /// The `<path>#<key path>` locator of the switch that Disables it, if one does.
+    pub switch: Option<String>,
     /// The reason as a sentence, rendered by the core.
     pub sentence: String,
 }
@@ -817,6 +872,11 @@ pub struct Reason {
 pub enum ReasonCode {
     /// A same-named Entry at a location the Agent ranks higher is Effective.
     ShadowedByPrecedence,
+    /// A switch names the Item, so the Agent skips every Entry of it that
+    /// the switch covers.
+    DisabledByName,
+    /// The Entry's own switch is off.
+    DisabledNatively,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.

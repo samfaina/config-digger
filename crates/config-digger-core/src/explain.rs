@@ -2,6 +2,8 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{Action, OperationStatus, Reason, ReasonCode, Verify};
+use crate::edit::Edit;
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 
 /// A Shadowed Entry's reason, pointing at the Effective Entry `effective`.
@@ -23,18 +25,22 @@ pub(crate) fn shadowed_by_precedence(
     Reason {
         code: ReasonCode::ShadowedByPrecedence,
         effective: Some(effective.to_owned()),
+        switch: None,
         sentence: format!("Shadowed by the {effective_scope} Entry {effective}, {why}."),
     }
 }
 
 /// Which Entry of an Item is Effective after an Operation that keeps some of
-/// its Entries. `unchanged` says it was Effective before too.
+/// its Entries, if any. `unchanged` says it was Effective before too.
 pub(crate) fn effective_after(
     item: &str,
     agent_name: &str,
-    effective: &str,
+    effective: Option<&str>,
     unchanged: bool,
 ) -> String {
+    let Some(effective) = effective else {
+        return format!("No Entry is Effective for {item} in {agent_name} afterwards.");
+    };
     let verb = if unchanged { "stays" } else { "becomes" };
     format!("{effective} {verb} Effective for {item} in {agent_name}.")
 }
@@ -43,6 +49,7 @@ pub(crate) fn effective_after(
 pub(crate) fn operation_title(action: Action, entries: usize) -> String {
     let verb = match action {
         Action::Disable => "Disable",
+        Action::Enable => "Enable",
         Action::Remove => "Remove",
         Action::Undo => "Undo",
         Action::DeleteBackup => "Delete the backup of",
@@ -128,14 +135,178 @@ pub(crate) fn may_be_overwritten(path: &Path, agent_name: &str) -> String {
     )
 }
 
-/// What Disable would write for the Entry `name`: add it to the list `list`
-/// in `path`, for the context's Project when `per_project`.
-pub(crate) fn disable_target(name: &str, list: &str, path: &Path, per_project: bool) -> String {
-    let scope = if per_project { " for this Project" } else { "" };
+/// Where a switch applies, after the file it is in.
+fn for_project(per_project: bool) -> &'static str {
+    if per_project { " for this Project" } else { "" }
+}
+
+/// What Disable writes for the Entry `name`: `edit` on the switch in
+/// `path`, which applies in the context's Project only when `per_project`.
+pub(crate) fn disable_switch(edit: &Edit, name: &str, path: &Path, per_project: bool) -> String {
+    let scope = for_project(per_project);
+    let path = path.display();
+    match edit {
+        Edit::Append { key_path, .. } => {
+            format!(
+                "Disable adds `{name}` to `{}` in {path}{scope}.",
+                last(key_path)
+            )
+        }
+        edit => format!("Disable {}{scope}.", describe(edit, &path.to_string())),
+    }
+}
+
+/// What Enable writes for the Entry `name`: `edits` on the switch in
+/// `path`, which applies in the context's Project only when `per_project`.
+pub(crate) fn enable_switch(edits: &[Edit], name: &str, path: &Path, per_project: bool) -> String {
+    let scope = for_project(per_project);
+    let path = path.display();
+    match edits.first() {
+        Some(Edit::RemoveItem { key_path, .. }) => {
+            format!(
+                "Enable removes `{name}` from `{}` in {path}{scope}.",
+                last(key_path)
+            )
+        }
+        Some(edit) => format!("Enable {}{scope}.", describe(edit, &path.to_string())),
+        None => format!("Enable leaves {path} as it is."),
+    }
+}
+
+/// An edit of a switch as a sentence says it, after its verb's subject.
+fn describe(edit: &Edit, path: &str) -> String {
+    let key = edit.key_path().join(".");
+    match edit {
+        Edit::Set { value, .. } | Edit::Insert { value, .. } => {
+            format!("sets `{key}` to {value} in {path}")
+        }
+        Edit::Remove { .. } => format!("deletes `{key}` in {path}"),
+        Edit::Append { value, .. } => format!("adds {value} to `{key}` in {path}"),
+        Edit::RemoveItem { value, .. } => format!("removes {value} from `{key}` in {path}"),
+    }
+}
+
+fn last(key_path: &[String]) -> &str {
+    key_path.last().map_or("", String::as_str)
+}
+
+/// That the list `list` in `path` holds `name`.
+pub(crate) fn in_list(name: &str, list: &str, path: &Path, per_project: bool) -> String {
     format!(
-        "Disable adds `{name}` to `{list}` in {}{scope}.",
-        path.display()
+        "`{name}` is in `{list}` in {}{}",
+        path.display(),
+        for_project(per_project)
     )
+}
+
+/// That the field at `key_path` in `path` holds `value`.
+pub(crate) fn field_holds(
+    key_path: &[String],
+    value: Option<&Value>,
+    path: &Path,
+    per_project: bool,
+) -> String {
+    let value = value.map_or_else(|| "missing".to_owned(), Value::to_string);
+    format!(
+        "`{}` is {value} in {}{}",
+        key_path.join("."),
+        path.display(),
+        for_project(per_project)
+    )
+}
+
+/// A Disabled Entry's reason, when the switch `holds` names its Item.
+pub(crate) fn disabled_by_name(holds: &str, agent_name: &str) -> String {
+    format!("Disabled by name: {holds}, so {agent_name} skips the Entries with that name.")
+}
+
+/// A Disabled Entry's reason, when the switch `holds` is its own.
+pub(crate) fn disabled_natively(holds: &str, agent_name: &str) -> String {
+    format!("Disabled: {holds}, so {agent_name} skips it.")
+}
+
+/// The note on an Entry part of which the partial switch `holds` limits.
+pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
+    format!(
+        "Partial switch: {holds}. {agent_name} still uses the Entry, with only part of it available."
+    )
+}
+
+/// The State a Disabled Entry would have once Enabled: Effective, or
+/// Shadowed by the `scope` Entry `effective`.
+pub(crate) fn what_if(shadowed_by: Option<(&str, &str)>) -> String {
+    match shadowed_by {
+        None => "Disabled: would be Effective once Enabled.".to_owned(),
+        Some((scope, effective)) => {
+            format!("Disabled: would be Shadowed by the {scope} Entry {effective} once Enabled.")
+        }
+    }
+}
+
+/// An Entry, by locator, that a switch reaches beyond what an action targets.
+pub(crate) enum Reached {
+    /// In the action's own context.
+    Here(String),
+    /// In another Project.
+    InProject(String, PathBuf),
+    /// With no Project.
+    WithoutProject(String),
+}
+
+/// The warning of a plan whose switches reach the Entries `others` beyond
+/// those it targets.
+pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
+    let verb = match action {
+        Action::Enable => "Enable",
+        _ => "Disable",
+    };
+    let rows: Vec<String> = others
+        .iter()
+        .map(|reached| match reached {
+            Reached::Here(locator) => locator.clone(),
+            Reached::InProject(locator, project) => {
+                format!("{locator} in Project {}", project.display())
+            }
+            Reached::WithoutProject(locator) => format!("{locator} with no Project"),
+        })
+        .collect();
+    format!(
+        "This {verb} reaches more than what it targets: the switch it writes also changes the State of {}.",
+        rows.join(", ")
+    )
+}
+
+/// Why Disable is refused for an Entry it is not offered for: `sentence`.
+pub(crate) fn disable_not_offered(locator: &str, sentence: &str) -> String {
+    format!("cannot Disable {locator}: {sentence}")
+}
+
+/// Why Disable is refused for an Entry that is Disabled already.
+pub(crate) fn already_disabled(locator: &str) -> String {
+    format!("cannot Disable {locator}: it is Disabled already")
+}
+
+/// What Disable says of an Entry that is Disabled already.
+pub(crate) fn already_disabled_option() -> String {
+    "Disable is not offered: the Entry is Disabled already.".to_owned()
+}
+
+/// What Enable says of a Disabled Entry when the switch `holds` is one
+/// config-digger only reads.
+pub(crate) fn enable_not_offered(holds: &str) -> String {
+    format!(
+        "Enable is not offered: {holds}, which config-digger does not write; take the name out of it there by hand."
+    )
+}
+
+/// Why Enable is refused for an Entry it is not offered for: `sentence`.
+pub(crate) fn enable_refused(locator: &str, sentence: &str) -> String {
+    format!("cannot Enable {locator}: {sentence}")
+}
+
+/// Why Enable is refused for an Entry that is not Disabled.
+pub(crate) fn not_disabled(locator: &str) -> String {
+    format!("cannot Enable {locator}: it is not Disabled")
 }
 
 /// Why Disable is not offered when every switch of `agent_name` that could
@@ -158,10 +329,30 @@ pub(crate) fn disable_only_in_versioned(
     )
 }
 
+/// Why Disable is not offered when every switch of `agent_name` that could
+/// Disable the Entry is in one of `files`, which cannot be read.
+pub(crate) fn disable_only_in_unreadable(agent_name: &str, files: &[PathBuf]) -> String {
+    let files: Vec<&Path> = files.iter().map(PathBuf::as_path).collect();
+    format!(
+        "Disable is not offered: {agent_name}'s switches for this Entry are in files config-digger cannot read ({}), so it cannot write them safely.",
+        path_list(&files)
+    )
+}
+
 /// Why Disable is not offered when `agent_name` has no switch for the Entry
-/// in the context. `needs_project` says it has one per Project.
-pub(crate) fn no_disable_mechanism(agent_name: &str, needs_project: bool) -> String {
-    if needs_project {
+/// in the context. `needs_project` says it has one per Project, and there is
+/// no Project; `unrecorded` says it has one per Project, and nowhere to keep
+/// it for this one.
+pub(crate) fn no_disable_mechanism(
+    agent_name: &str,
+    needs_project: bool,
+    unrecorded: bool,
+) -> String {
+    if unrecorded {
+        format!(
+            "Disable is not offered: {agent_name} Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+        )
+    } else if needs_project {
         format!(
             "Disable is not offered: {agent_name} Disables this Entry per Project, and there is no Project in this context."
         )
@@ -206,6 +397,7 @@ pub(crate) fn outcome(
 ) -> String {
     let done = match action {
         Action::Disable => format!("Disabled {}", count(entries)),
+        Action::Enable => format!("Enabled {}", count(entries)),
         Action::Remove => format!("Removed {}", count(entries)),
         Action::Undo => format!("Undid {}", undo_of.unwrap_or("an Operation")),
         Action::DeleteBackup => {

@@ -3,8 +3,10 @@
 //! decides a State.
 
 use crate::api::ReadFailureKind;
-use crate::definitions::blocks::{Anchored, Disables, Locate, Parse, Register};
-use crate::definitions::{AgentDefinition, LocationDefinition, PROJECT_KEY};
+use crate::definitions::blocks::{
+    Anchored, Disables, JsonFormat, Locate, NAME_KEY, Parse, Register, StoreClass,
+};
+use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
 use crate::ports::Ports;
 use crate::{mask, paths};
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,11 +24,62 @@ pub(crate) struct Snapshot {
     pub read_failures: Vec<ScannedReadFailure>,
     /// Every location read, existing or not, once per Agent home.
     pub readers: Vec<LocationReader>,
-    /// The location files and Disable targets that are in the index of
+    /// The location files and Disable switch files that are in the index of
     /// their git repo. A location file is asked about when it exists, and a
-    /// target when its folder does, since a target in the index can be
+    /// switch file when its folder does, since a file in the index can be
     /// missing from the working tree.
     pub versioned: BTreeSet<PathBuf>,
+    /// Every place a Disable mechanism's switch is, set or not.
+    pub switches: Vec<ScannedSwitch>,
+    /// The switch files that cannot be read or parsed. They Disable nothing,
+    /// and are never written.
+    pub unreadable_switches: BTreeSet<PathBuf>,
+}
+
+/// One place a Disable mechanism's switch is, for one Agent home and, for a
+/// switch that applies per Project, one Project.
+#[derive(Clone)]
+pub(crate) struct ScannedSwitch {
+    pub agent_index: usize,
+    pub home: String,
+    pub kind: ItemKind,
+    /// The mechanism's index among its Item kind's mechanisms.
+    pub mechanism: usize,
+    pub path: PathBuf,
+    /// The key of the Project it applies in, or `None` when it applies in every context.
+    pub project: Option<String>,
+    /// Its key path, `{project}` replaced by the Project key in the Agent's
+    /// own spelling, `{name}` left in place.
+    pub key_path: Vec<String>,
+    /// What the file holds at the key path, up to `{name}` when it has one:
+    /// `None` when the file or key is missing.
+    pub value: Option<serde_json::Value>,
+    /// How the file behaves while the Agent runs.
+    pub store_class: StoreClass,
+}
+
+impl ScannedSwitch {
+    /// The switch's key path for the Entry named `name`.
+    pub fn key_path_for(&self, name: &str) -> Vec<String> {
+        self.key_path
+            .iter()
+            .map(|key| if key == NAME_KEY { name } else { key }.to_owned())
+            .collect()
+    }
+
+    /// What the switch holds for the Entry named `name`.
+    pub fn value_for(&self, name: &str) -> Option<&serde_json::Value> {
+        let value = self.value.as_ref()?;
+        match self.key_path.iter().position(|key| key == NAME_KEY) {
+            Some(at) => lookup(value.get(name)?, &self.key_path[at + 1..]),
+            None => Some(value),
+        }
+    }
+}
+
+/// The value at `key_path` below `value`.
+fn lookup<'v>(value: &'v serde_json::Value, key_path: &[String]) -> Option<&'v serde_json::Value> {
+    key_path.iter().try_fold(value, |value, key| value.get(key))
 }
 
 impl Snapshot {
@@ -73,12 +126,58 @@ impl Snapshot {
             .roots
     }
 
-    /// Whether the Project with the key `key` was scanned and its folder exists.
-    pub fn project_exists(&self, key: &str) -> bool {
-        self.projects
+    /// The Entry at `path` and `key_path`, which a resolved Entry comes from.
+    pub fn entry(&self, path: &Path, key_path: &[String]) -> &ScannedEntry {
+        self.entries
             .iter()
-            .any(|project| project.key == key && project.exists)
+            .find(|scanned| scanned.path == path && scanned.key_path == key_path)
+            .expect("a resolved Entry comes from the snapshot")
     }
+
+    /// The places of the switch of the mechanism at `mechanism` among those
+    /// of `kind`, in the Agent home of `entry`.
+    pub fn switches_of<'s>(
+        &'s self,
+        entry: &'s ScannedEntry,
+        kind: ItemKind,
+        mechanism: usize,
+    ) -> impl Iterator<Item = &'s ScannedSwitch> + Clone {
+        self.switches.iter().filter(move |switch| {
+            switch.agent_index == entry.agent_index
+                && switch.home == entry.home
+                && switch.kind == kind
+                && switch.mechanism == mechanism
+        })
+    }
+
+    /// The Agent homes whose Disable switches are in the file at `path`,
+    /// each with the strongest store class of its switches there.
+    pub fn switch_stores_of(&self, path: &Path) -> Vec<SwitchStore> {
+        let mut stores: Vec<SwitchStore> = Vec::new();
+        for switch in self.switches.iter().filter(|switch| switch.path == path) {
+            match stores
+                .iter_mut()
+                .find(|store| store.agent_index == switch.agent_index && store.home == switch.home)
+            {
+                Some(store) => store.store_class = store.store_class.max(switch.store_class),
+                None => stores.push(SwitchStore {
+                    agent_index: switch.agent_index,
+                    home: switch.home.clone(),
+                    store_class: switch.store_class,
+                }),
+            }
+        }
+        stores
+    }
+}
+
+/// An Agent home whose Disable switches are in a file, and how the file
+/// behaves while the Agent runs.
+#[derive(Clone)]
+pub(crate) struct SwitchStore {
+    pub agent_index: usize,
+    pub home: String,
+    pub store_class: StoreClass,
 }
 
 /// An Agent home found on this machine.
@@ -213,17 +312,19 @@ pub(crate) fn scan_as_if(
 
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
-    let targets = disable_targets(definitions, &found, &projects);
+    let (switches, unreadable_switches) =
+        read_switches(definitions, &found, &projects, &mut scanner.reader);
+    let switch_files = switch_files(definitions, &found, &projects);
     let locations = scanner
         .readers
         .iter()
         .map(|reader| reader.path.as_path())
         .filter(|path| ports.fs.exists(path));
-    let targets = targets
+    let switch_files = switch_files
         .iter()
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
-    let versioned = versioned(ports, locations.chain(targets));
+    let versioned = versioned(ports, locations.chain(switch_files));
     Ok(Snapshot {
         read_at,
         homes: found
@@ -239,33 +340,138 @@ pub(crate) fn scan_as_if(
         readers: scanner.readers,
         read_failures: scanner.reader.failures,
         versioned,
+        switches,
+        unreadable_switches,
     })
 }
 
-/// The file of every Disable mechanism's target, for each found Agent
-/// home, and for a target in a Project, in each existing Project folder.
-fn disable_targets(
+/// Every place each Disable mechanism's switch is, for each found Agent
+/// home: in each existing Project folder for a switch in a Project, under
+/// each spelling of each Project key for a switch keyed by `{project}`, and
+/// once otherwise. A switch file that is missing is read as empty; one that
+/// cannot be read or parsed as JSON is listed apart and has no places.
+fn read_switches(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
-) -> BTreeSet<PathBuf> {
-    let mut targets = BTreeSet::new();
+    reader: &mut Reader,
+) -> (Vec<ScannedSwitch>, BTreeSet<PathBuf>) {
+    let mut switches = Vec::new();
+    let mut unreadable = BTreeSet::new();
     for home in found {
         let definition = &definitions[home.agent_index];
-        for rules in definition.items.values() {
-            for mechanism in &rules.disable {
-                let anchor = &mechanism.target().anchor;
-                if !anchor.in_project() {
-                    targets.extend(anchor.path(&home.roots, None));
-                    continue;
-                }
-                for project in projects.iter().filter(|project| project.exists) {
-                    targets.extend(anchor.path(&home.roots, Some(&project.path)));
+        for (&kind, rules) in &definition.items {
+            for (mechanism, block) in rules.disable.iter().enumerate() {
+                let switch = block.switch();
+                let places: Vec<(PathBuf, Option<String>)> = if switch.anchor.in_project() {
+                    projects
+                        .iter()
+                        .filter(|project| project.exists)
+                        .filter_map(|project| {
+                            let path = switch.anchor.path(&home.roots, Some(&project.path))?;
+                            Some((path, Some(project.key.clone())))
+                        })
+                        .collect()
+                } else {
+                    switch
+                        .anchor
+                        .path(&home.roots, None)
+                        .map(|path| (path, None))
+                        .into_iter()
+                        .collect()
+                };
+                for (path, project) in places {
+                    let document = match reader.peek(&path) {
+                        Ok(None) => None,
+                        Ok(Some(text)) => match (JsonFormat {}).parse(text) {
+                            Ok(document) => Some(document),
+                            Err(_) => {
+                                unreadable.insert(path);
+                                continue;
+                            }
+                        },
+                        Err(_) => {
+                            unreadable.insert(path);
+                            continue;
+                        }
+                    };
+                    let place = |project: Option<String>, key_path: Vec<String>| {
+                        let up_to_name = key_path
+                            .iter()
+                            .position(|key| key == NAME_KEY)
+                            .unwrap_or(key_path.len());
+                        ScannedSwitch {
+                            agent_index: home.agent_index,
+                            home: home.home.clone(),
+                            kind,
+                            mechanism,
+                            path: path.clone(),
+                            project,
+                            value: document
+                                .as_ref()
+                                .and_then(|document| lookup(document, &key_path[..up_to_name]))
+                                .cloned(),
+                            key_path,
+                            store_class: switch.store_class,
+                        }
+                    };
+                    let Some(at) = switch.key_path.iter().position(|key| key == PROJECT_KEY) else {
+                        switches.push(place(project, switch.key_path.clone()));
+                        continue;
+                    };
+                    // Each key there is a Project in the Agent's own spelling.
+                    let keyed = document
+                        .as_ref()
+                        .and_then(|document| lookup(document, &switch.key_path[..at]))
+                        .and_then(serde_json::Value::as_object);
+                    for spelling in keyed.into_iter().flat_map(serde_json::Map::keys) {
+                        let Some(project) = project_of(projects, spelling) else {
+                            continue;
+                        };
+                        let mut key_path = switch.key_path.clone();
+                        key_path[at] = spelling.clone();
+                        switches.push(place(Some(project), key_path));
+                    }
                 }
             }
         }
     }
-    targets
+    (switches, unreadable)
+}
+
+/// The key of the scanned Project that `spelling` names, if any.
+fn project_of(projects: &[ScannedProject], spelling: &str) -> Option<String> {
+    let spelling = paths::key(&paths::lexical(Path::new(spelling)));
+    projects
+        .iter()
+        .find(|project| project.spellings.contains(&spelling))
+        .map(|project| project.key.clone())
+}
+
+/// The file of every Disable mechanism's switch, for each found Agent
+/// home, and for a switch in a Project, in each existing Project folder.
+fn switch_files(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    projects: &[ScannedProject],
+) -> BTreeSet<PathBuf> {
+    let mut files = BTreeSet::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for rules in definition.items.values() {
+            for mechanism in &rules.disable {
+                let anchor = &mechanism.switch().anchor;
+                if !anchor.in_project() {
+                    files.extend(anchor.path(&home.roots, None));
+                    continue;
+                }
+                for project in projects.iter().filter(|project| project.exists) {
+                    files.extend(anchor.path(&home.roots, Some(&project.path)));
+                }
+            }
+        }
+    }
+    files
 }
 
 /// The files among `paths` that are in the index of their git repo, asking
@@ -479,6 +685,19 @@ impl<'p> Reader<'p> {
             return None;
         }
         self.files[path].as_ref().ok()?.as_deref()
+    }
+
+    /// A file's text, `None` when it is missing, as [`text`](Self::text)
+    /// reads it but without reporting a failure: for a file that holds no
+    /// Entries, such as a switch's.
+    fn peek(&mut self, path: &Path) -> Result<Option<&str>, ReadFailureKind> {
+        if !self.files.contains_key(path) {
+            self.files.insert(path.to_path_buf(), self.read(path));
+        }
+        match &self.files[path] {
+            Ok(text) => Ok(text.as_deref()),
+            Err(kind) => Err(*kind),
+        }
     }
 
     fn read(&self, path: &Path) -> Result<Option<String>, ReadFailureKind> {

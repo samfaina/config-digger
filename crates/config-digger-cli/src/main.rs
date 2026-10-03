@@ -78,11 +78,21 @@ enum Command {
     Remove(EntryWrite),
     /// Disable Entries through each Agent's own machine-local switch, keeping them.
     ///
+    /// Writes the switch the Agent's own UI writes, such as Claude Code's
+    /// `disabledMcpServers` for this Project. A switch that works by name
+    /// Disables every Entry of the Item: the preview lists every other Entry
+    /// and Project it reaches, and `--ack wide-reach` acknowledges that.
     /// Disable never writes a git-versioned file: it skips a switch in one for
     /// the Agent's next machine-local switch, and when there is none, it is not
     /// offered and exits 5 with the reason. `show` says which switch it would
-    /// write. This release does not write Disable switches yet.
+    /// write.
     Disable(EntryWrite),
+    /// Enable Disabled Entries again, lifting every switch that Disables them.
+    ///
+    /// It is the inverse of Disable, whoever Disabled the Entry: the Agent
+    /// itself or config-digger. It is an Operation of its own, separate from
+    /// Undo. `show` says what it would write.
+    Enable(EntryWrite),
     /// List past Operations, newest first, and whether each can be undone.
     History {
         #[command(subcommand)]
@@ -427,6 +437,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         }
         Command::Remove(write) => write_entries(cli, &core, Action::Remove, write),
         Command::Disable(write) => write_entries(cli, &core, Action::Disable, write),
+        Command::Enable(write) => write_entries(cli, &core, Action::Enable, write),
         Command::History { command: None } => {
             let operations = core.history()?;
             if cli.json {
@@ -1030,8 +1041,30 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let location = location_cell(entry, location_width);
         let line = table_line(cells, &widths, location, Style::new());
         out.push_str(&line.fit(width).render());
-        let reason = entry.reason.as_ref().map(|reason| reason.sentence.as_str());
-        for sentence in reason.into_iter().chain([entry.disable.sentence()]) {
+        // Why it has its State, what it would be once Enabled, the other
+        // checks it fails, its partial switches, then what
+        // Enable or Disable would write.
+        let reason = entry.reason.iter().map(|reason| reason.sentence.as_str());
+        let what_if = entry
+            .what_if
+            .iter()
+            .map(|what_if| what_if.sentence.as_str());
+        let secondary = entry
+            .secondary
+            .iter()
+            .map(|reason| format!("Also: {}", reason.sentence));
+        let secondary: Vec<String> = secondary.collect();
+        let notes = entry.notes.iter().map(|note| note.sentence.as_str());
+        let action = entry
+            .enable
+            .as_deref()
+            .unwrap_or_else(|| entry.disable.sentence());
+        let sentences = reason
+            .chain(what_if)
+            .chain(secondary.iter().map(String::as_str))
+            .chain(notes)
+            .chain([action]);
+        for sentence in sentences {
             for text in terminal::wrap(sentence, reason_width) {
                 let mut line = Line::default();
                 line.push(reason_indent.as_str(), Style::new())
@@ -1393,6 +1426,7 @@ fn state_after_label(state: api::StateAfter) -> &'static str {
     match state {
         api::StateAfter::Effective => "Effective",
         api::StateAfter::Shadowed => "Shadowed",
+        api::StateAfter::Disabled => "Disabled",
         api::StateAfter::Removed => "removed",
     }
 }
@@ -1401,6 +1435,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
     match state {
         api::StateAfter::Effective => state_style(api::State::Effective),
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
+        api::StateAfter::Disabled => state_style(api::State::Disabled),
         api::StateAfter::Removed => AnsiColor::Red.on_default(),
     }
 }
@@ -1409,14 +1444,16 @@ fn state_label(state: api::State) -> &'static str {
     match state {
         api::State::Effective => "Effective",
         api::State::Shadowed => "Shadowed",
+        api::State::Disabled => "Disabled",
     }
 }
 
-/// The app's State colours: green Effective, grey Shadowed.
+/// The app's State colours: green Effective, grey Shadowed, amber Disabled.
 fn state_style(state: api::State) -> Style {
     match state {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
+        api::State::Disabled => AnsiColor::Yellow.on_default(),
     }
 }
 

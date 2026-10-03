@@ -56,8 +56,9 @@ pub(crate) fn diff(
         return unavailable(
             DiffUnavailable::NoReader,
             format!(
-                "Can't show a masked diff: no Agent reads `{}` any more.",
-                path.display()
+                "Can't show a masked diff: no Agent reads Entries from `{}`, so nothing says where its Secrets are; {}.",
+                path.display(),
+                lines_differ(changed_lines)
             ),
         );
     }

@@ -26,6 +26,11 @@ id = "default"
 block = "path"
 path = "~/.claude.json"
 
+# The user settings, which hold Disable switches but no Entries.
+[homes.roots.settings_file]
+block = "path"
+path = "~/.claude/settings.json"
+
 [[scopes]]
 id = "local"
 
@@ -85,20 +90,67 @@ interpolation = { block = "braces", default_separator = ":-" }
 # records as approved or rejected.
 secrets.file_fields = [["primaryApiKey"], ["customApiKeyResponses", "*", "*"]]
 
-# Same-named Entries compete whole; the highest location wins.
+# Same-named Entries compete whole; the highest location wins. Claude Code
+# skips a Disabled Entry before they compete, so the next one down can win.
 [items.mcp]
 precedence = ["local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
 
 # The `/mcp` toggle: names in `projects["<path>"].disabledMcpServers`, which
-# Claude Code skips in that Project whatever file declares them.
+# Claude Code skips in that Project whatever file declares them. It is
+# written under the Project key in the spelling Claude Code recorded; until
+# it has recorded the Project, this switch is skipped rather than written
+# under a spelling Claude Code might not look up.
 [[items.mcp.disable]]
 block = "json-name-list"
-target = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpServers"], store_class = "rewritten-while-running" }
+switch = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpServers"], store_class = "rewritten-while-running" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
 
 # `disabledMcpjsonServers` in any settings file skips `.mcp.json` servers by
 # name [docs]. The local settings file is the one meant to stay out of git.
 [[items.mcp.disable]]
 block = "json-name-list"
-target = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
 locations = ["project-mcp"]
+
+# The `.mcp.json` approval dialog keeps the servers it rejects per Project
+# in `~/.claude.json`. Enable lifts it there too.
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpjsonServers"], store_class = "rewritten-while-running" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+
+# The shared Project settings and the user settings can hold the list too.
+# config-digger only reads them: the first belongs to the team, and the
+# second applies in every Project.
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+enable_offered = false
+
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+enable_offered = false

@@ -84,6 +84,10 @@ _Avoid_: Partial, combined, partly Effective
 Said of an Entry that the Agent skips because it was Disabled, natively or by config-digger. When the Agent's mechanism works by name, every Entry of the Item is Disabled.
 _Avoid_: Off, inactive
 
+**Partial switch**:
+A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note.
+_Avoid_: Partial disable, partly off
+
 **Blocked**:
 Said of an Entry that the Agent will not use because of a gate outside the Entry that Enable cannot lift: an untrusted folder, a project server not yet approved, or managed policy. config-digger never lifts these gates.
 _Avoid_: Pending, denied, untrusted
