@@ -1639,7 +1639,8 @@ fn remove_while_the_agent_runs_without_a_tty_needs_ack_running_agent() {
     assert_eq!(run.code, 4, "{}", run.stderr);
     assert!(run.stdout.contains("[running-agent]"), "{}", run.stdout);
     assert!(
-        run.stdout.contains("may overwrite this change"),
+        run.stdout
+            .contains("may overwrite what this Operation writes"),
         "{}",
         run.stdout
     );
@@ -1656,7 +1657,7 @@ fn remove_while_the_agent_runs_with_ack_prints_a_restart_hint() {
     assert_eq!(run.code, 0, "{}", run.stderr);
     assert!(
         run.stdout
-            .contains("Restart Claude Code so that it reads the change."),
+            .contains("Restart Claude Code so that it reads what the Operation wrote."),
         "{}",
         run.stdout
     );
@@ -1684,9 +1685,13 @@ fn remove_while_the_agent_runs_json_has_the_warning_and_the_hints() {
 
     assert_eq!(run.code, 0, "{}", run.stderr);
     let document = run.document();
+    assert_eq!(document["blocks"], json!([]));
     assert_eq!(document["warnings"][0]["class"], "running-agent");
     assert_eq!(document["warnings"][0]["acknowledged"], true);
     let hints = document["result"]["hints"].as_array().unwrap();
     assert_eq!(hints.len(), 2, "{hints:?}");
-    assert_eq!(hints[0], "Restart Claude Code so that it reads the change.");
+    assert_eq!(
+        hints[0],
+        "Restart Claude Code so that it reads what the Operation wrote."
+    );
 }

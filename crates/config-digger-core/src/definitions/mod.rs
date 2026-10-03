@@ -95,8 +95,8 @@ pub(crate) struct HomeDefinition {
     /// Named roots of the home. The home is found when any root exists.
     pub roots: BTreeMap<String, Locator>,
     /// How to tell that the Agent of this home is running, in place of the
-    /// definition's `[process]`, such as for a home whose Agent runs from
-    /// another binary.
+    /// definition's `[process]`, such as for a home read by another
+    /// Installation of the Agent.
     pub process: Option<ProcessDefinition>,
 }
 
@@ -119,7 +119,9 @@ pub(crate) struct ProcessDefinition {
     #[serde(default)]
     pub paths: Vec<String>,
     /// Text the command line must contain, every one of them, compared
-    /// case-insensitively, such as Gemini CLI's script in `node.exe`.
+    /// case-insensitively, such as Gemini CLI's script in `node.exe`. A
+    /// process whose command line the OS hides does not match: unlike a
+    /// path, it narrows down images such as `node.exe` that run much else.
     #[serde(default)]
     pub cmdline_contains: Vec<String>,
     /// Files the Agent keeps per running session, each naming a PID that

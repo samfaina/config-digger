@@ -8,10 +8,11 @@ format_version = 1
 id = "claude-code"
 name = "Claude Code"
 
-# The native CLI runs as `claude.exe` from `~/.local/bin`. Claude Desktop is
-# also `claude.exe`, so the path tells them apart. Each running session keeps
-# `~/.claude/sessions/<pid>.json`, which also covers an npm install in
-# `node.exe`; only its name is read, since it holds a `peerToken`.
+# The native Installation runs as `claude.exe` from `~/.local/bin`. Claude
+# Desktop is also `claude.exe`, so the path tells them apart. Each running
+# session keeps `~/.claude/sessions/<pid>.json`, which also covers an npm
+# Installation in `node.exe`; only its name is read, since it holds a
+# `peerToken`.
 [process]
 images = ["claude.exe"]
 paths = ["~/.local/bin/claude.exe"]

@@ -130,7 +130,10 @@ fn a_write_to_a_file_the_running_agent_rewrites_gets_a_strong_warning() {
     let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
     assert!(sentence.contains("Claude Code"), "{sentence}");
     assert!(sentence.contains(".claude.json"), "{sentence}");
-    assert!(sentence.contains("may overwrite this change"), "{sentence}");
+    assert!(
+        sentence.contains("may overwrite what this Operation writes"),
+        "{sentence}"
+    );
     let error = core.execute(plan, &[]).unwrap_err();
     assert_eq!(error.code, ErrorCode::AckRequired);
     assert_eq!(fs.contents(claude_json()).unwrap(), CLAUDE_JSON.as_bytes());
@@ -199,7 +202,7 @@ fn an_acknowledged_write_adds_a_restart_hint_and_says_it_may_be_overwritten() {
     assert_eq!(
         outcome.hints,
         [
-            "Restart Claude Code so that it reads the change.".to_owned(),
+            "Restart Claude Code so that it reads what the Operation wrote.".to_owned(),
             format!(
                 "{} may be overwritten while Claude Code runs.",
                 claude_json().display()
@@ -224,7 +227,7 @@ fn a_write_to_a_plain_file_adds_only_the_restart_hint() {
 
     assert_eq!(
         outcome.hints,
-        ["Restart Claude Code so that it reads the change."]
+        ["Restart Claude Code so that it reads what the Operation wrote."]
     );
 }
 
@@ -280,13 +283,13 @@ fn store() -> PathBuf {
     PathBuf::from(HOME).join(r".store\state.vscdb")
 }
 
-/// A core over `fs` with only `definition` loaded and `processes` as the
+/// A core over `fs` with `definition` loaded besides the built-in ones and `processes` as the
 /// processes on this machine.
 fn core_with(fs: &FakeFileSystem, definition: &str, processes: &FakeProcesses) -> Core {
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     let mut ports = fake::ports(fs.clone(), env);
     ports.processes = Box::new(processes.clone());
-    Core::with_definitions(ports, &[("test.toml", definition)]).unwrap()
+    Core::with_extra_definitions(ports, &[("test.toml", definition)]).unwrap()
 }
 
 fn store_agent() -> RunningProcess {
@@ -421,7 +424,10 @@ fn an_undo_while_the_agent_runs_gets_the_warning_too() {
     let undo = core.plan_undo(&outcome.operation).unwrap();
 
     let sentence = running_agent_sentence(&undo).expect("a running-agent warning");
-    assert!(sentence.contains("may overwrite this change"), "{sentence}");
+    assert!(
+        sentence.contains("may overwrite what this Operation writes"),
+        "{sentence}"
+    );
 }
 
 #[test]
@@ -432,11 +438,62 @@ fn a_block_wins_over_a_missing_acknowledgement() {
     let mut ports = fake::ports(fs.clone(), env);
     ports.processes = Box::new(processes);
     ports.git = Box::new(FakeGitIndex::default().with_versioned(store()));
-    let core = Core::with_definitions(ports, &[("test.toml", SQLITE_AGENT)]).unwrap();
+    let core = Core::with_extra_definitions(ports, &[("test.toml", SQLITE_AGENT)]).unwrap();
     let plan = remove(&core, "search");
     assert_eq!(plan.warnings()[0].class, WarningClass::GitVersioned);
 
     let error = core.execute(plan, &[]).unwrap_err();
 
     assert_eq!(error.code, ErrorCode::Blocked);
+}
+
+#[test]
+fn an_agent_that_starts_after_the_preview_needs_a_fresh_preview() {
+    let fs = fixture();
+    let processes = FakeProcesses::default();
+    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let mut ports = fake::ports(fs.clone(), env);
+    ports.processes = Box::new(processes.clone());
+    let core = Core::new(ports).unwrap();
+    let plan = remove(&core, "notes");
+    assert!(plan.warnings().is_empty());
+
+    processes.start(claude_code_cli());
+    let error = core.execute(plan, &[]).unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::Stale);
+    assert!(error.message.contains("Claude Code"), "{}", error.message);
+    assert_eq!(fs.contents(claude_json()).unwrap(), CLAUDE_JSON.as_bytes());
+}
+
+#[test]
+fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
+    let definition = plain_agent("[process]\nimages = [\"store.exe\"]\n").replace(
+        "[[scopes]]",
+        "[[homes]]\nid = \"other\"\nroots.state = { block = \"path\", path = \"~/.other/state.vscdb\" }\n\n[[scopes]]",
+    );
+    let other = PathBuf::from(HOME).join(r".other\state.vscdb");
+    let fs = FakeFileSystem::new()
+        .with_file(store(), STORE)
+        .with_file(&other, STORE);
+    let processes = FakeProcesses::default().with_process(store_agent());
+    let core = core_with(&fs, &definition, &processes);
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let targets = Targets {
+        selectors: vec![
+            format!("{}#servers.search", store().display()),
+            format!("{}#servers.search", other.display()),
+        ],
+        all: false,
+    };
+    let plan = core
+        .plan(&snapshot, &Context::default(), Action::Remove, &targets)
+        .unwrap();
+
+    let outcome = core.execute(plan, &[WarningClass::RunningAgent]).unwrap();
+
+    assert_eq!(
+        outcome.hints,
+        ["Restart Store Agent so that it reads what the Operation wrote."]
+    );
 }

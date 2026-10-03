@@ -70,6 +70,14 @@ pub(crate) fn execute(
     if !running.blocks.is_empty() {
         return Err(blocked(&running.blocks));
     }
+    let warned = planned
+        .warnings
+        .iter()
+        .any(|warning| warning.class == WarningClass::RunningAgent);
+    if running.warning.is_some() && !warned {
+        // Its warning was never shown, so it could not be acknowledged.
+        return Err(Error::stale(explain::agent_started(&running.agents)));
+    }
     if let Some(undone) = &planned.preview.undo_of {
         // Another Undo of the same Operation may have run since the plan.
         let manifests = history::load_all(ports)?;

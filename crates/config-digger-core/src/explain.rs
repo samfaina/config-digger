@@ -91,7 +91,7 @@ pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> String 
 /// rewrites while it runs.
 pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> String {
     format!(
-        "{agent_name} is running and rewrites {} while it runs: it may overwrite this change. Close {agent_name} first to be safe.",
+        "{agent_name} is running and rewrites {} while it runs: it may overwrite what this Operation writes. Close {agent_name} first to be safe.",
         path_list(files)
     )
 }
@@ -100,14 +100,23 @@ pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> Strin
 /// `agent_name` reads.
 pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> String {
     format!(
-        "{agent_name} is running and reads {}: it may not see this change until it restarts.",
+        "{agent_name} is running and reads {}: it may not see what this Operation writes until it restarts.",
         path_list(files)
+    )
+}
+
+/// Why an Operation needs a fresh preview when the Agents `agent_names`,
+/// which read what it writes, started since its preview.
+pub(crate) fn agent_started(agent_names: &[String]) -> String {
+    format!(
+        "{} started since the preview, which did not warn about it",
+        agent_names.join(", ")
     )
 }
 
 /// What the result says to do once a running `agent_name` reads a written file.
 pub(crate) fn restart_hint(agent_name: &str) -> String {
-    format!("Restart {agent_name} so that it reads the change.")
+    format!("Restart {agent_name} so that it reads what the Operation wrote.")
 }
 
 /// What the result says of a written file `path` that the running

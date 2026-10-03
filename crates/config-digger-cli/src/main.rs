@@ -603,11 +603,12 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
     })
 }
 
-/// A write's JSON document: the plan, its warnings and, unless it was a dry
-/// run, the result.
+/// A write's JSON document: the plan, what blocks it, its warnings and,
+/// unless it was a dry run, the result.
 #[derive(Serialize)]
 struct WriteBody<'a> {
     plan: &'a api::Preview,
+    blocks: &'a [api::Block],
     warnings: Vec<WarningBody<'a>>,
     result: Option<&'a api::Outcome>,
 }
@@ -643,32 +644,21 @@ fn confirm_and_execute(
     flags: &WriteFlags,
 ) -> Result<(), Failure> {
     let preview = plan.preview().clone();
+    let blocks = plan.blocks().to_vec();
     let warnings = plan.warnings().to_vec();
     let mut acknowledged: Vec<WarningClass> = flags.ack.iter().map(|&ack| ack.into()).collect();
     let width = terminal::output_width(cli.wide);
     if !cli.json {
         anstream::print!(
             "{}",
-            render_preview(project_line, &preview, plan.blocks(), &warnings, width)
+            render_preview(project_line, &preview, &blocks, &warnings, width)
         );
-    }
-    // No acknowledgement lifts a block, so nothing is asked.
-    if !plan.blocks().is_empty() {
-        let sentences: Vec<&str> = plan
-            .blocks()
-            .iter()
-            .map(|block| block.sentence.as_str())
-            .collect();
-        return Err(Failure::new(
-            "blocked",
-            format!("nothing was written: {}", sentences.join(" ")),
-            Exit::Blocked,
-        ));
     }
     if flags.dry_run {
         if cli.json {
             print_json(&WriteBody {
                 plan: &preview,
+                blocks: &blocks,
                 warnings: warning_bodies(&warnings, &acknowledged),
                 result: None,
             });
@@ -679,11 +669,21 @@ fn confirm_and_execute(
         }
         return Ok(());
     }
+    // No acknowledgement lifts a block, so nothing is asked.
+    if !blocks.is_empty() {
+        let sentences: Vec<&str> = blocks.iter().map(|block| block.sentence.as_str()).collect();
+        return Err(Failure::new(
+            "blocked",
+            format!("nothing was written: {}", sentences.join(" ")),
+            Exit::Blocked,
+        ));
+    }
     confirm(cli, &preview.title, flags.yes, &warnings, &mut acknowledged)?;
     let outcome = core.execute(plan, &acknowledged)?;
     if cli.json {
         print_json(&WriteBody {
             plan: &preview,
+            blocks: &blocks,
             warnings: warning_bodies(&warnings, &acknowledged),
             result: Some(&outcome),
         });
@@ -1151,7 +1151,7 @@ fn render_preview(
 
     if !blocks.is_empty() {
         out.push('\n');
-        out.push_str(&styled_line("Blocked", BOLD, width));
+        out.push_str(&styled_line("Cannot apply", BOLD, width));
         for block in blocks {
             let text = format!("{INDENT}{}", block.sentence);
             for line in terminal::wrap(&text, width) {

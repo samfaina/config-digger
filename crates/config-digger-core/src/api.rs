@@ -49,15 +49,15 @@ impl Core {
         Ok(Self { ports, definitions })
     }
 
-    /// Loads the Agent definitions `files`, each a file name and its TOML
-    /// text, in place of the built-in ones. A file that fails to load is
+    /// Loads the built-in Agent definitions plus the extra ones in `files`,
+    /// each a file name and its TOML text, as `--definitions` does for
+    /// development and tests (ADR 0005). A file that fails to load is
     /// rejected whole.
-    pub fn with_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
-        let definitions = files
-            .iter()
-            .map(|(file, text)| definitions::parse(file, text))
-            .collect::<Result<_, _>>()
-            .map_err(Error::unexpected)?;
+    pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
+        let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
+        for (file, text) in files {
+            definitions.push(definitions::parse(file, text).map_err(Error::unexpected)?);
+        }
         Ok(Self { ports, definitions })
     }
 

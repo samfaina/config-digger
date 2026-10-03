@@ -291,7 +291,9 @@ pub(crate) enum Provenance {
 // --- Store classes ----------------------------------------------------------
 
 /// How a store config-digger writes behaves while its Agent runs, which
-/// decides whether a write warns or is blocked then.
+/// decides whether a write warns or is blocked then. Declared from the
+/// weakest to the strongest: a file several locations read takes the
+/// strongest of their classes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum StoreClass {

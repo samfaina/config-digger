@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 /// What the running Agents mean for an Operation's writes.
 pub(crate) struct RunningCheck {
+    /// The names of the running Agents that read a written file.
+    pub agents: Vec<String>,
     /// One per running Agent that holds a written SQLite store open.
     pub blocks: Vec<Block>,
     /// One `running-agent` warning covering every other running reader.
@@ -23,8 +25,9 @@ pub(crate) struct RunningCheck {
     pub hints: Vec<String>,
 }
 
-/// A running Agent home that reads written files, with the store class of
-/// each file it reads, the strongest when several of its locations do.
+/// A running Agent that reads written files, through any of its homes, with
+/// the store class of each file it reads: the strongest when several of
+/// its locations read the file.
 struct RunningReader<'d> {
     agent_name: &'d str,
     files: BTreeMap<PathBuf, StoreClass>,
@@ -47,13 +50,14 @@ pub(crate) fn check(
     files: &[PlannedFile],
 ) -> RunningCheck {
     let mut processes: Option<Vec<RunningProcess>> = None;
-    let mut detected: BTreeMap<(usize, String), bool> = BTreeMap::new();
-    let mut readers: Vec<((usize, String), RunningReader)> = Vec::new();
+    // Whether the Agent of each home runs, since a home may override its process.
+    let mut detected: BTreeMap<(usize, &str), bool> = BTreeMap::new();
+    let mut readers: BTreeMap<usize, RunningReader> = BTreeMap::new();
     for file in files {
         for reader in &file.readers {
             let definition = &definitions[reader.agent_index];
-            let key = (reader.agent_index, reader.home.clone());
-            let running = *detected.entry(key.clone()).or_insert_with(|| {
+            let home = (reader.agent_index, reader.home.as_str());
+            let running = *detected.entry(home).or_insert_with(|| {
                 definition.process(&reader.home).is_some_and(|process| {
                     let processes = processes.get_or_insert_with(|| ports.processes.running());
                     is_running(process, processes, ports)
@@ -63,21 +67,12 @@ pub(crate) fn check(
                 continue;
             }
             let class = definition.location(&reader.location).store_class;
-            let index = match readers.iter().position(|(known, _)| *known == key) {
-                Some(index) => index,
-                None => {
-                    readers.push((
-                        key,
-                        RunningReader {
-                            agent_name: &definition.agent.name,
-                            files: BTreeMap::new(),
-                        },
-                    ));
-                    readers.len() - 1
-                }
-            };
-            let stored = readers[index]
-                .1
+            let stored = readers
+                .entry(reader.agent_index)
+                .or_insert_with(|| RunningReader {
+                    agent_name: &definition.agent.name,
+                    files: BTreeMap::new(),
+                })
                 .files
                 .entry(file.path.clone())
                 .or_insert(class);
@@ -88,7 +83,7 @@ pub(crate) fn check(
     let mut blocks = Vec::new();
     let mut sentences = Vec::new();
     let mut hints = Vec::new();
-    for (_, reader) in &readers {
+    for reader in readers.values() {
         let sqlite = reader.paths(StoreClass::Sqlite);
         if !sqlite.is_empty() {
             blocks.push(Block {
@@ -113,6 +108,10 @@ pub(crate) fn check(
         }
     }
     RunningCheck {
+        agents: readers
+            .values()
+            .map(|reader| reader.agent_name.to_owned())
+            .collect(),
         blocks,
         warning: (!sentences.is_empty()).then(|| Warning {
             class: WarningClass::RunningAgent,

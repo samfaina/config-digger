@@ -109,7 +109,7 @@
           "default": []
         },
         "cmdline_contains": {
-          "description": "Text the command line must contain, every one of them, compared\ncase-insensitively, such as Gemini CLI's script in `node.exe`.",
+          "description": "Text the command line must contain, every one of them, compared\ncase-insensitively, such as Gemini CLI's script in `node.exe`. A\nprocess whose command line the OS hides does not match: unlike a\npath, it narrows down images such as `node.exe` that run much else.",
           "type": "array",
           "items": {
             "type": "string"
@@ -195,7 +195,7 @@
           }
         },
         "process": {
-          "description": "How to tell that the Agent of this home is running, in place of the\ndefinition's `[process]`, such as for a home whose Agent runs from\nanother binary.",
+          "description": "How to tell that the Agent of this home is running, in place of the\ndefinition's `[process]`, such as for a home read by another\nInstallation of the Agent.",
           "anyOf": [
             {
               "$ref": "#/$defs/ProcessDefinition"
@@ -417,7 +417,7 @@
       ]
     },
     "StoreClass": {
-      "description": "How a store config-digger writes behaves while its Agent runs, which\ndecides whether a write warns or is blocked then.",
+      "description": "How a store config-digger writes behaves while its Agent runs, which\ndecides whether a write warns or is blocked then. Declared from the\nweakest to the strongest: a file several locations read takes the\nstrongest of their classes.",
       "oneOf": [
         {
           "description": "A file the Agent reads and leaves alone: a write while it runs warns\nthat it may not see the change until it restarts.",
