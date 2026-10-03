@@ -21,6 +21,36 @@ export type DiffUnavailable =
 /**  No Agent reads the file any more, so nothing says where its Secrets are. */
 "no_reader";
 
+/**  Why Disable is not offered for an Entry. */
+export type DisableNotOffered = 
+/**
+ *  Every switch of the Agent that could Disable the Entry is in a
+ *  git-versioned file, where a change reaches every clone.
+ */
+"git_versioned" | 
+/**  The Agent has no switch that Disables the Entry in this context. */
+"no_mechanism";
+
+/**
+ *  What Disable would do to an Entry in its context: write the Agent's own
+ *  switch for it, or nothing, with the reason.
+ */
+export type DisableOption = 
+/**
+ *  Disable writes the switch of the Agent's first mechanism, in its
+ *  order of preference, that covers the Entry in the context and whose
+ *  file is machine-local, not git-versioned.
+ */
+{ status: "offered"; 
+/**  The file the switch is in. */
+path: string; 
+/**  What Disable writes, as a sentence rendered by the core. */
+sentence: string } | 
+/**  Disable is not offered. */
+{ status: "not_offered"; code: DisableNotOffered; 
+/**  The reason as a sentence, rendered by the core. */
+sentence: string };
+
 export type Entry = {
 	path: string,
 	key_path: string[],
@@ -28,6 +58,11 @@ export type Entry = {
 	locator: string,
 	scope: string,
 	provenance: Provenance,
+	/**
+	 *  Its file is in the index of its git repo, so a change to it shows in
+	 *  the git diff and reaches every clone once committed.
+	 */
+	git_versioned: boolean,
 	state: State,
 	/**  Why the Entry has its State, when it is not Effective. */
 	reason: Reason | null,
@@ -39,6 +74,8 @@ export type Entry = {
 	 *  key is its index.
 	 */
 	masked: string[][],
+	/**  What Disable would do to it in this context. */
+	disable: DisableOption,
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */

@@ -94,7 +94,7 @@ fn at_locator(selector: &str) -> impl Fn(&&Entry) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{Entry, ItemKind, Provenance, State};
+    use crate::api::{DisableNotOffered, DisableOption, Entry, ItemKind, Provenance, State};
     use std::path::PathBuf;
 
     fn item(home: &str, name: &str) -> Item {
@@ -112,10 +112,15 @@ mod tests {
                 key_path,
                 scope: "user".to_owned(),
                 provenance: Provenance::File,
+                git_versioned: false,
                 state: State::Effective,
                 reason: None,
                 config: serde_json::json!({}),
                 masked: Vec::new(),
+                disable: DisableOption::NotOffered {
+                    code: DisableNotOffered::NoMechanism,
+                    sentence: String::new(),
+                },
             }],
         }
     }

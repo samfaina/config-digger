@@ -405,6 +405,13 @@
         },
         "competition": {
           "$ref": "#/$defs/Competition"
+        },
+        "disable": {
+          "description": "How the Agent Disables an Entry, in its order of preference.\nDisable uses the first that covers the Entry and applies in the\ncontext, skipping any whose target is git-versioned.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DisableMechanism"
+          }
         }
       },
       "additionalProperties": false,
@@ -430,6 +437,59 @@
             "block"
           ]
         }
+      ]
+    },
+    "DisableMechanism": {
+      "description": "How an Agent Disables an Entry. An Item kind lists its mechanisms in\nthe Agent's order of preference.",
+      "oneOf": [
+        {
+          "description": "A list of names in a JSON file: the Agent skips every Entry of an Item\nwhose name is in it.",
+          "type": "object",
+          "properties": {
+            "target": {
+              "description": "The list.",
+              "$ref": "#/$defs/Target"
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "json-name-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "target"
+          ]
+        }
+      ]
+    },
+    "Target": {
+      "description": "The key a mechanism writes, in a file outside or inside a Project.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, so that the switch applies only there.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
       ]
     }
   }

@@ -3,7 +3,7 @@
 //! decides a State.
 
 use crate::api::ReadFailureKind;
-use crate::definitions::blocks::{Anchored, Locate, Parse, Register};
+use crate::definitions::blocks::{Anchored, Disables, Locate, Parse, Register};
 use crate::definitions::{AgentDefinition, LocationDefinition, PROJECT_KEY};
 use crate::ports::Ports;
 use crate::{mask, paths};
@@ -22,6 +22,11 @@ pub(crate) struct Snapshot {
     pub read_failures: Vec<ScannedReadFailure>,
     /// Every location read, existing or not, once per Agent home.
     pub readers: Vec<LocationReader>,
+    /// The location files and Disable targets that are in the index of
+    /// their git repo. A location file is asked about when it exists, and a
+    /// target when its folder does, since a target in the index can be
+    /// missing from the working tree.
+    pub versioned: BTreeSet<PathBuf>,
 }
 
 impl Snapshot {
@@ -55,6 +60,24 @@ impl Snapshot {
             .cloned()
             .collect()
     }
+
+    /// The roots of the Agent home `home` of the Agent at `agent_index`,
+    /// which the scan found.
+    pub fn roots(&self, agent_index: usize, home: &str) -> &BTreeMap<String, PathBuf> {
+        &self
+            .homes
+            .iter()
+            .find(|found| found.agent_index == agent_index && found.home == home)
+            .expect("Entries come from found homes")
+            .roots
+    }
+
+    /// Whether the Project with the key `key` was scanned and its folder exists.
+    pub fn project_exists(&self, key: &str) -> bool {
+        self.projects
+            .iter()
+            .any(|project| project.key == key && project.exists)
+    }
 }
 
 /// An Agent home found on this machine.
@@ -63,6 +86,8 @@ pub(crate) struct ScannedHome {
     /// Index of the Agent definition in the definitions the snapshot was scanned with.
     pub agent_index: usize,
     pub home: String,
+    /// The path of each of its roots, by name.
+    pub roots: BTreeMap<String, PathBuf>,
 }
 
 /// A Project, found in a registry or asked for.
@@ -187,6 +212,17 @@ pub(crate) fn scan_as_if(
 
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
+    let targets = disable_targets(definitions, &found, &projects);
+    let locations = scanner
+        .readers
+        .iter()
+        .map(|reader| reader.path.as_path())
+        .filter(|path| ports.fs.exists(path));
+    let targets = targets
+        .iter()
+        .map(PathBuf::as_path)
+        .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
+    let versioned = versioned(ports, locations.chain(targets));
     Ok(Snapshot {
         read_at,
         homes: found
@@ -194,13 +230,52 @@ pub(crate) fn scan_as_if(
             .map(|home| ScannedHome {
                 agent_index: home.agent_index,
                 home: home.home,
+                roots: home.roots,
             })
             .collect(),
         projects,
         entries: scanner.entries,
         readers: scanner.readers,
         read_failures: scanner.reader.failures,
+        versioned,
     })
+}
+
+/// The file of every Disable mechanism's target, for each found Agent
+/// home, and for a target in a Project, in each existing Project folder.
+fn disable_targets(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    projects: &[ScannedProject],
+) -> BTreeSet<PathBuf> {
+    let mut targets = BTreeSet::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for rules in definition.items.values() {
+            for mechanism in &rules.disable {
+                let anchor = &mechanism.target().anchor;
+                if !anchor.in_project() {
+                    targets.extend(anchor.path(&home.roots, None));
+                    continue;
+                }
+                for project in projects.iter().filter(|project| project.exists) {
+                    targets.extend(anchor.path(&home.roots, Some(&project.path)));
+                }
+            }
+        }
+    }
+    targets
+}
+
+/// The files among `paths` that are in the index of their git repo, asking
+/// once per file. Ignored and untracked files are not.
+fn versioned<'a>(ports: &Ports, paths: impl Iterator<Item = &'a Path>) -> BTreeSet<PathBuf> {
+    let paths: BTreeSet<&Path> = paths.collect();
+    paths
+        .into_iter()
+        .filter(|path| ports.git.is_versioned(path))
+        .map(Path::to_path_buf)
+        .collect()
 }
 
 fn find_homes(definitions: &[AgentDefinition], ports: &Ports) -> Result<Vec<FoundHome>, ScanError> {

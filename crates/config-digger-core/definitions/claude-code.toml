@@ -75,3 +75,16 @@ secrets.file_fields = [["primaryApiKey"], ["customApiKeyResponses", "*", "*"]]
 [items.mcp]
 precedence = ["local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }
+
+# The `/mcp` toggle: names in `projects["<path>"].disabledMcpServers`, which
+# Claude Code skips in that Project whatever file declares them.
+[[items.mcp.disable]]
+block = "json-name-list"
+target = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpServers"] }
+
+# `disabledMcpjsonServers` in any settings file skips `.mcp.json` servers by
+# name [docs]. The local settings file is the one meant to stay out of git.
+[[items.mcp.disable]]
+block = "json-name-list"
+target = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"] }
+locations = ["project-mcp"]

@@ -75,25 +75,14 @@ enum Command {
     ///
     /// Prints the preview, asks for confirmation, then backs up each touched
     /// file, writes, verifies and records the Operation in History.
-    Remove {
-        /// Each one an Item name with a single Entry, or the
-        /// `<path>#<key path>` locator of an Entry. Together they form one
-        /// Operation, applied entirely or not at all.
-        #[arg(required = true)]
-        selectors: Vec<String>,
-        /// Target every Entry of the one Item each selector names.
-        #[arg(long)]
-        all: bool,
-        /// Confirm the Operation without asking.
-        #[arg(long)]
-        yes: bool,
-        /// Acknowledge one class of warning without asking. Repeat for several.
-        #[arg(long, value_enum, value_name = "CLASS")]
-        ack: Vec<Ack>,
-        /// Print the plan and write nothing.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    Remove(EntryWrite),
+    /// Disable Entries through each Agent's own machine-local switch, keeping them.
+    ///
+    /// Disable never writes a git-versioned file: it skips a switch in one for
+    /// the Agent's next machine-local switch, and when there is none, it is not
+    /// offered and exits 5 with the reason. `show` says which switch it would
+    /// write. This release does not write Disable switches yet.
+    Disable(EntryWrite),
     /// List past Operations, newest first, and whether each can be undone.
     History {
         #[command(subcommand)]
@@ -123,6 +112,28 @@ enum Command {
         #[arg(value_enum)]
         shell: Shell,
     },
+}
+
+/// The Entries a write targets, and the flags every write takes.
+#[derive(clap::Args)]
+struct EntryWrite {
+    /// Each one an Item name with a single Entry, or the
+    /// `<path>#<key path>` locator of an Entry. Together they form one
+    /// Operation, applied entirely or not at all.
+    #[arg(required = true)]
+    selectors: Vec<String>,
+    /// Target every Entry of the one Item each selector names.
+    #[arg(long)]
+    all: bool,
+    /// Confirm the Operation without asking.
+    #[arg(long)]
+    yes: bool,
+    /// Acknowledge one class of warning without asking. Repeat for several.
+    #[arg(long, value_enum, value_name = "CLASS")]
+    ack: Vec<Ack>,
+    /// Print the plan and write nothing.
+    #[arg(long)]
+    dry_run: bool,
 }
 
 #[derive(Subcommand)]
@@ -414,36 +425,8 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
-        Command::Remove {
-            selectors,
-            all,
-            yes,
-            ack,
-            dry_run,
-        } => {
-            let scanned = scanned(cli, &core)?;
-            let targets = Targets {
-                selectors: selectors.clone(),
-                all: *all,
-            };
-            let plan = core.plan(
-                &scanned.snapshot,
-                &scanned.context,
-                Action::Remove,
-                &targets,
-            )?;
-            confirm_and_execute(
-                cli,
-                &core,
-                plan,
-                Some(&project_line(&scanned.inventory, width)),
-                &WriteFlags {
-                    yes: *yes,
-                    ack: ack.clone(),
-                    dry_run: *dry_run,
-                },
-            )
-        }
+        Command::Remove(write) => write_entries(cli, &core, Action::Remove, write),
+        Command::Disable(write) => write_entries(cli, &core, Action::Disable, write),
         Command::History { command: None } => {
             let operations = core.history()?;
             if cli.json {
@@ -536,6 +519,34 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         }
         Command::Completions { .. } => unreachable!("completions run without a core"),
     }
+}
+
+/// Plans `action` on the Entries `write` targets in the context the flags
+/// ask for, then confirms and executes it.
+fn write_entries(
+    cli: &Cli,
+    core: &Core,
+    action: Action,
+    write: &EntryWrite,
+) -> Result<(), Failure> {
+    let scanned = scanned(cli, core)?;
+    let targets = Targets {
+        selectors: write.selectors.clone(),
+        all: write.all,
+    };
+    let plan = core.plan(&scanned.snapshot, &scanned.context, action, &targets)?;
+    let width = terminal::output_width(cli.wide);
+    confirm_and_execute(
+        cli,
+        core,
+        plan,
+        Some(&project_line(&scanned.inventory, width)),
+        &WriteFlags {
+            yes: write.yes,
+            ack: write.ack.clone(),
+            dry_run: write.dry_run,
+        },
+    )
 }
 
 fn completions(cli: &Cli, shell: Shell) -> Result<(), Failure> {
@@ -879,7 +890,7 @@ fn render_list(inventory: &Inventory, selected: bool, width: Option<usize>) -> S
         let header_line = table_line(&header, &widths, "LOCATION".to_owned(), DIM);
         out.push_str(&header_line.fit(width).render());
         for row in &rows {
-            let location = location(row.effective, location_width);
+            let location = location_cell(row.effective, location_width);
             let line = table_line(&row.cells, &widths, location, Style::new());
             out.push_str(&line.fit(width).render());
         }
@@ -1003,11 +1014,12 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
     let reason_indent = " ".repeat(INDENT.len() + widths[0] + GAP.len());
     let reason_width = width.map(|width| width.saturating_sub(reason_indent.len()));
     for (entry, cells) in item.entries.iter().zip(&rows) {
-        let location = location(entry, location_width);
+        let location = location_cell(entry, location_width);
         let line = table_line(cells, &widths, location, Style::new());
         out.push_str(&line.fit(width).render());
-        if let Some(reason) = &entry.reason {
-            for text in terminal::wrap(&reason.sentence, reason_width) {
+        let reason = entry.reason.as_ref().map(|reason| reason.sentence.as_str());
+        for sentence in reason.into_iter().chain([entry.disable.sentence()]) {
+            for text in terminal::wrap(sentence, reason_width) {
                 let mut line = Line::default();
                 line.push(reason_indent.as_str(), Style::new())
                     .push(text, Style::new());
@@ -1037,6 +1049,19 @@ fn styled_line(text: &str, style: Style, width: Option<usize>) -> String {
 /// the key path is what tells Entries of one file apart, so it stays whole.
 fn location(entry: &api::Entry, width: Option<usize>) -> String {
     elide_locator(&entry.locator, &entry.path, width)
+}
+
+/// What follows the locator of an Entry in a git-versioned file.
+const GIT_VERSIONED_TAG: &str = " [git-versioned]";
+
+/// An Entry's location column: its locator, shortened to `width` as
+/// [`location`] does, then a tag when its file is git-versioned.
+fn location_cell(entry: &api::Entry, width: Option<usize>) -> String {
+    if !entry.git_versioned {
+        return location(entry, width);
+    }
+    let width = width.map(|width| width.saturating_sub(columns(GIT_VERSIONED_TAG)));
+    format!("{}{GIT_VERSIONED_TAG}", location(entry, width))
 }
 
 /// The locator of an Entry in the file at `path`, shortened like [`location`].
