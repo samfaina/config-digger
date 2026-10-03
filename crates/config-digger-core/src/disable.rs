@@ -4,10 +4,10 @@
 //! switch in one is skipped for the next mechanism.
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
-use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::{
     Anchored, DisableMechanism, DisableReason, Disables, MechanismContext,
 };
+use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
 use crate::explain;
 use crate::locator;
@@ -147,9 +147,13 @@ pub(crate) fn hits<'a>(
 }
 
 /// What Enable writes to lift `disabling`, the switches that Disable an
-/// Entry, as a sentence. Or why it is not offered: one of them is a switch
-/// config-digger only reads.
-pub(crate) fn enable(disabling: &[Hit]) -> Result<String, String> {
+/// Entry of `location`, as a sentence. Or why it is not offered:
+/// config-digger only reads the Entry, or one of them is a switch it only
+/// reads.
+pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result<String, String> {
+    if location.provenance.read_only() {
+        return Err(explain::read_only_enable());
+    }
     if let Some(hit) = disabling.iter().find(|hit| !hit.mechanism.enable_offered()) {
         return Err(explain::enable_not_offered(&hit.holds()));
     }
@@ -193,6 +197,9 @@ pub(crate) fn choose(
     project: Option<&ContextProject>,
 ) -> Result<Choice, (DisableNotOffered, String)> {
     let location = definition.location(&entry.location);
+    if location.provenance.read_only() {
+        return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
+    }
     let roots = snapshot.roots(entry.agent_index, &entry.home);
     let mut mechanisms: Vec<(usize, &DisableMechanism)> = definition
         .rules(location.kind)

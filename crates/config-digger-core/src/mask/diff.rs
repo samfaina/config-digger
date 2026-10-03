@@ -4,7 +4,6 @@
 //! Context lines and other Entries are masked too.
 
 use crate::api::{DiffUnavailable, FileDiff};
-use crate::definitions::blocks::Parse;
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit;
 use crate::scan::{self, LocationReader};
@@ -175,15 +174,18 @@ fn secret_spans(
     location: &LocationDefinition,
     text: &str,
 ) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
+    // A folder of skill folders is no file, and holds no Secret a diff shows.
+    let Some(format) = location.format.file() else {
+        return Ok(Vec::new());
+    };
     let unparsed = |position| Unparsed::Parse {
-        dialect: location.format.dialect(),
+        dialect: format.dialect(),
         position,
     };
-    let document = location
-        .format
+    let document = format
         .parse(text)
         .map_err(|error| unparsed(error.position))?;
-    let syntax = location.format.syntax();
+    let syntax = format.syntax();
     let mut objects = Vec::new();
     scan::find_objects(&document, &location.root, Vec::new(), None, &mut objects)
         .map_err(|_| unparsed(None))?;

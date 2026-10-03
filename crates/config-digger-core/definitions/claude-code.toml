@@ -66,6 +66,11 @@ folder = { block = "path", path = "~" }
 state_file = ".claude.json"
 # The user settings, which hold Disable switches but no Entries.
 settings_file = ".claude/settings.json"
+# Personal skills, one folder each, and the skills synced from claude.ai.
+skills = ".claude/skills"
+
+[[scopes]]
+id = "managed"
 
 [[scopes]]
 id = "local"
@@ -201,4 +206,108 @@ context = "all"
 enable_action = "remove-item"
 reason = "disabled_by_name"
 locations = ["project-mcp"]
+enable_offered = false
+
+# Skills are folders holding a `SKILL.md`, read one level down only [docs].
+# A skill is named by its frontmatter `name`, or by its folder when there is
+# none. Claude Code reads the frontmatter only when `---` is the first line,
+# and loads a skill whose YAML does not parse with no fields set [docs]. It
+# never loads a skill from a folder named `synced` or `anthropic-skills`, in
+# any capitalisation, outside claude.ai sync [docs]. Whether it rewrites a
+# name that is not lower case and hyphens is not known, so names are used as
+# written.
+
+# Enterprise skills, in the managed settings directory [docs].
+[[locations]]
+id = "managed-skills"
+anchor = { block = "machine", path = "%ProgramFiles%/ClaudeCode/.claude/skills" }
+format = { block = "skill-folder", name_from = "frontmatter", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "user-skills"
+anchor = { block = "home", root = "skills" }
+format = { block = "skill-folder", name_from = "frontmatter", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# `.claude/skills` in the Project folder and in every parent up to the repo
+# root [docs]. Outside a repo only the Project folder is read, and which of
+# two same-named skills of different folders wins is not known: the nearest
+# one is taken to win.
+[[locations]]
+id = "project-skills"
+anchor = { block = "project", path = ".claude/skills", walk = "up-to-repo-root" }
+format = { block = "skill-folder", name_from = "frontmatter", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Skills synced from claude.ai sit one level deeper than the docs say, in
+# `synced/<org>_<account>/<name>` [disk], next to `manifest.json` and a
+# `.staging` folder. Claude Code owns this copy.
+[[locations]]
+id = "synced-skills"
+anchor = { block = "home", root = "skills", path = "synced" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Enterprise beats personal, and personal beats project [docs]. A local
+# skill beats a synced one, which then answers only to
+# `/anthropic-skills:<name>` [docs]. Claude Code skips a skill it cannot
+# load before they compete.
+[items.skill]
+precedence = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "disable", "precedence"]
+
+# The `/skills` menu: `skillOverrides: {"<name>": "off"}` in the Project's
+# local settings [docs]. `"name-only"` and `"user-invocable-only"` hide the
+# skill from Claude but keep it in the `/` menu; `"on"` is the default.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+target = "name"
+context = "project"
+enable_action = "delete-key"
+reason = "disabled_by_name"
+disabled_value = "off"
+partial_values = ["name-only", "user-invocable-only"]
+
+# Any settings file can hold `skillOverrides` [docs]. config-digger only
+# reads the shared Project settings, which belong to the team, and the user
+# settings, which apply in every Project.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+target = "name"
+context = "project"
+enable_action = "delete-key"
+reason = "disabled_by_name"
+disabled_value = "off"
+partial_values = ["name-only", "user-invocable-only"]
+enable_offered = false
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "delete-key"
+reason = "disabled_by_name"
+disabled_value = "off"
+partial_values = ["name-only", "user-invocable-only"]
 enable_offered = false

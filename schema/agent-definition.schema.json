@@ -84,6 +84,9 @@
       "properties": {
         "mcp": {
           "$ref": "#/$defs/ItemRules"
+        },
+        "skill": {
+          "$ref": "#/$defs/ItemRules"
         }
       },
       "additionalProperties": false
@@ -334,12 +337,16 @@
           ]
         },
         {
-          "description": "A path in the Project folder itself.",
+          "description": "A path in the Project folder, and with `walk`, in its parents too.",
           "type": "object",
           "properties": {
             "path": {
               "description": "A `/`-separated path relative to the Project folder.",
               "type": "string"
+            },
+            "walk": {
+              "description": "Which folders the path is read in, from the Project folder up.\nOnly a location can walk.",
+              "$ref": "#/$defs/ProjectWalk"
             },
             "block": {
               "type": "string",
@@ -351,6 +358,40 @@
             "block",
             "path"
           ]
+        },
+        {
+          "description": "A fixed path outside any Agent home or Project, read once for every\nhome of the Agent, such as a folder an organisation deploys to every\nuser of the machine.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "Starts with `%NAME%`, expanded from the environment, or a drive;\n`/`-separated, without wildcards.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "machine"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
+          ]
+        }
+      ]
+    },
+    "ProjectWalk": {
+      "description": "How far up from the Project folder a location in a Project is read.",
+      "oneOf": [
+        {
+          "description": "In the Project folder only.",
+          "type": "string",
+          "const": "none"
+        },
+        {
+          "description": "In the Project folder and each parent up to the root of its git\nrepo, the folder holding `.git`. Outside a repo, in the Project\nfolder only.",
+          "type": "string",
+          "const": "up-to-repo-root"
         }
       ]
     },
@@ -553,11 +594,12 @@
           "$ref": "#/$defs/Format"
         },
         "root": {
-          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project.",
+          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project. Omitted for a folder of skill folders.",
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "default": []
         },
         "kind": {
           "$ref": "#/$defs/ItemKind"
@@ -617,7 +659,6 @@
         "id",
         "anchor",
         "format",
-        "root",
         "kind",
         "scope",
         "provenance",
@@ -626,7 +667,7 @@
       ]
     },
     "Format": {
-      "description": "The file format and dialect a location is read in.",
+      "description": "The format a location is read in: a file in a dialect, or a folder of\nskill folders.",
       "oneOf": [
         {
           "description": "JSON, in the dialect the Agent reads it in.",
@@ -659,6 +700,64 @@
           "required": [
             "block"
           ]
+        },
+        {
+          "description": "A folder whose subfolders holding a `SKILL.md` are skills, each one an\nEntry. A folder whose name starts with `.` is never read, and one\nwithout `SKILL.md` is not an Entry.",
+          "type": "object",
+          "properties": {
+            "recursive": {
+              "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth.\nA skill folder's own subfolders never are.",
+              "type": "boolean",
+              "default": false
+            },
+            "name_from": {
+              "description": "Where a skill's name comes from.",
+              "$ref": "#/$defs/NameFrom"
+            },
+            "sanitize": {
+              "description": "How the Agent rewrites a name into the one it uses, if it does.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sanitize"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reserved": {
+              "description": "Folder names the Agent never loads a skill from, compared\ncase-insensitively, such as a name it keeps for itself.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "no_frontmatter": {
+              "description": "What the Agent does with a `SKILL.md` that does not open with a\n`---` frontmatter.",
+              "$ref": "#/$defs/SkillFallback"
+            },
+            "malformed_frontmatter": {
+              "description": "What the Agent does with a frontmatter that is not YAML it reads.",
+              "$ref": "#/$defs/SkillFallback"
+            },
+            "no_name": {
+              "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
+              "$ref": "#/$defs/SkillFallback"
+            },
+            "block": {
+              "type": "string",
+              "const": "skill-folder"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "name_from",
+            "no_frontmatter",
+            "malformed_frontmatter",
+            "no_name"
+          ]
         }
       ]
     },
@@ -682,19 +781,70 @@
         }
       ]
     },
+    "NameFrom": {
+      "description": "Where a skill's name comes from.",
+      "oneOf": [
+        {
+          "description": "The skill folder's name.",
+          "type": "string",
+          "const": "folder"
+        },
+        {
+          "description": "The `name` of the `SKILL.md` frontmatter.",
+          "type": "string",
+          "const": "frontmatter"
+        }
+      ]
+    },
+    "Sanitize": {
+      "description": "How an Agent rewrites a skill's name.",
+      "oneOf": [
+        {
+          "description": "Lower case, each run of characters other than `a`-`z` and `0`-`9`\nreplaced by one `-`, with no `-` at either end.",
+          "type": "string",
+          "const": "lowercase-hyphens"
+        }
+      ]
+    },
+    "SkillFallback": {
+      "description": "What an Agent does with a skill whose `SKILL.md` it cannot fully read.",
+      "oneOf": [
+        {
+          "description": "It skips the skill, which is Invalid.",
+          "type": "string",
+          "const": "skip"
+        },
+        {
+          "description": "It loads the skill under its folder's name, with no other\nfrontmatter field: Effective, with a note.",
+          "type": "string",
+          "const": "folder-name"
+        }
+      ]
+    },
     "ItemKind": {
       "type": "string",
       "enum": [
-        "mcp"
+        "mcp",
+        "skill"
       ]
     },
     "Provenance": {
       "description": "How the Entries of a location got there, which decides how they can be taken away.",
       "oneOf": [
         {
-          "description": "A key someone wrote into a configuration file, by hand or through the Agent.",
+          "description": "A key someone wrote into a configuration file, or a skill folder\nsomeone put there, by hand or through the Agent.",
           "type": "string",
           "const": "file"
+        },
+        {
+          "description": "Configuration an organisation deploys to the machine, such as\nenterprise skills. config-digger only reads it.",
+          "type": "string",
+          "const": "managed"
+        },
+        {
+          "description": "A copy the Agent keeps of configuration held in the user's account,\nsuch as skills synced from claude.ai. config-digger only reads it.",
+          "type": "string",
+          "const": "cloud-mirror"
         }
       ]
     },
@@ -972,6 +1122,11 @@
           "description": "The Entry lacks the minimal shape its location declares: Invalid.\nRequired when a location of the kind declares a shape, and refused\notherwise.",
           "type": "string",
           "const": "shape"
+        },
+        {
+          "description": "The Agent skips the skill because of its `SKILL.md` or its folder's\nname: Invalid. Required when a location of the kind is a folder of\nskill folders, and refused otherwise.",
+          "type": "string",
+          "const": "frontmatter"
         }
       ]
     },

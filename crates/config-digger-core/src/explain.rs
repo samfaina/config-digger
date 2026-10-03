@@ -4,7 +4,7 @@
 use crate::api::{
     Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, State, Verify,
 };
-use crate::definitions::blocks::{FieldType, Malformed};
+use crate::definitions::blocks::{FieldType, Malformed, SkillDefect};
 use crate::edit::Edit;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -721,4 +721,59 @@ pub(crate) fn definition_untested(agent_name: &str) -> String {
     format!(
         "This definition of {agent_name} has no tested version range, so what it says may not match how {agent_name} behaves."
     )
+}
+
+/// What is wrong with a skill's `SKILL.md` or folder, as a sentence ends.
+fn skill_defect(defect: SkillDefect) -> &'static str {
+    match defect {
+        SkillDefect::NoFrontmatter => "its SKILL.md does not open with a `---` frontmatter",
+        SkillDefect::MalformedFrontmatter => "its SKILL.md frontmatter is not valid YAML",
+        SkillDefect::NoName => "its SKILL.md frontmatter has no `name`",
+        SkillDefect::Reserved => "its folder has a name the Agent keeps for itself",
+    }
+}
+
+/// The reason of a skill the Agent skips because of `defect`.
+pub(crate) fn malformed_skill(agent_name: &str, defect: SkillDefect) -> Reason {
+    Reason {
+        code: ReasonCode::MalformedSkill,
+        effective: None,
+        switch: None,
+        sentence: format!("{agent_name} skips this skill: {}.", skill_defect(defect)),
+    }
+}
+
+/// The note of a skill the Agent loads under its folder's name despite `defect`.
+pub(crate) fn skill_fallback(agent_name: &str, defect: SkillDefect, folder: &str) -> String {
+    format!(
+        "{agent_name} still loads this skill, as `{folder}`, its folder's name: {}.",
+        skill_defect(defect)
+    )
+}
+
+/// Why Disable is not offered for an Entry config-digger only reads.
+pub(crate) fn read_only_option() -> String {
+    "Disable is not offered: this Entry is managed or mirrored from the user's account, and config-digger only reads it.".to_owned()
+}
+
+/// Why `action` is refused for the read-only Entry at `locator`.
+pub(crate) fn read_only(action: Action, locator: &str) -> String {
+    let verb = match action {
+        Action::Disable => "Disable",
+        Action::Enable => "Enable",
+        _ => "Remove",
+    };
+    format!(
+        "cannot {verb} {locator}: it is managed or mirrored from the user's account, and config-digger only reads it"
+    )
+}
+
+/// Why Remove is refused for the skill folder at `locator`.
+pub(crate) fn skill_remove_not_offered(locator: &str) -> String {
+    format!("cannot Remove {locator}: Remove of a skill folder is not available yet")
+}
+
+/// Why Enable is not offered for a Disabled Entry config-digger only reads.
+pub(crate) fn read_only_enable() -> String {
+    "Enable is not offered: this Entry is managed or mirrored from the user's account, and config-digger only reads it.".to_owned()
 }

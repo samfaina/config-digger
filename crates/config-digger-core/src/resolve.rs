@@ -2,7 +2,9 @@
 //! to the Items of every Agent home and the State of each Entry.
 
 use crate::api::{self, Context};
-use crate::definitions::blocks::{Compete, Conform, JsonFormat, Malformed, Parse};
+use crate::definitions::blocks::{
+    Compete, Conform, JsonFormat, Malformed, Parse, SkillDefect, SkillFallback,
+};
 use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
@@ -113,7 +115,12 @@ pub(crate) fn resolve(
             // key, are ordered by key path so that the choice is stable.
             // Unread Entries come last, so that they never name the Item.
             entries.sort_by(|a, b| {
-                (unread(a), rank(a), &a.key_path).cmp(&(unread(b), rank(b), &b.key_path))
+                (unread(a), rank(a), a.depth, &a.key_path).cmp(&(
+                    unread(b),
+                    rank(b),
+                    b.depth,
+                    &b.key_path,
+                ))
             });
             // An Item is named after the Entry that would be Effective
             // without Disables.
@@ -133,10 +140,27 @@ pub(crate) fn resolve(
                     shape.malformed(&entry.config)
                 })
                 .collect();
+            // What makes the Agent skip each skill, and what it loads anyway
+            // through a fallback.
+            let (skipped, fallbacks): (Vec<Option<SkillDefect>>, Vec<Option<SkillDefect>>) =
+                entries
+                    .iter()
+                    .map(|entry| {
+                        let folder = definition.location(&entry.location).format.skill_folder();
+                        match (entry.defect, folder) {
+                            (Some(defect), Some(folder)) => match folder.fallback(defect) {
+                                SkillFallback::Skip => (Some(defect), None),
+                                SkillFallback::FolderName => (None, Some(defect)),
+                            },
+                            _ => (None, None),
+                        }
+                    })
+                    .unzip();
             // An Invalid Entry competes only where the Agent still lists it,
-            // and an Unread one never does.
+            // and an Unread one or a skipped skill never does.
             let competes = |index: usize| {
                 !unread(entries[index])
+                    && skipped[index].is_none()
                     && (malformed[index].is_none()
                         || definition
                             .location(&entries[index].location)
@@ -183,6 +207,14 @@ pub(crate) fn resolve(
                                     ));
                                 }
                             }
+                            Check::Frontmatter => {
+                                if let Some(defect) = skipped[index] {
+                                    failed.push((
+                                        api::State::Invalid,
+                                        explain::malformed_skill(agent_name, defect),
+                                    ));
+                                }
+                            }
                             Check::Precedence => {
                                 if let Some(winner) = winner.filter(|&winner| winner < index) {
                                     failed.push((api::State::Shadowed, shadowed_by(index, winner)));
@@ -208,9 +240,10 @@ pub(crate) fn resolve(
                             .find(|&other| lifted(other) && competes(other))
                             .filter(|&winner| winner < index);
                         let Some(winner) = winner else {
-                            let state = match malformed[index] {
-                                Some(_) => api::State::Invalid,
-                                None => api::State::Effective,
+                            let state = if malformed[index].is_some() || skipped[index].is_some() {
+                                api::State::Invalid
+                            } else {
+                                api::State::Effective
                             };
                             return api::WhatIf {
                                 state,
@@ -230,8 +263,9 @@ pub(crate) fn resolve(
                             effective: Some(effective),
                         }
                     });
-                    let enable = (!disabling.is_empty())
-                        .then(|| disable::enable(disabling).unwrap_or_else(|refused| refused));
+                    let enable = (!disabling.is_empty()).then(|| {
+                        disable::enable(location, disabling).unwrap_or_else(|refused| refused)
+                    });
                     let disable = if disabling.is_empty() {
                         disable::option(definition, snapshot, entry, context_project.as_ref())
                     } else {
@@ -251,13 +285,22 @@ pub(crate) fn resolve(
                         reason,
                         secondary: failed.map(|(_, reason)| reason).collect(),
                         what_if,
-                        notes: partial
-                            .iter()
-                            .map(|hit| api::Note {
-                                code: api::NoteCode::PartialSwitch,
-                                switch: hit.locator(),
-                                sentence: explain::partial_switch(&hit.holds(), agent_name),
+                        notes: fallbacks[index]
+                            .map(|defect| api::Note {
+                                code: api::NoteCode::SkillFallback,
+                                switch: None,
+                                sentence: explain::skill_fallback(
+                                    agent_name,
+                                    defect,
+                                    &entry.path.file_name().unwrap_or_default().to_string_lossy(),
+                                ),
                             })
+                            .into_iter()
+                            .chain(partial.iter().map(|hit| api::Note {
+                                code: api::NoteCode::PartialSwitch,
+                                switch: Some(hit.locator()),
+                                sentence: explain::partial_switch(&hit.holds(), agent_name),
+                            }))
                             .collect(),
                         config: entry.config.clone(),
                         masked: entry.masked.clone(),
@@ -493,7 +536,10 @@ fn reaction(
         dialect: locations
             .first()
             .map_or(JsonFormat::STRICT.dialect(), |location| {
-                location.format.dialect()
+                location
+                    .format
+                    .file()
+                    .map_or(JsonFormat::STRICT.dialect(), Parse::dialect)
             }),
         kinds: locations.iter().map(|location| location.kind).collect(),
     }

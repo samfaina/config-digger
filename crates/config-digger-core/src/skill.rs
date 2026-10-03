@@ -6,6 +6,7 @@
 //! file that differs is only said to have changed.
 
 use crate::api::{Error, SkillContent, SkillFile, SkillFileChange, SkillFileChangeKind};
+use crate::definitions::blocks::SkillDefect;
 use crate::ports::FileSystem;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -19,7 +20,7 @@ pub(crate) fn content(fs: &dyn FileSystem, folder: &Path) -> Result<SkillContent
     let files = files(fs, folder)?;
     let frontmatter = files
         .get(SKILL_MD)
-        .map(|bytes| frontmatter(&String::from_utf8_lossy(bytes)))
+        .and_then(|bytes| frontmatter(&String::from_utf8_lossy(bytes)).ok())
         .unwrap_or_default();
     Ok(SkillContent {
         name: frontmatter.get("name").cloned(),
@@ -111,25 +112,36 @@ fn cannot_read(path: &Path, error: &io::Error) -> Error {
     Error::blocked(format!("cannot read {}: {error}", path.display()))
 }
 
-/// The top-level scalar keys of a YAML frontmatter, as far as a skill's
-/// `name` and `description` need: plain, quoted, and `|` or `>` block
-/// scalars, and plain scalars continued on indented lines.
-fn frontmatter(text: &str) -> BTreeMap<String, String> {
+/// The top-level scalar keys of the YAML frontmatter of a `SKILL.md`, as
+/// far as a skill's `name` and `description` need: plain, quoted, and `|`
+/// or `>` block scalars, and plain scalars continued on indented lines. Or
+/// why there is none: the text does not open with `---`, or the
+/// frontmatter never closes or holds a top-level line that is not a key.
+pub(crate) fn frontmatter(text: &str) -> Result<BTreeMap<String, String>, SkillDefect> {
     let mut keys = BTreeMap::new();
-    let mut lines = text.lines();
+    let mut lines = text.trim_start_matches('\u{feff}').lines();
     if lines.next().map(str::trim_end) != Some("---") {
-        return keys;
+        return Err(SkillDefect::NoFrontmatter);
     }
-    let lines: Vec<&str> = lines.take_while(|line| line.trim_end() != "---").collect();
+    let mut closed = false;
+    let lines: Vec<&str> = lines
+        .take_while(|line| {
+            closed = line.trim_end() == "---";
+            !closed
+        })
+        .collect();
+    if !closed {
+        return Err(SkillDefect::MalformedFrontmatter);
+    }
     let mut index = 0;
     while index < lines.len() {
         let line = lines[index];
         index += 1;
-        if line.starts_with([' ', '\t', '#']) {
+        if line.trim().is_empty() || line.starts_with([' ', '\t', '#']) {
             continue;
         }
         let Some((key, value)) = line.split_once(':') else {
-            continue;
+            return Err(SkillDefect::MalformedFrontmatter);
         };
         let value = value.trim();
         let continued: Vec<&str> = lines[index..]
@@ -151,7 +163,7 @@ fn frontmatter(text: &str) -> BTreeMap<String, String> {
         };
         keys.insert(key.trim().to_owned(), value);
     }
-    keys
+    Ok(keys)
 }
 
 /// Lines folded into one, as YAML folds a plain or `>` scalar.

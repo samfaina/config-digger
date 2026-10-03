@@ -403,6 +403,64 @@ fn list_accepts_a_selector() {
 }
 
 #[test]
+fn list_kind_filters_items_by_kind() {
+    let harness = Harness::new()
+        .with_file(".claude.json", CLAUDE_JSON)
+        .with_file(
+            ".claude/skills/deploy/SKILL.md",
+            "---\nname: deploy\ndescription: Deploys.\n---\n",
+        );
+    let kinds = |run: &Run| -> Vec<(String, String)> {
+        run.document()["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| {
+                (
+                    item["kind"].as_str().unwrap().to_owned(),
+                    item["name"].as_str().unwrap().to_owned(),
+                )
+            })
+            .collect()
+    };
+
+    let skills = harness.run(&["list", "--kind", "skill", "--json"]);
+    let servers = harness.run(&["list", "--kind", "mcp", "--json"]);
+    let both = harness.run(&["list", "--json"]);
+    let unknown = harness.run(&["list", "--kind", "plugin"]);
+
+    assert_eq!(skills.code, 0, "{}", skills.stderr);
+    assert_eq!(kinds(&skills), pairs(&[("skill", "deploy")]));
+    assert_eq!(
+        kinds(&servers),
+        pairs(&[("mcp", "cd-throwaway-github"), ("mcp", "linear")])
+    );
+    assert_eq!(kinds(&both).len(), 3);
+    assert_eq!(unknown.code, 2, "{}", unknown.stderr);
+}
+
+#[test]
+fn list_prints_a_skill_with_its_folder() {
+    let harness =
+        Harness::new().with_file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+
+    let run = harness.run(&["list", "--kind", "skill"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let folder = real_path(&harness.path(".claude/skills"))
+        .join("deploy")
+        .display()
+        .to_string();
+    let row = run
+        .stdout
+        .lines()
+        .find(|line| line.contains(&folder))
+        .unwrap_or_else(|| panic!("no row for deploy:\n{}", run.stdout));
+    let columns: Vec<&str> = row.split_whitespace().collect();
+    assert_eq!(columns, ["deploy", "user", "Effective", folder.as_str()]);
+}
+
+#[test]
 fn list_prints_each_user_server_with_name_scope_location_and_state() {
     let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
 
@@ -444,7 +502,7 @@ fn list_json_prints_one_document_with_schema_version() {
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
-            "scopes": ["local", "project", "user"],
+            "scopes": ["managed", "local", "project", "user"],
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
@@ -1823,6 +1881,38 @@ fn disable_then_enable_round_trips_through_the_switch_claude_code_writes() {
         .map(|operation| operation["title"].as_str().unwrap())
         .collect();
     assert_eq!(titles, ["Enable 1 Entry", "Disable 1 Entry"]);
+}
+
+#[test]
+fn disable_then_enable_of_a_project_skill_round_trips_through_skill_overrides() {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_cwd_file(".claude/skills/lint/SKILL.md", "---\nname: lint\n---\n");
+    let settings_local = harness.root.path().join(".claude/settings.local.json");
+
+    let disable = harness.run(&["disable", "lint", "--yes"]);
+    assert_eq!(disable.code, 0, "{}\n{}", disable.stdout, disable.stderr);
+    let written: Value = serde_json::from_str(&read(&settings_local)).unwrap();
+    assert_eq!(written, json!({ "skillOverrides": { "lint": "off" } }));
+    let list = harness
+        .run(&["list", "--kind", "skill", "--json"])
+        .document();
+    assert_eq!(
+        entry_states(&list, "lint"),
+        pairs(&[("project", "disabled")])
+    );
+
+    let enable = harness.run(&["enable", "lint", "--yes"]);
+    assert_eq!(enable.code, 0, "{}\n{}", enable.stdout, enable.stderr);
+    let written: Value = serde_json::from_str(&read(&settings_local)).unwrap();
+    assert_eq!(written, json!({ "skillOverrides": {} }));
+    let list = harness
+        .run(&["list", "--kind", "skill", "--json"])
+        .document();
+    assert_eq!(
+        entry_states(&list, "lint"),
+        pairs(&[("project", "effective")])
+    );
 }
 
 #[test]

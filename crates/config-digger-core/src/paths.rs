@@ -190,6 +190,13 @@ fn walk(fs: &dyn FileSystem, bases: Vec<PathBuf>, parts: &[&str]) -> Vec<PathBuf
     paths
 }
 
+/// The lexical normalisation of a fixed path that [`validate_glob`]
+/// accepts, its `~/` or `%NAME%` start expanded from `env`, `None` when
+/// `env` does not say what it stands for.
+pub(crate) fn expand(path: &str, env: &dyn Environment) -> Option<PathBuf> {
+    Some(lexical(Path::new(&expand_start(path, env)?)))
+}
+
 /// A glob with its `~/` or `%NAME%` start expanded from `env`, `None` when
 /// `env` does not say what it stands for.
 fn expand_start(glob: &str, env: &dyn Environment) -> Option<String> {
