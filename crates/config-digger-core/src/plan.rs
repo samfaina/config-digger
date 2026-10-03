@@ -4,7 +4,7 @@
 
 use crate::api::{
     self, Action, Change, Context, EditSummary, EffectiveChange, Error, FileChange, Inventory,
-    Preview, ScanOptions, StateAfter, Targets, Warning,
+    Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -26,6 +26,9 @@ pub(crate) struct Planned {
     pub files: Vec<PlannedFile>,
     pub preview: Preview,
     pub warnings: Vec<Warning>,
+    /// The Read failures before the Operation: Verify fails it when a
+    /// written file no longer parses for a reader that could read it.
+    pub read_failures: Vec<ReadFailure>,
 }
 
 /// The edits to one file.
@@ -122,6 +125,7 @@ pub(crate) fn plan(
         files,
         preview,
         warnings: Vec::new(),
+        read_failures: before.read_failures,
     })
 }
 
@@ -177,6 +181,7 @@ pub(crate) fn plan_undo(
         files,
         preview,
         warnings: Vec::new(),
+        read_failures: before.read_failures,
     })
 }
 

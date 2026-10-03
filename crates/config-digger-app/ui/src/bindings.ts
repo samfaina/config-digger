@@ -29,15 +29,17 @@ export type Error = {
 	/**  What an ambiguous selector could mean, one locator per Item or Entry. */
 	candidates: string[],
 	/**
-	 *  The backup folder of an Operation that needs manual recovery, or of
-	 *  one whose Undo was refused.
+	 *  The backup folder of a failed Operation, or of one whose Undo was
+	 *  refused.
 	 */
 	backup: string | null,
 	/**
-	 *  For a refused Undo, a unified diff from each backed-up file to what
-	 *  it holds now.
+	 *  For a refused Undo, or a Rollback that is incomplete, a unified diff
+	 *  from each backed-up file to what it holds now.
 	 */
 	diff: string | null,
+	/**  The Operation that failed, once it was recorded in History. */
+	failed: FailedOperation | null,
 };
 
 export type ErrorCode = "unexpected" | 
@@ -55,15 +57,40 @@ export type ErrorCode = "unexpected" |
 "stale" | 
 /**  A backup copy does not hold the bytes read; nothing was written. */
 "backup_failed" | 
-/**  The first write failed; nothing was written. */
+/**  A write failed; the Operation was rolled back. */
 "write_failed" | 
+/**  An edit did not land; the Operation was rolled back. */
+"verify_failed" | 
 /**
- *  Some files were written and the Operation did not complete, so it
- *  needs manual recovery from its backup.
+ *  An Agent rewrote a file after config-digger wrote it, taking an edit
+ *  away; the Operation was rolled back.
  */
-"needs_recovery" | 
+"overwritten_by_agent" | 
+/**
+ *  A file no longer parses for a reader that could read it before; the
+ *  Operation was rolled back.
+ */
+"read_failure_introduced" | 
+/**
+ *  The Operation failed and its Rollback could not restore every file,
+ *  so it needs manual recovery from its backup.
+ */
+"rollback_incomplete" | 
 /**  What the Operation to undo touched changed since it ran. */
 "undo_refused";
+
+/**  An Operation that failed after it was recorded in History. */
+export type FailedOperation = {
+	/**  Its id in History. */
+	operation: string,
+	/**
+	 *  For `rollback_incomplete`, the code of the failure that started the
+	 *  Rollback.
+	 */
+	failure: ErrorCode | null,
+	/**  Where its Rollback left each file it touched. */
+	rollback: RollbackLocation[],
+};
 
 /**  An Agent home found on this machine. */
 export type Home = {
@@ -137,6 +164,33 @@ export type Reason = {
 export type ReasonCode = 
 /**  A same-named Entry at a location the Agent ranks higher is Effective. */
 "shadowed_by_precedence";
+
+/**  Where a failed Operation's Rollback left one file it touched. */
+export type RollbackLocation = {
+	path: string,
+	outcome: RollbackOutcome,
+	/**  Why it was left alone or not restored, as a sentence. */
+	reason: string | null,
+};
+
+export type RollbackOutcome = 
+/**
+ *  It holds the bytes it held before the Operation again, or is gone
+ *  again when the Operation created it.
+ */
+"restored" | 
+/**  The Operation never wrote it. */
+"not_written" | 
+/**
+ *  It changed after config-digger wrote it, and holds none of the
+ *  Operation's edits any more, so it is left as it is.
+ */
+"left_alone" | 
+/**
+ *  It still holds some of the Operation's edits and could not be
+ *  restored. It needs manual recovery from the backup.
+ */
+"not_restored";
 
 export type State = "effective" | "shadowed";
 

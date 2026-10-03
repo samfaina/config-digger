@@ -45,8 +45,12 @@ struct FakeFiles {
     locked_elsewhere: BTreeSet<String>,
     /// Folders below which a write stores other bytes than it was given.
     corrupting: Vec<PathBuf>,
-    /// Files whose writes fail.
-    failing: Vec<PathBuf>,
+    /// Files whose writes fail, each with the number of writes to it that
+    /// still succeed first.
+    failing: Vec<(PathBuf, usize)>,
+    /// Files an Agent rewrites with other bytes right after the core's next
+    /// write to them.
+    rewrites: Vec<(PathBuf, Vec<u8>)>,
 }
 
 impl FakeFileSystem {
@@ -105,7 +109,24 @@ impl FakeFileSystem {
 
     /// Every write to the file at `path` fails.
     pub fn failing_writes_to(self, path: impl Into<PathBuf>) -> Self {
-        self.files().failing.push(path.into());
+        self.failing_writes_to_after(path, 0)
+    }
+
+    /// The next `successes` writes to the file at `path` succeed, and every
+    /// one after them fails.
+    pub fn failing_writes_to_after(self, path: impl Into<PathBuf>, successes: usize) -> Self {
+        self.files().failing.push((path.into(), successes));
+        self
+    }
+
+    /// Right after the core's next write to the file at `path`, an Agent
+    /// rewrites it with `contents`, as one holding the file in memory would.
+    pub fn agent_rewrites_after_next_write(
+        self,
+        path: impl Into<PathBuf>,
+        contents: impl Into<Vec<u8>>,
+    ) -> Self {
+        self.files().rewrites.push((path.into(), contents.into()));
         self
     }
 
@@ -285,6 +306,19 @@ impl FileSystem for FakeFileSystem {
         Ok(())
     }
 
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
+        self.count_access();
+        let exists = {
+            let files = self.files();
+            files.find_file(&files.follow(path)).is_some()
+        };
+        if !exists {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        self.delete_file(path);
+        Ok(())
+    }
+
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         self.count_access();
         let mut files = self.files();
@@ -302,12 +336,12 @@ impl FileSystem for FakeFileSystem {
         self.count_access();
         let mut files = self.files();
         let path = files.follow(path);
-        if files
-            .failing
-            .iter()
-            .any(|failing| strip_prefix(&path, failing).is_some_and(|rest| rest.is_empty()))
-        {
-            return Err(io::Error::other("this fake write fails"));
+        let is = |known: &Path| strip_prefix(&path, known).is_some_and(|rest| rest.is_empty());
+        if let Some((_, successes)) = files.failing.iter_mut().find(|(failing, _)| is(failing)) {
+            if *successes == 0 {
+                return Err(io::Error::other("this fake write fails"));
+            }
+            *successes -= 1;
         }
         let folder = path.parent().unwrap_or(Path::new(""));
         if files.real_path(folder).is_none() {
@@ -316,6 +350,13 @@ impl FileSystem for FakeFileSystem {
         let mut bytes = bytes.to_vec();
         if FakeFiles::is_below(&files.corrupting, &path) {
             bytes.push(b'!');
+        }
+        if let Some(index) = files
+            .rewrites
+            .iter()
+            .position(|(rewritten, _)| is(rewritten))
+        {
+            bytes = files.rewrites.remove(index).1;
         }
         let spelling = match files.find_file(&path) {
             Some((spelling, _)) => spelling.clone(),

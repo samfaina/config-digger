@@ -1,15 +1,22 @@
 //! Execute: carries out a plan. It refuses unless every warning is
-//! acknowledged, then, under the global lock: re-reads each touched file,
-//! backs it up and checks the copy, writes atomically, verifies, and records
-//! the Operation in History.
+//! acknowledged, then, under the global lock: re-reads each touched file and
+//! writes nothing when a touched Entry changed since the preview, backs each
+//! file up and checks the copy, writes atomically, verifies, rolls the whole
+//! Operation back when a write or Verify fails, and records the Operation in
+//! History.
 
-use crate::api::{Difference, Error, OperationStatus, Outcome, Verify, WarningClass};
+use crate::api::{
+    Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome, RollbackLocation,
+    RollbackOutcome, Verify, WarningClass,
+};
 use crate::definitions::AgentDefinition;
-use crate::edit::EditableFile;
+use crate::edit::{self, EditableFile};
 use crate::history::{self, EditRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::Ports;
 use crate::{explain, resolve, scan};
+use serde_json::Value;
+use std::io;
 use std::path::{Path, PathBuf};
 
 /// One file about to be written.
@@ -96,17 +103,36 @@ pub(crate) fn execute(
     }
     history::record(ports, &folder, &manifest).map_err(Error::backup_failed)?;
 
-    for (index, write) in writes.iter().enumerate() {
+    let mut written = 0;
+    let mut failure = None;
+    for write in &writes {
         if let Err(error) = ports.fs.write_atomic(&write.file.path, &write.bytes) {
-            let cause = format!("cannot write {}: {error}", write.file.path.display());
-            return Err(fail(ports, &folder, &mut manifest, index > 0, cause));
+            failure = Some(Failure::new(
+                ErrorCode::WriteFailed,
+                format!("cannot write {}: {error}", write.file.path.display()),
+            ));
+            break;
         }
+        written += 1;
     }
-    if let Err(cause) = verify_files(ports, &writes) {
-        return Err(fail(ports, &folder, &mut manifest, true, cause));
-    }
-
-    let differences = verify_states(definitions, ports, &planned)?;
+    let verified = match failure {
+        Some(failure) => Err(failure),
+        None => verify(definitions, ports, &planned, &writes),
+    };
+    let differences = match verified {
+        Ok(differences) => differences,
+        Err(failure) => {
+            let rollback = roll_back(ports, &writes, written);
+            return Err(fail(
+                ports,
+                &folder,
+                &mut manifest,
+                &writes,
+                rollback,
+                failure,
+            ));
+        }
+    };
     let verify = if differences.is_empty() {
         Verify::Verified
     } else {
@@ -247,82 +273,190 @@ fn back_up(ports: &Ports, copy: &Path, bytes: &[u8]) -> Result<(), Error> {
     Ok(())
 }
 
-/// Records a failed Operation and the error to report. There is no Rollback
-/// yet, so an Operation that wrote anything needs manual recovery.
-fn fail(
-    ports: &Ports,
-    folder: &Path,
-    manifest: &mut Manifest,
-    written: bool,
+/// Why an Operation failed after it was backed up.
+struct Failure {
+    code: ErrorCode,
     cause: String,
-) -> Error {
-    manifest.status = if written {
-        OperationStatus::NeedsAttention
-    } else {
-        OperationStatus::Failed
-    };
-    manifest.cause = Some(cause.clone());
-    if let Err(error) = history::record(ports, folder, manifest) {
-        tracing::error!(operation = %manifest.id, %error, "cannot record the failed Operation");
-    }
-    tracing::error!(operation = %manifest.id, %cause, "operation failed");
-    if written {
-        Error::needs_recovery(cause, folder.to_path_buf())
-    } else {
-        Error::write_failed(cause)
+}
+
+impl Failure {
+    fn new(code: ErrorCode, cause: String) -> Self {
+        Self { code, cause }
     }
 }
 
-/// Verify, per file: it reads back and every key an edit changed holds the
-/// value the edit gave it.
-fn verify_files(ports: &Ports, writes: &[PendingWrite]) -> Result<(), String> {
+/// Verify: each edit landed, and every written file still parses for each
+/// reader that could read it before. Then it scans and resolves the context
+/// again and compares each predicted State with the actual one.
+fn verify(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    planned: &Planned,
+    writes: &[PendingWrite],
+) -> Result<Vec<Difference>, Failure> {
+    for write in writes {
+        verify_file(ports, planned, write)?;
+    }
+    let snapshot =
+        scan::scan(definitions, ports, &planned.scan_options.projects).map_err(|error| {
+            Failure::new(
+                ErrorCode::VerifyFailed,
+                format!("cannot scan again: {error}"),
+            )
+        })?;
+    let actual = resolve::resolve(definitions, &snapshot, &planned.context);
     for write in writes {
         let path = &write.file.path;
-        let bytes = ports
-            .fs
-            .read(path)
-            .map_err(|error| format!("cannot read {} back: {error}", path.display()))?;
-        let file = EditableFile::decode(&bytes, write.file.syntax)
-            .map_err(|reason| format!("{} cannot be read back: {reason}", path.display()))?;
-        // A key an edit changes again is checked against its last value only.
-        let mut checked: Vec<&[String]> = Vec::new();
-        let dependencies = write.file.edited.edits.iter().rev();
-        for dependency in dependencies.flat_map(|applied| applied.depends_on.iter().rev()) {
-            if checked.contains(&dependency.key_path.as_slice()) {
-                continue;
-            }
-            checked.push(&dependency.key_path);
-            let value = file
-                .value_at(&dependency.key_path)
-                .map_err(|error| format!("{} no longer parses: {error}", path.display()))?;
-            if value != dependency.after {
-                return Err(format!(
-                    "`{}` in {} does not hold what was written",
-                    dependency.key_path.join("."),
-                    path.display()
-                ));
-            }
+        let introduced = actual.read_failures.iter().find(|failure| {
+            failure.path == *path
+                && !planned
+                    .read_failures
+                    .iter()
+                    .any(|before| before.same_reader_and_location(failure))
+        });
+        let Some(introduced) = introduced else {
+            continue;
+        };
+        let ours = ports.fs.read(path).is_ok_and(|bytes| bytes == write.bytes);
+        return Err(if ours {
+            Failure::new(
+                ErrorCode::ReadFailureIntroduced,
+                format!(
+                    "{} no longer parses for {}",
+                    path.display(),
+                    introduced.agent_name
+                ),
+            )
+        } else {
+            overwritten(planned, write)
+        });
+    }
+    Ok(differences(planned, &actual))
+}
+
+/// Verify of one file: it reads back, and every key an edit changed holds the
+/// value the edit gave it. When the file holds other bytes than those
+/// written, something rewrote it since, and only a rewrite that took an edit
+/// away fails the Operation.
+fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result<(), Failure> {
+    let path = &write.file.path;
+    let bytes = ports.fs.read(path).map_err(|error| {
+        Failure::new(
+            ErrorCode::VerifyFailed,
+            format!("cannot read {} back: {error}", path.display()),
+        )
+    })?;
+    match edits_hold(&bytes, write) {
+        Ok(()) => Ok(()),
+        Err(_) if bytes != write.bytes => Err(overwritten(planned, write)),
+        Err(Landed::ReadFailure(cause)) => {
+            Err(Failure::new(ErrorCode::ReadFailureIntroduced, cause))
+        }
+        Err(Landed::Mismatch(cause)) => Err(Failure::new(ErrorCode::VerifyFailed, cause)),
+    }
+}
+
+/// Why the edits of a file do not hold in it.
+enum Landed {
+    /// The file no longer decodes or parses.
+    ReadFailure(String),
+    /// A key does not hold what its last edit gave it.
+    Mismatch(String),
+}
+
+/// One key the edits of a file changed.
+struct TouchedKey<'w> {
+    key_path: &'w [String],
+    /// Its value before the Operation.
+    before: &'w Option<Value>,
+    /// The value its last edit gave it.
+    after: &'w Option<Value>,
+}
+
+/// Each key the edits of a file changed, once, in the order first changed.
+fn touched_keys<'w>(write: &'w PendingWrite) -> Vec<TouchedKey<'w>> {
+    let mut keys: Vec<TouchedKey> = Vec::new();
+    let dependencies = write.file.edited.edits.iter();
+    for dependency in dependencies.flat_map(|applied| &applied.depends_on) {
+        match keys
+            .iter_mut()
+            .find(|key| key.key_path == dependency.key_path.as_slice())
+        {
+            Some(key) => key.after = &dependency.after,
+            None => keys.push(TouchedKey {
+                key_path: &dependency.key_path,
+                before: &dependency.before,
+                after: &dependency.after,
+            }),
+        }
+    }
+    keys
+}
+
+/// Whether every key the edits of a file changed holds, in `bytes`, the
+/// value its last edit gave it.
+fn edits_hold(bytes: &[u8], write: &PendingWrite) -> Result<(), Landed> {
+    let path = &write.file.path;
+    let file = EditableFile::decode(bytes, write.file.syntax).map_err(|reason| {
+        Landed::ReadFailure(format!("{} cannot be read back: {reason}", path.display()))
+    })?;
+    for key in touched_keys(write) {
+        let value = file.value_at(key.key_path).map_err(|error| {
+            Landed::ReadFailure(format!("{} no longer parses: {error}", path.display()))
+        })?;
+        if value != *key.after {
+            return Err(Landed::Mismatch(format!(
+                "`{}` in {} does not hold what was written",
+                key.key_path.join("."),
+                path.display()
+            )));
         }
     }
     Ok(())
 }
 
-/// Verify, overall: scans and resolves the context again and compares each
-/// predicted State with the actual one.
-fn verify_states(
-    definitions: &[AgentDefinition],
-    ports: &Ports,
-    planned: &Planned,
-) -> Result<Vec<Difference>, Error> {
-    let snapshot = scan::scan(definitions, ports, &planned.scan_options.projects)
-        .map_err(Error::unexpected)?;
-    let actual = resolve::resolve(definitions, &snapshot, &planned.context);
-    Ok(planned
+/// Whether every key the edits of a file changed holds, in `bytes`, the
+/// value it had before the Operation.
+fn edits_undone(bytes: &[u8], write: &PendingWrite) -> bool {
+    let Ok(file) = EditableFile::decode(bytes, write.file.syntax) else {
+        return false;
+    };
+    touched_keys(write).iter().all(|key| {
+        file.value_at(key.key_path)
+            .is_ok_and(|value| value == *key.before)
+    })
+}
+
+/// A file rewritten after the write, taking an edit away. Agents that hold
+/// their file in memory do this when they save; config-digger does not know
+/// which one did, so it names the one whose States the file changes.
+fn overwritten(planned: &Planned, write: &PendingWrite) -> Failure {
+    let path = &write.file.path;
+    let agent = planned
+        .preview
+        .changes
+        .iter()
+        .find(|change| change.path == *path)
+        .map_or("the Agent that reads it", |change| {
+            change.agent_name.as_str()
+        });
+    Failure::new(
+        ErrorCode::OverwrittenByAgent,
+        format!(
+            "{} was rewritten after the write; if {agent} is running, close it and retry",
+            path.display()
+        ),
+    )
+}
+
+/// The States after that differ from the preview's prediction.
+fn differences(planned: &Planned, actual: &Inventory) -> Vec<Difference> {
+    planned
         .preview
         .changes
         .iter()
         .filter_map(|change| {
-            let state = plan::state_in(&actual, &change.agent, &change.home, &change.locator);
+            let state = plan::state_in(actual, &change.agent, &change.home, &change.locator);
             (state != change.after).then(|| Difference {
                 agent: change.agent.clone(),
                 home: change.home.clone(),
@@ -331,13 +465,137 @@ fn verify_states(
                 actual: state,
             })
         })
-        .collect())
+        .collect()
+}
+
+/// Rollback: puts back the bytes each of the first `written` files held
+/// before the Operation, but only while the file holds exactly what
+/// config-digger wrote. A file changed since is left as it is.
+fn roll_back(ports: &Ports, writes: &[PendingWrite], written: usize) -> Vec<RollbackLocation> {
+    writes
+        .iter()
+        .enumerate()
+        .map(|(index, write)| {
+            let (outcome, reason) = if index < written {
+                restore(ports, write)
+            } else {
+                (RollbackOutcome::NotWritten, None)
+            };
+            RollbackLocation {
+                path: write.file.path.clone(),
+                outcome,
+                reason,
+            }
+        })
+        .collect()
+}
+
+/// Rolls one written file back, and says why when it is not restored.
+fn restore(ports: &Ports, write: &PendingWrite) -> (RollbackOutcome, Option<String>) {
+    let path = &write.file.path;
+    let not_restored = |reason: &str| (RollbackOutcome::NotRestored, Some(reason.to_owned()));
+    let current = match ports.fs.read(path) {
+        Ok(current) => Some(current),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return not_restored(&format!("Cannot read it: {error}.")),
+    };
+    if current.as_ref() == Some(&write.bytes) {
+        let restored = match &write.current {
+            Some(before) => put_back(ports, path, before),
+            None => ports
+                .fs
+                .remove_file(path)
+                .map_err(|error| format!("Cannot delete the file it created: {error}.")),
+        };
+        return match restored {
+            Ok(()) => (RollbackOutcome::Restored, None),
+            Err(reason) => not_restored(&reason),
+        };
+    }
+    let left_alone = |reason: &str| (RollbackOutcome::LeftAlone, Some(reason.to_owned()));
+    match current {
+        None if write.current.is_none() => {
+            left_alone("It was deleted after config-digger created it.")
+        }
+        None => not_restored("It was deleted after config-digger wrote it."),
+        Some(current) if edits_undone(&current, write) => left_alone(
+            "It changed after config-digger wrote it and holds none of the Operation's edits, so it is left as it is.",
+        ),
+        Some(_) => not_restored(
+            "It changed after config-digger wrote it and still holds some of the Operation's edits; restoring it would overwrite those changes.",
+        ),
+    }
+}
+
+/// Writes a file's bytes from before the Operation back, and checks it holds them.
+fn put_back(ports: &Ports, path: &Path, bytes: &[u8]) -> Result<(), String> {
+    ports
+        .fs
+        .write_atomic(path, bytes)
+        .map_err(|error| format!("Cannot write it back: {error}."))?;
+    match ports.fs.read(path) {
+        Ok(now) if now == bytes => Ok(()),
+        Ok(_) => Err("It does not hold its backup after being written back.".to_owned()),
+        Err(error) => Err(format!("Cannot read it back: {error}.")),
+    }
+}
+
+/// Records a failed Operation with its cause and Rollback, and returns the
+/// error to report: the failure itself when the Rollback is complete, or
+/// `RollbackIncomplete` with a diff of each file it could not restore.
+fn fail(
+    ports: &Ports,
+    folder: &Path,
+    manifest: &mut Manifest,
+    writes: &[PendingWrite],
+    rollback: Vec<RollbackLocation>,
+    failure: Failure,
+) -> Error {
+    let complete = rollback
+        .iter()
+        .all(|location| location.outcome != RollbackOutcome::NotRestored);
+    manifest.status = if complete {
+        OperationStatus::Failed
+    } else {
+        OperationStatus::NeedsAttention
+    };
+    manifest.cause = Some(failure.cause.clone());
+    manifest.rollback = rollback.clone();
+    if let Err(error) = history::record(ports, folder, manifest) {
+        tracing::error!(operation = %manifest.id, %error, "cannot record the failed Operation");
+    }
+    tracing::error!(
+        operation = %manifest.id,
+        code = failure.code.code(),
+        cause = %failure.cause,
+        complete,
+        "operation failed"
+    );
+    let diff: String = writes
+        .iter()
+        .zip(&rollback)
+        .filter(|(_, location)| location.outcome == RollbackOutcome::NotRestored)
+        .map(|(write, _)| {
+            let current = ports.fs.read(&write.file.path).unwrap_or_default();
+            let before = write.current.as_deref().unwrap_or_default();
+            edit::unified_diff_bytes(before, &current, &write.file.path.display().to_string())
+        })
+        .collect();
+    Error::rolled_back(
+        failure.code,
+        failure.cause,
+        manifest.id.clone(),
+        folder.to_path_buf(),
+        rollback,
+        diff,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use crate::api::{
-        Action, Context, Core, ErrorCode, Plan, ScanOptions, Targets, Warning, WarningClass,
+        Action, Context, Core, ErrorCode, Plan, RollbackOutcome, ScanOptions, Targets, Warning,
+        WarningClass,
     };
     use crate::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 
@@ -390,5 +648,48 @@ mod tests {
         core.execute(plan, &warnings).unwrap();
 
         assert_eq!(fs.contents(CLAUDE_JSON).unwrap(), br#"{"mcpServers": {}}"#);
+    }
+
+    /// Executes the plan to remove `linear`, writing `bytes` in place of
+    /// what the edit computed, as a faulty edit would.
+    fn execute_writing(fs: &FakeFileSystem, bytes: &str) -> crate::api::Error {
+        let (core, mut plan) = plan_with_warnings(fs, &[]);
+        plan.0.files[0].edited.bytes = bytes.as_bytes().to_vec();
+        core.execute(plan, &[]).unwrap_err()
+    }
+
+    #[test]
+    fn an_edit_that_did_not_land_fails_verify_and_is_rolled_back() {
+        let fs = FakeFileSystem::new().with_file(CLAUDE_JSON, SERVERS);
+
+        let error = execute_writing(&fs, r#"{"mcpServers": {"linear": {"url": "https://x"}}}"#);
+
+        assert_eq!(error.code, ErrorCode::VerifyFailed);
+        assert!(
+            error.message.contains("mcpServers.linear"),
+            "{}",
+            error.message
+        );
+        assert_eq!(fs.contents(CLAUDE_JSON).unwrap(), SERVERS.as_bytes());
+        assert_eq!(
+            error.failed.as_ref().unwrap().rollback[0].outcome,
+            RollbackOutcome::Restored
+        );
+    }
+
+    #[test]
+    fn a_write_its_reader_cannot_parse_any_more_is_rolled_back() {
+        let fs = FakeFileSystem::new().with_file(CLAUDE_JSON, SERVERS);
+
+        // The edit holds, but Claude Code reads the file as strict JSON.
+        let error = execute_writing(&fs, r#"{"mcpServers": {} /* removed */}"#);
+
+        assert_eq!(error.code, ErrorCode::ReadFailureIntroduced);
+        assert!(error.message.contains("Claude Code"), "{}", error.message);
+        assert_eq!(fs.contents(CLAUDE_JSON).unwrap(), SERVERS.as_bytes());
+        assert_eq!(
+            error.failed.as_ref().unwrap().rollback[0].outcome,
+            RollbackOutcome::Restored
+        );
     }
 }

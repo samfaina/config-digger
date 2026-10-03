@@ -83,15 +83,20 @@ pub(crate) fn outcome(
 }
 
 /// An Operation's status as History shows it: "Applied", "Undone by …",
-/// "Undo of …", or both of the last two for an Undo that was undone.
+/// "Undo of …", or both of the last two for an Undo that was undone;
+/// "Failed, rolled back" or "Needs attention" for a failed one.
 pub(crate) fn operation_status(
     status: OperationStatus,
+    dismissed: bool,
     undo_of: Option<&str>,
     undone_by: Option<&str>,
 ) -> String {
     match (status, undo_of, undone_by) {
         (OperationStatus::InProgress, ..) => "Incomplete".to_owned(),
-        (OperationStatus::Failed, ..) => "Failed".to_owned(),
+        (OperationStatus::Failed, ..) => "Failed, rolled back".to_owned(),
+        (OperationStatus::NeedsAttention, ..) if dismissed => {
+            "Rollback incomplete, dismissed".to_owned()
+        }
         (OperationStatus::NeedsAttention, ..) => "Needs attention".to_owned(),
         (OperationStatus::Applied, None, None) => "Applied".to_owned(),
         (OperationStatus::Applied, Some(undone), None) => format!("Undo of {undone}"),
@@ -108,11 +113,9 @@ pub(crate) fn not_undoable(status: OperationStatus) -> Option<String> {
     let reason = match status {
         OperationStatus::Applied => return None,
         OperationStatus::InProgress => "It did not complete; recover its files from its backup.",
-        OperationStatus::Failed => {
-            "It failed before writing anything, so there is nothing to undo."
-        }
+        OperationStatus::Failed => "It failed and was rolled back, so there is nothing to undo.",
         OperationStatus::NeedsAttention => {
-            "It needs manual recovery; the files as they were before it are in its backup."
+            "Its Rollback is incomplete; recover its files from its backup by hand."
         }
     };
     Some(reason.to_owned())

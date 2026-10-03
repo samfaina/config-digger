@@ -41,6 +41,10 @@ impl FileSystem for RealFileSystem {
         std::fs::remove_dir_all(path)
     }
 
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
+        std::fs::remove_file(path)
+    }
+
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         std::fs::create_dir_all(path)
     }
