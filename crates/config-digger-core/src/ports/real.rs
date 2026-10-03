@@ -25,6 +25,38 @@ impl FileSystem for RealFileSystem {
         Ok(bytes)
     }
 
+    /// Opened read-only, waiting briefly for an Agent that holds a write
+    /// lock, and closed when the query is done.
+    fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>> {
+        use rusqlite::types::ValueRef;
+        use rusqlite::{Connection, OpenFlags, OptionalExtension};
+
+        if !path.is_file() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        let sqlite = |error: rusqlite::Error| io::Error::other(error);
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(sqlite)?;
+        connection
+            .busy_timeout(std::time::Duration::from_millis(250))
+            .map_err(sqlite)?;
+        connection
+            .query_row("SELECT value FROM ItemTable WHERE key = ?1", [key], |row| {
+                Ok(match row.get_ref(0)? {
+                    ValueRef::Text(bytes) | ValueRef::Blob(bytes) => {
+                        Some(String::from_utf8_lossy(bytes).into_owned())
+                    }
+                    _ => None,
+                })
+            })
+            .optional()
+            .map(Option::flatten)
+            .map_err(sqlite)
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }

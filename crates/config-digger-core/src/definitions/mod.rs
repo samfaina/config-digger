@@ -6,9 +6,9 @@ pub mod skill_managers;
 
 use crate::version::{Standing, Version};
 use blocks::{
-    Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    ProjectWalk, Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate,
-    VersionSource,
+    Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
+    GateLookup, Holds, Interpolation, Locator, LookUp, ProjectWalk, Provenance, Register, Registry,
+    SessionFiles, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -91,6 +91,29 @@ pub(crate) struct AgentDefinition {
     pub locations: Vec<LocationDefinition>,
     /// Rules per Item kind.
     pub items: BTreeMap<ItemKind, ItemRules>,
+    /// Switches on the Agent vendor's side that change how the Agent treats
+    /// its configuration, only those that change a State.
+    #[serde(default)]
+    pub feature_gates: Vec<FeatureGateDefinition>,
+}
+
+/// A switch on the Agent vendor's side, such as whether Claude Code syncs
+/// skills from claude.ai. config-digger sees at most the value the Agent
+/// last cached, shown as of when it cached it; otherwise it assumes the
+/// Agent's default. Every Entry it affects gets a caveat saying which.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FeatureGateDefinition {
+    /// The gate's name as the vendor knows it, unique in the definition.
+    pub name: String,
+    /// The value the Agent uses when it has none cached.
+    pub assumed: bool,
+    /// The ids of the locations whose Entries depend on it.
+    pub affects: Vec<String>,
+    /// Where the Agent caches the gate's value.
+    pub lookup: GateLookup,
+    /// When the Agent ignores its cache and uses its own default.
+    pub bypass: Option<Bypass>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -281,6 +304,10 @@ pub(crate) struct LocationDefinition {
     /// The minimal shape the Agent requires of the location's Entries:
     /// one without it is Invalid. Without it, no Entry here is Invalid.
     pub shape: Option<Shape>,
+    /// Conditions under which the Agent reads the location, every one of
+    /// them. While one does not hold, its Entries are Unread.
+    #[serde(default)]
+    pub when: Vec<Condition>,
 }
 
 /// What an Agent does with a location it cannot read. Declared from the
@@ -436,6 +463,11 @@ impl AgentDefinition {
             .or(self.process.as_ref())
     }
 
+    /// The Feature gate named `name`, if the definition declares one.
+    pub fn feature_gate(&self, name: &str) -> Option<&FeatureGateDefinition> {
+        self.feature_gates.iter().find(|gate| gate.name == name)
+    }
+
     pub fn location(&self, id: &str) -> &LocationDefinition {
         self.locations
             .iter()
@@ -526,6 +558,33 @@ impl AgentDefinition {
                 .map_err(context)?;
         }
 
+        unique(
+            "feature gate",
+            self.feature_gates.iter().map(|gate| gate.name.as_str()),
+        )?;
+        for gate in &self.feature_gates {
+            let context = |e: String| format!("feature gate `{}`: {e}", gate.name);
+            if gate.affects.is_empty() {
+                return Err(context("affects names no location".into()));
+            }
+            if let Some(id) = gate
+                .affects
+                .iter()
+                .find(|id| !self.locations.iter().any(|location| location.id == **id))
+            {
+                return Err(context(format!("affects undeclared location `{id}`")));
+            }
+            gate.lookup.validate().map_err(context)?;
+            self.validate_home_root(gate.lookup.anchor())
+                .map_err(context)?;
+            if let Some(bypass) = &gate.bypass {
+                bypass.validate().map_err(context)?;
+                for map in bypass.env_maps() {
+                    self.validate_home_root(&map.anchor).map_err(context)?;
+                }
+            }
+        }
+
         for location in &self.locations {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
@@ -577,6 +636,21 @@ impl AgentDefinition {
             }
             if !self.scopes.iter().any(|scope| scope.id == location.scope) {
                 return Err(context(format!("undeclared scope `{}`", location.scope)));
+            }
+            for condition in &location.when {
+                condition.validate().map_err(context)?;
+                let Some(name) = condition.gate() else {
+                    continue;
+                };
+                match self.feature_gate(name) {
+                    None => return Err(context(format!("undeclared feature gate `{name}`"))),
+                    Some(gate) if !gate.affects.contains(&location.id) => {
+                        return Err(context(format!(
+                            "feature gate `{name}` does not list it in `affects`"
+                        )));
+                    }
+                    Some(_) => {}
+                }
             }
             if !self.items.contains_key(&location.kind) {
                 return Err(context(format!(
@@ -1453,5 +1527,137 @@ checks = {checks}
             r#"{ block = "project", path = ".test.json", walk = "up-to-repo-root" }"#,
         ));
         assert!(error(&text).contains("cannot walk"), "{}", error(&text));
+    }
+
+    /// `VALID` with `lookup` as the lookup of a gate affecting its servers,
+    /// which they are read only while it is on, and `extra` gate fields.
+    fn with_gate(lookup: &str, extra: &str) -> String {
+        VALID.replace(
+            "on_read_failure = \"ignores_file\"\n",
+            "on_read_failure = \"ignores_file\"\nwhen = [{ block = \"feature-gate\", gate = \"sync\" }]\n",
+        ) + &format!(
+            "\n[[feature_gates]]\nname = \"sync\"\nassumed = true\naffects = [\"user-mcp\"]\nlookup = {lookup}\n{extra}"
+        )
+    }
+
+    const JSON_LOOKUP: &str = r#"{ block = "json-value", anchor = { block = "home", root = "state" }, key_path = ["features", "{gate}"], cached_at = ["fetchedAt"] }"#;
+
+    #[test]
+    fn a_feature_gate_with_a_lookup_and_a_bypass_loads() {
+        let bypass = r#"bypass = { block = "env", variables = [{ name = "NO_FLAGS", values = "truthy" }, { name = "USE_OTHER", values = "non-empty", unless = ["HOSTED"] }], env_maps = [{ anchor = { block = "home", root = "state" }, key_path = ["env"] }] }"#;
+        let text = with_gate(JSON_LOOKUP, bypass);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let sqlite = r#"{ block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "bootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2" }"#;
+        let text = with_gate(sqlite, "");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_lookup_key_path_names_the_gate_once() {
+        let text = with_gate(&JSON_LOOKUP.replace(r#", "{gate}""#, ""), "");
+        assert!(error(&text).contains("exactly once"), "{}", error(&text));
+        let text = with_gate(&JSON_LOOKUP.replace(r#""features""#, r#""{gate}""#), "");
+        assert!(error(&text).contains("exactly once"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_lookup_lies_in_the_agent_home() {
+        let text = with_gate(
+            &JSON_LOOKUP.replace(
+                r#"{ block = "home", root = "state" }"#,
+                r#"{ block = "project", path = ".test.json" }"#,
+            ),
+            "",
+        );
+        assert!(error(&text).contains("not a Project"), "{}", error(&text));
+        let text = with_gate(
+            &JSON_LOOKUP.replace(r#"root = "state""#, r#"root = "cache""#),
+            "",
+        );
+        assert!(error(&text).contains("no root `cache`"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_sqlite_lookup_needs_a_key() {
+        let sqlite = r#"{ block = "sqlite-json", anchor = { block = "home", root = "state" }, key = " ", key_path = ["{gate}"] }"#;
+        let text = with_gate(sqlite, "");
+        assert!(error(&text).contains("needs a key"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_feature_gate_affects_declared_locations() {
+        let text = with_gate(JSON_LOOKUP, "").replace(r#"affects = ["user-mcp"]"#, "affects = []");
+        assert!(
+            error(&text).contains("names no location"),
+            "{}",
+            error(&text)
+        );
+        let text = with_gate(JSON_LOOKUP, "").replace(
+            r#"affects = ["user-mcp"]"#,
+            r#"affects = ["user-mcp", "ghost"]"#,
+        );
+        assert!(
+            error(&text).contains("undeclared location `ghost`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_condition_names_a_declared_gate_that_affects_its_location() {
+        let text = with_gate(JSON_LOOKUP, "").replace(r#"gate = "sync""#, r#"gate = "other""#);
+        assert!(
+            error(&text).contains("undeclared feature gate `other`"),
+            "{}",
+            error(&text)
+        );
+        let text = format!(
+            "{}\n[[locations]]\nid = \"other-mcp\"\nanchor = {{ block = \"home\", root = \"state\" }}\nformat = {{ block = \"json\", dialect = \"strict\" }}\nroot = [\"other\"]\nkind = \"mcp\"\nscope = \"user\"\nprovenance = \"file\"\nstore_class = \"plain\"\non_read_failure = \"ignores_file\"\n",
+            with_gate(JSON_LOOKUP, "")
+        )
+        .replace(r#"precedence = ["user-mcp"]"#, r#"precedence = ["user-mcp", "other-mcp"]"#)
+        .replace(r#"affects = ["user-mcp"]"#, r#"affects = ["other-mcp"]"#);
+        assert!(
+            error(&text).contains("does not list it in `affects`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_feature_gate_is_declared_once() {
+        let gate = with_gate(JSON_LOOKUP, "");
+        let twice = gate.clone() + &gate[gate.find("\n[[feature_gates]]").unwrap()..];
+        assert!(
+            error(&twice).contains("feature gate `sync` is declared twice"),
+            "{}",
+            error(&twice)
+        );
+    }
+
+    #[test]
+    fn a_bypass_names_variables() {
+        let text = with_gate(JSON_LOOKUP, r#"bypass = { block = "env", variables = [] }"#);
+        assert!(error(&text).contains("needs variables"), "{}", error(&text));
+        let text = with_gate(
+            JSON_LOOKUP,
+            r#"bypass = { block = "env", variables = [{ name = "A=1", values = "truthy" }] }"#,
+        );
+        assert!(
+            error(&text).contains("not a variable name"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn djb2_hashes_gate_names_as_statsig_does() {
+        assert_eq!(blocks::djb2("dedupe_mcp_servers"), "1316230643");
+        assert_eq!(
+            blocks::djb2("mcp_profile_scoped_global_disabled_state"),
+            "713966870"
+        );
+        assert_eq!(blocks::djb2("enable_cc_plugin_import"), "1307925454");
+        assert_eq!(blocks::djb2(""), "0");
     }
 }

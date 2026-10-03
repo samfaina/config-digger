@@ -1419,6 +1419,9 @@ pub enum ReasonCode {
     /// The Entry is a link whose target is gone, so the Agent reads nothing
     /// there.
     LinkBroken,
+    /// The Agent reads its location only while a Feature gate has another
+    /// value than the one it has.
+    FeatureGate,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.
@@ -1544,6 +1547,13 @@ pub enum CaveatCode {
     /// A file holding a Disable switch that could apply is a Read failure,
     /// so the Entry is resolved as if the switch were not set.
     SwitchReadFailure,
+    /// The Entry depends on a Feature gate, resolved with the value the
+    /// Agent last cached, as of when it cached it.
+    GateCached,
+    /// The Entry depends on a Feature gate whose value cannot be read, or
+    /// that the Agent ignores its cache for, so it is resolved with the
+    /// Agent's default.
+    GateAssumed,
 }
 
 /// A place in a file's text.

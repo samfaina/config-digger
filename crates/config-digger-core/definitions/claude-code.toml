@@ -254,7 +254,9 @@ on_read_failure = "ignores_file"
 
 # Skills synced from claude.ai sit one level deeper than the docs say, in
 # `synced/<org>_<account>/<name>` [disk], next to `manifest.json` and a
-# `.staging` folder. Claude Code owns this copy.
+# `.staging` folder. Claude Code owns this copy. It syncs these skills into
+# its sessions only while its claude.ai sync gate is on [docs]; that it then
+# skips the folder too is inferred.
 [[locations]]
 id = "synced-skills"
 anchor = { block = "home", root = "skills", path = "synced" }
@@ -264,6 +266,7 @@ scope = "user"
 provenance = "cloud-mirror"
 store_class = "plain"
 on_read_failure = "ignores_file"
+when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 
 # Enterprise beats personal, and personal beats project [docs]. A local
 # skill beats a synced one, which then answers only to
@@ -312,3 +315,39 @@ reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
 enable_offered = false
+
+# Claude Code fetches GrowthBook features for the signed-in account and
+# caches them in `~/.claude.json` [disk]: names in clear, values as JSON,
+# and when it fetched them in milliseconds. What each gate does is inferred
+# from its name; Claude Code ships compiled. The plugin sync gate,
+# `tengu_claudeai_plugins_sync_enabled`, joins once plugins are read.
+#
+# It skips the fetch and uses its own defaults when any of these is set, in
+# its environment or in the `env` of a settings file: `DISABLE_GROWTHBOOK`
+# (1 or true), `DISABLE_TELEMETRY` and
+# `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` (any value), `DO_NOT_TRACK`
+# (a boolean), or a third-party provider, unless the host that embeds it
+# sets `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` [docs]. Only the user
+# settings are read for `env`: a Project's settings could bypass the cache
+# in that Project alone. A Claude apps gateway session also skips the
+# fetch, which nothing on disk shows.
+[[feature_gates]]
+name = "tengu_claudeai_skills_sync_enabled"
+assumed = true
+affects = ["synced-skills"]
+lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
+
+[feature_gates.bypass]
+block = "env"
+variables = [
+  { name = "DISABLE_GROWTHBOOK", values = "truthy" },
+  { name = "DISABLE_TELEMETRY", values = "non-empty" },
+  { name = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", values = "non-empty" },
+  { name = "DO_NOT_TRACK", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_BEDROCK", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_MANTLE", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_ANTHROPIC_AWS", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_VERTEX", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_FOUNDRY", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+]
+env_maps = [{ anchor = { block = "home", root = "settings_file" }, key_path = ["env"] }]

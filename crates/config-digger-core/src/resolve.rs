@@ -3,14 +3,16 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    Compete, Conform, JsonFormat, Malformed, Parse, Provenance, SkillDefect, SkillFallback,
+    Compete, Conform, Holds, JsonFormat, Malformed, Parse, Provenance, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
 use crate::disable::{self, ContextProject, Hit};
-use crate::scan::{HomeSource, ScannedEntry, ScannedReadFailure, Snapshot};
+use crate::scan::{
+    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedReadFailure, Snapshot,
+};
 use crate::{explain, installations, locator, paths};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -83,9 +85,13 @@ pub(crate) fn resolve(
             .iter()
             .any(|known| known.key == *key && !known.exists)
     });
-    // Nor does it read anything through a link whose target is gone.
-    let unread =
-        |entry: &ScannedEntry| (missing.is_some() && entry.project.is_some()) || is_broken(entry);
+    // Nor does it read anything through a link whose target is gone, nor a
+    // location while a Feature gate keeps it closed.
+    let unread = |entry: &ScannedEntry| {
+        (missing.is_some() && entry.project.is_some())
+            || is_broken(entry)
+            || closed_gate(&definitions[entry.agent_index], snapshot, entry).is_some()
+    };
 
     let reactions: Vec<Reaction> = snapshot
         .read_failures
@@ -188,13 +194,20 @@ pub(crate) fn resolve(
                 .enumerate()
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
+                    let gate_caveats = gate_caveats(definition, snapshot, entry);
                     if let Some(link) = entry.link.as_ref().filter(|link| link.broken()) {
                         let reason = explain::link_broken(agent_name, &link.target);
-                        return unread_entry(snapshot, entry, location, reason);
+                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
                     }
-                    if let (true, Some((path, _))) = (unread(entry), missing) {
+                    if let (true, Some(_), Some((path, _))) =
+                        (unread(entry), &entry.project, missing)
+                    {
                         let reason = explain::project_missing(agent_name, path);
-                        return unread_entry(snapshot, entry, location, reason);
+                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                    }
+                    if let Some((gate, on)) = closed_gate(definition, snapshot, entry) {
+                        let reason = explain::feature_gate(agent_name, gate, on);
+                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
                     }
                     let origin = origin(location, entry);
                     let (disabling, partial) = &hits[index];
@@ -330,6 +343,7 @@ pub(crate) fn resolve(
                             sentence: explain::switch_read_failure(&path),
                             path,
                         })
+                        .chain(gate_caveats)
                         .collect(),
                     }
                 })
@@ -484,12 +498,14 @@ fn is_broken(entry: &ScannedEntry) -> bool {
 }
 
 /// An Entry the Agent never reads, for `reason`, such as one keyed to a
-/// missing Project: it competes with nothing and can only be Removed.
+/// missing Project, with `caveats`: it competes with nothing and can only
+/// be Removed.
 fn unread_entry(
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     location: &LocationDefinition,
     reason: api::Reason,
+    caveats: Vec<api::Caveat>,
 ) -> api::Entry {
     let origin = origin(location, entry);
     api::Entry {
@@ -513,7 +529,7 @@ fn unread_entry(
             sentence: explain::unread_option(),
         },
         enable: None,
-        caveats: Vec::new(),
+        caveats,
     }
 }
 
@@ -639,4 +655,87 @@ fn origin(location: &LocationDefinition, entry: &ScannedEntry) -> Origin {
             sentence: explain::provenance_by_name_only(&definition.manager.name),
         }),
     }
+}
+
+/// Whether the Feature gate `name` of the Agent home of `entry` is on: the
+/// value the Agent last cached, or else the definition's assumed default.
+fn gate_on(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    name: &str,
+) -> bool {
+    let cached = scanned_gate(snapshot, entry, name).and_then(|gate| match gate.reading {
+        GateReading::Cached(cached) => Some(cached.on),
+        GateReading::Unreadable | GateReading::Bypassed(_) => None,
+    });
+    cached.unwrap_or_else(|| {
+        definition
+            .feature_gate(name)
+            .is_some_and(|gate| gate.assumed)
+    })
+}
+
+fn scanned_gate<'s>(
+    snapshot: &'s Snapshot,
+    entry: &ScannedEntry,
+    name: &str,
+) -> Option<&'s ScannedGate> {
+    snapshot.gates.iter().find(|gate| {
+        gate.agent_index == entry.agent_index && gate.home == entry.home && gate.name == name
+    })
+}
+
+/// The first `when` condition of the location of `entry` that does not
+/// hold, as the Feature gate it depends on and whether that gate is on.
+fn closed_gate<'d>(
+    definition: &'d AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Option<(&'d str, bool)> {
+    let gate_on = |name: &str| gate_on(definition, snapshot, entry, name);
+    definition
+        .location(&entry.location)
+        .when
+        .iter()
+        .find(|condition| !condition.holds(&gate_on))
+        .and_then(Holds::gate)
+        .map(|name| (name, gate_on(name)))
+}
+
+/// A caveat per Feature gate that affects the location of `entry`, saying
+/// which value it is resolved with and how certain that is.
+fn gate_caveats(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Vec<api::Caveat> {
+    let agent_name = &definition.agent.name;
+    definition
+        .feature_gates
+        .iter()
+        .filter(|gate| gate.affects.contains(&entry.location))
+        .filter_map(|gate| {
+            let scanned = scanned_gate(snapshot, entry, &gate.name)?;
+            let (code, sentence) = match &scanned.reading {
+                GateReading::Cached(cached) => (
+                    api::CaveatCode::GateCached,
+                    explain::gate_cached(agent_name, &gate.name, cached.on, cached.at),
+                ),
+                GateReading::Unreadable => (
+                    api::CaveatCode::GateAssumed,
+                    explain::gate_assumed(agent_name, &gate.name, gate.assumed, None),
+                ),
+                GateReading::Bypassed(variable) => (
+                    api::CaveatCode::GateAssumed,
+                    explain::gate_assumed(agent_name, &gate.name, gate.assumed, Some(variable)),
+                ),
+            };
+            Some(api::Caveat {
+                code,
+                path: scanned.path.clone(),
+                sentence,
+            })
+        })
+        .collect()
 }

@@ -4,8 +4,8 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    Anchored, Disables, Format, JsonFormat, Locate, NAME_KEY, NameFrom, Parse, ProjectWalk,
-    Register, SkillDefect, SkillFolder, StoreClass,
+    Anchored, Bypasses, Cached, Disables, Format, GateStore, JsonFormat, Locate, LookUp, NAME_KEY,
+    NameFrom, Parse, ProjectWalk, Register, SkillDefect, SkillFolder, StoreClass,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
@@ -41,6 +41,32 @@ pub(crate) struct Snapshot {
     /// The switch files that cannot be read or parsed. They Disable nothing,
     /// and are never written.
     pub unreadable_switches: BTreeSet<PathBuf>,
+    /// Every Feature gate of every found Agent home, as far as it can be read.
+    pub gates: Vec<ScannedGate>,
+}
+
+/// A Feature gate of one Agent home, as config-digger reads it.
+#[derive(Clone)]
+pub(crate) struct ScannedGate {
+    pub agent_index: usize,
+    pub home: String,
+    /// The gate's name.
+    pub name: String,
+    /// The file the Agent caches it in.
+    pub path: PathBuf,
+    pub reading: GateReading,
+}
+
+/// What config-digger reads of a Feature gate.
+#[derive(Clone, PartialEq)]
+pub(crate) enum GateReading {
+    /// The value the Agent last cached.
+    Cached(Cached),
+    /// No value can be read: the cache is missing, cannot be read, or holds
+    /// none for the gate.
+    Unreadable,
+    /// The Agent ignores its cache because this variable is set.
+    Bypassed(String),
 }
 
 /// One place a Disable mechanism's switch is, for one Agent home and, for a
@@ -428,6 +454,7 @@ pub(crate) fn scan_as_if(
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
     let switch_files = switch_files(definitions, &found, &projects);
+    let gates = read_gates(definitions, &found, &mut scanner.reader, ports);
     scanner.entries = one_per_entry(definitions, scanner.entries);
     let managers = skill_managers::built_in().unwrap_or_default();
     for entry in &mut scanner.entries {
@@ -494,6 +521,7 @@ pub(crate) fn scan_as_if(
         versioned,
         switches,
         unreadable_switches,
+        gates,
     })
 }
 
@@ -506,6 +534,77 @@ fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader)
     let document = JsonFormat::STRICT.parse(text).ok()?;
     let value = lookup(&document, &last_ran.key_path)?;
     Some(value.as_str()?.to_owned())
+}
+
+/// Each Feature gate of each found Agent home: bypassed when a variable
+/// makes the Agent ignore its cache, else the value it cached, else
+/// unreadable. Nothing here applies the gate's assumed default.
+fn read_gates(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    reader: &mut Reader,
+    ports: &Ports,
+) -> Vec<ScannedGate> {
+    let mut gates = Vec::new();
+    for home in found {
+        let definition = &definitions[home.agent_index];
+        for gate in &definition.feature_gates {
+            let Some(path) = gate.lookup.anchor().path(&home.roots, None) else {
+                continue;
+            };
+            let bypassed = gate.bypass.as_ref().and_then(|bypass| {
+                let maps: Vec<serde_json::Map<String, serde_json::Value>> = bypass
+                    .env_maps()
+                    .iter()
+                    .filter_map(|map| {
+                        let path = map.anchor.path(&home.roots, None)?;
+                        let document = JsonFormat::STRICT.parse(reader.peek(&path).ok()??).ok()?;
+                        lookup(&document, &map.key_path)?.as_object().cloned()
+                    })
+                    .collect();
+                // A variable in a map replaces the one in the environment.
+                let var = |name: &str| {
+                    maps.iter()
+                        .find_map(|map| map.get(name))
+                        .map(|value| match value {
+                            serde_json::Value::String(text) => text.clone(),
+                            other => other.to_string(),
+                        })
+                        .or_else(|| ports.env.var(name))
+                };
+                bypass.bypassed_by(&var)
+            });
+            let reading = match bypassed {
+                Some(variable) => GateReading::Bypassed(variable),
+                None => {
+                    let document = match gate.lookup.store() {
+                        GateStore::JsonFile => reader
+                            .peek(&path)
+                            .ok()
+                            .flatten()
+                            .and_then(|text| JsonFormat::STRICT.parse(text).ok()),
+                        GateStore::SqliteItem(key) => reader
+                            .fs
+                            .read_sqlite_item(&path, key)
+                            .ok()
+                            .flatten()
+                            .and_then(|text| JsonFormat::STRICT.parse(&text).ok()),
+                    };
+                    document
+                        .and_then(|document| gate.lookup.cached(&document, &gate.name))
+                        .map_or(GateReading::Unreadable, GateReading::Cached)
+                }
+            };
+            gates.push(ScannedGate {
+                agent_index: home.agent_index,
+                home: home.home.clone(),
+                name: gate.name.clone(),
+                path,
+                reading,
+            });
+        }
+    }
+    gates
 }
 
 /// Every place each Disable mechanism's switch is, for each found Agent

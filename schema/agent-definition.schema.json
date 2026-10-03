@@ -90,6 +90,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "feature_gates": {
+      "description": "Switches on the Agent vendor's side that change how the Agent treats\nits configuration, only those that change a State.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/FeatureGateDefinition"
+      }
     }
   },
   "additionalProperties": false,
@@ -652,6 +659,13 @@
               "type": "null"
             }
           ]
+        },
+        "when": {
+          "description": "Conditions under which the Agent reads the location, every one of\nthem. While one does not hold, its Entries are Unread.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Condition"
+          }
         }
       },
       "additionalProperties": false,
@@ -1051,6 +1065,34 @@
         }
       ]
     },
+    "Condition": {
+      "oneOf": [
+        {
+          "description": "Holds while a Feature gate of the same definition is on, or with\n`is = false`, while it is off.",
+          "type": "object",
+          "properties": {
+            "gate": {
+              "description": "The name of a declared Feature gate.",
+              "type": "string"
+            },
+            "is": {
+              "description": "The value the gate must have. Omitted for on.",
+              "type": "boolean",
+              "default": true
+            },
+            "block": {
+              "type": "string",
+              "const": "feature-gate"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "gate"
+          ]
+        }
+      ]
+    },
     "ItemRules": {
       "type": "object",
       "properties": {
@@ -1336,6 +1378,259 @@
           "type": "string",
           "const": "disabled_natively"
         }
+      ]
+    },
+    "FeatureGateDefinition": {
+      "description": "A switch on the Agent vendor's side, such as whether Claude Code syncs\nskills from claude.ai. config-digger sees at most the value the Agent\nlast cached, shown as of when it cached it; otherwise it assumes the\nAgent's default. Every Entry it affects gets a caveat saying which.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The gate's name as the vendor knows it, unique in the definition.",
+          "type": "string"
+        },
+        "assumed": {
+          "description": "The value the Agent uses when it has none cached.",
+          "type": "boolean"
+        },
+        "affects": {
+          "description": "The ids of the locations whose Entries depend on it.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lookup": {
+          "description": "Where the Agent caches the gate's value.",
+          "$ref": "#/$defs/GateLookup"
+        },
+        "bypass": {
+          "description": "When the Agent ignores its cache and uses its own default.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bypass"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "assumed",
+        "affects",
+        "lookup"
+      ]
+    },
+    "GateLookup": {
+      "oneOf": [
+        {
+          "description": "A gate's value in a JSON file of the Agent home, such as Claude Code's\n`cachedGrowthBookFeatures` in `~/.claude.json`.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "The file, in the Agent home.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "key_path": {
+              "description": "The key path of the gate's `true` or `false`, one key per segment.\nOne segment is `{gate}`: the gate's name, or its hash with `hash`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "hash": {
+              "description": "How the Agent hashes gate names in its cache. Omitted when it keys\nthem by name.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GateHash"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cached_at": {
+              "description": "The key path of when the Agent cached its values: milliseconds\nsince 1970, or an RFC 3339 time. Omitted when it records none.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "json-value"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "key_path"
+          ]
+        },
+        {
+          "description": "A gate's value in the JSON text an Agent keeps under a key of the\n`ItemTable` of a SQLite store, as VS Code and Cursor keep their state in\n`state.vscdb`, such as Cursor's Statsig bootstrap.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "The SQLite file, in the Agent home.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "key": {
+              "description": "The `ItemTable` key whose value is the JSON text.",
+              "type": "string"
+            },
+            "key_path": {
+              "description": "The key path of the gate's `true` or `false` in the JSON, one key\nper segment. One segment is `{gate}`: the gate's name, or its hash\nwith `hash`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "hash": {
+              "description": "How the Agent hashes gate names in its cache. Omitted when it keys\nthem by name.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GateHash"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cached_at": {
+              "description": "The key path in the JSON of when the Agent cached its values:\nmilliseconds since 1970, or an RFC 3339 time. Omitted when it\nrecords none.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "sqlite-json"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "key",
+            "key_path"
+          ]
+        }
+      ]
+    },
+    "GateHash": {
+      "description": "How an Agent hashes gate names in its cache.",
+      "oneOf": [
+        {
+          "description": "Statsig's djb2: a 32-bit hash of the name's UTF-16 code units,\nwritten as an unsigned decimal number.",
+          "type": "string",
+          "const": "djb2"
+        }
+      ]
+    },
+    "Bypass": {
+      "oneOf": [
+        {
+          "description": "Environment variables that make the Agent ignore its cache, such as\nClaude Code's `DISABLE_GROWTHBOOK`.",
+          "type": "object",
+          "properties": {
+            "variables": {
+              "description": "The cache is ignored when any of them is set.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BypassVariable"
+              }
+            },
+            "env_maps": {
+              "description": "Maps of variables the Agent applies over the environment it starts\nin, such as the `env` of Claude Code's user settings, highest\nfirst. A variable there replaces the one in the environment.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/EnvMap"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "env"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "variables"
+          ]
+        }
+      ]
+    },
+    "BypassVariable": {
+      "description": "One variable that makes the Agent ignore its cache.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "values": {
+          "description": "Which of its values count.",
+          "$ref": "#/$defs/VariableValues"
+        },
+        "unless": {
+          "description": "Variables that, when any is set to a non-empty value, keep this one\nfrom counting.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "values"
+      ]
+    },
+    "VariableValues": {
+      "description": "Which values of a variable count as setting it.",
+      "oneOf": [
+        {
+          "description": "Any non-empty value, `0` and `false` included.",
+          "type": "string",
+          "const": "non-empty"
+        },
+        {
+          "description": "`1`, `true`, `yes` or `on`, in any case.",
+          "type": "string",
+          "const": "truthy"
+        }
+      ]
+    },
+    "EnvMap": {
+      "description": "A JSON object of variable names and values in a file of the Agent home.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the object, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
       ]
     }
   }

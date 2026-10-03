@@ -75,7 +75,18 @@ export type CaveatCode =
  *  A file holding a Disable switch that could apply is a Read failure,
  *  so the Entry is resolved as if the switch were not set.
  */
-"switch_read_failure";
+"switch_read_failure" | 
+/**
+ *  The Entry depends on a Feature gate, resolved with the value the
+ *  Agent last cached, as of when it cached it.
+ */
+"gate_cached" | 
+/**
+ *  The Entry depends on a Feature gate whose value cannot be read, or
+ *  that the Agent ignores its cache for, so it is resolved with the
+ *  Agent's default.
+ */
+"gate_assumed";
 
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
@@ -564,7 +575,12 @@ export type ReasonCode =
  *  The Entry is a link whose target is gone, so the Agent reads nothing
  *  there.
  */
-"link_broken";
+"link_broken" | 
+/**
+ *  The Agent reads its location only while a Feature gate has another
+ *  value than the one it has.
+ */
+"feature_gate";
 
 export type RiskCode = 
 /**  The Agent may offer to reset the file, losing what it holds. */
