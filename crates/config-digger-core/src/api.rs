@@ -136,6 +136,13 @@ impl Core {
     pub fn history_show(&self, id: &str) -> Result<OperationDetail, Error> {
         history::detail(&self.ports, id)
     }
+
+    /// Dismisses an Operation that needs attention, once its files have been
+    /// recovered by hand: it is no longer flagged, and pruning treats it like
+    /// any other. It is refused for any other Operation.
+    pub fn dismiss(&self, id: &str) -> Result<OperationSummary, Error> {
+        history::dismiss(&self.ports, id)
+    }
 }
 
 /// What an Operation does to the Entries it targets.
@@ -356,10 +363,36 @@ pub enum OperationStatus {
     /// Backed up and being written, or interrupted while it was.
     InProgress,
     Applied,
-    /// Failed before any write.
+    /// Failed, and rolled back: no file holds any of its edits.
     Failed,
-    /// Failed after some writes; the backup is needed to recover.
+    /// Failed, and its Rollback could not restore every file, so its backup
+    /// is needed to recover. Its backup is kept until it is dismissed.
     NeedsAttention,
+}
+
+/// Where a failed Operation's Rollback left one file it touched.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct RollbackLocation {
+    pub path: PathBuf,
+    pub outcome: RollbackOutcome,
+    /// Why it was left alone or not restored, as a sentence.
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RollbackOutcome {
+    /// It holds the bytes it held before the Operation again, or is gone
+    /// again when the Operation created it.
+    Restored,
+    /// The Operation never wrote it.
+    NotWritten,
+    /// It changed after config-digger wrote it, and holds none of the
+    /// Operation's edits any more, so it is left as it is.
+    LeftAlone,
+    /// It still holds some of the Operation's edits and could not be
+    /// restored. It needs manual recovery from the backup.
+    NotRestored,
 }
 
 /// One Operation as History lists it.
@@ -375,6 +408,10 @@ pub struct OperationSummary {
     pub status: OperationStatus,
     /// The status as History shows it, such as "Applied", rendered by the core.
     pub status_text: String,
+    /// Why it failed, as a sentence, when it did.
+    pub cause: Option<String>,
+    /// Its Rollback is incomplete and it was not dismissed yet.
+    pub needs_attention: bool,
     /// The Operation this one undoes, when it is an Undo.
     pub undo_of: Option<String>,
     /// The Undo of this Operation, while that Undo is in effect.
@@ -401,6 +438,8 @@ pub struct OperationDetail {
     pub backup: PathBuf,
     /// Why it did not complete.
     pub cause: Option<String>,
+    /// Where its Rollback left each file it touched, when it failed.
+    pub rollback: Vec<RollbackLocation>,
     pub verify: Option<Verify>,
     /// Where the States after differed from the prediction.
     pub differences: Vec<Difference>,
@@ -556,6 +595,14 @@ pub struct ReadFailure {
     pub kind: ReadFailureKind,
 }
 
+impl ReadFailure {
+    /// Whether `other` is the same reader failing on the same location,
+    /// whatever the kind of failure.
+    pub(crate) fn same_reader_and_location(&self, other: &ReadFailure) -> bool {
+        self.agent == other.agent && self.home == other.home && self.path == other.path
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFailureKind {
@@ -585,12 +632,26 @@ pub struct Error {
     pub message: String,
     /// What an ambiguous selector could mean, one locator per Item or Entry.
     pub candidates: Vec<String>,
-    /// The backup folder of an Operation that needs manual recovery, or of
-    /// one whose Undo was refused.
+    /// The backup folder of a failed Operation, or of one whose Undo was
+    /// refused.
     pub backup: Option<PathBuf>,
-    /// For a refused Undo, a unified diff from each backed-up file to what
-    /// it holds now.
+    /// For a refused Undo, or a Rollback that is incomplete, a unified diff
+    /// from each backed-up file to what it holds now.
     pub diff: Option<String>,
+    /// The Operation that failed, once it was recorded in History.
+    pub failed: Option<Box<FailedOperation>>,
+}
+
+/// An Operation that failed after it was recorded in History.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct FailedOperation {
+    /// Its id in History.
+    pub operation: String,
+    /// For `rollback_incomplete`, the code of the failure that started the
+    /// Rollback.
+    pub failure: Option<ErrorCode>,
+    /// Where its Rollback left each file it touched.
+    pub rollback: Vec<RollbackLocation>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -611,13 +672,43 @@ pub enum ErrorCode {
     Stale,
     /// A backup copy does not hold the bytes read; nothing was written.
     BackupFailed,
-    /// The first write failed; nothing was written.
+    /// A write failed; the Operation was rolled back.
     WriteFailed,
-    /// Some files were written and the Operation did not complete, so it
-    /// needs manual recovery from its backup.
-    NeedsRecovery,
+    /// An edit did not land; the Operation was rolled back.
+    VerifyFailed,
+    /// An Agent rewrote a file after config-digger wrote it, taking an edit
+    /// away; the Operation was rolled back.
+    OverwrittenByAgent,
+    /// A file no longer parses for a reader that could read it before; the
+    /// Operation was rolled back.
+    ReadFailureIntroduced,
+    /// The Operation failed and its Rollback could not restore every file,
+    /// so it needs manual recovery from its backup.
+    RollbackIncomplete,
     /// What the Operation to undo touched changed since it ran.
     UndoRefused,
+}
+
+impl ErrorCode {
+    /// The code as it appears in JSON.
+    pub fn code(self) -> &'static str {
+        match self {
+            ErrorCode::Unexpected => "unexpected",
+            ErrorCode::NoMatch => "no_match",
+            ErrorCode::Ambiguous => "ambiguous",
+            ErrorCode::AckRequired => "ack_required",
+            ErrorCode::Blocked => "blocked",
+            ErrorCode::Locked => "locked",
+            ErrorCode::Stale => "stale",
+            ErrorCode::BackupFailed => "backup_failed",
+            ErrorCode::WriteFailed => "write_failed",
+            ErrorCode::VerifyFailed => "verify_failed",
+            ErrorCode::OverwrittenByAgent => "overwritten_by_agent",
+            ErrorCode::ReadFailureIntroduced => "read_failure_introduced",
+            ErrorCode::RollbackIncomplete => "rollback_incomplete",
+            ErrorCode::UndoRefused => "undo_refused",
+        }
+    }
 }
 
 impl Error {
@@ -628,6 +719,7 @@ impl Error {
             candidates: Vec::new(),
             backup: None,
             diff: None,
+            failed: None,
         }
     }
 
@@ -708,13 +800,6 @@ impl Error {
         )
     }
 
-    pub(crate) fn write_failed(message: String) -> Self {
-        Self::new(
-            ErrorCode::WriteFailed,
-            format!("{message}; nothing was written"),
-        )
-    }
-
     /// No Operation in History has the id `id`.
     pub(crate) fn no_operation(id: &str) -> Self {
         Self::new(
@@ -735,14 +820,49 @@ impl Error {
         }
     }
 
-    pub(crate) fn needs_recovery(message: String, backup: PathBuf) -> Self {
+    /// The Operation `operation` failed with `cause`, and its Rollback left
+    /// each file as `rollback` says. `diff` goes from each backed-up file it
+    /// could not restore to what that file holds now.
+    pub(crate) fn rolled_back(
+        cause: ErrorCode,
+        message: String,
+        operation: String,
+        backup: PathBuf,
+        rollback: Vec<RollbackLocation>,
+        diff: String,
+    ) -> Self {
+        let not_restored = rollback
+            .iter()
+            .filter(|location| location.outcome == RollbackOutcome::NotRestored)
+            .count();
+        let complete = not_restored == 0;
+        let failure = Self {
+            backup: Some(backup.clone()),
+            failed: Some(Box::new(FailedOperation {
+                operation: operation.clone(),
+                failure: (!complete).then_some(cause),
+                rollback,
+            })),
+            ..Self::new(cause, String::new())
+        };
+        if complete {
+            return Self {
+                message: format!("{message}; Operation {operation} was rolled back"),
+                ..failure
+            };
+        }
+        let files = match not_restored {
+            1 => "1 file".to_owned(),
+            n => format!("{n} files"),
+        };
         Self {
+            code: ErrorCode::RollbackIncomplete,
             message: format!(
-                "{message}; the Operation needs manual recovery: the files as they were before it are in {}",
+                "{message}; the Rollback of Operation {operation} could not restore {files}, which need manual recovery: the files as they were before it are in {}",
                 backup.display()
             ),
-            backup: Some(backup),
-            ..Self::new(ErrorCode::NeedsRecovery, String::new())
+            diff: Some(diff),
+            ..failure
         }
     }
 }

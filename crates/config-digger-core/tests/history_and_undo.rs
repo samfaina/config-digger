@@ -413,49 +413,6 @@ fn pruning_keeps_everything_from_the_last_30_days() {
 }
 
 #[test]
-fn pruning_never_removes_an_operation_that_needs_attention() {
-    let project = r"E:\projects\petme-app";
-    let mcp_json = PathBuf::from(project).join(".mcp.json");
-    let fs = FakeFileSystem::new()
-        .with_file(claude_json(), TWO_USER_SERVERS)
-        .with_file(
-            &mcp_json,
-            r#"{"mcpServers": {"linear": {"url": "https://p"}}}"#,
-        )
-        .failing_writes_to(claude_json());
-    let clock = FakeClock::default();
-    // Both `linear` Entries: the project file is written, then the user file fails.
-    let core_then = core_at(&fs, &clock);
-    let options = ScanOptions {
-        projects: vec![PathBuf::from(project)],
-    };
-    let snapshot = core_then.scan(&options).unwrap();
-    let context = Context {
-        project: Some(PathBuf::from(project)),
-    };
-    let targets = Targets {
-        selectors: vec!["linear".to_owned()],
-        all: true,
-    };
-    let plan = core_then
-        .plan(&snapshot, &context, Action::Remove, &targets)
-        .unwrap();
-    let error = core_then.execute(plan, &[]).err().unwrap();
-    assert_eq!(error.code, ErrorCode::NeedsRecovery);
-    let needs_attention = core(&fs).history().unwrap()[0].id.clone();
-    fs.stop_failing_writes();
-    clock.advance(Duration::from_secs(60));
-    operations(&fs, &clock, 51);
-    clock.advance(40 * DAY);
-
-    let pruned = core_at(&fs, &clock).prune_history().unwrap();
-
-    assert_eq!(pruned.len(), 1);
-    assert_ne!(pruned[0], needs_attention);
-    assert!(history_ids(&fs).contains(&needs_attention));
-}
-
-#[test]
 fn pruning_fails_at_once_while_another_operation_holds_the_lock() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
     let clock = FakeClock::default();

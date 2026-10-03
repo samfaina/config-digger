@@ -4,7 +4,7 @@
 
 use crate::api::{
     Action, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
-    OperationStatus, OperationSummary, Preview, Verify,
+    OperationStatus, OperationSummary, Preview, RollbackLocation, Verify,
 };
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::ports::{Environment, HeldLock, Ports};
@@ -106,6 +106,12 @@ pub(crate) struct Manifest {
     pub changes: Vec<Change>,
     pub locations: Vec<LocationRecord>,
     pub verify: Option<VerifyRecord>,
+    /// Where the Rollback of a failed Operation left each touched file.
+    #[serde(default)]
+    pub rollback: Vec<RollbackLocation>,
+    /// When the user dismissed an Operation that needed attention, in RFC 3339.
+    #[serde(default)]
+    pub dismissed_at: Option<String>,
 }
 
 impl Manifest {
@@ -124,7 +130,14 @@ impl Manifest {
             changes: preview.changes.clone(),
             locations: Vec::new(),
             verify: None,
+            rollback: Vec::new(),
+            dismissed_at: None,
         }
+    }
+
+    /// Its Rollback is incomplete and the user has not dismissed it.
+    pub fn needs_attention(&self) -> bool {
+        self.status == OperationStatus::NeedsAttention && self.dismissed_at.is_none()
     }
 
     pub fn to_json(&self) -> Vec<u8> {
@@ -251,9 +264,12 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         status: manifest.status,
         status_text: explain::operation_status(
             manifest.status,
+            manifest.dismissed_at.is_some(),
             manifest.undo_of.as_deref(),
             undone_by.as_deref(),
         ),
+        cause: manifest.cause.clone(),
+        needs_attention: manifest.needs_attention(),
         undo_of: manifest.undo_of.clone(),
         undone_by,
         agents,
@@ -318,6 +334,7 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
             })
             .collect(),
         cause: manifest.cause.clone(),
+        rollback: manifest.rollback.clone(),
         verify: manifest.verify.as_ref().map(|record| record.verify),
         differences: manifest
             .verify
@@ -328,6 +345,32 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
     })
 }
 
+/// Dismisses the Operation `id`, under the global lock, when it needs
+/// attention.
+pub(crate) fn dismiss(ports: &Ports, id: &str) -> Result<OperationSummary, Error> {
+    let data = data_folder(ports.env.as_ref())?;
+    // With no History yet there is no data folder to take the lock in.
+    if !ports.fs.exists(&backups_folder(&data)) {
+        return Err(Error::no_operation(id));
+    }
+    let _lock = lock(ports, &data)?;
+    let mut manifests = load_all(ports)?;
+    let index = manifests
+        .iter()
+        .position(|manifest| manifest.id == id)
+        .ok_or_else(|| Error::no_operation(id))?;
+    if !manifests[index].needs_attention() {
+        return Err(Error::blocked(format!(
+            "Operation {id} does not need attention, so there is nothing to dismiss"
+        )));
+    }
+    manifests[index].dismissed_at =
+        Some(humantime::format_rfc3339_seconds(ports.clock.now()).to_string());
+    record(ports, &backups_folder(&data).join(id), &manifests[index]).map_err(Error::unexpected)?;
+    tracing::info!(operation = %id, "operation dismissed");
+    Ok(summary(ports, &manifests[index], &manifests))
+}
+
 /// History keeps at least this many Operations…
 const KEEP_OPERATIONS: usize = 50;
 /// …and every Operation younger than this.
@@ -335,7 +378,8 @@ const KEEP_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 /// Prunes History under the global lock: every Operation beyond the last
 /// [`KEEP_OPERATIONS`] that is older than [`KEEP_FOR`] goes, with its
-/// backup, unless it needs attention. Returns the ids pruned, oldest first.
+/// backup, unless it needs attention and was not dismissed. Returns the ids
+/// pruned, oldest first.
 pub(crate) fn prune(ports: &Ports) -> Result<Vec<String>, Error> {
     let data = data_folder(ports.env.as_ref())?;
     let backups = backups_folder(&data);
@@ -348,7 +392,7 @@ pub(crate) fn prune(ports: &Ports) -> Result<Vec<String>, Error> {
     for manifest in load_all(ports)?.iter().skip(KEEP_OPERATIONS).rev() {
         let old = humantime::parse_rfc3339(&manifest.created_at)
             .is_ok_and(|created| now.duration_since(created).is_ok_and(|age| age > KEEP_FOR));
-        if !old || manifest.status == OperationStatus::NeedsAttention {
+        if !old || manifest.needs_attention() {
             continue;
         }
         let folder = backups.join(&manifest.id);

@@ -1132,3 +1132,69 @@ fn undo_of_an_unknown_operation_exits_3() {
 
     assert_eq!(run.code, 3, "{}", run.stderr);
 }
+
+/// Makes a file read-only, or writable again.
+fn set_read_only(path: &Path, read_only: bool) {
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    permissions.set_readonly(read_only);
+    std::fs::set_permissions(path, permissions).unwrap();
+}
+
+#[test]
+fn a_write_that_fails_exits_9_and_history_shows_it_failed_and_rolled_back() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let claude_json = harness.path(".claude.json");
+    // A read-only file cannot be replaced, so the write fails.
+    set_read_only(&claude_json, true);
+
+    let json = harness.run(&["remove", "linear", "--no-project", "--yes", "--json"]);
+    let text = harness.run(&["remove", "linear", "--no-project", "--yes"]);
+    let history = harness.run(&["history"]);
+    set_read_only(&claude_json, false);
+
+    assert_eq!(json.code, 9, "{}", json.stderr);
+    let error = &json.document()["error"];
+    assert_eq!(error["code"], "write_failed");
+    let operation = error["operation"].as_str().unwrap();
+    assert_eq!(
+        error["backup"],
+        harness.backups().join(operation).display().to_string()
+    );
+    assert_eq!(error["rollback"][0]["outcome"], "not_written");
+    assert_eq!(
+        error["rollback"][0]["path"],
+        claude_json.display().to_string()
+    );
+    assert_eq!(text.code, 9, "{}", text.stderr);
+    assert!(text.stderr.contains("rolled back"), "{}", text.stderr);
+    assert!(text.stderr.contains("not written"), "{}", text.stderr);
+    assert_eq!(read(&claude_json), TWO_USER_SERVERS);
+    assert!(
+        history.stdout.contains("Failed, rolled back"),
+        "{}",
+        history.stdout
+    );
+    assert!(
+        history.stdout.contains("Cause: cannot write"),
+        "{}",
+        history.stdout
+    );
+}
+
+#[test]
+fn dismissing_an_operation_that_does_not_need_attention_exits_5() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+
+    let run = harness.run(&["history", "dismiss", &removed, "--json"]);
+
+    assert_eq!(run.code, 5, "{}", run.stderr);
+    assert_eq!(run.document()["error"]["code"], "blocked");
+}
+
+#[test]
+fn dismissing_an_unknown_operation_exits_3() {
+    let run = Harness::new().run(&["history", "dismiss", "20261001-120000-abc"]);
+
+    assert_eq!(run.code, 3, "{}", run.stderr);
+}

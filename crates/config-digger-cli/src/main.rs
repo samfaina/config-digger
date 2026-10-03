@@ -132,6 +132,12 @@ enum HistoryCommand {
         /// The Operation's id, as `history` lists it.
         id: String,
     },
+    /// Dismiss an Operation that needs attention, once its files are
+    /// recovered by hand. History then prunes it like any other.
+    Dismiss {
+        /// The Operation's id, as `history` lists it.
+        id: String,
+    },
 }
 
 /// The shells `completions` writes a script for.
@@ -184,7 +190,7 @@ enum Exit {
     Stale = 7,
     UndoRefused = 8,
     Failed = 9,
-    NeedsRecovery = 10,
+    RollbackIncomplete = 10,
 }
 
 /// A failed invocation, reported as `{schema_version, error: {code, message, …}}`.
@@ -195,14 +201,19 @@ struct Failure {
     /// What an ambiguous selector could mean.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     candidates: Vec<String>,
-    /// The backup folder of an Operation that needs manual recovery, or of
-    /// one whose Undo was refused.
+    /// The backup folder of a failed Operation, or of one whose Undo was
+    /// refused. Boxed, like `diff`, to keep every `Result<_, Failure>` small.
     #[serde(skip_serializing_if = "Option::is_none")]
-    backup: Option<PathBuf>,
-    /// For a refused Undo, a diff from each backed-up file to what it holds
-    /// now. A boxed `str` keeps every `Result<_, Failure>` small.
+    backup: Option<Box<Path>>,
+    /// For a refused Undo or an incomplete Rollback, a diff from each
+    /// backed-up file to what it holds now. A boxed `str` keeps every
+    /// `Result<_, Failure>` small.
     #[serde(skip_serializing_if = "Option::is_none")]
     diff: Option<Box<str>>,
+    /// The Operation that failed, its id, the failure that started an
+    /// incomplete Rollback, and where the Rollback left each file.
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    failed: Option<Box<api::FailedOperation>>,
     #[serde(skip)]
     exit: Exit,
 }
@@ -215,6 +226,7 @@ impl Failure {
             candidates: Vec::new(),
             backup: None,
             diff: None,
+            failed: None,
             exit,
         }
     }
@@ -226,24 +238,27 @@ impl Failure {
 
 impl From<api::Error> for Failure {
     fn from(error: api::Error) -> Self {
-        let (code, exit) = match error.code {
-            api::ErrorCode::Unexpected => ("unexpected", Exit::Unexpected),
-            api::ErrorCode::NoMatch => ("no_match", Exit::Selector),
-            api::ErrorCode::Ambiguous => ("ambiguous", Exit::Selector),
-            api::ErrorCode::AckRequired => ("ack_required", Exit::NotConfirmed),
-            api::ErrorCode::Blocked => ("blocked", Exit::Blocked),
-            api::ErrorCode::Locked => ("locked", Exit::Locked),
-            api::ErrorCode::Stale => ("stale", Exit::Stale),
-            api::ErrorCode::BackupFailed => ("backup_failed", Exit::Failed),
-            api::ErrorCode::WriteFailed => ("write_failed", Exit::Failed),
-            api::ErrorCode::NeedsRecovery => ("needs_recovery", Exit::NeedsRecovery),
-            api::ErrorCode::UndoRefused => ("undo_refused", Exit::UndoRefused),
+        let exit = match error.code {
+            api::ErrorCode::Unexpected => Exit::Unexpected,
+            api::ErrorCode::NoMatch | api::ErrorCode::Ambiguous => Exit::Selector,
+            api::ErrorCode::AckRequired => Exit::NotConfirmed,
+            api::ErrorCode::Blocked => Exit::Blocked,
+            api::ErrorCode::Locked => Exit::Locked,
+            api::ErrorCode::Stale => Exit::Stale,
+            api::ErrorCode::BackupFailed
+            | api::ErrorCode::WriteFailed
+            | api::ErrorCode::VerifyFailed
+            | api::ErrorCode::OverwrittenByAgent
+            | api::ErrorCode::ReadFailureIntroduced => Exit::Failed,
+            api::ErrorCode::RollbackIncomplete => Exit::RollbackIncomplete,
+            api::ErrorCode::UndoRefused => Exit::UndoRefused,
         };
         Failure {
             candidates: error.candidates,
-            backup: error.backup,
+            backup: error.backup.map(PathBuf::into_boxed_path),
             diff: error.diff.map(String::into_boxed_str),
-            ..Failure::new(code, error.message, exit)
+            failed: error.failed,
+            ..Failure::new(error.code.code(), error.message, exit)
         }
     }
 }
@@ -289,8 +304,17 @@ fn main() -> ExitCode {
                 if let Some(backup) = &failure.backup {
                     anstream::eprintln!("  backup: {}", backup.display());
                 }
+                if let Some(failed) = &failure.failed {
+                    anstream::eprint!("{}", render_rollback(&failed.rollback, INDENT));
+                }
                 if let Some(diff) = &failure.diff {
                     anstream::eprint!("{}", render_diff(diff));
+                }
+                if let (Exit::RollbackIncomplete, Some(failed)) = (failure.exit, &failure.failed) {
+                    anstream::eprintln!(
+                        "Once its files are recovered, dismiss it with `config-digger history dismiss {}`.",
+                        failed.operation
+                    );
                 }
             }
             ExitCode::from(failure.exit as u8)
@@ -316,6 +340,12 @@ struct HistoryBody<'a> {
 #[derive(Serialize)]
 struct OperationBody<'a> {
     operation: &'a api::OperationDetail,
+}
+
+/// `history dismiss --json`: the Operation as History now lists it.
+#[derive(Serialize)]
+struct DismissBody<'a> {
+    operation: &'a api::OperationSummary,
 }
 
 fn run(cli: &Cli) -> Result<(), Failure> {
@@ -411,6 +441,28 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                 });
             } else {
                 anstream::print!("{}", render_operation(&operation, width));
+            }
+            Ok(())
+        }
+        Command::History {
+            command: Some(HistoryCommand::Dismiss { id }),
+        } => {
+            let operation = core.dismiss(id)?;
+            if cli.json {
+                print_json(&DismissBody {
+                    operation: &operation,
+                });
+            } else {
+                anstream::print!(
+                    "{}",
+                    plain_line(
+                        &format!(
+                            "Dismissed Operation {}: {}.",
+                            operation.id, operation.status_text
+                        ),
+                        width
+                    )
+                );
             }
             Ok(())
         }
@@ -1073,7 +1125,11 @@ fn render_history(operations: &[api::OperationSummary], width: Option<usize>) ->
                 .fit(width)
                 .render(),
         );
-        if let Some(reason) = &operation.not_undoable {
+        let cause = operation
+            .cause
+            .as_ref()
+            .map(|cause| format!("Cause: {cause}"));
+        for reason in cause.iter().chain(&operation.not_undoable) {
             for text in terminal::wrap(reason, reason_width) {
                 out.push_str(&plain_line(&format!("{reason_indent}{text}"), width));
             }
@@ -1114,6 +1170,12 @@ fn render_operation(operation: &api::OperationDetail, width: Option<usize>) -> S
         width,
     ));
 
+    if !operation.rollback.is_empty() {
+        out.push('\n');
+        out.push_str(&styled_line("Rollback", BOLD, width));
+        out.push_str(&render_rollback(&operation.rollback, INDENT));
+    }
+
     if !operation.changes.is_empty() {
         out.push('\n');
         out.push_str(&styled_line("Changes", BOLD, width));
@@ -1142,6 +1204,29 @@ fn render_operation(operation: &api::OperationDetail, width: Option<usize>) -> S
             None => "created by this Operation, so nothing was backed up".to_owned(),
         };
         out.push_str(&plain_line(&format!("{INDENT}{INDENT}{backup}"), width));
+    }
+    out
+}
+
+/// Where a failed Operation's Rollback left each file, one per line after
+/// `indent`, then why when it was not restored. Never cut: it is what manual
+/// recovery starts from.
+fn render_rollback(rollback: &[api::RollbackLocation], indent: &str) -> String {
+    let mut out = String::new();
+    for location in rollback {
+        let (label, style) = match location.outcome {
+            api::RollbackOutcome::Restored => ("restored", AnsiColor::Green.on_default()),
+            api::RollbackOutcome::NotWritten => ("not written", Style::new()),
+            api::RollbackOutcome::LeftAlone => ("left alone", Style::new()),
+            api::RollbackOutcome::NotRestored => ("not restored", ERROR),
+        };
+        out.push_str(&format!(
+            "{indent}{style}{label}{style:#}: {}\n",
+            location.path.display()
+        ));
+        if let Some(reason) = &location.reason {
+            out.push_str(&format!("{indent}{INDENT}{reason}\n"));
+        }
     }
     out
 }

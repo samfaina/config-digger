@@ -31,6 +31,9 @@ pub trait FileSystem: Send + Sync {
     /// Deletes a folder and everything below it.
     fn remove_dir_all(&self, path: &Path) -> io::Result<()>;
 
+    /// Deletes a file. A missing file is an error of kind `NotFound`.
+    fn remove_file(&self, path: &Path) -> io::Result<()>;
+
     /// Creates a folder and any missing parent folders.
     fn create_dir_all(&self, path: &Path) -> io::Result<()>;
 
