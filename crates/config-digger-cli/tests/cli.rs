@@ -63,6 +63,11 @@ impl Harness {
         self.root.path().join("AppData").join("Local")
     }
 
+    /// Where the binary's `%APPDATA%` points.
+    fn roaming_app_data(&self) -> PathBuf {
+        self.root.path().join("AppData").join("Roaming")
+    }
+
     /// The folder Operations are backed up and recorded in.
     fn backups(&self) -> PathBuf {
         self.local_app_data().join("config-digger").join("backups")
@@ -109,8 +114,10 @@ impl Harness {
         command
             .args(args)
             .current_dir(self.root.path())
-            // config-digger's data folder (backups, History, lock) stays in the temporary folder.
+            // config-digger's data folders (backups, History, lock, and the
+            // homes and Projects the user added or hid) stay in the temporary folder.
             .env("LOCALAPPDATA", self.local_app_data())
+            .env("APPDATA", self.roaming_app_data())
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("RUST_LOG");
         // Terminal conventions the tests opt into one at a time.
@@ -422,6 +429,10 @@ fn list_json_prints_one_document_with_schema_version() {
             "agent": "claude-code",
             "agent_name": "Claude Code",
             "home": "default",
+            "folder": real_path(&harness.home).display().to_string(),
+            "source": {"kind": "default"},
+            "hidden": false,
+            "no_configuration": null,
             "scopes": ["local", "project", "user"]
         }])
     );
@@ -1911,4 +1922,248 @@ fn a_disable_that_must_write_into_read_failures_exits_5() {
 
     assert_eq!(run.code, 5, "{}", run.stderr);
     assert_eq!(run.document()["error"]["code"], "blocked");
+}
+
+impl Harness {
+    /// A folder next to the home, created empty, by its real path.
+    fn folder(&self, name: &str) -> PathBuf {
+        let folder = self.root.path().join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        real_path(&folder)
+    }
+
+    /// The list of homes and Projects the user added or hid.
+    fn user_list(&self) -> Value {
+        let file = self
+            .roaming_app_data()
+            .join("config-digger")
+            .join("homes-and-projects.json");
+        serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap()
+    }
+}
+
+/// `(home, source kind, hidden)` of each home `homes list --json` lists.
+fn listed_homes(document: &Value) -> Vec<(String, String, bool)> {
+    document["homes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|home| {
+            (
+                home["home"].as_str().unwrap().to_owned(),
+                home["source"]["kind"].as_str().unwrap().to_owned(),
+                home["hidden"].as_bool().unwrap(),
+            )
+        })
+        .collect()
+}
+
+/// The paths `projects list --json` lists.
+fn listed_projects(document: &Value) -> Vec<String> {
+    document["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|project| project["path"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn homes_add_reads_an_existing_folder_as_an_agent_home() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+    let alt = harness.folder("alt");
+    std::fs::write(
+        alt.join(".claude.json"),
+        r#"{"mcpServers": {"notes": {"command": "notes"}}}"#,
+    )
+    .unwrap();
+    let alt = alt.display().to_string();
+    let empty = harness.folder("empty").display().to_string();
+
+    let added = harness.run(&["homes", "add", &alt, "--agent", "claude-code", "--json"]);
+    let without_files = harness.run(&["homes", "add", &empty, "--agent", "claude-code"]);
+    let list = harness.run(&["homes", "list", "--json"]);
+    let text = harness.run(&["homes", "list", "--wide"]);
+    let items = harness.run(&["list", "--no-project", "--json"]);
+
+    assert_eq!(added.code, 0, "{}", added.stderr);
+    assert_eq!(added.document()["home"]["source"]["kind"], "added");
+    assert_eq!(without_files.code, 0, "{}", without_files.stderr);
+    assert!(
+        without_files
+            .stdout
+            .contains("No configuration found for Claude Code."),
+        "{}",
+        without_files.stdout
+    );
+    assert_eq!(
+        listed_homes(&list.document()),
+        vec![
+            ("default".to_owned(), "default".to_owned(), false),
+            (alt.clone(), "added".to_owned(), false),
+            (empty.clone(), "added".to_owned(), false),
+        ]
+    );
+    assert!(
+        text.stdout.contains("definition default"),
+        "{}",
+        text.stdout
+    );
+    assert!(text.stdout.contains("added by you"), "{}", text.stdout);
+    let notes_home = items.document()["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["name"] == "notes")
+        .map(|item| item["home"].clone());
+    assert_eq!(notes_home, Some(json!(alt)));
+}
+
+#[test]
+fn homes_add_needs_an_existing_folder_and_a_known_agent() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+    let missing = harness.root.path().join("missing").display().to_string();
+    let alt = harness.folder("alt").display().to_string();
+
+    let no_folder = harness.run(&["homes", "add", &missing, "--agent", "claude-code", "--json"]);
+    let no_agent = harness.run(&["homes", "add", &alt, "--agent", "zed", "--json"]);
+    let no_agent_flag = harness.run(&["homes", "add", &alt]);
+
+    assert_eq!(no_folder.code, 2, "{}", no_folder.stderr);
+    assert_eq!(no_folder.document()["error"]["code"], "invalid_path");
+    assert_eq!(no_agent.code, 3, "{}", no_agent.stderr);
+    assert_eq!(no_agent.document()["error"]["code"], "no_match");
+    assert_eq!(no_agent_flag.code, 2);
+    assert!(
+        !harness.roaming_app_data().exists(),
+        "a refused add writes nothing"
+    );
+}
+
+#[test]
+fn a_hidden_home_and_its_items_are_listed_only_with_include_hidden() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let hide = harness.run(&["homes", "hide", "default", "--agent", "claude-code"]);
+    let homes = harness.run(&["homes", "list", "--json"]);
+    let agents = harness.run(&["agents", "--json"]);
+    let items = harness.run(&["list", "--json"]);
+    let all_items = harness.run(&["list", "--json", "--include-hidden"]);
+    let unhide = harness.run(&["homes", "unhide", "default", "--json"]);
+    let shown = harness.run(&["homes", "list", "--json"]);
+
+    assert_eq!(hide.code, 0, "{}", hide.stderr);
+    assert_eq!(listed_homes(&homes.document()), vec![]);
+    assert_eq!(agents.document()["agents"][0]["homes"], json!([]));
+    assert_eq!(items.document()["items"], json!([]));
+    assert!(!all_items.document()["items"].as_array().unwrap().is_empty());
+    assert_eq!(unhide.code, 0, "{}", unhide.stderr);
+    assert_eq!(unhide.document()["home"]["hidden"], false);
+    assert_eq!(
+        listed_homes(&shown.document()),
+        vec![("default".to_owned(), "default".to_owned(), false)]
+    );
+}
+
+#[test]
+fn projects_add_hide_unhide_and_forget() {
+    let harness = Harness::new().with_local_linear();
+    let scratch = harness.folder("scratch").display().to_string();
+    let workspace = harness.root.path().join("team.code-workspace");
+    std::fs::write(&workspace, r#"{"folders": []}"#).unwrap();
+    let workspace = real_path(&workspace).display().to_string();
+    let registered = harness.cwd().display().to_string();
+
+    let add = harness.run(&["projects", "add", &scratch, "--json"]);
+    let add_workspace = harness.run(&["projects", "add", &workspace]);
+    let listed = harness.run(&["projects", "list", "--json"]);
+    let hide = harness.run(&["projects", "hide", &scratch]);
+    let hidden = harness.run(&["projects", "list", "--json"]);
+    let with_hidden = harness.run(&["projects", "list", "--json", "--include-hidden"]);
+    let unhide = harness.run(&["projects", "unhide", &scratch]);
+    let forget = harness.run(&["projects", "forget", &scratch, "--json"]);
+    let forgotten = harness.run(&["projects", "list", "--json"]);
+
+    assert_eq!(add.code, 0, "{}", add.stderr);
+    assert_eq!(add.document()["project"]["added"], true);
+    assert_eq!(add_workspace.code, 0, "{}", add_workspace.stderr);
+    let mut expected = vec![registered.clone(), scratch.clone(), workspace.clone()];
+    expected.sort_by_key(|path| path.to_lowercase());
+    assert_eq!(listed_projects(&listed.document()), expected);
+    assert_eq!(hide.code, 0, "{}", hide.stderr);
+    assert!(!listed_projects(&hidden.document()).contains(&scratch));
+    assert!(listed_projects(&with_hidden.document()).contains(&scratch));
+    assert_eq!(unhide.code, 0, "{}", unhide.stderr);
+    assert_eq!(forget.code, 0, "{}", forget.stderr);
+    assert_eq!(
+        listed_projects(&forgotten.document()),
+        vec![registered, workspace.clone()]
+    );
+    assert_eq!(harness.user_list()["projects"], json!([workspace]));
+}
+
+#[test]
+fn forget_refuses_what_is_discovered_and_points_to_hide() {
+    let harness = Harness::new().with_local_linear();
+    let registered = harness.cwd().display().to_string();
+
+    let home = harness.run(&["homes", "forget", "default", "--json"]);
+    let project = harness.run(&["projects", "forget", &registered]);
+
+    assert_eq!(home.code, 5, "{}", home.stderr);
+    assert_eq!(home.document()["error"]["code"], "blocked");
+    assert_eq!(project.code, 5, "{}", project.stderr);
+    assert!(
+        project
+            .stderr
+            .contains("hide it with `config-digger projects hide`"),
+        "{}",
+        project.stderr
+    );
+}
+
+#[test]
+fn a_hidden_project_picked_with_project_is_still_evaluated() {
+    let harness = Harness::new().with_local_linear();
+    let registered = harness.cwd().display().to_string();
+    let claude_json = std::fs::read(harness.path(".claude.json")).unwrap();
+
+    let hide = harness.run(&["projects", "hide", &registered]);
+    let listed = harness.run(&["projects", "list", "--json"]);
+    let picked = harness.run(&["list", "--project", &registered, "--json"]);
+
+    assert_eq!(hide.code, 0, "{}", hide.stderr);
+    assert_eq!(listed_projects(&listed.document()), Vec::<String>::new());
+    assert_eq!(picked.code, 0, "{}", picked.stderr);
+    assert_eq!(picked.document()["project"], registered);
+    assert_eq!(
+        entry_states(&picked.document(), "linear"),
+        pairs(&[("local", "effective"), ("user", "shadowed")])
+    );
+    // Hiding writes config-digger's own list, never Agent configuration.
+    assert_eq!(
+        std::fs::read(harness.path(".claude.json")).unwrap(),
+        claude_json
+    );
+}
+
+#[test]
+fn agents_lists_the_loaded_definitions_and_the_homes_found() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let json = harness.run(&["agents", "--json"]);
+    let text = harness.run(&["agents"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let agent = &json.document()["agents"][0];
+    assert_eq!(agent["id"], "claude-code");
+    assert_eq!(agent["built_in"], true);
+    assert_eq!(agent["homes"][0]["home"], "default");
+    assert_eq!(agent["homes"][0]["source"]["kind"], "default");
+    assert!(
+        text.stdout
+            .starts_with("Claude Code (claude-code), built-in definition\n"),
+        "{}",
+        text.stdout
+    );
 }

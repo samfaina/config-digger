@@ -7,7 +7,7 @@ use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
 use crate::disable::{self, ContextProject, Hit};
-use crate::scan::{ScannedEntry, ScannedReadFailure, Snapshot};
+use crate::scan::{HomeSource, ScannedEntry, ScannedReadFailure, Snapshot};
 use crate::{explain, locator, paths};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -26,6 +26,14 @@ pub(crate) fn resolve(
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
                 home: home.home.clone(),
+                folder: home.folder.clone(),
+                source: match home.source {
+                    HomeSource::Default => api::HomeSource::Default,
+                    HomeSource::Added => api::HomeSource::Added,
+                },
+                hidden: home.hidden,
+                no_configuration: (!home.configured)
+                    .then(|| explain::no_configuration(&definition.agent.name)),
                 scopes: definition
                     .scopes
                     .iter()
@@ -41,11 +49,14 @@ pub(crate) fn resolve(
         .map(|project| api::Project {
             path: project.path.clone(),
             missing: !project.exists,
+            workspace: project.workspace,
             registered_by: project
                 .registered_by
                 .iter()
                 .map(|&agent| definitions[agent].agent.id.clone())
                 .collect(),
+            added: project.added,
+            hidden: project.hidden,
         })
         .collect();
 

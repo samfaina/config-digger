@@ -8,6 +8,7 @@ use crate::definitions::blocks::{
 };
 use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
 use crate::ports::Ports;
+use crate::user_list::{self, UserList};
 use crate::{mask, paths};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -180,28 +181,58 @@ pub(crate) struct SwitchStore {
     pub store_class: StoreClass,
 }
 
-/// An Agent home found on this machine.
+/// An Agent home found on this machine, or added by the user.
 #[derive(Clone)]
 pub(crate) struct ScannedHome {
     /// Index of the Agent definition in the definitions the snapshot was scanned with.
     pub agent_index: usize,
     pub home: String,
+    /// The folder its roots are in.
+    pub folder: PathBuf,
     /// The path of each of its roots, by name.
     pub roots: BTreeMap<String, PathBuf>,
+    pub source: HomeSource,
+    /// Any of its roots exists.
+    pub configured: bool,
+    /// The user hid it.
+    pub hidden: bool,
 }
 
-/// A Project, found in a registry or asked for.
+/// Where an Agent home came from.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HomeSource {
+    /// The location the Agent definition gives.
+    Default,
+    /// The user added it, and no definition location finds it.
+    Added,
+}
+
+/// A Project, found in a registry, added by the user, or asked for.
 #[derive(Clone)]
 pub(crate) struct ScannedProject {
-    /// The real path of an existing folder, the lexical normalisation otherwise.
+    /// The real path of an existing folder or workspace file, the lexical
+    /// normalisation otherwise.
     pub path: PathBuf,
     /// What Projects are compared by.
     pub key: String,
     pub exists: bool,
+    /// It is a `.code-workspace` file rather than a folder.
+    pub workspace: bool,
     /// The keys of every lexically normalised spelling that names this Project.
     pub spellings: BTreeSet<String>,
     /// The Agents whose registries record it.
     pub registered_by: BTreeSet<usize>,
+    /// The user added it.
+    pub added: bool,
+    /// The user hid it.
+    pub hidden: bool,
+}
+
+impl ScannedProject {
+    /// It is a folder that exists, so that locations in it can be read.
+    pub fn is_folder(&self) -> bool {
+        self.exists && !self.workspace
+    }
 }
 
 /// One declaration at one concrete location.
@@ -254,7 +285,9 @@ pub(crate) enum ScanError {
 struct FoundHome {
     agent_index: usize,
     home: String,
+    folder: PathBuf,
     roots: BTreeMap<String, PathBuf>,
+    source: HomeSource,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -275,7 +308,13 @@ pub(crate) fn scan_as_if(
     written: &[(PathBuf, Vec<u8>)],
 ) -> Result<Snapshot, ScanError> {
     let read_at = ports.clock.now();
-    let found = find_homes(definitions, ports)?;
+    // A list config-digger cannot read adds and hides nothing; writing it
+    // is refused until it is fixed.
+    let user_list = user_list::load(ports).unwrap_or_else(|error| {
+        tracing::warn!(%error, "user list not read");
+        UserList::default()
+    });
+    let found = find_homes(definitions, ports, &user_list)?;
     let mut scanner = Scanner {
         reader: Reader::new(ports, written),
         projects: Projects::new(ports),
@@ -285,6 +324,9 @@ pub(crate) fn scan_as_if(
 
     for home in &found {
         scanner.read_registries(home, &definitions[home.agent_index]);
+    }
+    for path in &user_list.projects {
+        scanner.projects.add_by_user(path);
     }
     for path in extra_projects {
         scanner.projects.add(path, None);
@@ -306,7 +348,7 @@ pub(crate) fn scan_as_if(
         .projects
         .list
         .iter()
-        .filter(|project| project.exists)
+        .filter(|project| project.is_folder())
         .map(|project| (project.path.clone(), project.key.clone()))
         .collect();
     for home in &found {
@@ -325,6 +367,12 @@ pub(crate) fn scan_as_if(
 
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
+    for project in &mut projects {
+        project.hidden = user_list
+            .hidden_projects
+            .iter()
+            .any(|hidden| project.spellings.contains(&paths::lexical_key(hidden)));
+    }
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
     let switch_files = switch_files(definitions, &found, &projects);
@@ -353,9 +401,16 @@ pub(crate) fn scan_as_if(
         homes: found
             .into_iter()
             .map(|home| ScannedHome {
+                configured: home.roots.values().any(|root| ports.fs.exists(root)),
+                hidden: user_list.hidden_homes.iter().any(|hidden| {
+                    hidden.agent == definitions[home.agent_index].agent.id
+                        && hidden.home.eq_ignore_ascii_case(&home.home)
+                }),
                 agent_index: home.agent_index,
                 home: home.home,
+                folder: home.folder,
                 roots: home.roots,
+                source: home.source,
             })
             .collect(),
         projects,
@@ -390,7 +445,7 @@ fn read_switches(
                 let places: Vec<(PathBuf, Option<String>)> = if switch.anchor.in_project() {
                     projects
                         .iter()
-                        .filter(|project| project.exists)
+                        .filter(|project| project.is_folder())
                         .filter_map(|project| {
                             let path = switch.anchor.path(&home.roots, Some(&project.path))?;
                             Some((path, Some(project.key.clone())))
@@ -500,7 +555,7 @@ fn switch_files(
                     files.extend(anchor.path(&home.roots, None));
                     continue;
                 }
-                for project in projects.iter().filter(|project| project.exists) {
+                for project in projects.iter().filter(|project| project.is_folder()) {
                     files.extend(anchor.path(&home.roots, Some(&project.path)));
                 }
             }
@@ -520,7 +575,11 @@ fn versioned<'a>(ports: &Ports, paths: impl Iterator<Item = &'a Path>) -> BTreeS
         .collect()
 }
 
-fn find_homes(definitions: &[AgentDefinition], ports: &Ports) -> Result<Vec<FoundHome>, ScanError> {
+fn find_homes(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    user_list: &UserList,
+) -> Result<Vec<FoundHome>, ScanError> {
     let mut found = Vec::new();
     for (agent_index, definition) in definitions.iter().enumerate() {
         for home in &definition.homes {
@@ -540,9 +599,37 @@ fn find_homes(definitions: &[AgentDefinition], ports: &Ports) -> Result<Vec<Foun
             found.push(FoundHome {
                 agent_index,
                 home: home.id.clone(),
+                folder,
                 roots,
+                source: HomeSource::Default,
             });
         }
+    }
+    // A home the user added is listed even with none of its roots, and
+    // only once when a definition location finds it too. Its id is its folder.
+    for added in &user_list.homes {
+        let Some(agent_index) = definitions
+            .iter()
+            .position(|definition| definition.agent.id == added.agent)
+        else {
+            tracing::debug!(agent = %added.agent, "added home of an Agent not loaded");
+            continue;
+        };
+        let key = paths::key(&paths::canonical(ports.fs.as_ref(), &added.folder).0);
+        let known = found.iter().any(|home| {
+            home.agent_index == agent_index
+                && paths::key(&paths::canonical(ports.fs.as_ref(), &home.folder).0) == key
+        });
+        if known {
+            continue;
+        }
+        found.push(FoundHome {
+            agent_index,
+            home: added.folder.display().to_string(),
+            folder: added.folder.clone(),
+            roots: definitions[agent_index].homes[0].roots_in(&added.folder),
+            source: HomeSource::Added,
+        });
     }
     Ok(found)
 }
@@ -837,11 +924,14 @@ impl<'p> Projects<'p> {
                     Some(index) => index,
                     None => {
                         self.list.push(ScannedProject {
+                            workspace: is_workspace(&path),
                             path,
                             key: key.clone(),
                             exists,
                             spellings: BTreeSet::from([key.clone()]),
                             registered_by: BTreeSet::new(),
+                            added: false,
+                            hidden: false,
                         });
                         self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1
@@ -856,4 +946,19 @@ impl<'p> Projects<'p> {
         project.registered_by.extend(registered_by);
         Some(project.key.clone())
     }
+
+    /// Records a Project the user added.
+    fn add_by_user(&mut self, path: &Path) {
+        if let Some(key) = self.add(path, None)
+            && let Some(project) = self.list.iter_mut().find(|project| project.key == key)
+        {
+            project.added = true;
+        }
+    }
+}
+
+/// Whether a Project path names a VS Code workspace file rather than a folder.
+pub(crate) fn is_workspace(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("code-workspace"))
 }

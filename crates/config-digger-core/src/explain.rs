@@ -616,3 +616,27 @@ pub(crate) fn read_failure_target(path: &Path, failure: &str) -> String {
         path.display()
     )
 }
+
+/// An Agent home where none of the files the Agent reads exists.
+pub(crate) fn no_configuration(agent_name: &str) -> String {
+    format!("No configuration found for {agent_name}")
+}
+
+/// Why `path` cannot be added: it is not an existing folder, or
+/// `.code-workspace` file when `workspace` is allowed.
+pub(crate) fn not_existing(path: &Path, workspace: bool) -> String {
+    let what = if workspace {
+        "an existing folder or .code-workspace file"
+    } else {
+        "an existing folder"
+    };
+    format!("{} is not {what}", path.display())
+}
+
+/// Why `what`, which `found_by` says how it is discovered, cannot be
+/// forgotten, and the command of `group` that hides it instead.
+pub(crate) fn forget_refused(what: &str, found_by: &str, group: &str) -> String {
+    format!(
+        "{what} {found_by}, so forgetting it would not take it off the list; hide it with `config-digger {group} hide`"
+    )
+}
