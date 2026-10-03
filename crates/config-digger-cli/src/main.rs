@@ -1267,16 +1267,29 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let secondary: Vec<String> = secondary.collect();
         let notes = entry.notes.iter().map(|note| note.sentence.as_str());
         let caveats = entry.caveats.iter().map(|caveat| caveat.sentence.as_str());
-        let action = entry
-            .enable
-            .as_deref()
-            .unwrap_or_else(|| entry.disable.sentence());
+        // An Entry Remove is not offered for, such as a plugin's, says how
+        // to remove it instead, and offers Disable in its place.
+        let how_to_remove = match &entry.remove {
+            api::RemoveOption::NotOffered {
+                how_to_remove: Some(how),
+                ..
+            } => Some(how.sentence.as_str()),
+            _ => None,
+        };
+        let action = match (&entry.enable, how_to_remove, &entry.disable) {
+            (Some(enable), _, _) => enable.clone(),
+            (None, Some(_), api::DisableOption::Offered { sentence, .. }) => {
+                format!("Disable instead: {sentence}")
+            }
+            (None, _, disable) => disable.sentence().to_owned(),
+        };
         let sentences = reason
             .chain(what_if)
             .chain(secondary.iter().map(String::as_str))
             .chain(notes)
             .chain(caveats)
-            .chain([action]);
+            .chain(how_to_remove)
+            .chain([action.as_str()]);
         for sentence in sentences {
             for text in terminal::wrap(sentence, reason_width) {
                 let mut line = Line::default();
@@ -1744,6 +1757,10 @@ fn provenance_label(entry: &api::Entry) -> String {
         (api::Provenance::File, _) => "file".to_owned(),
         (api::Provenance::Managed, _) => "managed".to_owned(),
         (api::Provenance::CloudMirror, _) => "cloud-mirror".to_owned(),
+        (api::Provenance::Plugin, _) => match &entry.plugin {
+            Some(plugin) => format!("plugin ({})", plugin.id),
+            None => "plugin".to_owned(),
+        },
     }
 }
 

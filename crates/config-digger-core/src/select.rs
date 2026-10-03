@@ -122,7 +122,9 @@ fn at_locator(selector: &str) -> impl Fn(&&Entry) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{DisableNotOffered, DisableOption, Entry, ItemKind, Provenance, State};
+    use crate::api::{
+        DisableNotOffered, DisableOption, Entry, ItemKind, Provenance, RemoveOption, State,
+    };
     use std::path::PathBuf;
 
     fn item(home: &str, name: &str) -> Item {
@@ -141,6 +143,7 @@ mod tests {
                 scope: "user".to_owned(),
                 provenance: Provenance::File,
                 skill_manager: None,
+                plugin: None,
                 git_versioned: false,
                 link: None,
                 state: State::Effective,
@@ -155,6 +158,7 @@ mod tests {
                     sentence: String::new(),
                 },
                 enable: None,
+                remove: RemoveOption::Offered,
                 caveats: Vec::new(),
             }],
             caveats: Vec::new(),

@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "E:/projects/petme-app": {
+      "mcpServers": {}
+    }
+  },
+  "mcpServers": {
+    "docs": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase"]
+    }
+  }
+}

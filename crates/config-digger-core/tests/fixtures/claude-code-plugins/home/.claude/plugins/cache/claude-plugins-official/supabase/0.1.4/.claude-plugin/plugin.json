@@ -1,0 +1,7 @@
+{
+  "name": "supabase",
+  "version": "0.1.4",
+  "description": "Supabase for Claude Code.",
+  "mcpServers": "./agents/claude/.mcp.json",
+  "skills": "./skills/"
+}

@@ -1210,6 +1210,8 @@ pub struct Entry {
     pub provenance: Provenance,
     /// For `skill_manager` Provenance, the skill manager that installed it.
     pub skill_manager: Option<SkillManager>,
+    /// For `plugin` Provenance, the plugin it is part of.
+    pub plugin: Option<Plugin>,
     /// Its file is in the index of its git repo, so a change to it shows in
     /// the git diff and reaches every clone once committed.
     pub git_versioned: bool,
@@ -1238,6 +1240,8 @@ pub struct Entry {
     /// For a Disabled Entry, what Enable writes, as a sentence rendered by
     /// the core.
     pub enable: Option<String>,
+    /// Whether Remove is offered for it.
+    pub remove: RemoveOption,
     /// What makes its State less certain, such as a Disable switch that
     /// cannot be read.
     pub caveats: Vec<Caveat>,
@@ -1340,6 +1344,44 @@ pub enum DisableNotOffered {
     ReadOnly,
 }
 
+/// Whether Remove is offered for an Entry, and if not, why, and what to
+/// do instead.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum RemoveOption {
+    /// Remove deletes the Entry from where it lives, for every Agent that
+    /// reads it.
+    Offered,
+    /// Remove is not offered.
+    NotOffered {
+        code: RemoveNotOffered,
+        /// The reason as a sentence, rendered by the core.
+        sentence: String,
+        /// How to remove it some other way, such as through the Agent.
+        how_to_remove: Option<HowToRemove>,
+    },
+}
+
+/// Why Remove is not offered for an Entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoveNotOffered {
+    /// The Entry is managed, or a copy of the user's account, and
+    /// config-digger only reads it.
+    ReadOnly,
+    /// The Entry is part of a plugin, which only the Agent uninstalls.
+    Plugin,
+}
+
+/// How to remove an Entry that config-digger does not Remove.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct HowToRemove {
+    /// The Agent's own command that removes it.
+    pub command: String,
+    /// What to do, as a sentence rendered by the core.
+    pub sentence: String,
+}
+
 /// How an Entry got where it is, which decides how it can be taken away.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
@@ -1355,6 +1397,10 @@ pub enum Provenance {
     /// A skill folder a skill manager installed, as its definition
     /// recognises it. Remove touches that folder or link alone.
     SkillManager,
+    /// Part of a plugin the Agent installed. Disable takes the whole plugin
+    /// through its own switch, and Remove is not offered: the Agent
+    /// uninstalls it.
+    Plugin,
 }
 
 /// A skill manager, such as `npx skills`, as its definition names it.
@@ -1364,12 +1410,28 @@ pub struct SkillManager {
     pub name: String,
 }
 
+/// A plugin an Agent installed, which an Entry is part of.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Plugin {
+    /// The id the Agent knows it by, such as `supabase@claude-plugins-official`.
+    pub id: String,
+    /// The name its Entries are named by, such as `supabase`.
+    pub name: String,
+    /// The Scope it is installed at, as the Agent records it.
+    pub scope: Option<String>,
+    /// Its version, as the Agent records it.
+    pub version: Option<String>,
+    /// The folder its files are in.
+    pub folder: PathBuf,
+}
+
 impl From<DefinitionProvenance> for Provenance {
     fn from(provenance: DefinitionProvenance) -> Self {
         match provenance {
             DefinitionProvenance::File => Provenance::File,
             DefinitionProvenance::Managed => Provenance::Managed,
             DefinitionProvenance::CloudMirror => Provenance::CloudMirror,
+            DefinitionProvenance::Plugin => Provenance::Plugin,
         }
     }
 }
@@ -1416,6 +1478,9 @@ pub enum ReasonCode {
     DisabledByName,
     /// The Entry's own switch is off.
     DisabledNatively,
+    /// The switch of the plugin the Entry is part of is off, so the Agent
+    /// skips every Entry of the plugin.
+    PluginDisabled,
     /// A rule in a settings file the user writes, such as a deny list,
     /// leaves the Entry out. config-digger never lifts it.
     DisabledByRule,

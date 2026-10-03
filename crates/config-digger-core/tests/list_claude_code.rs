@@ -42,7 +42,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
-            "scopes": ["managed", "local", "project", "user"],
+            "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
@@ -69,6 +69,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "scope": "user",
                     "provenance": "file",
                     "skill_manager": null,
+                    "plugin": null,
                     "git_versioned": false,
                     "link": null,
                     "state": "effective",
@@ -85,6 +86,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]],
                     "disable": no_project_switch(),
                     "enable": null,
+                    "remove": { "status": "offered" },
                     "caveats": []
                 }],
                 "caveats": []
@@ -102,6 +104,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "scope": "user",
                     "provenance": "file",
                     "skill_manager": null,
+                    "plugin": null,
                     "git_versioned": false,
                     "link": null,
                     "state": "effective",
@@ -113,6 +116,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "masked": [],
                     "disable": no_project_switch(),
                     "enable": null,
+                    "remove": { "status": "offered" },
                     "caveats": []
                 }],
                 "caveats": []

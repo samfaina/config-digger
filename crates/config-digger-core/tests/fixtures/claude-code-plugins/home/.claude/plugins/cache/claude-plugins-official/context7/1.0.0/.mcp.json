@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://MCP.context7.com:443/mcp/"
+    }
+  }
+}

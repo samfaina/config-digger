@@ -1261,11 +1261,25 @@ fn removal(
     snapshot: &Snapshot,
     entry: &api::Entry,
 ) -> Result<Removal, Error> {
+    if let api::RemoveOption::NotOffered {
+        code,
+        sentence,
+        how_to_remove,
+    } = &entry.remove
+    {
+        let message = match code {
+            api::RemoveNotOffered::ReadOnly => explain::read_only_remove(&entry.locator),
+            api::RemoveNotOffered::Plugin => {
+                let how = how_to_remove
+                    .as_ref()
+                    .map_or("", |how| how.sentence.as_str());
+                explain::plugin_remove_refused(&entry.locator, sentence, how)
+            }
+        };
+        return Err(Error::blocked(message));
+    }
     let scanned = snapshot.entry(&entry.path, &entry.key_path);
     let location = definitions[scanned.agent_index].location(&scanned.location);
-    if location.provenance.read_only() {
-        return Err(Error::blocked(explain::read_only_remove(&entry.locator)));
-    }
     Ok(match location.format.file() {
         Some(format) => Removal::Key(format.syntax()),
         None => Removal::Folder,

@@ -1,0 +1,11 @@
+{
+  "name": "ponytail",
+  "mcpServers": [
+    "./servers.json",
+    {
+      "tail": {
+        "command": "tail-mcp"
+      }
+    }
+  ]
+}

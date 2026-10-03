@@ -4,12 +4,14 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    Anchor, Anchored, Bypasses, Cached, Disables, Format, Gate, GateStore, JsonFormat, Locate,
-    LookUp, NAME_KEY, NameFrom, Parse, ProjectWalk, Register, SettingsSource, SkillDefect,
-    SkillFolder, StoreClass,
+    self, Anchor, Anchored, Bypasses, Cached, Disables, Format, Gate, GateStore, JsonFormat,
+    ListPlugins, Locate, LookUp, NameFrom, Parse, ProjectWalk, Register, SettingsSource,
+    SkillDefect, SkillFolder, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
-use crate::definitions::{AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY};
+use crate::definitions::{
+    AgentDefinition, ItemKind, LocationDefinition, PROJECT_KEY, PluginsDefinition, References,
+};
 use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
@@ -54,6 +56,25 @@ pub(crate) struct Snapshot {
     /// The files a rule reads that cannot be read or parsed. They set
     /// nothing.
     pub unreadable_settings: BTreeSet<PathBuf>,
+}
+
+/// A plugin an Agent home loads, as one of its records says.
+#[derive(Clone)]
+pub(crate) struct ScannedPlugin {
+    /// The id of the `[[plugins]]` that lists it.
+    pub plugins: String,
+    /// Such as `supabase@claude-plugins-official`.
+    pub id: String,
+    /// The name its Entries are named by, such as `supabase`.
+    pub name: String,
+    /// The folder its files are in.
+    pub folder: PathBuf,
+    /// The Scope it is installed at, as the Agent records it.
+    pub scope: Option<String>,
+    /// The key of the one Project it applies in, `None` when it applies in every one.
+    pub project: Option<String>,
+    /// Its version, as the Agent records it.
+    pub version: Option<String>,
 }
 
 /// A value a rule or gate reads, at one place, for one Agent home.
@@ -183,9 +204,10 @@ pub(crate) struct ScannedSwitch {
     /// The key of the Project it applies in, or `None` when it applies in every context.
     pub project: Option<String>,
     /// Its key path, `{project}` replaced by the Project key in the Agent's
-    /// own spelling, `{name}` left in place.
+    /// own spelling, `{name}` or `{plugin_id}` left in place.
     pub key_path: Vec<String>,
-    /// What the file holds at the key path, up to `{name}` when it has one:
+    /// What the file holds at the key path, up to `{name}` or `{plugin_id}`
+    /// when it has one:
     /// `None` when the file or key is missing.
     pub value: Option<serde_json::Value>,
     /// How the file behaves while the Agent runs.
@@ -193,19 +215,20 @@ pub(crate) struct ScannedSwitch {
 }
 
 impl ScannedSwitch {
-    /// The switch's key path for the Entry named `name`.
-    pub fn key_path_for(&self, name: &str) -> Vec<String> {
+    /// The switch's key path for the Entry it holds by `key`: its name, or
+    /// its plugin's id.
+    pub fn key_path_for(&self, key: &str) -> Vec<String> {
         self.key_path
             .iter()
-            .map(|key| if key == NAME_KEY { name } else { key }.to_owned())
+            .map(|known| if is_entry_key(known) { key } else { known }.to_owned())
             .collect()
     }
 
-    /// What the switch holds for the Entry named `name`.
-    pub fn value_for(&self, name: &str) -> Option<&serde_json::Value> {
+    /// What the switch holds for the Entry it holds by `key`.
+    pub fn value_for(&self, key: &str) -> Option<&serde_json::Value> {
         let value = self.value.as_ref()?;
-        match self.key_path.iter().position(|key| key == NAME_KEY) {
-            Some(at) => lookup(value.get(name)?, &self.key_path[at + 1..]),
+        match self.key_path.iter().position(|known| is_entry_key(known)) {
+            Some(at) => lookup(value.get(key)?, &self.key_path[at + 1..]),
             None => Some(value),
         }
     }
@@ -396,6 +419,8 @@ pub(crate) struct ScannedEntry {
     /// For a skill, the skill manager that installed it, as far as one's
     /// definition recognises it.
     pub manager: Option<ManagerMatch>,
+    /// For an Entry of a plugin, the plugin.
+    pub plugin: Option<ScannedPlugin>,
 }
 
 /// The skill manager whose detectors match a skill folder most strongly.
@@ -512,8 +537,24 @@ pub(crate) fn scan_as_if(
     // every one of them is read before any location in a Project folder.
     for home in &found {
         let definition = &definitions[home.agent_index];
+        let plugins: Vec<ScannedPlugin> = definition
+            .plugins
+            .iter()
+            .flat_map(|plugins| scanner.read_plugins(home, plugins))
+            .collect();
         for location in definition.locations.iter() {
             if location.anchor.in_project() {
+                continue;
+            }
+            // Read in the folder of each plugin, whose Entries apply where
+            // the plugin does.
+            if let Some(anchor) = location.anchor.plugin() {
+                for plugin in plugins
+                    .iter()
+                    .filter(|plugin| plugin.plugins == anchor.plugins)
+                {
+                    scanner.read_plugin_location(home, definition, location, plugin, &anchor.path);
+                }
                 continue;
             }
             // Every source is read, so that the Entries of those the Agent
@@ -1015,7 +1056,7 @@ impl Places<'_> {
             let place = |project: Option<String>, key_path: Vec<String>| {
                 let up_to_name = key_path
                     .iter()
-                    .position(|key| key == NAME_KEY)
+                    .position(|key| is_entry_key(key))
                     .unwrap_or(key_path.len());
                 Place {
                     path: path.clone(),
@@ -1280,6 +1321,79 @@ impl Scanner<'_> {
         }
     }
 
+    /// The plugins of `plugins` that the Agent home installed, each record
+    /// once, leaving out those whose folder carries the superseded marker.
+    /// The Project a record applies in is recorded as a Project.
+    fn read_plugins(
+        &mut self,
+        home: &FoundHome,
+        plugins: &PluginsDefinition,
+    ) -> Vec<ScannedPlugin> {
+        let registry = &plugins.registry;
+        let Some(path) = registry.anchor().path(&home.roots, None) else {
+            return Vec::new();
+        };
+        let Some(text) = self.reader.text(home, &path, None) else {
+            return Vec::new();
+        };
+        let records = match registry.records(text) {
+            Ok(records) => records,
+            Err(error) => {
+                self.reader
+                    .fail(home, &path, None, ReadFailureKind::Parse, error.position);
+                return Vec::new();
+            }
+        };
+        let mut found = Vec::new();
+        for record in records {
+            let folder = paths::lexical(Path::new(&record.folder));
+            if !paths::is_absolute(&folder) {
+                tracing::debug!(plugin = %record.id, "plugin folder is not absolute");
+                continue;
+            }
+            let superseded = plugins.superseded_marker.as_ref().is_some_and(|marker| {
+                self.reader
+                    .fs
+                    .exists(&blocks::join_relative(&folder, marker))
+            });
+            if superseded {
+                tracing::debug!(plugin = %record.id, "plugin folder superseded");
+                continue;
+            }
+            let project = match &record.project {
+                Some(spelling) => match self.projects.add(Path::new(spelling), None) {
+                    Some(key) => Some(key),
+                    // Bound to something that is not a Project path: no context loads it.
+                    None => continue,
+                },
+                None => None,
+            };
+            let named = plugins.name.as_ref().and_then(|name| {
+                let file = blocks::join_relative(&folder, &name.file);
+                let text = self.reader.peek(&file).ok()??;
+                let document = JsonFormat::STRICT.parse(text).ok()?;
+                let named = lookup(&document, &name.key_path)?.as_str()?;
+                (!named.is_empty()).then(|| named.to_owned())
+            });
+            let name = named.unwrap_or_else(|| {
+                let id = record.id.as_str();
+                let separator = plugins.id_separator.as_deref();
+                let name = separator.and_then(|separator| id.split_once(separator));
+                name.map_or(id, |(name, _)| name).to_owned()
+            });
+            found.push(ScannedPlugin {
+                plugins: plugins.id.clone(),
+                id: record.id,
+                name,
+                folder,
+                scope: record.scope,
+                project,
+                version: record.version,
+            });
+        }
+        found
+    }
+
     /// Adds the Entries of one location. `project` is the key of the Project
     /// whose folder holds the location, if it lies in one.
     fn read_location(
@@ -1291,33 +1405,12 @@ impl Scanner<'_> {
         project: Option<String>,
         depth: usize,
     ) {
-        let reader = LocationReader {
-            agent_index: home.agent_index,
-            home: home.home.clone(),
-            location: location.id.clone(),
-            path: path.clone(),
-        };
-        if !self.readers.contains(&reader) {
-            self.readers.push(reader);
+        self.add_reader(home, location, &path);
+        if let Format::SkillFolder(folder) = &location.format {
+            return self.read_skills(home, location, folder, &path, project, depth);
         }
-        let format: &dyn Parse = match &location.format {
-            Format::Json(format) => format,
-            Format::Toml(format) => format,
-            Format::SkillFolder(folder) => {
-                return self.read_skills(home, location, folder, &path, project, depth);
-            }
-        };
-        let Some(text) = self.reader.text(home, &path, project.as_deref()) else {
+        let Some(document) = self.document(home, location, &path, project.as_deref()) else {
             return;
-        };
-        let document = match format.parse(text) {
-            Ok(document) => document,
-            Err(error) => {
-                let project = project.as_deref();
-                self.reader
-                    .fail(home, &path, project, ReadFailureKind::Parse, error.position);
-                return;
-            }
         };
         let mut objects = Vec::new();
         if find_objects(&document, &location.root, Vec::new(), None, &mut objects).is_err() {
@@ -1326,6 +1419,158 @@ impl Scanner<'_> {
                 .fail(home, &path, project, ReadFailureKind::Parse, None);
             return;
         }
+        self.add_objects(home, definition, location, &path, project, depth, objects);
+    }
+
+    /// Adds the Entries of one location in the folder of `plugin`, each
+    /// named as the location says and part of the plugin. With references,
+    /// the value at its root can also point to other files of the plugin,
+    /// whose Entries are read from there.
+    fn read_plugin_location(
+        &mut self,
+        home: &FoundHome,
+        definition: &AgentDefinition,
+        location: &LocationDefinition,
+        plugin: &ScannedPlugin,
+        relative: &str,
+    ) {
+        let path = blocks::join_relative(&plugin.folder, relative);
+        let start = self.entries.len();
+        match &location.references {
+            None => {
+                let project = plugin.project.clone();
+                self.read_location(home, definition, location, path, project, 0);
+            }
+            Some(references) => {
+                self.read_references(home, definition, location, references, plugin, path);
+            }
+        }
+        for entry in &mut self.entries[start..] {
+            entry.name = location.entry_name(&entry.name, &plugin.name);
+            entry.plugin = Some(plugin.clone());
+        }
+    }
+
+    /// Adds the Entries at the root of the file `path` of `plugin`: an
+    /// object of Entries, a path to another file of the plugin holding
+    /// them, or a list of either.
+    fn read_references(
+        &mut self,
+        home: &FoundHome,
+        definition: &AgentDefinition,
+        location: &LocationDefinition,
+        references: &References,
+        plugin: &ScannedPlugin,
+        path: PathBuf,
+    ) {
+        self.add_reader(home, location, &path);
+        let project = plugin.project.as_deref();
+        let Some(document) = self.document(home, location, &path, project) else {
+            return;
+        };
+        let values: Vec<(Option<usize>, &serde_json::Value)> =
+            match lookup(&document, &location.root) {
+                None => Vec::new(),
+                Some(serde_json::Value::Array(values)) => values
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (Some(i), v))
+                    .collect(),
+                Some(value) => vec![(None, value)],
+            };
+        for (index, value) in values {
+            match value {
+                serde_json::Value::String(relative) => {
+                    let file = paths::lexical(&plugin.folder.join(relative));
+                    if !file.starts_with(&plugin.folder) {
+                        tracing::debug!(plugin = %plugin.id, "reference outside the plugin");
+                        continue;
+                    }
+                    self.add_reader(home, location, &file);
+                    let Some(referenced) = self.document(home, location, &file, project) else {
+                        continue;
+                    };
+                    let mut objects = Vec::new();
+                    if find_objects(
+                        &referenced,
+                        &references.root,
+                        Vec::new(),
+                        None,
+                        &mut objects,
+                    )
+                    .is_err()
+                    {
+                        self.reader
+                            .fail(home, &file, project, ReadFailureKind::Parse, None);
+                        continue;
+                    }
+                    let owned = plugin.project.clone();
+                    self.add_objects(home, definition, location, &file, owned, 0, objects);
+                }
+                serde_json::Value::Object(entries) => {
+                    let mut key_path = location.root.clone();
+                    key_path.extend(index.map(|index| index.to_string()));
+                    let objects = vec![RootObject {
+                        key_path,
+                        project: None,
+                        entries,
+                    }];
+                    let owned = plugin.project.clone();
+                    self.add_objects(home, definition, location, &path, owned, 0, objects);
+                }
+                _ => self
+                    .reader
+                    .fail(home, &path, project, ReadFailureKind::Parse, None),
+            }
+        }
+    }
+
+    /// Records that `location` reads the file or folder at `path`.
+    fn add_reader(&mut self, home: &FoundHome, location: &LocationDefinition, path: &Path) {
+        let reader = LocationReader {
+            agent_index: home.agent_index,
+            home: home.home.clone(),
+            location: location.id.clone(),
+            path: path.to_path_buf(),
+        };
+        if !self.readers.contains(&reader) {
+            self.readers.push(reader);
+        }
+    }
+
+    /// The file at `path` parsed in the format of `location`, `None` when
+    /// it is missing or a Read failure, which is then reported.
+    fn document(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        path: &Path,
+        project: Option<&str>,
+    ) -> Option<serde_json::Value> {
+        let format = location.format.file()?;
+        let text = self.reader.text(home, path, project)?;
+        match format.parse(text) {
+            Ok(document) => Some(document),
+            Err(error) => {
+                self.reader
+                    .fail(home, path, project, ReadFailureKind::Parse, error.position);
+                None
+            }
+        }
+    }
+
+    /// Adds the Entries of `objects`, read at `path` for `location`.
+    #[allow(clippy::too_many_arguments)]
+    fn add_objects(
+        &mut self,
+        home: &FoundHome,
+        definition: &AgentDefinition,
+        location: &LocationDefinition,
+        path: &Path,
+        project: Option<String>,
+        depth: usize,
+        objects: Vec<RootObject>,
+    ) {
         for object in objects {
             tracing::debug!(
                 agent = %definition.agent.id,
@@ -1350,7 +1595,7 @@ impl Scanner<'_> {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
-                    path: path.clone(),
+                    path: path.to_path_buf(),
                     key_path,
                     name: name.clone(),
                     project: project.clone(),
@@ -1360,6 +1605,7 @@ impl Scanner<'_> {
                     defect: None,
                     link: None,
                     manager: None,
+                    plugin: None,
                 });
             }
         }
@@ -1436,6 +1682,7 @@ impl Scanner<'_> {
                             real: None,
                         }),
                         manager: None,
+                        plugin: None,
                     });
                     continue;
                 }
@@ -1474,6 +1721,7 @@ impl Scanner<'_> {
                     defect: skill.defect,
                     link,
                     manager: None,
+                    plugin: None,
                 });
             }
         }

@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "plugins": {
+    "supabase@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\fixture\\.claude\\plugins\\cache\\claude-plugins-official\\supabase\\0.1.4",
+        "version": "0.1.4",
+        "installedAt": "2026-08-01T10:00:00.000Z",
+        "lastUpdated": "2026-08-01T10:00:00.000Z"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\fixture\\.claude\\plugins\\cache\\claude-plugins-official\\context7\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-08-01T10:00:00.000Z",
+        "lastUpdated": "2026-08-01T10:00:00.000Z"
+      }
+    ],
+    "superpowers@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\fixture\\.claude\\plugins\\cache\\claude-plugins-official\\superpowers\\6.4.1",
+        "version": "6.4.1",
+        "installedAt": "2026-08-01T10:00:00.000Z",
+        "lastUpdated": "2026-09-01T10:00:00.000Z"
+      }
+    ],
+    "ponytail@ponytail": [
+      {
+        "scope": "local",
+        "projectPath": "E:\\projects\\petme-app",
+        "installPath": "C:\\Users\\fixture\\.claude\\plugins\\cache\\ponytail\\ponytail\\0.2.0",
+        "version": "0.2.0",
+        "installedAt": "2026-08-01T10:00:00.000Z",
+        "lastUpdated": "2026-08-01T10:00:00.000Z"
+      }
+    ],
+    "retired@old-mkt": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\fixture\\.claude\\plugins\\cache\\old-mkt\\retired\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-01T10:00:00.000Z",
+        "lastUpdated": "2026-01-01T10:00:00.000Z"
+      }
+    ]
+  }
+}
