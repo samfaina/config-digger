@@ -22,7 +22,7 @@ pub(crate) struct ContextProject<'p> {
     pub key: &'p str,
 }
 
-/// A switch set for an Entry: one that Disables it, or turns part of it off.
+/// A switch set for an Entry: one that Disables it, or a partial switch.
 pub(crate) struct Hit<'a> {
     pub mechanism: &'a DisableMechanism,
     pub switch: &'a ScannedSwitch,
@@ -71,7 +71,7 @@ impl Hit<'_> {
 
     /// What the switch holds, as a sentence says it.
     pub fn holds(&self) -> String {
-        let per_project = self.mechanism.context() == MechanismContext::Project;
+        let per_project = self.per_project();
         match self.mechanism {
             DisableMechanism::JsonNameList(_) => explain::in_list(
                 self.name,
@@ -85,6 +85,11 @@ impl Hit<'_> {
         }
     }
 
+    /// Whether the switch applies in the context's Project only.
+    fn per_project(&self) -> bool {
+        self.mechanism.context() == MechanismContext::Project
+    }
+
     /// The edits that lift the switch.
     pub fn enable_edits(&self) -> Vec<Edit> {
         self.mechanism
@@ -93,7 +98,7 @@ impl Hit<'_> {
 
     /// What Enable writes to lift the switch, as a sentence.
     pub fn enable_sentence(&self) -> String {
-        let per_project = self.mechanism.context() == MechanismContext::Project;
+        let per_project = self.per_project();
         explain::enable_switch(
             &self.enable_edits(),
             self.name,
@@ -105,7 +110,7 @@ impl Hit<'_> {
 
 /// The switches of the mechanisms covering `entry` that are set for it in
 /// the context of the Project with the key `project`: those that Disable
-/// it, and those that turn part of it off. Each in the definition's order.
+/// it, and the partial switches. Each in the definition's order.
 pub(crate) fn hits<'a>(
     definition: &'a AgentDefinition,
     snapshot: &'a Snapshot,
@@ -119,13 +124,9 @@ pub(crate) fn hits<'a>(
         if !mechanism.covers(&location.id) {
             continue;
         }
-        let switches = snapshot.switches.iter().filter(|switch| {
-            switch.agent_index == entry.agent_index
-                && switch.home == entry.home
-                && switch.kind == location.kind
-                && switch.mechanism == index
-                && (switch.project.is_none() || switch.project.as_deref() == project)
-        });
+        let switches = snapshot
+            .switches_of(entry, location.kind, index)
+            .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project);
         for switch in switches {
             let value = switch.value_for(&entry.name);
             let hit = Hit {
@@ -143,6 +144,17 @@ pub(crate) fn hits<'a>(
         }
     }
     (disabling, partial)
+}
+
+/// What Enable writes to lift `disabling`, the switches that Disable an
+/// Entry, as a sentence. Or why it is not offered: one of them is a switch
+/// config-digger only reads.
+pub(crate) fn enable(disabling: &[Hit]) -> Result<String, String> {
+    if let Some(hit) = disabling.iter().find(|hit| !hit.mechanism.enable_offered()) {
+        return Err(explain::enable_not_offered(&hit.holds()));
+    }
+    let sentences: Vec<String> = disabling.iter().map(Hit::enable_sentence).collect();
+    Ok(sentences.join(" "))
 }
 
 /// The switch Disable writes for an Entry, and the edit it makes there.
@@ -187,7 +199,7 @@ pub(crate) fn choose(
         .disable
         .iter()
         .enumerate()
-        .filter(|(_, mechanism)| mechanism.covers(&location.id))
+        .filter(|(_, mechanism)| mechanism.covers(&location.id) && mechanism.enable_offered())
         .collect();
     mechanisms.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
 
@@ -219,14 +231,9 @@ pub(crate) fn choose(
             unreadable.push(path);
             continue;
         }
-        let mut places = snapshot.switches.iter().filter(|place| {
-            place.agent_index == entry.agent_index
-                && place.home == entry.home
-                && place.kind == location.kind
-                && place.mechanism == index
-                && place.path == path
-                && place.project.as_deref() == project_key
-        });
+        let mut places = snapshot
+            .switches_of(entry, location.kind, index)
+            .filter(|place| place.path == path && place.project.as_deref() == project_key);
         // Under several spellings of one Project key, the one whose switch
         // exists already, or else the first the file holds.
         let first = places.clone().next();

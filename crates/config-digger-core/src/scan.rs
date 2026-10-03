@@ -134,6 +134,22 @@ impl Snapshot {
             .expect("a resolved Entry comes from the snapshot")
     }
 
+    /// The places of the switch of the mechanism at `mechanism` among those
+    /// of `kind`, in the Agent home of `entry`.
+    pub fn switches_of<'s>(
+        &'s self,
+        entry: &'s ScannedEntry,
+        kind: ItemKind,
+        mechanism: usize,
+    ) -> impl Iterator<Item = &'s ScannedSwitch> + Clone {
+        self.switches.iter().filter(move |switch| {
+            switch.agent_index == entry.agent_index
+                && switch.home == entry.home
+                && switch.kind == kind
+                && switch.mechanism == mechanism
+        })
+    }
+
     /// The Agent homes whose Disable switches are in the file at `path`,
     /// each with the strongest store class of its switches there.
     pub fn switch_stores_of(&self, path: &Path) -> Vec<SwitchStore> {
@@ -298,17 +314,17 @@ pub(crate) fn scan_as_if(
     projects.sort_by(|a, b| a.key.cmp(&b.key));
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
-    let targets = disable_targets(definitions, &found, &projects);
+    let switch_files = switch_files(definitions, &found, &projects);
     let locations = scanner
         .readers
         .iter()
         .map(|reader| reader.path.as_path())
         .filter(|path| ports.fs.exists(path));
-    let targets = targets
+    let switch_files = switch_files
         .iter()
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
-    let versioned = versioned(ports, locations.chain(targets));
+    let versioned = versioned(ports, locations.chain(switch_files));
     Ok(Snapshot {
         read_at,
         homes: found
@@ -434,28 +450,28 @@ fn project_of(projects: &[ScannedProject], spelling: &str) -> Option<String> {
 
 /// The file of every Disable mechanism's switch, for each found Agent
 /// home, and for a switch in a Project, in each existing Project folder.
-fn disable_targets(
+fn switch_files(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
 ) -> BTreeSet<PathBuf> {
-    let mut targets = BTreeSet::new();
+    let mut files = BTreeSet::new();
     for home in found {
         let definition = &definitions[home.agent_index];
         for rules in definition.items.values() {
             for mechanism in &rules.disable {
                 let anchor = &mechanism.switch().anchor;
                 if !anchor.in_project() {
-                    targets.extend(anchor.path(&home.roots, None));
+                    files.extend(anchor.path(&home.roots, None));
                     continue;
                 }
                 for project in projects.iter().filter(|project| project.exists) {
-                    targets.extend(anchor.path(&home.roots, Some(&project.path)));
+                    files.extend(anchor.path(&home.roots, Some(&project.path)));
                 }
             }
         }
     }
-    targets
+    files
 }
 
 /// The files among `paths` that are in the index of their git repo, asking

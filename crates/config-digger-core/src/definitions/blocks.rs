@@ -673,6 +673,10 @@ pub(crate) trait Disables {
 
     /// The ids of the locations whose Entries it Disables, empty for
     /// every location of the Item kind.
+    /// Whether config-digger writes the switch: Disable through it, and
+    /// Enable lifting it.
+    fn enable_offered(&self) -> bool;
+
     fn locations(&self) -> &[String];
 
     /// Whether it Disables the Entries of the location `id`.
@@ -685,7 +689,8 @@ pub(crate) trait Disables {
     /// Disables it. `None` when the switch holds nothing for it.
     fn disables(&self, value: Option<&Value>, name: &str) -> bool;
 
-    /// Whether `value` turns part of the Entry off, leaving it Effective.
+    /// Whether `value` is a partial switch: it limits part of the Entry,
+    /// leaving it Effective.
     fn partial(&self, value: Option<&Value>) -> bool;
 
     /// The edit that Disables the Entry named `name` through the switch at
@@ -748,6 +753,12 @@ impl Disables for DisableMechanism {
         match self {
             DisableMechanism::JsonNameList(block) => block.locations(),
             DisableMechanism::JsonField(block) => block.locations(),
+        }
+    }
+    fn enable_offered(&self) -> bool {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.enable_offered(),
+            DisableMechanism::JsonField(block) => block.enable_offered(),
         }
     }
 
@@ -839,6 +850,11 @@ pub(crate) struct JsonNameList {
     /// Must be `remove-item`.
     pub enable_action: EnableAction,
     pub reason: DisableReason,
+    /// Whether config-digger writes the switch: Disable through it, and
+    /// Enable lifting it. Off for a switch it only reads, such as one in a
+    /// file shared with a team or applying to every Project.
+    #[serde(default = "offered")]
+    pub enable_offered: bool,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -883,6 +899,9 @@ impl Disables for JsonNameList {
     fn locations(&self) -> &[String] {
         &self.locations
     }
+    fn enable_offered(&self) -> bool {
+        self.enable_offered
+    }
 
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
         occurrences(value, name) > 0
@@ -892,16 +911,11 @@ impl Disables for JsonNameList {
         false
     }
 
-    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit {
-        match value {
-            Some(_) => Edit::Append {
-                key_path,
-                value: Value::from(name),
-            },
-            None => Edit::Set {
-                key_path,
-                value: Value::from(vec![name]),
-            },
+    /// An append, which creates the list when it is missing.
+    fn disable_edit(&self, key_path: Vec<String>, _value: Option<&Value>, name: &str) -> Edit {
+        Edit::Append {
+            key_path,
+            value: Value::from(name),
         }
     }
 
@@ -913,6 +927,11 @@ impl Disables for JsonNameList {
             })
             .collect()
     }
+}
+
+/// What `enable_offered` is when a definition leaves it out.
+fn offered() -> bool {
+    true
 }
 
 /// How many times the list `value` holds `name`.
@@ -943,10 +962,15 @@ pub(crate) struct JsonField {
     pub disabled_value: Value,
     /// The value Enable sets, with `enable_action = "set"`.
     pub enabled_value: Option<Value>,
-    /// Values that turn part of the Entry off, such as a skill listed by
-    /// name only: the Entry stays Effective, with a note.
+    /// Values that are partial switches, limiting part of the Entry, such
+    /// as a skill listed by name only: the Entry stays Effective, with a note.
     #[serde(default)]
     pub partial_values: Vec<Value>,
+    /// Whether config-digger writes the switch: Disable through it, and
+    /// Enable lifting it. Off for a switch it only reads, such as one in a
+    /// file shared with a team or applying to every Project.
+    #[serde(default = "offered")]
+    pub enable_offered: bool,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -994,6 +1018,9 @@ impl Disables for JsonField {
 
     fn locations(&self) -> &[String] {
         &self.locations
+    }
+    fn enable_offered(&self) -> bool {
+        self.enable_offered
     }
 
     fn disables(&self, value: Option<&Value>, _name: &str) -> bool {

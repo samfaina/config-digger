@@ -604,6 +604,11 @@
             "reason": {
               "$ref": "#/$defs/DisableReason"
             },
+            "enable_offered": {
+              "description": "Whether config-digger writes the switch: Disable through it, and\nEnable lifting it. Off for a switch it only reads, such as one in a\nfile shared with a team or applying to every Project.",
+              "type": "boolean",
+              "default": true
+            },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
               "type": "array",
@@ -655,10 +660,15 @@
               "description": "The value Enable sets, with `enable_action = \"set\"`."
             },
             "partial_values": {
-              "description": "Values that turn part of the Entry off, such as a skill listed by\nname only: the Entry stays Effective, with a note.",
+              "description": "Values that are partial switches, limiting part of the Entry, such\nas a skill listed by name only: the Entry stays Effective, with a note.",
               "type": "array",
               "items": true,
               "default": []
+            },
+            "enable_offered": {
+              "description": "Whether config-digger writes the switch: Disable through it, and\nEnable lifting it. Off for a switch it only reads, such as one in a\nfile shared with a team or applying to every Project.",
+              "type": "boolean",
+              "default": true
             },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",

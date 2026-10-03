@@ -11,6 +11,7 @@ use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
 use crate::disable::{self, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
+use crate::explain::Reached;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot, SwitchStore};
@@ -169,15 +170,6 @@ impl Targeted<'_> {
             .map(|(path, key)| ContextProject { path, key });
         // The edits of each switch file, in the order its Entries were selected.
         let mut by_file: Vec<(PathBuf, Vec<Edit>)> = Vec::new();
-        let mut add = |path: PathBuf, edit: Edit| match by_file
-            .iter_mut()
-            .find(|(known, _)| *known == path)
-        {
-            // Entries Disabled by one name share its switch.
-            Some((_, edits)) if edits.contains(&edit) => {}
-            Some((_, edits)) => edits.push(edit),
-            None => by_file.push((path, vec![edit])),
-        };
         let mut lifted: Vec<Hit> = Vec::new();
         for entry in self.entries {
             let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
@@ -194,9 +186,15 @@ impl Targeted<'_> {
                         context_project.as_ref(),
                     )
                     .map_err(|(_, sentence)| {
-                        Error::blocked(format!("cannot Disable {}: {sentence}", entry.locator))
+                        Error::blocked(explain::disable_not_offered(&entry.locator, &sentence))
                     })?;
-                    add(choice.path, choice.edit);
+                    // Entries Disabled by one name share its switch.
+                    let shared = by_file
+                        .iter()
+                        .any(|(path, edits)| *path == choice.path && edits.contains(&choice.edit));
+                    if !shared {
+                        add_edit(&mut by_file, choice.path, choice.edit);
+                    }
                 }
                 _ => {
                     let project = project.as_ref().map(|(_, key)| key.as_str());
@@ -204,13 +202,19 @@ impl Targeted<'_> {
                     if disabling.is_empty() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
+                    if let Err(sentence) = disable::enable(&disabling) {
+                        return Err(Error::blocked(explain::enable_refused(
+                            &entry.locator,
+                            &sentence,
+                        )));
+                    }
                     for hit in disabling {
                         // Entries Disabled by one name share its switch.
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
                         for edit in hit.enable_edits() {
-                            add(hit.switch.path.clone(), edit);
+                            add_edit(&mut by_file, hit.switch.path.clone(), edit);
                         }
                         lifted.push(hit);
                     }
@@ -277,20 +281,26 @@ impl Targeted<'_> {
         (changes, effective)
     }
 
-    /// The `wide-reach` warning when `changes` reach Entries the action does
-    /// not target, or other contexts than its own.
+    /// The `wide-reach` warning when the switches written Disable, or lift
+    /// for, Entries the action does not target, or apply in other contexts
+    /// than its own. An Entry that only wins or loses against one that the
+    /// switches reach is not reached itself.
     fn wide_reach(&self, changes: &[Change]) -> Option<Warning> {
-        let others: Vec<(String, Option<Option<PathBuf>>)> = changes
+        let others: Vec<Reached> = changes
             .iter()
+            .filter(|change| {
+                change.before == StateAfter::Disabled || change.after == StateAfter::Disabled
+            })
             .filter_map(|change| {
+                let locator = change.locator.clone();
                 if change.project != self.before.project {
-                    return Some((change.locator.clone(), Some(change.project.clone())));
+                    return Some(match &change.project {
+                        Some(project) => Reached::InProject(locator, project.clone()),
+                        None => Reached::WithoutProject(locator),
+                    });
                 }
-                let targeted = self
-                    .entries
-                    .iter()
-                    .any(|entry| entry.locator == change.locator);
-                (!targeted).then(|| (change.locator.clone(), None))
+                let targeted = self.entries.iter().any(|entry| entry.locator == locator);
+                (!targeted).then_some(Reached::Here(locator))
             })
             .collect();
         (!others.is_empty()).then(|| Warning {
@@ -354,6 +364,14 @@ impl Targeted<'_> {
             preview,
             read_failures: self.before.read_failures.clone(),
         })
+    }
+}
+
+/// Adds `edit` to the edits of the file at `path`, after those it has.
+fn add_edit(by_file: &mut Vec<(PathBuf, Vec<Edit>)>, path: PathBuf, edit: Edit) {
+    match by_file.iter_mut().find(|(known, _)| *known == path) {
+        Some((_, edits)) => edits.push(edit),
+        None => by_file.push((path, vec![edit])),
     }
 }
 
@@ -549,10 +567,22 @@ fn undo_edits(bytes: &[u8], location: &history::LocationRecord) -> Result<Edited
     })
 }
 
+/// An append to a missing list becomes a set of the list holding the item.
 /// An insertion or a set whose parent objects are missing becomes a set of
 /// the outermost missing one, holding the rest, so that the file gets the
 /// minimal structure that holds the key.
 fn with_parents(file: &EditableFile, edit: &Edit) -> Result<Edit, EditError> {
+    let created;
+    let edit = match edit {
+        Edit::Append { key_path, value } if file.value_at(key_path)?.is_none() => {
+            created = Edit::Set {
+                key_path: key_path.clone(),
+                value: serde_json::json!([value]),
+            };
+            &created
+        }
+        edit => edit,
+    };
     let (Edit::Insert {
         key_path, value, ..
     }

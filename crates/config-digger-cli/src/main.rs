@@ -1042,7 +1042,7 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let line = table_line(cells, &widths, location, Style::new());
         out.push_str(&line.fit(width).render());
         // Why it has its State, what it would be once Enabled, the other
-        // checks it fails, the switches that turn part of it off, then what
+        // checks it fails, its partial switches, then what
         // Enable or Disable would write.
         let reason = entry.reason.iter().map(|reason| reason.sentence.as_str());
         let what_if = entry

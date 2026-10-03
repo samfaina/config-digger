@@ -152,12 +152,6 @@ pub(crate) fn disable_switch(edit: &Edit, name: &str, path: &Path, per_project: 
                 last(key_path)
             )
         }
-        Edit::Set { key_path, value } if *value == Value::from(vec![name]) => {
-            format!(
-                "Disable adds `{name}` to `{}` in {path}{scope}.",
-                last(key_path)
-            )
-        }
         edit => format!("Disable {}{scope}.", describe(edit, &path.to_string())),
     }
 }
@@ -231,15 +225,15 @@ pub(crate) fn disabled_natively(holds: &str, agent_name: &str) -> String {
     format!("Disabled: {holds}, so {agent_name} skips it.")
 }
 
-/// The note on an Entry part of which the switch `holds` turns off.
-pub(crate) fn partly_switched_off(holds: &str, agent_name: &str) -> String {
+/// The note on an Entry part of which the partial switch `holds` limits.
+pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
     format!(
-        "Partly switched off: {holds}. {agent_name} still uses the Entry, with that part of it turned off."
+        "Partial switch: {holds}. {agent_name} still uses the Entry, with only part of it available."
     )
 }
 
 /// The State a Disabled Entry would have once Enabled: Effective, or
-/// Shadowed by the `effective_scope` Entry `effective`.
+/// Shadowed by the `scope` Entry `effective`.
 pub(crate) fn what_if(shadowed_by: Option<(&str, &str)>) -> String {
     match shadowed_by {
         None => "Disabled: would be Effective once Enabled.".to_owned(),
@@ -249,20 +243,31 @@ pub(crate) fn what_if(shadowed_by: Option<(&str, &str)>) -> String {
     }
 }
 
+/// An Entry, by locator, that a switch reaches beyond what an action targets.
+pub(crate) enum Reached {
+    /// In the action's own context.
+    Here(String),
+    /// In another Project.
+    InProject(String, PathBuf),
+    /// With no Project.
+    WithoutProject(String),
+}
+
 /// The warning of a plan whose switches reach the Entries `others` beyond
-/// those it targets, each a locator and, for one in another context than
-/// the plan's, its Project or `None` for no Project.
-pub(crate) fn wide_reach(action: Action, others: &[(String, Option<Option<PathBuf>>)]) -> String {
+/// those it targets.
+pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
     let verb = match action {
         Action::Enable => "Enable",
         _ => "Disable",
     };
     let rows: Vec<String> = others
         .iter()
-        .map(|(locator, context)| match context {
-            None => locator.clone(),
-            Some(Some(project)) => format!("{locator} in Project {}", project.display()),
-            Some(None) => format!("{locator} with no Project"),
+        .map(|reached| match reached {
+            Reached::Here(locator) => locator.clone(),
+            Reached::InProject(locator, project) => {
+                format!("{locator} in Project {}", project.display())
+            }
+            Reached::WithoutProject(locator) => format!("{locator} with no Project"),
         })
         .collect();
     format!(
@@ -271,9 +276,32 @@ pub(crate) fn wide_reach(action: Action, others: &[(String, Option<Option<PathBu
     )
 }
 
+/// Why Disable is refused for an Entry it is not offered for: `sentence`.
+pub(crate) fn disable_not_offered(locator: &str, sentence: &str) -> String {
+    format!("cannot Disable {locator}: {sentence}")
+}
+
 /// Why Disable is refused for an Entry that is Disabled already.
 pub(crate) fn already_disabled(locator: &str) -> String {
     format!("cannot Disable {locator}: it is Disabled already")
+}
+
+/// What Disable says of an Entry that is Disabled already.
+pub(crate) fn already_disabled_option() -> String {
+    "Disable is not offered: the Entry is Disabled already.".to_owned()
+}
+
+/// What Enable says of a Disabled Entry when the switch `holds` is one
+/// config-digger only reads.
+pub(crate) fn enable_not_offered(holds: &str) -> String {
+    format!(
+        "Enable is not offered: {holds}, which config-digger does not write; take the name out of it there by hand."
+    )
+}
+
+/// Why Enable is refused for an Entry it is not offered for: `sentence`.
+pub(crate) fn enable_refused(locator: &str, sentence: &str) -> String {
+    format!("cannot Enable {locator}: {sentence}")
 }
 
 /// Why Enable is refused for an Entry that is not Disabled.
@@ -441,9 +469,4 @@ fn count(entries: usize) -> String {
         1 => "1 Entry".to_owned(),
         n => format!("{n} Entries"),
     }
-}
-
-/// What Disable says of an Entry that is Disabled already.
-pub(crate) fn already_disabled_option() -> String {
-    "Disable is not offered: the Entry is Disabled already.".to_owned()
 }

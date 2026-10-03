@@ -737,7 +737,7 @@ pub struct Entry {
     pub secondary: Vec<Reason>,
     /// For a Disabled Entry, the State it would have once Enabled.
     pub what_if: Option<WhatIf>,
-    /// Switches that turn part of it off, leaving its State as it is.
+    /// Partial switches that limit part of it, leaving its State as it is.
     pub notes: Vec<Note>,
     /// The Entry's value as declared, with every Secret masked as `••••`.
     #[specta(type = JsonValue)]
@@ -776,7 +776,7 @@ pub struct Note {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum NoteCode {
-    /// A switch turns part of the Entry off, and the Agent still uses it.
+    /// A partial switch limits part of the Entry, and the Agent still uses it.
     PartialSwitch,
 }
 

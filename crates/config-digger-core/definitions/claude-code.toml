@@ -26,6 +26,11 @@ id = "default"
 block = "path"
 path = "~/.claude.json"
 
+# The user settings, which hold Disable switches but no Entries.
+[homes.roots.settings_file]
+block = "path"
+path = "~/.claude/settings.json"
+
 [[scopes]]
 id = "local"
 
@@ -115,3 +120,37 @@ context = "project"
 enable_action = "remove-item"
 reason = "disabled_by_name"
 locations = ["project-mcp"]
+
+# The `.mcp.json` approval dialog keeps the servers it rejects per Project
+# in `~/.claude.json`. Enable lifts it there too.
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpjsonServers"], store_class = "rewritten-while-running" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+
+# The shared Project settings and the user settings can hold the list too.
+# config-digger only reads them: the first belongs to the team, and the
+# second applies in every Project.
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+enable_offered = false
+
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+locations = ["project-mcp"]
+enable_offered = false

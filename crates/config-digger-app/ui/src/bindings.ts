@@ -85,7 +85,7 @@ export type Entry = {
 	secondary: Reason[],
 	/**  For a Disabled Entry, the State it would have once Enabled. */
 	what_if: WhatIf | null,
-	/**  Switches that turn part of it off, leaving its State as it is. */
+	/**  Partial switches that limit part of it, leaving its State as it is. */
 	notes: Note[],
 	/**  The Entry's value as declared, with every Secret masked as `••••`. */
 	config: JsonValue,
@@ -246,7 +246,7 @@ export type Note = {
 };
 
 export type NoteCode = 
-/**  A switch turns part of the Entry off, and the Agent still uses it. */
+/**  A partial switch limits part of the Entry, and the Agent still uses it. */
 "partial_switch";
 
 /**  What an Agent can be started on. */

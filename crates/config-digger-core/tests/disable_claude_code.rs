@@ -748,3 +748,194 @@ fn a_switch_file_that_does_not_parse_disables_nothing_and_is_never_written() {
         offered => panic!("Disable offered: {offered:?}"),
     }
 }
+
+#[test]
+fn disable_of_two_names_into_a_missing_list_keeps_both() {
+    let fs = FakeFileSystem::new()
+        .with_folder(PETME)
+        .with_file(claude_json(), CLAUDE_JSON)
+        .with_file(mcp_json(), MCP_JSON);
+    let core = core_with(&fs, &[claude_json()], &[]);
+    let github = format!("{}#mcpServers.github", mcp_json().display());
+
+    let plan = plan(
+        &core,
+        &in_petme(),
+        Action::Disable,
+        &targets(&[&project_supabase(), &github], false),
+    )
+    .unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert_eq!(
+        json(&fs, settings_local()),
+        serde_json::json!({ "disabledMcpjsonServers": ["supabase", "github"] })
+    );
+}
+
+#[test]
+fn enable_removes_every_occurrence_of_a_name_listed_twice() {
+    let claude_json_text = String::from_utf8(CLAUDE_JSON.to_vec()).unwrap().replace(
+        r#""disabledMcpServers": ["linear"]"#,
+        r#""disabledMcpServers": ["notes", "linear", "notes"]"#,
+    );
+    let fs = fixture().with_file(claude_json(), claude_json_text);
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &in_petme(),
+        Action::Enable,
+        &targets(&["notes"], false),
+    )
+    .unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert_eq!(
+        json(&fs, claude_json())["projects"]["E:/projects/petme-app"]["disabledMcpServers"],
+        serde_json::json!(["linear"])
+    );
+    assert_eq!(
+        states(&inventory_of(&core), "notes"),
+        pairs(&[("user", "effective")])
+    );
+}
+
+#[test]
+fn an_entry_that_wins_once_the_target_is_disabled_is_not_wide_reach() {
+    // `~/.claude.json` is versioned, so the switch covers `.mcp.json` only.
+    let fs = with_user_supabase();
+    let core = core_with(&fs, &[claude_json()], &[]);
+
+    let plan = plan(
+        &core,
+        &in_petme(),
+        Action::Disable,
+        &targets(&[&project_supabase()], false),
+    )
+    .unwrap();
+
+    assert_eq!(
+        changes(&plan),
+        [
+            row(&project_supabase(), "effective", "disabled"),
+            row(&user_supabase(), "shadowed", "effective"),
+        ]
+    );
+    assert!(plan.warnings().is_empty(), "{:?}", plan.warnings());
+}
+
+fn shared_settings() -> PathBuf {
+    PathBuf::from(PETME).join(r".claude\settings.json")
+}
+
+fn user_settings() -> PathBuf {
+    PathBuf::from(HOME).join(r".claude\settings.json")
+}
+
+#[test]
+fn disabled_mcpjson_servers_is_read_from_every_file_claude_code_reads_it_from() {
+    // The approval dialog keeps it in `~/.claude.json`, and any settings file can hold it.
+    let claude_json_text = String::from_utf8(CLAUDE_JSON.to_vec()).unwrap().replace(
+        r#""disabledMcpServers": ["linear"]"#,
+        r#""disabledMcpServers": ["linear"],
+      "disabledMcpjsonServers": ["supabase"]"#,
+    );
+    let fs = fixture()
+        .with_file(claude_json(), claude_json_text)
+        .with_file(settings_local(), "{}")
+        .with_file(
+            shared_settings(),
+            r#"{ "disabledMcpjsonServers": ["github"] }"#,
+        )
+        .with_file(
+            user_settings(),
+            r#"{ "disabledMcpjsonServers": ["linear"] }"#,
+        );
+    let inventory = inventory(&core(&fs), &in_petme());
+
+    let switch = |name: &str| {
+        entries(&inventory, name)
+            .iter()
+            .find(|entry| entry.scope == "project")
+            .unwrap()
+            .reason
+            .clone()
+            .unwrap()
+            .switch
+            .unwrap()
+    };
+    assert_eq!(
+        switch("supabase"),
+        format!(
+            "{}#projects.E:/projects/petme-app.disabledMcpjsonServers",
+            claude_json().display()
+        )
+    );
+    assert_eq!(
+        switch("github"),
+        format!("{}#disabledMcpjsonServers", shared_settings().display())
+    );
+    let linear = &entries(&inventory, "linear")[0];
+    let codes: Vec<String> = linear.secondary.iter().map(|r| code(r.code)).collect();
+    assert_eq!(codes, ["disabled_by_name"]);
+    assert_eq!(
+        linear.secondary[0].switch.as_deref(),
+        Some(format!("{}#disabledMcpjsonServers", user_settings().display()).as_str())
+    );
+}
+
+#[test]
+fn enable_lifts_the_switch_the_approval_dialog_keeps_in_claude_json() {
+    let claude_json_text = String::from_utf8(CLAUDE_JSON.to_vec()).unwrap().replace(
+        r#""disabledMcpServers": ["linear"]"#,
+        r#""disabledMcpServers": ["linear"],
+      "disabledMcpjsonServers": ["supabase"]"#,
+    );
+    let fs = fixture().with_file(claude_json(), claude_json_text);
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &in_petme(),
+        Action::Enable,
+        &targets(&["supabase"], false),
+    )
+    .unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert_eq!(
+        json(&fs, claude_json())["projects"]["E:/projects/petme-app"]["disabledMcpjsonServers"],
+        serde_json::json!([])
+    );
+}
+
+#[test]
+fn enable_is_not_offered_through_a_switch_config_digger_only_reads() {
+    // The shared settings file belongs to the team.
+    let fs = fixture().with_file(
+        shared_settings(),
+        r#"{ "disabledMcpjsonServers": ["supabase"] }"#,
+    );
+    let core = core(&fs);
+    let supabase = &entries(&inventory(&core, &in_petme()), "supabase")[0];
+    assert_eq!(code(supabase.state), "disabled");
+    let enable = supabase.enable.as_deref().unwrap();
+    assert!(enable.starts_with("Enable is not offered"), "{enable}");
+    assert!(
+        enable.contains(&shared_settings().display().to_string()),
+        "{enable}"
+    );
+
+    let error = plan(
+        &core,
+        &in_petme(),
+        Action::Enable,
+        &targets(&["supabase"], false),
+    )
+    .err()
+    .unwrap();
+
+    assert_eq!(code(error.code), "blocked");
+    assert!(error.message.contains(enable), "{}", error.message);
+}

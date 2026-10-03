@@ -153,11 +153,8 @@ pub(crate) fn resolve(
                             effective: Some(effective),
                         }
                     });
-                    let enable = (!disabling.is_empty()).then(|| {
-                        let sentences: Vec<String> =
-                            disabling.iter().map(Hit::enable_sentence).collect();
-                        sentences.join(" ")
-                    });
+                    let enable = (!disabling.is_empty())
+                        .then(|| disable::enable(disabling).unwrap_or_else(|refused| refused));
                     let disable = if disabling.is_empty() {
                         disable::option(definition, snapshot, entry, context_project.as_ref())
                     } else {
@@ -182,7 +179,7 @@ pub(crate) fn resolve(
                             .map(|hit| api::Note {
                                 code: api::NoteCode::PartialSwitch,
                                 switch: hit.locator(),
-                                sentence: explain::partly_switched_off(&hit.holds(), agent_name),
+                                sentence: explain::partial_switch(&hit.holds(), agent_name),
                             })
                             .collect(),
                         config: entry.config.clone(),
