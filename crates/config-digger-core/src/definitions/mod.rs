@@ -5,7 +5,7 @@ pub(crate) mod blocks;
 
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
-    Provenance, Register, Registry, SessionFiles, StoreClass, Validate,
+    Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -198,6 +198,9 @@ pub(crate) struct LocationDefinition {
     /// configuration, shown as warnings on the Read failure.
     #[serde(default)]
     pub risks: Vec<RiskCode>,
+    /// The minimal shape the Agent requires of the location's Entries:
+    /// one without it is Invalid. Without it, no Entry here is Invalid.
+    pub shape: Option<Shape>,
 }
 
 /// What an Agent does with a location it cannot read. Declared from the
@@ -308,6 +311,10 @@ pub(crate) enum Check {
     Disable,
     /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
     Precedence,
+    /// The Entry lacks the minimal shape its location declares: Invalid.
+    /// Required when a location of the kind declares a shape, and refused
+    /// otherwise.
+    Shape,
 }
 
 impl AgentDefinition {
@@ -396,6 +403,9 @@ impl AgentDefinition {
                 interpolation.validate().map_err(context)?;
             }
             location.secrets.validate().map_err(context)?;
+            if let Some(shape) = &location.shape {
+                shape.validate().map_err(context)?;
+            }
             self.validate_home_root(&location.anchor).map_err(context)?;
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
@@ -447,6 +457,31 @@ impl AgentDefinition {
                     _ => return Err(context(format!("checks holds `{}` twice", check.id()))),
                 }
             }
+            let shaped = self
+                .locations
+                .iter()
+                .any(|location| location.kind == *kind && location.shape.is_some());
+            match (
+                rules
+                    .checks
+                    .iter()
+                    .filter(|known| **known == Check::Shape)
+                    .count(),
+                shaped,
+            ) {
+                (1, true) | (0, false) => {}
+                (0, true) => {
+                    return Err(context(
+                        "checks leaves out `shape`, which a location declares".into(),
+                    ));
+                }
+                (_, true) => return Err(context("checks holds `shape` twice".into())),
+                (_, false) => {
+                    return Err(context(
+                        "checks holds `shape`, but no location declares one".into(),
+                    ));
+                }
+            }
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
@@ -490,6 +525,7 @@ impl Check {
         match self {
             Check::Disable => "disable",
             Check::Precedence => "precedence",
+            Check::Shape => "shape",
         }
     }
 }
@@ -950,6 +986,54 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
             r#"checks = ["disable", "precedence", "disable"]"#,
         );
         assert!(error(&text).contains("twice"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_needs_the_shape_check_and_the_shape_check_needs_a_shape() {
+        let shaped = VALID.replace(
+            "on_read_failure = \"ignores_file\"
+",
+            "on_read_failure = \"ignores_file\"
+shape = { block = \"fields\", one_of = [\"command\"] }
+",
+        );
+        assert!(
+            error(&shaped).contains("leaves out `shape`"),
+            "{}",
+            error(&shaped)
+        );
+        let checked = shaped.replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(parse("test.toml", &checked).is_ok(), "{}", error(&checked));
+        let unshaped = VALID.replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(
+            error(&unshaped).contains("no location declares one"),
+            "{}",
+            error(&unshaped)
+        );
+    }
+
+    #[test]
+    fn an_empty_shape_is_rejected() {
+        let text = VALID
+            .replace(
+                "on_read_failure = \"ignores_file\"
+",
+                "on_read_failure = \"ignores_file\"
+shape = { block = \"fields\" }
+",
+            )
+            .replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#);
+        assert!(error(&text).contains("one_of or types"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_location_needs_a_read_failure_reaction() {
+        let text = VALID.replace(
+            "on_read_failure = \"ignores_file\"
+",
+            "",
+        );
+        assert!(error(&text).contains("on_read_failure"), "{}", error(&text));
     }
 
     #[test]

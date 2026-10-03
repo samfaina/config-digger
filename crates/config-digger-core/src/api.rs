@@ -344,6 +344,7 @@ pub enum StateAfter {
     Effective,
     Shadowed,
     Disabled,
+    Invalid,
     Removed,
 }
 
@@ -353,6 +354,7 @@ impl From<State> for StateAfter {
             State::Effective => StateAfter::Effective,
             State::Shadowed => StateAfter::Shadowed,
             State::Disabled => StateAfter::Disabled,
+            State::Invalid => StateAfter::Invalid,
         }
     }
 }
@@ -859,6 +861,9 @@ pub enum State {
     /// The Agent skips it because a switch Disables it, natively or set by
     /// config-digger.
     Disabled,
+    /// The Agent rejects it on its own, such as a server missing what the
+    /// Agent requires.
+    Invalid,
 }
 
 /// Why an Entry has its State.
@@ -883,6 +888,8 @@ pub enum ReasonCode {
     DisabledByName,
     /// The Entry's own switch is off.
     DisabledNatively,
+    /// The Entry lacks the minimal shape the Agent requires of it.
+    MalformedEntry,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.

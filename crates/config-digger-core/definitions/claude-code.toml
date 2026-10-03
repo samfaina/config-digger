@@ -63,6 +63,7 @@ interpolation = { block = "braces", default_separator = ":-" }
 # and asks whether to exit or reset the file [docs].
 on_read_failure = "asks_user"
 risks = ["agent_may_reset_file"]
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 # Read in the Project folder only: whether Claude Code also looks in parent
 # folders is not known.
@@ -79,6 +80,7 @@ store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-" }
 # What Claude Code does with a `.mcp.json` it cannot parse is not known.
 on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "user-mcp"
@@ -97,13 +99,15 @@ interpolation = { block = "braces", default_separator = ":-" }
 secrets.file_fields = [["primaryApiKey"], ["customApiKeyResponses", "*", "*"]]
 on_read_failure = "asks_user"
 risks = ["agent_may_reset_file"]
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 # Same-named Entries compete whole; the highest location wins. Claude Code
-# skips a Disabled Entry before they compete, so the next one down can win.
+# skips a malformed Entry with a warning [docs], and a Disabled one, before
+# they compete, so the next one down can win.
 [items.mcp]
 precedence = ["local-mcp", "project-mcp", "user-mcp"]
 competition = { block = "exact-name" }
-checks = ["disable", "precedence"]
+checks = ["shape", "disable", "precedence"]
 
 # The `/mcp` toggle: names in `projects["<path>"].disabledMcpServers`, which
 # Claude Code skips in that Project whatever file declares them. It is

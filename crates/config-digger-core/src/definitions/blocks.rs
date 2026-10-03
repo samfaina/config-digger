@@ -748,6 +748,144 @@ impl Compete for ExactName {
     }
 }
 
+// --- Shapes -----------------------------------------------------------------
+
+/// Why an Entry does not have the minimal shape its Agent requires.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Malformed {
+    /// The Entry is not an object.
+    NotAnObject,
+    /// It holds none of these fields.
+    Missing(Vec<String>),
+    /// This field holds another type than the Agent reads.
+    WrongType(String, FieldType),
+}
+
+/// Checks an Entry against the minimal shape its Agent requires. Keys the
+/// shape does not name are never flagged.
+pub(crate) trait Conform {
+    /// Why `value` does not conform, if it does not.
+    fn malformed(&self, value: &Value) -> Option<Malformed>;
+
+    /// Whether an Entry that does not conform still competes by name, as
+    /// when the Agent lists it and fails to start it.
+    fn still_competes(&self) -> bool;
+}
+
+/// The minimal shape of the Entries of a location.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Shape {
+    Fields(FieldShape),
+}
+
+impl Validate for Shape {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Shape::Fields(block) => block.validate(),
+        }
+    }
+}
+
+impl Conform for Shape {
+    fn malformed(&self, value: &Value) -> Option<Malformed> {
+        match self {
+            Shape::Fields(block) => block.malformed(value),
+        }
+    }
+
+    fn still_competes(&self) -> bool {
+        match self {
+            Shape::Fields(block) => block.still_competes(),
+        }
+    }
+}
+
+/// An object that holds at least one of some fields, each field it holds
+/// being of the type the Agent reads.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FieldShape {
+    /// The Entry must hold at least one of these, such as `command` or `url`.
+    #[serde(default)]
+    pub one_of: Vec<String>,
+    /// The type of each field, when the Entry holds it.
+    #[serde(default)]
+    pub types: BTreeMap<String, FieldType>,
+    /// Whether an Entry without this shape still competes by name.
+    #[serde(default)]
+    pub still_competes: bool,
+}
+
+/// The type of a field's value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum FieldType {
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    /// A list of strings.
+    StringArray,
+    /// An object whose values are strings.
+    StringMap,
+}
+
+impl FieldType {
+    fn holds(self, value: &Value) -> bool {
+        match self {
+            FieldType::String => value.is_string(),
+            FieldType::Number => value.is_number(),
+            FieldType::Boolean => value.is_boolean(),
+            FieldType::Array => value.is_array(),
+            FieldType::Object => value.is_object(),
+            FieldType::StringArray => value
+                .as_array()
+                .is_some_and(|items| items.iter().all(Value::is_string)),
+            FieldType::StringMap => value
+                .as_object()
+                .is_some_and(|object| object.values().all(Value::is_string)),
+        }
+    }
+}
+
+impl Validate for FieldShape {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(field) = self
+            .one_of
+            .iter()
+            .chain(self.types.keys())
+            .find(|field| field.is_empty())
+        {
+            return Err(format!("a shape field `{field}` must not be empty"));
+        }
+        if self.one_of.is_empty() && self.types.is_empty() {
+            return Err("a shape needs one_of or types".into());
+        }
+        Ok(())
+    }
+}
+
+impl Conform for FieldShape {
+    fn malformed(&self, value: &Value) -> Option<Malformed> {
+        let Value::Object(object) = value else {
+            return Some(Malformed::NotAnObject);
+        };
+        if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
+            return Some(Malformed::Missing(self.one_of.clone()));
+        }
+        self.types.iter().find_map(|(field, &kind)| {
+            let value = object.get(field)?;
+            (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
+        })
+    }
+
+    fn still_competes(&self) -> bool {
+        self.still_competes
+    }
+}
+
 // --- Disable mechanisms -----------------------------------------------------
 
 /// Disables Entries through a switch the Agent itself reads to skip an

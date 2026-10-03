@@ -1427,6 +1427,7 @@ fn state_after_label(state: api::StateAfter) -> &'static str {
         api::StateAfter::Effective => "Effective",
         api::StateAfter::Shadowed => "Shadowed",
         api::StateAfter::Disabled => "Disabled",
+        api::StateAfter::Invalid => "Invalid",
         api::StateAfter::Removed => "removed",
     }
 }
@@ -1436,6 +1437,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
         api::StateAfter::Effective => state_style(api::State::Effective),
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
         api::StateAfter::Disabled => state_style(api::State::Disabled),
+        api::StateAfter::Invalid => state_style(api::State::Invalid),
         api::StateAfter::Removed => AnsiColor::Red.on_default(),
     }
 }
@@ -1445,6 +1447,7 @@ fn state_label(state: api::State) -> &'static str {
         api::State::Effective => "Effective",
         api::State::Shadowed => "Shadowed",
         api::State::Disabled => "Disabled",
+        api::State::Invalid => "Invalid",
     }
 }
 
@@ -1454,6 +1457,7 @@ fn state_style(state: api::State) -> Style {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
         api::State::Disabled => AnsiColor::Yellow.on_default(),
+        api::State::Invalid => AnsiColor::Red.on_default(),
     }
 }
 

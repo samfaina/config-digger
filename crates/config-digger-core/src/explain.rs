@@ -1,7 +1,10 @@
 //! Explain: turns reason codes into the sentences the front-ends show.
 //! Definitions carry codes and pointers only, never free text.
 
-use crate::api::{Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, Verify};
+use crate::api::{
+    Action, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode, State, Verify,
+};
+use crate::definitions::blocks::{FieldType, Malformed};
 use crate::edit::Edit;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -234,8 +237,9 @@ pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
 
 /// The State a Disabled Entry would have once Enabled: Effective, or
 /// Shadowed by the `scope` Entry `effective`.
-pub(crate) fn what_if(shadowed_by: Option<(&str, &str)>) -> String {
+pub(crate) fn what_if(state: State, shadowed_by: Option<(&str, &str)>) -> String {
     match shadowed_by {
+        None if state == State::Invalid => "Disabled: would be Invalid once Enabled.".to_owned(),
         None => "Disabled: would be Effective once Enabled.".to_owned(),
         Some((scope, effective)) => {
             format!("Disabled: would be Shadowed by the {scope} Entry {effective} once Enabled.")
@@ -534,4 +538,45 @@ pub(crate) fn unreadable_location(agent_name: &str, path: &Path) -> String {
         "A location that could take part couldn't be read: {}, so the State shown may not be the one {agent_name} has.",
         path.display()
     )
+}
+
+/// An Invalid Entry's reason: why it lacks the minimal shape `agent_name`
+/// requires. `competes` says the Agent still lists it, so that it competes
+/// by name.
+pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes: bool) -> Reason {
+    let why = match malformed {
+        Malformed::NotAnObject => "it is not an object".to_owned(),
+        Malformed::Missing(fields) => {
+            let fields: Vec<String> = fields.iter().map(|field| format!("`{field}`")).collect();
+            let fields = match fields.split_last() {
+                Some((last, [])) => last.clone(),
+                Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
+                None => String::new(),
+            };
+            format!("it needs {fields}")
+        }
+        Malformed::WrongType(field, kind) => {
+            let kind = match kind {
+                FieldType::String => "a string",
+                FieldType::Number => "a number",
+                FieldType::Boolean => "true or false",
+                FieldType::Array => "a list",
+                FieldType::Object => "an object",
+                FieldType::StringArray => "a list of strings",
+                FieldType::StringMap => "an object of strings",
+            };
+            format!("`{field}` must be {kind}")
+        }
+    };
+    let sentence = if competes {
+        format!("{agent_name} cannot use this Entry: {why}. It still competes by name.")
+    } else {
+        format!("{agent_name} skips this Entry: {why}.")
+    };
+    Reason {
+        code: ReasonCode::MalformedEntry,
+        effective: None,
+        switch: None,
+        sentence,
+    }
 }

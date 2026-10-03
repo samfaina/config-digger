@@ -2,7 +2,7 @@
 //! to the Items of every Agent home and the State of each Entry.
 
 use crate::api::{self, Context};
-use crate::definitions::blocks::{Compete, JsonFormat, Parse};
+use crate::definitions::blocks::{Compete, Conform, JsonFormat, Malformed, Parse};
 use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
@@ -95,8 +95,27 @@ pub(crate) fn resolve(
                     disable::hits(definition, snapshot, entry, project_key.map(String::as_str))
                 })
                 .collect();
-            // The Agent skips a Disabled Entry, so the highest of the others wins.
-            let effective = (0..entries.len()).find(|&index| hits[index].0.is_empty());
+            // Why each Entry lacks the minimal shape its location declares.
+            let malformed: Vec<Option<Malformed>> = entries
+                .iter()
+                .map(|entry| {
+                    let shape = definition.location(&entry.location).shape.as_ref()?;
+                    shape.malformed(&entry.config)
+                })
+                .collect();
+            // An Invalid Entry competes only where the Agent still lists it.
+            let competes = |index: usize| {
+                malformed[index].is_none()
+                    || definition
+                        .location(&entries[index].location)
+                        .shape
+                        .as_ref()
+                        .is_some_and(Conform::still_competes)
+            };
+            // The Agent skips a Disabled Entry, and an Invalid one that does
+            // not compete, so the highest of the others wins.
+            let winner =
+                (0..entries.len()).find(|&index| hits[index].0.is_empty() && competes(index));
             let shadowed_by = |index: usize, winner: usize| {
                 explain::shadowed_by_precedence(
                     agent_name,
@@ -120,8 +139,17 @@ pub(crate) fn resolve(
                                     .iter()
                                     .map(|hit| (api::State::Disabled, hit.reason(agent_name))),
                             ),
+                            Check::Shape => {
+                                if let Some(malformed) = &malformed[index] {
+                                    let competes = competes(index);
+                                    failed.push((
+                                        api::State::Invalid,
+                                        explain::malformed_entry(agent_name, malformed, competes),
+                                    ));
+                                }
+                            }
                             Check::Precedence => {
-                                if let Some(winner) = effective.filter(|&winner| winner < index) {
+                                if let Some(winner) = winner.filter(|&winner| winner < index) {
                                     failed.push((api::State::Shadowed, shadowed_by(index, winner)));
                                 }
                             }
@@ -142,21 +170,28 @@ pub(crate) fn resolve(
                                 .all(|hit| disabling.iter().any(|own| own.same_switch(hit)))
                         };
                         let winner = (0..entries.len())
-                            .find(|&other| lifted(other))
-                            .expect("the Entry itself is lifted");
-                        if winner == index {
-                            return api::WhatIf {
-                                state: api::State::Effective,
-                                effective: None,
-                                sentence: explain::what_if(None),
+                            .find(|&other| lifted(other) && competes(other))
+                            .filter(|&winner| winner < index);
+                        let Some(winner) = winner else {
+                            let state = match malformed[index] {
+                                Some(_) => api::State::Invalid,
+                                None => api::State::Effective,
                             };
-                        }
+                            return api::WhatIf {
+                                state,
+                                effective: None,
+                                sentence: explain::what_if(state, None),
+                            };
+                        };
                         let scope = &definition.location(&entries[winner].location).scope;
                         let effective =
                             locator::render(&entries[winner].path, &entries[winner].key_path);
                         api::WhatIf {
                             state: api::State::Shadowed,
-                            sentence: explain::what_if(Some((scope, &effective))),
+                            sentence: explain::what_if(
+                                api::State::Shadowed,
+                                Some((scope, &effective)),
+                            ),
                             effective: Some(effective),
                         }
                     });
@@ -196,12 +231,9 @@ pub(crate) fn resolve(
                     }
                 })
                 .collect();
-            // An Item is in use when one of its Entries is Effective.
-            let state = if effective.is_some() {
-                api::State::Effective
-            } else {
-                api_entries[0].state
-            };
+            // An Item takes the State of the Entry the Agent uses, if any:
+            // Effective, or Invalid when it is malformed and still competes.
+            let state = api_entries[winner.unwrap_or(0)].state;
             // A location the Agent may or may not read without could hold
             // an Entry of the Item.
             let caveats = snapshot
