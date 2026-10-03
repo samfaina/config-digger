@@ -134,7 +134,7 @@ fn existing(fs: &dyn FileSystem, path: &Path, workspace: bool) -> Result<PathBuf
     let lexical = paths::lexical(path);
     let (real, exists) = paths::canonical(fs, &lexical);
     let is_folder = exists && fs.read_dir(&real).is_ok();
-    let is_workspace = workspace && exists && scan::is_workspace(&real);
+    let is_workspace = workspace && exists && !is_folder && scan::is_workspace(&real);
     if paths::is_absolute(&lexical) && (is_folder || is_workspace) {
         Ok(real)
     } else {

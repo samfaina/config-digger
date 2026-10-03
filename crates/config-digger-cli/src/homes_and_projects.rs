@@ -18,9 +18,11 @@ pub(crate) enum HomesCommand {
     List,
     /// Add an existing folder as an Agent home of an Agent.
     ///
-    /// The folder is read as the Agent's own home is laid out, with no other
-    /// check: a folder with none of the files the Agent reads is listed with
-    /// "No configuration found".
+    /// The folder is read as the Agent's default home is laid out, with no
+    /// other check: it stands where `homes list` shows the default home's
+    /// folder, such as the folder holding `.claude.json` for Claude Code. A
+    /// folder with none of the files the Agent reads is listed with "No
+    /// configuration found".
     Add {
         /// The folder.
         path: PathBuf,
@@ -45,6 +47,18 @@ pub(crate) struct HomeSelector {
     /// The home's Agent, when homes of several Agents match.
     #[arg(long, value_name = "ID")]
     agent: Option<String>,
+}
+
+impl HomeSelector {
+    /// The selector as the core takes it: a folder relative to the current
+    /// directory made absolute, anything else as typed.
+    fn home(&self) -> String {
+        let path = Path::new(&self.home);
+        match std::path::absolute(path) {
+            Ok(absolute) if path.is_relative() && path.is_dir() => absolute.display().to_string(),
+            _ => self.home.clone(),
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -148,15 +162,15 @@ pub(crate) fn homes(cli: &Cli, core: &Core, command: &HomesCommand) -> Result<()
             (core.add_home(&path, agent)?, "Added")
         }
         HomesCommand::Hide(selector) => (
-            core.hide_home(&selector.home, selector.agent.as_deref())?,
+            core.hide_home(&selector.home(), selector.agent.as_deref())?,
             "Hid",
         ),
         HomesCommand::Unhide(selector) => (
-            core.unhide_home(&selector.home, selector.agent.as_deref())?,
+            core.unhide_home(&selector.home(), selector.agent.as_deref())?,
             "Listed again",
         ),
         HomesCommand::Forget(selector) => (
-            core.forget_home(&selector.home, selector.agent.as_deref())?,
+            core.forget_home(&selector.home(), selector.agent.as_deref())?,
             "Forgot",
         ),
     };
@@ -239,8 +253,7 @@ fn home_source(home: &api::Home) -> String {
     }
 }
 
-/// One table of Agent homes: each home's Agent, id and source, then its
-/// folder, and under it any note.
+/// One table of Agent homes: each home's Agent, id and source.
 fn render_homes(homes: &[api::Home], width: Option<usize>) -> String {
     if homes.is_empty() {
         return plain_line("No Agent home found.", width);
@@ -258,12 +271,23 @@ fn render_homes(homes: &[api::Home], width: Option<usize>) -> String {
         })
         .collect();
     let header = [("AGENT", DIM), ("HOME", DIM), ("SOURCE", DIM)];
-    let widths = column_widths(&header, &rows);
+    home_table(homes, &header, &rows, width)
+}
+
+/// A table with one row of `cells` per home, then its folder, and under it
+/// any note.
+fn home_table<const N: usize>(
+    homes: &[api::Home],
+    header: &[(&str, Style); N],
+    rows: &[[(&str, Style); N]],
+    width: Option<usize>,
+) -> String {
+    let widths = column_widths(header, rows);
     let folder_width = last_column_width(&widths, width);
-    let mut out = table_line(&header, &widths, "FOLDER".to_owned(), DIM)
+    let mut out = table_line(header, &widths, "FOLDER".to_owned(), DIM)
         .fit(width)
         .render();
-    for (home, cells) in homes.iter().zip(&rows) {
+    for (home, cells) in homes.iter().zip(rows) {
         let folder = folder_cell(&home.folder, folder_width);
         out.push_str(
             &table_line(cells, &widths, folder, Style::new())
@@ -324,22 +348,7 @@ fn render_agents(agents: &[api::Agent], width: Option<usize>) -> String {
             })
             .collect();
         let header = [("HOME", DIM), ("SOURCE", DIM)];
-        let widths = column_widths(&header, &rows);
-        let folder_width = last_column_width(&widths, width);
-        out.push_str(
-            &table_line(&header, &widths, "FOLDER".to_owned(), DIM)
-                .fit(width)
-                .render(),
-        );
-        for (home, cells) in agent.homes.iter().zip(&rows) {
-            let folder = folder_cell(&home.folder, folder_width);
-            out.push_str(
-                &table_line(cells, &widths, folder, Style::new())
-                    .fit(width)
-                    .render(),
-            );
-            out.push_str(&home_notes(home, width));
-        }
+        out.push_str(&home_table(&agent.homes, &header, &rows, width));
     }
     out
 }
@@ -374,7 +383,7 @@ fn render_projects(
             if project.added {
                 source.push("added by you".to_owned());
             }
-            if project.workspace {
+            if project.workspace_file {
                 source.push("workspace file".to_owned());
             }
             if project.missing {

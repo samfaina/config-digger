@@ -217,7 +217,7 @@ pub(crate) struct ScannedProject {
     pub key: String,
     pub exists: bool,
     /// It is a `.code-workspace` file rather than a folder.
-    pub workspace: bool,
+    pub workspace_file: bool,
     /// The keys of every lexically normalised spelling that names this Project.
     pub spellings: BTreeSet<String>,
     /// The Agents whose registries record it.
@@ -231,7 +231,7 @@ pub(crate) struct ScannedProject {
 impl ScannedProject {
     /// It is a folder that exists, so that locations in it can be read.
     pub fn is_folder(&self) -> bool {
-        self.exists && !self.workspace
+        self.exists && !self.workspace_file
     }
 }
 
@@ -279,6 +279,8 @@ impl ScannedReadFailure {
 pub(crate) enum ScanError {
     #[error("cannot determine where {agent} home `{home}` is: the user's home folder is unknown")]
     HomeUnknown { agent: String, home: String },
+    #[error("{0}")]
+    UserList(String),
 }
 
 /// A found Agent home with the paths of its roots.
@@ -308,12 +310,9 @@ pub(crate) fn scan_as_if(
     written: &[(PathBuf, Vec<u8>)],
 ) -> Result<Snapshot, ScanError> {
     let read_at = ports.clock.now();
-    // A list config-digger cannot read adds and hides nothing; writing it
-    // is refused until it is fixed.
-    let user_list = user_list::load(ports).unwrap_or_else(|error| {
-        tracing::warn!(%error, "user list not read");
-        UserList::default()
-    });
+    // Without the list, hidden homes and Projects would show again and added
+    // ones vanish without a word, so a list that cannot be read stops the scan.
+    let user_list = user_list::load(ports).map_err(|error| ScanError::UserList(error.message))?;
     let found = find_homes(definitions, ports, &user_list)?;
     let mut scanner = Scanner {
         reader: Reader::new(ports, written),
@@ -580,7 +579,16 @@ fn find_homes(
     ports: &Ports,
     user_list: &UserList,
 ) -> Result<Vec<FoundHome>, ScanError> {
+    let fs = ports.fs.as_ref();
+    let added_to = |agent: &str, folder: &Path| {
+        let key = paths::canonical_key(fs, folder);
+        user_list
+            .homes
+            .iter()
+            .any(|added| added.agent == agent && paths::canonical_key(fs, &added.folder) == key)
+    };
     let mut found = Vec::new();
+    let mut definition_folders = Vec::new();
     for (agent_index, definition) in definitions.iter().enumerate() {
         for home in &definition.homes {
             let folder =
@@ -590,23 +598,30 @@ fn find_homes(
                         agent: definition.agent.name.clone(),
                         home: home.id.clone(),
                     })?;
+            definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
             let roots = home.roots_in(&folder);
-            if !roots.values().any(|root| ports.fs.exists(root)) {
+            // A definition home the user added keeps its id, so that it is
+            // the same home before and after its files appear.
+            let source = if roots.values().any(|root| fs.exists(root)) {
+                HomeSource::Default
+            } else if added_to(&definition.agent.id, &folder) {
+                HomeSource::Added
+            } else {
                 tracing::debug!(agent = %definition.agent.id, home = %home.id, "home not found");
                 continue;
-            }
+            };
             tracing::debug!(agent = %definition.agent.id, home = %home.id, "home found");
             found.push(FoundHome {
                 agent_index,
                 home: home.id.clone(),
                 folder,
                 roots,
-                source: HomeSource::Default,
+                source,
             });
         }
     }
-    // A home the user added is listed even with none of its roots, and
-    // only once when a definition location finds it too. Its id is its folder.
+    // Any other home the user added is listed even with none of its roots,
+    // laid out like the definition's first home. Its id is its folder.
     for added in &user_list.homes {
         let Some(agent_index) = definitions
             .iter()
@@ -615,12 +630,8 @@ fn find_homes(
             tracing::debug!(agent = %added.agent, "added home of an Agent not loaded");
             continue;
         };
-        let key = paths::key(&paths::canonical(ports.fs.as_ref(), &added.folder).0);
-        let known = found.iter().any(|home| {
-            home.agent_index == agent_index
-                && paths::key(&paths::canonical(ports.fs.as_ref(), &home.folder).0) == key
-        });
-        if known {
+        let key = paths::canonical_key(fs, &added.folder);
+        if definition_folders.contains(&(agent_index, key)) {
             continue;
         }
         found.push(FoundHome {
@@ -924,7 +935,8 @@ impl<'p> Projects<'p> {
                     Some(index) => index,
                     None => {
                         self.list.push(ScannedProject {
-                            workspace: is_workspace(&path),
+                            workspace_file: is_workspace(&path)
+                                && self.ports.fs.read_dir(&path).is_err(),
                             path,
                             key: key.clone(),
                             exists,
@@ -957,7 +969,7 @@ impl<'p> Projects<'p> {
     }
 }
 
-/// Whether a Project path names a VS Code workspace file rather than a folder.
+/// Whether a Project path is named like a VS Code workspace file.
 pub(crate) fn is_workspace(path: &Path) -> bool {
     path.extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("code-workspace"))

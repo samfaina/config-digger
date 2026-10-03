@@ -2049,6 +2049,11 @@ fn a_hidden_home_and_its_items_are_listed_only_with_include_hidden() {
     let agents = harness.run(&["agents", "--json"]);
     let items = harness.run(&["list", "--json"]);
     let all_items = harness.run(&["list", "--json", "--include-hidden"]);
+    let name = all_items.document()["items"][0]["name"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let show = harness.run(&["show", &name]);
     let unhide = harness.run(&["homes", "unhide", "default", "--json"]);
     let shown = harness.run(&["homes", "list", "--json"]);
 
@@ -2057,6 +2062,8 @@ fn a_hidden_home_and_its_items_are_listed_only_with_include_hidden() {
     assert_eq!(agents.document()["agents"][0]["homes"], json!([]));
     assert_eq!(items.document()["items"], json!([]));
     assert!(!all_items.document()["items"].as_array().unwrap().is_empty());
+    // Hiding only filters what is listed: a hidden home's Item still shows.
+    assert_eq!(show.code, 0, "{}", show.stderr);
     assert_eq!(unhide.code, 0, "{}", unhide.stderr);
     assert_eq!(unhide.document()["home"]["hidden"], false);
     assert_eq!(

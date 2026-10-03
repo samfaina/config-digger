@@ -633,10 +633,20 @@ pub(crate) fn not_existing(path: &Path, workspace: bool) -> String {
     format!("{} is not {what}", path.display())
 }
 
-/// Why `what`, which `found_by` says how it is discovered, cannot be
-/// forgotten, and the command of `group` that hides it instead.
-pub(crate) fn forget_refused(what: &str, found_by: &str, group: &str) -> String {
+/// Why the Agent home `home` of `agent_name`, which the definition finds,
+/// cannot be forgotten, and how to hide it instead.
+pub(crate) fn forget_refused_home(home: &str, agent_name: &str) -> String {
     format!(
-        "{what} {found_by}, so forgetting it would not take it off the list; hide it with `config-digger {group} hide`"
+        "Agent home {home} of {agent_name} is found without you, so forgetting it would not take it off the list; hide it with `config-digger homes hide`"
+    )
+}
+
+/// Why the Project at `path`, which the registries of `agent_names`
+/// record, cannot be forgotten, and how to hide it instead.
+pub(crate) fn forget_refused_project(path: &Path, agent_names: &[&str]) -> String {
+    format!(
+        "Project {} is recorded by {}, so forgetting it would not take it off the list; hide it with `config-digger projects hide`",
+        path.display(),
+        agent_names.join(", ")
     )
 }

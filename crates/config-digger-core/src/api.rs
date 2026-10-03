@@ -273,11 +273,9 @@ impl Core {
     pub fn forget_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
         let found = self.find_home(&self.listing()?, home, agent)?.clone();
         if found.source != HomeSource::Added {
-            let what = format!("Agent home {} of {}", found.home, found.agent_name);
-            return Err(Error::blocked(explain::forget_refused(
-                &what,
-                "is found without you",
-                "homes",
+            return Err(Error::blocked(explain::forget_refused_home(
+                &found.home,
+                &found.agent_name,
             )));
         }
         user_list::forget_home(&self.ports, &found.agent, &found.home, &found.folder)?;
@@ -296,10 +294,9 @@ impl Core {
                 .filter_map(|id| self.definitions.iter().find(|d| d.agent.id == *id))
                 .map(|definition| definition.agent.name.as_str())
                 .collect();
-            return Err(Error::blocked(explain::forget_refused(
-                &format!("Project {}", found.path.display()),
-                &format!("is recorded by {}", names.join(", ")),
-                "projects",
+            return Err(Error::blocked(explain::forget_refused_project(
+                &found.path,
+                &names,
             )));
         }
         if !found.added {
@@ -324,14 +321,14 @@ impl Core {
         agent: Option<&str>,
     ) -> Result<&'i Home, Error> {
         let fs = self.ports.fs.as_ref();
-        let folder = paths::key(&paths::canonical(fs, Path::new(selector)).0);
+        let folder = paths::canonical_key(fs, Path::new(selector));
         let found: Vec<&Home> = inventory
             .homes
             .iter()
             .filter(|home| agent.is_none_or(|agent| home.agent.eq_ignore_ascii_case(agent)))
             .filter(|home| {
                 home.home.eq_ignore_ascii_case(selector)
-                    || paths::key(&paths::canonical(fs, &home.folder).0) == folder
+                    || paths::canonical_key(fs, &home.folder) == folder
             })
             .collect();
         match found.as_slice() {
@@ -347,7 +344,7 @@ impl Core {
         inventory: &'i Inventory,
         path: &Path,
     ) -> Result<&'i Project, Error> {
-        let key = paths::key(&paths::canonical(self.ports.fs.as_ref(), path).0);
+        let key = paths::canonical_key(self.ports.fs.as_ref(), path);
         inventory
             .projects
             .iter()
@@ -894,8 +891,8 @@ impl Inventory {
 
     /// The inventory as it is listed by default: without the Agent homes
     /// the user hid, their Items, Read failures and flags, nor the Projects
-    /// the user hid. The context's Project stays, hidden or not, since it
-    /// was picked.
+    /// the user hid. The context stays as it was resolved, its Entries
+    /// included, even when its Project is hidden, since it was picked.
     pub fn without_hidden(mut self) -> Inventory {
         let hidden: Vec<(String, String)> = self
             .homes
@@ -928,7 +925,7 @@ pub struct Project {
     pub path: PathBuf,
     pub missing: bool,
     /// It is a `.code-workspace` file rather than a folder.
-    pub workspace: bool,
+    pub workspace_file: bool,
     /// The Agents whose registries record it. Empty when it was only added
     /// or asked for.
     pub registered_by: Vec<String>,
@@ -1468,6 +1465,7 @@ impl Error {
         )
     }
 
+    /// A path given to add is not what it must be, as `message` says.
     pub(crate) fn invalid_path(message: String) -> Self {
         Self::new(ErrorCode::InvalidPath, message)
     }

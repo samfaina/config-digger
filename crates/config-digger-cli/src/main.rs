@@ -423,7 +423,12 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     let width = terminal::output_width(cli.wide);
     match &cli.command {
         Command::List { selector } => {
-            let mut inventory = scanned(cli, &core)?.inventory;
+            let inventory = scanned(cli, &core)?.inventory;
+            let mut inventory = if cli.include_hidden {
+                inventory
+            } else {
+                inventory.without_hidden()
+            };
             if let Some(selector) = selector {
                 let selected: Vec<api::Item> =
                     inventory.select(selector).into_iter().cloned().collect();
@@ -620,11 +625,6 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
     })?;
     let context = Context { project };
     let inventory = core.resolve(&snapshot, &context);
-    let inventory = if cli.include_hidden {
-        inventory
-    } else {
-        inventory.without_hidden()
-    };
     for failure in &inventory.read_failures {
         anstream::eprintln!("{WARNING}warning:{WARNING:#} {}", failure.sentence);
         let risks = failure.warnings.iter().map(|risk| &risk.sentence);

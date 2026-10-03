@@ -49,7 +49,7 @@ pub(crate) fn resolve(
         .map(|project| api::Project {
             path: project.path.clone(),
             missing: !project.exists,
-            workspace: project.workspace,
+            workspace_file: project.workspace_file,
             registered_by: project
                 .registered_by
                 .iter()

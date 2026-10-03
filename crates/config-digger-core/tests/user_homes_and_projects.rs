@@ -156,7 +156,7 @@ fn projects(inventory: &Inventory) -> Vec<(String, Vec<String>, bool, bool)> {
                 project.path.display().to_string(),
                 project.registered_by.clone(),
                 project.added,
-                project.workspace,
+                project.workspace_file,
             )
         })
         .collect()
@@ -435,4 +435,56 @@ fn agents_lists_every_loaded_definition_with_the_homes_found() {
         summary(&with_hidden)[0].2,
         vec!["default".to_owned(), ALT.to_owned()]
     );
+}
+
+#[test]
+fn a_definition_home_the_user_adds_keeps_its_id_before_and_after_its_files_appear() {
+    let fs = FakeFileSystem::new().with_folder(HOME);
+    let core = core(&fs);
+
+    let added = core.add_home(Path::new(HOME), "claude-code").unwrap();
+    core.hide_home("default", None).unwrap();
+    fs.put_file(in_home(".claude.json"), "{}");
+    let found = &inventory(&core, true).homes;
+
+    assert_eq!(added.home, "default");
+    assert_eq!(json(&added.source), json!({"kind": "added"}));
+    assert_eq!(
+        added.no_configuration.as_deref(),
+        Some("No configuration found for Claude Code")
+    );
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].home, "default");
+    assert_eq!(json(&found[0].source), json!({"kind": "default"}));
+    assert!(found[0].hidden);
+}
+
+#[test]
+fn a_list_that_cannot_be_read_stops_the_scan_rather_than_show_hidden_homes() {
+    let fs = claude_code_home().with_file(
+        Path::new(APPDATA).join(r"config-digger\homes-and-projects.json"),
+        "{ not json",
+    );
+    let core = core(&fs);
+
+    let error = core.scan(&ScanOptions::default()).err().unwrap();
+
+    assert_eq!(error.code, ErrorCode::Unexpected);
+    assert!(
+        error.message.contains("fix or delete it"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn a_folder_named_like_a_workspace_file_is_a_folder_project() {
+    let fs = with_projects().with_folder(r"E:\odd.code-workspace");
+    let core = core(&fs);
+
+    let project = core
+        .add_project(Path::new(r"E:\odd.code-workspace"))
+        .unwrap();
+
+    assert!(!project.workspace_file);
 }

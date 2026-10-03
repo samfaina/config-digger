@@ -345,7 +345,7 @@ export type Project = {
 	path: string,
 	missing: boolean,
 	/**  It is a `.code-workspace` file rather than a folder. */
-	workspace: boolean,
+	workspace_file: boolean,
 	/**
 	 *  The Agents whose registries record it. Empty when it was only added
 	 *  or asked for.
