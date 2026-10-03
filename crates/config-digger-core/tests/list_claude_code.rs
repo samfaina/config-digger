@@ -70,7 +70,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     },
                     "masked": [["env", "GITHUB_PERSONAL_ACCESS_TOKEN"]],
                     "disable": no_project_switch(),
-                    "enable": null
+                    "enable": null,
+                    "caveats": []
                 }],
                 "caveats": []
             },
@@ -95,7 +96,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "config": { "type": "http", "url": "https://mcp.linear.app/mcp" },
                     "masked": [],
                     "disable": no_project_switch(),
-                    "enable": null
+                    "enable": null,
+                    "caveats": []
                 }],
                 "caveats": []
             }

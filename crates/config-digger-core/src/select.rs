@@ -125,6 +125,7 @@ mod tests {
                     sentence: String::new(),
                 },
                 enable: None,
+                caveats: Vec::new(),
             }],
             caveats: Vec::new(),
         }

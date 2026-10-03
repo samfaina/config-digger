@@ -580,3 +580,12 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
         sentence,
     }
 }
+
+/// The caveat of an Entry when the file at `path`, holding a switch that
+/// could Disable it, cannot be read.
+pub(crate) fn unreadable_switch(path: &Path) -> String {
+    format!(
+        "{} couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not.",
+        path.display()
+    )
+}

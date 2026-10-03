@@ -759,6 +759,9 @@ pub struct Entry {
     /// For a Disabled Entry, what Enable writes, as a sentence rendered by
     /// the core.
     pub enable: Option<String>,
+    /// What makes its State less certain, such as a Disable switch that
+    /// cannot be read.
+    pub caveats: Vec<Caveat>,
 }
 
 /// The State a Disabled Entry would have once Enabled.

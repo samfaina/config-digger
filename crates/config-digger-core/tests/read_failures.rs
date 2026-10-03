@@ -503,3 +503,38 @@ fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_cavea
     assert_eq!(without_project["items"][0]["caveats"], json!([]));
     assert_eq!(in_project["agent_flags"], json!([]));
 }
+
+#[test]
+fn an_unreadable_disable_store_resolves_with_defaults_and_a_caveat() {
+    let settings = PathBuf::from(PROJECT).join(r".claude\settings.local.json");
+    let fs = FakeFileSystem::new()
+        .with_file(
+            in_home(".claude.json"),
+            r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}, "projects": {"E:/work/app": {}}}"#,
+        )
+        .with_file(mcp_json(), r#"{"mcpServers": {"github": {"command": "gh"}}}"#)
+        .with_file(&settings, r#"{"disabledMcpjsonServers": ["github"],"#);
+    let inventory = inventory(fs, &[]);
+
+    assert_eq!(
+        items(&inventory),
+        [
+            item("claude-code", "github", "effective"),
+            item("claude-code", "linear", "effective")
+        ]
+    );
+    let github = &inventory["items"][0]["entries"][0];
+    assert_eq!(
+        github["caveats"],
+        json!([{
+            "code": "unreadable_switch",
+            "path": settings,
+            "sentence": r"E:\work\app\.claude\settings.local.json couldn't be read, so whether it Disables this Entry is not known: it is shown as if it did not."
+        }])
+    );
+    // Disable goes through a switch config-digger can read.
+    assert_eq!(github["disable"]["status"], "offered");
+    assert_eq!(github["disable"]["path"], json!(in_home(".claude.json")));
+    // The store only covers `.mcp.json` servers.
+    assert_eq!(inventory["items"][1]["entries"][0]["caveats"], json!([]));
+}

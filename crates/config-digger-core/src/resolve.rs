@@ -228,6 +228,19 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
+                        caveats: disable::unreadable_switches(
+                            definition,
+                            snapshot,
+                            entry,
+                            context_project.as_ref(),
+                        )
+                        .into_iter()
+                        .map(|path| api::Caveat {
+                            code: api::CaveatCode::UnreadableSwitch,
+                            sentence: explain::unreadable_switch(&path),
+                            path,
+                        })
+                        .collect(),
                     }
                 })
                 .collect();
