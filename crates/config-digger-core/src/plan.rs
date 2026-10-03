@@ -133,12 +133,7 @@ pub(crate) fn plan_remove_leftovers(
         return Err(Error::no_leftovers(project));
     };
     let targets = Targets {
-        selectors: found
-            .items
-            .iter()
-            .flat_map(|item| &item.entries)
-            .map(|entry| entry.locator.clone())
-            .collect(),
+        selectors: found.entries().map(|entry| entry.locator.clone()).collect(),
         all: false,
     };
     let context = Context {
@@ -205,18 +200,14 @@ impl Targeted<'_> {
         let after = resolve::resolve(self.definitions, &without, self.context);
         let (mut changes, effective) = predict(self.before, &after);
         // A leftover of another missing Project goes in that Project's context.
-        let targeted = |leftovers: &&Leftovers| {
-            leftovers
-                .items
-                .iter()
-                .flat_map(|item| &item.entries)
-                .any(|leftover| {
-                    self.entries
-                        .iter()
-                        .any(|entry| entry.locator == leftover.locator)
-                })
+        let holds_target = |leftovers: &&Leftovers| {
+            leftovers.entries().any(|leftover| {
+                self.entries
+                    .iter()
+                    .any(|entry| entry.locator == leftover.locator)
+            })
         };
-        for leftovers in self.leftovers.iter().filter(targeted) {
+        for leftovers in self.leftovers.iter().filter(holds_target) {
             let context = Context {
                 project: Some(leftovers.project.clone()),
             };
@@ -238,13 +229,10 @@ impl Targeted<'_> {
         let mut by_file: Vec<(PathBuf, Vec<Edit>)> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
         for entry in self.entries {
+            // Its switches would be offered as for any Entry of the Project.
             if entry.state == State::Unread {
-                let action = match self.action {
-                    Action::Disable => "Disable",
-                    _ => "Enable",
-                };
                 return Err(Error::blocked(explain::only_removed(
-                    action,
+                    self.action,
                     &entry.locator,
                 )));
             }
@@ -493,9 +481,26 @@ pub(crate) fn plan_undo(
         .iter()
         .map(|file| (file.path.clone(), file.edited.bytes.clone()))
         .collect();
-    let after = resolve::resolve(definitions, &scan(&written)?, &context);
+    let after_snapshot = scan(&written)?;
+    let after = resolve::resolve(definitions, &after_snapshot, &context);
     let title = explain::undo_title(id, &manifest.title);
-    let (changes, effective) = predict(&before, &after);
+    let (mut changes, effective) = predict(&before, &after);
+    // What the Operation changed in another Project, such as a leftover it
+    // Removed, changes back there.
+    let mut others: Vec<&Option<PathBuf>> = Vec::new();
+    for change in &manifest.changes {
+        if change.project != manifest.project && !others.contains(&&change.project) {
+            others.push(&change.project);
+        }
+    }
+    for project in others {
+        let context = Context {
+            project: project.clone(),
+        };
+        let before = resolve::resolve(definitions, &snapshot, &context);
+        let after = resolve::resolve(definitions, &after_snapshot, &context);
+        changes.extend(predict(&before, &after).0);
+    }
     let preview = preview(
         definitions,
         ports,

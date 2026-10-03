@@ -52,9 +52,13 @@ pub(crate) fn unread_option() -> String {
     "Disable is not offered: the Agent never reads the Entry, so it can only be Removed.".to_owned()
 }
 
-/// Why Disable or Enable is refused for the Unread Entry at `locator`.
-pub(crate) fn only_removed(action: &str, locator: &str) -> String {
-    format!("cannot {action} {locator}: the Agent never reads it, so it can only be Removed")
+/// Why Disable or Enable, `action`, is refused for the Unread Entry at `locator`.
+pub(crate) fn only_removed(action: Action, locator: &str) -> String {
+    let verb = match action {
+        Action::Disable => "Disable",
+        _ => "Enable",
+    };
+    format!("cannot {verb} {locator}: the Agent never reads it, so it can only be Removed")
 }
 
 /// Which Entry of an Item is Effective after an Operation that keeps some of

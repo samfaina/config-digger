@@ -608,6 +608,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     }
 }
 
+/// The Entries `selectors` name, or with `all`, every Entry of their Items.
 fn targets(selectors: &[String], all: bool) -> Targets {
     Targets {
         selectors: selectors.to_vec(),
@@ -675,28 +676,12 @@ fn list_leftovers(cli: &Cli, core: &Core, width: Option<usize>) -> Result<(), Fa
     }
     let scanned = scanned(cli, core)?;
     let inventory = &scanned.inventory;
-    let hidden_home = |item: &api::Item| {
-        inventory
-            .homes
-            .iter()
-            .any(|home| home.hidden && home.agent == item.agent && home.home == item.home)
-    };
-    let hidden_project = |path: &Path| {
-        inventory
-            .projects
-            .iter()
-            .any(|project| project.hidden && project.path == path)
-    };
     let mut leftovers = core.leftovers(&scanned.snapshot);
     if cli.project.is_some() {
         leftovers.retain(|leftovers| inventory.project.as_ref() == Some(&leftovers.project));
     }
     if !cli.include_hidden {
-        leftovers.retain(|leftovers| !hidden_project(&leftovers.project));
-        for leftovers in &mut leftovers {
-            leftovers.items.retain(|item| !hidden_home(item));
-        }
-        leftovers.retain(|leftovers| !leftovers.items.is_empty());
+        leftovers = inventory.leftovers_without_hidden(leftovers);
     }
     if cli.json {
         print_json(&LeftoversBody {

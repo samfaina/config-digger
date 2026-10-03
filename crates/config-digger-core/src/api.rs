@@ -943,6 +943,28 @@ impl Inventory {
         self.projects.retain(|project| !project.hidden);
         self
     }
+
+    /// `leftovers` as they are listed by default: without those of the
+    /// missing Projects and the Agent homes the user hid, as this
+    /// inventory, with hidden ones included, marks them.
+    pub fn leftovers_without_hidden(&self, mut leftovers: Vec<Leftovers>) -> Vec<Leftovers> {
+        let hidden_home = |item: &Item| {
+            self.homes
+                .iter()
+                .any(|home| home.hidden && home.agent == item.agent && home.home == item.home)
+        };
+        leftovers.retain(|leftovers| {
+            !self
+                .projects
+                .iter()
+                .any(|project| project.hidden && project.path == leftovers.project)
+        });
+        for leftovers in &mut leftovers {
+            leftovers.items.retain(|item| !hidden_home(item));
+        }
+        leftovers.retain(|leftovers| !leftovers.items.is_empty());
+        leftovers
+    }
 }
 
 /// What an Agent can be started on.
@@ -970,6 +992,13 @@ pub struct Leftovers {
     pub project: PathBuf,
     /// Each Item with only its Unread Entries, sorted like [`Inventory::items`].
     pub items: Vec<Item>,
+}
+
+impl Leftovers {
+    /// Every leftover, Item by Item.
+    pub fn entries(&self) -> impl Iterator<Item = &Entry> {
+        self.items.iter().flat_map(|item| &item.entries)
+    }
 }
 
 /// A loaded Agent definition and the Agent homes listed for it.

@@ -96,6 +96,10 @@ _Avoid_: Pending, denied, untrusted
 Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips or one keyed to a missing Project. It competes with nothing and can only be Removed.
 _Avoid_: Orphaned, stale, ignored
 
+**Leftover**:
+An Unread Entry keyed to a missing Project in a user file, such as a Claude Code `projects["<path>"]` key. The leftovers of every missing Project are listed together and can be Removed in one Operation, or all of one Project's at once. Removing them never touches the Project's key itself, nor any trust it records.
+_Avoid_: Orphan, stale entry, remnant
+
 **Invalid**:
 Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, or Codex Entries that merge into a server with two transports, which stops the Agent from starting.
 _Avoid_: Broken, conflicting, error

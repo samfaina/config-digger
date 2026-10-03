@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 const HOME: &str = r"C:\Users\fixture";
 const LOCAL_APP_DATA: &str = r"C:\Users\fixture\AppData\Local";
+const APP_DATA: &str = r"C:\Users\fixture\AppData\Roaming";
 const PETME: &str = r"E:\projects\petme-app";
 const GONE: &str = r"E:\projects\gone";
 
@@ -48,7 +49,9 @@ fn fixture() -> FakeFileSystem {
 }
 
 fn core(fs: &FakeFileSystem) -> Core {
-    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
+        .with_var("APPDATA", APP_DATA);
     Core::new(fake::ports(fs.clone(), env)).unwrap()
 }
 
@@ -409,4 +412,66 @@ fn remove_leftovers_is_refused_for_a_project_that_exists_or_has_none() {
         assert_eq!(error.code, ErrorCode::NoMatch, "{project}");
         assert!(error.message.contains(project), "{}", error.message);
     }
+}
+
+#[test]
+fn the_undo_of_a_leftover_removed_from_another_context_predicts_it_back_in_its_project() {
+    let fs = fixture();
+    let core = core(&fs);
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let plan = core
+        .plan(
+            &snapshot,
+            &context(Some(PETME)),
+            Action::Remove,
+            &targets(&[OLD]),
+        )
+        .unwrap();
+    let removed = core.execute(plan, &[]).unwrap();
+
+    let undo = core.plan_undo(&removed.operation).unwrap();
+
+    let changes: Vec<(String, Option<PathBuf>, StateAfter, StateAfter)> = undo
+        .preview()
+        .changes
+        .iter()
+        .map(|change| {
+            (
+                change.locator.clone(),
+                change.project.clone(),
+                change.before,
+                change.after,
+            )
+        })
+        .collect();
+    assert_eq!(
+        changes,
+        [(
+            OLD.to_owned(),
+            Some(PathBuf::from(GONE)),
+            StateAfter::Removed,
+            StateAfter::Unread
+        )]
+    );
+    let outcome = core.execute(undo, &[]).unwrap();
+    assert_eq!(outcome.verify, Verify::Verified);
+    assert_eq!(text(&fs), CLAUDE_JSON);
+}
+
+#[test]
+fn the_leftovers_of_a_hidden_project_are_listed_only_when_asked_for() {
+    let fs = two_missing_projects();
+    let core = core(&fs);
+    core.hide_project(Path::new(GONE)).unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let shown = inventory.leftovers_without_hidden(core.leftovers(&snapshot));
+
+    let projects: Vec<&Path> = shown
+        .iter()
+        .map(|leftovers| leftovers.project.as_path())
+        .collect();
+    assert_eq!(projects, [Path::new(r"E:\archive\legacy")]);
+    assert_eq!(core.leftovers(&snapshot).len(), 2);
 }
