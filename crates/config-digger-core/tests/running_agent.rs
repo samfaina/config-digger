@@ -275,6 +275,7 @@ store_class = "sqlite"
 [items.mcp]
 precedence = ["user-mcp"]
 competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
 "#;
 
 const STORE: &str = r#"{"servers": {"search": {"command": "search-mcp"}}}"#;

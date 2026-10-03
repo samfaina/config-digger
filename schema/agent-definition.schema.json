@@ -523,8 +523,15 @@
         "competition": {
           "$ref": "#/$defs/Competition"
         },
+        "checks": {
+          "description": "The Agent's checks, in the order it applies them: an Entry's State\ncomes from the first it fails, and the others it fails are listed as\nsecondary reasons. Each check appears once.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        },
         "disable": {
-          "description": "How the Agent Disables an Entry, in its order of preference.\nDisable uses the first that covers the Entry and applies in the\ncontext, skipping any whose target is git-versioned.",
+          "description": "How the Agent Disables an Entry, in its order of preference. Disable\nuses the most specific one (target, then context) that covers the\nEntry and applies in the context, taking the first in this order\namong equally specific ones, and skipping any whose switch is\ngit-versioned.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/DisableMechanism"
@@ -534,7 +541,8 @@
       "additionalProperties": false,
       "required": [
         "precedence",
-        "competition"
+        "competition",
+        "checks"
       ]
     },
     "Competition": {
@@ -556,16 +564,45 @@
         }
       ]
     },
+    "Check": {
+      "description": "One of an Agent's checks that decides an Entry's State.",
+      "oneOf": [
+        {
+          "description": "A Disable mechanism's switch is set for the Entry: Disabled.",
+          "type": "string",
+          "const": "disable"
+        },
+        {
+          "description": "A same-named Entry the Agent ranks higher is not Disabled: Shadowed.",
+          "type": "string",
+          "const": "precedence"
+        }
+      ]
+    },
     "DisableMechanism": {
       "description": "How an Agent Disables an Entry. An Item kind lists its mechanisms in\nthe Agent's order of preference.",
       "oneOf": [
         {
-          "description": "A list of names in a JSON file: the Agent skips every Entry of an Item\nwhose name is in it.",
+          "description": "A list of names in a JSON file: the Agent skips every Entry of an Item\nwhose name is in it. Disable appends the name, creating the list and\nany missing parent; Enable removes it.",
           "type": "object",
           "properties": {
-            "target": {
+            "switch": {
               "description": "The list.",
-              "$ref": "#/$defs/Target"
+              "$ref": "#/$defs/Switch"
+            },
+            "target": {
+              "description": "Must be `name`.",
+              "$ref": "#/$defs/MechanismTarget"
+            },
+            "context": {
+              "$ref": "#/$defs/MechanismContext"
+            },
+            "enable_action": {
+              "description": "Must be `remove-item`.",
+              "$ref": "#/$defs/EnableAction"
+            },
+            "reason": {
+              "$ref": "#/$defs/DisableReason"
             },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
@@ -583,27 +620,88 @@
           "additionalProperties": false,
           "required": [
             "block",
-            "target"
+            "switch",
+            "target",
+            "context",
+            "enable_action",
+            "reason"
+          ]
+        },
+        {
+          "description": "A field in a JSON file whose value says whether the Agent skips an\nEntry, such as `enabled: false`. Disable sets it to `disabled_value`,\nadding it and any missing parent; Enable deletes it or sets it to\n`enabled_value`, as `enable_action` says.",
+          "type": "object",
+          "properties": {
+            "switch": {
+              "description": "The field. Its key path may hold `{name}`, the Entry's name.",
+              "$ref": "#/$defs/Switch"
+            },
+            "target": {
+              "$ref": "#/$defs/MechanismTarget"
+            },
+            "context": {
+              "$ref": "#/$defs/MechanismContext"
+            },
+            "enable_action": {
+              "description": "`delete-key` or `set`.",
+              "$ref": "#/$defs/EnableAction"
+            },
+            "reason": {
+              "$ref": "#/$defs/DisableReason"
+            },
+            "disabled_value": {
+              "description": "The value that Disables the Entry."
+            },
+            "enabled_value": {
+              "description": "The value Enable sets, with `enable_action = \"set\"`."
+            },
+            "partial_values": {
+              "description": "Values that turn part of the Entry off, such as a skill listed by\nname only: the Entry stays Effective, with a note.",
+              "type": "array",
+              "items": true,
+              "default": []
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "json-field"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "switch",
+            "target",
+            "context",
+            "enable_action",
+            "reason",
+            "disabled_value"
           ]
         }
       ]
     },
-    "Target": {
-      "description": "The key a mechanism writes, in a file outside or inside a Project.",
+    "Switch": {
+      "description": "The key a mechanism writes, in a JSON file outside or inside a Project.",
       "type": "object",
       "properties": {
         "anchor": {
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
-          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, so that the switch applies only there.",
+          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`:\nthe Entry's name.",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "store_class": {
-          "description": "How the target's file behaves while the Agent runs.",
+          "description": "How the switch's file behaves while the Agent runs.",
           "$ref": "#/$defs/StoreClass"
         }
       },
@@ -612,6 +710,71 @@
         "anchor",
         "key_path",
         "store_class"
+      ]
+    },
+    "MechanismTarget": {
+      "description": "What one write of a mechanism's switch Disables. Declared from the most\nspecific to the widest: Disable prefers the most specific mechanism.",
+      "oneOf": [
+        {
+          "description": "The one Entry.",
+          "type": "string",
+          "const": "entry"
+        },
+        {
+          "description": "Every Entry of the Item it covers, since they share the name.",
+          "type": "string",
+          "const": "name"
+        }
+      ]
+    },
+    "MechanismContext": {
+      "description": "Where a mechanism's switch applies. Declared from the most specific to\nthe widest: Disable prefers the most specific mechanism.",
+      "oneOf": [
+        {
+          "description": "In one Project: the switch is in a Project folder, or keyed by `{project}`.",
+          "type": "string",
+          "const": "project"
+        },
+        {
+          "description": "In every context.",
+          "type": "string",
+          "const": "all"
+        }
+      ]
+    },
+    "EnableAction": {
+      "description": "What Enable writes to lift a mechanism's switch.",
+      "oneOf": [
+        {
+          "description": "Removes the name from the list.",
+          "type": "string",
+          "const": "remove-item"
+        },
+        {
+          "description": "Deletes the key.",
+          "type": "string",
+          "const": "delete-key"
+        },
+        {
+          "description": "Sets the key to the mechanism's `enabled_value`.",
+          "type": "string",
+          "const": "set"
+        }
+      ]
+    },
+    "DisableReason": {
+      "description": "The reason code an Entry Disabled through a mechanism gets.",
+      "oneOf": [
+        {
+          "description": "The switch names the Item, so every Entry of it that the mechanism\ncovers is Disabled.",
+          "type": "string",
+          "const": "disabled_by_name"
+        },
+        {
+          "description": "The switch is the Entry's own.",
+          "type": "string",
+          "const": "disabled_natively"
+        }
       ]
     }
   }

@@ -115,12 +115,16 @@ mod tests {
                 git_versioned: false,
                 state: State::Effective,
                 reason: None,
+                secondary: Vec::new(),
+                what_if: None,
+                notes: Vec::new(),
                 config: serde_json::json!({}),
                 masked: Vec::new(),
                 disable: DisableOption::NotOffered {
                     code: DisableNotOffered::NoMechanism,
                     sentence: String::new(),
                 },
+                enable: None,
             }],
         }
     }

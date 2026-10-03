@@ -251,11 +251,27 @@ pub(crate) struct ItemRules {
     /// Location ids of this kind, highest precedence first.
     pub precedence: Vec<String>,
     pub competition: Competition,
-    /// How the Agent Disables an Entry, in its order of preference.
-    /// Disable uses the first that covers the Entry and applies in the
-    /// context, skipping any whose target is git-versioned.
+    /// The Agent's checks, in the order it applies them: an Entry's State
+    /// comes from the first it fails, and the others it fails are listed as
+    /// secondary reasons. Each check appears once.
+    pub checks: Vec<Check>,
+    /// How the Agent Disables an Entry, in its order of preference. Disable
+    /// uses the most specific one (target, then context) that covers the
+    /// Entry and applies in the context, taking the first in this order
+    /// among equally specific ones, and skipping any whose switch is
+    /// git-versioned.
     #[serde(default)]
     pub disable: Vec<DisableMechanism>,
+}
+
+/// One of an Agent's checks that decides an Entry's State.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Check {
+    /// A Disable mechanism's switch is set for the Entry: Disabled.
+    Disable,
+    /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
+    Precedence,
 }
 
 impl AgentDefinition {
@@ -388,10 +404,17 @@ impl AgentDefinition {
             if let Some(id) = declared.difference(&ranked).next() {
                 return Err(context(format!("precedence leaves out location `{id}`")));
             }
+            for check in [Check::Disable, Check::Precedence] {
+                match rules.checks.iter().filter(|known| **known == check).count() {
+                    1 => {}
+                    0 => return Err(context(format!("checks leaves out `{}`", check.id()))),
+                    _ => return Err(context(format!("checks holds `{}` twice", check.id()))),
+                }
+            }
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
-                self.validate_home_root(&mechanism.target().anchor)
+                self.validate_home_root(&mechanism.switch().anchor)
                     .map_err(context)?;
                 if let Some(id) = mechanism
                     .locations()
@@ -422,6 +445,15 @@ impl ItemKind {
     pub fn id(self) -> &'static str {
         match self {
             ItemKind::Mcp => "mcp",
+        }
+    }
+}
+
+impl Check {
+    fn id(self) -> &'static str {
+        match self {
+            Check::Disable => "disable",
+            Check::Precedence => "precedence",
         }
     }
 }
@@ -476,6 +508,7 @@ store_class = "plain"
 [items.mcp]
 precedence = ["user-mcp"]
 competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
 "#;
 
     /// `VALID` plus a project registry and a location keyed by Project.
@@ -621,10 +654,8 @@ store_class = "plain"
     }
 
     #[test]
-    fn a_disable_target_needs_a_store_class() {
-        let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"] } }"#,
-        );
+    fn a_disable_switch_needs_a_store_class() {
+        let text = with_disable(&name_list(false, "").replace(r#", store_class = "plain""#, ""));
         assert!(error(&text).contains("store_class"), "{}", error(&text));
     }
 
@@ -770,19 +801,78 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
         )
     }
 
+    /// A name list in the home file, keyed by `{project}` when `per_project`,
+    /// with `extra` fields.
+    fn name_list(per_project: bool, extra: &str) -> String {
+        let (key_path, context) = if per_project {
+            (r#"["projects", "{project}", "off"]"#, "project")
+        } else {
+            (r#"["off"]"#, "all")
+        };
+        format!(
+            r#"{{ block = "json-name-list", switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = {key_path}, store_class = "plain" }}, target = "name", context = "{context}", enable_action = "remove-item", reason = "disabled_by_name"{extra} }}"#
+        )
+    }
+
+    /// A field per name in the home file, with `extra` fields.
+    fn json_field(extra: &str) -> String {
+        format!(
+            r#"{{ block = "json-field", switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["servers", "{{name}}", "enabled"], store_class = "plain" }}, target = "entry", context = "all", reason = "disabled_natively", disabled_value = false{extra} }}"#
+        )
+    }
+
     #[test]
     fn a_disable_mechanism_loads() {
-        let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "off"], store_class = "plain" }, locations = ["user-mcp"] }"#,
-        );
+        let text = with_disable(&name_list(true, r#", locations = ["user-mcp"]"#));
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
     #[test]
-    fn a_disable_mechanism_for_an_unknown_location_is_rejected() {
-        let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "home", root = "state" }, key_path = ["off"], store_class = "plain" }, locations = ["ghost"] }"#,
+    fn a_json_field_mechanism_loads() {
+        let text = with_disable(&json_field(
+            r#", enable_action = "set", enabled_value = true, partial_values = ["name-only"]"#,
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_disable(&json_field(r#", enable_action = "delete-key""#));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_json_field_set_on_enable_needs_an_enabled_value() {
+        let text = with_disable(&json_field(r#", enable_action = "set""#));
+        assert!(error(&text).contains("enabled_value"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_name_list_targets_names_and_enables_by_removing_the_item() {
+        let text = with_disable(&name_list(false, "").replace(r#""name""#, r#""entry""#));
+        assert!(error(&text).contains("must be `name`"), "{}", error(&text));
+        let text = with_disable(&name_list(false, "").replace("remove-item", "delete-key"));
+        assert!(error(&text).contains("remove-item"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_mechanism_context_agrees_with_where_its_switch_is() {
+        let text = with_disable(&name_list(true, "").replace(r#""project""#, r#""all""#));
+        assert!(error(&text).contains("context `all`"), "{}", error(&text));
+        let text = with_disable(&name_list(false, "").replace(r#""all""#, r#""project""#));
+        assert!(
+            error(&text).contains("context `project`"),
+            "{}",
+            error(&text)
         );
+    }
+
+    #[test]
+    fn a_mechanism_needs_a_reason_code() {
+        let text =
+            with_disable(&name_list(false, "").replace(r#", reason = "disabled_by_name""#, ""));
+        assert!(error(&text).contains("reason"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_disable_mechanism_for_an_unknown_location_is_rejected() {
+        let text = with_disable(&name_list(false, r#", locations = ["ghost"]"#));
         assert!(
             error(&text).contains("`ghost` is not a location of this kind"),
             "{}",
@@ -791,15 +881,34 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     }
 
     #[test]
-    fn a_disable_target_in_a_project_cannot_be_keyed_by_project() {
-        let text = with_disable(
-            r#"{ block = "json-name-list", target = { anchor = { block = "project", path = ".test.json" }, key_path = ["{project}", "off"], store_class = "plain" } }"#,
-        );
+    fn a_disable_switch_in_a_project_cannot_be_keyed_by_project() {
+        let text = with_disable(&name_list(true, "").replace(
+            r#"{ block = "home", root = "state" }"#,
+            r#"{ block = "project", path = ".test.json" }"#,
+        ));
         assert!(
             error(&text).contains("cannot be keyed by `{project}`"),
             "{}",
             error(&text)
         );
+    }
+
+    #[test]
+    fn checks_name_each_check_once() {
+        let text = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            r#"checks = ["precedence"]"#,
+        );
+        assert!(
+            error(&text).contains("leaves out `disable`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            r#"checks = ["disable", "precedence", "disable"]"#,
+        );
+        assert!(error(&text).contains("twice"), "{}", error(&text));
     }
 
     #[test]

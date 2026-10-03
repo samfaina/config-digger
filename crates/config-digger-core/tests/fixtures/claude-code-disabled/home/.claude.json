@@ -1,0 +1,26 @@
+{
+  "numStartups": 12,
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+    "notes": {
+      "command": "notes-mcp"
+    }
+  },
+  "projects": {
+    "E:/projects/petme-app": {
+      "allowedTools": [],
+      "mcpServers": {
+        "github": {
+          "command": "gh-mcp"
+        }
+      },
+      "disabledMcpServers": ["linear"]
+    },
+    "E:/projects/other": {
+      "mcpServers": {}
+    }
+  }
+}

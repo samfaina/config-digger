@@ -5,10 +5,11 @@
 //! new block is added in one place and the compiler points at every `match`
 //! that must handle it.
 
-use crate::edit::Syntax;
+use crate::edit::{Edit, Syntax};
 use crate::ports::{Environment, FileSystem};
 use schemars::JsonSchema;
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
@@ -659,7 +660,16 @@ impl Compete for ExactName {
 /// Entry while keeping it.
 pub(crate) trait Disables {
     /// Where the switch is written.
-    fn target(&self) -> &Target;
+    fn switch(&self) -> &Switch;
+
+    /// What one write of the switch Disables.
+    fn target(&self) -> MechanismTarget;
+
+    /// Where the switch applies.
+    fn context(&self) -> MechanismContext;
+
+    /// The reason code an Entry Disabled through it gets.
+    fn reason(&self) -> DisableReason;
 
     /// The ids of the locations whose Entries it Disables, empty for
     /// every location of the Item kind.
@@ -670,6 +680,21 @@ pub(crate) trait Disables {
         let locations = self.locations();
         locations.is_empty() || locations.iter().any(|location| location == id)
     }
+
+    /// Whether `value`, what the switch holds for the Entry named `name`,
+    /// Disables it. `None` when the switch holds nothing for it.
+    fn disables(&self, value: Option<&Value>, name: &str) -> bool;
+
+    /// Whether `value` turns part of the Entry off, leaving it Effective.
+    fn partial(&self, value: Option<&Value>) -> bool;
+
+    /// The edit that Disables the Entry named `name` through the switch at
+    /// `key_path`, which holds `value` now.
+    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit;
+
+    /// The edits that lift the switch at `key_path`, which holds `value`
+    /// for the Entry named `name`.
+    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit>;
 }
 
 /// How an Agent Disables an Entry. An Item kind lists its mechanisms in
@@ -678,37 +703,142 @@ pub(crate) trait Disables {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
+    JsonField(JsonField),
 }
 
 impl Validate for DisableMechanism {
     fn validate(&self) -> Result<(), String> {
         match self {
             DisableMechanism::JsonNameList(block) => block.validate(),
+            DisableMechanism::JsonField(block) => block.validate(),
         }
     }
 }
 
 impl Disables for DisableMechanism {
-    fn target(&self) -> &Target {
+    fn switch(&self) -> &Switch {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.switch(),
+            DisableMechanism::JsonField(block) => block.switch(),
+        }
+    }
+
+    fn target(&self) -> MechanismTarget {
         match self {
             DisableMechanism::JsonNameList(block) => block.target(),
+            DisableMechanism::JsonField(block) => block.target(),
+        }
+    }
+
+    fn context(&self) -> MechanismContext {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.context(),
+            DisableMechanism::JsonField(block) => block.context(),
+        }
+    }
+
+    fn reason(&self) -> DisableReason {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.reason(),
+            DisableMechanism::JsonField(block) => block.reason(),
         }
     }
 
     fn locations(&self) -> &[String] {
         match self {
             DisableMechanism::JsonNameList(block) => block.locations(),
+            DisableMechanism::JsonField(block) => block.locations(),
+        }
+    }
+
+    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.disables(value, name),
+            DisableMechanism::JsonField(block) => block.disables(value, name),
+        }
+    }
+
+    fn partial(&self, value: Option<&Value>) -> bool {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.partial(value),
+            DisableMechanism::JsonField(block) => block.partial(value),
+        }
+    }
+
+    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.disable_edit(key_path, value, name),
+            DisableMechanism::JsonField(block) => block.disable_edit(key_path, value, name),
+        }
+    }
+
+    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.enable_edits(key_path, value, name),
+            DisableMechanism::JsonField(block) => block.enable_edits(key_path, value, name),
         }
     }
 }
 
+/// What one write of a mechanism's switch Disables. Declared from the most
+/// specific to the widest: Disable prefers the most specific mechanism.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MechanismTarget {
+    /// The one Entry.
+    Entry,
+    /// Every Entry of the Item it covers, since they share the name.
+    Name,
+}
+
+/// Where a mechanism's switch applies. Declared from the most specific to
+/// the widest: Disable prefers the most specific mechanism.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MechanismContext {
+    /// In one Project: the switch is in a Project folder, or keyed by `{project}`.
+    Project,
+    /// In every context.
+    All,
+}
+
+/// What Enable writes to lift a mechanism's switch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum EnableAction {
+    /// Removes the name from the list.
+    RemoveItem,
+    /// Deletes the key.
+    DeleteKey,
+    /// Sets the key to the mechanism's `enabled_value`.
+    Set,
+}
+
+/// The reason code an Entry Disabled through a mechanism gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum DisableReason {
+    /// The switch names the Item, so every Entry of it that the mechanism
+    /// covers is Disabled.
+    DisabledByName,
+    /// The switch is the Entry's own.
+    DisabledNatively,
+}
+
 /// A list of names in a JSON file: the Agent skips every Entry of an Item
-/// whose name is in it.
+/// whose name is in it. Disable appends the name, creating the list and
+/// any missing parent; Enable removes it.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonNameList {
     /// The list.
-    pub target: Target,
+    pub switch: Switch,
+    /// Must be `name`.
+    pub target: MechanismTarget,
+    pub context: MechanismContext,
+    /// Must be `remove-item`.
+    pub enable_action: EnableAction,
+    pub reason: DisableReason,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -717,63 +847,260 @@ pub(crate) struct JsonNameList {
 
 impl Validate for JsonNameList {
     fn validate(&self) -> Result<(), String> {
-        self.target.validate()
+        validate_mechanism(&self.switch, self.context)?;
+        if self.switch.names() {
+            return Err(format!(
+                "a name list's key path cannot hold `{NAME_KEY}`: the names are its items"
+            ));
+        }
+        if self.target != MechanismTarget::Name {
+            return Err("a name list's target must be `name`".into());
+        }
+        if self.enable_action != EnableAction::RemoveItem {
+            return Err("a name list's enable_action must be `remove-item`".into());
+        }
+        Ok(())
     }
 }
 
 impl Disables for JsonNameList {
-    fn target(&self) -> &Target {
-        &self.target
+    fn switch(&self) -> &Switch {
+        &self.switch
+    }
+
+    fn target(&self) -> MechanismTarget {
+        self.target
+    }
+
+    fn context(&self) -> MechanismContext {
+        self.context
+    }
+
+    fn reason(&self) -> DisableReason {
+        self.reason
     }
 
     fn locations(&self) -> &[String] {
         &self.locations
     }
+
+    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
+        occurrences(value, name) > 0
+    }
+
+    fn partial(&self, _value: Option<&Value>) -> bool {
+        false
+    }
+
+    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit {
+        match value {
+            Some(_) => Edit::Append {
+                key_path,
+                value: Value::from(name),
+            },
+            None => Edit::Set {
+                key_path,
+                value: Value::from(vec![name]),
+            },
+        }
+    }
+
+    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+        (0..occurrences(value, name))
+            .map(|_| Edit::RemoveItem {
+                key_path: key_path.clone(),
+                value: Value::from(name),
+            })
+            .collect()
+    }
 }
 
-/// The key a mechanism writes, in a file outside or inside a Project.
+/// How many times the list `value` holds `name`.
+fn occurrences(value: Option<&Value>, name: &str) -> usize {
+    value.and_then(Value::as_array).map_or(0, |names| {
+        names
+            .iter()
+            .filter(|item| item.as_str() == Some(name))
+            .count()
+    })
+}
+
+/// A field in a JSON file whose value says whether the Agent skips an
+/// Entry, such as `enabled: false`. Disable sets it to `disabled_value`,
+/// adding it and any missing parent; Enable deletes it or sets it to
+/// `enabled_value`, as `enable_action` says.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Target {
-    pub anchor: Anchor,
-    /// The key path of the value written. One segment may be `{project}`:
-    /// the context's Project key, so that the switch applies only there.
-    pub key_path: Vec<String>,
-    /// How the target's file behaves while the Agent runs.
-    // Read once Disable writes its target.
-    #[allow(dead_code)]
-    pub store_class: StoreClass,
+pub(crate) struct JsonField {
+    /// The field. Its key path may hold `{name}`, the Entry's name.
+    pub switch: Switch,
+    pub target: MechanismTarget,
+    pub context: MechanismContext,
+    /// `delete-key` or `set`.
+    pub enable_action: EnableAction,
+    pub reason: DisableReason,
+    /// The value that Disables the Entry.
+    pub disabled_value: Value,
+    /// The value Enable sets, with `enable_action = "set"`.
+    pub enabled_value: Option<Value>,
+    /// Values that turn part of the Entry off, such as a skill listed by
+    /// name only: the Entry stays Effective, with a note.
+    #[serde(default)]
+    pub partial_values: Vec<Value>,
+    /// The ids of the locations whose Entries it Disables. Omitted, it
+    /// Disables Entries of every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
 }
 
-impl Validate for Target {
+impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
-        self.anchor.validate()?;
-        if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
-            return Err("a target needs a key path, with no empty key".into());
-        }
-        let project_keys = self
-            .key_path
-            .iter()
-            .filter(|key| *key == super::PROJECT_KEY);
-        match project_keys.count() {
-            0 => Ok(()),
-            1 if self.anchor.in_project() => Err(format!(
-                "a target in a Project cannot be keyed by `{}`",
-                super::PROJECT_KEY
-            )),
-            1 => Ok(()),
-            _ => Err(format!(
-                "a target key path holds `{}` twice",
-                super::PROJECT_KEY
-            )),
+        validate_mechanism(&self.switch, self.context)?;
+        match (self.enable_action, &self.enabled_value) {
+            (EnableAction::RemoveItem, _) => {
+                Err("a field's enable_action must be `delete-key` or `set`".into())
+            }
+            (EnableAction::Set, None) => Err("enable_action `set` needs an enabled_value".into()),
+            (EnableAction::DeleteKey, Some(_)) => {
+                Err("enable_action `delete-key` takes no enabled_value".into())
+            }
+            (EnableAction::Set, Some(enabled)) if *enabled == self.disabled_value => {
+                Err("enabled_value must differ from disabled_value".into())
+            }
+            _ if self.partial_values.contains(&self.disabled_value) => {
+                Err("partial_values must not hold disabled_value".into())
+            }
+            _ => Ok(()),
         }
     }
 }
 
-impl Target {
+impl Disables for JsonField {
+    fn switch(&self) -> &Switch {
+        &self.switch
+    }
+
+    fn target(&self) -> MechanismTarget {
+        self.target
+    }
+
+    fn context(&self) -> MechanismContext {
+        self.context
+    }
+
+    fn reason(&self) -> DisableReason {
+        self.reason
+    }
+
+    fn locations(&self) -> &[String] {
+        &self.locations
+    }
+
+    fn disables(&self, value: Option<&Value>, _name: &str) -> bool {
+        value == Some(&self.disabled_value)
+    }
+
+    fn partial(&self, value: Option<&Value>) -> bool {
+        value.is_some_and(|value| self.partial_values.contains(value))
+    }
+
+    fn disable_edit(&self, key_path: Vec<String>, _value: Option<&Value>, _name: &str) -> Edit {
+        Edit::Set {
+            key_path,
+            value: self.disabled_value.clone(),
+        }
+    }
+
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        _value: Option<&Value>,
+        _name: &str,
+    ) -> Vec<Edit> {
+        vec![match (&self.enabled_value, self.enable_action) {
+            (Some(value), EnableAction::Set) => Edit::Set {
+                key_path,
+                value: value.clone(),
+            },
+            _ => Edit::Remove { key_path },
+        }]
+    }
+}
+
+/// Checks what every mechanism shares: its switch, and a context that
+/// agrees with where the switch is.
+fn validate_mechanism(switch: &Switch, context: MechanismContext) -> Result<(), String> {
+    switch.validate()?;
+    match (context, switch.per_project()) {
+        (MechanismContext::Project, false) => Err(format!(
+            "context `project` needs a switch in a Project or keyed by `{}`",
+            super::PROJECT_KEY
+        )),
+        (MechanismContext::All, true) => Err(format!(
+            "context `all` needs a switch outside any Project and not keyed by `{}`",
+            super::PROJECT_KEY
+        )),
+        _ => Ok(()),
+    }
+}
+
+/// The key a mechanism writes, in a JSON file outside or inside a Project.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Switch {
+    pub anchor: Anchor,
+    /// The key path of the value written. One segment may be `{project}`:
+    /// the context's Project key, in the Agent's own spelling, so that the
+    /// switch applies only there. One segment after it may be `{name}`:
+    /// the Entry's name.
+    pub key_path: Vec<String>,
+    /// How the switch's file behaves while the Agent runs.
+    pub store_class: StoreClass,
+}
+
+/// The switch `key_path` segment that stands for the Entry's name.
+pub(crate) const NAME_KEY: &str = "{name}";
+
+impl Validate for Switch {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
+            return Err("a switch needs a key path, with no empty key".into());
+        }
+        let position = |template: &str| self.key_path.iter().position(|key| key == template);
+        let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();
+        for template in [super::PROJECT_KEY, NAME_KEY] {
+            if count(template) > 1 {
+                return Err(format!("a switch key path holds `{template}` twice"));
+            }
+        }
+        if position(super::PROJECT_KEY).is_some() && self.anchor.in_project() {
+            return Err(format!(
+                "a switch in a Project cannot be keyed by `{}`",
+                super::PROJECT_KEY
+            ));
+        }
+        if let (Some(project), Some(name)) = (position(super::PROJECT_KEY), position(NAME_KEY))
+            && name < project
+        {
+            return Err(format!(
+                "`{}` must come before `{NAME_KEY}` in a switch key path",
+                super::PROJECT_KEY
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Switch {
     /// Whether the switch applies in one Project only, so that it needs one.
     pub fn per_project(&self) -> bool {
         self.anchor.in_project() || self.key_path.iter().any(|key| key == super::PROJECT_KEY)
+    }
+
+    /// Whether its key path holds `{name}`, so that it holds one value per name.
+    pub fn names(&self) -> bool {
+        self.key_path.iter().any(|key| key == NAME_KEY)
     }
 }
 

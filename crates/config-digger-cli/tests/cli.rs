@@ -1603,6 +1603,12 @@ fn disable_where_every_switch_is_versioned_exits_5_with_the_reason() {
 #[test]
 fn show_names_the_machine_local_switch_disable_would_write() {
     let harness = versioned_fixture();
+    // Claude Code keys its switch by the Project as it recorded it.
+    let claude_json_text = json!({
+        "mcpServers": { "notes": { "command": "notes-mcp" } },
+        "projects": { project_key(&harness): {} }
+    });
+    std::fs::write(harness.path(".claude.json"), claude_json_text.to_string()).unwrap();
     in_git_repo(&harness, &[".mcp.json"]);
 
     let show = harness.run(&["show", "linear", "--wide"]);
@@ -1611,6 +1617,24 @@ fn show_names_the_machine_local_switch_disable_would_write() {
     assert!(
         show.stdout.contains(&format!(
             "Disable adds `linear` to `disabledMcpServers` in {claude_json} for this Project."
+        )),
+        "{}",
+        show.stdout
+    );
+}
+
+#[test]
+fn show_falls_back_on_the_local_settings_while_claude_code_has_not_recorded_the_project() {
+    let harness = versioned_fixture();
+    in_git_repo(&harness, &[".mcp.json"]);
+
+    let show = harness.run(&["show", "linear", "--wide"]);
+
+    let settings = harness.cwd().join(".claude").join("settings.local.json");
+    assert!(
+        show.stdout.contains(&format!(
+            "Disable adds `linear` to `disabledMcpjsonServers` in {} for this Project.",
+            settings.display()
         )),
         "{}",
         show.stdout
@@ -1694,4 +1718,123 @@ fn remove_while_the_agent_runs_json_has_the_warning_and_the_hints() {
         hints[0],
         "Restart Claude Code so that it reads what the Operation wrote."
     );
+}
+
+/// The key `with_local_linear` records the current folder under, as Claude
+/// Code spelled it.
+fn project_key(harness: &Harness) -> String {
+    harness
+        .cwd()
+        .display()
+        .to_string()
+        .replace('\\', "/")
+        .to_lowercase()
+}
+
+fn claude_json_value(harness: &Harness) -> Value {
+    serde_json::from_str(&read(&harness.path(".claude.json"))).unwrap()
+}
+
+#[test]
+fn disable_then_enable_round_trips_through_the_switch_claude_code_writes() {
+    let harness = Harness::new().with_local_linear();
+    let key = project_key(&harness);
+
+    let disable = harness.run(&["disable", "notes", "--yes"]);
+    assert_eq!(disable.code, 0, "{}\n{}", disable.stdout, disable.stderr);
+    assert!(
+        disable.stdout.contains("Disabled 1 Entry"),
+        "{}",
+        disable.stdout
+    );
+    assert_eq!(
+        claude_json_value(&harness)["projects"][&key]["disabledMcpServers"],
+        json!(["notes"])
+    );
+    let list = harness.run(&["list", "--json"]).document();
+    assert_eq!(entry_states(&list, "notes"), pairs(&[("user", "disabled")]));
+    let show = harness.run(&["show", "notes", "--wide"]);
+    assert!(show.stdout.contains("Disabled by name"), "{}", show.stdout);
+    assert!(
+        show.stdout
+            .contains("Disabled: would be Effective once Enabled."),
+        "{}",
+        show.stdout
+    );
+    assert!(
+        show.stdout
+            .contains("Enable removes `notes` from `disabledMcpServers`"),
+        "{}",
+        show.stdout
+    );
+
+    let enable = harness.run(&["enable", "notes", "--yes"]);
+    assert_eq!(enable.code, 0, "{}\n{}", enable.stdout, enable.stderr);
+    assert!(
+        enable.stdout.contains("Enabled 1 Entry"),
+        "{}",
+        enable.stdout
+    );
+    assert_eq!(
+        claude_json_value(&harness)["projects"][&key]["disabledMcpServers"],
+        json!([])
+    );
+    let list = harness.run(&["list", "--json"]).document();
+    assert_eq!(
+        entry_states(&list, "notes"),
+        pairs(&[("user", "effective")])
+    );
+    let history = harness.run(&["history", "--json"]).document();
+    let titles: Vec<&str> = history["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|operation| operation["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, ["Enable 1 Entry", "Disable 1 Entry"]);
+}
+
+#[test]
+fn disable_by_name_of_one_entry_without_a_tty_needs_ack_wide_reach() {
+    let harness = Harness::new().with_local_linear();
+    let local = locator(
+        &harness.path(".claude.json"),
+        &format!("projects.\"{}\".mcpServers.linear", project_key(&harness)),
+    );
+    let before = read(&harness.path(".claude.json"));
+
+    let refused = harness.run(&["disable", &local, "--yes"]);
+
+    assert_eq!(refused.code, 4, "{}", refused.stderr);
+    assert!(
+        refused.stdout.contains("[wide-reach]"),
+        "{}",
+        refused.stdout
+    );
+    let user = locator(&harness.path(".claude.json"), "mcpServers.linear");
+    assert!(refused.stdout.contains(&user), "{}", refused.stdout);
+    assert!(
+        refused.stderr.contains("--ack wide-reach"),
+        "{}",
+        refused.stderr
+    );
+    assert_eq!(read(&harness.path(".claude.json")), before);
+
+    let run = harness.run(&["disable", &local, "--yes", "--ack", "wide-reach"]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let list = harness.run(&["list", "--json"]).document();
+    assert_eq!(
+        entry_states(&list, "linear"),
+        pairs(&[("local", "disabled"), ("user", "disabled")])
+    );
+}
+
+#[test]
+fn enable_of_an_entry_that_is_not_disabled_exits_5() {
+    let harness = Harness::new().with_local_linear();
+
+    let run = harness.run(&["enable", "notes", "--yes", "--json"]);
+
+    assert_eq!(run.code, 5, "{}", run.stdout);
+    assert_eq!(run.document()["error"]["code"], "blocked");
 }

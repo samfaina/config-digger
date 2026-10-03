@@ -1,7 +1,8 @@
-//! Running Agents: which Agents that read the files an Operation writes are
-//! running, and what each write then needs given its location's store
-//! class: a block, a warning, and hints for the result. Detection is
-//! best-effort and never closes an Agent.
+//! Running Agents: which Agents that read the files an Operation writes,
+//! or keep Disable switches in them, are running, and what each write then
+//! needs given the store class of the location or switch: a block, a
+//! warning, and hints for the result. Detection is best-effort and never
+//! closes an Agent.
 
 use crate::api::{Block, BlockCode, Warning, WarningClass};
 use crate::definitions::blocks::{Sessions, StoreClass};
@@ -25,9 +26,9 @@ pub(crate) struct RunningCheck {
     pub hints: Vec<String>,
 }
 
-/// A running Agent that reads written files, through any of its homes, with
-/// the store class of each file it reads: the strongest when several of
-/// its locations read the file.
+/// A running Agent that reads written files or keeps switches in them,
+/// through any of its homes, with the store class of each file: the
+/// strongest when several of its locations or switches are in the file.
 struct RunningReader<'d> {
     agent_name: &'d str,
     files: BTreeMap<PathBuf, StoreClass>,
@@ -43,7 +44,8 @@ impl RunningReader<'_> {
     }
 }
 
-/// Checks the readers of `files` against the processes running now.
+/// Checks the readers of `files`, and the Agents with switches in them,
+/// against the processes running now.
 pub(crate) fn check(
     definitions: &[AgentDefinition],
     ports: &Ports,
@@ -54,11 +56,20 @@ pub(crate) fn check(
     let mut detected: BTreeMap<(usize, &str), bool> = BTreeMap::new();
     let mut readers: BTreeMap<usize, RunningReader> = BTreeMap::new();
     for file in files {
-        for reader in &file.readers {
+        // Each Agent home that reads the file, or keeps a Disable switch in it.
+        let locations = file.readers.iter().map(|reader| {
             let definition = &definitions[reader.agent_index];
-            let home = (reader.agent_index, reader.home.as_str());
-            let running = *detected.entry(home).or_insert_with(|| {
-                definition.process(&reader.home).is_some_and(|process| {
+            let class = definition.location(&reader.location).store_class;
+            (reader.agent_index, reader.home.as_str(), class)
+        });
+        let switches = file
+            .switches
+            .iter()
+            .map(|store| (store.agent_index, store.home.as_str(), store.store_class));
+        for (agent_index, home, class) in locations.chain(switches) {
+            let definition = &definitions[agent_index];
+            let running = *detected.entry((agent_index, home)).or_insert_with(|| {
+                definition.process(home).is_some_and(|process| {
                     let processes = processes.get_or_insert_with(|| ports.processes.running());
                     is_running(process, processes, ports)
                 })
@@ -66,9 +77,8 @@ pub(crate) fn check(
             if !running {
                 continue;
             }
-            let class = definition.location(&reader.location).store_class;
             let stored = readers
-                .entry(reader.agent_index)
+                .entry(agent_index)
                 .or_insert_with(|| RunningReader {
                     agent_name: &definition.agent.name,
                     files: BTreeMap::new(),

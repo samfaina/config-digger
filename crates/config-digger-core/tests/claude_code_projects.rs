@@ -131,6 +131,7 @@ fn a_shadowed_entry_points_at_the_effective_entry_with_a_reason() {
         json!({
             "code": "shadowed_by_precedence",
             "effective": r"E:\projects\petme-app\.mcp.json#mcpServers.linear",
+            "switch": null,
             "sentence": r"Shadowed by the project Entry E:\projects\petme-app\.mcp.json#mcpServers.linear, which Claude Code ranks higher."
         })
     );

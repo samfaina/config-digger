@@ -4,4 +4,5 @@ import type { State } from "./bindings";
 export const STATE_LABELS: Record<State, string> = {
   effective: "Effective",
   shadowed: "Shadowed",
+  disabled: "Disabled",
 };
