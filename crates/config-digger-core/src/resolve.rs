@@ -25,6 +25,9 @@ pub(crate) fn resolve(
             let (installations, notes) =
                 installations::of_home(definition, &snapshot.installations, home);
             api::Home {
+                out_of_range: installations
+                    .iter()
+                    .any(|installation| installation.out_of_range),
                 installations,
                 last_ran: home.last_ran.clone(),
                 notes,

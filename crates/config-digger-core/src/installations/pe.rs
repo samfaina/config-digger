@@ -116,18 +116,22 @@ fn subdirectory(target: u32) -> Option<usize> {
     (target & 0x8000_0000 != 0).then(|| to_usize(target & 0x7FFF_FFFF))?
 }
 
+/// The high and low 16 bits of `value`.
 fn halves(value: u32) -> [u16; 2] {
     [(value >> 16) as u16, (value & 0xFFFF) as u16]
 }
 
+/// The little-endian `u16` at `at`, `None` past the end of `bytes`.
 fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_le_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
 }
 
+/// The little-endian `u32` at `at`, `None` past the end of `bytes`.
 fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
 }
 
+/// `value` as an offset or size.
 fn to_usize(value: u32) -> Option<usize> {
     usize::try_from(value).ok()
 }

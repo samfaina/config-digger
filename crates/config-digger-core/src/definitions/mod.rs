@@ -3,7 +3,7 @@
 
 pub(crate) mod blocks;
 
-use crate::version::Version;
+use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Competition, DisableMechanism, Disables, Format, Interpolation, Locator,
     Provenance, Register, Registry, SessionFiles, Shape, StoreClass, Validate, VersionSource,
@@ -110,6 +110,14 @@ pub(crate) struct VerifiedRange {
     pub max: String,
 }
 
+impl VerifiedRange {
+    /// Where `version` stands against the range.
+    pub fn standing(&self, version: &Version) -> Standing {
+        let parse = |text: &str| Version::parse(text).expect("validation parses the range");
+        crate::version::standing(version, &parse(&self.min), &parse(&self.max))
+    }
+}
+
 impl Validate for VerifiedRange {
     fn validate(&self) -> Result<(), String> {
         let parse =
@@ -126,6 +134,7 @@ impl Validate for VerifiedRange {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct InstallationDefinition {
+    /// A stable id, such as `native`, unique in the definition.
     pub id: String,
     /// A glob of the folder it is in, starting with `~/`, `%NAME%` or a
     /// drive; `*` and `?` stay within one folder name and `{a,b}` is
@@ -492,9 +501,7 @@ impl AgentDefinition {
                 return Err(context("must lie in the Agent home, not a Project".into()));
             }
             self.validate_home_root(&last_ran.anchor).map_err(context)?;
-            if last_ran.key_path.is_empty() || last_ran.key_path.iter().any(String::is_empty) {
-                return Err(context("key_path needs keys, none of them empty".into()));
-            }
+            blocks::validate_key_path(&last_ran.key_path).map_err(context)?;
         }
 
         for (index, registry) in self.projects.registries.iter().enumerate() {

@@ -34,6 +34,7 @@ export type AgentFlagCode =
  *  no State and blocks nothing.
  */
 export type AgentNote = {
+	/**  What it notes, from a closed set. */
 	code: AgentNoteCode,
 	/**  The executable of the Installation it is about, if it is about one. */
 	installation: string | null,
@@ -41,6 +42,7 @@ export type AgentNote = {
 	sentence: string,
 };
 
+/**  What an Agent note is about. */
 export type AgentNoteCode = 
 /**
  *  An Installation's version is newer or older than the definition's
@@ -298,6 +300,11 @@ export type Home = {
 	scopes: string[],
 	/**  Each Installation that reads it, with its version as read at this scan. */
 	installations: Installation[],
+	/**
+	 *  The version of an Installation that reads it is outside the
+	 *  definition's tested range.
+	 */
+	out_of_range: boolean,
 	/**  The version that last ran against it, as the Agent records it. */
 	last_ran: string | null,
 	/**

@@ -516,3 +516,22 @@ fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
         ["Restart Store Agent so that it reads what the Operation wrote."]
     );
 }
+
+#[test]
+fn without_an_installation_a_running_agent_still_blocks_its_sqlite_store_but_never_warns() {
+    let fs = FakeFileSystem::new().with_file(store(), STORE);
+    let processes = FakeProcesses::default().with_process(store_agent());
+    let core = core_with(
+        &fs,
+        &plain_agent("[process]\nimages = [\"store.exe\"]\n"),
+        &processes,
+    );
+    assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
+    let core = core_with(&fs, SQLITE_AGENT, &processes);
+
+    let plan = remove(&core, "search");
+
+    let codes: Vec<BlockCode> = plan.blocks().iter().map(|block| block.code).collect();
+    assert_eq!(codes, [BlockCode::RunningAgentSqlite]);
+    assert_eq!(plan.warnings(), []);
+}

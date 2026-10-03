@@ -44,6 +44,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "no_configuration": null,
             "scopes": ["local", "project", "user"],
             "installations": [],
+            "out_of_range": false,
             "last_ran": null,
             "notes": [{
                 "code": "no_installation_found",

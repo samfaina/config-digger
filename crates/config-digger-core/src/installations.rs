@@ -9,7 +9,7 @@ use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
 use crate::ports::Ports;
 use crate::scan::{ScannedHome, Snapshot};
-use crate::version::{self, Standing, Version};
+use crate::version::{Standing, Version};
 use crate::{explain, paths};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -33,10 +33,7 @@ pub(crate) fn of_home(
     home: &ScannedHome,
 ) -> (Vec<api::Installation>, Vec<api::AgentNote>) {
     let agent_name = &definition.agent.name;
-    let range = definition.verified.as_ref().map(|verified| {
-        let parse = |text: &str| Version::parse(text).expect("validation parses the range");
-        (verified, parse(&verified.min), parse(&verified.max))
-    });
+    let range = definition.verified.as_ref();
     let mut notes = Vec::new();
     let note = |code, installation: Option<&ScannedInstallation>, sentence| api::AgentNote {
         code,
@@ -63,11 +60,14 @@ pub(crate) fn of_home(
     }
     let mut listed = Vec::new();
     for installation in reading {
-        let standing = installation.version.as_ref().and_then(|read| {
-            let (verified, min, max) = range.as_ref()?;
-            let version = Version::parse(&read.text).expect("a version read parses");
-            Some((read, verified, version::standing(&version, min, max)))
-        });
+        let standing = installation
+            .version
+            .as_ref()
+            .zip(range)
+            .map(|(read, verified)| {
+                let version = Version::parse(&read.text).expect("a version read parses");
+                (read, verified, verified.standing(&version))
+            });
         let out_of_range = match standing {
             Some((read, verified, standing)) if standing != Standing::Tested => {
                 notes.push(note(

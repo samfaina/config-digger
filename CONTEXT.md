@@ -26,6 +26,10 @@ _Avoid_: Profile, instance, installation
 A launchable copy of an Agent, with its own version, such as the native Claude Code, the Claude Code that Claude Desktop downloads, or a VS Code user setup. Several Installations can read the same Agent home, and one Installation can read several. Older version files an installer keeps around are not Installations.
 _Avoid_: Install, binary, copy
 
+**Tested range**:
+The lowest and highest versions of an Agent that its Agent definition was tested against. An Installation outside it, older or newer, is noted on each Agent home it reads and in the preview of every Operation on that Agent; nothing is turned off. A definition without one is untested.
+_Avoid_: Supported versions, compatible range, verified range
+
 **Feature gate**:
 A switch on the Agent vendor's side that changes how the Agent treats its configuration, such as whether Cursor collapses servers with the same URL. config-digger sees at most the value the Agent last cached, as of when it cached it; otherwise it assumes the Agent's default.
 _Avoid_: Flag, experiment, rollout

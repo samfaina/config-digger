@@ -10,11 +10,14 @@ use std::cmp::Ordering;
 pub(crate) struct Version(Vec<u64>);
 
 impl Version {
-    /// The numeric version `text` starts with, such as `0.159.3` in
-    /// `0.159.3-win32-x64`; `None` when it does not start with a number.
+    /// The numeric version `text` starts with, after any `v`, such as
+    /// `0.159.3` in `0.159.3-win32-x64`; `None` when it does not start with a
+    /// number.
     pub fn parse(text: &str) -> Option<Self> {
+        let text = text.trim();
         let numeric = text
-            .trim()
+            .strip_prefix(['v', 'V'])
+            .unwrap_or(text)
             .split(|c: char| !(c.is_ascii_digit() || c == '.'))
             .next()
             .unwrap_or("");
@@ -101,6 +104,12 @@ mod tests {
         assert_eq!(version("1.130.0-insider"), version("1.130.0"));
         assert_eq!(version("0.159.3-win32-x64"), version("0.159.3"));
         assert_eq!(version("2.1.287+build.5"), version("2.1.287"));
+    }
+
+    #[test]
+    fn a_leading_v_is_left_out() {
+        assert_eq!(version("v2.1.286"), version("2.1.286"));
+        assert_eq!(Version::parse("vscode"), None);
     }
 
     #[test]

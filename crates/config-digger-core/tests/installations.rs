@@ -62,6 +62,7 @@ fn the_native_installation_shows_the_version_of_its_executable() {
     assert_eq!(installation.path, native_claude());
     assert_eq!(installation.version.as_deref(), Some("2.1.286"));
     assert!(!installation.out_of_range);
+    assert!(!home.out_of_range);
     assert_eq!(home.notes, []);
 }
 
@@ -75,6 +76,7 @@ fn a_newer_version_is_noted_as_outside_the_tested_range() {
 
     let home = home(&core(&fs), "claude-code");
 
+    assert!(home.out_of_range);
     assert!(home.installations[0].out_of_range);
     let [note] = home.notes.as_slice() else {
         panic!("one note: {:?}", home.notes);
@@ -211,6 +213,7 @@ fn every_installation_that_reads_the_home_is_checked_and_any_out_of_range_flags_
 
     let home = home(&core_with_app_data(&fs), "claude-code");
 
+    assert!(home.out_of_range, "one of them is out of range");
     let installed: Vec<(&str, Option<&str>, bool)> = home
         .installations
         .iter()
@@ -336,6 +339,28 @@ fn with_an_installation_found_the_running_agent_warning_fires() {
 
     let classes: Vec<WarningClass> = plan.warnings().iter().map(|w| w.class).collect();
     assert_eq!(classes, [WarningClass::RunningAgent]);
+}
+
+#[test]
+fn an_npm_installation_reads_its_package_json() {
+    let npm = PathBuf::from(APP_DATA).join("npm");
+    let fs = fixture()
+        .with_file(npm.join("claude.cmd"), "@node cli.js %*\r\n")
+        .with_file(
+            npm.join(r"node_modules\@anthropic-ai\claude-code\package.json"),
+            r#"{ "name": "@anthropic-ai/claude-code", "version": "2.1.286" }"#,
+        );
+
+    let home = home(&core_with_app_data(&fs), "claude-code");
+
+    let [installation] = home.installations.as_slice() else {
+        panic!("one Installation: {:?}", home.installations);
+    };
+    assert_eq!(
+        (installation.id.as_str(), installation.version.as_deref()),
+        ("npm", Some("2.1.286"))
+    );
+    assert_eq!(note_codes(&home), []);
 }
 
 /// A test Agent with two homes, `~/.test` and `~/.test-insiders`, tested

@@ -446,6 +446,7 @@ fn list_json_prints_one_document_with_schema_version() {
             "no_configuration": null,
             "scopes": ["local", "project", "user"],
             "installations": [],
+            "out_of_range": false,
             "last_ran": null,
             "notes": [{
                 "code": "no_installation_found",

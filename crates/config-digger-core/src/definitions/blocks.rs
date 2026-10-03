@@ -1535,10 +1535,7 @@ pub(crate) struct JsonValue {
 impl Validate for JsonValue {
     fn validate(&self) -> Result<(), String> {
         validate_relative(&self.file)?;
-        if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
-            return Err("key_path needs keys, none of them empty".into());
-        }
-        Ok(())
+        validate_key_path(&self.key_path)
     }
 }
 
@@ -1565,6 +1562,7 @@ impl ReadVersion for JsonValue {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UninstallKey {
+    /// The hive the key is in, for an install per user or per machine.
     pub hive: RegistryHive,
     /// The key's name under `Software\Microsoft\Windows\CurrentVersion\Uninstall`.
     pub key: String,
@@ -1615,6 +1613,14 @@ fn files(installation: &InstallationPaths, file: Option<&str>, ports: &Ports) ->
 }
 
 // --- Paths ------------------------------------------------------------------
+
+/// A key path names at least one key, none of them empty.
+pub(crate) fn validate_key_path(key_path: &[String]) -> Result<(), String> {
+    if key_path.is_empty() || key_path.iter().any(String::is_empty) {
+        return Err("key_path needs keys, none of them empty".into());
+    }
+    Ok(())
+}
 
 /// A `/`-separated path must stay below the folder it is relative to.
 pub(crate) fn validate_relative(path: &str) -> Result<(), String> {

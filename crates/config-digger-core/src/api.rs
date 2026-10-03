@@ -1058,6 +1058,9 @@ pub struct Home {
     pub scopes: Vec<String>,
     /// Each Installation that reads it, with its version as read at this scan.
     pub installations: Vec<Installation>,
+    /// The version of an Installation that reads it is outside the
+    /// definition's tested range.
+    pub out_of_range: bool,
     /// The version that last ran against it, as the Agent records it.
     pub last_ran: Option<String>,
     /// What to know about the Agent's versions here, such as one outside
@@ -1085,6 +1088,7 @@ pub struct Installation {
 /// no State and blocks nothing.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct AgentNote {
+    /// What it notes, from a closed set.
     pub code: AgentNoteCode,
     /// The executable of the Installation it is about, if it is about one.
     pub installation: Option<PathBuf>,
@@ -1092,6 +1096,7 @@ pub struct AgentNote {
     pub sentence: String,
 }
 
+/// What an Agent note is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentNoteCode {
@@ -1109,7 +1114,9 @@ pub enum AgentNoteCode {
 /// The versions an Agent definition was tested with, both ends included.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct VersionRange {
+    /// The lowest version tested, as the definition spells it.
     pub min: String,
+    /// The highest version tested, as the definition spells it.
     pub max: String,
 }
 

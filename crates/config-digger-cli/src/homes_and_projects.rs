@@ -352,13 +352,16 @@ fn render_agents(agents: &[api::Agent], width: Option<usize>) -> String {
             .zip(&sources)
             .zip(&installed)
             .map(|((home, source), installed)| {
-                let out_of_range = home.installations.iter().any(|i| i.out_of_range);
                 [
                     (home_id(home), Style::new()),
                     (source.as_str(), Style::new()),
                     (
                         installed.as_str(),
-                        if out_of_range { WARNING } else { Style::new() },
+                        if home.out_of_range {
+                            WARNING
+                        } else {
+                            Style::new()
+                        },
                     ),
                     (tested.as_str(), Style::new()),
                 ]

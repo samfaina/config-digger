@@ -32,6 +32,9 @@ pub(crate) struct RunningCheck {
 struct RunningReader<'d> {
     agent_name: &'d str,
     files: BTreeMap<PathBuf, StoreClass>,
+    /// An Installation found reads one of those homes. Without one, its
+    /// SQLite stores still block, but it gets no warning or hint.
+    installed: bool,
 }
 
 impl RunningReader<'_> {
@@ -45,8 +48,9 @@ impl RunningReader<'_> {
 }
 
 /// Checks the readers of `files`, and the Agents with switches in them,
-/// against the processes running now. Only the Agent homes in `installed`,
-/// which an Installation found reads, can have their Agent running.
+/// against the processes running now. Only an Agent running for a home in
+/// `installed`, which an Installation found reads, gets the warning and the
+/// hints; any running Agent blocks a write to a SQLite store it holds.
 pub(crate) fn check(
     definitions: &[AgentDefinition],
     ports: &Ports,
@@ -71,25 +75,21 @@ pub(crate) fn check(
         for (agent_index, home, class) in locations.chain(switches) {
             let definition = &definitions[agent_index];
             let running = *detected.entry((agent_index, home)).or_insert_with(|| {
-                let found = installed.contains(&(agent_index, home.to_owned()));
-                found
-                    && definition.process(home).is_some_and(|process| {
-                        let processes = processes.get_or_insert_with(|| ports.processes.running());
-                        is_running(process, processes, ports)
-                    })
+                definition.process(home).is_some_and(|process| {
+                    let processes = processes.get_or_insert_with(|| ports.processes.running());
+                    is_running(process, processes, ports)
+                })
             });
             if !running {
                 continue;
             }
-            let stored = readers
-                .entry(agent_index)
-                .or_insert_with(|| RunningReader {
-                    agent_name: &definition.agent.name,
-                    files: BTreeMap::new(),
-                })
-                .files
-                .entry(file.path.clone())
-                .or_insert(class);
+            let reader = readers.entry(agent_index).or_insert_with(|| RunningReader {
+                agent_name: &definition.agent.name,
+                files: BTreeMap::new(),
+                installed: false,
+            });
+            reader.installed |= installed.contains(&(agent_index, home.to_owned()));
+            let stored = reader.files.entry(file.path.clone()).or_insert(class);
             *stored = (*stored).max(class);
         }
     }
@@ -104,6 +104,9 @@ pub(crate) fn check(
                 code: BlockCode::RunningAgentSqlite,
                 sentence: explain::running_agent_sqlite(reader.agent_name, &sqlite),
             });
+        }
+        if !reader.installed {
+            continue;
         }
         let rewritten = reader.paths(StoreClass::RewrittenWhileRunning);
         if !rewritten.is_empty() {
@@ -124,6 +127,7 @@ pub(crate) fn check(
     RunningCheck {
         agents: readers
             .values()
+            .filter(|reader| reader.installed)
             .map(|reader| reader.agent_name.to_owned())
             .collect(),
         blocks,

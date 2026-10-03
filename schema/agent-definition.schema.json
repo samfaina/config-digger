@@ -139,6 +139,7 @@
       "type": "object",
       "properties": {
         "id": {
+          "description": "A stable id, such as `native`, unique in the definition.",
           "type": "string"
         },
         "folder": {
@@ -252,6 +253,7 @@
           "type": "object",
           "properties": {
             "hive": {
+              "description": "The hive the key is in, for an install per user or per machine.",
               "$ref": "#/$defs/RegistryHive"
             },
             "key": {
