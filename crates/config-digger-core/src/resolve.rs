@@ -3,8 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse, Provenance,
-    SkillDefect, SkillFallback,
+    self, Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse,
+    Provenance, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -103,14 +103,16 @@ pub(crate) fn resolve(
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
+    let in_context: Vec<&ScannedEntry> = snapshot
+        .entries
+        .iter()
+        .filter(|entry| entry.project.is_none() || entry.project.as_ref() == project_key)
+        .collect();
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
-    for entry in &snapshot.entries {
-        if entry.project.is_some() && entry.project.as_ref() != project_key {
-            continue;
-        }
+    for &entry in &in_context {
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
-        let key = definition.rules(location.kind).competition.key(&entry.name);
+        let key = item_key(definition, &in_context, entry, &unread);
         competing
             .entry((entry.agent_index, entry.home.as_str(), location.kind, key))
             .or_default()
@@ -232,6 +234,10 @@ pub(crate) fn resolve(
                     &definition.location(&entries[winner].location).scope,
                     &locator::render(&entries[winner].path, &entries[winner].key_path),
                     rank(entries[index]) == rank(entries[winner]),
+                    definition
+                        .rules(kind)
+                        .competition
+                        .by_endpoint(&entries[index].location),
                 )
             };
             let api_entries: Vec<api::Entry> = entries
@@ -242,21 +248,49 @@ pub(crate) fn resolve(
                     let gate_caveats = gate_caveats(definition, snapshot, entry);
                     if let Some(link) = entry.link.as_ref().filter(|link| link.broken()) {
                         let reason = explain::link_broken(agent_name, &link.target);
-                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
                     }
                     if let (true, Some(_), Some((path, _))) =
                         (unread(entry), &entry.project, missing)
                     {
                         let reason = explain::project_missing(agent_name, path);
-                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
                     }
                     if let Some((gate, on)) = closed_gate(definition, snapshot, entry) {
                         let reason = explain::feature_gate(agent_name, gate, on);
-                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
                     }
                     if let Some((settings, read)) = skipped_source(definition, snapshot, entry) {
                         let reason = explain::source_skipped(agent_name, settings, read);
-                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
                     }
                     let origin = origin(location, entry);
                     let (disabling, partial) = &hits[index];
@@ -397,6 +431,7 @@ pub(crate) fn resolve(
                         scope: location.scope.clone(),
                         provenance: origin.provenance,
                         skill_manager: origin.skill_manager,
+                        plugin: plugin(entry),
                         git_versioned: snapshot.versioned.contains(&entry.path),
                         link: link(entry),
                         state,
@@ -429,6 +464,7 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
+                        remove: remove(definition, location, entry),
                         caveats: read_failure_caveats(
                             definition,
                             snapshot,
@@ -567,12 +603,15 @@ pub(crate) fn leftovers(
                 project: Some(project.path.clone()),
             };
             let mut items = resolve(definitions, snapshot, &context).items;
+            // A plugin bound to the Project is no leftover: only the Agent
+            // uninstalls it.
             for item in &mut items {
                 item.entries.retain(|entry| {
-                    entry
-                        .reason
-                        .as_ref()
-                        .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
+                    entry.plugin.is_none()
+                        && entry
+                            .reason
+                            .as_ref()
+                            .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
                 });
                 item.state = api::State::Unread;
             }
@@ -585,6 +624,52 @@ pub(crate) fn leftovers(
         .collect()
 }
 
+/// What an Entry competes by: Entries with the same key are one Item.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum ItemKey {
+    /// The competition key of a name.
+    Name(String),
+    /// An endpoint no Entry that competes by name has.
+    Endpoint(String),
+}
+
+/// What `entry`, among the Entries `in_context` of the context, competes
+/// by: its name, or for an Entry of a location that competes by endpoint,
+/// the name of the Entry the Agent ranks highest among those of other
+/// locations that have its endpoint and are read, or else its endpoint.
+fn item_key(
+    definition: &AgentDefinition,
+    in_context: &[&ScannedEntry],
+    entry: &ScannedEntry,
+    unread: &dyn Fn(&ScannedEntry) -> bool,
+) -> ItemKey {
+    let location = definition.location(&entry.location);
+    let competition = &definition.rules(location.kind).competition;
+    let by_name = |entry: &ScannedEntry| ItemKey::Name(competition.key(&entry.name));
+    if !competition.by_endpoint(&location.id) {
+        return by_name(entry);
+    }
+    let Some(endpoint) = blocks::endpoint(&entry.config) else {
+        return by_name(entry);
+    };
+    let named = in_context
+        .iter()
+        .filter(|other| {
+            let other_location = definition.location(&other.location);
+            other.agent_index == entry.agent_index
+                && other.home == entry.home
+                && other_location.kind == location.kind
+                && !competition.by_endpoint(&other_location.id)
+                && !unread(other)
+                && blocks::endpoint(&other.config).as_ref() == Some(&endpoint)
+        })
+        .min_by_key(|other| definition.rank(definition.location(&other.location)));
+    match named {
+        Some(other) => by_name(other),
+        None => ItemKey::Endpoint(endpoint),
+    }
+}
+
 /// Whether the Entry is a link whose target is gone.
 fn is_broken(entry: &ScannedEntry) -> bool {
     entry.link.as_ref().is_some_and(|link| link.broken())
@@ -594,6 +679,7 @@ fn is_broken(entry: &ScannedEntry) -> bool {
 /// missing Project, with `caveats`: it competes with nothing and can only
 /// be Removed.
 fn unread_entry(
+    definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     location: &LocationDefinition,
@@ -608,6 +694,7 @@ fn unread_entry(
         scope: location.scope.clone(),
         provenance: origin.provenance,
         skill_manager: origin.skill_manager,
+        plugin: plugin(entry),
         git_versioned: snapshot.versioned.contains(&entry.path),
         link: link(entry),
         state: api::State::Unread,
@@ -622,6 +709,7 @@ fn unread_entry(
             sentence: explain::unread_option(),
         },
         enable: None,
+        remove: remove(definition, location, entry),
         caveats,
     }
 }
@@ -948,4 +1036,48 @@ fn gate_caveats(
             })
         })
         .collect()
+}
+
+/// The plugin an Entry of a plugin is part of.
+fn plugin(entry: &ScannedEntry) -> Option<api::Plugin> {
+    entry.plugin.as_ref().map(|plugin| api::Plugin {
+        id: plugin.id.clone(),
+        name: plugin.name.clone(),
+        scope: plugin.scope.clone(),
+        version: plugin.version.clone(),
+        folder: plugin.folder.clone(),
+    })
+}
+
+/// Whether Remove is offered for `entry` of `location`: not for an Entry
+/// config-digger only reads, nor for one of a plugin, which the Agent
+/// uninstalls with its own command.
+fn remove(
+    definition: &AgentDefinition,
+    location: &LocationDefinition,
+    entry: &ScannedEntry,
+) -> api::RemoveOption {
+    if location.provenance.read_only() {
+        return api::RemoveOption::NotOffered {
+            code: api::RemoveNotOffered::ReadOnly,
+            sentence: explain::read_only_remove_option(),
+            how_to_remove: None,
+        };
+    }
+    let Some(plugin) = &entry.plugin else {
+        return api::RemoveOption::Offered;
+    };
+    let agent_name = &definition.agent.name;
+    let command = definition
+        .declared_plugins(&plugin.plugins)
+        .expect("validation declares the plugins a location reads")
+        .uninstall(&plugin.id, plugin.scope.as_deref());
+    api::RemoveOption::NotOffered {
+        code: api::RemoveNotOffered::Plugin,
+        sentence: explain::plugin_not_removed(&plugin.id, agent_name),
+        how_to_remove: Some(api::HowToRemove {
+            sentence: explain::how_to_remove_plugin(&plugin.id, &command),
+            command,
+        }),
+    }
 }

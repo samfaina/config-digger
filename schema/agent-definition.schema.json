@@ -78,6 +78,13 @@
       "description": "Where this Agent records the Projects it has been started on.",
       "$ref": "#/$defs/ProjectsDefinition"
     },
+    "plugins": {
+      "description": "The plugins this Agent installs, each in a folder of its own that\nlocations anchored in plugins are read in.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PluginsDefinition"
+      }
+    },
     "locations": {
       "description": "The configuration locations this Agent reads.",
       "type": "array",
@@ -410,6 +417,30 @@
             "block",
             "settings"
           ]
+        },
+        {
+          "description": "A path in the folder of each plugin a definition's `[[plugins]]` lists,\nread once per plugin.",
+          "type": "object",
+          "properties": {
+            "plugins": {
+              "description": "The id of a declared `[[plugins]]`.",
+              "type": "string"
+            },
+            "path": {
+              "description": "A `/`-separated path relative to the plugin's folder.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "plugin"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "plugins",
+            "path"
+          ]
         }
       ]
     },
@@ -695,6 +726,128 @@
         }
       ]
     },
+    "PluginsDefinition": {
+      "description": "Plugins an Agent installs, each in a folder of its own, such as Claude\nCode's plugin cache. A plugin's Entries are Disabled with the whole\nplugin through its own switch, and never Removed: the Agent uninstalls\nit.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Unique in the definition, such as `installed`.",
+          "type": "string"
+        },
+        "registry": {
+          "description": "Where the Agent records the plugins it installed.",
+          "$ref": "#/$defs/PluginRegistry"
+        },
+        "superseded_marker": {
+          "description": "A file whose presence in a plugin's folder means the Agent no longer\nloads that folder, such as a version it superseded.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Where a plugin's name is. Without it, or when the plugin's folder\ndoes not hold one, its name is its id up to `@`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginName"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uninstall": {
+          "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "registry",
+        "uninstall"
+      ]
+    },
+    "PluginRegistry": {
+      "description": "Where an Agent records the plugins it installed.",
+      "oneOf": [
+        {
+          "description": "An object in a strict JSON file whose keys are plugin ids, each holding\nthe plugin's installs: an array of objects, one per Scope it is\ninstalled at, or one object. An install without a folder is skipped.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the file is, in the Agent home.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "root": {
+              "description": "The key path of the object whose keys are plugin ids.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "folder": {
+              "description": "The field of an install that holds its folder.",
+              "type": "string"
+            },
+            "scope": {
+              "description": "The field of an install that holds the Scope it is installed at.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "project": {
+              "description": "The field of an install that holds the path of the one Project it\napplies in. Without it, an install applies in every Project.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "description": "The field of an install that holds its version.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "json-installs"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "root",
+            "folder"
+          ]
+        }
+      ]
+    },
+    "PluginName": {
+      "description": "A string in a JSON file of a plugin's folder that names the plugin.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "A `/`-separated path relative to the plugin's folder.",
+          "type": "string"
+        },
+        "key_path": {
+          "description": "The key path of the string, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "key_path"
+      ]
+    },
     "LocationDefinition": {
       "type": "object",
       "properties": {
@@ -773,6 +926,24 @@
           "items": {
             "$ref": "#/$defs/Condition"
           }
+        },
+        "name_template": {
+          "description": "The name the Agent gives an Entry of a location in plugins, made\nof `{plugin}`, the plugin's name, and `{name}`, the Entry's own\nname, such as `{plugin}:{name}`. Without it, an Entry goes by its\nown name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "references": {
+          "description": "What the value at `root` of a location in plugins may hold besides\nan object of Entries: a path, relative to the plugin's folder, of\nanother file in the location's format, or a list of such paths and\nobjects of Entries, such as a Claude Code plugin manifest's\n`mcpServers`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/References"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -966,6 +1137,11 @@
           "description": "A copy the Agent keeps of configuration held in the user's account,\nsuch as skills synced from claude.ai. config-digger only reads it.",
           "type": "string",
           "const": "cloud-mirror"
+        },
+        {
+          "description": "Part of a plugin the Agent installed. config-digger Disables it only\nthrough the plugin's own switch, with every Entry of the plugin, and\nnever Removes it: uninstalling is up to the Agent.",
+          "type": "string",
+          "const": "plugin"
         }
       ]
     },
@@ -1201,6 +1377,23 @@
         }
       ]
     },
+    "References": {
+      "description": "Files a value can point to, each holding Entries in the format of the\nlocation that holds the value.",
+      "type": "object",
+      "properties": {
+        "root": {
+          "description": "The key path of the object whose keys are Entries in a file pointed to.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "root"
+      ]
+    },
     "ItemRules": {
       "type": "object",
       "properties": {
@@ -1254,9 +1447,17 @@
       "description": "How same-kind Entries of one Agent home compete.",
       "oneOf": [
         {
-          "description": "Entries compete when their names are exactly equal.",
+          "description": "Entries compete when their names are exactly equal. An Entry of a\n`by_endpoint` location competes instead with the Entries of other\nlocations that have its endpoint, joining the Item of the one the Agent\nranks highest, and otherwise with those of `by_endpoint` locations that\nhave it.",
           "type": "object",
           "properties": {
+            "by_endpoint": {
+              "description": "The ids of the locations whose Entries compete by endpoint, such as\nClaude Code's plugin servers.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
             "block": {
               "type": "string",
               "const": "exact-name"
@@ -1434,7 +1635,7 @@
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
-          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`:\nthe Entry's name.",
+          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`,\nthe Entry's name, or `{plugin}`, the id of the plugin it is part of.",
           "type": "array",
           "items": {
             "type": "string"
@@ -1464,6 +1665,11 @@
           "description": "Every Entry of the Item it covers, since they share the name.",
           "type": "string",
           "const": "name"
+        },
+        {
+          "description": "Every Entry of the plugin the Entry is part of, of every Item kind.\nThe switch's key path names the plugin with `{plugin}`, and it\ncovers locations in plugins only.",
+          "type": "string",
+          "const": "plugin"
         }
       ]
     },
@@ -1514,6 +1720,11 @@
           "description": "The switch is the Entry's own.",
           "type": "string",
           "const": "disabled_natively"
+        },
+        {
+          "description": "The switch is that of the plugin the Entry is part of, so every\nEntry of the plugin is Disabled.",
+          "type": "string",
+          "const": "plugin_disabled"
         }
       ]
     },

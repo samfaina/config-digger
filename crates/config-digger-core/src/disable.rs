@@ -5,7 +5,7 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    Anchored, DisableMechanism, DisableReason, Disables, MechanismContext,
+    Anchored, DisableMechanism, DisableReason, Disables, MechanismContext, MechanismTarget,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
@@ -30,7 +30,7 @@ pub(crate) struct Hit<'a> {
     pub key_path: Vec<String>,
     /// What the switch holds for the Entry.
     pub value: Option<&'a Value>,
-    /// The Entry's name.
+    /// What the switch holds the Entry by: its name, or its plugin's id.
     pub name: &'a str,
 }
 
@@ -59,6 +59,10 @@ impl Hit<'_> {
             DisableReason::DisabledNatively => (
                 ReasonCode::DisabledNatively,
                 explain::disabled_natively(&holds, agent_name),
+            ),
+            DisableReason::PluginDisabled => (
+                ReasonCode::PluginDisabled,
+                explain::plugin_disabled(self.name, &holds, agent_name),
             ),
         };
         Reason {
@@ -127,16 +131,19 @@ pub(crate) fn hits<'a>(
         let switches = snapshot
             .switches_of(entry, location.kind, index)
             .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project);
+        let Some(key) = switch_key(mechanism, entry) else {
+            continue;
+        };
         for switch in switches {
-            let value = switch.value_for(&entry.name);
+            let value = switch.value_for(key);
             let hit = Hit {
                 mechanism,
                 switch,
-                key_path: switch.key_path_for(&entry.name),
+                key_path: switch.key_path_for(key),
                 value,
-                name: &entry.name,
+                name: key,
             };
-            if mechanism.disables(value, &entry.name) {
+            if mechanism.disables(value, key) {
                 disabling.push(hit);
             } else if mechanism.partial(value) {
                 partial.push(hit);
@@ -144,6 +151,17 @@ pub(crate) fn hits<'a>(
         }
     }
     (disabling, partial)
+}
+
+/// What the switch of `mechanism` holds `entry` by: the id of the plugin
+/// it is part of, for a switch keyed by plugin, and its name otherwise.
+/// `None` for an Entry of no plugin under a switch keyed by plugin.
+fn switch_key<'e>(mechanism: &DisableMechanism, entry: &'e ScannedEntry) -> Option<&'e str> {
+    if mechanism.switch().plugins() {
+        entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
+    } else {
+        Some(&entry.name)
+    }
 }
 
 /// What Enable writes to lift `disabling`, the switches that Disable an
@@ -201,12 +219,18 @@ pub(crate) fn choose(
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }
     let roots = snapshot.roots(entry.agent_index, &entry.home);
+    // An Entry of a plugin is Disabled through the plugin's own switch only.
+    let in_plugin = entry.plugin.is_some();
     let mut mechanisms: Vec<(usize, &DisableMechanism)> = definition
         .rules(location.kind)
         .disable
         .iter()
         .enumerate()
-        .filter(|(_, mechanism)| mechanism.covers(&location.id) && mechanism.enable_offered())
+        .filter(|(_, mechanism)| {
+            mechanism.covers(&location.id)
+                && mechanism.enable_offered()
+                && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
+        })
         .collect();
     mechanisms.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
 
@@ -250,15 +274,18 @@ pub(crate) fn choose(
             unrecorded = true;
             continue;
         };
-        let key_path = place.key_path_for(&entry.name);
-        let value = place.value_for(&entry.name);
-        let edit = mechanism.disable_edit(key_path, value, &entry.name);
-        let sentence = explain::disable_switch(
-            &edit,
-            &entry.name,
-            &path,
-            mechanism.context() == MechanismContext::Project,
-        );
+        let Some(key) = switch_key(mechanism, entry) else {
+            continue;
+        };
+        let key_path = place.key_path_for(key);
+        let value = place.value_for(key);
+        let edit = mechanism.disable_edit(key_path, value, key);
+        let per_project = mechanism.context() == MechanismContext::Project;
+        let mut sentence = explain::disable_switch(&edit, key, &path, per_project);
+        if mechanism.target() == MechanismTarget::Plugin {
+            sentence.push(' ');
+            sentence.push_str(&explain::takes_whole_plugin(key));
+        }
         return Ok(Choice {
             path,
             edit,

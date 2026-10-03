@@ -124,6 +124,7 @@ pub(crate) enum Anchor {
     Project(ProjectAnchor),
     Machine(MachineAnchor),
     Settings(SettingsAnchor),
+    Plugin(PluginAnchor),
 }
 
 impl Validate for Anchor {
@@ -133,6 +134,7 @@ impl Validate for Anchor {
             Anchor::Project(block) => block.validate(),
             Anchor::Machine(block) => block.validate(),
             Anchor::Settings(block) => block.validate(),
+            Anchor::Plugin(block) => block.validate(),
         }
     }
 }
@@ -144,6 +146,7 @@ impl Anchored for Anchor {
             Anchor::Project(block) => block.path(roots, project),
             Anchor::Machine(block) => block.path(roots, project),
             Anchor::Settings(block) => block.path(roots, project),
+            Anchor::Plugin(block) => block.path(roots, project),
         }
     }
 
@@ -153,6 +156,7 @@ impl Anchored for Anchor {
             Anchor::Project(block) => block.home_root(),
             Anchor::Machine(block) => block.home_root(),
             Anchor::Settings(block) => block.home_root(),
+            Anchor::Plugin(block) => block.home_root(),
         }
     }
 
@@ -162,6 +166,7 @@ impl Anchored for Anchor {
             Anchor::Project(block) => block.in_project(),
             Anchor::Machine(block) => block.in_project(),
             Anchor::Settings(block) => block.in_project(),
+            Anchor::Plugin(block) => block.in_project(),
         }
     }
 
@@ -171,6 +176,7 @@ impl Anchored for Anchor {
             Anchor::Project(block) => block.machine(),
             Anchor::Machine(block) => block.machine(),
             Anchor::Settings(block) => block.machine(),
+            Anchor::Plugin(block) => block.machine(),
         }
     }
 
@@ -180,6 +186,7 @@ impl Anchored for Anchor {
             Anchor::Project(block) => block.walk(),
             Anchor::Machine(block) => block.walk(),
             Anchor::Settings(block) => block.walk(),
+            Anchor::Plugin(block) => block.walk(),
         }
     }
 }
@@ -379,20 +386,77 @@ impl Anchored for SettingsAnchor {
     }
 }
 
+/// A path in the folder of each plugin a definition's `[[plugins]]` lists,
+/// read once per plugin.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginAnchor {
+    /// The id of a declared `[[plugins]]`.
+    pub plugins: String,
+    /// A `/`-separated path relative to the plugin's folder.
+    pub path: String,
+}
+
+impl Validate for PluginAnchor {
+    fn validate(&self) -> Result<(), String> {
+        if self.plugins.trim().is_empty() {
+            return Err("a plugin anchor needs a plugins id".into());
+        }
+        validate_relative(&self.path)
+    }
+}
+
+impl Anchored for PluginAnchor {
+    /// There is one path per plugin, which the scan finds.
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        None
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
+}
+
 impl Anchor {
     /// The id of the `[[settings]]` the anchor reads, if it reads settings.
     pub fn settings(&self) -> Option<&str> {
         match self {
             Anchor::Settings(block) => Some(&block.settings),
-            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) => None,
+            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) | Anchor::Plugin(_) => None,
         }
     }
 
-    /// Refuses an anchor of settings, where one file is needed.
+    /// The `[[plugins]]` id and the path in each plugin's folder, if the
+    /// anchor is in plugins.
+    pub fn plugin(&self) -> Option<&PluginAnchor> {
+        match self {
+            Anchor::Plugin(block) => Some(block),
+            Anchor::Home(_) | Anchor::Project(_) | Anchor::Machine(_) | Anchor::Settings(_) => None,
+        }
+    }
+
+    /// Refuses an anchor of settings or plugins, where one file is needed.
     pub fn one_file(&self) -> Result<(), String> {
-        match self.settings() {
-            Some(_) => Err("a settings anchor names several files; one file is needed here".into()),
-            None => Ok(()),
+        match (self.settings(), self.plugin()) {
+            (Some(_), _) => {
+                Err("a settings anchor names several files; one file is needed here".into())
+            }
+            (_, Some(_)) => {
+                Err("a plugin anchor names a file per plugin; one file is needed here".into())
+            }
+            (None, None) => Ok(()),
         }
     }
 }
@@ -570,6 +634,143 @@ impl Register for JsonKeys {
     }
 }
 
+// --- Plugin registries ------------------------------------------------------
+
+/// One install of a plugin, as the Agent records it.
+pub(crate) struct Install {
+    /// The plugin's id, such as `supabase@claude-plugins-official`.
+    pub id: String,
+    /// The folder the plugin's files are in, as recorded.
+    pub folder: String,
+    /// The Scope it is installed at, as recorded.
+    pub scope: Option<String>,
+    /// The Project it applies in, as recorded; `None` when it applies in every one.
+    pub project: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Lists the plugins an Agent installed.
+pub(crate) trait ListInstalls {
+    /// Where the registry lives.
+    fn anchor(&self) -> &Anchor;
+
+    /// The installs the registry's text records, in its order.
+    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError>;
+}
+
+/// Where an Agent records the plugins it installed.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum PluginRegistry {
+    JsonInstalls(JsonInstalls),
+}
+
+impl Validate for PluginRegistry {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            PluginRegistry::JsonInstalls(block) => block.validate(),
+        }
+    }
+}
+
+impl ListInstalls for PluginRegistry {
+    fn anchor(&self) -> &Anchor {
+        match self {
+            PluginRegistry::JsonInstalls(block) => block.anchor(),
+        }
+    }
+
+    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError> {
+        match self {
+            PluginRegistry::JsonInstalls(block) => block.installs(text),
+        }
+    }
+}
+
+/// An object in a strict JSON file whose keys are plugin ids, each holding
+/// the plugin's installs: an array of objects, one per Scope it is
+/// installed at, or one object. An install without a folder is skipped.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonInstalls {
+    /// Where the file is, in the Agent home.
+    pub anchor: Anchor,
+    /// The key path of the object whose keys are plugin ids.
+    pub root: Vec<String>,
+    /// The field of an install that holds its folder.
+    pub folder: String,
+    /// The field of an install that holds the Scope it is installed at.
+    pub scope: Option<String>,
+    /// The field of an install that holds the path of the one Project it
+    /// applies in. Without it, an install applies in every Project.
+    pub project: Option<String>,
+    /// The field of an install that holds its version.
+    pub version: Option<String>,
+}
+
+impl Validate for JsonInstalls {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        self.anchor.one_file()?;
+        if self.anchor.home_root().is_none() {
+            return Err("a plugin registry must lie in the Agent home".into());
+        }
+        if self.root.is_empty() || self.root.iter().any(String::is_empty) {
+            return Err("a plugin registry needs a root key path, with no empty key".into());
+        }
+        for field in std::iter::once(&self.folder)
+            .chain(&self.scope)
+            .chain(&self.project)
+            .chain(&self.version)
+        {
+            if field.is_empty() {
+                return Err("a plugin registry field must not be empty".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ListInstalls for JsonInstalls {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn installs(&self, text: &str) -> Result<Vec<Install>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        let root = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        let Some(Value::Object(plugins)) = root else {
+            return Ok(Vec::new());
+        };
+        let text_of = |install: &Value, field: Option<&String>| {
+            install.get(field?)?.as_str().map(str::to_owned)
+        };
+        let mut installs = Vec::new();
+        for (id, value) in plugins {
+            let each = match value {
+                Value::Array(each) => each.iter().collect(),
+                value => vec![value],
+            };
+            for install in each {
+                let Some(folder) = text_of(install, Some(&self.folder)) else {
+                    continue;
+                };
+                installs.push(Install {
+                    id: id.clone(),
+                    folder,
+                    scope: text_of(install, self.scope.as_ref()),
+                    project: text_of(install, self.project.as_ref()),
+                    version: text_of(install, self.version.as_ref()),
+                });
+            }
+        }
+        Ok(installs)
+    }
+}
+
 // --- Provenance -------------------------------------------------------------
 
 /// How the Entries of a location got there, which decides how they can be taken away.
@@ -585,6 +786,10 @@ pub(crate) enum Provenance {
     /// A copy the Agent keeps of configuration held in the user's account,
     /// such as skills synced from claude.ai. config-digger only reads it.
     CloudMirror,
+    /// Part of a plugin the Agent installed. config-digger Disables it only
+    /// through the plugin's own switch, with every Entry of the plugin, and
+    /// never Removes it: uninstalling is up to the Agent.
+    Plugin,
 }
 
 impl Provenance {
@@ -592,7 +797,7 @@ impl Provenance {
     /// Enables or Removes them.
     pub fn read_only(self) -> bool {
         match self {
-            Provenance::File => false,
+            Provenance::File | Provenance::Plugin => false,
             Provenance::Managed | Provenance::CloudMirror => true,
         }
     }
@@ -1135,6 +1340,10 @@ fn is_name(text: &str) -> bool {
 pub(crate) trait Compete {
     /// Entries with equal keys are the same Item.
     fn key(&self, name: &str) -> String;
+
+    /// Whether the Entries of the location `id` compete by endpoint
+    /// instead of by name.
+    fn by_endpoint(&self, id: &str) -> bool;
 }
 
 /// How same-kind Entries of one Agent home compete.
@@ -1158,12 +1367,36 @@ impl Compete for Competition {
             Competition::ExactName(block) => block.key(name),
         }
     }
+
+    fn by_endpoint(&self, id: &str) -> bool {
+        match self {
+            Competition::ExactName(block) => block.by_endpoint(id),
+        }
+    }
 }
 
-/// Entries compete when their names are exactly equal.
+impl Competition {
+    /// The ids of the locations whose Entries compete by endpoint.
+    pub fn endpoint_locations(&self) -> &[String] {
+        match self {
+            Competition::ExactName(block) => &block.by_endpoint,
+        }
+    }
+}
+
+/// Entries compete when their names are exactly equal. An Entry of a
+/// `by_endpoint` location competes instead with the Entries of other
+/// locations that have its endpoint, joining the Item of the one the Agent
+/// ranks highest, and otherwise with those of `by_endpoint` locations that
+/// have it.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ExactName {}
+pub(crate) struct ExactName {
+    /// The ids of the locations whose Entries compete by endpoint, such as
+    /// Claude Code's plugin servers.
+    #[serde(default)]
+    pub by_endpoint: Vec<String>,
+}
 
 impl Validate for ExactName {
     fn validate(&self) -> Result<(), String> {
@@ -1175,6 +1408,57 @@ impl Compete for ExactName {
     fn key(&self, name: &str) -> String {
         name.to_owned()
     }
+
+    fn by_endpoint(&self, id: &str) -> bool {
+        self.by_endpoint.iter().any(|known| known == id)
+    }
+}
+
+/// A server's endpoint as an Agent compares it: its URL with the scheme
+/// and host in lower case, without the scheme's default port or a
+/// trailing slash on its path; or else its command and args. `None` for
+/// an Entry with neither.
+pub(crate) fn endpoint(config: &Value) -> Option<String> {
+    if let Some(url) = config.get("url").and_then(Value::as_str) {
+        return Some(format!("url {}", normal_url(url)));
+    }
+    let command = config.get("command").and_then(Value::as_str)?;
+    let args = config
+        .get("args")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|arg| arg.as_str().map_or_else(|| arg.to_string(), str::to_owned));
+    let words: Vec<String> = std::iter::once(command.to_owned()).chain(args).collect();
+    Some(format!("command {words:?}"))
+}
+
+/// `url` with the scheme and host in lower case, without the scheme's
+/// default port or a trailing slash on its path.
+fn normal_url(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let scheme = scheme.to_ascii_lowercase();
+    let (authority, rest) = rest.split_at(rest.find(['/', '?', '#']).unwrap_or(rest.len()));
+    let (userinfo, host) = match authority.rsplit_once('@') {
+        Some((userinfo, host)) => (format!("{userinfo}@"), host),
+        None => (String::new(), authority),
+    };
+    let mut host = host.to_ascii_lowercase();
+    let default_port = match scheme.as_str() {
+        "http" | "ws" => Some(":80"),
+        "https" | "wss" => Some(":443"),
+        _ => None,
+    };
+    if let Some(port) = default_port
+        && let Some(without) = host.strip_suffix(port)
+    {
+        host = without.to_owned();
+    }
+    let (path, tail) = rest.split_at(rest.find(['?', '#']).unwrap_or(rest.len()));
+    let path = path.trim_end_matches('/');
+    format!("{scheme}://{userinfo}{host}{path}{tail}")
 }
 
 // --- Shapes -----------------------------------------------------------------
@@ -1461,6 +1745,10 @@ pub(crate) enum MechanismTarget {
     Entry,
     /// Every Entry of the Item it covers, since they share the name.
     Name,
+    /// Every Entry of the plugin the Entry is part of, of every Item kind.
+    /// The switch's key path names the plugin with `{plugin}`, and it
+    /// covers locations in plugins only.
+    Plugin,
 }
 
 /// Where a mechanism's switch applies. Declared from the most specific to
@@ -1495,6 +1783,9 @@ pub(crate) enum DisableReason {
     DisabledByName,
     /// The switch is the Entry's own.
     DisabledNatively,
+    /// The switch is that of the plugin the Entry is part of, so every
+    /// Entry of the plugin is Disabled.
+    PluginDisabled,
 }
 
 /// A list of names in a JSON file: the Agent skips every Entry of an Item
@@ -1524,7 +1815,7 @@ pub(crate) struct JsonNameList {
 
 impl Validate for JsonNameList {
     fn validate(&self) -> Result<(), String> {
-        validate_mechanism(&self.switch, self.context)?;
+        validate_mechanism(&self.switch, self.target, self.context)?;
         if self.switch.names() {
             return Err(format!(
                 "a name list's key path cannot hold `{NAME_KEY}`: the names are its items"
@@ -1640,7 +1931,7 @@ pub(crate) struct JsonField {
 
 impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
-        validate_mechanism(&self.switch, self.context)?;
+        validate_mechanism(&self.switch, self.target, self.context)?;
         match (self.enable_action, &self.enabled_value) {
             (EnableAction::RemoveItem, _) => {
                 Err("a field's enable_action must be `delete-key` or `set`".into())
@@ -1715,10 +2006,20 @@ impl Disables for JsonField {
     }
 }
 
-/// Checks what every mechanism shares: its switch, and a context that
-/// agrees with where the switch is.
-fn validate_mechanism(switch: &Switch, context: MechanismContext) -> Result<(), String> {
+/// Checks what every mechanism shares: its switch, a target that agrees
+/// with what the switch is keyed by, and a context that agrees with where
+/// the switch is.
+fn validate_mechanism(
+    switch: &Switch,
+    target: MechanismTarget,
+    context: MechanismContext,
+) -> Result<(), String> {
     switch.validate()?;
+    if (target == MechanismTarget::Plugin) != switch.plugins() {
+        return Err(format!(
+            "a switch key path holds `{PLUGIN_KEY}` exactly when the target is `plugin`"
+        ));
+    }
     match (context, switch.per_project()) {
         (MechanismContext::Project, false) => Err(format!(
             "context `project` needs a switch in a Project or keyed by `{}`",
@@ -1739,8 +2040,8 @@ pub(crate) struct Switch {
     pub anchor: Anchor,
     /// The key path of the value written. One segment may be `{project}`:
     /// the context's Project key, in the Agent's own spelling, so that the
-    /// switch applies only there. One segment after it may be `{name}`:
-    /// the Entry's name.
+    /// switch applies only there. One segment after it may be `{name}`,
+    /// the Entry's name, or `{plugin}`, the id of the plugin it is part of.
     pub key_path: Vec<String>,
     /// How the switch's file behaves while the Agent runs.
     pub store_class: StoreClass,
@@ -1748,6 +2049,16 @@ pub(crate) struct Switch {
 
 /// The switch `key_path` segment that stands for the Entry's name.
 pub(crate) const NAME_KEY: &str = "{name}";
+
+/// The switch `key_path` segment that stands for the id of the plugin the
+/// Entry is part of.
+pub(crate) const PLUGIN_KEY: &str = "{plugin}";
+
+/// Whether a switch `key_path` segment stands for what the switch holds an
+/// Entry by: its name, or its plugin's id.
+pub(crate) fn is_entry_key(key: &str) -> bool {
+    key == NAME_KEY || key == PLUGIN_KEY
+}
 
 impl Validate for Switch {
     fn validate(&self) -> Result<(), String> {
@@ -1758,10 +2069,15 @@ impl Validate for Switch {
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();
-        for template in [super::PROJECT_KEY, NAME_KEY] {
+        for template in [super::PROJECT_KEY, NAME_KEY, PLUGIN_KEY] {
             if count(template) > 1 {
                 return Err(format!("a switch key path holds `{template}` twice"));
             }
+        }
+        if self.names() && self.plugins() {
+            return Err(format!(
+                "a switch key path cannot hold both `{NAME_KEY}` and `{PLUGIN_KEY}`"
+            ));
         }
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a switch cannot walk up from the Project folder".into());
@@ -1772,11 +2088,12 @@ impl Validate for Switch {
                 super::PROJECT_KEY
             ));
         }
-        if let (Some(project), Some(name)) = (position(super::PROJECT_KEY), position(NAME_KEY))
-            && name < project
+        let entry = self.key_path.iter().position(|key| is_entry_key(key));
+        if let (Some(project), Some(entry)) = (position(super::PROJECT_KEY), entry)
+            && entry < project
         {
             return Err(format!(
-                "`{}` must come before `{NAME_KEY}` in a switch key path",
+                "`{}` must come before `{NAME_KEY}` or `{PLUGIN_KEY}` in a switch key path",
                 super::PROJECT_KEY
             ));
         }
@@ -1793,6 +2110,11 @@ impl Switch {
     /// Whether its key path holds `{name}`, so that it holds one value per name.
     pub fn names(&self) -> bool {
         self.key_path.iter().any(|key| key == NAME_KEY)
+    }
+
+    /// Whether its key path holds `{plugin}`, so that it holds one value per plugin.
+    pub fn plugins(&self) -> bool {
+        self.key_path.iter().any(|key| key == PLUGIN_KEY)
     }
 }
 
@@ -1820,6 +2142,9 @@ impl Validate for SettingPlace {
         validate_key_path(&self.key_path)?;
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a setting cannot walk up from the Project folder".into());
+        }
+        if self.anchor.plugin().is_some() {
+            return Err("a setting cannot lie in a plugin's folder".into());
         }
         let projects = self
             .key_path

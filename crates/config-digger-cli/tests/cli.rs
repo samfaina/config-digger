@@ -552,7 +552,7 @@ fn list_json_prints_one_document_with_schema_version() {
             "source": {"kind": "default"},
             "hidden": false,
             "no_configuration": null,
-            "scopes": ["managed", "local", "project", "user"],
+            "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
@@ -2768,4 +2768,64 @@ fn remove_of_a_skill_folder_moves_it_into_the_backup_and_undo_moves_it_back() {
     assert_eq!(undone.code, 0, "{}{}", undone.stdout, undone.stderr);
     assert!(folder.join("SKILL.md").exists());
     assert!(!operation.join("1-deploy").exists());
+}
+
+/// A Claude Code home with the plugin `supabase@claude-plugins-official`
+/// installed for the user, carrying the skill `supabase-postgres`.
+fn with_supabase_plugin() -> Harness {
+    let harness = Harness::new().with_file(".claude.json", "{}");
+    let folder = harness.path(".claude/plugins/cache/claude-plugins-official/supabase/0.1.4");
+    let installed = json!({
+        "version": 2,
+        "plugins": {
+            "supabase@claude-plugins-official": [
+                { "scope": "user", "installPath": folder, "version": "0.1.4" }
+            ]
+        }
+    });
+    harness
+        .with_file(
+            ".claude/plugins/installed_plugins.json",
+            &installed.to_string(),
+        )
+        .with_file(
+            ".claude/plugins/cache/claude-plugins-official/supabase/0.1.4/skills/supabase-postgres/SKILL.md",
+            "---\nname: supabase-postgres\ndescription: Postgres on Supabase.\n---\n",
+        )
+}
+
+#[test]
+fn show_of_a_plugin_entry_says_how_to_remove_it_and_offers_disable_instead() {
+    let harness = with_supabase_plugin();
+
+    let show = harness.run(&[
+        "show",
+        "supabase:supabase-postgres",
+        "--no-project",
+        "--wide",
+    ]);
+
+    assert_eq!(show.code, 0, "{}", show.stderr);
+    assert!(
+        show.stdout
+            .contains("plugin (supabase@claude-plugins-official)"),
+        "{}",
+        show.stdout
+    );
+    assert!(
+        show.stdout.contains(
+            "How to remove: uninstall the plugin supabase@claude-plugins-official with `claude plugin uninstall supabase@claude-plugins-official --scope user`."
+        ),
+        "{}",
+        show.stdout
+    );
+    let settings = harness.path(".claude").join("settings.json");
+    let settings = settings.display();
+    assert!(
+        show.stdout.contains(&format!(
+            "Disable instead: Disable sets `enabledPlugins.supabase@claude-plugins-official` to false in {settings}."
+        )),
+        "{}",
+        show.stdout
+    );
 }

@@ -68,6 +68,8 @@ state_file = ".claude.json"
 settings_file = ".claude/settings.json"
 # Personal skills, one folder each, and the skills synced from claude.ai.
 skills = ".claude/skills"
+# The plugins Claude Code installed, and the cache of their files.
+plugins = ".claude/plugins"
 
 # The settings an organisation deploys, highest first [docs]. Claude Code
 # reads them only from the first source that holds any setting, unless that
@@ -95,12 +97,31 @@ id = "project"
 [[scopes]]
 id = "user"
 
+# What a plugin carries, whatever Scope the plugin is installed at.
+[[scopes]]
+id = "plugin"
+
 # Every Project Claude Code has been started on has a key in `projects`, in
 # whatever spelling it was started with (`E:/x` and `E:\x` both occur).
 [projects]
 registries = [
   { block = "json-keys", anchor = { block = "home", root = "state_file" }, root = ["projects"] },
 ]
+
+# Plugins installed from a marketplace [docs, disk]. `installed_plugins.json`
+# maps each `<name>@<marketplace>` to an array of installs, one per Scope,
+# each with its folder in the plugin cache; a `local` or `project` install
+# records the one Project it applies in. When Claude Code updates a plugin
+# it marks the version it supersedes with `.orphaned_at` and deletes it 14
+# days later; it no longer loads it. A plugin is named by its manifest's
+# `name`, the manifest being optional [docs]. `claude plugin uninstall`
+# also deletes the plugin's data folder [docs].
+[[plugins]]
+id = "installed"
+registry = { block = "json-installs", anchor = { block = "home", root = "plugins", path = "installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath", version = "version" }
+superseded_marker = ".orphaned_at"
+name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
+uninstall = "claude plugin uninstall {id} --scope {scope}"
 
 # Servers an administrator deploys to the machine [docs]. config-digger
 # only reads them. What Claude Code does with a file it cannot parse is not
@@ -186,12 +207,54 @@ on_read_failure = "asks_user"
 risks = ["agent_may_reset_file"]
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
+# A plugin's default `.mcp.json` [docs]. What Claude Code does with one it
+# cannot parse is not known.
+[[locations]]
+id = "plugin-mcp"
+anchor = { block = "plugin", plugins = "installed", path = ".mcp.json" }
+# `/mcp` names it `plugin:<plugin>:<server>`, which is what
+# `disabledMcpServers` holds [disk].
+name_template = "plugin:{plugin}:{name}"
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+# Plugins can also use `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}` and
+# `${CLAUDE_PROJECT_DIR}` [docs]. `${user_config.KEY}` is shown as text.
+interpolation = { block = "braces", default_separator = ":-" }
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+
+# The servers a plugin's manifest declares in `mcpServers` [docs, disk]:
+# inline, as a path to a file of the plugin shaped like `.mcp.json`, or a
+# list of either. Claude Code reads them after the plugin's `.mcp.json`
+# [docs]. `.mcpb` bundles are not read.
+[[locations]]
+id = "plugin-manifest-mcp"
+anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
+name_template = "plugin:{plugin}:{name}"
+references = { root = ["mcpServers"] }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-" }
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+
 # Same-named Entries compete whole; the highest location wins. Claude Code
 # skips a malformed Entry with a warning [docs], and a Disabled one, before
-# they compete, so the next one down can win.
+# they compete, so the next one down can win. A plugin server competes by
+# endpoint instead, the same URL, ignoring the host's case, the default port
+# and a trailing slash, or the same command, and loses to any other server
+# [docs]. Which of two plugins with the same endpoint wins is not known.
 [items.mcp]
-precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp"]
-competition = { block = "exact-name" }
+precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-mcp", "plugin-manifest-mcp"]
+competition = { block = "exact-name", by_endpoint = ["plugin-mcp", "plugin-manifest-mcp"] }
 # An exclusive `managed-mcp.json` suppresses the other servers, and an
 # unapproved server is not loaded: neither competes. The allow and deny
 # lists apply after precedence, to the server that wins [docs].
@@ -320,6 +383,49 @@ reason = "disabled_by_name"
 locations = ["project-mcp"]
 enable_offered = false
 
+# A plugin is on or off as a whole, with every server and skill it carries,
+# by `enabledPlugins["<name>@<marketplace>"]` in a settings file, which
+# `claude plugin disable --scope local|project|user` writes [docs, disk].
+# Settings merge the key across files, local over Project over user [docs],
+# but any `false` is read as turning the plugin off. A plugin missing from
+# every file is taken as on. Disable writes `false` to the local settings in
+# a Project, and to the user settings otherwise; Enable sets `true`. The
+# shared Project settings belong to the team, so config-digger only reads
+# them. These switches are repeated for skills below.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-mcp", "plugin-manifest-mcp"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-mcp", "plugin-manifest-mcp"]
+enable_offered = false
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-mcp", "plugin-manifest-mcp"]
+
 # Skills are folders holding a `SKILL.md`, read one level down only [docs].
 # A skill is named by its frontmatter `name`, or by its folder when there is
 # none. Claude Code reads the frontmatter only when `---` is the first line,
@@ -364,6 +470,19 @@ provenance = "file"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+# A plugin's skills, in its `skills` folder [docs, disk]. They answer to
+# `<plugin>:<skill>`, so they never compete with other skills [docs].
+[[locations]]
+id = "plugin-skills"
+anchor = { block = "plugin", plugins = "installed", path = "skills" }
+format = { block = "skill-folder", name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+name_template = "{plugin}:{name}"
+kind = "skill"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
 # Skills synced from claude.ai sit one level deeper than the docs say, in
 # `synced/<org>_<account>/<name>` [disk], next to `manifest.json` and a
 # `.staging` folder. Claude Code owns this copy. It syncs these skills into
@@ -385,7 +504,7 @@ when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 # `/anthropic-skills:<name>` [docs]. Claude Code skips a skill it cannot
 # load before they compete.
 [items.skill]
-precedence = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
+precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence", "rules"]
 
@@ -406,7 +525,8 @@ sources = [
 # The `/skills` menu: `skillOverrides: {"<name>": "off"}` in the Project's
 # local settings [docs]. `"name-only"` lists only the name to Claude and
 # `"user-invocable-only"` lists nothing, both keeping the skill in the `/`
-# menu: partial switches. `"on"` is the default.
+# menu: partial switches. `"on"` is the default. It does not apply to plugin
+# skills [docs].
 [[items.skill.disable]]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
@@ -416,6 +536,7 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
+locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 
 # Any settings file can hold `skillOverrides` [docs]. config-digger only
 # reads the shared Project settings, which belong to the team, and the user
@@ -429,6 +550,7 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
+locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 enable_offered = false
 
 [[items.skill.disable]]
@@ -440,13 +562,49 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
+locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 enable_offered = false
+
+# A plugin's switches, as for its servers above.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-skills"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-skills"]
+enable_offered = false
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-skills"]
 
 # Claude Code fetches GrowthBook features for the signed-in account and
 # caches them in `~/.claude.json` [disk]: names in clear, values as JSON,
 # and when it fetched them in milliseconds. What each gate does is inferred
 # from its name; Claude Code ships compiled. The plugin sync gate,
-# `tengu_claudeai_plugins_sync_enabled`, joins once plugins are read.
+# `tengu_claudeai_plugins_sync_enabled`, joins once synced plugins are read.
 #
 # It skips the fetch and uses its own defaults when any of these is set, in
 # its environment or in the `env` of a settings file: `DISABLE_GROWTHBOOK`

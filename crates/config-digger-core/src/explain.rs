@@ -16,16 +16,25 @@ use std::time::SystemTime;
 /// A Shadowed Entry's reason, pointing at the Effective Entry `effective`.
 /// `tied` says the two have the same precedence, as under two spellings of
 /// one Project key, where which one the Agent uses is not known.
+/// `same_endpoint` says they compete because they have the same endpoint.
 pub(crate) fn shadowed_by_precedence(
     agent_name: &str,
     effective_scope: &str,
     effective: &str,
     tied: bool,
+    same_endpoint: bool,
 ) -> Reason {
+    let endpoint = if same_endpoint {
+        "has the same endpoint and "
+    } else {
+        ""
+    };
     let why = if tied {
         format!(
-            "which has the same precedence in {agent_name}; which of the two it uses is not known"
+            "which {endpoint}has the same precedence in {agent_name}; which of the two it uses is not known"
         )
+    } else if same_endpoint {
+        format!("which {endpoint}{agent_name} ranks higher")
     } else {
         format!("which {agent_name} ranks higher")
     };
@@ -286,6 +295,19 @@ pub(crate) fn disabled_by_name(holds: &str, agent_name: &str) -> String {
 /// A Disabled Entry's reason, when the switch `holds` is its own.
 pub(crate) fn disabled_natively(holds: &str, agent_name: &str) -> String {
     format!("Disabled: {holds}, so {agent_name} skips it.")
+}
+
+/// A Disabled Entry's reason, when the switch `holds` is that of the
+/// plugin `plugin` it is part of.
+pub(crate) fn plugin_disabled(plugin: &str, holds: &str, agent_name: &str) -> String {
+    format!(
+        "Disabled with its plugin {plugin}: {holds}, so {agent_name} skips every server and skill of the plugin."
+    )
+}
+
+/// What Disable through the switch of the plugin `plugin` takes with it.
+pub(crate) fn takes_whole_plugin(plugin: &str) -> String {
+    format!("This Disables the whole plugin {plugin}, with every server and skill it carries.")
 }
 
 /// The note on an Entry part of which the partial switch `holds` limits.
@@ -1024,6 +1046,29 @@ pub(crate) fn read_only_option() -> String {
 /// Why Enable is not offered for a Disabled Entry config-digger only reads.
 pub(crate) fn read_only_enable() -> String {
     format!("Enable is not offered: {READ_ONLY}.")
+}
+
+/// Why Remove is not offered for an Entry config-digger only reads.
+pub(crate) fn read_only_remove_option() -> String {
+    format!("Remove is not offered: {READ_ONLY}.")
+}
+
+/// Why Remove is not offered for an Entry of the plugin `plugin`.
+pub(crate) fn plugin_not_removed(plugin: &str, agent_name: &str) -> String {
+    format!("Not in v0.1: uninstall the plugin {plugin} in {agent_name}.")
+}
+
+/// How to remove an Entry of the plugin `plugin`: uninstall it with `command`.
+pub(crate) fn how_to_remove_plugin(plugin: &str, command: &str) -> String {
+    format!(
+        "How to remove: uninstall the plugin {plugin} with `{command}`. It takes every server and skill of the plugin with it."
+    )
+}
+
+/// Why Remove is refused for the Entry at `locator`, which a plugin
+/// carries: `why`, and how to remove it instead.
+pub(crate) fn plugin_remove_refused(locator: &str, why: &str, how: &str) -> String {
+    format!("cannot Remove {locator}: {why} {how}")
 }
 
 /// Why Remove is refused for the read-only Entry at `locator`.

@@ -165,6 +165,8 @@ export type Entry = {
 	provenance: Provenance,
 	/**  For `skill_manager` Provenance, the skill manager that installed it. */
 	skill_manager: SkillManager | null,
+	/**  For `plugin` Provenance, the plugin it is part of. */
+	plugin: Plugin | null,
 	/**
 	 *  Its file is in the index of its git repo, so a change to it shows in
 	 *  the git diff and reaches every clone once committed.
@@ -202,6 +204,8 @@ export type Entry = {
 	 *  the core.
 	 */
 	enable: string | null,
+	/**  Whether Remove is offered for it. */
+	remove: RemoveOption,
 	/**
 	 *  What makes its State less certain, such as a Disable switch that
 	 *  cannot be read.
@@ -350,6 +354,14 @@ export type HomeSource =
 /**  The user added it, and no definition location finds it. */
 { kind: "added" };
 
+/**  How to remove an Entry that config-digger does not Remove. */
+export type HowToRemove = {
+	/**  The Agent's own command that removes it. */
+	command: string,
+	/**  What to do, as a sentence rendered by the core. */
+	sentence: string,
+};
+
 /**  A launchable copy of an Agent, with its own version. */
 export type Installation = {
 	/**  The id of the definition's installation, such as `native`. */
@@ -435,6 +447,19 @@ export type NoteCode =
  */
 "provenance_by_name_only";
 
+/**  A plugin an Agent installed, which an Entry is part of. */
+export type Plugin = {
+	/**  The id the Agent knows it by, such as `supabase@claude-plugins-official`. */
+	id: string,
+	/**  The name its Entries are named by, such as `supabase`. */
+	name: string,
+	/**  The Scope it is installed at, as the Agent records it. */
+	scope: string | null,
+	version: string | null,
+	/**  The folder its files are in. */
+	folder: string,
+};
+
 /**  A place in a file's text. */
 export type Position = {
 	/**  1-based. */
@@ -482,7 +507,13 @@ export type Provenance =
  *  A skill folder a skill manager installed, as its definition
  *  recognises it. Remove touches that folder or link alone.
  */
-"skill_manager";
+"skill_manager" | 
+/**
+ *  Part of a plugin the Agent installed. Disable takes the whole plugin
+ *  through its own switch, and Remove is not offered: the Agent
+ *  uninstalls it.
+ */
+"plugin";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {
@@ -571,6 +602,11 @@ export type ReasonCode =
 /**  The Entry's own switch is off. */
 "disabled_natively" | 
 /**
+ *  The switch of the plugin the Entry is part of is off, so the Agent
+ *  skips every Entry of the plugin.
+ */
+"plugin_disabled" | 
+/**
  *  A rule in a settings file the user writes, such as a deny list,
  *  leaves the Entry out. config-digger never lifts it.
  */
@@ -605,6 +641,33 @@ export type ReasonCode =
  *  the other value from the one it is resolved with.
  */
 "feature_gate";
+
+/**  Why Remove is not offered for an Entry. */
+export type RemoveNotOffered = 
+/**
+ *  The Entry is managed, or a copy of the user's account, and
+ *  config-digger only reads it.
+ */
+"read_only" | 
+/**  The Entry is part of a plugin, which only the Agent uninstalls. */
+"plugin";
+
+/**
+ *  Whether Remove is offered for an Entry, and if not, why, and what to
+ *  do instead.
+ */
+export type RemoveOption = 
+/**
+ *  Remove deletes the Entry from where it lives, for every Agent that
+ *  reads it.
+ */
+{ status: "offered" } | 
+/**  Remove is not offered. */
+{ status: "not_offered"; code: RemoveNotOffered; 
+/**  The reason as a sentence, rendered by the core. */
+sentence: string; 
+/**  How to remove it some other way, such as through the Agent. */
+how_to_remove: HowToRemove | null };
 
 export type RiskCode = 
 /**  The Agent may offer to reset the file, losing what it holds. */

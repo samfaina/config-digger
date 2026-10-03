@@ -1,0 +1,9 @@
+{
+  "name": "superpowers",
+  "mcpServers": {
+    "episodic-memory": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/memory/server.js"]
+    }
+  }
+}

@@ -7,8 +7,9 @@ pub mod skill_managers;
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
-    Gate, GateLookup, Holds, Interpolation, Locator, LookUp, ProjectWalk, Provenance, Register,
-    Registry, Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    Gate, GateLookup, Holds, Interpolation, ListInstalls, Locator, LookUp, MechanismTarget,
+    PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles,
+    SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -91,6 +92,10 @@ pub(crate) struct AgentDefinition {
     /// Where this Agent records the Projects it has been started on.
     #[serde(default)]
     pub projects: ProjectsDefinition,
+    /// The plugins this Agent installs, each in a folder of its own that
+    /// locations anchored in plugins are read in.
+    #[serde(default)]
+    pub plugins: Vec<PluginsDefinition>,
     /// The configuration locations this Agent reads.
     pub locations: Vec<LocationDefinition>,
     /// Rules per Item kind.
@@ -283,6 +288,80 @@ pub(crate) struct ProjectsDefinition {
     pub registries: Vec<Registry>,
 }
 
+/// Plugins an Agent installs, each in a folder of its own, such as Claude
+/// Code's plugin cache. A plugin's Entries are Disabled with the whole
+/// plugin through its own switch, and never Removed: the Agent uninstalls
+/// it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginsDefinition {
+    /// Unique in the definition, such as `installed`.
+    pub id: String,
+    /// Where the Agent records the plugins it installed.
+    pub registry: PluginRegistry,
+    /// A file whose presence in a plugin's folder means the Agent no longer
+    /// loads that folder, such as a version it superseded.
+    pub superseded_marker: Option<String>,
+    /// Where a plugin's name is. Without it, or when the plugin's folder
+    /// does not hold one, its name is its id up to `@`.
+    pub name: Option<PluginName>,
+    /// The Agent's own command that uninstalls a plugin, shown in place of
+    /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
+    /// Scope it is installed at: when that is not recorded, the word
+    /// holding it and an option just before it are left out.
+    pub uninstall: String,
+}
+
+/// A string in a JSON file of a plugin's folder that names the plugin.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginName {
+    /// A `/`-separated path relative to the plugin's folder.
+    pub file: String,
+    /// The key path of the string, one key per segment.
+    pub key_path: Vec<String>,
+}
+
+/// The `uninstall` segment that stands for a plugin's id.
+pub(crate) const PLUGIN_ID: &str = "{id}";
+/// The `uninstall` segment that stands for the Scope a plugin is installed at.
+pub(crate) const PLUGIN_SCOPE: &str = "{scope}";
+
+impl PluginsDefinition {
+    fn validate(&self) -> Result<(), String> {
+        non_empty("plugins id", &self.id)?;
+        self.registry.validate()?;
+        if let Some(marker) = &self.superseded_marker {
+            blocks::validate_relative(marker)?;
+        }
+        if let Some(name) = &self.name {
+            blocks::validate_relative(&name.file)?;
+            blocks::validate_key_path(&name.key_path)?;
+        }
+        if !self.uninstall.contains(PLUGIN_ID) {
+            return Err(format!("uninstall must name the plugin with `{PLUGIN_ID}`"));
+        }
+        Ok(())
+    }
+
+    /// The command that uninstalls the plugin `id`, installed at `scope`.
+    pub fn uninstall(&self, id: &str, scope: Option<&str>) -> String {
+        let command = self.uninstall.replace(PLUGIN_ID, id);
+        if let Some(scope) = scope {
+            return command.replace(PLUGIN_SCOPE, scope);
+        }
+        let mut words: Vec<&str> = Vec::new();
+        for word in command.split_whitespace() {
+            if !word.contains(PLUGIN_SCOPE) {
+                words.push(word);
+            } else if words.last().is_some_and(|option| option.starts_with('-')) {
+                words.pop();
+            }
+        }
+        words.join(" ")
+    }
+}
+
 /// The `root` segment that stands for any Project path key.
 pub(crate) const PROJECT_KEY: &str = "{project}";
 
@@ -324,7 +403,32 @@ pub(crate) struct LocationDefinition {
     /// them. While one does not hold, its Entries are Unread.
     #[serde(default)]
     pub when: Vec<Condition>,
+    /// The name the Agent gives an Entry of a location in plugins, made
+    /// of `{plugin}`, the plugin's name, and `{name}`, the Entry's own
+    /// name, such as `{plugin}:{name}`. Without it, an Entry goes by its
+    /// own name.
+    pub name_template: Option<String>,
+    /// What the value at `root` of a location in plugins may hold besides
+    /// an object of Entries: a path, relative to the plugin's folder, of
+    /// another file in the location's format, or a list of such paths and
+    /// objects of Entries, such as a Claude Code plugin manifest's
+    /// `mcpServers`.
+    pub references: Option<References>,
 }
+
+/// Files a value can point to, each holding Entries in the format of the
+/// location that holds the value.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct References {
+    /// The key path of the object whose keys are Entries in a file pointed to.
+    pub root: Vec<String>,
+}
+
+/// The `name_template` segment that stands for the plugin's name.
+pub(crate) const PLUGIN_NAME: &str = "{plugin}";
+/// The `name_template` segment that stands for the Entry's own name.
+pub(crate) const ENTRY_NAME: &str = "{name}";
 
 /// What an Agent does with a location it cannot read. Declared from the
 /// mildest to the strongest: a file several locations of one Agent read
@@ -407,6 +511,17 @@ impl LocationDefinition {
     /// Whether the location's Entries are keyed by Project inside the file.
     pub fn keyed_by_project(&self) -> bool {
         self.root.iter().any(|key| key == PROJECT_KEY)
+    }
+
+    /// The name the Agent gives an Entry named `name` of the plugin named
+    /// `plugin`.
+    pub fn entry_name(&self, name: &str, plugin: &str) -> String {
+        match &self.name_template {
+            Some(template) => template
+                .replace(PLUGIN_NAME, plugin)
+                .replace(ENTRY_NAME, name),
+            None => name.to_owned(),
+        }
     }
 }
 
@@ -613,6 +728,17 @@ impl AgentDefinition {
         }
 
         unique(
+            "plugins",
+            self.plugins.iter().map(|plugins| plugins.id.as_str()),
+        )?;
+        for plugins in &self.plugins {
+            let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
+            plugins.validate().map_err(context)?;
+            self.validate_home_root(plugins.registry.anchor())
+                .map_err(context)?;
+        }
+
+        unique(
             "feature gate",
             self.feature_gates.iter().map(|gate| gate.name.as_str()),
         )?;
@@ -656,6 +782,37 @@ impl AgentDefinition {
                 if location.format.file().is_none() {
                     return Err(context("settings are read in a file format".into()));
                 }
+            }
+            if let Some(anchor) = location.anchor.plugin() {
+                self.declared_plugins(&anchor.plugins).map_err(context)?;
+                if location.keyed_by_project() {
+                    return Err(context(format!(
+                        "a location in plugins cannot be keyed by `{PROJECT_KEY}`"
+                    )));
+                }
+            }
+            if let Some(template) = &location.name_template {
+                if location.anchor.plugin().is_none() {
+                    return Err(context(
+                        "only a location in plugins takes a name_template".into(),
+                    ));
+                }
+                if template.matches(ENTRY_NAME).count() != 1 {
+                    return Err(context(format!(
+                        "name_template must hold `{ENTRY_NAME}` once"
+                    )));
+                }
+            }
+            if let Some(references) = &location.references {
+                if location.anchor.plugin().is_none() || location.format.file().is_none() {
+                    return Err(context(
+                        "only a file location in plugins takes references".into(),
+                    ));
+                }
+                if location.root.is_empty() {
+                    return Err(context("references need a root to hold them".into()));
+                }
+                blocks::validate_key_path(&references.root).map_err(context)?;
             }
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
@@ -742,6 +899,16 @@ impl AgentDefinition {
             }
             if let Some(id) = declared.difference(&ranked).next() {
                 return Err(context(format!("precedence leaves out location `{id}`")));
+            }
+            if let Some(id) = rules
+                .competition
+                .endpoint_locations()
+                .iter()
+                .find(|id| !declared.contains(id.as_str()))
+            {
+                return Err(context(format!(
+                    "competition names `{id}`, which is not a location of this kind"
+                )));
             }
             for check in [Check::Disable, Check::Precedence] {
                 match rules.checks.iter().filter(|known| **known == check).count() {
@@ -870,6 +1037,20 @@ impl AgentDefinition {
                 {
                     return Err(context(format!("`{id}` is not a location of this kind")));
                 }
+                if mechanism.target() == MechanismTarget::Plugin {
+                    if mechanism.locations().is_empty() {
+                        return Err(context("target `plugin` needs its locations listed".into()));
+                    }
+                    if let Some(id) = mechanism
+                        .locations()
+                        .iter()
+                        .find(|id| self.location(id).anchor.plugin().is_none())
+                    {
+                        return Err(context(format!(
+                            "target `plugin` covers locations in plugins only, not `{id}`"
+                        )));
+                    }
+                }
             }
         }
         Ok(())
@@ -893,6 +1074,14 @@ impl AgentDefinition {
             .iter()
             .find(|settings| settings.id == id)
             .ok_or_else(|| format!("undeclared settings `{id}`"))
+    }
+
+    /// The `[[plugins]]` with the id `id`, which a plugin anchor names.
+    pub fn declared_plugins(&self, id: &str) -> Result<&PluginsDefinition, String> {
+        self.plugins
+            .iter()
+            .find(|plugins| plugins.id == id)
+            .ok_or_else(|| format!("undeclared plugins `{id}`"))
     }
 
     /// A setting's anchor needs the root or the `[[settings]]` it names.
@@ -2026,6 +2215,131 @@ prompt"#,
             "{}",
             error(&text)
         );
+    }
+
+    /// `VALID` plus plugins and a location in them, with `extra` appended.
+    fn with_plugins(extra: &str) -> String {
+        let plugins = r#"
+roots.plugins = "plugins"
+
+[[plugins]]
+id = "installed"
+registry = { block = "json-installs", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }
+uninstall = "agent plugin uninstall {id} --scope {scope}"
+
+[[locations]]
+id = "plugin-mcp"
+anchor = { block = "plugin", plugins = "installed", path = "mcp.json" }
+name_template = "plugin:{plugin}:{name}"
+format = { block = "json", dialect = "strict" }
+root = ["servers"]
+kind = "mcp"
+scope = "user"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+"#;
+        VALID
+            .replace(
+                "roots.state = \".test.json\"
+",
+                &format!("roots.state = \".test.json\"{plugins}"),
+            )
+            .replace(
+                r#"precedence = ["user-mcp"]"#,
+                r#"precedence = ["user-mcp", "plugin-mcp"]"#,
+            )
+            + extra
+    }
+
+    /// A Disable mechanism of `target` whose switch is keyed by `key`.
+    fn plugin_switch(target: &str, key: &str, locations: &str) -> String {
+        format!(
+            r#"
+[[items.mcp.disable]]
+block = "json-field"
+switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["enabledPlugins", "{key}"], store_class = "plain" }}
+target = "{target}"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = {locations}
+"#
+        )
+    }
+
+    #[test]
+    fn plugins_and_their_switch_load() {
+        let text = with_plugins(&plugin_switch("plugin", "{plugin}", r#"["plugin-mcp"]"#));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_plugin_anchor_names_declared_plugins() {
+        let text = with_plugins("").replace(
+            r#"plugins = "installed", path"#,
+            r#"plugins = "other", path"#,
+        );
+        assert!(
+            error(&text).contains("undeclared plugins `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_name_template_names_the_entry_once_in_a_location_in_plugins() {
+        let text = with_plugins("").replace("plugin:{plugin}:{name}", "plugin:{plugin}");
+        assert!(
+            error(&text).contains("must hold `{name}` once"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn the_plugin_target_and_a_switch_keyed_by_plugin_go_together() {
+        let text = with_plugins(&plugin_switch("name", "{plugin}", r#"["plugin-mcp"]"#));
+        assert!(
+            error(&text).contains("exactly when the target is `plugin`"),
+            "{}",
+            error(&text)
+        );
+        let text = with_plugins(&plugin_switch("plugin", "{name}", r#"["plugin-mcp"]"#));
+        assert!(
+            error(&text).contains("exactly when the target is `plugin`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn the_plugin_target_covers_locations_in_plugins_only() {
+        let text = with_plugins(&plugin_switch("plugin", "{plugin}", r#"["user-mcp"]"#));
+        assert!(
+            error(&text).contains("locations in plugins only"),
+            "{}",
+            error(&text)
+        );
+        let text = with_plugins(&plugin_switch("plugin", "{plugin}", "[]"));
+        assert!(
+            error(&text).contains("needs its locations listed"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn an_uninstall_command_names_the_plugin_and_drops_an_unknown_scope() {
+        let definition = parse("test.toml", &with_plugins("")).unwrap();
+        let plugins = definition.declared_plugins("installed").unwrap();
+        assert_eq!(
+            plugins.uninstall("a@m", Some("local")),
+            "agent plugin uninstall a@m --scope local"
+        );
+        assert_eq!(plugins.uninstall("a@m", None), "agent plugin uninstall a@m");
     }
 
     #[test]
