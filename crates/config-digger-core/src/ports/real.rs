@@ -79,25 +79,39 @@ impl FileSystem for RealFileSystem {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a link"));
         }
         if cfg!(windows) {
-            std::fs::remove_dir(path).or_else(|_| std::fs::remove_file(path))
+            // A file symlink is removed as a file; any other failure is the
+            // folder's to report.
+            std::fs::remove_dir(path).or_else(|error| std::fs::remove_file(path).map_err(|_| error))
         } else {
             std::fs::remove_file(path)
         }
     }
 
     /// The standard library creates no junction, and this crate forbids
-    /// the unsafe code that would, so `mklink /J` creates it.
+    /// the unsafe code that would, so `mklink /J` creates it. Each path is
+    /// quoted for `cmd`, which then takes `&` or `^` in it literally; one
+    /// holding `"` or `%`, which quotes do not protect, is refused.
     #[cfg(windows)]
     fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
         if std::fs::symlink_metadata(link).is_ok() {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
+        use std::os::windows::process::CommandExt;
+
         // `mklink` reads a `/` as the start of a switch.
-        let backslashed = |path: &Path| path.as_os_str().to_string_lossy().replace('/', "\\");
+        let quoted = |path: &Path| {
+            let text = path.as_os_str().to_string_lossy().replace('/', "\\");
+            if text.contains(['"', '%']) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("cannot create a junction at or to {text}"),
+                ));
+            }
+            Ok(format!("\"{text}\""))
+        };
         let output = Command::new("cmd")
-            .args(["/D", "/C", "mklink", "/J"])
-            .arg(backslashed(link))
-            .arg(backslashed(target))
+            .args(["/D", "/C"])
+            .raw_arg(format!("mklink /J {} {}", quoted(link)?, quoted(target)?))
             .stdin(Stdio::null())
             .output()?;
         if output.status.success() && self.link_target(link).is_some() {
@@ -114,22 +128,38 @@ impl FileSystem for RealFileSystem {
         std::os::unix::fs::symlink(target, link)
     }
 
-    /// A rename, or across volumes, where no rename works, a copy that is
-    /// removed again when it fails, then the removal of the original.
+    /// A rename. Across volumes, where no rename works, the folder is first
+    /// renamed aside on its own volume, under a dot name no Agent reads,
+    /// then copied: a copy that fails is removed and the folder renamed
+    /// back, so its location is never left half empty. Verify checks the copy.
+    /// What is left aside once the copy is complete is removed, and a
+    /// failure to remove it is only logged.
     fn move_folder(&self, from: &Path, to: &Path) -> io::Result<()> {
         if std::fs::symlink_metadata(to).is_ok() {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
         match std::fs::rename(from, to) {
-            Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
-                if let Err(error) = copy_folder(from, to) {
-                    let _ = std::fs::remove_dir_all(to);
-                    return Err(error);
-                }
-                std::fs::remove_dir_all(from)
-            }
-            moved => moved,
+            Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {}
+            moved => return moved,
         }
+        let (Some(folder), Some(name)) = (from.parent(), from.file_name()) else {
+            return Err(io::ErrorKind::InvalidInput.into());
+        };
+        let aside = folder.join(format!(
+            ".{}.config-digger-{}.moving",
+            name.to_string_lossy(),
+            std::process::id()
+        ));
+        std::fs::rename(from, &aside)?;
+        if let Err(error) = copy_folder(&aside, to) {
+            let _ = std::fs::remove_dir_all(to);
+            std::fs::rename(&aside, from)?;
+            return Err(error);
+        }
+        if let Err(error) = std::fs::remove_dir_all(&aside) {
+            tracing::warn!(folder = %aside.display(), %error, "cannot remove a folder moved across volumes");
+        }
+        Ok(())
     }
 
     /// The temporary file sits next to the target, so that the rename stays
@@ -172,13 +202,21 @@ impl FileSystem for RealFileSystem {
     }
 }
 
-/// Copies the folder `from` and everything below it to `to`.
+/// Copies the folder `from` and everything below it to `to`. A link inside
+/// it is refused: copying it would copy what it points to, or never end.
 fn copy_folder(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::create_dir(to)?;
     for entry in std::fs::read_dir(from)? {
         let entry = entry?;
         let target = to.join(entry.file_name());
-        if entry.path().is_dir() {
+        let kind = entry.file_type()?;
+        if kind.is_symlink() {
+            return Err(io::Error::other(format!(
+                "{} is a link, which cannot be moved to another volume",
+                entry.path().display()
+            )));
+        }
+        if kind.is_dir() {
             copy_folder(&entry.path(), &target)?;
         } else {
             std::fs::copy(entry.path(), target)?;

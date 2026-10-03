@@ -390,7 +390,7 @@ export type JsonValue = null | boolean | number | null | string | JsonValue[] | 
 
 /**  Where the junction or symlink of a Linked Entry points. */
 export type Link = {
-	/**  The target's real path, or the path the link holds when it is gone. */
+	/**  The path the link holds, made absolute. */
 	target: string,
 	/**
 	 *  The target is gone, so the Agent reads nothing there and the Entry

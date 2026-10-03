@@ -824,7 +824,7 @@ pub(crate) fn folder_size(size: FolderSize) -> String {
         1 => "1 file".to_owned(),
         n => format!("{n} files"),
     };
-    let bytes = match size.size {
+    let bytes = match size.bytes {
         1 => "1 byte".to_owned(),
         n => format!("{n} bytes"),
     };

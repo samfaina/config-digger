@@ -16,7 +16,7 @@ use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot, SwitchStore};
-use crate::{explain, history, installations, paths, resolve, running, scan, select};
+use crate::{explain, history, installations, resolve, running, scan, select};
 use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -256,12 +256,12 @@ impl Targeted<'_> {
     /// backup, each measured for Verify.
     fn removed_folder(&self, entry: &api::Entry) -> Result<PlannedFolder, Error> {
         let fs = self.ports.fs.as_ref();
-        let (op, size) = match &entry.link {
+        let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+        let (op, size) = match &scanned.link {
             Some(link) => {
-                let size = if link.broken {
-                    FolderSize { files: 0, size: 0 }
-                } else {
-                    folders::measure(fs, &link.target)?
+                let size = match &link.real {
+                    Some(real) => folders::measure(fs, real)?,
+                    None => FolderSize { files: 0, bytes: 0 },
                 };
                 let target = link.target.clone();
                 (FolderOp::RemoveLink { target }, size)
@@ -286,12 +286,10 @@ impl Targeted<'_> {
             .filter(|folder| folder.op == FolderOp::MoveToBackup);
         for folder in moved {
             for entry in &self.snapshot.entries {
-                let Some(link) = entry.link.as_ref().filter(|link| !link.broken) else {
+                let Some(real) = entry.link.as_ref().and_then(|link| link.real.as_ref()) else {
                     continue;
                 };
-                let into = paths::key(&link.target) == paths::key(&folder.path)
-                    || paths::key(&link.target)
-                        .starts_with(&format!("{}\\", paths::key(&folder.path)));
+                let into = folders::below(real, &folder.path).is_some();
                 let targeted = self
                     .entries
                     .iter()
@@ -485,7 +483,7 @@ impl Targeted<'_> {
     }
 
     /// The plan that writes `files` and touches `folders`, whose preview
-    /// shows `changes` and `effective`, with `extra`, the warning of its
+    /// shows `changes` and `effective`, with `action_warning`, the warning of its
     /// own action if it has one.
     fn planned(
         &self,
@@ -493,7 +491,7 @@ impl Targeted<'_> {
         folders: Vec<PlannedFolder>,
         changes: Vec<Change>,
         effective: Vec<EffectiveChange>,
-        extra: Option<Warning>,
+        action_warning: Option<Warning>,
     ) -> Result<Planned, Error> {
         let title = explain::operation_title(self.action, self.entries.len());
         let preview = preview(
@@ -513,7 +511,7 @@ impl Targeted<'_> {
         let installed = installations::installed_homes(self.definitions, self.snapshot);
         let running = running::check(self.definitions, self.ports, &installed, &files);
         let mut warnings = warnings(&files, &folders, running.warning);
-        warnings.extend(extra);
+        warnings.extend(action_warning);
         Ok(Planned {
             action: self.action,
             entries: self.entries.len(),
@@ -883,7 +881,6 @@ pub(crate) fn undo_folders(
     let fs = ports.fs.as_ref();
     let folder = history::operation_folder(ports, &manifest.id)?;
     let refused = |what: String| Error::undo_refused(what, folder.clone(), Vec::new());
-    let taken = |path: &Path| fs.exists(path) || fs.link_target(path).is_some();
     let mut planned = Vec::new();
     for record in manifest.folders.iter().rev() {
         let path = &record.path;
@@ -905,10 +902,7 @@ pub(crate) fn undo_folders(
                 record.size,
             ),
             FolderOpRecord::MovedBack { .. } => {
-                let now = folders::measure(fs, path)
-                    .ok()
-                    .filter(|_| fs.link_target(path).is_none());
-                if now != Some(record.size) {
+                if !folders::holds(fs, path, record.size) {
                     return Err(refused(format!(
                         "the skill folder {} changed since the Operation",
                         path.display()
@@ -917,8 +911,7 @@ pub(crate) fn undo_folders(
                 (FolderOp::MoveToBackup, record.size)
             }
             FolderOpRecord::LinkCreated { target } => {
-                let now = fs.link_target(path).map(|now| paths::lexical(&now));
-                if now.is_none_or(|now| paths::key(&now) != paths::key(target)) {
+                if !folders::links_to(fs, path, target) {
                     return Err(refused(format!(
                         "the link {} changed since the Operation",
                         path.display()
@@ -932,7 +925,7 @@ pub(crate) fn undo_folders(
             record.op,
             FolderOpRecord::MovedToBackup { .. } | FolderOpRecord::LinkRemoved { .. }
         );
-        if empties && taken(path) {
+        if empties && folders::taken(fs, path) {
             return Err(refused(format!(
                 "something is at {} again since the Operation",
                 path.display()

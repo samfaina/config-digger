@@ -11,12 +11,12 @@ use crate::api::{
 };
 use crate::definitions::AgentDefinition;
 use crate::edit::EditableFile;
-use crate::folders::{self, FolderOp, FolderSize, PlannedFolder};
+use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::mask::{self, Side};
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::{FileSystem, Ports};
-use crate::{explain, paths, resolve, running, scan};
+use crate::{explain, resolve, running, scan};
 use serde_json::Value;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -169,15 +169,17 @@ pub(crate) fn execute(
         written += 1;
     }
     let mut done = 0;
-    for touched in pending.iter().filter(|_| failure.is_none()) {
-        if let Err(error) = do_folder(ports, touched) {
-            failure = Some(Failure::new(
-                ErrorCode::WriteFailed,
-                explain::folder_failed(&touched.folder.op, &touched.folder.path, &error),
-            ));
-            break;
+    if failure.is_none() {
+        for touched in &pending {
+            if let Err(error) = do_folder(ports, touched) {
+                failure = Some(Failure::new(
+                    ErrorCode::WriteFailed,
+                    explain::folder_failed(&touched.folder.op, &touched.folder.path, &error),
+                ));
+                break;
+            }
+            done += 1;
         }
-        done += 1;
     }
     let verified = match failure {
         Some(failure) => Err(failure),
@@ -300,34 +302,16 @@ struct PendingFolder<'p> {
     backup: Option<PathBuf>,
 }
 
-/// Whether anything, a link included, is at `path`.
-fn taken(ports: &Ports, path: &Path) -> bool {
-    ports.fs.exists(path) || ports.fs.link_target(path).is_some()
-}
-
-/// Whether the link at `path` points to `target`.
-fn links_to(ports: &Ports, path: &Path, target: &Path) -> bool {
-    ports
-        .fs
-        .link_target(path)
-        .is_some_and(|now| paths::key(&paths::lexical(&now)) == paths::key(target))
-}
-
-/// Whether the folder at `path`, which is no link, has `size`.
-fn holds(ports: &Ports, path: &Path, size: FolderSize) -> bool {
-    ports.fs.link_target(path).is_none()
-        && folders::measure(ports.fs.as_ref(), path).is_ok_and(|now| now == size)
-}
-
 /// Checks under the lock that a skill folder's location is still as the
 /// plan saw it.
 fn check_folder(ports: &Ports, folder: &PlannedFolder) -> Result<(), Error> {
+    let fs = ports.fs.as_ref();
     let path = &folder.path;
     let unchanged = match &folder.op {
-        FolderOp::MoveToBackup => holds(ports, path, folder.size),
-        FolderOp::RemoveLink { target } => links_to(ports, path, target),
-        FolderOp::MoveBack { from } => !taken(ports, path) && ports.fs.exists(from),
-        FolderOp::CreateLink { .. } => !taken(ports, path),
+        FolderOp::MoveToBackup => folders::holds(fs, path, folder.size),
+        FolderOp::RemoveLink { target } => folders::links_to(fs, path, target),
+        FolderOp::MoveBack { from } => !folders::taken(fs, path) && fs.exists(from),
+        FolderOp::CreateLink { .. } => !folders::taken(fs, path),
     };
     if unchanged {
         return Ok(());
@@ -372,17 +356,19 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
     let failed = |cause: String| Err(Failure::new(ErrorCode::VerifyFailed, cause));
     let size = explain::folder_size(folder.size);
     match (&folder.op, &touched.backup) {
-        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if taken(ports, path) => {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
             failed(format!("{} is still there", path.display()))
         }
-        (FolderOp::MoveToBackup, Some(backup)) if !holds(ports, backup, folder.size) => {
+        (FolderOp::MoveToBackup, Some(backup)) if !folders::holds(fs, backup, folder.size) => {
             failed(format!(
                 "the copy of {} in the backup does not hold its {size}",
                 path.display()
             ))
         }
         (FolderOp::RemoveLink { target }, _)
-            if folder.size.files > 0 && !holds(ports, target, folder.size) =>
+            // The target may be a link itself, measured through.
+            if folder.size.files > 0
+                && folders::measure(fs, target).ok() != Some(folder.size) =>
         {
             failed(format!(
                 "the target {} of the link {} no longer holds its {size}",
@@ -390,13 +376,13 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
                 path.display()
             ))
         }
-        (FolderOp::MoveBack { from }, _) if !holds(ports, path, folder.size) || fs.exists(from) => {
+        (FolderOp::MoveBack { from }, _) if !folders::holds(fs, path, folder.size) || fs.exists(from) => {
             failed(format!(
                 "the skill folder {} does not hold its {size} again",
                 path.display()
             ))
         }
-        (FolderOp::CreateLink { target }, _) if !links_to(ports, path, target) => failed(format!(
+        (FolderOp::CreateLink { target }, _) if !folders::links_to(fs, path, target) => failed(format!(
             "the link {} does not point to {}",
             path.display(),
             target.display()
@@ -438,7 +424,7 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
     let occupied =
         || not_restored("Something else is there since config-digger touched it.".into());
     let restored = match (&touched.folder.op, &touched.backup) {
-        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if taken(ports, path) => {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
             return occupied();
         }
         (FolderOp::MoveToBackup, Some(backup)) => {
@@ -448,9 +434,9 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
         (FolderOp::RemoveLink { target }, _) => {
             parent(fs, path).and_then(|()| fs.create_link(path, target))
         }
-        (FolderOp::MoveBack { from }, _) if taken(ports, from) => return occupied(),
+        (FolderOp::MoveBack { from }, _) if folders::taken(fs, from) => return occupied(),
         (FolderOp::MoveBack { from }, _) => fs.move_folder(path, from),
-        (FolderOp::CreateLink { target }, _) if links_to(ports, path, target) => {
+        (FolderOp::CreateLink { target }, _) if folders::links_to(fs, path, target) => {
             fs.remove_link(path)
         }
         (FolderOp::CreateLink { .. }, _) => {

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct FolderSize {
     pub files: u64,
-    pub size: u64,
+    pub bytes: u64,
 }
 
 /// The size of the folder at `folder`.
@@ -24,7 +24,7 @@ pub(crate) fn measure(fs: &dyn FileSystem, folder: &Path) -> Result<FolderSize, 
     let files = skill::files(fs, folder)?;
     Ok(FolderSize {
         files: files.len() as u64,
-        size: files.values().map(|bytes| bytes.len() as u64).sum(),
+        bytes: files.values().map(|bytes| bytes.len() as u64).sum(),
     })
 }
 
@@ -68,7 +68,7 @@ impl PlannedFolder {
             change,
             target: target.cloned(),
             files: self.size.files,
-            size: self.size.size,
+            size: self.size.bytes,
             git_versioned: self.git_versioned,
         }
     }
@@ -82,9 +82,16 @@ pub(crate) struct AsIf<'f> {
     fs: &'f dyn FileSystem,
     /// Paths with nothing at them or below.
     gone: Vec<PathBuf>,
-    /// Paths that show another path: a folder moved back, or a link and
-    /// whether it is one.
-    shown: Vec<(PathBuf, PathBuf, bool)>,
+    /// Paths that show another path: a folder moved back, or a link created.
+    shown: Vec<Shown>,
+}
+
+/// A path of an [`AsIf`] view that shows another path.
+struct Shown {
+    at: PathBuf,
+    /// The copy moved back, or the link's target.
+    from: PathBuf,
+    link: bool,
 }
 
 /// Where a path of an [`AsIf`] view is read.
@@ -104,10 +111,18 @@ impl<'f> AsIf<'f> {
                 }
                 FolderOp::MoveBack { from } => {
                     gone.push(from.clone());
-                    shown.push((folder.path.clone(), from.clone(), false));
+                    shown.push(Shown {
+                        at: folder.path.clone(),
+                        from: from.clone(),
+                        link: false,
+                    });
                 }
                 FolderOp::CreateLink { target } => {
-                    shown.push((folder.path.clone(), target.clone(), true));
+                    shown.push(Shown {
+                        at: folder.path.clone(),
+                        from: target.clone(),
+                        link: true,
+                    });
                 }
             }
         }
@@ -115,9 +130,10 @@ impl<'f> AsIf<'f> {
     }
 
     fn seen(&self, path: &Path) -> Seen {
-        for (at, from, _) in &self.shown {
-            if let Some(rest) = below(path, at) {
-                return Seen::At(rest.iter().fold(from.clone(), |path, part| path.join(part)));
+        for shown in &self.shown {
+            if let Some(rest) = below(path, &shown.at) {
+                let from = shown.from.clone();
+                return Seen::At(rest.iter().fold(from, |path, part| path.join(part)));
             }
         }
         let gone = |path: &Path| self.gone.iter().any(|gone| below(path, gone).is_some());
@@ -131,7 +147,7 @@ impl<'f> AsIf<'f> {
 
 /// The names of `path` below `base`, compared case-insensitively as on
 /// Windows; `None` when it is not at or below it.
-fn below(path: &Path, base: &Path) -> Option<Vec<OsString>> {
+pub(crate) fn below(path: &Path, base: &Path) -> Option<Vec<OsString>> {
     let mut parts = path.components();
     for expected in base.components() {
         let part = parts.next()?;
@@ -140,6 +156,27 @@ fn below(path: &Path, base: &Path) -> Option<Vec<OsString>> {
         }
     }
     Some(parts.map(|part| part.as_os_str().to_owned()).collect())
+}
+
+/// Whether `path` is `other`, compared as [`below`] compares.
+pub(crate) fn is_at(path: &Path, other: &Path) -> bool {
+    below(path, other).is_some_and(|rest| rest.is_empty())
+}
+
+/// Whether anything, a link included, is at `path`.
+pub(crate) fn taken(fs: &dyn FileSystem, path: &Path) -> bool {
+    fs.exists(path) || fs.link_target(path).is_some()
+}
+
+/// Whether the link at `path` points to `target`.
+pub(crate) fn links_to(fs: &dyn FileSystem, path: &Path, target: &Path) -> bool {
+    fs.link_target(path)
+        .is_some_and(|now| is_at(&paths::lexical(&now), target))
+}
+
+/// Whether the folder at `path`, which is no link, has `size`.
+pub(crate) fn holds(fs: &dyn FileSystem, path: &Path, size: FolderSize) -> bool {
+    fs.link_target(path).is_none() && measure(fs, path).is_ok_and(|now| now == size)
 }
 
 fn read_only() -> io::Error {
@@ -165,7 +202,7 @@ impl FileSystem for AsIf<'_> {
         let moved_back = self
             .shown
             .iter()
-            .any(|(at, _, link)| !link && below(path, at).is_some());
+            .any(|shown| !shown.link && below(path, &shown.at).is_some());
         match self.seen(path) {
             Seen::Gone => None,
             // A folder moved back is real where it lands.
@@ -178,15 +215,11 @@ impl FileSystem for AsIf<'_> {
         let created = self
             .shown
             .iter()
-            .find(|(at, _, link)| *link && below(path, at).is_some_and(|rest| rest.is_empty()));
-        if let Some((_, target, _)) = created {
-            return Some(target.clone());
+            .find(|shown| shown.link && is_at(path, &shown.at));
+        if let Some(shown) = created {
+            return Some(shown.from.clone());
         }
-        if self
-            .gone
-            .iter()
-            .any(|gone| below(path, gone).is_some_and(|rest| rest.is_empty()))
-        {
+        if self.gone.iter().any(|gone| is_at(path, gone)) {
             return None;
         }
         self.fs.link_target(path)
@@ -196,17 +229,11 @@ impl FileSystem for AsIf<'_> {
         let Seen::At(at) = self.seen(path) else {
             return Err(io::ErrorKind::NotFound.into());
         };
-        let in_path = |shown: &Path| {
-            shown
-                .parent()
-                .and_then(|parent| below(parent, path))
-                .is_some_and(|rest| rest.is_empty())
-        };
+        let in_path = |shown: &Shown| shown.at.parent().is_some_and(|parent| is_at(parent, path));
         let found = match self.fs.read_dir(&at) {
             // A folder moved back creates the folders it goes in.
             Err(error)
-                if error.kind() == io::ErrorKind::NotFound
-                    && self.shown.iter().any(|(shown, _, _)| in_path(shown)) =>
+                if error.kind() == io::ErrorKind::NotFound && self.shown.iter().any(in_path) =>
             {
                 Vec::new()
             }
@@ -215,16 +242,11 @@ impl FileSystem for AsIf<'_> {
         let mut children: Vec<PathBuf> = found
             .into_iter()
             .filter_map(|child| Some(path.join(child.file_name()?)))
-            .filter(|child| {
-                !self
-                    .gone
-                    .iter()
-                    .any(|gone| below(child, gone).is_some_and(|rest| rest.is_empty()))
-            })
+            .filter(|child| !self.gone.iter().any(|gone| is_at(child, gone)))
             .collect();
-        for (shown, _, _) in &self.shown {
-            if in_path(shown) && !children.iter().any(|child| below(child, shown).is_some()) {
-                children.push(shown.clone());
+        for shown in &self.shown {
+            if in_path(shown) && !children.iter().any(|child| is_at(child, &shown.at)) {
+                children.push(shown.at.clone());
             }
         }
         Ok(children)

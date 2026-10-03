@@ -498,3 +498,52 @@ fn deleting_the_backup_of_a_folder_remove_deletes_the_moved_folder() {
     assert_eq!(fs.files_below(&store), Vec::<PathBuf>::new());
     assert!(!core.history().unwrap()[0].undoable);
 }
+
+#[test]
+fn a_link_to_a_link_is_removed_as_it_holds_it_and_undone_to_the_same_target() {
+    // `~/.claude/skills/deploy` → `D:\dev\deploy` → `~/.agents/skills/deploy`.
+    let dev = PathBuf::from(r"D:\dev\deploy");
+    let fs = with_skill(claude_home(), agents_skill("deploy"), "deploy")
+        .with_folder(in_home(r".claude\skills"))
+        .with_folder(r"D:\dev")
+        .with_link(&dev, agents_skill("deploy"))
+        .with_link(claude_skill("deploy"), &dev);
+    let core = core(&fs);
+    let before = inventory(&core);
+    let link = before
+        .items
+        .iter()
+        .flat_map(|item| &item.entries)
+        .find(|entry| entry.path == claude_skill("deploy"))
+        .and_then(|entry| entry.link.clone())
+        .unwrap();
+    assert_eq!(link.target, dev);
+    // Its real target is in `.agents/skills`, where `npx skills` keeps it.
+    let manager = before
+        .items
+        .iter()
+        .flat_map(|item| &item.entries)
+        .find(|entry| entry.path == claude_skill("deploy"))
+        .and_then(|entry| entry.skill_manager.clone())
+        .unwrap();
+    assert_eq!(manager.id, "npx-skills");
+
+    let removed = execute(
+        &core,
+        remove(&core, &claude_skill("deploy").display().to_string()),
+    );
+
+    assert_eq!(code(removed.verify), "verified");
+    assert!(!fs.is_link(claude_skill("deploy")));
+    assert!(fs.is_link(&dev));
+    execute(&core, core.plan_undo(&removed.operation).unwrap());
+    assert!(fs.is_link(claude_skill("deploy")));
+    let after = inventory(&core);
+    let again = after
+        .items
+        .iter()
+        .flat_map(|item| &item.entries)
+        .find(|entry| entry.path == claude_skill("deploy"))
+        .unwrap();
+    assert_eq!(again.link.as_ref().unwrap().target, dev);
+}

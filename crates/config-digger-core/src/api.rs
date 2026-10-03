@@ -47,13 +47,7 @@ pub struct Context {
 impl Core {
     /// Loads the built-in Agent definitions.
     pub fn new(ports: Ports) -> Result<Self, Error> {
-        definitions::skill_managers::built_in().map_err(Error::unexpected)?;
-        let definitions = definitions::built_in().map_err(Error::unexpected)?;
-        Ok(Self {
-            ports,
-            built_in: definitions.len(),
-            definitions,
-        })
+        Self::with_extra_definitions(ports, &[])
     }
 
     /// Loads the built-in Agent definitions plus the extra ones in `files`,
@@ -61,6 +55,8 @@ impl Core {
     /// development and tests (ADR 0005). A file that fails to load is
     /// rejected whole.
     pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
+        // Scans read the built-in skill manager definitions: one that fails
+        // to load fails here, rather than recognising no skill manager.
         definitions::skill_managers::built_in().map_err(Error::unexpected)?;
         let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
         let built_in = definitions.len();
@@ -1248,7 +1244,7 @@ pub struct Entry {
 /// Where the junction or symlink of a Linked Entry points.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Link {
-    /// The target's real path, or the path the link holds when it is gone.
+    /// The path the link holds, made absolute.
     pub target: PathBuf,
     /// The target is gone, so the Agent reads nothing there and the Entry
     /// is Unread.

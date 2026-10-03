@@ -282,10 +282,18 @@ pub(crate) struct ManagerMatch {
 /// Where the link or junction at a Linked Entry's location points.
 #[derive(Clone)]
 pub(crate) struct ScannedLink {
-    /// The target's real path when it exists, else the path the link holds.
+    /// The path the link holds, made absolute: what Remove checks it still
+    /// points to, and Undo points it to again.
     pub target: PathBuf,
-    /// The target is gone, so the Agent reads nothing there.
-    pub broken: bool,
+    /// The real path the link leads to, through any further links; `None`
+    /// when the target is gone, so the Agent reads nothing there.
+    pub real: Option<PathBuf>,
+}
+
+impl ScannedLink {
+    pub fn broken(&self) -> bool {
+        self.real.is_none()
+    }
 }
 
 #[derive(Clone)]
@@ -981,7 +989,7 @@ impl Scanner<'_> {
                         defect: None,
                         link: Some(ScannedLink {
                             target: paths::lexical(&target),
-                            broken: true,
+                            real: None,
                         }),
                         manager: None,
                     });
@@ -1005,10 +1013,8 @@ impl Scanner<'_> {
                 // A link at the skill's own location is an Entry apart from
                 // its target.
                 let link = fs.link_target(&child).map(|target| ScannedLink {
-                    target: fs
-                        .real_path(&child)
-                        .map_or(target, |real| paths::lexical(&real)),
-                    broken: false,
+                    target: paths::lexical(&target),
+                    real: fs.real_path(&child).map(|real| paths::lexical(&real)),
                 });
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
@@ -1056,10 +1062,12 @@ fn manager_of(
 /// Whether `detector` matches the skill folder of `entry`.
 fn detects(detector: &Detector, reader: &mut Reader, ports: &Ports, entry: &ScannedEntry) -> bool {
     match detector {
-        Detector::LinkTargetGlob(block) => entry
-            .link
-            .as_ref()
-            .is_some_and(|link| paths::tail_matches(&block.glob, &link.target)),
+        Detector::LinkTargetGlob(block) => entry.link.as_ref().is_some_and(|link| {
+            let real = link.real.iter();
+            std::iter::once(&link.target)
+                .chain(real)
+                .any(|target| paths::tail_matches(&block.glob, target))
+        }),
         Detector::MarkerFile(block) => reader.fs.exists(&entry.path.join(&block.file)),
         Detector::LocationGlob(block) => paths::tail_matches(&block.glob, &entry.path),
         Detector::LockFileEntry(block) => {
