@@ -723,13 +723,18 @@ pub(crate) fn definition_untested(agent_name: &str) -> String {
     )
 }
 
-/// What is wrong with a skill's `SKILL.md` or folder, as a sentence ends.
-fn skill_defect(defect: SkillDefect) -> &'static str {
+/// What is wrong with a skill's `SKILL.md` or folder for `agent_name`, as
+/// the end of a sentence.
+fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
     match defect {
-        SkillDefect::NoFrontmatter => "its SKILL.md does not open with a `---` frontmatter",
-        SkillDefect::MalformedFrontmatter => "its SKILL.md frontmatter is not valid YAML",
-        SkillDefect::NoName => "its SKILL.md frontmatter has no `name`",
-        SkillDefect::Reserved => "its folder has a name the Agent keeps for itself",
+        SkillDefect::NoFrontmatter => {
+            "its SKILL.md does not open with a `---` frontmatter".to_owned()
+        }
+        SkillDefect::MalformedFrontmatter => {
+            "its SKILL.md frontmatter is not valid YAML".to_owned()
+        }
+        SkillDefect::NoName => "its SKILL.md frontmatter has no `name`".to_owned(),
+        SkillDefect::Reserved => format!("{agent_name} keeps its folder's name for itself"),
     }
 }
 
@@ -739,7 +744,10 @@ pub(crate) fn malformed_skill(agent_name: &str, defect: SkillDefect) -> Reason {
         code: ReasonCode::MalformedSkill,
         effective: None,
         switch: None,
-        sentence: format!("{agent_name} skips this skill: {}.", skill_defect(defect)),
+        sentence: format!(
+            "{agent_name} skips this skill: {}.",
+            skill_defect(agent_name, defect)
+        ),
     }
 }
 
@@ -747,33 +755,30 @@ pub(crate) fn malformed_skill(agent_name: &str, defect: SkillDefect) -> Reason {
 pub(crate) fn skill_fallback(agent_name: &str, defect: SkillDefect, folder: &str) -> String {
     format!(
         "{agent_name} still loads this skill, as `{folder}`, its folder's name: {}.",
-        skill_defect(defect)
+        skill_defect(agent_name, defect)
     )
 }
+
+/// Why config-digger never writes an Entry of a read-only Provenance.
+const READ_ONLY: &str =
+    "this Entry is managed, or a copy of the user's account, and config-digger only reads it";
 
 /// Why Disable is not offered for an Entry config-digger only reads.
 pub(crate) fn read_only_option() -> String {
-    "Disable is not offered: this Entry is managed or mirrored from the user's account, and config-digger only reads it.".to_owned()
+    format!("Disable is not offered: {READ_ONLY}.")
 }
 
-/// Why `action` is refused for the read-only Entry at `locator`.
-pub(crate) fn read_only(action: Action, locator: &str) -> String {
-    let verb = match action {
-        Action::Disable => "Disable",
-        Action::Enable => "Enable",
-        _ => "Remove",
-    };
-    format!(
-        "cannot {verb} {locator}: it is managed or mirrored from the user's account, and config-digger only reads it"
-    )
+/// Why Enable is not offered for a Disabled Entry config-digger only reads.
+pub(crate) fn read_only_enable() -> String {
+    format!("Enable is not offered: {READ_ONLY}.")
+}
+
+/// Why Remove is refused for the read-only Entry at `locator`.
+pub(crate) fn read_only_remove(locator: &str) -> String {
+    format!("cannot Remove {locator}: {READ_ONLY}")
 }
 
 /// Why Remove is refused for the skill folder at `locator`.
 pub(crate) fn skill_remove_not_offered(locator: &str) -> String {
     format!("cannot Remove {locator}: Remove of a skill folder is not available yet")
-}
-
-/// Why Enable is not offered for a Disabled Entry config-digger only reads.
-pub(crate) fn read_only_enable() -> String {
-    "Enable is not offered: this Entry is managed or mirrored from the user's account, and config-digger only reads it.".to_owned()
 }

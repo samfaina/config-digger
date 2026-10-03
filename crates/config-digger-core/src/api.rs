@@ -1277,7 +1277,7 @@ pub enum DisableNotOffered {
     /// The Entry is Unread: the Agent never reads it, so it can only be
     /// Removed.
     Unread,
-    /// The Entry is managed or mirrored from the user's account, and
+    /// The Entry is managed, or a copy of the user's account, and
     /// config-digger only reads it.
     ReadOnly,
 }

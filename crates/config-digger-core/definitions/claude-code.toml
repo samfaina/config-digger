@@ -275,8 +275,9 @@ competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence"]
 
 # The `/skills` menu: `skillOverrides: {"<name>": "off"}` in the Project's
-# local settings [docs]. `"name-only"` and `"user-invocable-only"` hide the
-# skill from Claude but keep it in the `/` menu; `"on"` is the default.
+# local settings [docs]. `"name-only"` lists only the name to Claude and
+# `"user-invocable-only"` lists nothing, both keeping the skill in the `/`
+# menu: partial switches. `"on"` is the default.
 [[items.skill.disable]]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }

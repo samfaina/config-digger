@@ -107,8 +107,8 @@ pub(crate) trait Anchored {
     fn in_project(&self) -> bool;
 
     /// The machine-wide folder or file this anchor names, as written, such
-    /// as `%ProgramFiles%/ClaudeCode`: the scan adds its expansion to the
-    /// roots under that text.
+    /// as `%ProgramFiles%/ClaudeCode`. Its expansion is among the roots
+    /// `path` is given, under that text.
     fn machine(&self) -> Option<&str>;
 
     /// How far up from the Project folder the location is read.

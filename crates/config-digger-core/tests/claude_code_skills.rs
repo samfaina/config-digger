@@ -286,7 +286,7 @@ fn project_skill(name: &str) -> PathBuf {
 }
 
 #[test]
-fn name_clashes_resolve_enterprise_over_personal_over_project_over_synced() {
+fn a_name_clash_is_won_by_enterprise_then_personal_then_project_then_synced() {
     let program_files = r"C:\Program Files";
     let mut fs = claude_home().with_folder(PROJECT);
     for folder in [
@@ -413,7 +413,7 @@ fn a_skill_in_a_folder_claude_code_reserves_is_invalid_and_does_not_compete() {
     assert_eq!(code(reason.code), "malformed_skill");
     assert_eq!(
         reason.sentence,
-        "Claude Code skips this skill: its folder has a name the Agent keeps for itself."
+        "Claude Code skips this skill: Claude Code keeps its folder's name for itself."
     );
     assert_eq!(code(skill(&inventory, "tools").state), "effective");
 }
@@ -463,6 +463,63 @@ fn a_frontmatter_that_is_not_yaml_loads_with_no_fields_under_the_folder_name() {
         "{}",
         deploy.entries[0].notes[0].sentence
     );
+}
+
+#[test]
+fn a_plain_value_holding_a_colon_and_space_is_not_yaml() {
+    let fs = with_skill(
+        claude_home(),
+        in_home(r".claude\skills\deploy"),
+        "---\nname: ship\ndescription: Use when: shipping\n---\n",
+    );
+
+    let inventory = no_project(&fs);
+
+    let deploy = skill(&inventory, "deploy");
+    assert_eq!(deploy.entries[0].config, json!({}));
+    assert!(
+        deploy.entries[0].notes[0]
+            .sentence
+            .ends_with("its SKILL.md frontmatter is not valid YAML."),
+        "{}",
+        deploy.entries[0].notes[0].sentence
+    );
+}
+
+#[test]
+fn a_quoted_value_may_hold_a_colon_and_space() {
+    let fs = with_skill(
+        claude_home(),
+        in_home(r".claude\skills\deploy"),
+        "---\nname: ship\ndescription: \"Use when: shipping\"\n---\n",
+    );
+
+    let inventory = no_project(&fs);
+
+    let ship = skill(&inventory, "ship");
+    assert_eq!(
+        ship.entries[0].config,
+        json!({ "name": "ship", "description": "Use when: shipping" })
+    );
+    assert_eq!(ship.entries[0].notes, []);
+}
+
+#[test]
+fn a_frontmatter_may_nest_a_mapping_or_continue_a_value_on_the_next_lines() {
+    let fs = with_skill(
+        claude_home(),
+        in_home(r".claude\skills\deploy"),
+        "---\nname: ship\ndescription:\n  Ships the app\n  to staging.\nmetadata:\n  author: me\nallowed-tools:\n  - Bash\n---\n",
+    );
+
+    let inventory = no_project(&fs);
+
+    let ship = skill(&inventory, "ship");
+    assert_eq!(
+        ship.entries[0].config,
+        json!({ "name": "ship", "description": "Ships the app to staging." })
+    );
+    assert_eq!(ship.entries[0].notes, []);
 }
 
 #[test]

@@ -567,16 +567,11 @@ impl AgentDefinition {
                     }
                 }
                 (None, ItemKind::Mcp) => {}
-                (Some(_), kind) | (None, kind @ ItemKind::Skill) => {
-                    return Err(context(format!(
-                        "kind `{}` needs {}",
-                        kind.id(),
-                        if kind == ItemKind::Skill {
-                            "the skill-folder format"
-                        } else {
-                            "a file format"
-                        }
-                    )));
+                (Some(_), ItemKind::Mcp) => {
+                    return Err(context("kind `mcp` needs a file format".into()));
+                }
+                (None, ItemKind::Skill) => {
+                    return Err(context("kind `skill` needs the skill-folder format".into()));
                 }
             }
             if !self.scopes.iter().any(|scope| scope.id == location.scope) {

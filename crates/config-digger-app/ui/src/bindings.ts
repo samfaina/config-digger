@@ -114,7 +114,7 @@ export type DisableNotOffered =
  */
 "unread" | 
 /**
- *  The Entry is managed or mirrored from the user's account, and
+ *  The Entry is managed, or a copy of the user's account, and
  *  config-digger only reads it.
  */
 "read_only";

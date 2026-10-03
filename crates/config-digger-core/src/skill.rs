@@ -159,7 +159,23 @@ pub(crate) fn frontmatter(text: &str) -> Result<BTreeMap<String, String>, SkillD
                 .and_then(|value| value.strip_suffix(quote))
                 .unwrap_or(value)
                 .to_owned(),
-            _ => fold(&[&[value][..], &continued].concat()),
+            // A key with no value on its line may open a mapping or a list,
+            // which is no scalar.
+            _ if value.is_empty()
+                && continued
+                    .iter()
+                    .any(|line| line.contains(": ") || line.starts_with("- ")) =>
+            {
+                String::new()
+            }
+            _ => {
+                let lines = [&[value][..], &continued].concat();
+                // `: ` would start a mapping inside a plain scalar.
+                if lines.iter().any(|line| line.contains(": ")) {
+                    return Err(SkillDefect::MalformedFrontmatter);
+                }
+                fold(&lines)
+            }
         };
         keys.insert(key.trim().to_owned(), value);
     }

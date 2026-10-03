@@ -174,7 +174,7 @@ impl Targeted<'_> {
         // The edits of each file, in the order its Entries were selected.
         let mut by_file: Vec<(PathBuf, Syntax, Vec<Edit>)> = Vec::new();
         for entry in self.entries {
-            let syntax = syntax(self.definitions, self.snapshot, entry)?;
+            let syntax = removable_syntax(self.definitions, self.snapshot, entry)?;
             let edit = Edit::Remove {
                 key_path: entry.key_path.clone(),
             };
@@ -1060,7 +1060,7 @@ fn warnings(files: &[PlannedFile], running: Option<Warning>) -> Vec<Warning> {
 
 /// The syntax the location of an Entry to Remove is edited in. Or why it
 /// cannot be Removed: config-digger only reads it, or it is a skill folder.
-fn syntax(
+fn removable_syntax(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,
     entry: &api::Entry,
@@ -1068,10 +1068,7 @@ fn syntax(
     let scanned = snapshot.entry(&entry.path, &entry.key_path);
     let location = definitions[scanned.agent_index].location(&scanned.location);
     if location.provenance.read_only() {
-        return Err(Error::blocked(explain::read_only(
-            Action::Remove,
-            &entry.locator,
-        )));
+        return Err(Error::blocked(explain::read_only_remove(&entry.locator)));
     }
     match location.format.file() {
         Some(format) => Ok(format.syntax()),

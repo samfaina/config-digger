@@ -372,7 +372,7 @@ pub(crate) fn scan_as_if(
                 continue;
             }
             for (project_folder, key) in &folders {
-                for (folder, depth) in walked(ports, project_folder, location.anchor.walk()) {
+                for (folder, depth) in folders_read(ports, project_folder, location.anchor.walk()) {
                     if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
                         let key = Some(key.clone());
                         scanner.read_location(home, definition, location, path, key, depth);
@@ -393,7 +393,7 @@ pub(crate) fn scan_as_if(
     let (switches, unreadable_switches) =
         read_switches(definitions, &found, &projects, &mut scanner.reader);
     let switch_files = switch_files(definitions, &found, &projects);
-    scanner.entries = one_per_location(definitions, scanner.entries);
+    scanner.entries = one_per_entry(definitions, scanner.entries);
     // A skill folder is git-versioned when a file below it is.
     let skill_folders = scanner
         .entries
@@ -710,7 +710,7 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
 
 /// The folders a location in the Project folder `folder` is read in, with
 /// how many levels up each one is.
-fn walked(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf, usize)> {
+fn folders_read(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf, usize)> {
     let fs = ports.fs.as_ref();
     match walk {
         ProjectWalk::None => vec![(folder.to_path_buf(), 0)],
@@ -728,15 +728,12 @@ fn walked(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf, usiz
     }
 }
 
-/// The Entries with one Entry per location: an Entry several locations of
-/// an Agent home reach, such as a skill folder through a linked folder, is
+/// The Entries, each one once: an Entry several locations of an Agent home
+/// reach, such as a skill folder through a linked folder, is
 /// kept once, from the location the Agent ranks highest, and the nearest
 /// Project folder among equals. An Entry keyed to one Project and another
 /// keyed to a second Project are not the same.
-fn one_per_location(
-    definitions: &[AgentDefinition],
-    entries: Vec<ScannedEntry>,
-) -> Vec<ScannedEntry> {
+fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) -> Vec<ScannedEntry> {
     let rank = |entry: &ScannedEntry| {
         let definition = &definitions[entry.agent_index];
         (
@@ -964,9 +961,11 @@ const SKILL_MD: &str = "SKILL.md";
 
 /// A skill as its Agent reads it.
 struct ReadSkill {
+    /// The name the Agent gives it, which it competes by.
     name: String,
     /// The frontmatter's `name` and `description`, as far as it has them.
     config: serde_json::Value,
+    /// Why the Agent may not read its `SKILL.md` as written.
     defect: Option<SkillDefect>,
 }
 
