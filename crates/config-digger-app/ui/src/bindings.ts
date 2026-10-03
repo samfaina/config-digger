@@ -86,7 +86,12 @@ export type CaveatCode =
  *  that the Agent ignores its cache for, so it is resolved with the
  *  Agent's default.
  */
-"gate_assumed";
+"gate_assumed" | 
+/**
+ *  A settings file holding a rule or gate that could apply cannot be
+ *  read, so the Entry is resolved as if it held none.
+ */
+"setting_read_failure";
 
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
@@ -565,6 +570,25 @@ export type ReasonCode =
 "disabled_by_name" | 
 /**  The Entry's own switch is off. */
 "disabled_natively" | 
+/**
+ *  A rule in a settings file the user writes, such as a deny list,
+ *  leaves the Entry out. config-digger never lifts it.
+ */
+"disabled_by_rule" | 
+/**
+ *  A setting that turns off every Entry it covers is off. config-digger
+ *  never lifts it.
+ */
+"disabled_globally" | 
+/**  Managed policy keeps the Agent from using the Entry. */
+"policy" | 
+/**  The Agent has not approved the Entry, which it asks the user to do. */
+"not_approved" | 
+/**
+ *  The Entry is in a source of settings the Agent skips, since it reads
+ *  only the first that holds any.
+ */
+"source_skipped" | 
 /**  The Entry lacks the minimal shape the Agent requires of it. */
 "malformed_entry" | 
 /**  The Agent skips the skill because of its `SKILL.md` or its folder's name. */
@@ -636,6 +660,12 @@ export type State = "effective" | "shadowed" |
  *  config-digger.
  */
 "disabled" | 
+/**
+ *  The Agent will not use it because of a gate outside it that Enable
+ *  cannot lift, such as managed policy or a server not yet approved.
+ *  config-digger never lifts these gates.
+ */
+"blocked" | 
 /**
  *  The Agent rejects it on its own, such as a server missing what the
  *  Agent requires.

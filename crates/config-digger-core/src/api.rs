@@ -607,6 +607,7 @@ pub enum StateAfter {
     Effective,
     Shadowed,
     Disabled,
+    Blocked,
     Invalid,
     Unread,
     Removed,
@@ -618,6 +619,7 @@ impl From<State> for StateAfter {
             State::Effective => StateAfter::Effective,
             State::Shadowed => StateAfter::Shadowed,
             State::Disabled => StateAfter::Disabled,
+            State::Blocked => StateAfter::Blocked,
             State::Invalid => StateAfter::Invalid,
             State::Unread => StateAfter::Unread,
         }
@@ -1380,6 +1382,10 @@ pub enum State {
     /// The Agent skips it because a switch Disables it, natively or set by
     /// config-digger.
     Disabled,
+    /// The Agent will not use it because of a gate outside it that Enable
+    /// cannot lift, such as managed policy or a server not yet approved.
+    /// config-digger never lifts these gates.
+    Blocked,
     /// The Agent rejects it on its own, such as a server missing what the
     /// Agent requires.
     Invalid,
@@ -1410,6 +1416,19 @@ pub enum ReasonCode {
     DisabledByName,
     /// The Entry's own switch is off.
     DisabledNatively,
+    /// A rule in a settings file the user writes, such as a deny list,
+    /// leaves the Entry out. config-digger never lifts it.
+    DisabledByRule,
+    /// A setting that turns off every Entry it covers is off. config-digger
+    /// never lifts it.
+    DisabledGlobally,
+    /// Managed policy keeps the Agent from using the Entry.
+    Policy,
+    /// The Agent has not approved the Entry, which it asks the user to do.
+    NotApproved,
+    /// The Entry is in a source of settings the Agent skips, since it reads
+    /// only the first that holds any.
+    SourceSkipped,
     /// The Entry lacks the minimal shape the Agent requires of it.
     MalformedEntry,
     /// The Agent skips the skill because of its `SKILL.md` or its folder's name.
@@ -1554,6 +1573,9 @@ pub enum CaveatCode {
     /// that the Agent ignores its cache for, so it is resolved with the
     /// Agent's default.
     GateAssumed,
+    /// A settings file holding a rule or gate that could apply cannot be
+    /// read, so the Entry is resolved as if it held none.
+    SettingReadFailure,
 }
 
 /// A place in a file's text.

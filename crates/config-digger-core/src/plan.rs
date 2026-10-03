@@ -16,7 +16,7 @@ use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, Snapshot, SwitchStore};
-use crate::{explain, history, installations, resolve, running, scan, select};
+use crate::{explain, history, installations, resolve, rules, running, scan, select};
 use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -349,6 +349,17 @@ impl Targeted<'_> {
                 }
                 _ => {
                     let project = project.as_ref().map(|(_, key)| key.as_str());
+                    let ruled = rules::hits(definition, self.snapshot, scanned, project);
+                    let by_rule: Vec<&rules::RuleHit> = ruled
+                        .iter()
+                        .filter(|hit| hit.state == State::Disabled)
+                        .collect();
+                    if let Some(sentence) = rules::enable_not_offered(&by_rule) {
+                        return Err(Error::blocked(explain::enable_refused(
+                            &entry.locator,
+                            &sentence,
+                        )));
+                    }
                     let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
                     if disabling.is_empty() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));

@@ -232,8 +232,8 @@ fn a_disabled_malformed_server_would_be_invalid_once_enabled() {
     )
     .unwrap()
     .replace(
-        r#"checks = ["shape", "disable", "precedence"]"#,
-        r#"checks = ["disable", "shape", "precedence"]"#,
+        r#"checks = ["policy", "shape", "rules", "disable", "approval", "precedence"]"#,
+        r#"checks = ["policy", "rules", "disable", "shape", "approval", "precedence"]"#,
     )
     .replace(r#"id = "claude-code""#, r#"id = "claude-code-reordered""#);
     let inventory = inventory_of(

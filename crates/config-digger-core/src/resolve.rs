@@ -3,8 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    Compete, Condition, Conform, Holds, JsonFormat, Malformed, Parse, Provenance, SkillDefect,
-    SkillFallback,
+    Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse, Provenance,
+    SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -12,11 +12,11 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedReadFailure, Snapshot,
+    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedReadFailure, SettingOwner, Snapshot,
 };
-use crate::{explain, installations, locator, paths};
+use crate::{explain, installations, locator, paths, rules};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn resolve(
     definitions: &[AgentDefinition],
@@ -92,6 +92,7 @@ pub(crate) fn resolve(
         (missing.is_some() && entry.project.is_some())
             || is_broken(entry)
             || closed_gate(&definitions[entry.agent_index], snapshot, entry).is_some()
+            || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
     };
 
     let reactions: Vec<Reaction> = snapshot
@@ -166,6 +167,18 @@ pub(crate) fn resolve(
                         }
                     })
                     .unzip();
+            // The gates that Block each Entry, each with the check it belongs to.
+            let gated: Vec<Vec<(Check, api::Reason)>> = entries
+                .iter()
+                .map(|entry| gates(definition, snapshot, entry, project_key.map(String::as_str)))
+                .collect();
+            // The rules that keep each Entry out.
+            let ruled: Vec<Vec<rules::RuleHit>> = entries
+                .iter()
+                .map(|entry| {
+                    rules::hits(definition, snapshot, entry, project_key.map(String::as_str))
+                })
+                .collect();
             // An Invalid Entry competes only where the Agent still lists it,
             // and an Unread one or a skipped skill never does.
             let competes = |index: usize| {
@@ -178,10 +191,15 @@ pub(crate) fn resolve(
                             .as_ref()
                             .is_some_and(Conform::still_competes))
             };
-            // The Agent skips a Disabled Entry, and an Invalid one that does
-            // not compete, so the highest of the others wins.
-            let winner =
-                (0..entries.len()).find(|&index| hits[index].0.is_empty() && competes(index));
+            // The Agent skips a Disabled or Blocked Entry, and an Invalid one
+            // that does not compete, so the highest of the others wins.
+            let free = |index: usize| {
+                hits[index].0.is_empty()
+                    && gated[index].is_empty()
+                    && ruled[index].is_empty()
+                    && competes(index)
+            };
+            let winner = (0..entries.len()).find(|&index| free(index));
             let shadowed_by = |index: usize, winner: usize| {
                 explain::shadowed_by_precedence(
                     agent_name,
@@ -210,21 +228,56 @@ pub(crate) fn resolve(
                         let reason = explain::feature_gate(agent_name, gate, on);
                         return unread_entry(snapshot, entry, location, reason, gate_caveats);
                     }
+                    if let Some((settings, read)) = skipped_source(definition, snapshot, entry) {
+                        let reason = explain::source_skipped(agent_name, settings, read);
+                        return unread_entry(snapshot, entry, location, reason, gate_caveats);
+                    }
                     let origin = origin(location, entry);
                     let (disabling, partial) = &hits[index];
+                    // The rules outside policy that Disable it.
+                    let by_rule: Vec<&rules::RuleHit> = ruled[index]
+                        .iter()
+                        .filter(|hit| hit.state == api::State::Disabled)
+                        .collect();
                     // Each check the Entry fails, in the Agent's order.
-                    let mut failed: Vec<(api::State, api::Reason)> = Vec::new();
-                    for check in &definition.rules(kind).checks {
+                    let checks = &definition.rules(kind).checks;
+                    let mut failed: Vec<(Check, api::State, api::Reason)> = Vec::new();
+                    for &check in checks {
                         match check {
-                            Check::Disable => failed.extend(
-                                disabling
-                                    .iter()
-                                    .map(|hit| (api::State::Disabled, hit.reason(agent_name))),
+                            Check::Policy => {
+                                failed.extend(
+                                    gated[index].iter().filter(|(gate, _)| *gate == check).map(
+                                        |(_, reason)| (check, api::State::Blocked, reason.clone()),
+                                    ),
+                                );
+                                failed.extend(
+                                    ruled[index]
+                                        .iter()
+                                        .filter(|hit| hit.check == check)
+                                        .map(|hit| (check, hit.state, hit.reason.clone())),
+                                );
+                            }
+                            Check::Approval => failed.extend(
+                                gated[index].iter().filter(|(gate, _)| *gate == check).map(
+                                    |(_, reason)| (check, api::State::Blocked, reason.clone()),
+                                ),
                             ),
+                            Check::Rules => failed.extend(
+                                ruled[index]
+                                    .iter()
+                                    .filter(|hit| hit.check == check)
+                                    .map(|hit| (check, hit.state, hit.reason.clone())),
+                            ),
+                            Check::Disable => {
+                                failed.extend(disabling.iter().map(|hit| {
+                                    (check, api::State::Disabled, hit.reason(agent_name))
+                                }))
+                            }
                             Check::Shape => {
                                 if let Some(malformed) = &malformed[index] {
                                     let competes = competes(index);
                                     failed.push((
+                                        check,
                                         api::State::Invalid,
                                         explain::malformed_entry(agent_name, malformed, competes),
                                     ));
@@ -233,6 +286,7 @@ pub(crate) fn resolve(
                             Check::Frontmatter => {
                                 if let Some(defect) = skipped[index] {
                                     failed.push((
+                                        check,
                                         api::State::Invalid,
                                         explain::malformed_skill(agent_name, defect),
                                     ));
@@ -240,56 +294,87 @@ pub(crate) fn resolve(
                             }
                             Check::Precedence => {
                                 if let Some(winner) = winner.filter(|&winner| winner < index) {
-                                    failed.push((api::State::Shadowed, shadowed_by(index, winner)));
+                                    failed.push((
+                                        check,
+                                        api::State::Shadowed,
+                                        shadowed_by(index, winner),
+                                    ));
                                 }
                             }
                         }
                     }
-                    let mut failed = failed.into_iter();
-                    let (state, reason) = match failed.next() {
-                        Some((state, reason)) => (state, Some(reason)),
+                    let (state, reason) = match failed.first() {
+                        Some((_, state, reason)) => (*state, Some(reason.clone())),
                         None => (api::State::Effective, None),
                     };
-                    // Enable lifts every switch that Disables it, and with
-                    // them those of the Entries they Disable too.
-                    let what_if = (state == api::State::Disabled).then(|| {
-                        let lifted = |other: usize| {
-                            hits[other]
-                                .0
-                                .iter()
-                                .all(|hit| disabling.iter().any(|own| own.same_switch(hit)))
-                        };
-                        let winner = (0..entries.len())
-                            .find(|&other| lifted(other) && competes(other))
-                            .filter(|&winner| winner < index);
-                        let Some(winner) = winner else {
-                            let state = if malformed[index].is_some() || skipped[index].is_some() {
-                                api::State::Invalid
-                            } else {
-                                api::State::Effective
+                    // The State it would have once what sets its State is
+                    // lifted. Enable lifts every switch that Disables it, and
+                    // with them those of the Entries they Disable too.
+                    let what_if =
+                        matches!(state, api::State::Disabled | api::State::Blocked).then(|| {
+                            let lifted =
+                                |other: usize| match state {
+                                    api::State::Disabled => {
+                                        hits[other].0.iter().all(|hit| {
+                                            disabling.iter().any(|own| own.same_switch(hit))
+                                        }) && gated[other].is_empty()
+                                            && ruled[other].is_empty()
+                                            && competes(other)
+                                    }
+                                    _ => free(other),
+                                };
+                            let render = |next: api::State, shadowed_by: Option<(&str, &str)>| {
+                                if state == api::State::Disabled && by_rule.is_empty() {
+                                    explain::what_if(next, shadowed_by)
+                                } else {
+                                    explain::what_if_otherwise(state, next, shadowed_by)
+                                }
                             };
-                            return api::WhatIf {
-                                state,
+                            for &check in checks {
+                                if check == Check::Precedence {
+                                    let Some(winner) = (0..index).find(|&other| lifted(other))
+                                    else {
+                                        continue;
+                                    };
+                                    let scope =
+                                        &definition.location(&entries[winner].location).scope;
+                                    let effective = locator::render(
+                                        &entries[winner].path,
+                                        &entries[winner].key_path,
+                                    );
+                                    return api::WhatIf {
+                                        state: api::State::Shadowed,
+                                        sentence: render(
+                                            api::State::Shadowed,
+                                            Some((scope, &effective)),
+                                        ),
+                                        effective: Some(effective),
+                                    };
+                                }
+                                let next = failed
+                                    .iter()
+                                    .find(|(failed, next, _)| *failed == check && *next != state);
+                                if let Some((_, next, _)) = next {
+                                    return api::WhatIf {
+                                        state: *next,
+                                        effective: None,
+                                        sentence: render(*next, None),
+                                    };
+                                }
+                            }
+                            api::WhatIf {
+                                state: api::State::Effective,
                                 effective: None,
-                                sentence: explain::what_if(state, None),
-                            };
-                        };
-                        let scope = &definition.location(&entries[winner].location).scope;
-                        let effective =
-                            locator::render(&entries[winner].path, &entries[winner].key_path);
-                        api::WhatIf {
-                            state: api::State::Shadowed,
-                            sentence: explain::what_if(
-                                api::State::Shadowed,
-                                Some((scope, &effective)),
-                            ),
-                            effective: Some(effective),
-                        }
+                                sentence: render(api::State::Effective, None),
+                            }
+                        });
+                    // Enable lifts no rule.
+                    let enable = rules::enable_not_offered(&by_rule).or_else(|| {
+                        (!disabling.is_empty()).then(|| {
+                            disable::enable(location, disabling).unwrap_or_else(|refused| refused)
+                        })
                     });
-                    let enable = (!disabling.is_empty()).then(|| {
-                        disable::enable(location, disabling).unwrap_or_else(|refused| refused)
-                    });
-                    let disable = if disabling.is_empty() {
+                    let disable = if disabling.is_empty() && by_rule.is_empty() {
                         disable::option(definition, snapshot, entry, context_project.as_ref())
                     } else {
                         api::DisableOption::NotOffered {
@@ -308,7 +393,11 @@ pub(crate) fn resolve(
                         link: link(entry),
                         state,
                         reason,
-                        secondary: failed.map(|(_, reason)| reason).collect(),
+                        secondary: failed
+                            .into_iter()
+                            .skip(1)
+                            .map(|(_, _, reason)| reason)
+                            .collect(),
                         what_if,
                         notes: fallbacks[index]
                             .map(|defect| api::Note {
@@ -332,18 +421,13 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
-                        caveats: disable::failed_switch_files(
+                        caveats: read_failure_caveats(
                             definition,
                             snapshot,
                             entry,
                             context_project.as_ref(),
                         )
                         .into_iter()
-                        .map(|path| api::Caveat {
-                            code: api::CaveatCode::SwitchReadFailure,
-                            sentence: explain::switch_read_failure(&path),
-                            path,
-                        })
                         .chain(gate_caveats)
                         .collect(),
                     }
@@ -656,6 +740,105 @@ fn origin(location: &LocationDefinition, entry: &ScannedEntry) -> Origin {
             sentence: explain::provenance_by_name_only(&definition.manager.name),
         }),
     }
+}
+
+/// A caveat per file that cannot be read and holds a Disable switch, a
+/// rule or a gate that could apply to `entry` in the context of `project`,
+/// each file once.
+fn read_failure_caveats(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&ContextProject>,
+) -> Vec<api::Caveat> {
+    let switches = disable::failed_switch_files(definition, snapshot, entry, project);
+    let settings = rules::failed_files(
+        definition,
+        snapshot,
+        entry,
+        project.map(|project| project.path),
+    );
+    let mut caveats: Vec<api::Caveat> = switches
+        .iter()
+        .map(|path| api::Caveat {
+            code: api::CaveatCode::SwitchReadFailure,
+            sentence: explain::switch_read_failure(path),
+            path: path.clone(),
+        })
+        .collect();
+    caveats.extend(
+        settings
+            .into_iter()
+            .filter(|path| !switches.contains(path))
+            .map(|path| api::Caveat {
+                code: api::CaveatCode::SettingReadFailure,
+                sentence: explain::setting_read_failure(&path),
+                path,
+            }),
+    );
+    caveats
+}
+
+/// For an Entry in a source of settings the Agent skips, the settings' id
+/// and the first file of the source it reads instead.
+fn skipped_source<'s>(
+    definition: &AgentDefinition,
+    snapshot: &'s Snapshot,
+    entry: &ScannedEntry,
+) -> Option<(&'s str, &'s Path)> {
+    let id = definition.location(&entry.location).anchor.settings()?;
+    let settings = snapshot.settings_of(entry.agent_index, id);
+    if !settings.skips(&entry.path) {
+        return None;
+    }
+    Some((&settings.id, settings.read().first()?))
+}
+
+/// The gates of its Item kind that Block `entry` in the context of the
+/// Project with the key `project`, each with the check it belongs to and
+/// why, in the definition's order.
+fn gates(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Vec<(Check, api::Reason)> {
+    let location = definition.location(&entry.location);
+    let roots = snapshot.roots(entry.agent_index, &entry.home);
+    let agent_name = &definition.agent.name;
+    definition
+        .rules(location.kind)
+        .gates
+        .iter()
+        .enumerate()
+        .filter(|(_, gate)| gate.covers(&location.id))
+        .filter_map(|(index, gate)| match gate {
+            Gate::ManagedExclusive(block) => {
+                let path = definition
+                    .location(&block.location)
+                    .anchor
+                    .path(roots, None)
+                    .filter(|path| snapshot.exclusive.contains(path))?;
+                let reason = explain::managed_exclusive(agent_name, &path, location.kind.items());
+                Some((Check::Policy, reason))
+            }
+            Gate::ApprovalList(block) => {
+                let approved = (0..block.sources.len()).any(|source| {
+                    let owner = SettingOwner::Gate {
+                        gate: index,
+                        source,
+                    };
+                    snapshot
+                        .settings_for(entry, location.kind, owner, project)
+                        .filter_map(|value| value.value.as_ref())
+                        .any(|value| block.approves(value, &entry.name))
+                });
+                let reason =
+                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);
+                (!approved).then_some((Check::Approval, reason))
+            }
+        })
+        .collect()
 }
 
 /// Whether the Feature gate `name` of the Agent home of `entry` is on: the

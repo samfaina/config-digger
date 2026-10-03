@@ -10,11 +10,18 @@ const HOME: &str = r"C:\Users\fixture";
 const PETME: &str = r"E:\projects\petme-app";
 const CLAUDE_JSON: &[u8] = include_bytes!("fixtures/claude-code-projects/home/.claude.json");
 const MCP_JSON: &[u8] = include_bytes!("fixtures/claude-code-projects/petme-app/.mcp.json");
+const SETTINGS: &[u8] =
+    include_bytes!("fixtures/claude-code-projects/petme-app/.claude/settings.json");
 
+/// petme-app approves every `.mcp.json` server in its `settings.json`.
 fn fixture() -> FakeFileSystem {
     FakeFileSystem::new()
         .with_file(PathBuf::from(HOME).join(".claude.json"), CLAUDE_JSON)
         .with_file(PathBuf::from(PETME).join(".mcp.json"), MCP_JSON)
+        .with_file(
+            PathBuf::from(PETME).join(r".claude\settings.json"),
+            SETTINGS,
+        )
 }
 
 fn core(fs: FakeFileSystem) -> Core {
@@ -236,10 +243,15 @@ fn a_missing_project_is_matched_lexically() {
 
 #[test]
 fn a_project_no_registry_knows_is_evaluated_when_asked_for() {
-    let fs = fixture().with_file(
-        r"E:\scratch\.mcp.json",
-        r#"{"mcpServers": {"scratchpad": {"command": "x"}}}"#,
-    );
+    let fs = fixture()
+        .with_file(
+            r"E:\scratch\.mcp.json",
+            r#"{"mcpServers": {"scratchpad": {"command": "x"}}}"#,
+        )
+        .with_file(
+            r"E:\scratch\.claude\settings.local.json",
+            r#"{"enabledMcpjsonServers": ["scratchpad"]}"#,
+        );
     let core = core(fs);
     let snapshot = core
         .scan(&ScanOptions {

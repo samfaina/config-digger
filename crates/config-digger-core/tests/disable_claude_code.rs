@@ -21,6 +21,8 @@ const MCP_JSON: &[u8] = include_bytes!("fixtures/claude-code-disabled/petme-app/
 const BUILT_IN_CLAUDE_CODE: &[u8] = include_bytes!("../definitions/claude-code.toml");
 const SETTINGS_LOCAL: &[u8] =
     include_bytes!("fixtures/claude-code-disabled/petme-app/.claude/settings.local.json");
+const SETTINGS: &[u8] =
+    include_bytes!("fixtures/claude-code-disabled/petme-app/.claude/settings.json");
 
 fn claude_json() -> PathBuf {
     PathBuf::from(HOME).join(".claude.json")
@@ -35,13 +37,18 @@ fn settings_local() -> PathBuf {
 }
 
 /// `~/.claude.json` Disables `linear` by name in petme-app, and its
-/// `settings.local.json` Disables the `.mcp.json` server `github`.
+/// `settings.local.json` Disables the `.mcp.json` server `github`. Its
+/// `settings.json` approves every `.mcp.json` server.
 fn fixture() -> FakeFileSystem {
     FakeFileSystem::new()
         .with_folder(PETME)
         .with_file(claude_json(), CLAUDE_JSON)
         .with_file(mcp_json(), MCP_JSON)
         .with_file(settings_local(), SETTINGS_LOCAL)
+        .with_file(
+            PathBuf::from(PETME).join(r".claude\settings.json"),
+            SETTINGS,
+        )
 }
 
 fn core(fs: &FakeFileSystem) -> Core {
@@ -194,8 +201,8 @@ fn the_state_comes_from_the_first_failed_check_in_the_definitions_order() {
     let definition = String::from_utf8(BUILT_IN_CLAUDE_CODE.to_vec())
         .unwrap()
         .replace(
-            r#"checks = ["shape", "disable", "precedence"]"#,
-            r#"checks = ["shape", "precedence", "disable"]"#,
+            r#"checks = ["policy", "shape", "rules", "disable", "approval", "precedence"]"#,
+            r#"checks = ["policy", "shape", "rules", "approval", "precedence", "disable"]"#,
         )
         .replace(r#"id = "claude-code""#, r#"id = "claude-code-reordered""#);
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
@@ -853,7 +860,7 @@ fn disabled_mcpjson_servers_is_read_from_every_file_claude_code_reads_it_from() 
         .with_file(settings_local(), "{}")
         .with_file(
             shared_settings(),
-            r#"{ "disabledMcpjsonServers": ["github"] }"#,
+            r#"{ "disabledMcpjsonServers": ["github"], "enableAllProjectMcpServers": true }"#,
         )
         .with_file(
             user_settings(),

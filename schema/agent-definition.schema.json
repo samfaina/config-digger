@@ -67,6 +67,13 @@
         "$ref": "#/$defs/ScopeDefinition"
       }
     },
+    "settings": {
+      "description": "Sets of settings the Agent reads from the first of several sources\nthat holds any, such as managed settings.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SettingsDefinition"
+      }
+    },
     "projects": {
       "description": "Where this Agent records the Projects it has been started on.",
       "$ref": "#/$defs/ProjectsDefinition"
@@ -384,6 +391,25 @@
             "block",
             "path"
           ]
+        },
+        {
+          "description": "The settings a definition's `[[settings]]` names, read from whichever of\nits sources applies. Only a location can read them.",
+          "type": "object",
+          "properties": {
+            "settings": {
+              "description": "The id of a declared `[[settings]]`.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "settings"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "settings"
+          ]
         }
       ]
     },
@@ -541,6 +567,87 @@
       "additionalProperties": false,
       "required": [
         "id"
+      ]
+    },
+    "SettingsDefinition": {
+      "description": "One set of settings, which the Agent reads from the first of its\nsources that holds any setting, and from no other. Entries in the\nothers are Unread.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Unique in the definition, such as `managed`.",
+          "type": "string"
+        },
+        "sources": {
+          "description": "Highest first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingsSource"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sources"
+      ]
+    },
+    "SettingsSource": {
+      "description": "Where an Agent can read one set of its settings, such as the managed\nsettings an organisation deploys.",
+      "oneOf": [
+        {
+          "description": "A string value in the Windows registry holding JSON, such as Claude\nCode's `Settings` under `HKLM\\SOFTWARE\\Policies\\ClaudeCode`. It is shown\nas `<HKLM|HKCU>\\<key>\\<value>`.",
+          "type": "object",
+          "properties": {
+            "hive": {
+              "$ref": "#/$defs/RegistryHive"
+            },
+            "key": {
+              "description": "The key below the hive, `\\`-separated.",
+              "type": "string"
+            },
+            "value": {
+              "description": "The value's name.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "registry-value"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "hive",
+            "key",
+            "value"
+          ]
+        },
+        {
+          "description": "A JSON file on the machine, and the `.json` files of a drop-in folder,\nby name, read after it, such as Claude Code's `managed-settings.json`\nand `managed-settings.d`. They are one source.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "Starts with `%NAME%` or a drive; `/`-separated.",
+              "type": "string"
+            },
+            "drop_ins": {
+              "description": "The drop-in folder, written as `path` is.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "files"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "path"
+          ]
+        }
       ]
     },
     "ProjectsDefinition": {
@@ -1120,6 +1227,20 @@
           "items": {
             "$ref": "#/$defs/DisableMechanism"
           }
+        },
+        "gates": {
+          "description": "What keeps the Agent from using an Entry whatever it declares, such\nas managed policy: config-digger never lifts these.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Gate"
+          }
+        },
+        "rules": {
+          "description": "Settings that keep Entries out by a rule rather than one by one,\nsuch as deny lists: config-digger never writes them.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
         }
       },
       "additionalProperties": false,
@@ -1152,9 +1273,24 @@
       "description": "One of an Agent's checks that decides an Entry's State.",
       "oneOf": [
         {
+          "description": "Managed policy keeps the Agent from using the Entry: Blocked, with\n`policy`. Required when a gate of the kind is policy, and refused\notherwise.",
+          "type": "string",
+          "const": "policy"
+        },
+        {
           "description": "A Disable mechanism's switch is set for the Entry: Disabled.",
           "type": "string",
           "const": "disable"
+        },
+        {
+          "description": "The Agent has not approved the Entry: Blocked, with `not_approved`.\nRequired when a gate of the kind is an approval list, and refused\notherwise.",
+          "type": "string",
+          "const": "approval"
+        },
+        {
+          "description": "A rule outside managed policy keeps the Entry out: Disabled, with\n`disabled_by_rule` or `disabled_globally`. Required when a rule of\nthe kind has a source that is not policy, and refused otherwise.",
+          "type": "string",
+          "const": "rules"
         },
         {
           "description": "A same-named Entry the Agent ranks higher is not Disabled: Shadowed.",
@@ -1380,6 +1516,228 @@
           "const": "disabled_natively"
         }
       ]
+    },
+    "Gate": {
+      "description": "Something outside an Entry that keeps the Agent from using it, which\nEnable cannot lift and config-digger never lifts: the Entry is Blocked.",
+      "oneOf": [
+        {
+          "description": "A managed file that takes exclusive control while it exists, even\nempty: the Agent then loads no Entry of the kind from any other\nlocation but those it exempts, which are Blocked by `policy`. Such as\nClaude Code's `managed-mcp.json`.",
+          "type": "object",
+          "properties": {
+            "location": {
+              "description": "The id of the location whose file takes control, outside any Project.",
+              "type": "string"
+            },
+            "except": {
+              "description": "The ids of the other locations it leaves alone, such as servers the\nmanaged settings declare.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "managed-exclusive"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "location"
+          ]
+        },
+        {
+          "description": "Entries the Agent uses only once the user approves them, such as Claude\nCode's `.mcp.json` servers: one no source approves is Blocked, with\n`not_approved`. config-digger never approves an Entry.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need approval.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where approvals are: a list of the names approved, or `true`,\nwhich approves every Entry.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "prompt": {
+              "description": "Where the Agent asks the user to approve an Entry.",
+              "$ref": "#/$defs/ApprovalPrompt"
+            },
+            "block": {
+              "type": "string",
+              "const": "approval-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "prompt"
+          ]
+        }
+      ]
+    },
+    "SettingPlace": {
+      "description": "A value an Agent reads from one of its settings files, such as the list\na rule holds. config-digger only reads it.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the value. One segment may be `{project}`: the\ncontext's Project key, in the Agent's own spelling, so that the\nvalue applies only there.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policy": {
+          "description": "The value is managed policy: what it keeps out is Blocked, by\n`policy`, rather than Disabled.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
+      ]
+    },
+    "ApprovalPrompt": {
+      "description": "Where an Agent asks the user to approve an Entry.",
+      "oneOf": [
+        {
+          "description": "When it starts in the Project.",
+          "type": "string",
+          "const": "on-start"
+        }
+      ]
+    },
+    "Rule": {
+      "description": "A setting that keeps Entries out by a rule rather than one by one, such\nas a deny list: the Entries it keeps out are Disabled, or Blocked when\nthe setting is policy. config-digger never writes it, so Enable is not\noffered.",
+      "oneOf": [
+        {
+          "description": "Lists of servers, each item naming servers by name, command or URL,\nmerged from every source that holds one. A deny list keeps out every\nserver an item matches. An allow list, once any source holds one, keeps\nout every server no item matches: an empty one keeps out all of them.",
+          "type": "object",
+          "properties": {
+            "list": {
+              "$ref": "#/$defs/ListKind"
+            },
+            "sources": {
+              "description": "Where the lists are. A server an allow list keeps out is Blocked\nwhen any allow list is policy.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "match": {
+              "description": "The field of an item that matches each part of a server.",
+              "$ref": "#/$defs/ItemFields"
+            },
+            "strict": {
+              "description": "When the allow list holds an item matching by command, a server\nwith a command is allowed only by such an item, and when it holds\none matching by URL, a remote server only by such an item.",
+              "type": "boolean",
+              "default": false
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it covers. Omitted, it covers\nevery location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "allow-deny-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "list",
+            "sources",
+            "match"
+          ]
+        },
+        {
+          "description": "A setting that turns off every Entry it covers while it holds `off`,\nsuch as Claude Code's `syncClaudeAiSkills: false`. The first source\nthat holds it decides; the Entries are Disabled globally, or Blocked\nwhen that source is policy.",
+          "type": "object",
+          "properties": {
+            "sources": {
+              "description": "Highest first.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "off": {
+              "description": "The value that turns the Entries off."
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it covers. Omitted, it covers\nevery location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "global-switch"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "sources",
+            "off"
+          ]
+        }
+      ]
+    },
+    "ListKind": {
+      "description": "Whether a list keeps out what it matches or what it does not.",
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny"
+      ]
+    },
+    "ItemFields": {
+      "description": "The fields of a list item, each matching one part of a server on the\ncommon server model.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Holds a server name, matched exactly.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "command": {
+          "description": "Holds the command and its args as one list, matched exactly.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "Holds a URL, where `*` stands for any text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "FeatureGateDefinition": {
       "description": "A switch on the Agent vendor's side, such as whether Claude Code syncs\nskills from claude.ai. config-digger sees at most the value the Agent\nlast cached, shown as of when it cached it; otherwise it assumes the\nAgent's default. Every Entry it affects gets a caveat saying which.",

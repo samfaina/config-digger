@@ -5,7 +5,7 @@ use crate::api::{
     Action, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
     State, Verify,
 };
-use crate::definitions::blocks::{FieldType, Malformed, SkillDefect};
+use crate::definitions::blocks::{ApprovalPrompt, FieldType, Malformed, MatchedBy, SkillDefect};
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
 use serde_json::Value;
@@ -59,6 +59,21 @@ pub(crate) fn link_broken(agent_name: &str, target: &Path) -> Reason {
         sentence: format!(
             "{agent_name} reads nothing here: the link points to {}, which is gone. It can only be Removed.",
             target.display()
+        ),
+    }
+}
+
+/// An Unread Entry's reason: it is in a source of `agent_name`'s settings
+/// `settings` that it skips, since it reads them only from `read`, the
+/// first that holds any.
+pub(crate) fn source_skipped(agent_name: &str, settings: &str, read: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::SourceSkipped,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} never reads it: it reads its {settings} settings only from the first source that holds any, which is {}.",
+            read.display()
         ),
     }
 }
@@ -283,12 +298,156 @@ pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
 /// Shadowed by the `scope` Entry `effective`.
 pub(crate) fn what_if(state: State, shadowed_by: Option<(&str, &str)>) -> String {
     match shadowed_by {
-        None if state == State::Invalid => "Disabled: would be Invalid once Enabled.".to_owned(),
-        None => "Disabled: would be Effective once Enabled.".to_owned(),
+        None => format!("Disabled: would be {} once Enabled.", state_name(state)),
         Some((scope, effective)) => {
             format!("Disabled: would be Shadowed by the {scope} Entry {effective} once Enabled.")
         }
     }
+}
+
+/// The State an Entry whose State is `from` would have without what sets
+/// it, which Enable does not lift: `state`, or Shadowed by the `scope`
+/// Entry `effective`.
+pub(crate) fn what_if_otherwise(
+    from: State,
+    state: State,
+    shadowed_by: Option<(&str, &str)>,
+) -> String {
+    let from = state_name(from);
+    match shadowed_by {
+        None => format!("{from}: would otherwise be {}.", state_name(state)),
+        Some((scope, effective)) => {
+            format!("{from}: would otherwise be Shadowed by the {scope} Entry {effective}.")
+        }
+    }
+}
+
+/// A State as a sentence names it.
+fn state_name(state: State) -> &'static str {
+    match state {
+        State::Effective => "Effective",
+        State::Shadowed => "Shadowed",
+        State::Disabled => "Disabled",
+        State::Blocked => "Blocked",
+        State::Invalid => "Invalid",
+        State::Unread => "Unread",
+    }
+}
+
+/// A Blocked Entry's reason: the managed file `path`, which `agent_name`
+/// reads, takes exclusive control of its `items`.
+pub(crate) fn managed_exclusive(agent_name: &str, path: &Path, items: &str) -> Reason {
+    Reason {
+        code: ReasonCode::Policy,
+        effective: None,
+        switch: Some(path.display().to_string()),
+        sentence: format!(
+            "Blocked by policy: {} takes exclusive control, so {agent_name} loads only the {items} its administrator manages.",
+            path.display()
+        ),
+    }
+}
+
+/// A Blocked Entry's reason: `agent_name` has not approved the Entry
+/// `name` of the file `path`, which it asks about in the way `prompt` says.
+pub(crate) fn not_approved(
+    agent_name: &str,
+    name: &str,
+    path: &Path,
+    prompt: ApprovalPrompt,
+) -> Reason {
+    let asks = match prompt {
+        ApprovalPrompt::OnStart => "which asks about it when it starts in this Project",
+    };
+    Reason {
+        code: ReasonCode::NotApproved,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {asks}; config-digger never approves servers.",
+            path.display()
+        ),
+    }
+}
+
+/// A setting, by its last key, in `path`.
+pub(crate) fn setting(key: &str, path: &Path) -> String {
+    format!("`{key}` in {}", path.display())
+}
+
+/// How a rule keeps an Entry out: Blocked by policy when `policy`,
+/// Disabled by rule otherwise, with `why` and the verb that ends it.
+fn kept_out(policy: bool, code: ReasonCode, why: &str, agent_name: &str) -> Reason {
+    let sentence = if policy {
+        format!("Blocked by policy: {why}, so {agent_name} does not load it.")
+    } else {
+        let kind = match code {
+            ReasonCode::DisabledGlobally => "globally",
+            _ => "by rule",
+        };
+        format!("Disabled {kind}: {why}, so {agent_name} skips it.")
+    };
+    Reason {
+        code: if policy { ReasonCode::Policy } else { code },
+        effective: None,
+        switch: None,
+        sentence,
+    }
+}
+
+/// The reason of an Entry the deny list `key` in `path` names `by` its
+/// name, command or URL.
+pub(crate) fn denied(
+    policy: bool,
+    key: &str,
+    path: &Path,
+    by: MatchedBy,
+    agent_name: &str,
+) -> Reason {
+    let by = match by {
+        MatchedBy::Name => "name",
+        MatchedBy::Command => "command",
+        MatchedBy::Url => "URL",
+    };
+    let why = format!("{} names it by {by}", setting(key, path));
+    kept_out(policy, ReasonCode::DisabledByRule, &why, agent_name)
+}
+
+/// The reason of an Entry nothing in the allow lists `key` in `paths` matches.
+pub(crate) fn not_allowed(policy: bool, key: &str, paths: &[&Path], agent_name: &str) -> Reason {
+    let why = format!(
+        "`{key}` in {} names nothing that matches it",
+        path_list(paths)
+    );
+    kept_out(policy, ReasonCode::DisabledByRule, &why, agent_name)
+}
+
+/// The reason of an Entry the switch `key` in `path` turns off, holding `value`.
+pub(crate) fn switched_off(
+    policy: bool,
+    key: &str,
+    value: &Value,
+    path: &Path,
+    agent_name: &str,
+) -> Reason {
+    let why = format!("`{key}` is {value} in {}", path.display());
+    kept_out(policy, ReasonCode::DisabledGlobally, &why, agent_name)
+}
+
+/// What Enable says of an Entry the rule `holds` keeps out.
+pub(crate) fn rule_enable_not_offered(holds: &str) -> String {
+    format!(
+        "Enable is not offered: {holds} is a rule config-digger never lifts; change it there by hand."
+    )
+}
+
+/// The caveat of an Entry when the file at `path`, holding a rule or gate
+/// that could keep it out, cannot be read.
+pub(crate) fn setting_read_failure(path: &Path) -> String {
+    format!(
+        "{} couldn't be read, so whether a rule or gate there keeps this Entry out is not known: it is shown as if none did.",
+        path.display()
+    )
 }
 
 /// An Entry, by locator, that a switch reaches beyond what an action targets.
