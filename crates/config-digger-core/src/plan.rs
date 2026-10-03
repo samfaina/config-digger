@@ -4,7 +4,7 @@
 
 use crate::api::{
     self, Action, Change, Context, EditSummary, EffectiveChange, Error, FileChange, Inventory,
-    Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning,
+    Preview, ReadFailure, ScanOptions, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::Parse;
@@ -84,6 +84,11 @@ pub(crate) fn plan(
             Action::Undo => {
                 return Err(Error::unexpected(
                     "an Undo targets an Operation, not Entries: plan it with plan_undo",
+                ));
+            }
+            Action::DeleteBackup => {
+                return Err(Error::unexpected(
+                    "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
                 ));
             }
         };
@@ -182,6 +187,52 @@ pub(crate) fn plan_undo(
         preview,
         warnings: Vec::new(),
         read_failures: before.read_failures,
+    })
+}
+
+/// Plans the deletion of the backup of the Operation `id` in History: the
+/// copies it deletes, and when the Operation needs attention, the warning
+/// that they are the only copy for manual recovery. It writes no
+/// configuration, so it has no context, edits or States.
+pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Error> {
+    let manifests = history::load_all(ports)?;
+    let manifest = history::find(&manifests, id)?;
+    let folder = history::operation_folder(ports, id)?;
+    let deleted = history::backup_copies(ports, &folder, manifest);
+    if history::backup_already_deleted(manifest, &deleted) {
+        return Err(Error::blocked(format!(
+            "the backup of Operation {id} was already deleted"
+        )));
+    }
+    let mut warnings = Vec::new();
+    if manifest.needs_attention() {
+        warnings.push(Warning {
+            class: WarningClass::NeedsAttention,
+            sentence: explain::only_copy_for_recovery(id),
+        });
+    }
+    let preview = Preview {
+        action: Action::DeleteBackup,
+        title: explain::delete_backup_title(id, &manifest.title),
+        undo_of: None,
+        backup_of: Some(id.to_owned()),
+        project: None,
+        changes: Vec::new(),
+        effective: Vec::new(),
+        files: Vec::new(),
+        deleted,
+        backup_note: explain::delete_backup_note(id),
+        backup_folder: folder,
+    };
+    Ok(Planned {
+        action: Action::DeleteBackup,
+        entries: 0,
+        context: Context::default(),
+        scan_options: ScanOptions::default(),
+        files: Vec::new(),
+        preview,
+        warnings,
+        read_failures: Vec::new(),
     })
 }
 
@@ -392,6 +443,7 @@ fn preview(
         action,
         title,
         undo_of,
+        backup_of: None,
         project: before.project.clone(),
         changes,
         effective,
@@ -408,6 +460,7 @@ fn preview(
                 diff: file.edited.diff.clone(),
             })
             .collect(),
+        deleted: Vec::new(),
         backup_note: explain::backup_note(&backup_folder),
         backup_folder,
     })

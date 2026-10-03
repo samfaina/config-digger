@@ -114,6 +114,15 @@ impl Core {
         plan::plan_undo(&self.definitions, &self.ports, id).map(Plan)
     }
 
+    /// Plans the deletion of the backup of the Operation `id`, such as one
+    /// holding Secrets: its copies go for good, and so do the values of its
+    /// edits in History, so it can no longer be undone. When the Operation
+    /// needs attention, the plan warns that the backup is the only copy for
+    /// manual recovery, and executing it dismisses the Operation.
+    pub fn plan_delete_backup(&self, id: &str) -> Result<Plan, Error> {
+        plan::plan_delete_backup(&self.ports, id).map(Plan)
+    }
+
     /// Every Operation in History, newest first, across restarts.
     pub fn history(&self) -> Result<Vec<OperationSummary>, Error> {
         Ok(history::summaries(
@@ -154,6 +163,9 @@ pub enum Action {
     /// Applies the inverse of every edit of an earlier Operation to the files
     /// as they are now.
     Undo,
+    /// Deletes the backup of an earlier Operation, which can no longer be
+    /// undone afterwards.
+    DeleteBackup,
 }
 
 /// The Entries an action targets.
@@ -189,6 +201,8 @@ pub struct Preview {
     pub title: String,
     /// The Operation this one undoes, when it is an Undo.
     pub undo_of: Option<String>,
+    /// The Operation whose backup it deletes, when it is a Delete backup.
+    pub backup_of: Option<String>,
     /// The context's Project, as in [`Inventory::project`].
     pub project: Option<PathBuf>,
     /// One row per (Agent, Entry, Project) whose State the Operation changes.
@@ -196,7 +210,10 @@ pub struct Preview {
     /// For each Item that keeps Entries, which one is Effective afterwards.
     pub effective: Vec<EffectiveChange>,
     pub files: Vec<FileChange>,
-    /// Where each touched file is copied before anything is written.
+    /// The backed-up copies a Delete backup deletes for good.
+    pub deleted: Vec<PathBuf>,
+    /// Where each touched file is copied before anything is written, or for
+    /// a Delete backup, the folder it deletes the copies from.
     pub backup_folder: PathBuf,
     /// The same, as a sentence.
     pub backup_note: String,
@@ -259,13 +276,13 @@ pub struct FileChange {
     pub diff: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct EditSummary {
     pub op: EditOp,
     pub key_path: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum EditOp {
     Remove,
@@ -309,6 +326,9 @@ pub enum WarningClass {
     WideReach,
     /// An Agent that reads or rewrites the file is running.
     RunningAgent,
+    /// The backup a Delete backup deletes is the only copy for the manual
+    /// recovery of an Operation that needs attention.
+    NeedsAttention,
 }
 
 impl WarningClass {
@@ -318,6 +338,7 @@ impl WarningClass {
             WarningClass::GitVersioned => "git-versioned",
             WarningClass::WideReach => "wide-reach",
             WarningClass::RunningAgent => "running-agent",
+            WarningClass::NeedsAttention => "needs-attention",
         }
     }
 }
@@ -416,6 +437,8 @@ pub struct OperationSummary {
     pub undo_of: Option<String>,
     /// The Undo of this Operation, while that Undo is in effect.
     pub undone_by: Option<String>,
+    /// Its backup was deleted, and with it the values of its edits.
+    pub backup_deleted: bool,
     /// The names of the Agents whose States it changed.
     pub agents: Vec<String>,
     /// The files it touched.
@@ -450,7 +473,7 @@ pub struct OperationDetail {
 pub struct OperationLocation {
     pub path: PathBuf,
     /// Its copy as it was before the Operation, or `None` when the Operation
-    /// created the file.
+    /// created the file or its backup was deleted.
     pub backup: Option<PathBuf>,
     pub edits: Vec<EditSummary>,
 }

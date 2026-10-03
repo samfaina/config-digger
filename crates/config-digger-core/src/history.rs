@@ -4,7 +4,7 @@
 
 use crate::api::{
     Action, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
-    OperationStatus, OperationSummary, Preview, RollbackLocation, Verify,
+    OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
 };
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::ports::{Environment, HeldLock, Ports};
@@ -112,6 +112,9 @@ pub(crate) struct Manifest {
     /// When the user dismissed an Operation that needed attention, in RFC 3339.
     #[serde(default)]
     pub dismissed_at: Option<String>,
+    /// When the user deleted its backup, in RFC 3339.
+    #[serde(default)]
+    pub backup_deleted_at: Option<String>,
 }
 
 impl Manifest {
@@ -132,6 +135,7 @@ impl Manifest {
             verify: None,
             rollback: Vec::new(),
             dismissed_at: None,
+            backup_deleted_at: None,
         }
     }
 
@@ -158,7 +162,24 @@ pub(crate) struct LocationRecord {
     pub sha256_before: Option<String>,
     /// Of the bytes written.
     pub sha256_after: String,
+    /// Empty once the backup is deleted, since edit values may hold Secrets.
     pub edits: Vec<EditRecord>,
+    /// What each edit did, without its values, once the backup is deleted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deleted_edits: Vec<EditSummary>,
+}
+
+impl LocationRecord {
+    /// What each edit did, whether or not the backup was deleted.
+    fn edit_summaries(&self) -> Vec<EditSummary> {
+        if self.edits.is_empty() {
+            return self.deleted_edits.clone();
+        }
+        self.edits
+            .iter()
+            .map(|record| EditSummary::from(&record.edit))
+            .collect()
+    }
 }
 
 /// One edit, with what Undo needs (ADR 0003).
@@ -267,11 +288,13 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
             manifest.dismissed_at.is_some(),
             manifest.undo_of.as_deref(),
             undone_by.as_deref(),
+            manifest.backup_deleted_at.is_some(),
         ),
         cause: manifest.cause.clone(),
         needs_attention: manifest.needs_attention(),
         undo_of: manifest.undo_of.clone(),
         undone_by,
+        backup_deleted: manifest.backup_deleted_at.is_some(),
         agents,
         locations: manifest
             .locations
@@ -295,7 +318,9 @@ pub(crate) fn find<'m>(manifests: &'m [Manifest], id: &str) -> Result<&'m Manife
 /// History does not stop it. Whether its files still allow it is up to
 /// [`plan::undo_files`].
 pub(crate) fn not_undoable(manifest: &Manifest, manifests: &[Manifest]) -> Option<String> {
-    if let Some(reason) = explain::not_undoable(manifest.status) {
+    if let Some(reason) =
+        explain::not_undoable(manifest.status, manifest.backup_deleted_at.is_some())
+    {
         return Some(reason);
     }
     undone_by(&manifest.id, manifests).map(|undo| explain::already_undone(&undo.id))
@@ -325,12 +350,12 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
             .iter()
             .map(|location| OperationLocation {
                 path: location.path.clone(),
-                backup: location.backup.as_ref().map(|backup| folder.join(backup)),
-                edits: location
-                    .edits
-                    .iter()
-                    .map(|record| EditSummary::from(&record.edit))
-                    .collect(),
+                backup: location
+                    .backup
+                    .as_ref()
+                    .filter(|_| manifest.backup_deleted_at.is_none())
+                    .map(|backup| folder.join(backup)),
+                edits: location.edit_summaries(),
             })
             .collect(),
         cause: manifest.cause.clone(),
@@ -369,6 +394,94 @@ pub(crate) fn dismiss(ports: &Ports, id: &str) -> Result<OperationSummary, Error
     record(ports, &backups_folder(&data).join(id), &manifests[index]).map_err(Error::unexpected)?;
     tracing::info!(operation = %id, "operation dismissed");
     Ok(summary(ports, &manifests[index], &manifests))
+}
+
+/// The copies in the Operation's backup that are still there. Only the copies
+/// its manifest names belong to it: nothing else in the data folder, such
+/// as a parked Entry, is part of a backup.
+pub(crate) fn backup_copies(ports: &Ports, folder: &Path, manifest: &Manifest) -> Vec<PathBuf> {
+    manifest
+        .locations
+        .iter()
+        .filter_map(|location| location.backup.as_ref())
+        .map(|backup| folder.join(backup))
+        .filter(|copy| ports.fs.exists(copy))
+        .collect()
+}
+
+/// The backup was deleted and none of its `copies` is left. A deletion that
+/// could not delete every copy can be run again.
+pub(crate) fn backup_already_deleted(manifest: &Manifest, copies: &[PathBuf]) -> bool {
+    manifest.backup_deleted_at.is_some() && copies.is_empty()
+}
+
+/// Deletes the backup of the Operation `id` under the global lock. Its
+/// manifest is rewritten first without the values of its edits, which makes
+/// it not undoable, and dismissed when it needs attention; then each copy is
+/// deleted and checked gone. `needed_attention` says whether it needed
+/// attention at the preview, whose check was acknowledged only then.
+pub(crate) fn delete_backup(
+    ports: &Ports,
+    id: &str,
+    needed_attention: bool,
+) -> Result<Outcome, Error> {
+    let data = data_folder(ports.env.as_ref())?;
+    let _lock = lock(ports, &data)?;
+    let mut manifests = load_all(ports)?;
+    let index = manifests
+        .iter()
+        .position(|manifest| manifest.id == id)
+        .ok_or_else(|| Error::stale(format!("Operation {id} is no longer in History")))?;
+    let mut manifest = manifests.swap_remove(index);
+    let folder = backups_folder(&data).join(id);
+    let copies = backup_copies(ports, &folder, &manifest);
+    if backup_already_deleted(&manifest, &copies) {
+        return Err(Error::stale(format!(
+            "the backup of Operation {id} was deleted since the preview"
+        )));
+    }
+    if manifest.needs_attention() != needed_attention {
+        return Err(Error::stale(format!(
+            "Operation {id} changed status since the preview"
+        )));
+    }
+
+    let now = humantime::format_rfc3339_seconds(ports.clock.now()).to_string();
+    if manifest.needs_attention() {
+        manifest.dismissed_at = Some(now.clone());
+    }
+    manifest.backup_deleted_at.get_or_insert(now);
+    for location in &mut manifest.locations {
+        if !location.edits.is_empty() {
+            location.deleted_edits = location.edit_summaries();
+            location.edits.clear();
+        }
+    }
+    record(ports, &folder, &manifest).map_err(Error::unexpected)?;
+
+    let left: Vec<String> = copies
+        .iter()
+        .filter_map(|copy| match ports.fs.remove_file(copy) {
+            Ok(()) if !ports.fs.exists(copy) => None,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Ok(()) => Some(format!("{} is still there", copy.display())),
+            Err(error) => Some(format!("cannot delete {}: {error}", copy.display())),
+        })
+        .collect();
+    if !left.is_empty() {
+        return Err(Error::unexpected(format!(
+            "{}; Operation {id} can no longer be undone, and deleting its backup again deletes the rest",
+            left.join("; ")
+        )));
+    }
+    tracing::info!(operation = %id, copies = copies.len(), "backup deleted");
+    Ok(Outcome {
+        operation: id.to_owned(),
+        verify: Verify::Verified,
+        differences: Vec::new(),
+        backup: folder,
+        sentence: explain::outcome(Action::DeleteBackup, 0, None, id, Verify::Verified),
+    })
 }
 
 /// History keeps at least this many Operations…
