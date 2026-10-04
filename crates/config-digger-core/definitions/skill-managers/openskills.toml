@@ -1,6 +1,6 @@
 #:schema ../../../../schema/skill-manager-definition.schema.json
-# openskills. Facts from docs/research/skill-managers.md on
-# research/skill-managers (read in the source of 1.5.0).
+# openskills. Facts from docs/research/skill-managers.md
+# (read in the source of 1.5.0).
 
 format_version = 1
 

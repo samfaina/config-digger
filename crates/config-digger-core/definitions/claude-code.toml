@@ -1,5 +1,5 @@
 #:schema ../../../schema/agent-definition.schema.json
-# Claude Code. Facts from docs/research/claude-code.md on research/claude-code
+# Claude Code. Facts from docs/research/claude-code.md
 # (verified against 2.1.286).
 
 format_version = 1

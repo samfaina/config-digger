@@ -1,6 +1,6 @@
 #:schema ../../../schema/agent-definition.schema.json
-# Claude Desktop. Facts from docs/research/claude-desktop.md on
-# research/claude-desktop (verified against 2.16120.0.0).
+# Claude Desktop. Facts from docs/research/claude-desktop.md
+# (verified against 2.16120.0.0).
 
 format_version = 1
 verified = { min = "2.16120", max = "2.16120" }
