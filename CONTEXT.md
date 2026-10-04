@@ -97,7 +97,7 @@ Said of an Entry that the Agent will not use because of a gate outside the Entry
 _Avoid_: Pending, denied, untrusted
 
 **Unread**:
-Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, or one in a location the Agent reads only while a Feature gate has the other value. It competes with nothing and can only be Removed.
+Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, or one in a location the Agent reads only while a Feature gate, or one of the Agent's settings, has another value, such as another app's configuration VS Code discovers only once told to. It competes with nothing and can only be Removed.
 _Avoid_: Orphaned, stale, ignored
 
 **Leftover**:

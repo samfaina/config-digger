@@ -4,7 +4,7 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse,
-    PolicyField, Provenance, SkillDefect, SkillFallback,
+    PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -96,12 +96,18 @@ pub(crate) fn resolve(
             .any(|known| known.key == *key && !known.exists)
     });
     // Nor does it read anything through a link whose target is gone, nor a
-    // location while a Feature gate keeps it closed.
+    // location while a Feature gate or a setting keeps it closed.
     let unread = |entry: &ScannedEntry| {
         skipped_home(snapshot, entry).is_some()
             || (missing.is_some() && entry.project.is_some())
             || is_broken(entry)
-            || closed_gate(&definitions[entry.agent_index], snapshot, entry).is_some()
+            || closed(
+                &definitions[entry.agent_index],
+                snapshot,
+                entry,
+                project_key.map(String::as_str),
+            )
+            .is_some()
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
     };
 
@@ -122,14 +128,22 @@ pub(crate) fn resolve(
     for &entry in &in_context {
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
-        let key = item_key(definition, &in_context, entry, &unread);
+        let key = if competes(definition, snapshot, entry, project_key.map(String::as_str)) {
+            item_key(definition, &in_context, entry, &unread)
+        } else {
+            ItemKey::Alone(
+                entry.name.clone(),
+                entry.path.clone(),
+                entry.key_path.clone(),
+            )
+        };
         competing
             .entry((entry.agent_index, entry.home.as_str(), location.kind, key))
             .or_default()
             .push(entry);
     }
 
-    let items = competing
+    let mut items: Vec<api::Item> = competing
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
@@ -304,8 +318,13 @@ pub(crate) fn resolve(
                             gate_caveats,
                         );
                     }
-                    if let Some((gate, on)) = closed_gate(definition, snapshot, entry) {
-                        let reason = explain::feature_gate(agent_name, gate, on);
+                    if let Some(closed) =
+                        closed(definition, snapshot, entry, project_key.map(String::as_str))
+                    {
+                        let reason = match closed {
+                            Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
+                            Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
+                        };
                         return unread_entry(
                             definition,
                             snapshot,
@@ -531,6 +550,7 @@ pub(crate) fn resolve(
                         .into_iter()
                         .chain(gate_caveats)
                         .collect(),
+                        also_read_by: Vec::new(),
                     }
                 })
                 .collect();
@@ -567,6 +587,8 @@ pub(crate) fn resolve(
             }
         })
         .collect();
+
+    also_read_by(definitions, &mut items);
 
     let read_failures = snapshot
         .read_failures
@@ -688,6 +710,32 @@ enum ItemKey {
     Name(String),
     /// An endpoint no Entry that competes by name has.
     Endpoint(String),
+    /// The Entry's own name, path and key path, when it competes with none.
+    Alone(String, PathBuf, Vec<String>),
+}
+
+/// Whether the Entries of the Agent home of `entry` compete in the context
+/// of the Project with the key `project`: always, unless their competition
+/// depends on a setting that does not hold there.
+fn competes(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> bool {
+    let kind = definition.location(&entry.location).kind;
+    let Some(setting) = definition.rules(kind).competition.only_while() else {
+        return true;
+    };
+    setting.is_met((0..setting.sources.len()).map(|source| {
+        setting_value(
+            snapshot,
+            entry,
+            kind,
+            SettingOwner::Competition { source },
+            project,
+        )
+    }))
 }
 
 /// What `entry`, among the Entries `in_context` of the context, competes
@@ -800,6 +848,7 @@ fn unread_entry(
         enable: None,
         remove: remove(definition, location, entry),
         caveats,
+        also_read_by: Vec::new(),
     }
 }
 
@@ -1087,22 +1136,63 @@ fn scanned_gate<'s>(
     })
 }
 
+/// What the source of a setting `owner` names holds for `entry` in the
+/// context of the Project with the key `project`, the first of its files
+/// that holds it; `None` when none does.
+fn setting_value(
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    kind: ItemKind,
+    owner: SettingOwner,
+    project: Option<&str>,
+) -> Option<serde_json::Value> {
+    snapshot
+        .settings_for(entry, kind, owner, project)
+        .find_map(|value| value.value.clone())
+}
+
+/// A `when` condition of a location that does not hold.
+enum Closed<'d> {
+    /// The Feature gate it depends on, and whether that gate is on.
+    Gate(&'d str, bool),
+    /// The setting that does not have the value it needs.
+    Setting(&'d SettingIs),
+}
+
 /// The first `when` condition of the location of `entry` that does not
-/// hold, as the Feature gate it depends on and whether that gate is on.
-fn closed_gate<'d>(
+/// hold in the context of the Project with the key `project`.
+fn closed<'d>(
     definition: &'d AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
-) -> Option<(&'d str, bool)> {
+    project: Option<&str>,
+) -> Option<Closed<'d>> {
     let gate_on = |name: &str| gate_on(definition, snapshot, entry, name);
-    let condition = definition
-        .location(&entry.location)
+    let location = definition
+        .locations
+        .iter()
+        .position(|location| location.id == entry.location)
+        .expect("snapshot location ids come from this definition");
+    let kind = definition.locations[location].kind;
+    let (_, condition) = definition.locations[location]
         .when
         .iter()
-        .find(|condition| !condition.holds(&gate_on))?;
-    match condition {
-        Condition::FeatureGate(block) => Some((block.gate.as_str(), gate_on(&block.gate))),
-    }
+        .enumerate()
+        .find(|(condition, block)| {
+            let setting = |source: usize| {
+                let owner = SettingOwner::Condition {
+                    location,
+                    condition: *condition,
+                    source,
+                };
+                setting_value(snapshot, entry, kind, owner, project)
+            };
+            !block.holds(&gate_on, &setting)
+        })?;
+    Some(match condition {
+        Condition::FeatureGate(block) => Closed::Gate(block.gate.as_str(), gate_on(&block.gate)),
+        Condition::Setting(block) => Closed::Setting(block),
+    })
 }
 
 /// A caveat per Feature gate that affects the location of `entry`, saying
@@ -1168,10 +1258,21 @@ fn remove(
             how_to_remove: None,
         };
     }
-    let Some(plugin) = &entry.plugin else {
-        return api::RemoveOption::Offered;
-    };
     let agent_name = &definition.agent.name;
+    let Some(plugin) = &entry.plugin else {
+        // An extension's server the Agent caches is the extension's to remove.
+        return match location.provenance {
+            Provenance::Extension => api::RemoveOption::NotOffered {
+                code: api::RemoveNotOffered::Extension,
+                sentence: explain::cached_extension_not_removed(agent_name),
+                how_to_remove: None,
+            },
+            Provenance::File
+            | Provenance::Plugin
+            | Provenance::Managed
+            | Provenance::CloudMirror => api::RemoveOption::Offered,
+        };
+    };
     let command = definition
         .declared_plugins(&plugin.plugins)
         .expect("validation declares the plugins a location reads")
@@ -1195,5 +1296,38 @@ fn remove(
             sentence: explain::how_to_remove_plugin(&plugin.id, &command),
             command,
         }),
+    }
+}
+
+/// Fills in, on each Entry of `items`, every Agent home of another Agent
+/// whose Items hold the same Entry, with its State there.
+fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
+    // Every Entry once per Agent home that holds it, by its locator.
+    let mut readers: Vec<(String, api::AlsoReadBy)> = Vec::new();
+    for item in items.iter() {
+        let agent_name = definitions
+            .iter()
+            .find(|definition| definition.agent.id == item.agent)
+            .map_or(item.agent.as_str(), |definition| &definition.agent.name);
+        for entry in &item.entries {
+            let reader = api::AlsoReadBy {
+                agent: item.agent.clone(),
+                agent_name: agent_name.to_owned(),
+                home: item.home.clone(),
+                state: entry.state,
+                sentence: explain::also_read_by(agent_name, &item.home, entry.state),
+            };
+            readers.push((entry.locator.clone(), reader));
+        }
+    }
+    readers.sort_by(|(_, a), (_, b)| (&a.agent, &a.home).cmp(&(&b.agent, &b.home)));
+    for item in items.iter_mut() {
+        for entry in &mut item.entries {
+            entry.also_read_by = readers
+                .iter()
+                .filter(|(locator, reader)| *locator == entry.locator && reader.agent != item.agent)
+                .map(|(_, reader)| reader.clone())
+                .collect();
+        }
     }
 }

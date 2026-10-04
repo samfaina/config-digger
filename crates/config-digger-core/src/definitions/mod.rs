@@ -26,6 +26,7 @@ const BUILT_IN: &[(&str, &str)] = &[
         "claude-desktop.toml",
         include_str!("../../definitions/claude-desktop.toml"),
     ),
+    ("vscode.toml", include_str!("../../definitions/vscode.toml")),
 ];
 
 /// The only `format_version` this release reads.
@@ -318,6 +319,12 @@ pub(crate) struct ProjectsDefinition {
     /// are evaluated for every Agent.
     #[serde(default)]
     pub registries: Vec<Registry>,
+    /// Whether the Agent opens `.code-workspace` files: such a Project
+    /// reads `project-file` locations in the file itself, and the other
+    /// locations in a Project in each of its member folders, the first
+    /// member ranking highest.
+    #[serde(default)]
+    pub workspace_files: bool,
 }
 
 /// Plugins an Agent installs, each in a folder of its own, such as Claude
@@ -432,6 +439,8 @@ impl PluginsDefinition {
 
 /// The `root` segment that stands for any Project path key.
 pub(crate) const PROJECT_KEY: &str = "{project}";
+/// The `root` segment that stands for every key.
+pub(crate) const ANY_KEY: &str = "*";
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -441,9 +450,21 @@ pub(crate) struct LocationDefinition {
     pub format: Format,
     /// The key path of the object whose keys are Entries. One segment may be
     /// `{project}`: each key there is a Project path, and the Entries below it
-    /// apply only in that Project. Omitted for a folder of skill folders.
+    /// apply only in that Project. Any segment may be `*`, which stands for
+    /// every key there, such as each extension's servers in VS Code's cache.
+    /// Omitted for a folder of skill folders.
     #[serde(default)]
     pub root: Vec<String>,
+    /// When the value at `root` is a list of objects rather than an object
+    /// keyed by name, the field of each that holds its name, such as the
+    /// `label` of each server in VS Code's cache of extension servers. An
+    /// item without it is no Entry.
+    pub named_by: Option<String>,
+    /// Whether a file without `root` holds its Entries at its top level
+    /// instead, as VS Code reads a `.mcp.json` that is a bare object of
+    /// servers.
+    #[serde(default)]
+    pub bare: bool,
     /// Whether the value at `root` is one Entry rather than an object of
     /// them, named by the plugin it is part of, such as the server a Claude
     /// Desktop extension's manifest declares in `server.mcp_config`. Only a
@@ -888,6 +909,11 @@ impl AgentDefinition {
         for location in &self.locations {
             let context = |e: String| format!("location `{}`: {e}", location.id);
             location.anchor.validate().map_err(context)?;
+            if location.anchor.project_file() && !self.projects.workspace_files {
+                return Err(context(
+                    "a project-file location needs `projects.workspace_files`".into(),
+                ));
+            }
             if location.anchor.per_plugin() || location.anchor.entry().is_some() {
                 return Err(context(
                     "a location is anchored once per home, not by `{plugin_id}` or beside an Entry"
@@ -944,6 +970,46 @@ impl AgentDefinition {
                     ));
                 }
             }
+            if location.bare
+                && (location.root.is_empty()
+                    || location.keyed_by_project()
+                    || location.one_entry
+                    || location.format.file().is_none())
+            {
+                return Err(context(
+                    "only a file location with a root, not keyed by Project nor holding one Entry, can be bare"
+                        .into(),
+                ));
+            }
+            if let Some(field) = &location.named_by {
+                if field.is_empty() {
+                    return Err(context("named_by must not be empty".into()));
+                }
+                if location.root.is_empty() || location.one_entry || location.references.is_some() {
+                    return Err(context(
+                        "named_by needs a root, and no one_entry or references".into(),
+                    ));
+                }
+            }
+            if let Some(store) = location.format.sqlite()
+                && location.root.first() != Some(&store.key)
+            {
+                return Err(context(format!(
+                    "the root of a sqlite-json location starts with its key `{}`",
+                    store.key
+                )));
+            }
+            if location.anchor.project_storage().is_some()
+                && !self
+                    .projects
+                    .registries
+                    .iter()
+                    .any(|registry| matches!(registry, Registry::JsonFolders(_)))
+            {
+                return Err(context(
+                    "a project-storage location needs a json-folders project registry".into(),
+                ));
+            }
             if let Some(references) = &location.references {
                 if location.anchor.plugin().is_none() || location.format.file().is_none() {
                     return Err(context(
@@ -997,6 +1063,13 @@ impl AgentDefinition {
             }
             for condition in &location.when {
                 condition.validate().map_err(context)?;
+                for source in condition
+                    .setting()
+                    .iter()
+                    .flat_map(|setting| &setting.sources)
+                {
+                    self.validate_setting(&source.anchor).map_err(context)?;
+                }
                 let Some(name) = condition.gate() else {
                     continue;
                 };
@@ -1021,6 +1094,14 @@ impl AgentDefinition {
         for (kind, rules) in &self.items {
             let context = |e: String| format!("items.{}: {e}", kind.id());
             rules.competition.validate().map_err(context)?;
+            for source in rules
+                .competition
+                .only_while()
+                .iter()
+                .flat_map(|setting| &setting.sources)
+            {
+                self.validate_setting(&source.anchor).map_err(context)?;
+            }
             unique(
                 "precedence entry",
                 rules.precedence.iter().map(String::as_str),
@@ -1399,7 +1480,7 @@ on_read_failure = "ignores_file"
             .into_iter()
             .map(|definition| definition.agent.id)
             .collect();
-        assert_eq!(ids, ["claude-code", "claude-desktop"]);
+        assert_eq!(ids, ["claude-code", "claude-desktop", "vscode"]);
     }
 
     #[test]
@@ -1977,9 +2058,8 @@ checks = {checks}
     }
 
     #[test]
-    fn a_machine_path_starts_from_a_variable_or_a_drive_without_wildcards() {
+    fn a_machine_path_starts_from_the_home_folder_a_variable_or_a_drive_without_wildcards() {
         for (path, message) in [
-            ("~/skills", "`%NAME%` or a drive"),
             ("skills", "must start with"),
             ("%ProgramFiles%/*/skills", "wildcards"),
         ] {
@@ -1987,6 +2067,9 @@ checks = {checks}
             let text = with_skills(&anchor, SKILL_FORMAT, CHECKS);
             assert!(error(&text).contains(message), "{path}: {}", error(&text));
         }
+        let anchor = r#"{ block = "machine", path = "~/.agents/skills" }"#;
+        let text = with_skills(anchor, SKILL_FORMAT, CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
     #[test]
@@ -2626,5 +2709,127 @@ enable_offered = false
         );
         assert_eq!(blocks::djb2("enable_cc_plugin_import"), "1307925454");
         assert_eq!(blocks::djb2(""), "0");
+    }
+
+    /// `VALID` with its location's `anchor`, `format` and `root` lines replaced.
+    fn with_location(anchor: &str, format: &str, root: &str) -> String {
+        VALID
+            .replace(
+                r#"anchor = { block = "home", root = "state" }"#,
+                &format!("anchor = {anchor}"),
+            )
+            .replace(
+                r#"format = { block = "json", dialect = "strict" }"#,
+                &format!("format = {format}"),
+            )
+            .replace(r#"root = ["servers"]"#, &format!("root = {root}"))
+    }
+
+    const SQLITE: &str = r#"{ block = "sqlite-json", key = "cache" }"#;
+    const STORAGE: &str = r#"{ block = "project-storage", path = "state.vscdb" }"#;
+    const STORAGE_REGISTRY: &str = r#"[projects]
+registries = [{ block = "json-folders", anchor = { block = "home", root = "state" }, file = "workspace.json", fields = ["folder"], spelling = "file-uri" }]
+
+[[scopes]]"#;
+
+    #[test]
+    fn a_project_storage_location_needs_a_json_folders_registry() {
+        let text = with_location(STORAGE, SQLITE, r#"["cache", "*", "servers"]"#);
+        assert!(error(&text).contains("json-folders"), "{}", error(&text));
+        let text = text.replacen("[[scopes]]", STORAGE_REGISTRY, 1);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_sqlite_location_s_root_starts_with_its_key() {
+        let text = with_location(STATE, SQLITE, r#"["servers"]"#);
+        assert!(
+            error(&text).contains("starts with its key `cache`"),
+            "{}",
+            error(&text)
+        );
+        let text = with_location(STATE, SQLITE, r#"["cache"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn named_by_needs_a_root_and_a_name() {
+        let named = |field: &str, root: &str| {
+            with_location(STATE, r#"{ block = "json", dialect = "strict" }"#, root).replace(
+                r#"kind = "mcp""#,
+                &format!("named_by = \"{field}\"\nkind = \"mcp\""),
+            )
+        };
+        let text = named("", r#"["servers"]"#);
+        assert!(
+            error(&text).contains("named_by must not be empty"),
+            "{}",
+            error(&text)
+        );
+        let text = named("label", "[]");
+        assert!(
+            error(&text).contains("named_by needs a root"),
+            "{}",
+            error(&text)
+        );
+        assert!(parse("test.toml", &named("label", r#"["servers"]"#)).is_ok());
+    }
+
+    #[test]
+    fn a_project_file_location_needs_an_agent_that_opens_workspace_files() {
+        let text = with_location(
+            r#"{ block = "project-file" }"#,
+            r#"{ block = "json", dialect = "jsonc" }"#,
+            r#"["settings", "mcp", "servers"]"#,
+        );
+        assert!(error(&text).contains("workspace_files"), "{}", error(&text));
+        let text = text.replacen(
+            "[[scopes]]",
+            "[projects]\nworkspace_files = true\n\n[[scopes]]",
+            1,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_bare_location_needs_a_root_in_a_file() {
+        let text = VALID.replace(r#"kind = "mcp""#, "bare = true\nkind = \"mcp\"");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_location(STATE, r#"{ block = "json", dialect = "strict" }"#, "[]")
+            .replace(r#"kind = "mcp""#, "bare = true\nkind = \"mcp\"");
+        assert!(error(&text).contains("can be bare"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_case_insensitive_competition_reads_its_setting_in_declared_files() {
+        let competition = r#"competition = { block = "case-insensitive-name", only_while = { equals = "disable", default = "disable", sources = [{ anchor = { block = "home", root = "settings" }, key_path = ["collision"], dialect = "jsonc" }] } }"#;
+        let text = VALID.replace(r#"competition = { block = "exact-name" }"#, competition);
+        assert!(
+            error(&text).contains("declares no root `settings`"),
+            "{}",
+            error(&text)
+        );
+        let text = text.replace(
+            "roots.state = \".test.json\"",
+            "roots.state = \".test.json\"\nroots.settings = \"settings.json\"",
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_json_list_home_reads_a_list_of_folders_below_a_base() {
+        let home = |file: &str| {
+            VALID.replace(
+                r#"folder = { block = "path", path = "~" }"#,
+                &format!(r#"folder = {{ block = "json-list", file = "{file}", key_path = ["profiles"], field = "location", base = "%APPDATA%/Test/profiles" }}"#),
+            )
+        };
+        assert!(parse("test.toml", &home("%APPDATA%/Test/storage.json")).is_ok());
+        let text = home("~/storage.json");
+        assert!(
+            error(&text).contains("`%NAME%` or a drive"),
+            "{}",
+            error(&text)
+        );
     }
 }

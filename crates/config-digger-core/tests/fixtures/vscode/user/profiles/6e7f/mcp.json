@@ -1,0 +1,5 @@
+{
+	"servers": {
+		"never-read": { "command": "shared-server" },
+	},
+}

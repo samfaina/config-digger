@@ -5,14 +5,14 @@
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, Format, Gate, GateStore,
-    HoldsHere, JsonFormat, JsonPluginRecords, Locate, LookUp, NameFrom, Parse, PluginFolders,
-    PluginRecord, PluginRegistry, ProjectWalk, Register, SettingsSource, SkillDefect, SkillFolder,
-    StoreClass, is_entry_key,
+    HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp, NameFrom,
+    Parse, PluginFolders, PluginRecord, PluginRegistry, ProjectWalk, Register, Registry,
+    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
-    AgentDefinition, HomeDefinition, ItemKind, LocationDefinition, PROJECT_KEY, PluginNames,
-    PluginsDefinition, References,
+    ANY_KEY, AgentDefinition, HomeDefinition, ItemKind, LocationDefinition, PROJECT_KEY,
+    PluginNames, PluginsDefinition, References,
 };
 use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -130,11 +130,29 @@ pub(crate) struct ScannedSetting {
 }
 
 /// The rule or gate a setting is read for, by its index among those of its
-/// Item kind, and the source among its sources.
+/// Item kind, or the setting its competition depends on, and the source
+/// among its sources.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SettingOwner {
-    Rule { rule: usize, source: usize },
-    Gate { gate: usize, source: usize },
+    Rule {
+        rule: usize,
+        source: usize,
+    },
+    Gate {
+        gate: usize,
+        source: usize,
+    },
+    /// A source of the setting the Item kind's competition depends on.
+    Competition {
+        source: usize,
+    },
+    /// A source of the setting of the `when` condition `condition` of the
+    /// location at `location` among the definition's.
+    Condition {
+        location: usize,
+        condition: usize,
+        source: usize,
+    },
 }
 
 impl Snapshot {
@@ -633,6 +651,7 @@ pub(crate) fn scan_as_if(
         projects: Projects::new(ports),
         entries: Vec::new(),
         readers: Vec::new(),
+        storage: Vec::new(),
     };
 
     let settings = read_settings(definitions, ports, &mut scanner.reader);
@@ -671,6 +690,25 @@ pub(crate) fn scan_as_if(
                 }
                 continue;
             }
+            // Read in the folder the home keeps for each Project, whose
+            // Entries apply in that Project.
+            if let Some(relative) = location.anchor.project_storage() {
+                let folders: Vec<(PathBuf, String)> = scanner
+                    .storage
+                    .iter()
+                    .filter(|storage| {
+                        storage.agent_index == home.agent_index && storage.home == home.home
+                    })
+                    .map(|storage| {
+                        let path = blocks::join_relative(&storage.folder, relative);
+                        (path, storage.project.clone())
+                    })
+                    .collect();
+                for (path, project) in folders {
+                    scanner.read_location(home, definition, location, path, Some(project), 0);
+                }
+                continue;
+            }
             // Every source is read, so that the Entries of those the Agent
             // skips are listed as Unread.
             if let Some(id) = location.anchor.settings() {
@@ -695,18 +733,48 @@ pub(crate) fn scan_as_if(
         .filter(|project| project.is_folder())
         .map(|project| (project.path.clone(), project.key.clone()))
         .collect();
+    // Each workspace file with its member folders, first first.
+    let mut workspaces: Vec<(PathBuf, String, Vec<PathBuf>)> = Vec::new();
+    for project in &scanner.projects.list {
+        if project.exists && project.workspace_file {
+            let members = members(&mut scanner.reader, &project.path);
+            workspaces.push((project.path.clone(), project.key.clone(), members));
+        }
+    }
     for home in &found {
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
             if !location.anchor.in_project() {
                 continue;
             }
-            for (project_folder, key) in &folders {
-                for (folder, depth) in folders_read(ports, project_folder, location.anchor.walk()) {
-                    if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
-                        let key = Some(key.clone());
-                        scanner.read_location(home, definition, location, path, key, depth);
+            let walk = location.anchor.walk();
+            // Each folder or file read, with the key of its Project and how
+            // far it ranks below the Project's own.
+            let mut read: Vec<(PathBuf, &String, usize)> = Vec::new();
+            if !location.anchor.project_file() {
+                for (project_folder, key) in &folders {
+                    for (folder, depth) in folders_read(ports, project_folder, walk) {
+                        read.push((folder, key, depth));
                     }
+                }
+            }
+            if definition.projects.workspace_files {
+                for (file, key, members) in &workspaces {
+                    if location.anchor.project_file() {
+                        read.push((file.clone(), key, 0));
+                        continue;
+                    }
+                    for (index, member) in members.iter().enumerate() {
+                        for (folder, depth) in folders_read(ports, member, walk) {
+                            read.push((folder, key, index * MEMBER_RANKS + depth));
+                        }
+                    }
+                }
+            }
+            for (folder, key, depth) in read {
+                if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
+                    let key = Some(key.clone());
+                    scanner.read_location(home, definition, location, path, key, depth);
                 }
             }
         }
@@ -1037,8 +1105,13 @@ fn read_switches(
                     plugins: plugins_of(installed, home),
                     entries: covered(definition, entries, home, kind, block),
                 };
-                for place in places.read(&switch.anchor, &switch.key_path, reader, &mut unreadable)
-                {
+                for place in places.read(
+                    &switch.anchor,
+                    &switch.key_path,
+                    &JsonFormat::STRICT,
+                    reader,
+                    &mut unreadable,
+                ) {
                     switches.push(ScannedSwitch {
                         agent_index: home.agent_index,
                         home: home.home.clone(),
@@ -1088,7 +1161,43 @@ fn read_rules(
                     .enumerate()
                     .map(move |(source, setting)| (SettingOwner::Gate { gate, source }, setting))
             });
-            for (owner, setting) in rule_sources.chain(gate_sources) {
+            let competition_sources = rules
+                .competition
+                .only_while()
+                .into_iter()
+                .flat_map(|setting| setting.sources.iter().enumerate())
+                .map(|(source, setting)| (SettingOwner::Competition { source }, setting));
+            let condition_sources =
+                definition
+                    .locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, location)| location.kind == kind)
+                    .flat_map(|(location, block)| {
+                        block
+                            .when
+                            .iter()
+                            .enumerate()
+                            .flat_map(move |(condition, block)| {
+                                block.setting().into_iter().flat_map(move |setting| {
+                                    setting.sources.iter().enumerate().map(
+                                        move |(source, setting)| {
+                                            let owner = SettingOwner::Condition {
+                                                location,
+                                                condition,
+                                                source,
+                                            };
+                                            (owner, setting)
+                                        },
+                                    )
+                                })
+                            })
+                    });
+            let sources = rule_sources
+                .chain(gate_sources)
+                .chain(competition_sources)
+                .chain(condition_sources);
+            for (owner, setting) in sources {
                 let places = Places {
                     home,
                     projects,
@@ -1096,9 +1205,14 @@ fn read_rules(
                     plugins: plugins_of(installed, home),
                     entries: Vec::new(),
                 };
-                for place in
-                    places.read(&setting.anchor, &setting.key_path, reader, &mut unreadable)
-                {
+                let format = setting.format();
+                for place in places.read(
+                    &setting.anchor,
+                    &setting.key_path,
+                    &format,
+                    reader,
+                    &mut unreadable,
+                ) {
                     values.push(ScannedSetting {
                         agent_index: home.agent_index,
                         home: home.home.clone(),
@@ -1187,6 +1301,7 @@ impl Places<'_> {
         &self,
         anchor: &Anchor,
         key_path: &[String],
+        format: &JsonFormat,
         reader: &mut Reader,
         unreadable: &mut BTreeSet<PathBuf>,
     ) -> Vec<Place> {
@@ -1229,6 +1344,12 @@ impl Places<'_> {
                         ))
                     })
                     .collect()
+            } else if anchor.project_file() {
+                self.projects
+                    .iter()
+                    .filter(|project| project.exists && project.workspace_file)
+                    .map(|project| (project.path.clone(), Some(project.key.clone()), None))
+                    .collect()
             } else if anchor.in_project() {
                 self.projects
                     .iter()
@@ -1260,7 +1381,7 @@ impl Places<'_> {
             }
             let document = match reader.peek(&path) {
                 Ok(None) => None,
-                Ok(Some(text)) => match JsonFormat::STRICT.parse(text) {
+                Ok(Some(text)) => match format.parse(text) {
                     Ok(document) => Some(document),
                     Err(_) => {
                         unreadable.insert(path);
@@ -1545,8 +1666,8 @@ fn pick(
     })
 }
 
-/// The machine-wide paths a definition's locations and Feature gate env
-/// maps name, each by the text that names it, as far as the environment
+/// The machine-wide paths a definition's locations, plugin and project
+/// registries and Feature gate env maps name, each by the text that names it, as far as the environment
 /// says where they are.
 fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String, PathBuf> {
     let env_maps = definition
@@ -1555,13 +1676,61 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .filter_map(|gate| gate.bypass.as_ref())
         .flat_map(|bypass| bypass.env_maps())
         .map(|map| &map.anchor);
+    let plugins = definition
+        .plugins
+        .iter()
+        .flat_map(|plugins| plugins.registry.anchors());
+    let registries = definition
+        .projects
+        .registries
+        .iter()
+        .map(|registry| registry.anchor());
     definition
         .locations
         .iter()
         .map(|location| &location.anchor)
         .chain(env_maps)
+        .chain(plugins)
+        .chain(registries)
         .filter_map(|anchor| anchor.machine())
         .filter_map(|text| Some((text.to_owned(), paths::expand(text, ports.env.as_ref())?)))
+        .collect()
+}
+
+/// How many folders up one member folder of a workspace file is read at
+/// most, so that every location of the first member ranks above any of the
+/// second.
+const MEMBER_RANKS: usize = 1 << 16;
+
+/// The member folders of the `.code-workspace` file at `file`, in its
+/// order: each item of its `folders` names one by a `path`, relative to the
+/// file's folder or absolute, or by a `file:` `uri`. A file that cannot be
+/// read has none; the location reading it reports why.
+fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
+    let Some(folder) = file.parent() else {
+        return Vec::new();
+    };
+    let jsonc = JsonFormat {
+        dialect: JsonDialect::Jsonc,
+    };
+    let document = match reader.peek(file) {
+        Ok(Some(text)) => jsonc.parse(text).ok(),
+        _ => None,
+    };
+    let items = document
+        .as_ref()
+        .and_then(|document| document.get("folders"))
+        .and_then(serde_json::Value::as_array);
+    items
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            if let Some(path) = item.get("path").and_then(serde_json::Value::as_str) {
+                let path = paths::lexical(&folder.join(path));
+                return paths::is_absolute(&path).then_some(path);
+            }
+            paths::from_file_uri(item.get("uri")?.as_str()?)
+        })
         .collect()
 }
 
@@ -1624,6 +1793,19 @@ struct Scanner<'p> {
     projects: Projects<'p>,
     entries: Vec<ScannedEntry>,
     readers: Vec<LocationReader>,
+    /// The folder an Agent home keeps for each Project, as its registry
+    /// of such folders records it.
+    storage: Vec<StorageFolder>,
+}
+
+/// The folder an Agent home keeps what it stores for one Project in, such as
+/// VS Code's `workspaceStorage\<id>`.
+struct StorageFolder {
+    agent_index: usize,
+    home: String,
+    folder: PathBuf,
+    /// The Project's key.
+    project: String,
 }
 
 impl Scanner<'_> {
@@ -1633,22 +1815,66 @@ impl Scanner<'_> {
             let Some(path) = registry.anchor().path(&home.roots, None) else {
                 continue;
             };
-            let Some(text) = self.reader.text(home, &path, None) else {
-                continue;
-            };
-            match registry.spellings(text) {
-                Ok(spellings) => {
-                    for spelling in spellings {
-                        self.projects
-                            .add(Path::new(&spelling), Some(home.agent_index));
+            let spelling = registry.spelling();
+            match registry {
+                Registry::JsonKeys(block) => {
+                    let Some(text) = self.reader.text(home, &path, None) else {
+                        continue;
+                    };
+                    match block.spellings(text) {
+                        Ok(spellings) => {
+                            for text in spellings {
+                                self.add_spelling(home, spelling, &text);
+                            }
+                        }
+                        Err(error) => self.reader.fail(
+                            home,
+                            &path,
+                            None,
+                            ReadFailureKind::Parse,
+                            error.position,
+                        ),
                     }
                 }
-                Err(error) => {
-                    self.reader
-                        .fail(home, &path, None, ReadFailureKind::Parse, error.position)
+                Registry::JsonFolders(block) => {
+                    let mut folders = self.reader.fs.read_dir(&path).unwrap_or_default();
+                    folders.sort_by_key(|folder| paths::key(folder));
+                    for folder in folders {
+                        let file = blocks::join_relative(&folder, &block.file);
+                        let Some(text) = self.reader.text(home, &file, None) else {
+                            continue;
+                        };
+                        match block.spelling_in(text) {
+                            Ok(Some(text)) => {
+                                if let Some(project) = self.add_spelling(home, spelling, &text) {
+                                    self.storage.push(StorageFolder {
+                                        agent_index: home.agent_index,
+                                        home: home.home.clone(),
+                                        folder,
+                                        project,
+                                    });
+                                }
+                            }
+                            Ok(None) => {}
+                            Err(error) => self.reader.fail(
+                                home,
+                                &file,
+                                None,
+                                ReadFailureKind::Parse,
+                                error.position,
+                            ),
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /// Records the Project a registry of `home` spells `text`, and returns
+    /// its key; `None` when it names none on this machine.
+    fn add_spelling(&mut self, home: &FoundHome, spelling: Spelling, text: &str) -> Option<String> {
+        let path = spelling.path(text)?;
+        self.projects.add(&path, Some(home.agent_index))
     }
 
     /// The plugins of `plugins` that the Agent home installed, each record
@@ -1765,7 +1991,13 @@ impl Scanner<'_> {
         children.sort_by_key(|child| paths::key(child));
         children
             .into_iter()
-            .filter(|child| fs.exists(&blocks::join_relative(child, &block.marker)))
+            .filter(|child| {
+                block
+                    .marker
+                    .all()
+                    .iter()
+                    .any(|marker| fs.exists(&blocks::join_relative(child, marker)))
+            })
             .filter_map(|child| {
                 let id = child.file_name()?.to_str()?.to_owned();
                 Some(PluginRecord {
@@ -1858,8 +2090,14 @@ impl Scanner<'_> {
         depth: usize,
     ) {
         self.add_reader(home, location, &path);
-        if let Format::SkillFolder(folder) = &location.format {
-            return self.read_skills(home, location, folder, &path, project, depth);
+        match &location.format {
+            Format::SkillFolder(folder) => {
+                return self.read_skills(home, location, folder, &path, project, depth);
+            }
+            Format::SkillList(list) => {
+                return self.read_skill_list(home, location, list, &path, project, depth);
+            }
+            Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => {}
         }
         let Some(document) = self.document(home, location, &path, project.as_deref()) else {
             return;
@@ -1887,13 +2125,12 @@ impl Scanner<'_> {
             }
             return;
         }
-        let mut objects = Vec::new();
-        if find_objects(&document, &location.root, Vec::new(), None, &mut objects).is_err() {
+        let Ok(objects) = entries_of(location, &document) else {
             let project = project.as_deref();
             self.reader
                 .fail(home, &path, project, ReadFailureKind::Parse, None);
             return;
-        }
+        };
         self.add_objects(home, definition, location, &path, project, depth, objects);
     }
 
@@ -1973,6 +2210,7 @@ impl Scanner<'_> {
                     if find_objects(
                         &referenced,
                         &references.root,
+                        None,
                         Vec::new(),
                         None,
                         &mut objects,
@@ -1989,6 +2227,14 @@ impl Scanner<'_> {
                 serde_json::Value::Object(entries) => {
                     let mut key_path = location.root.clone();
                     key_path.extend(index.map(|index| index.to_string()));
+                    let entries = entries
+                        .iter()
+                        .map(|(key, value)| FoundEntry {
+                            key: key.clone(),
+                            name: key.clone(),
+                            value,
+                        })
+                        .collect();
                     let objects = vec![RootObject {
                         key_path,
                         project: None,
@@ -2026,6 +2272,17 @@ impl Scanner<'_> {
         path: &Path,
         project: Option<&str>,
     ) -> Option<serde_json::Value> {
+        if let Some(store) = location.format.sqlite() {
+            let text = self.reader.sqlite_text(home, path, &store.key, project)?;
+            return match store.parse(&text) {
+                Ok(document) => Some(document),
+                Err(error) => {
+                    self.reader
+                        .fail(home, path, project, ReadFailureKind::Parse, error.position);
+                    None
+                }
+            };
+        }
         let format = location.format.file()?;
         let text = self.reader.text(home, path, project)?;
         match format.parse(text) {
@@ -2066,17 +2323,17 @@ impl Scanner<'_> {
                 },
                 None => project.clone(),
             };
-            for (name, value) in object.entries {
+            for found in object.entries {
                 let mut key_path = object.key_path.clone();
-                key_path.push(name.clone());
-                let masked = mask::entry(location, value);
+                key_path.push(found.key);
+                let masked = mask::entry(location, found.value);
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
                     path: path.to_path_buf(),
                     key_path,
-                    name: name.clone(),
+                    name: found.name,
                     project: project.clone(),
                     config: masked.value,
                     masked: masked.key_paths,
@@ -2175,36 +2432,126 @@ impl Scanner<'_> {
                     }
                     continue;
                 }
-                let Some(text) = self.reader.text(home, &skill_md, project.as_deref()) else {
-                    continue;
-                };
-                let skill = read_skill(format, name, text);
-                tracing::debug!(location = %location.id, skill = %skill.name, "read skill");
-                // A link at the skill's own location is an Entry apart from
-                // its target.
-                let link = fs.link_target(&child).map(|target| ScannedLink {
-                    target: paths::lexical(&target),
-                    real: fs.real_path(&child).map(|real| paths::lexical(&real)),
-                });
-                self.entries.push(ScannedEntry {
-                    agent_index: home.agent_index,
-                    home: home.home.clone(),
-                    location: location.id.clone(),
+                let skill = SkillAt {
+                    folder: &child,
                     path: real.join(name),
-                    key_path: Vec::new(),
-                    name: skill.name,
-                    project: project.clone(),
-                    config: skill.config,
-                    masked: Vec::new(),
-                    depth,
-                    defect: skill.defect,
-                    link,
-                    manager: None,
-                    plugin: None,
-                });
+                    name,
+                };
+                self.add_skill(home, location, format, skill, &project, depth);
             }
         }
     }
+
+    /// Adds a skill Entry for the folder `skill`, whose `SKILL.md` exists.
+    fn add_skill(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        format: &SkillFolder,
+        skill: SkillAt,
+        project: &Option<String>,
+        depth: usize,
+    ) {
+        let fs = self.reader.fs;
+        let skill_md = skill.folder.join(SKILL_MD);
+        let Some(text) = self.reader.text(home, &skill_md, project.as_deref()) else {
+            return;
+        };
+        let read = read_skill(format, skill.name, text);
+        tracing::debug!(location = %location.id, skill = %read.name, "read skill");
+        // A link at the skill's own location is an Entry apart from its target.
+        let link = fs.link_target(skill.folder).map(|target| ScannedLink {
+            target: paths::lexical(&target),
+            real: fs.real_path(skill.folder).map(|real| paths::lexical(&real)),
+        });
+        self.entries.push(ScannedEntry {
+            agent_index: home.agent_index,
+            home: home.home.clone(),
+            location: location.id.clone(),
+            path: skill.path,
+            key_path: Vec::new(),
+            name: read.name,
+            project: project.clone(),
+            config: read.config,
+            masked: Vec::new(),
+            depth,
+            defect: read.defect,
+            link,
+            manager: None,
+            plugin: None,
+        });
+    }
+
+    /// Adds a skill Entry for each folder the list in the JSON file `path`
+    /// names, such as an extension's `contributes.chatSkills`, each by its
+    /// own path or its `SKILL.md`'s, relative to the file's folder. A path
+    /// outside that folder, or without a `SKILL.md`, names no skill.
+    fn read_skill_list(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        list: &SkillList,
+        path: &Path,
+        project: Option<String>,
+        depth: usize,
+    ) {
+        let Some(base) = path.parent() else {
+            return;
+        };
+        let Some(text) = self.reader.text(home, path, project.as_deref()) else {
+            return;
+        };
+        let document = match JsonFormat::STRICT.parse(text) {
+            Ok(document) => document,
+            Err(error) => {
+                let project = project.as_deref();
+                self.reader
+                    .fail(home, path, project, ReadFailureKind::Parse, error.position);
+                return;
+            }
+        };
+        let relatives: Vec<String> = lookup(&document, &list.list)
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|item| Some(item.get(&list.field)?.as_str()?.to_owned()))
+            .collect();
+        let fs = self.reader.fs;
+        for relative in relatives {
+            let mut folder = paths::lexical(&base.join(&relative));
+            let names_file = folder
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case(SKILL_MD));
+            if names_file {
+                folder.pop();
+            }
+            if !folder.starts_with(base) || !fs.exists(&folder.join(SKILL_MD)) {
+                tracing::debug!(path = %relative, "names no skill");
+                continue;
+            }
+            let Some(name) = folder.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            let name = name.to_owned();
+            let real = fs
+                .real_path(&folder)
+                .map_or_else(|| folder.clone(), |real| paths::lexical(&real));
+            let skill = SkillAt {
+                folder: &folder,
+                path: real,
+                name: &name,
+            };
+            self.add_skill(home, location, &list.skills, skill, &project, depth);
+        }
+    }
+}
+
+/// A skill folder to read: where it is, the path its Entry has, with links
+/// in its parent folders resolved, and its folder's name.
+struct SkillAt<'a> {
+    folder: &'a Path,
+    path: PathBuf,
+    name: &'a str,
 }
 
 /// The skill manager whose detectors match the skill folder of `entry`
@@ -2314,12 +2661,22 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
     }
 }
 
-/// An object whose keys are Entries.
+/// An object or list whose items are Entries.
 pub(crate) struct RootObject<'v> {
     pub key_path: Vec<String>,
     /// The Project key it sits under, in the Agent's spelling.
     pub project: Option<String>,
-    pub entries: &'v serde_json::Map<String, serde_json::Value>,
+    pub entries: Vec<FoundEntry<'v>>,
+}
+
+/// One Entry of a [`RootObject`].
+pub(crate) struct FoundEntry<'v> {
+    /// Its key below the object, or its index in the list.
+    pub key: String,
+    /// The name it goes by: its key, or in a list, the field that names it.
+    pub name: String,
+    /// Its value as declared.
+    pub value: &'v serde_json::Value,
 }
 
 /// Where Entries are, a file holds something other than an object, so
@@ -2327,28 +2684,78 @@ pub(crate) struct RootObject<'v> {
 #[derive(Debug)]
 pub(crate) struct NotEnumerable;
 
-/// The objects at `root` below `value`. Below `{project}`, every key is a
-/// Project. A missing key holds no objects; a key on the way that holds
-/// something other than an object fails.
+/// The objects of Entries `location` reads in `document`: at its root, or
+/// at the top level of a bare file without it.
+pub(crate) fn entries_of<'v>(
+    location: &LocationDefinition,
+    document: &'v serde_json::Value,
+) -> Result<Vec<RootObject<'v>>, NotEnumerable> {
+    let root: &[String] = if location.bare && lookup(document, &location.root).is_none() {
+        &[]
+    } else {
+        &location.root
+    };
+    let mut objects = Vec::new();
+    find_objects(
+        document,
+        root,
+        location.named_by.as_deref(),
+        Vec::new(),
+        None,
+        &mut objects,
+    )?;
+    Ok(objects)
+}
+
+/// The objects at `root` below `value`, or with `named_by`, the lists there
+/// of objects each named by that field. Below `{project}`, every key is a
+/// Project, and below `*` every key is read. A missing key holds no
+/// objects; a key on the way that holds something other than an object
+/// fails, as does a list where an object is expected, or the reverse. An
+/// item of a list without its name is skipped.
 pub(crate) fn find_objects<'v>(
     value: &'v serde_json::Value,
     root: &[String],
+    named_by: Option<&str>,
     key_path: Vec<String>,
     project: Option<String>,
     out: &mut Vec<RootObject<'v>>,
 ) -> Result<(), NotEnumerable> {
-    let serde_json::Value::Object(object) = value else {
-        return Err(NotEnumerable);
-    };
     let Some((key, rest)) = root.split_first() else {
+        let entries = match (value, named_by) {
+            (serde_json::Value::Object(object), None) => object
+                .iter()
+                .map(|(key, value)| FoundEntry {
+                    key: key.clone(),
+                    name: key.clone(),
+                    value,
+                })
+                .collect(),
+            (serde_json::Value::Array(items), Some(field)) => items
+                .iter()
+                .enumerate()
+                .filter_map(|(index, value)| {
+                    let name = value.get(field)?.as_str()?;
+                    Some(FoundEntry {
+                        key: index.to_string(),
+                        name: name.to_owned(),
+                        value,
+                    })
+                })
+                .collect(),
+            _ => return Err(NotEnumerable),
+        };
         out.push(RootObject {
             key_path,
             project,
-            entries: object,
+            entries,
         });
         return Ok(());
     };
-    let children: Vec<(&String, &serde_json::Value)> = if key == PROJECT_KEY {
+    let serde_json::Value::Object(object) = value else {
+        return Err(NotEnumerable);
+    };
+    let children: Vec<(&String, &serde_json::Value)> = if key == PROJECT_KEY || key == ANY_KEY {
         object.iter().collect()
     } else {
         object.get_key_value(key).into_iter().collect()
@@ -2361,7 +2768,7 @@ pub(crate) fn find_objects<'v>(
         } else {
             project.clone()
         };
-        find_objects(child, rest, child_key_path, child_project, out)?;
+        find_objects(child, rest, named_by, child_key_path, child_project, out)?;
     }
     Ok(())
 }
@@ -2373,6 +2780,8 @@ struct Reader<'p> {
     /// Files read as holding these bytes instead of what is on disk.
     written: &'p [(PathBuf, Vec<u8>)],
     files: BTreeMap<PathBuf, Result<Option<String>, ReadFailureKind>>,
+    /// What SQLite stores hold, by store and key.
+    items: BTreeMap<(PathBuf, String), Result<Option<String>, ReadFailureKind>>,
     reported: BTreeSet<(usize, String, PathBuf)>,
     failures: Vec<ScannedReadFailure>,
 }
@@ -2383,6 +2792,7 @@ impl<'p> Reader<'p> {
             fs,
             written,
             files: BTreeMap::new(),
+            items: BTreeMap::new(),
             reported: BTreeSet::new(),
             failures: Vec::new(),
         }
@@ -2400,6 +2810,37 @@ impl<'p> Reader<'p> {
             return None;
         }
         self.files[path].as_ref().ok()?.as_deref()
+    }
+
+    /// The text under `key` in the `ItemTable` of the SQLite store at
+    /// `path`, `None` when the store or the key is missing, or the store
+    /// cannot be opened or queried, which is then reported.
+    fn sqlite_text(
+        &mut self,
+        home: &FoundHome,
+        path: &Path,
+        key: &str,
+        project: Option<&str>,
+    ) -> Option<String> {
+        let id = (path.to_path_buf(), key.to_owned());
+        if !self.items.contains_key(&id) {
+            let read = match self.fs.read_sqlite_item(path, key) {
+                Ok(text) => Ok(text),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => {
+                    tracing::debug!(path = %path.display(), %error, "cannot read the store");
+                    Err(ReadFailureKind::Sqlite)
+                }
+            };
+            self.items.insert(id.clone(), read);
+        }
+        match self.items[&id].clone() {
+            Ok(text) => text,
+            Err(kind) => {
+                self.fail(home, path, project, kind, None);
+                None
+            }
+        }
     }
 
     /// A file's text, `None` when it is missing, as [`text`](Self::text)

@@ -1,0 +1,5 @@
+{
+	"servers": {
+		"agents-only": { "command": "agents-server" },
+	},
+}

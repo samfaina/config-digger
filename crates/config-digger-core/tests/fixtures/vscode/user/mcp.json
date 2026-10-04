@@ -1,0 +1,21 @@
+{
+	// Written by VS Code's MCP: Add Server command.
+	"servers": {
+		"fetch": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": ["mcp-server-fetch"],
+			"envFile": "${workspaceFolder}/.env",
+		},
+		"github": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/",
+			"headers": {
+				"Authorization": "Bearer ${input:github-token}",
+			},
+		},
+	},
+	"inputs": [
+		{ "type": "promptString", "id": "github-token", "description": "GitHub token", "password": true },
+	],
+}

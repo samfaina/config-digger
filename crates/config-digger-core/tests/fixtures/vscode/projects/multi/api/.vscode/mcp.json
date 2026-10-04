@@ -1,0 +1,6 @@
+{
+	"servers": {
+		"shared": { "command": "api-shared" },
+		"api-only": { "command": "api-server" },
+	},
+}
