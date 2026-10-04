@@ -773,6 +773,11 @@
           "items": {
             "$ref": "#/$defs/HomeCondition"
           }
+        },
+        "default": {
+          "description": "The home is the definition default, where the Agent keeps its\nconfiguration unless told otherwise. At most one home is, and its\nfolder is one fixed path. Any other home found through a fixed path\nor a search is found at a known location, and one an environment\nvariable names, through that variable.",
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false,

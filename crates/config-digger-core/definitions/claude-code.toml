@@ -59,6 +59,7 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 
 [[homes]]
 id = "default"
+default = true
 folder = { block = "path", path = "~" }
 
 [homes.roots]

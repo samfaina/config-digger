@@ -38,6 +38,7 @@ paths = [
 # covers.
 [[homes]]
 id = "default"
+default = true
 folder = { block = "path", path = "%APPDATA%/Code/User" }
 
 [homes.roots]

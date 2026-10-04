@@ -6,10 +6,10 @@ pub mod skill_managers;
 
 use crate::version::{Standing, Version};
 use blocks::{
-    Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables, Format,
-    Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locator, LookUp,
-    MechanismTarget, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
-    SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
+    FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locate,
+    Locator, LookUp, MechanismTarget, PluginRegistry, ProjectWalk, Provenance, Register, Registry,
+    Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -259,6 +259,13 @@ pub(crate) struct HomeDefinition {
     /// in the lookup order takes them.
     #[serde(default)]
     pub when: Vec<HomeCondition>,
+    /// The home is the definition default, where the Agent keeps its
+    /// configuration unless told otherwise. At most one home is, and its
+    /// folder is one fixed path. Any other home found through a fixed path
+    /// or a search is found at a known location, and one an environment
+    /// variable names, through that variable.
+    #[serde(default)]
+    pub default: bool,
 }
 
 /// How to tell that an Agent is running. It runs when a process matches
@@ -845,6 +852,15 @@ impl AgentDefinition {
                     home.id
                 ));
             }
+            if home.default && home.folder.finds_by() != FindsBy::FixedPath {
+                return Err(format!(
+                    "home `{}` is the default, so its folder must be one fixed path",
+                    home.id
+                ));
+            }
+        }
+        if self.homes.iter().filter(|home| home.default).count() > 1 {
+            return Err("at most one home can be the default".into());
         }
         for order in &self.lookup_orders {
             unique("lookup order home", order.iter().map(String::as_str))?;
@@ -2802,6 +2818,35 @@ checks = {CHECKS}
         let text = ordered.replace("[\"default\"]", "[\"other\"]");
         assert!(
             error(&text).contains("lookup_orders names undeclared home `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn the_default_home_is_one_fixed_path() {
+        let default = "roots.state = \".test.json\"\ndefault = true\n";
+        let text = VALID.replace("roots.state = \".test.json\"\n", default);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        for folder in [
+            r#"{ block = "env", variable = "TEST_HOME" }"#,
+            r#"{ block = "path", path = "%LOCALAPPDATA%/Test_*" }"#,
+        ] {
+            let text = text.replace(r#"{ block = "path", path = "~" }"#, folder);
+            assert!(
+                error(&text).contains("is the default, so its folder must be one fixed path"),
+                "{}",
+                error(&text)
+            );
+        }
+
+        let second = format!(
+            "{default}\n[[homes]]\nid = \"other\"\nfolder = {{ block = \"path\", path = \"~/.other\" }}\n{default}"
+        );
+        let text = VALID.replace("roots.state = \".test.json\"\n", &second);
+        assert!(
+            error(&text).contains("at most one home can be the default"),
             "{}",
             error(&text)
         );

@@ -38,6 +38,20 @@ pub(crate) trait Locate {
     /// exists, creating it, so that a lookup order picks it as soon as it
     /// is named.
     fn used_before_it_exists(&self) -> bool;
+
+    /// How it finds its folders, which tells where a home it finds came from.
+    fn finds_by(&self) -> FindsBy<'_>;
+}
+
+/// How a home locator finds its folders.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FindsBy<'a> {
+    /// The value of the environment variable it names.
+    Variable(&'a str),
+    /// One fixed path.
+    FixedPath,
+    /// Every folder that a glob matches or a file lists.
+    Search,
 }
 
 /// Where one root of an Agent home lives.
@@ -81,6 +95,14 @@ impl Locate for Locator {
             Locator::Path(block) => block.used_before_it_exists(),
             Locator::Env(block) => block.used_before_it_exists(),
             Locator::JsonList(block) => block.used_before_it_exists(),
+        }
+    }
+
+    fn finds_by(&self) -> FindsBy<'_> {
+        match self {
+            Locator::Path(block) => block.finds_by(),
+            Locator::Env(block) => block.finds_by(),
+            Locator::JsonList(block) => block.finds_by(),
         }
     }
 }
@@ -174,6 +196,10 @@ impl Locate for JsonListLocator {
     fn used_before_it_exists(&self) -> bool {
         false
     }
+
+    fn finds_by(&self) -> FindsBy<'_> {
+        FindsBy::Search
+    }
 }
 
 /// The folder an environment variable holds, such as Claude Desktop's
@@ -210,6 +236,10 @@ impl Locate for EnvLocator {
 
     fn used_before_it_exists(&self) -> bool {
         true
+    }
+
+    fn finds_by(&self) -> FindsBy<'_> {
+        FindsBy::Variable(&self.variable)
     }
 }
 
@@ -287,6 +317,12 @@ pub(crate) struct PathLocator {
 }
 
 impl PathLocator {
+    /// Whether the path holds wildcards, so that it names every folder that
+    /// matches.
+    fn is_glob(&self) -> bool {
+        self.path.contains(['*', '?', '{'])
+    }
+
     /// The path below the user's home folder, `None` for the folder itself.
     /// An error for a path outside it.
     fn relative(&self) -> Result<Option<&str>, String> {
@@ -325,7 +361,7 @@ impl Validate for PathLocator {
 
 impl Locate for PathLocator {
     fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
-        if self.path.contains(['*', '?', '{']) {
+        if self.is_glob() {
             return paths::expand_glob(&self.path, fs, env);
         }
         if !self.in_home_folder() {
@@ -346,6 +382,14 @@ impl Locate for PathLocator {
 
     fn used_before_it_exists(&self) -> bool {
         false
+    }
+
+    fn finds_by(&self) -> FindsBy<'_> {
+        if self.is_glob() {
+            FindsBy::Search
+        } else {
+            FindsBy::FixedPath
+        }
     }
 }
 

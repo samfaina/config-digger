@@ -251,6 +251,56 @@ fn third_party_inference_keeps_a_home_of_its_own_that_is_always_read() {
 }
 
 #[test]
+fn each_home_says_whether_the_definition_default_a_variable_or_a_known_location_found_it() {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    let fs = with_classic_at(fs, &PathBuf::from(LOCAL_APP_DATA).join("Claude-3p"));
+    let fs = with_classic_at(fs, Path::new(r"E:\claude-data"));
+    let env = env().with_var("CLAUDE_USER_DATA_DIR", r"E:\claude-data");
+    let inventory = inventory_with(&fs, env);
+
+    assert_eq!(
+        json(&home(&inventory, "user-data-dir").source),
+        serde_json::json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
+    );
+    assert_eq!(
+        json(&home(&inventory, "classic").source),
+        serde_json::json!({"kind": "default"})
+    );
+    assert_eq!(
+        json(&home(&inventory, "msix").source),
+        serde_json::json!({"kind": "known_location"})
+    );
+    assert_eq!(
+        json(&home(&inventory, "third-party").source),
+        serde_json::json!({"kind": "known_location"})
+    );
+}
+
+#[test]
+fn a_home_the_user_adds_where_a_variable_finds_it_keeps_the_variable_as_its_source() {
+    let custom = PathBuf::from(r"E:\claude-data");
+    let fs = with_classic_at(FakeFileSystem::new(), &custom);
+    let env = env().with_var("CLAUDE_USER_DATA_DIR", r"E:\claude-data");
+    let core = core_with(&fs, env);
+
+    core.add_home(&custom, "claude-desktop").unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let homes: Vec<&Home> = inventory
+        .homes
+        .iter()
+        .filter(|home| home.agent == "claude-desktop")
+        .collect();
+    assert_eq!(homes.len(), 1);
+    assert_eq!(homes[0].home, "user-data-dir");
+    assert_eq!(
+        json(&homes[0].source),
+        serde_json::json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
+    );
+}
+
+#[test]
 fn a_remote_server_in_the_user_file_is_invalid_since_the_file_is_stdio_only() {
     let inventory = inventory(&store());
 

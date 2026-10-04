@@ -1196,11 +1196,19 @@ pub struct VersionRange {
 }
 
 /// Where an Agent home came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum HomeSource {
-    /// The location the Agent definition gives.
+    /// The location the Agent definition gives as its default.
     Default,
+    /// The environment variable that holds its folder.
+    Environment {
+        /// The variable's name, such as `CLAUDE_USER_DATA_DIR`.
+        variable: String,
+    },
+    /// Another location the Agent definition knows of, such as an MSIX
+    /// package's data folder.
+    KnownLocation,
     /// The user added it, and no definition location finds it.
     Added,
 }

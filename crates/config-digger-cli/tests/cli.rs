@@ -2338,6 +2338,61 @@ fn agents_lists_the_loaded_definitions_and_the_homes_found() {
 }
 
 #[test]
+fn homes_and_agents_say_whether_a_variable_or_a_known_location_found_a_home() {
+    let harness = Harness::new();
+    let config = "claude_desktop_config.json";
+    let classic = harness.roaming_app_data().join("Claude");
+    let msix = harness
+        .local_app_data()
+        .join(r"Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude");
+    let custom = harness.folder("claude-data");
+    for folder in [&classic, &msix, &custom] {
+        std::fs::create_dir_all(folder).unwrap();
+        std::fs::write(folder.join(config), "{}").unwrap();
+    }
+    let env = [("CLAUDE_USER_DATA_DIR", custom.to_str().unwrap())];
+
+    let list = harness.run_with_env(&["homes", "list", "--json"], &env);
+    let text = harness.run_with_env(&["homes", "list", "--wide"], &env);
+    let agents = harness.run_with_env(&["agents", "--wide"], &env);
+
+    assert_eq!(list.code, 0, "{}", list.stderr);
+    let sources: Vec<(String, Value)> = list.document()["homes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|home| home["agent"] == "claude-desktop")
+        .map(|home| {
+            (
+                home["home"].as_str().unwrap().to_owned(),
+                home["source"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        sources,
+        vec![
+            (
+                "user-data-dir".to_owned(),
+                json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
+            ),
+            ("classic".to_owned(), json!({"kind": "default"})),
+            ("msix".to_owned(), json!({"kind": "known_location"})),
+        ]
+    );
+    for run in [&text, &agents] {
+        assert_eq!(run.code, 0, "{}", run.stderr);
+        for source in [
+            "environment variable %CLAUDE_USER_DATA_DIR%",
+            "definition default",
+            "known location",
+        ] {
+            assert!(run.stdout.contains(source), "{source}: {}", run.stdout);
+        }
+    }
+}
+
+#[test]
 fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     let harness = Harness::new().with_file(
         ".claude.json",

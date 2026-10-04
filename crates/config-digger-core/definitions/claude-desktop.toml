@@ -81,6 +81,7 @@ skills = "local-agent-mode-sessions/skills-plugin"
 # The classic installer's data folder [docs].
 [[homes]]
 id = "classic"
+default = true
 folder = { block = "path", path = "%APPDATA%/Claude" }
 
 [homes.roots]

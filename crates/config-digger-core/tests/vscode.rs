@@ -299,6 +299,14 @@ fn a_profile_that_does_not_share_mcp_is_an_agent_home_of_its_own() {
     );
     assert_eq!(home(&inventory, &agents).folder, PathBuf::from(&agents));
     assert_eq!(
+        json(&home(&inventory, &agents).source),
+        serde_json::json!({"kind": "known_location"})
+    );
+    assert_eq!(
+        json(&home(&inventory, "default").source),
+        serde_json::json!({"kind": "default"})
+    );
+    assert_eq!(
         json(item_in(&inventory, &work, "work-only").state),
         "effective"
     );
