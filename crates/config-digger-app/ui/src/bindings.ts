@@ -591,7 +591,7 @@ export type Provenance =
  */
 "extension" | 
 /**
- *  Shipped with the Agent, which keeps it as it ships it, such as
+ *  Shipped with the Agent, which restores it as it ships it, such as
  *  Cursor's built-in skills. config-digger only reads it.
  */
 "built_in";

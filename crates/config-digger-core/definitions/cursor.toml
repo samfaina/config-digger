@@ -124,7 +124,9 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 
 # `.cursor\mcp.json` at the root of each folder of the Project, read in no
 # folder above or below it [code]. `0` in its servers' identifiers is the
-# folder's position in the Project, followed by its name [code, disk].
+# folder's position in the Project, followed by its name [code, disk]. A
+# `name` a `.code-workspace` file gives a folder, which Cursor may name it
+# by instead, is not read.
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".cursor/mcp.json" }
@@ -201,14 +203,51 @@ gate = "dedupe_mcp_servers"
 unseen = ["extensions", "team", "marketplace-plugins", "user-pick"]
 
 # Cursor loads a Claude Code plugin only while Claude Code's
-# `enabledPlugins["<name>@<marketplace>"]` holds `true` for it, and never
-# while a Project's settings hold `false` [code]: one no settings file names
-# is off. It reads a user install's in the user settings and a `local` or
-# `project` install's in the Project's [code]; config-digger reads them in
-# layers as Claude Code does, local over Project over user, so a plugin only
-# the other settings turn on is taken as on. These switches are Claude
-# Code's, so Disable through them reaches Claude Code too. They are repeated
-# for skills below.
+# `enabledPlugins["<name>@<marketplace>"]` holds `true` for it in the
+# settings of its install [code]: a user install's in the user settings, and
+# never while a Project's settings hold `false` for it there; a `local` or
+# `project` install's in the Project's settings, the local file over the
+# shared one. A plugin none of them names is off. These switches are Claude
+# Code's, which reads them in layers of its own, so Disable through them
+# reaches Claude Code too. They are repeated for skills below.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+enable_offered = false
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+
 [[items.mcp.disable]]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
@@ -221,6 +260,7 @@ default_value = false
 reason = "plugin_disabled"
 layered = true
 locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["project", "local"]
 
 [[items.mcp.disable]]
 block = "json-field"
@@ -234,27 +274,18 @@ default_value = false
 reason = "plugin_disabled"
 layered = true
 locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["project", "local"]
 enable_offered = false
-
-[[items.mcp.disable]]
-block = "json-field"
-switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
-target = "plugin"
-context = "all"
-enable_action = "set"
-enabled_value = true
-disabled_value = false
-default_value = false
-reason = "plugin_disabled"
-layered = true
-locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 
 # Cursor starts a Project server only once the user approves it in its MCP
 # settings, as it is configured: it keeps `<identifier>:<hash>` in
 # `cursor/approvedProjectMcpServers` of the application's state, or, from
 # older versions, the bare identifier, and drops the approval of a server
 # whose hash changes [code, disk]. The hash covers the fields of the
-# server's transport [code], which config-digger hashes as Cursor does.
+# server's transport [code], which config-digger hashes as Cursor does: a
+# server with a `command` hashes its `command`, `args`, `env` and
+# `envFile`, one without its `url`, given `http://` when it names no
+# scheme, `headers` and `auth` [code].
 [[items.mcp.gates]]
 block = "approval-hash"
 locations = ["project-mcp"]
@@ -390,7 +421,8 @@ provenance = "built-in"
 store_class = "rewritten-while-running"
 on_read_failure = "ignores_file"
 
-# A Claude Code plugin's skills, in its `skills` folder [docs, disk].
+# A Claude Code plugin's skills, in its `skills` folder [docs, disk]. A
+# folder its manifest names in `skills` instead [docs] is not read.
 [[locations]]
 id = "claude-plugin-skills"
 anchor = { block = "plugin", plugins = "claude-code", path = "skills" }
@@ -413,6 +445,43 @@ competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", "
 checks = ["frontmatter", "rules", "disable", "precedence"]
 
 # Claude Code's plugin switches, as for servers above.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
+enable_offered = false
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
 
 [[items.skill.disable]]
 block = "json-field"
@@ -426,6 +495,7 @@ default_value = false
 reason = "plugin_disabled"
 layered = true
 locations = ["claude-plugin-skills"]
+plugin_scopes = ["project", "local"]
 
 [[items.skill.disable]]
 block = "json-field"
@@ -439,20 +509,8 @@ default_value = false
 reason = "plugin_disabled"
 layered = true
 locations = ["claude-plugin-skills"]
+plugin_scopes = ["project", "local"]
 enable_offered = false
-
-[[items.skill.disable]]
-block = "json-field"
-switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
-target = "plugin"
-context = "all"
-enable_action = "set"
-enabled_value = true
-disabled_value = false
-default_value = false
-reason = "plugin_disabled"
-layered = true
-locations = ["claude-plugin-skills"]
 
 # Cursor caches the Statsig gates of the signed-in account in the
 # application's state, under `workbench.experiments.statsigBootstrap`, each

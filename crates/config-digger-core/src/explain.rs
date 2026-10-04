@@ -1234,21 +1234,16 @@ pub(crate) fn unseen_servers(agent_name: &str, unseen: &[UnseenServers]) -> Stri
     let picked = unseen.contains(&UnseenServers::UserPick);
     let Some((last, first)) = sources.split_last() else {
         return format!(
-            "{agent_name} runs one server per URL. One the user picked in {agent_name} may run instead."
+            "{agent_name} runs one server per URL. One you picked in {agent_name} may run instead."
         );
     };
-    let mut those = String::from("those of ");
-    for source in first {
-        those.push_str(source);
-        those.push_str(", of ");
-    }
-    if !first.is_empty() {
-        those.truncate(those.len() - ", of ".len());
-        those.push_str(" and of ");
-    }
-    those.push_str(last);
+    let those = if first.is_empty() {
+        format!("those of {last}")
+    } else {
+        format!("those of {} and of {last}", first.join(", of "))
+    };
     let picked = if picked {
-        format!(", or one the user picked in {agent_name},")
+        format!(", or one you picked in {agent_name},")
     } else {
         String::new()
     };

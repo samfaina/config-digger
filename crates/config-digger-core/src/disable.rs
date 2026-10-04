@@ -176,7 +176,10 @@ fn set_for<'a>(
         .enumerate()
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)));
     for (index, mechanism) in switched {
-        if !mechanism.covers(&location.id) || (mechanism.layered() && layer_decided) {
+        if !mechanism.covers(&location.id)
+            || !mechanism.covers_plugin(plugin_scope(entry))
+            || (mechanism.layered() && layer_decided)
+        {
             continue;
         }
         let switches = snapshot
@@ -314,6 +317,7 @@ pub(crate) fn choose(
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
         .filter(|(_, mechanism)| {
             mechanism.covers(&location.id)
+                && mechanism.covers_plugin(plugin_scope(entry))
                 && mechanism.enable_offered()
                 && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
         })
@@ -431,10 +435,9 @@ pub(crate) fn failed_switch_files(
     let location = definition.location(&entry.location);
     let mut files: Vec<PathBuf> = Vec::new();
     for mechanism in &definition.rules(location.kind).disable {
-        let Some(mechanism) = mechanism
-            .switched()
-            .filter(|mechanism| mechanism.covers(&location.id))
-        else {
+        let Some(mechanism) = mechanism.switched().filter(|mechanism| {
+            mechanism.covers(&location.id) && mechanism.covers_plugin(plugin_scope(entry))
+        }) else {
             continue;
         };
         let switch = mechanism.switch();
@@ -450,4 +453,9 @@ pub(crate) fn failed_switch_files(
         }
     }
     files
+}
+
+/// The Scope the plugin of `entry` is installed at, as the Agent records it.
+fn plugin_scope(entry: &ScannedEntry) -> Option<&str> {
+    entry.plugin.as_ref()?.scope.as_deref()
 }

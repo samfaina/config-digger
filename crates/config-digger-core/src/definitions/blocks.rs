@@ -1518,7 +1518,9 @@ impl Validate for PluginFolders {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub(crate) enum RelativePaths {
+    /// A `/`-separated relative path.
     One(String),
+    /// Several such paths, in order.
     Several(Vec<String>),
 }
 
@@ -2566,10 +2568,10 @@ impl Compete for PathKey {
     }
 }
 
-/// Entries compete when their names are exactly equal, and, while the
-/// Feature gate `gate` is on, the remote Entries of `locations` compete when
-/// they have the same URL, as Cursor runs one server per URL: the one the
-/// Agent ranks highest wins. A remote Entry has a `url` and no `command`.
+/// Entries compete when their names are exactly equal, except that, while
+/// the Feature gate `gate` is on, the remote Entries of `locations` compete
+/// by URL instead, as Cursor runs one server per URL: the one the Agent ranks
+/// highest wins. A remote Entry has a `url` and no `command`.
 /// URLs compare as WHATWG URLs, by scheme, host and port, path without a
 /// trailing `/`, and query, a URL without a scheme taking `http://`.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -2630,26 +2632,20 @@ impl SameUrl {
         if !self.locations.iter().any(|known| known == id) {
             return None;
         }
-        let command = config.get("command").is_some_and(|command| match command {
-            Value::Null | Value::Bool(false) => false,
-            Value::String(text) => !text.is_empty(),
-            _ => true,
-        });
+        if truthy(config, "command") {
+            return None;
+        }
         let url = config.get("url")?.as_str().filter(|url| !url.is_empty())?;
-        (!command).then(|| whatwg_url(url))
+        Some(whatwg_url(url))
     }
 }
 
 /// `url` as Cursor compares it, given `http://` when it names no scheme: an
-/// `http`, `https`, `ws` or `wss` URL's scheme and host in lower case,
+/// `http`, `https`, `ws` or `wss` URL's host in lower case,
 /// without user info, the scheme's default port or a fragment, and with no
 /// `/` ending its path; any other URL in lower case.
 fn whatwg_url(url: &str) -> String {
-    let url = if has_scheme(url) {
-        url.to_owned()
-    } else {
-        format!("http://{url}")
-    };
+    let url = with_scheme(url);
     let (scheme, rest) = url.split_once("://").expect("a scheme is given");
     let default_port = match scheme {
         "http" | "ws" => ":80",
@@ -2888,6 +2884,19 @@ pub(crate) trait Disables {
 
     fn locations(&self) -> &[String];
 
+    /// The Scopes a plugin must be installed at for the switch to apply to
+    /// its Entries, as the Agent records them; empty for any.
+    fn plugin_scopes(&self) -> &[String] {
+        &[]
+    }
+
+    /// Whether it applies to the Entries of a plugin installed at `scope`,
+    /// or to an Entry of no plugin.
+    fn covers_plugin(&self, scope: Option<&str>) -> bool {
+        let scopes = self.plugin_scopes();
+        scopes.is_empty() || scope.is_some_and(|scope| scopes.iter().any(|known| known == scope))
+    }
+
     /// Whether it Disables the Entries of the location `id`.
     fn covers(&self, id: &str) -> bool {
         let locations = self.locations();
@@ -3078,6 +3087,10 @@ impl Disables for Switched<'_> {
 
     fn by_id(&self) -> bool {
         self.block().by_id()
+    }
+
+    fn plugin_scopes(&self) -> &[String] {
+        self.block().plugin_scopes()
     }
 }
 
@@ -3324,11 +3337,23 @@ pub(crate) struct JsonField {
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// With target `plugin`, the Scopes a plugin must be installed at for
+    /// the field to apply to it, as the Agent records them, such as Cursor
+    /// reading a user install's `enabledPlugins` in the user settings alone.
+    /// Omitted, it applies to every plugin.
+    #[serde(default)]
+    pub plugin_scopes: Vec<String>,
 }
 
 impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
         validate_mechanism(&self.switch, self.target, self.context)?;
+        if !self.plugin_scopes.is_empty() && self.target != MechanismTarget::Plugin {
+            return Err("plugin_scopes needs target `plugin`".into());
+        }
+        if self.plugin_scopes.iter().any(String::is_empty) {
+            return Err("a plugin scope must not be empty".into());
+        }
         if self.switch.named_by.is_some() && self.enable_offered {
             return Err(
                 "a switch named_by a list item is only read: enable_offered must be false".into(),
@@ -3356,6 +3381,10 @@ impl Validate for JsonField {
 impl Disables for JsonField {
     fn switch(&self) -> &Switch {
         &self.switch
+    }
+
+    fn plugin_scopes(&self) -> &[String] {
+        &self.plugin_scopes
     }
 
     fn target(&self) -> MechanismTarget {
@@ -4408,18 +4437,10 @@ impl ConfigHash {
     pub fn of(self, config: &Value) -> Option<String> {
         match self {
             ConfigHash::Cursor => {
-                let truthy = |field: &str| {
-                    config.get(field).is_some_and(|value| match value {
-                        Value::Null | Value::Bool(false) => false,
-                        Value::String(text) => !text.is_empty(),
-                        Value::Number(number) => number.as_f64() != Some(0.0),
-                        _ => true,
-                    })
-                };
                 let mut fields = serde_json::Map::new();
-                let keep: &[&str] = if truthy("command") {
+                let keep: &[&str] = if truthy(config, "command") {
                     &["command", "args", "env", "envFile"]
-                } else if truthy("url") {
+                } else if truthy(config, "url") {
                     &["url", "headers", "auth"]
                 } else {
                     return None;
@@ -4429,9 +4450,7 @@ impl ConfigHash {
                         continue;
                     };
                     let value = match (field, value) {
-                        ("url", Value::String(url)) if !has_scheme(url) => {
-                            Value::from(format!("http://{url}"))
-                        }
+                        ("url", Value::String(url)) => Value::from(with_scheme(url)),
                         _ => value.clone(),
                     };
                     fields.insert(field.to_owned(), value);
@@ -4452,12 +4471,28 @@ impl ConfigHash {
     }
 }
 
-/// Whether `url` starts with a scheme of one to eight lower-case letters
-/// and `://`, as Cursor checks before it adds `http://`.
-fn has_scheme(url: &str) -> bool {
-    url.split_once("://").is_some_and(|(scheme, _)| {
-        (1..=8).contains(&scheme.len()) && scheme.bytes().all(|byte| byte.is_ascii_lowercase())
+/// Whether `config` holds a value at `field` that JavaScript takes as true,
+/// as Cursor tests a server's `command` and `url`.
+fn truthy(config: &Value, field: &str) -> bool {
+    config.get(field).is_some_and(|value| match value {
+        Value::Null | Value::Bool(false) => false,
+        Value::String(text) => !text.is_empty(),
+        Value::Number(number) => number.as_f64() != Some(0.0),
+        Value::Bool(true) | Value::Array(_) | Value::Object(_) => true,
     })
+}
+
+/// `url`, given `http://` unless it starts with a scheme of one to eight
+/// lower-case letters and `://`, as Cursor gives a server's URL one.
+fn with_scheme(url: &str) -> String {
+    let has_scheme = url.split_once("://").is_some_and(|(scheme, _)| {
+        (1..=8).contains(&scheme.len()) && scheme.bytes().all(|byte| byte.is_ascii_lowercase())
+    });
+    if has_scheme {
+        url.to_owned()
+    } else {
+        format!("http://{url}")
+    }
 }
 
 /// `value` as JavaScript's `JSON.stringify` writes it: no spaces, an

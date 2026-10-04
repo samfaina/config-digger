@@ -555,9 +555,11 @@
       "description": "One `/`-separated relative path, or several.",
       "anyOf": [
         {
+          "description": "A `/`-separated relative path.",
           "type": "string"
         },
         {
+          "description": "Several such paths, in order.",
           "type": "array",
           "items": {
             "type": "string"
@@ -2193,7 +2195,7 @@
           ]
         },
         {
-          "description": "Entries compete when their names are exactly equal, and, while the\nFeature gate `gate` is on, the remote Entries of `locations` compete when\nthey have the same URL, as Cursor runs one server per URL: the one the\nAgent ranks highest wins. A remote Entry has a `url` and no `command`.\nURLs compare as WHATWG URLs, by scheme, host and port, path without a\ntrailing `/`, and query, a URL without a scheme taking `http://`.",
+          "description": "Entries compete when their names are exactly equal, except that, while\nthe Feature gate `gate` is on, the remote Entries of `locations` compete\nby URL instead, as Cursor runs one server per URL: the one the Agent ranks\nhighest wins. A remote Entry has a `url` and no `command`.\nURLs compare as WHATWG URLs, by scheme, host and port, path without a\ntrailing `/`, and query, a URL without a scheme taking `http://`.",
           "type": "object",
           "properties": {
             "locations": {
@@ -2424,6 +2426,14 @@
             },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "plugin_scopes": {
+              "description": "With target `plugin`, the Scopes a plugin must be installed at for\nthe field to apply to it, as the Agent records them, such as Cursor\nreading a user install's `enabledPlugins` in the user settings alone.\nOmitted, it applies to every plugin.",
               "type": "array",
               "items": {
                 "type": "string"

@@ -912,7 +912,7 @@ fn a_server_that_collapses_by_url_says_what_config_digger_cannot_see() {
         .unwrap_or_else(|| panic!("no unseen_servers caveat in {caveats}"));
     assert_eq!(
         unseen["sentence"],
-        "Cursor runs one server per URL, and servers config-digger cannot see take part too: those of extensions, of the team and of user Marketplace plugins. One of them, or one the user picked in Cursor, may run instead."
+        "Cursor runs one server per URL, and servers config-digger cannot see take part too: those of extensions, of the team and of user Marketplace plugins. One of them, or one you picked in Cursor, may run instead."
     );
     assert!(
         caveats
@@ -1147,7 +1147,7 @@ fn a_cursor_server_shows_whole_references_and_masks_literal_secrets() {
                 "local": {{
                     "command": "${{userHome}}${{/}}bin${{pathSeparator}}docs-mcp",
                     "args": ["--folder", "${{workspaceFolder}}", "--name", "${{workspaceFolderBasename}}"],
-                    "envFile": "${{workspaceFolder}}/.env",
+                    "envFile": "C:/secrets/docs.env",
                     "env": {{
                         "FROM_ENV": "${{env:DOCS_TOKEN}}",
                         "NOT_CURSOR": "${{DOCS_TOKEN}}",
@@ -1170,7 +1170,7 @@ fn a_cursor_server_shows_whole_references_and_masks_literal_secrets() {
     // Cursor replaces no `${NAME}` of another name.
     assert_eq!(local.config["env"]["NOT_CURSOR"], "••••");
     assert_eq!(local.config["env"]["LITERAL"], "••••");
-    assert_eq!(local.config["envFile"], "${workspaceFolder}/.env");
+    assert_eq!(local.config["envFile"], "C:/secrets/docs.env");
     assert_eq!(
         local.config["args"],
         json!([
@@ -1238,4 +1238,83 @@ fn a_user_setup_of_cursor_is_an_installation_of_its_home() {
         .collect();
     assert_eq!(versions, [(exe.as_path(), Some("3.22.12"))]);
     assert!(!home.out_of_range);
+}
+
+#[test]
+fn a_user_install_runs_only_while_the_user_settings_turn_it_on() {
+    let fs = with_installed(
+        context7(cursor()),
+        json!({ "context7@market": user_install("context7") }),
+        json!({}),
+    )
+    .with_file(
+        project(r"app\.claude\settings.local.json"),
+        json!({ "enabledPlugins": { "context7@market": true } }).to_string(),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    // Claude Code takes the Project's `true`; Cursor reads the user's alone.
+    let entry = &item(&inventory, "plugin-context7-context7").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.reason.as_ref().unwrap().switch.as_deref(),
+        Some(r"C:\Users\fixture\.claude\settings.json#enabledPlugins.context7@market")
+    );
+}
+
+#[test]
+fn a_project_s_false_keeps_a_user_install_out_of_that_project() {
+    let fs = with_installed(
+        context7(cursor()),
+        json!({ "context7@market": user_install("context7") }),
+        json!({ "context7@market": true }),
+    )
+    .with_file(
+        project(r"app\.claude\settings.json"),
+        json!({ "enabledPlugins": { "context7@market": false } }).to_string(),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        code(item(&inventory, "plugin-context7-context7").state),
+        "disabled"
+    );
+}
+
+#[test]
+fn a_local_install_runs_only_while_its_project_s_settings_turn_it_on() {
+    let fs = with_installed(
+        context7(cursor()),
+        json!({ "context7@market": [{
+            "scope": "local",
+            "projectPath": r"E:\projects\app",
+            "installPath": plugin_cache(r"market\context7\1.0.0").display().to_string(),
+        }] }),
+        json!({ "context7@market": true }),
+    )
+    .with_folder(project("app"));
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let entry = &item(&inventory, "plugin-context7-context7").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.reason.as_ref().unwrap().switch.as_deref(),
+        Some(r"E:\projects\app\.claude\settings.json#enabledPlugins.context7@market")
+    );
+}
+
+#[test]
+fn a_workspace_file_cursor_opened_is_a_project() {
+    let workspace = project(r"multi\multi.code-workspace");
+    let fs = cursor()
+        .with_file(&workspace, r#"{ "folders": [{ "path": "api" }] }"#)
+        .with_file(
+            Path::new(USER).join(r"workspaceStorage\4e5f\workspace.json"),
+            r#"{"workspace":"file:///e%3A/projects/multi/multi.code-workspace"}"#,
+        );
+
+    assert!(recorded_by_cursor(&inventory(&fs), &workspace));
 }

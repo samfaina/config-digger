@@ -1486,7 +1486,7 @@ pub enum Provenance {
     /// Disable goes through its own switch, and Remove is not offered: the
     /// Agent uninstalls it.
     Extension,
-    /// Shipped with the Agent, which keeps it as it ships it, such as
+    /// Shipped with the Agent, which restores it as it ships it, such as
     /// Cursor's built-in skills. config-digger only reads it.
     BuiltIn,
 }
