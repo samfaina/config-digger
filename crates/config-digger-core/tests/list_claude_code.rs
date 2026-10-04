@@ -42,6 +42,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "source": {"kind": "default"},
             "hidden": false,
             "not_read": null,
+            "mirror": null,
             "no_configuration": null,
             "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],
@@ -92,6 +93,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "caveats": [],
                     "also_read_by": []
                 }],
+                "built": null,
                 "caveats": []
             },
             {
@@ -124,6 +126,7 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "caveats": [],
                     "also_read_by": []
                 }],
+                "built": null,
                 "caveats": []
             }
         ])

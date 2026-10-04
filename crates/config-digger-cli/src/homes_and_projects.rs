@@ -315,14 +315,20 @@ fn folder_cell(folder: &Path, width: Option<usize>) -> String {
 }
 
 /// What to know about an Agent home, each on its own indented line: that
-/// the Agent never reads it, and that none of its files exist.
+/// another tool copies it, that the Agent never reads it, and that none of
+/// its files exist.
 fn home_notes(home: &api::Home, width: Option<usize>) -> String {
+    let mirror = home
+        .mirror
+        .iter()
+        .map(|mirror| format!("{}: {}", mirror.label, mirror.sentence));
     let not_read = home
         .not_read
         .iter()
         .map(|not_read| not_read.sentence.clone());
     let no_configuration = home.no_configuration.iter().map(|note| format!("{note}."));
-    not_read
+    mirror
+        .chain(not_read)
         .chain(no_configuration)
         .map(|note| plain_line(&format!("{INDENT}{INDENT}{note}"), width))
         .collect()

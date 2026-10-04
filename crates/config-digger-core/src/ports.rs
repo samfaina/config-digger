@@ -33,6 +33,14 @@ pub trait FileSystem: Send + Sync {
     /// there. A missing file is an error of kind `NotFound`.
     fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>>;
 
+    /// The text values of the column `column` in every row of the table
+    /// `table` of the SQLite store at `path`, such as the folder of each
+    /// thread Codex records, opened read-only for this one query. Values
+    /// that are not text are left out. A missing file is an error of kind
+    /// `NotFound`; a missing table or column is another error.
+    fn read_sqlite_column(&self, path: &Path, table: &str, column: &str)
+    -> io::Result<Vec<String>>;
+
     /// Sets the value under `key` in the `ItemTable` of the SQLite store at
     /// `path` to the text `value`, or deletes the row with `None`, in one
     /// transaction, waiting briefly for an Agent that holds a lock. It never

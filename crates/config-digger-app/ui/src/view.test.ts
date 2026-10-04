@@ -52,6 +52,7 @@ function item(overrides: Partial<Item> = {}): Item {
     name: "notes",
     state: "effective",
     entries: [entry()],
+    built: null,
     caveats: [],
     ...overrides,
   };
@@ -66,6 +67,7 @@ function home(overrides: Partial<Home> = {}): Home {
     source: { kind: "default" },
     hidden: false,
     not_read: null,
+    mirror: null,
     no_configuration: null,
     scopes: ["user", "project"],
     installations: [],

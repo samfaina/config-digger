@@ -117,6 +117,22 @@ export type Backup = {
 	copy: string,
 };
 
+/**
+ *  The server an Agent builds by merging same-named Entries field by field,
+ *  as Codex does across its layers.
+ */
+export type BuiltServer = {
+	/**  The server, with every Secret masked as `••••`. */
+	config: JsonValue,
+	/**  The key paths in `config` whose values were masked. */
+	masked: string[][],
+	/**
+	 *  Where each field of `config` comes from, in its order: each value
+	 *  that is not an object, and each empty object.
+	 */
+	origins: FieldOrigin[],
+};
+
 /**  Something that makes a State less certain than it looks. */
 export type Caveat = {
 	code: CaveatCode,
@@ -199,7 +215,12 @@ export type DisableNotOffered =
  *  The Entry is managed, or a copy of the user's account, and
  *  config-digger only reads it.
  */
-"read_only";
+"read_only" | 
+/**
+ *  The Entry is in a Mirrored home, which another tool copies from
+ *  another Agent home: config-digger never writes to it.
+ */
+"mirrored";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
@@ -383,6 +404,17 @@ export type FailedOperation = {
 	rollback: RollbackLocation[],
 };
 
+/**  The Entry one field of a built server comes from. */
+export type FieldOrigin = {
+	/**
+	 *  The field's key path in the server. An array item is not a field of
+	 *  its own: an array comes whole from one Entry.
+	 */
+	key_path: string[],
+	/**  The `<path>#<key path>` locator of the Entry. */
+	entry: string,
+};
+
 /**
  *  A diff of two versions of one file, with every Secret masked in both,
  *  or why it cannot be shown.
@@ -423,6 +455,11 @@ export type Home = {
 	 *  reads it and its Entries are Unread, what it reads instead.
 	 */
 	not_read: NotRead | null,
+	/**
+	 *  When another tool copies it from another Agent home of the Agent,
+	 *  which it is: config-digger never writes to it.
+	 */
+	mirror: Mirror | null,
 	/**
 	 *  When none of the files the Agent reads there exists, the sentence
 	 *  saying so, rendered by the core.
@@ -511,6 +548,11 @@ export type Item = {
 	/**  In precedence order, highest first. */
 	entries: Entry[],
 	/**
+	 *  For an Item whose Agent combines same-named Entries field by field,
+	 *  the server it builds, when more than one Entry takes part.
+	 */
+	built: BuiltServer | null,
+	/**
 	 *  What makes its State less certain, such as a location that could
 	 *  take part and could not be read.
 	 */
@@ -534,6 +576,23 @@ export type Link = {
 	 *  is Unread.
 	 */
 	broken: boolean,
+};
+
+/**
+ *  An Agent home another tool copies from a source Agent home, such as the
+ *  Codex home Orca keeps in sync with `~\.codex`. It is read-only.
+ */
+export type Mirror = {
+	/**  The tool that keeps the copy, such as `Orca`. */
+	owner: string,
+	/**  The id of the Agent home it copies. */
+	source: string,
+	/**  That home's folder, `None` when the environment cannot say where it is. */
+	source_folder: string | null,
+	/**  Such as "Mirrored by Orca", rendered by the core. */
+	label: string,
+	/**  What it is and why it is read-only, rendered by the core. */
+	sentence: string,
 };
 
 /**  Why the Agent never reads an Agent home: its lookup order picks another. */
@@ -735,6 +794,17 @@ export type ReasonCode =
 /**  A same-named Entry at a location the Agent ranks higher is Effective. */
 "shadowed_by_precedence" | 
 /**
+ *  The Agent builds the server it uses from this Entry and other
+ *  same-named ones, field by field.
+ */
+"merged" | 
+/**
+ *  The server the Agent builds from the Item's Entries holds fields of
+ *  two transports, such as Codex's `command` and `url`, which it
+ *  rejects, refusing to start.
+ */
+"transport_conflict" | 
+/**
  *  A switch names the Item, so the Agent skips every Entry of it that
  *  the switch covers.
  */
@@ -811,6 +881,11 @@ export type RemoveNotOffered =
  *  config-digger only reads it.
  */
 "read_only" | 
+/**
+ *  The Entry is in a Mirrored home, which another tool copies from
+ *  another Agent home: config-digger never writes to it.
+ */
+"mirrored" | 
 /**  The Entry is part of a plugin, which only the Agent uninstalls. */
 "plugin" | 
 /**  The Entry is an extension's, which only the Agent uninstalls. */
@@ -882,6 +957,12 @@ export type SkillManager = {
 };
 
 export type State = "effective" | "shadowed" | 
+/**
+ *  The Agent builds the server it uses by combining same-named Entries
+ *  field by field, and this one supplies some of its fields, so that no
+ *  single Entry is Effective.
+ */
+"merged" | 
 /**
  *  The Agent skips it because a switch Disables it, natively or set by
  *  config-digger.

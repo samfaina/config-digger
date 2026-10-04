@@ -1214,6 +1214,9 @@ pub(crate) enum Registry {
     JsonKeys(JsonKeys),
     JsonFolders(JsonFolders),
     SqliteList(SqliteList),
+    TomlKeys(TomlKeys),
+    JsonlHeads(JsonlHeads),
+    SqliteColumn(SqliteColumn),
 }
 
 impl Validate for Registry {
@@ -1222,6 +1225,9 @@ impl Validate for Registry {
             Registry::JsonKeys(block) => block.validate(),
             Registry::JsonFolders(block) => block.validate(),
             Registry::SqliteList(block) => block.validate(),
+            Registry::TomlKeys(block) => block.validate(),
+            Registry::JsonlHeads(block) => block.validate(),
+            Registry::SqliteColumn(block) => block.validate(),
         }
     }
 }
@@ -1232,6 +1238,9 @@ impl Register for Registry {
             Registry::JsonKeys(block) => block.anchor(),
             Registry::JsonFolders(block) => block.anchor(),
             Registry::SqliteList(block) => block.anchor(),
+            Registry::TomlKeys(block) => block.anchor(),
+            Registry::JsonlHeads(block) => block.anchor(),
+            Registry::SqliteColumn(block) => block.anchor(),
         }
     }
 
@@ -1240,6 +1249,9 @@ impl Register for Registry {
             Registry::JsonKeys(block) => block.spelling(),
             Registry::JsonFolders(block) => block.spelling(),
             Registry::SqliteList(block) => block.spelling(),
+            Registry::TomlKeys(block) => block.spelling(),
+            Registry::JsonlHeads(block) => block.spelling(),
+            Registry::SqliteColumn(block) => block.spelling(),
         }
     }
 }
@@ -1452,6 +1464,160 @@ impl SqliteList {
                 })
             })
             .collect())
+    }
+}
+
+/// The keys of a table in a TOML file, each one a Project, such as the
+/// folders Codex records a trust level for under `projects` in its
+/// `config.toml`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TomlKeys {
+    /// Where the file is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The key path of the table whose keys are Projects.
+    pub root: Vec<String>,
+}
+
+impl Validate for TomlKeys {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_anchor(&self.anchor)?;
+        validate_key_path(&self.root)
+    }
+}
+
+impl Register for TomlKeys {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spelling(&self) -> Spelling {
+        Spelling::Path
+    }
+}
+
+impl TomlKeys {
+    /// The Projects the registry's text records, as spelled there.
+    pub fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+        let document = TomlFormat {}.parse(text)?;
+        let root = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        Ok(match root {
+            Some(Value::Object(projects)) => projects.keys().cloned().collect(),
+            _ => Vec::new(),
+        })
+    }
+}
+
+/// Files of JSON lines below a folder, each naming the Project it was
+/// written in on its first line, such as the `session_meta` line that opens
+/// each Codex session's `rollout-*.jsonl`. A file whose first line is no
+/// JSON object naming a folder records none.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonlHeads {
+    /// Where the folder is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The `/`-separated path of the files below the folder, where `*` and
+    /// `?` stand for any name, such as `*/*/*/rollout-*.jsonl`.
+    pub files: String,
+    /// The key paths in the first line of the fields that can name the
+    /// Project, tried in turn.
+    pub fields: Vec<Vec<String>>,
+}
+
+/// The most of a file's first line that is read.
+const FIRST_LINE_MAX: usize = 4 << 20;
+
+impl Validate for JsonlHeads {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_anchor(&self.anchor)?;
+        validate_relative(&self.files)?;
+        if self.fields.is_empty() {
+            return Err("a jsonl-heads registry needs fields".into());
+        }
+        self.fields
+            .iter()
+            .try_for_each(|field| validate_key_path(field))
+    }
+}
+
+impl Register for JsonlHeads {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spelling(&self) -> Spelling {
+        Spelling::Path
+    }
+}
+
+impl JsonlHeads {
+    /// The Project the file at `path` records on its first line, as
+    /// spelled there, read up to its first line break.
+    pub fn spelling_in(&self, fs: &dyn FileSystem, path: &Path) -> Option<String> {
+        const CHUNK: usize = 64 << 10;
+        let mut line = Vec::new();
+        loop {
+            let offset = u64::try_from(line.len()).ok()?;
+            let chunk = fs.read_at(path, offset, CHUNK).ok()?;
+            let end = chunk.iter().position(|&byte| byte == b'\n');
+            line.extend_from_slice(&chunk[..end.unwrap_or(chunk.len())]);
+            if end.is_some() || chunk.len() < CHUNK {
+                break;
+            }
+            if line.len() > FIRST_LINE_MAX {
+                return None;
+            }
+        }
+        let document = JsonFormat::STRICT
+            .parse(std::str::from_utf8(&line).ok()?.trim_end_matches('\r'))
+            .ok()?;
+        self.fields.iter().find_map(|field| {
+            let value = field
+                .iter()
+                .try_fold(&document, |value, key| value.get(key))?;
+            value.as_str().map(str::to_owned)
+        })
+    }
+}
+
+/// A column of a table of a SQLite store, each text value of it naming a
+/// Project, such as the `cwd` of each thread Codex records in the `threads`
+/// table of its `state_5.sqlite`. The store is opened read-only and closed
+/// straight after. A store without the table records none.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SqliteColumn {
+    /// Where the store is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The table's name.
+    pub table: String,
+    /// The column's name.
+    pub column: String,
+}
+
+impl Validate for SqliteColumn {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_anchor(&self.anchor)?;
+        if !is_name(&self.table) || !is_name(&self.column) {
+            return Err(
+                "a sqlite-column registry names its table and column by plain names".into(),
+            );
+        }
+        Ok(())
+    }
+}
+
+impl Register for SqliteColumn {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spelling(&self) -> Spelling {
+        Spelling::Path
     }
 }
 
@@ -2618,6 +2784,7 @@ pub(crate) enum Competition {
     CaseInsensitiveName(CaseInsensitiveName),
     PathKey(PathKey),
     SameUrl(SameUrl),
+    Never(Never),
 }
 
 impl Validate for Competition {
@@ -2627,6 +2794,7 @@ impl Validate for Competition {
             Competition::CaseInsensitiveName(block) => block.validate(),
             Competition::PathKey(block) => block.validate(),
             Competition::SameUrl(block) => block.validate(),
+            Competition::Never(block) => block.validate(),
         }
     }
 }
@@ -2638,6 +2806,7 @@ impl Compete for Competition {
             Competition::CaseInsensitiveName(block) => block.key(name, path),
             Competition::PathKey(block) => block.key(name, path),
             Competition::SameUrl(block) => block.key(name, path),
+            Competition::Never(block) => block.key(name, path),
         }
     }
 
@@ -2647,6 +2816,7 @@ impl Compete for Competition {
             Competition::CaseInsensitiveName(block) => block.by_endpoint(id),
             Competition::PathKey(block) => block.by_endpoint(id),
             Competition::SameUrl(block) => block.by_endpoint(id),
+            Competition::Never(block) => block.by_endpoint(id),
         }
     }
 }
@@ -2658,7 +2828,8 @@ impl Competition {
             Competition::ExactName(block) => &block.by_endpoint,
             Competition::CaseInsensitiveName(_)
             | Competition::PathKey(_)
-            | Competition::SameUrl(_) => &[],
+            | Competition::SameUrl(_)
+            | Competition::Never(_) => &[],
         }
     }
 
@@ -2666,7 +2837,10 @@ impl Competition {
     /// does not, no two Entries compete.
     pub fn only_while(&self) -> Option<&SettingIs> {
         match self {
-            Competition::ExactName(_) | Competition::PathKey(_) | Competition::SameUrl(_) => None,
+            Competition::ExactName(_)
+            | Competition::PathKey(_)
+            | Competition::SameUrl(_)
+            | Competition::Never(_) => None,
             Competition::CaseInsensitiveName(block) => block.only_while.as_ref(),
         }
     }
@@ -2677,7 +2851,8 @@ impl Competition {
             Competition::SameUrl(block) => Some(block),
             Competition::ExactName(_)
             | Competition::CaseInsensitiveName(_)
-            | Competition::PathKey(_) => None,
+            | Competition::PathKey(_)
+            | Competition::Never(_) => None,
         }
     }
 }
@@ -2832,6 +3007,201 @@ impl Compete for PathKey {
         let root: PathBuf = components[..cut].iter().collect();
         let below: PathBuf = components[cut + 1..].iter().collect();
         format!("{}::{}", paths::key(&root), paths::key(&below))
+    }
+
+    fn by_endpoint(&self, _id: &str) -> bool {
+        false
+    }
+}
+
+// --- Merges -----------------------------------------------------------------
+
+/// How an Agent combines same-named Entries into the one server it uses,
+/// rather than letting the highest win whole. Each Entry that takes part is
+/// Merged, and the Item shows the server built, with the Entry each field
+/// comes from.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Merge {
+    DeepMerge(DeepMerge),
+}
+
+impl Validate for Merge {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Merge::DeepMerge(block) => block.validate(),
+        }
+    }
+}
+
+/// A server an Agent builds from same-named Entries, and the Entry each of
+/// its fields comes from.
+pub(crate) struct Built {
+    pub config: Value,
+    /// Each value that is not an object, and each empty object, by key path
+    /// in `config` and in its order, with the index of its Entry among
+    /// those the server is built from.
+    pub origins: Vec<(Vec<String>, usize)>,
+}
+
+impl Merge {
+    /// The server built from `entries`, highest first.
+    pub fn build(&self, entries: &[&Value]) -> Built {
+        match self {
+            Merge::DeepMerge(block) => block.build(entries),
+        }
+    }
+
+    /// The fields of the built server `config` that exclude each other,
+    /// when it holds more than one of them: the Agent rejects it.
+    pub fn conflict<'d>(&'d self, config: &Value) -> Vec<&'d str> {
+        let Merge::DeepMerge(block) = self;
+        let held: Vec<&str> = block
+            .exclusive
+            .iter()
+            .filter(|field| config.get(field.as_str()).is_some())
+            .map(String::as_str)
+            .collect();
+        if held.len() > 1 { held } else { Vec::new() }
+    }
+
+    /// The field whose `false` in a built server turns it off, if any.
+    pub fn enabled(&self) -> Option<&str> {
+        let Merge::DeepMerge(block) = self;
+        block.enabled.as_deref()
+    }
+}
+
+/// Tables merge key by key at any depth, from the lowest Entry up, and any
+/// other value of a higher Entry replaces the lower one's whole, arrays
+/// included, as Codex folds `[mcp_servers.<name>]` across its layers. An
+/// Entry may hold only some fields, such as only `enabled = false`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeepMerge {
+    /// Fields of which the built server may hold one at most, such as
+    /// Codex's `command` and `url`: holding more, it is rejected, every
+    /// Entry that takes part is Invalid, and the Agent is flagged as unable
+    /// to start in the context.
+    #[serde(default)]
+    pub exclusive: Vec<String>,
+    /// The field whose `false` in the built server turns it off, such as
+    /// Codex's `enabled`: every Entry of the Item is then Disabled, by the
+    /// Entry the field comes from.
+    pub enabled: Option<String>,
+}
+
+impl Validate for DeepMerge {
+    fn validate(&self) -> Result<(), String> {
+        if self
+            .exclusive
+            .iter()
+            .chain(&self.enabled)
+            .any(|field| field.is_empty())
+        {
+            return Err("a deep-merge field must not be empty".into());
+        }
+        if self.exclusive.len() == 1 {
+            return Err("exclusive fields come two or more".into());
+        }
+        Ok(())
+    }
+}
+
+impl DeepMerge {
+    fn build(&self, entries: &[&Value]) -> Built {
+        let mut config = Value::Object(serde_json::Map::new());
+        let mut origins: Vec<(Vec<String>, usize)> = Vec::new();
+        for (index, entry) in entries.iter().enumerate().rev() {
+            fold(&mut config, entry, &mut Vec::new(), index, &mut origins);
+        }
+        // In the order of the server's fields.
+        let mut ordered = Vec::new();
+        for (path, _) in leaves(&config, &mut Vec::new()) {
+            if let Some(origin) = origins.iter().find(|(known, _)| *known == path) {
+                ordered.push(origin.clone());
+            }
+        }
+        Built {
+            config,
+            origins: ordered,
+        }
+    }
+}
+
+/// Folds `higher`, read at `path`, into `lower`, recording that what it
+/// brings comes from the Entry at `index`.
+fn fold(
+    lower: &mut Value,
+    higher: &Value,
+    path: &mut Vec<String>,
+    index: usize,
+    origins: &mut Vec<(Vec<String>, usize)>,
+) {
+    match (lower, higher) {
+        (Value::Object(lower), Value::Object(higher)) => {
+            for (key, value) in higher {
+                path.push(key.clone());
+                match lower.get_mut(key) {
+                    Some(known @ Value::Object(_)) if value.is_object() => {
+                        fold(known, value, path, index, origins);
+                    }
+                    _ => {
+                        lower.insert(key.clone(), value.clone());
+                        replace(origins, path, value, index);
+                    }
+                }
+                path.pop();
+            }
+        }
+        (lower, higher) => {
+            *lower = higher.clone();
+            replace(origins, path, higher, index);
+        }
+    }
+}
+
+/// Records that `value`, now at `path`, comes whole from the Entry at `index`.
+fn replace(origins: &mut Vec<(Vec<String>, usize)>, path: &[String], value: &Value, index: usize) {
+    origins.retain(|(known, _)| !known.starts_with(path));
+    for (leaf, _) in leaves(value, &mut path.to_vec()) {
+        origins.push((leaf, index));
+    }
+}
+
+/// Each value at or below `value`, found at `path`, that is not an object,
+/// and each empty object, in order.
+fn leaves<'v>(value: &'v Value, path: &mut Vec<String>) -> Vec<(Vec<String>, &'v Value)> {
+    match value {
+        Value::Object(object) if !object.is_empty() => {
+            let mut found = Vec::new();
+            for (key, child) in object {
+                path.push(key.clone());
+                found.extend(leaves(child, path));
+                path.pop();
+            }
+            found
+        }
+        value => vec![(path.clone(), value)],
+    }
+}
+
+/// Entries never compete: each is an Item of its own, whatever its name, as
+/// Codex lists every skill it finds, same-named ones included.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Never {}
+
+impl Validate for Never {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Compete for Never {
+    /// Its location and name, which no other Entry of the Agent home has.
+    fn key(&self, name: &str, path: &Path) -> String {
+        format!("{}#{name}", paths::key(path))
     }
 
     fn by_endpoint(&self, _id: &str) -> bool {
@@ -4114,6 +4484,9 @@ pub(crate) struct SettingPlace {
     /// whose `ItemTable` holds JSON text under the key path's first key.
     #[serde(default)]
     pub sqlite: bool,
+    /// Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.
+    #[serde(default)]
+    pub toml: bool,
     /// The key path, in the same file, of when the Agent cached the value:
     /// milliseconds since 1970, or an RFC 3339 time, such as when VS Code
     /// fetched the account's policy. Omitted for a value the user writes.
@@ -4139,14 +4512,21 @@ impl SettingPlace {
     }
 
     /// How the file is parsed.
-    pub fn format(&self) -> JsonFormat {
-        JsonFormat::of(self.dialect)
+    pub fn format(&self) -> Box<dyn Parse> {
+        if self.toml {
+            Box::new(TomlFormat {})
+        } else {
+            Box::new(JsonFormat::of(self.dialect))
+        }
     }
 }
 
 impl Validate for SettingPlace {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
+        if self.toml && (self.sqlite || self.dialect.is_some()) {
+            return Err("a TOML setting takes no dialect and is no SQLite store".into());
+        }
         validate_key_path(&self.key_path)?;
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a setting cannot walk up from the Project folder".into());
@@ -4466,6 +4846,7 @@ pub(crate) enum Gate {
     TrustedFolders(TrustedFolders),
     NonceTrust(NonceTrust),
     ApprovalHash(ApprovalHash),
+    ProjectTrust(ProjectTrust),
 }
 
 impl Validate for Gate {
@@ -4477,6 +4858,7 @@ impl Validate for Gate {
             Gate::TrustedFolders(block) => block.validate(),
             Gate::NonceTrust(block) => block.validate(),
             Gate::ApprovalHash(block) => block.validate(),
+            Gate::ProjectTrust(block) => block.validate(),
         }
     }
 }
@@ -4490,7 +4872,8 @@ impl Gate {
             | Gate::PolicyField(_)
             | Gate::TrustedFolders(_)
             | Gate::NonceTrust(_)
-            | Gate::ApprovalHash(_) => self.locations().contains(&id),
+            | Gate::ApprovalHash(_)
+            | Gate::ProjectTrust(_) => self.locations().contains(&id),
         }
     }
 
@@ -4503,6 +4886,7 @@ impl Gate {
             Gate::TrustedFolders(block) => &block.sources,
             Gate::NonceTrust(block) => &block.sources,
             Gate::ApprovalHash(block) => &block.sources,
+            Gate::ProjectTrust(block) => &block.sources,
         }
     }
 
@@ -4529,6 +4913,7 @@ impl Gate {
             Gate::TrustedFolders(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::NonceTrust(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::ApprovalHash(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::ProjectTrust(block) => block.locations.iter().map(String::as_str).collect(),
         }
     }
 }
@@ -4586,6 +4971,54 @@ impl TrustedFolders {
             })
             .filter_map(|item| paths::from_uri_value(item.get(&self.uri)?))
             .collect()
+    }
+}
+
+/// Locations in each folder from a Project's root down to its own folder
+/// that the Agent reads only once the user trusts a folder, as Codex reads a
+/// `<folder>\.codex\config.toml`: it looks up the folder itself, then the
+/// Project's root, the folder holding `.git`, then the main checkout of its
+/// git repository, among the keys of a table of folders, and the first it
+/// finds with a trust level decides. An Entry of a folder whose level is not
+/// `trusted`, or that none of them has, is Blocked, with `untrusted_folder`.
+/// Keys compare as paths, without regard to case. config-digger never
+/// trusts a folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectTrust {
+    /// The ids of the locations whose Entries need trust, each in a Project.
+    pub locations: Vec<String>,
+    /// Where the tables of folders are, each keyed by a folder's path,
+    /// highest first: the first that gives a folder a trust level decides.
+    pub sources: Vec<SettingPlace>,
+    /// The field of a folder's record that holds its trust level.
+    pub field: String,
+    /// The trust level that trusts the folder.
+    pub trusted: String,
+}
+
+impl Validate for ProjectTrust {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a project-trust gate needs locations".into());
+        }
+        if self.field.is_empty() || self.trusted.is_empty() {
+            return Err("a project-trust gate needs its field and level named".into());
+        }
+        validate_sources(&self.sources)
+    }
+}
+
+impl ProjectTrust {
+    /// The trust level the table `value` gives the folder `folder`, if it
+    /// gives one.
+    pub fn level<'v>(&self, value: &'v Value, folder: &Path) -> Option<&'v str> {
+        let key = paths::key(folder);
+        value
+            .as_object()?
+            .iter()
+            .filter(|(spelling, _)| paths::lexical_key(Path::new(spelling)) == key)
+            .find_map(|(_, record)| record.get(&self.field)?.as_str())
     }
 }
 

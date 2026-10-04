@@ -8,8 +8,8 @@ use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locate,
-    Locator, LookUp, MechanismTarget, PluginRegistry, ProjectWalk, Provenance, Register, Registry,
-    Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    Locator, LookUp, MechanismTarget, Merge, PluginRegistry, ProjectWalk, Provenance, Register,
+    Registry, Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -28,6 +28,7 @@ const BUILT_IN: &[(&str, &str)] = &[
     ),
     ("vscode.toml", include_str!("../../definitions/vscode.toml")),
     ("cursor.toml", include_str!("../../definitions/cursor.toml")),
+    ("codex.toml", include_str!("../../definitions/codex.toml")),
 ];
 
 /// The only `format_version` this release reads.
@@ -90,6 +91,11 @@ pub(crate) struct AgentDefinition {
     pub process: Option<ProcessDefinition>,
     /// The Agent homes this Agent can have.
     pub homes: Vec<HomeDefinition>,
+    /// Agent homes another tool copies from one of `homes`, such as the
+    /// Codex home Orca keeps in sync with `~\.codex`. config-digger reads
+    /// them and never writes to them.
+    #[serde(default)]
+    pub mirrored_homes: Vec<MirroredHomeDefinition>,
     /// The orders in which a launch of the Agent picks one of its homes,
     /// each a list of home ids, such as the candidates for Claude Desktop's
     /// data folder of each of its packages: it reads the first whose `when`
@@ -266,6 +272,23 @@ pub(crate) struct HomeDefinition {
     /// variable names, through that variable.
     #[serde(default)]
     pub default: bool,
+}
+
+/// An Agent home whose content another tool copies from a source Agent
+/// home, laid out like it. It is found, as a known location, when any of
+/// its roots exists. A folder another home of the Agent finds too is this
+/// home, whichever finds it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MirroredHomeDefinition {
+    /// Unique among the definition's homes.
+    pub id: String,
+    /// The tool that keeps the copy, as it names itself, such as `Orca`.
+    pub owner: String,
+    /// The folder the home's roots are in.
+    pub folder: Locator,
+    /// The id of the home it copies, one of the definition's `homes`.
+    pub source: String,
 }
 
 /// How to tell that an Agent is running. It runs when a process matches
@@ -701,6 +724,9 @@ pub(crate) struct ItemRules {
     /// Location ids of this kind, highest precedence first.
     pub precedence: Vec<String>,
     pub competition: Competition,
+    /// How the Agent combines same-named Entries into the one it uses, field
+    /// by field. Omitted, the highest wins whole and Shadows the others.
+    pub merge: Option<Merge>,
     /// The Agent's checks, in the order it applies them: an Entry's State
     /// comes from the first it fails, and the others it fails are listed as
     /// secondary reasons. Each check appears once.
@@ -749,7 +775,14 @@ pub(crate) enum Check {
     /// rules, and refused otherwise.
     Rules,
     /// A same-named Entry the Agent ranks higher is not Disabled: Shadowed.
+    /// Where the kind merges, each Entry that takes part, with another, in
+    /// the server the Agent builds is Merged instead.
     Precedence,
+    /// The server the Agent builds from the Item's Entries holds fields that
+    /// exclude each other: every Entry that takes part is Invalid, with
+    /// `transport_conflict`. Required when the kind merges, and refused
+    /// otherwise.
+    Merge,
     /// The Entry lacks the minimal shape its location declares: Invalid.
     /// Required when a location of the kind declares a shape, and refused
     /// otherwise.
@@ -817,7 +850,24 @@ impl AgentDefinition {
         if let Some(process) = &self.process {
             process.validate().map_err(|e| format!("process: {e}"))?;
         }
-        unique("home", self.homes.iter().map(|home| home.id.as_str()))?;
+        unique(
+            "home",
+            self.homes
+                .iter()
+                .map(|home| home.id.as_str())
+                .chain(self.mirrored_homes.iter().map(|home| home.id.as_str())),
+        )?;
+        for mirror in &self.mirrored_homes {
+            let context = |e: String| format!("mirrored home `{}`: {e}", mirror.id);
+            non_empty("owner", &mirror.owner).map_err(context)?;
+            mirror.folder.validate().map_err(context)?;
+            if !self.homes.iter().any(|home| home.id == mirror.source) {
+                return Err(context(format!(
+                    "undeclared source home `{}`",
+                    mirror.source
+                )));
+            }
+        }
         unique("scope", self.scopes.iter().map(|scope| scope.id.as_str()))?;
         unique(
             "location",
@@ -1287,12 +1337,11 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::Trust,
-                    rules
-                        .gates
-                        .iter()
-                        .any(|gate| matches!(gate, Gate::TrustedFolders(_))),
-                    "which a trusted-folders gate needs",
-                    "but no gate is trusted folders",
+                    rules.gates.iter().any(|gate| {
+                        matches!(gate, Gate::TrustedFolders(_) | Gate::ProjectTrust(_))
+                    }),
+                    "which a trusted-folders or project-trust gate needs",
+                    "but no gate is trusted folders or project trust",
                 )
                 .map_err(context)?;
             rules
@@ -1303,6 +1352,33 @@ impl AgentDefinition {
                     "but the kind has no rule",
                 )
                 .map_err(context)?;
+            rules
+                .check_when(
+                    Check::Merge,
+                    rules.merge.is_some(),
+                    "which a merge needs",
+                    "but the kind does not merge",
+                )
+                .map_err(context)?;
+            if let Some(merge) = &rules.merge {
+                merge.validate().map_err(context)?;
+                if !matches!(
+                    rules.competition,
+                    Competition::ExactName(_) | Competition::CaseInsensitiveName(_)
+                ) || !rules.competition.endpoint_locations().is_empty()
+                {
+                    return Err(context(
+                        "only Entries that compete by name alone merge".into(),
+                    ));
+                }
+                if self
+                    .locations
+                    .iter()
+                    .any(|location| location.kind == *kind && location.format.file().is_none())
+                {
+                    return Err(context("only Entries of files merge".into()));
+                }
+            }
             for (index, rule) in rules.rules.iter().enumerate() {
                 let context = |e: String| context(format!("rules[{index}]: {e}"));
                 rule.validate().map_err(context)?;
@@ -1347,13 +1423,22 @@ impl AgentDefinition {
                     | Gate::PolicyField(_)
                     | Gate::TrustedFolders(_)
                     | Gate::NonceTrust(_)
-                    | Gate::ApprovalHash(_) => {
+                    | Gate::ApprovalHash(_)
+                    | Gate::ProjectTrust(_) => {
                         if let Some(id) = gate
                             .locations()
                             .into_iter()
                             .find(|id| !declared.contains(id))
                         {
                             return Err(context(format!("`{id}` is not a location of this kind")));
+                        }
+                        if let Gate::ProjectTrust(block) = gate
+                            && let Some(id) = block
+                                .locations
+                                .iter()
+                                .find(|id| !self.location(id).anchor.in_project())
+                        {
+                            return Err(context(format!("`{id}` is not in a Project")));
                         }
                     }
                 }
@@ -1514,6 +1599,7 @@ impl Check {
             Check::Approval => "approval",
             Check::Trust => "trust",
             Check::Precedence => "precedence",
+            Check::Merge => "merge",
             Check::Shape => "shape",
             Check::Frontmatter => "frontmatter",
         }
@@ -1615,7 +1701,10 @@ on_read_failure = "ignores_file"
             .into_iter()
             .map(|definition| definition.agent.id)
             .collect();
-        assert_eq!(ids, ["claude-code", "claude-desktop", "vscode", "cursor"]);
+        assert_eq!(
+            ids,
+            ["claude-code", "claude-desktop", "vscode", "cursor", "codex"]
+        );
     }
 
     #[test]
@@ -3127,5 +3216,96 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
             "{}",
             error(&text)
         );
+    }
+
+    #[test]
+    fn a_mirrored_home_copies_a_declared_home() {
+        let mirror = |source: &str| {
+            VALID.replace(
+                "[[scopes]]",
+                &format!(
+                    "[[mirrored_homes]]\nid = \"mirror\"\nowner = \"Orca\"\nfolder = {{ block = \"path\", path = \"%APPDATA%/mirror\" }}\nsource = \"{source}\"\n\n[[scopes]]"
+                ),
+            )
+        };
+        assert!(parse("test.toml", &mirror("default")).is_ok());
+        let text = mirror("other");
+        assert!(
+            error(&text).contains("undeclared source home `other`"),
+            "{}",
+            error(&text)
+        );
+        let text = mirror("default").replace("id = \"mirror\"", "id = \"default\"");
+        assert!(error(&text).contains("declared twice"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_kind_that_merges_checks_its_merge_and_competes_by_name() {
+        let merging = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            "merge = { block = \"deep-merge\", exclusive = [\"command\", \"url\"], enabled = \"enabled\" }\nchecks = [\"merge\", \"disable\", \"precedence\"]",
+        );
+        assert!(parse("test.toml", &merging).is_ok(), "{}", error(&merging));
+        let text = merging.replace(
+            r#"["merge", "disable", "precedence"]"#,
+            r#"["disable", "precedence"]"#,
+        );
+        assert!(
+            error(&text).contains("checks leaves out `merge`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            r#"checks = ["merge", "disable", "precedence"]"#,
+        );
+        assert!(
+            error(&text).contains("the kind does not merge"),
+            "{}",
+            error(&text)
+        );
+        let text = merging.replace(r#"{ block = "exact-name" }"#, r#"{ block = "never" }"#);
+        assert!(error(&text).contains("compete by name"), "{}", error(&text));
+        let text = merging.replace(
+            r#"exclusive = ["command", "url"]"#,
+            r#"exclusive = ["command"]"#,
+        );
+        assert!(error(&text).contains("two or more"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_project_trust_gate_covers_locations_in_a_project() {
+        let gated = |anchor: &str| {
+            with_location(anchor, r#"{ block = "toml" }"#, r#"["servers"]"#).replace(
+                r#"checks = ["disable", "precedence"]"#,
+                r#"checks = ["trust", "disable", "precedence"]"#,
+            ) + "\n[[items.mcp.gates]]\nblock = \"project-trust\"\nlocations = [\"user-mcp\"]\nsources = [{ anchor = { block = \"home\", root = \"state\" }, key_path = [\"projects\"], toml = true }]\nfield = \"trust_level\"\ntrusted = \"trusted\"\n"
+        };
+        let text =
+            gated(r#"{ block = "project", path = ".test/config.toml", walk = "up-to-repo-root" }"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = gated(STATE);
+        assert!(
+            error(&text).contains("`user-mcp` is not in a Project"),
+            "{}",
+            error(&text)
+        );
+        let text = gated(IN_PROJECT).replace("toml = true", "toml = true, dialect = \"jsonc\"");
+        assert!(error(&text).contains("TOML setting"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_sqlite_column_registry_names_its_table_and_column_plainly() {
+        let registry = |table: &str| {
+            VALID.replace(
+                "[[locations]]",
+                &format!(
+                    "[projects]\nregistries = [{{ block = \"sqlite-column\", anchor = {STATE}, table = \"{table}\", column = \"cwd\" }}]\n\n[[locations]]"
+                ),
+            )
+        };
+        assert!(parse("test.toml", &registry("threads")).is_ok());
+        let text = registry("threads; DROP TABLE threads");
+        assert!(error(&text).contains("plain names"), "{}", error(&text));
     }
 }

@@ -136,6 +136,7 @@ mod tests {
             kind: ItemKind::Mcp,
             name: name.to_owned(),
             state: State::Effective,
+            built: None,
             entries: vec![Entry {
                 locator: locator::render(&path, &key_path),
                 path,

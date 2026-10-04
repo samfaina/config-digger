@@ -1,0 +1,207 @@
+#:schema ../../../schema/agent-definition.schema.json
+# Codex, the CLI, which its desktop app and IDE extension share their
+# configuration with on Windows [docs]. Facts from docs/research/codex.md
+# (verified against 0.159.3).
+
+format_version = 1
+verified = { min = "0.159.3", max = "0.159.3" }
+
+[agent]
+id = "codex"
+name = "Codex"
+
+# `npm i -g @openai/codex`: the `codex.cmd` shim npm writes, and the
+# package's manifest [disk].
+[[installations]]
+id = "npm"
+folder = "%APPDATA%/npm"
+executable = "codex.cmd"
+versions = [{ block = "json-value", file = "node_modules/@openai/codex/package.json", key_path = ["version"] }]
+
+# The TUI and the app-server daemon it shares are both `codex.exe` [disk].
+[process]
+images = ["codex.exe"]
+
+# `~\.codex`, where Codex keeps everything unless `CODEX_HOME` moves it
+# [source].
+[[homes]]
+id = "default"
+default = true
+folder = { block = "path", path = "~/.codex" }
+
+[homes.roots]
+config = "config.toml"
+skills = "skills"
+sessions = "sessions"
+archived_sessions = "archived_sessions"
+state = "state_5.sqlite"
+
+# Another folder `CODEX_HOME` names, which Codex reads for every launch in
+# that environment [source]. A launch without it still reads `~\.codex`, so
+# both are read.
+[[homes]]
+id = "codex-home"
+folder = { block = "env", variable = "CODEX_HOME" }
+
+[homes.roots]
+config = "config.toml"
+skills = "skills"
+sessions = "sessions"
+archived_sessions = "archived_sessions"
+state = "state_5.sqlite"
+
+# The home Orca sets `CODEX_HOME` to for every Codex it starts: a copy of
+# the user's `config.toml`, with Orca's own additions, next to links to
+# `~\.codex\plugins` and `~\.codex\skills` [disk]. How and when Orca copies
+# it is not known: it is taken to follow `~\.codex`, so config-digger only
+# reads it.
+[[mirrored_homes]]
+id = "orca"
+owner = "Orca"
+folder = { block = "path", path = "%APPDATA%/orca/codex-runtime-home/home" }
+source = "default"
+
+[[scopes]]
+id = "managed"
+
+[[scopes]]
+id = "user"
+
+[[scopes]]
+id = "project"
+
+# Codex records the Projects it opened in each home [source, disk]: the
+# folders its trust prompt answered for, lower-cased keys of `projects` in
+# `config.toml`; the folder each session started in, `cwd` in the
+# `session_meta` line that opens its `sessions\YYYY\MM\DD\rollout-*.jsonl`,
+# or once archived, its `archived_sessions\rollout-*.jsonl`; and in
+# `state_5.sqlite`, the `cwd` of each thread and the `path` of each root of
+# the projects the app lists. That archived sessions are not kept by date is
+# taken from the source, not observed. The `5` of `state_5.sqlite` is a
+# schema generation, which changes with the version.
+[projects]
+registries = [
+  { block = "toml-keys", anchor = { block = "home", root = "config" }, root = ["projects"] },
+  { block = "jsonl-heads", anchor = { block = "home", root = "sessions" }, files = "*/*/*/rollout-*.jsonl", fields = [["payload", "cwd"]] },
+  { block = "jsonl-heads", anchor = { block = "home", root = "archived_sessions" }, files = "rollout-*.jsonl", fields = [["payload", "cwd"]] },
+  { block = "sqlite-column", anchor = { block = "home", root = "state" }, table = "threads", column = "cwd" },
+  { block = "sqlite-column", anchor = { block = "home", root = "state" }, table = "project_roots", column = "path" },
+]
+
+# Servers are the tables of `mcp_servers` in each layer of `config.toml`
+# files Codex folds, from the lowest up [source]:
+#
+# - the machine's, `%ProgramData%\OpenAI\Codex\config.toml`, the folder
+#   Windows names for `FOLDERID_ProgramData`, an organisation's defaults;
+# - the enterprise cloud bundle the account delivers on sign-in, which is
+#   not on disk here;
+# - the user's, `%CODEX_HOME%\config.toml`;
+# - with `--profile <name>`, `%CODEX_HOME%\<name>.config.toml`, which a
+#   launch picks and is not read here;
+# - a Project's, `<folder>\.codex\config.toml` in each folder from its root
+#   down to the Project's own, the deepest highest. Its root is the folder
+#   holding `.git`, or the Project's when none does;
+#   a `.codex` that is the home's own, as in a Project at the user's home
+#   folder, is no layer [source];
+# - `-c` flags, which only a launch has.
+#
+# `managed_config.toml` is no layer on Windows: Codex ignores it with a
+# warning [source].
+#
+# A server's transport is `command` for stdio, or `url` for streamable
+# HTTP [source]. Codex does not replace references to variables in its
+# values. `http_headers` and `http_headers_helper`, a command that prints
+# headers, hold Secrets, as does the OAuth client's `client_secret`;
+# `bearer_token_env_var` and the values of `env_http_headers` name
+# variables [source].
+#
+# Codex rewrites `config.toml` with no lock while it runs, and `codex mcp
+# add` or `remove` writes the whole of `mcp_servers` again [source]. It
+# refuses to start on a layer it cannot parse [sandbox].
+[[locations]]
+id = "system-mcp"
+anchor = { block = "machine", path = "%ProgramData%/OpenAI/Codex/config.toml" }
+format = { block = "toml" }
+root = ["mcp_servers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "stops_agent"
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "config" }
+format = { block = "toml" }
+root = ["mcp_servers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "stops_agent"
+
+[[locations]]
+id = "project-mcp"
+anchor = { block = "project", path = ".codex/config.toml", walk = "up-to-repo-root" }
+format = { block = "toml" }
+root = ["mcp_servers"]
+kind = "mcp"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "stops_agent"
+
+# Same-named servers of every layer make one server, table by table [source,
+# sandbox]: a Project's `[mcp_servers.docs] args = [...]` replaces only the
+# `args` of the user's `docs`, and `enabled = false` alone turns it off.
+# Codex refuses to start on a server with both `command` and `url`
+# [sandbox]. That a higher layer's `enabled = true` turns on again a server
+# a lower one turned off follows from the merge [source], not observed.
+[items.mcp]
+precedence = ["project-mcp", "user-mcp", "system-mcp"]
+competition = { block = "exact-name" }
+merge = { block = "deep-merge", exclusive = ["command", "url"], enabled = "enabled" }
+checks = ["trust", "merge", "disable", "precedence"]
+
+# A Project's layer counts only once the user trusts its folder, written by
+# Codex's trust prompt as `[projects.'<path>'] trust_level = "trusted"` in
+# the user's `config.toml`, the path lower-cased [source, disk]. Codex looks
+# up the layer's folder, then the Project's root, then the main checkout of
+# its git repository, so that trusting a repository trusts its worktrees
+# [source]. The machine's layer can trust folders too [source]. An
+# untrusted layer is loaded and left out [source, sandbox].
+[[items.mcp.gates]]
+block = "project-trust"
+locations = ["project-mcp"]
+sources = [
+  { anchor = { block = "home", root = "config" }, key_path = ["projects"], toml = true },
+  { anchor = { block = "machine", path = "%ProgramData%/OpenAI/Codex/config.toml" }, key_path = ["projects"], toml = true },
+]
+field = "trust_level"
+trusted = "trusted"
+
+# The skills of `%CODEX_HOME%\skills`, which Codex still reads although it
+# deprecates the folder [source]. A skill is a folder holding a `SKILL.md`
+# whose frontmatter has a `name` and a `description` [docs]; `.system`,
+# Codex's own, is read apart [source]. How deep Codex looks for skills, and
+# what it does with a `SKILL.md` it cannot read, is not known: skills are
+# taken to be found at any depth, and such a `SKILL.md` to be skipped.
+[[locations]]
+id = "user-skills"
+anchor = { block = "home", root = "skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Codex lists every skill it finds, by the path of its `SKILL.md`, so two
+# skills with one name are both used [source, docs].
+[items.skill]
+precedence = ["user-skills"]
+competition = { block = "never" }
+checks = ["frontmatter", "disable", "precedence"]

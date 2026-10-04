@@ -48,6 +48,83 @@ pub(crate) fn shadowed_by_precedence(
     }
 }
 
+/// The fields `fields`, each named by its key path joined with `.`, as a
+/// sentence lists them.
+fn field_list<S: AsRef<str>>(fields: &[S]) -> String {
+    let fields: Vec<String> = fields
+        .iter()
+        .map(|field| format!("`{}`", field.as_ref()))
+        .collect();
+    match fields.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// A Merged Entry's reason: `agent_name` builds the server `name` from
+/// `count` same-named Entries, and this one supplies `fields`.
+pub(crate) fn merged(agent_name: &str, name: &str, count: usize, fields: &[Vec<String>]) -> Reason {
+    let supplies = if fields.is_empty() {
+        "every field of this one comes from a higher Entry".to_owned()
+    } else {
+        let fields: Vec<String> = fields.iter().map(|field| field.join(".")).collect();
+        format!("this one supplies {}", field_list(&fields))
+    };
+    Reason {
+        code: ReasonCode::Merged,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Merged: {agent_name} builds `{name}` from {count} Entries, field by field; {supplies}."
+        ),
+    }
+}
+
+/// An Invalid Entry's reason: the server `agent_name` builds from the
+/// Entries of `name` holds `fields`, which exclude each other.
+pub(crate) fn transport_conflict(agent_name: &str, name: &str, fields: &[&str]) -> Reason {
+    Reason {
+        code: ReasonCode::TransportConflict,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Invalid: {agent_name} merges the Entries of `{name}` into a server with both {}, which it rejects, so it won't start.",
+            field_list(fields)
+        ),
+    }
+}
+
+/// The flag of an Agent that refuses to start because the server it builds
+/// from the Entries of `name` holds `fields`, which exclude each other.
+pub(crate) fn cannot_start_conflict(agent_name: &str, name: &str, fields: &[&str]) -> String {
+    format!(
+        "{agent_name} won't start: it merges the Entries of `{name}` into a server with both {}.",
+        field_list(fields)
+    )
+}
+
+/// A Disabled Entry's reason: `field` is `false` in the server
+/// `agent_name` builds from the Entries of `name`, set at `switch`.
+pub(crate) fn turned_off(agent_name: &str, name: &str, field: &str, switch: &str) -> Reason {
+    Reason {
+        code: ReasonCode::DisabledNatively,
+        effective: None,
+        switch: Some(switch.to_owned()),
+        sentence: format!(
+            "Disabled: `{field} = false` in {switch} turns off the server {agent_name} builds from every Entry of `{name}`."
+        ),
+    }
+}
+
+/// What Enable says of an Entry Disabled by `field = false` at `switch`
+/// in the server its Agent builds.
+pub(crate) fn turned_off_enable(field: &str, switch: &str) -> String {
+    format!(
+        "Enable is not offered: config-digger does not write `{field}` of a merged server; change it at {switch} by hand."
+    )
+}
+
 /// An Unread Entry's reason: it is keyed to `project`, whose folder no
 /// longer exists.
 pub(crate) fn project_missing(agent_name: &str, project: &Path) -> Reason {
@@ -519,6 +596,7 @@ fn state_name(state: State) -> &'static str {
     match state {
         State::Effective => "Effective",
         State::Shadowed => "Shadowed",
+        State::Merged => "Merged",
         State::Disabled => "Disabled",
         State::Blocked => "Blocked",
         State::Invalid => "Invalid",
@@ -1336,6 +1414,43 @@ pub(crate) fn read_only_enable() -> String {
 /// Why Remove is not offered for an Entry config-digger only reads.
 pub(crate) fn read_only_remove_option() -> String {
     format!("Remove is not offered: {READ_ONLY}.")
+}
+
+/// The label of an Agent home `owner` copies from another.
+pub(crate) fn mirror_label(owner: &str) -> String {
+    format!("Mirrored by {owner}")
+}
+
+/// Why config-digger never writes to an Agent home `owner` copies from the
+/// home at `source`, or from one whose folder is not known.
+fn mirrored(owner: &str, source: Option<&Path>) -> String {
+    let from = source.map_or_else(
+        || "another Agent home".to_owned(),
+        |source| source.display().to_string(),
+    );
+    format!("{owner} copies this Agent home from {from}, and config-digger never writes to it")
+}
+
+/// What a Mirrored home is, as a sentence.
+pub(crate) fn mirror(owner: &str, source: Option<&Path>) -> String {
+    format!("{}.", mirrored(owner, source))
+}
+
+/// Why `action`, `Disable`, `Enable` or `Remove`, is not offered for an
+/// Entry of an Agent home `owner` copies from `source`.
+pub(crate) fn mirrored_option(action: &str, owner: &str, source: Option<&Path>) -> String {
+    format!("{action} is not offered: {}.", mirrored(owner, source))
+}
+
+/// Why `action`, `Disable`, `Enable` or `Remove`, is refused for the Entry
+/// at `locator`, of an Agent home `owner` copies from `source`.
+pub(crate) fn mirrored_refused(
+    action: &str,
+    locator: &str,
+    owner: &str,
+    source: Option<&Path>,
+) -> String {
+    format!("cannot {action} {locator}: {}", mirrored(owner, source))
 }
 
 /// Why Remove is not offered for an Entry of the plugin `plugin`.

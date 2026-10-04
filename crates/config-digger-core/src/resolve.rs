@@ -3,8 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    self, Anchored, ApprovalHash, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed,
-    Parse, PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
+    self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Gate, Holds, JsonFormat,
+    Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -51,6 +51,13 @@ pub(crate) fn resolve(
                     HomeSource::Added => api::HomeSource::Added,
                 },
                 hidden: home.hidden,
+                mirror: home.mirror.as_ref().map(|mirror| api::Mirror {
+                    owner: mirror.owner.clone(),
+                    source: mirror.source.clone(),
+                    source_folder: mirror.source_folder.clone(),
+                    label: explain::mirror_label(&mirror.owner),
+                    sentence: explain::mirror(&mirror.owner, mirror.source_folder.as_deref()),
+                }),
                 not_read: home.skipped.as_ref().map(|skipped| api::NotRead {
                     read_instead: skipped.instead.clone(),
                     sentence: explain::home_not_read(
@@ -147,6 +154,8 @@ pub(crate) fn resolve(
             .push(entry);
     }
 
+    // The flags of the Agents that refuse to start on a server they build.
+    let mut conflicts: Vec<api::AgentFlag> = Vec::new();
     let mut items: Vec<api::Item> = competing
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
@@ -262,6 +271,14 @@ pub(crate) fn resolve(
                     && competes(index)
             };
             let winner = (0..entries.len()).find(|&index| free(index));
+            // Where the Agent merges same-named Entries, those it would let
+            // win take part in the server it builds, highest first.
+            let merge = definition.rules(kind).merge.as_ref();
+            let merging: Vec<usize> = match merge {
+                Some(_) => (0..entries.len()).filter(|&index| free(index)).collect(),
+                None => Vec::new(),
+            };
+            let merged = Merged::of(merge, &entries, &merging);
             // The URL each remote Entry competes by, while it does.
             let urls: Vec<Option<String>> = entries
                 .iter()
@@ -404,7 +421,21 @@ pub(crate) fn resolve(
                                 }
                                 failed.extend(disabling.iter().map(|hit| {
                                     (check, api::State::Disabled, hit.reason(agent_name))
-                                }))
+                                }));
+                                // A field that turns the built server off
+                                // turns off every Entry of the Item.
+                                if let Some(off) = merged.as_ref().and_then(Merged::off) {
+                                    failed.push((
+                                        check,
+                                        api::State::Disabled,
+                                        explain::turned_off(
+                                            agent_name,
+                                            &name,
+                                            &off.field,
+                                            &off.switch,
+                                        ),
+                                    ));
+                                }
                             }
                             Check::Shape => {
                                 if let Some(malformed) = &malformed[index] {
@@ -425,6 +456,43 @@ pub(crate) fn resolve(
                                     ));
                                 }
                             }
+                            Check::Merge => {
+                                if let Some(merged) = merged
+                                    .as_ref()
+                                    .filter(|merged| merged.takes_part(index))
+                                    .filter(|merged| !merged.conflict.is_empty())
+                                {
+                                    failed.push((
+                                        check,
+                                        api::State::Invalid,
+                                        explain::transport_conflict(
+                                            agent_name,
+                                            &name,
+                                            &merged.conflict,
+                                        ),
+                                    ));
+                                }
+                            }
+                            // Same-named Entries the Agent merges take part
+                            // together, and none Shadows another.
+                            Check::Precedence if merge.is_some() => {
+                                if let Some(merged) = merged
+                                    .as_ref()
+                                    .filter(|merged| merged.takes_part(index))
+                                    .filter(|merged| merged.with_others())
+                                {
+                                    failed.push((
+                                        check,
+                                        api::State::Merged,
+                                        explain::merged(
+                                            agent_name,
+                                            &name,
+                                            merged.taking_part.len(),
+                                            &merged.fields_of(index),
+                                        ),
+                                    ));
+                                }
+                            }
                             Check::Precedence => {
                                 if let Some(winner) = winner.filter(|&winner| winner < index) {
                                     failed.push((
@@ -440,6 +508,7 @@ pub(crate) fn resolve(
                         Some((_, state, reason)) => (*state, Some(reason.clone())),
                         None => (api::State::Effective, None),
                     };
+                    let off = merged.as_ref().and_then(Merged::off);
                     // The State it would have once what sets its State is
                     // lifted. Enable lifts every switch that Disables it, and
                     // with them those of the Entries they Disable too.
@@ -459,13 +528,31 @@ pub(crate) fn resolve(
                                 _ => free(other),
                             };
                             let render = |next: api::State, shadowed_by: Option<(&str, &str)>| {
-                                if state == api::State::Disabled && by_rule.is_empty() {
+                                if state == api::State::Disabled
+                                    && by_rule.is_empty()
+                                    && off.is_none()
+                                {
                                     explain::what_if(next, shadowed_by)
                                 } else {
                                     explain::what_if_otherwise(state, next, shadowed_by)
                                 }
                             };
                             for &check in checks {
+                                // It would take part with the others that would.
+                                if check == Check::Precedence && merge.is_some() {
+                                    let with_others = (0..entries.len())
+                                        .any(|other| other != index && lifted(other));
+                                    let next = if with_others {
+                                        api::State::Merged
+                                    } else {
+                                        api::State::Effective
+                                    };
+                                    return api::WhatIf {
+                                        state: next,
+                                        effective: None,
+                                        sentence: render(next, None),
+                                    };
+                                }
                                 if check == Check::Precedence {
                                     let Some(winner) = (0..index).find(|&other| lifted(other))
                                     else {
@@ -503,8 +590,25 @@ pub(crate) fn resolve(
                                 sentence: render(api::State::Effective, None),
                             }
                         });
-                    // Enable lifts no rule.
-                    let enable = match rules::enable_not_offered(&by_rule) {
+                    // Enable lifts no rule, and writes nothing in a Mirrored home.
+                    let mirrored = snapshot
+                        .mirror_of(entry)
+                        .filter(|_| state == api::State::Disabled)
+                        .map(|mirror| {
+                            explain::mirrored_option(
+                                "Enable",
+                                &mirror.owner,
+                                mirror.source_folder.as_deref(),
+                            )
+                        });
+                    let turned_off = off
+                        .as_ref()
+                        .filter(|_| state == api::State::Disabled)
+                        .map(|off| explain::turned_off_enable(&off.field, &off.switch));
+                    let enable = match mirrored
+                        .or_else(|| rules::enable_not_offered(&by_rule))
+                        .or(turned_off)
+                    {
                         Some(sentence) => Some(api::EnableOption::NotOffered { sentence }),
                         None => {
                             let unparks = parked[index]
@@ -524,15 +628,18 @@ pub(crate) fn resolve(
                             }
                         }
                     };
-                    let disable =
-                        if disabling.is_empty() && by_rule.is_empty() && parked[index].is_none() {
-                            disable::option(definition, snapshot, entry, context_project.as_ref())
-                        } else {
-                            api::DisableOption::NotOffered {
-                                code: api::DisableNotOffered::AlreadyDisabled,
-                                sentence: explain::already_disabled_option(),
-                            }
-                        };
+                    let disable = if disabling.is_empty()
+                        && by_rule.is_empty()
+                        && parked[index].is_none()
+                        && off.is_none()
+                    {
+                        disable::option(definition, snapshot, entry, context_project.as_ref())
+                    } else {
+                        api::DisableOption::NotOffered {
+                            code: api::DisableNotOffered::AlreadyDisabled,
+                            sentence: explain::already_disabled_option(),
+                        }
+                    };
                     api::Entry {
                         path: entry.path.clone(),
                         key_path: entry.key_path.clone(),
@@ -574,7 +681,7 @@ pub(crate) fn resolve(
                         masked: entry.masked.clone(),
                         disable,
                         enable,
-                        remove: remove(definition, location, entry),
+                        remove: remove(definition, snapshot, location, entry),
                         caveats: read_failure_caveats(
                             definition,
                             snapshot,
@@ -610,10 +717,26 @@ pub(crate) fn resolve(
                     sentence: explain::read_failure_caveat(agent_name, &failure.path),
                 })
                 .collect();
+            // The Agent refuses to start on a server it rejects.
+            if let Some(merged) = merged.as_ref().filter(|merged| !merged.conflict.is_empty()) {
+                let highest = entries[merged.taking_part[0]];
+                conflicts.push(api::AgentFlag {
+                    agent: definition.agent.id.clone(),
+                    agent_name: agent_name.clone(),
+                    home: home.to_owned(),
+                    code: api::AgentFlagCode::CannotStart,
+                    path: highest.path.clone(),
+                    sentence: explain::cannot_start_conflict(agent_name, &name, &merged.conflict),
+                });
+            }
             api::Item {
                 agent: definition.agent.id.clone(),
                 home: home.to_owned(),
                 kind: kind.into(),
+                built: merged
+                    .as_ref()
+                    .filter(|merged| merged.with_others())
+                    .map(|merged| merged.server(&entries)),
                 name,
                 state,
                 entries: api_entries,
@@ -688,6 +811,7 @@ pub(crate) fn resolve(
                 sentence: explain::cannot_start(&agent.name, &failure.path),
             }
         })
+        .chain(conflicts)
         .collect();
 
     api::Inventory {
@@ -735,6 +859,135 @@ pub(crate) fn leftovers(
             })
         })
         .collect()
+}
+
+/// The server an Agent that merges same-named Entries builds from those of
+/// one Item that take part.
+struct Merged<'m> {
+    /// The indexes of the Entries that take part among the Item's, highest
+    /// first.
+    taking_part: Vec<usize>,
+    built: Built,
+    /// The fields of the built server that exclude each other, when it
+    /// holds more than one of them.
+    conflict: Vec<&'m str>,
+    /// The field whose `false` turns the server off, if it has one.
+    enabled: Option<&'m str>,
+    /// The file and key path of each Entry of the Item.
+    places: Vec<(PathBuf, Vec<String>)>,
+}
+
+/// The field that turns a built server off, and where it is set.
+struct Off {
+    field: String,
+    /// The `<path>#<key path>` locator of the field in its Entry.
+    switch: String,
+}
+
+impl<'m> Merged<'m> {
+    /// What `merge` builds from the Entries at `taking_part` among
+    /// `entries`; `None` when the kind does not merge or none takes part.
+    fn of(
+        merge: Option<&'m Merge>,
+        entries: &[&ScannedEntry],
+        taking_part: &[usize],
+    ) -> Option<Merged<'m>> {
+        let merge = merge.filter(|_| !taking_part.is_empty())?;
+        let configs: Vec<&serde_json::Value> = taking_part
+            .iter()
+            .map(|&index| &entries[index].config)
+            .collect();
+        let mut built = merge.build(&configs);
+        // Origins point at the Item's Entries rather than those taking part.
+        for (_, origin) in &mut built.origins {
+            *origin = taking_part[*origin];
+        }
+        Some(Merged {
+            conflict: merge.conflict(&built.config),
+            enabled: merge.enabled(),
+            taking_part: taking_part.to_vec(),
+            places: entries
+                .iter()
+                .map(|entry| (entry.path.clone(), entry.key_path.clone()))
+                .collect(),
+            built,
+        })
+    }
+
+    /// The `<path>#<key path>` locator of the Entry at `index`.
+    fn locator(&self, index: usize) -> String {
+        let (path, key_path) = &self.places[index];
+        locator::render(path, key_path)
+    }
+
+    fn takes_part(&self, index: usize) -> bool {
+        self.taking_part.contains(&index)
+    }
+
+    /// Whether more than one Entry takes part, so that each is Merged.
+    fn with_others(&self) -> bool {
+        self.taking_part.len() > 1
+    }
+
+    /// The fields of the server that come from the Entry at `index`.
+    fn fields_of(&self, index: usize) -> Vec<Vec<String>> {
+        self.built
+            .origins
+            .iter()
+            .filter(|(_, origin)| *origin == index)
+            .map(|(field, _)| field.clone())
+            .collect()
+    }
+
+    /// The field that turns the server off, when it holds `false`, and the
+    /// Entry it comes from.
+    fn off(&self) -> Option<Off> {
+        let field = self.enabled?;
+        if self.built.config.get(field) != Some(&serde_json::Value::Bool(false)) {
+            return None;
+        }
+        let (_, origin) = self
+            .built
+            .origins
+            .iter()
+            .find(|(known, _)| *known == [field])?;
+        let (path, key_path) = &self.places[*origin];
+        let mut key_path = key_path.clone();
+        key_path.push(field.to_owned());
+        Some(Off {
+            field: field.to_owned(),
+            switch: locator::render(path, &key_path),
+        })
+    }
+
+    /// The server as an Item shows it, each Secret masked as its Entry's is.
+    fn server(&self, entries: &[&ScannedEntry]) -> api::BuiltServer {
+        let masked = self
+            .built
+            .origins
+            .iter()
+            .flat_map(|(field, origin)| {
+                entries[*origin]
+                    .masked
+                    .iter()
+                    .filter(move |masked| masked.starts_with(field))
+                    .cloned()
+            })
+            .collect();
+        api::BuiltServer {
+            config: self.built.config.clone(),
+            masked,
+            origins: self
+                .built
+                .origins
+                .iter()
+                .map(|(field, origin)| api::FieldOrigin {
+                    key_path: field.clone(),
+                    entry: self.locator(*origin),
+                })
+                .collect(),
+        }
+    }
 }
 
 /// What an Entry competes by: Entries with the same key are one Item.
@@ -892,7 +1145,7 @@ fn unread_entry(
             sentence: explain::unread_option(),
         },
         enable: None,
-        remove: remove(definition, location, entry),
+        remove: remove(definition, snapshot, location, entry),
         caveats,
         also_read_by: Vec::new(),
     }
@@ -1188,6 +1441,32 @@ fn gates(
                 let reason = explain::untrusted_folder(agent_name, &scanned.path);
                 (!all_trusted).then_some((Check::Trust, reason))
             }
+            Gate::ProjectTrust(block) => {
+                let tables: Vec<&serde_json::Value> = (0..block.sources.len())
+                    .flat_map(|source| {
+                        let owner = SettingOwner::Gate {
+                            gate: index,
+                            source,
+                        };
+                        snapshot.settings_for(entry, location.kind, owner, project)
+                    })
+                    .filter_map(|value| value.value.as_ref())
+                    .collect();
+                let scanned = snapshot
+                    .projects
+                    .iter()
+                    .find(|known| Some(known.key.as_str()) == entry.project.as_deref())?;
+                // The folder the Entry's location is in, as far up as the
+                // Project's folder as it was read.
+                let folder = scanned.path.ancestors().nth(entry.depth)?;
+                let root = scanned.repo_root.as_deref().unwrap_or(&scanned.path);
+                let level = [Some(folder), Some(root), scanned.main_checkout.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .find_map(|folder| tables.iter().find_map(|table| block.level(table, folder)));
+                let reason = explain::untrusted_folder(agent_name, folder);
+                (level != Some(block.trusted.as_str())).then_some((Check::Trust, reason))
+            }
             Gate::ApprovalHash(block) => {
                 let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
                 let hash = entry.config_hash.as_deref();
@@ -1365,9 +1644,21 @@ fn plugin(entry: &ScannedEntry) -> Option<api::Plugin> {
 /// the Agent uninstalls, with its own command when it has one.
 fn remove(
     definition: &AgentDefinition,
+    snapshot: &Snapshot,
     location: &LocationDefinition,
     entry: &ScannedEntry,
 ) -> api::RemoveOption {
+    if let Some(mirror) = snapshot.mirror_of(entry) {
+        return api::RemoveOption::NotOffered {
+            code: api::RemoveNotOffered::Mirrored,
+            sentence: explain::mirrored_option(
+                "Remove",
+                &mirror.owner,
+                mirror.source_folder.as_deref(),
+            ),
+            how_to_remove: None,
+        };
+    }
     if location.provenance.read_only() {
         return api::RemoveOption::NotOffered {
             code: api::RemoveNotOffered::ReadOnly,
