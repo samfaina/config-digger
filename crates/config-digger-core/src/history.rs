@@ -3,14 +3,14 @@
 //! JSON manifest with the edits, their inverses and the keys they depend on.
 
 use crate::api::{
-    Action, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
+    Action, Backup, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
     OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
 };
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::folders::{FolderOp, FolderSize};
 use crate::ports::{Environment, HeldLock, Ports};
 use crate::store::Medium;
-use crate::{explain, plan};
+use crate::{explain, paths, plan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::hash::{BuildHasher, RandomState};
@@ -466,6 +466,36 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
             .unwrap_or_default(),
         backup: folder,
     })
+}
+
+/// The copies of the file at `path`, in any spelling, that History still
+/// holds, newest first: one per Operation that backed it up and whose backup
+/// is not deleted.
+pub(crate) fn backups_of(ports: &Ports, path: &Path) -> Result<Vec<Backup>, Error> {
+    let fs = ports.fs.as_ref();
+    let key = paths::canonical_key(fs, path);
+    let mut backups = Vec::new();
+    for manifest in load_all(ports)? {
+        if manifest.backup_deleted_at.is_some() {
+            continue;
+        }
+        let folder = operation_folder(ports, &manifest.id)?;
+        let copies: Vec<PathBuf> = manifest
+            .locations
+            .iter()
+            .filter(|location| paths::canonical_key(fs, &location.path) == key)
+            .filter_map(|location| location.backup.as_ref())
+            .map(|backup| folder.join(backup))
+            .filter(|copy| fs.exists(copy))
+            .collect();
+        backups.extend(copies.into_iter().map(|copy| Backup {
+            operation: manifest.id.clone(),
+            created_at: manifest.created_at.clone(),
+            title: manifest.title.clone(),
+            copy,
+        }));
+    }
+    Ok(backups)
 }
 
 /// Dismisses the Operation `id`, under the global lock, when it needs

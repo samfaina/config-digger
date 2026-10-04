@@ -1,7 +1,13 @@
 fn main() {
     // Every command the webview may call. Each one becomes an `allow-<command>`
     // permission that the `main` capability grants; `lib.rs` registers the same list.
-    let manifest = tauri_build::AppManifest::new().commands(&["read_inventory"]);
+    let manifest = tauri_build::AppManifest::new().commands(&[
+        "read_inventory",
+        "switch_project",
+        "backups_of",
+        "open_location",
+        "reveal_location",
+    ]);
 
     // Tauri embeds its Windows application manifest (Common Controls v6) in
     // `[[bin]]` targets only. Without it, any other executable linking Tauri,

@@ -142,8 +142,9 @@ fn a_parked_entry_is_listed_as_disabled_with_reason_parked() {
     assert_eq!(entry["parked"]["path"], to_json(config()));
     assert_eq!(entry["parked"]["key_path"], json!(["mcpServers", "notes"]));
     assert_eq!(entry["what_if"]["state"], "effective");
+    assert_eq!(entry["enable"]["status"], "offered", "{entry}");
     assert!(
-        entry["enable"]
+        entry["enable"]["sentence"]
             .as_str()
             .unwrap()
             .contains("puts `notes` back"),

@@ -4,8 +4,8 @@
 //! Project, and the note of a partial switch.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, Entry, Inventory, Plan, ScanOptions, Targets,
-    WarningClass,
+    Action, Context, Core, DisableOption, EnableOption, Entry, Inventory, Plan, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -349,14 +349,13 @@ fn a_disabled_entry_offers_enable_instead_of_disable() {
     let alpha = &entries(&inventory(&core, &in_one()), "alpha")[0];
 
     assert_eq!(
-        alpha.enable.as_deref(),
-        Some(
-            format!(
+        alpha.enable,
+        Some(EnableOption::Offered {
+            sentence: format!(
                 "Enable removes `alpha` from `disabledServers` in {}.",
                 home_file().display()
             )
-            .as_str()
-        )
+        })
     );
     match &alpha.disable {
         DisableOption::NotOffered { code: reason, .. } => {

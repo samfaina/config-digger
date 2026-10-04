@@ -348,6 +348,54 @@ fn history_show_lists_the_edits_and_the_files_copied_to_the_backup() {
 }
 
 #[test]
+fn backups_of_a_file_list_each_copy_history_holds_newest_first() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let clock = FakeClock::default();
+    let first = remove_with(&core_at(&fs, &clock), "linear").unwrap();
+    clock.advance(Duration::from_secs(60));
+    let second = remove_with(&core_at(&fs, &clock), "notes").unwrap();
+
+    // A Read failure names the file in its own spelling.
+    let spelled = PathBuf::from(r"c:\users\FIXTURE\.claude.json");
+    let backups_of = core(&fs).backups_of(&spelled).unwrap();
+
+    let operations: Vec<&str> = backups_of.iter().map(|b| b.operation.as_str()).collect();
+    assert_eq!(
+        operations,
+        [second.operation.as_str(), first.operation.as_str()]
+    );
+    assert_eq!(backups_of[0].created_at, "2026-10-01T12:01:00Z");
+    assert_eq!(backups_of[0].title, "Remove 1 Entry");
+    let copy = backups().join(&first.operation).join("1-.claude.json");
+    assert_eq!(backups_of[1].copy, copy);
+    assert_eq!(text(&fs, copy), TWO_USER_SERVERS);
+}
+
+#[test]
+fn backups_of_a_file_leave_out_deleted_backups_and_other_files() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let core = core(&fs);
+    assert!(
+        core.backups_of(&PathBuf::from(HOME).join(".mcp.json"))
+            .unwrap()
+            .is_empty()
+    );
+
+    let plan = core.plan_delete_backup(&removed.operation).unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert!(core.backups_of(&claude_json()).unwrap().is_empty());
+}
+
+#[test]
+fn backups_of_a_file_are_none_before_any_operation() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+
+    assert!(core(&fs).backups_of(&claude_json()).unwrap().is_empty());
+}
+
+#[test]
 fn history_show_of_an_unknown_operation_fails() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
 

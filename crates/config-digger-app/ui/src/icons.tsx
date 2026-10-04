@@ -79,6 +79,59 @@ const ICONS = {
     </>
   ),
   flag: () => <path d="M5 3.5h11.5l-2.5 4.5 2.5 4.5H7V21H5z" />,
+  doc: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <path d="M8.5 9h7M8.5 12.5h7M8.5 16h4" stroke="#000" strokeWidth="1.9" strokeLinecap="round" />
+      </mask>
+      <rect x="4.5" y="2.5" width="15" height="19" rx="3.5" mask={`url(#${mask})`} />
+    </>
+  ),
+  search: () => (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.6" />
+      <path d="M15.5 15.5 20 20" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+    </>
+  ),
+  pause: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <rect x="8.5" y="8" width="2.4" height="8" rx="1" fill="#000" />
+        <rect x="13.1" y="8" width="2.4" height="8" rx="1" fill="#000" />
+      </mask>
+      <circle cx="12" cy="12" r="9.5" mask={`url(#${mask})`} />
+    </>
+  ),
+  play: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <path d="M10 8l6 4-6 4z" fill="#000" />
+      </mask>
+      <circle cx="12" cy="12" r="9.5" mask={`url(#${mask})`} />
+    </>
+  ),
+  trash: () => (
+    <>
+      <path d="M4 6.5h16M9 4.5h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M6 8h12l-1 11.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.5z" />
+    </>
+  ),
+  copy: () => (
+    <>
+      <rect x="8" y="8" width="13" height="13" rx="3" />
+      <path d="M5 16V6a3 3 0 0 1 3-3h8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </>
+  ),
+  open: () => (
+    <>
+      <path d="M13 3h8v8z" />
+      <path d="M20 4l-8 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M11 5H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </>
+  ),
 } satisfies Record<string, (mask: string) => ReactNode>;
 
 export type IconName = keyof typeof ICONS;

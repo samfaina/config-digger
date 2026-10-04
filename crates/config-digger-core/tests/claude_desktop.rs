@@ -6,7 +6,8 @@
 //! Code.
 
 use config_digger_core::api::{
-    Action, Context, Core, Entry, Home, Inventory, Item, ScanOptions, Targets, WarningClass,
+    Action, Context, Core, EnableOption, Entry, Home, Inventory, Item, ScanOptions, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeProcesses};
 use config_digger_core::ports::{Hive, RegistryData, RunningProcess};
@@ -502,10 +503,7 @@ fn the_user_file_s_own_switch_disables_its_servers_globally_with_no_enable() {
     let reason = notes.reason.as_ref().unwrap();
     assert_eq!(json(reason.code), "disabled_globally");
     assert!(
-        notes
-            .enable
-            .as_deref()
-            .is_some_and(|enable| enable.starts_with("Enable is not offered")),
+        matches!(&notes.enable, Some(EnableOption::NotOffered { sentence }) if sentence.starts_with("Enable is not offered")),
         "{:?}",
         notes.enable
     );
@@ -604,10 +602,7 @@ fn a_mirrored_skill_takes_its_state_from_the_enabled_flag_it_mirrors() {
         )
     );
     assert!(
-        notes
-            .enable
-            .as_deref()
-            .is_some_and(|enable| enable.starts_with("Enable is not offered")),
+        matches!(&notes.enable, Some(EnableOption::NotOffered { sentence }) if sentence.starts_with("Enable is not offered")),
         "{:?}",
         notes.enable
     );

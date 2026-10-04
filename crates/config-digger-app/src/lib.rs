@@ -7,6 +7,7 @@
 
 mod commands;
 mod logging;
+mod session;
 
 use config_digger_core::api::Core;
 use config_digger_core::ports::Ports;
@@ -19,7 +20,13 @@ const BINDINGS_HEADER: &str =
 
 /// The commands the webview can call. `build.rs` lists the same names.
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
-    tauri_specta::Builder::new().commands(tauri_specta::collect_commands![commands::read_inventory])
+    tauri_specta::Builder::new().commands(tauri_specta::collect_commands![
+        commands::read_inventory,
+        commands::switch_project,
+        commands::backups_of,
+        commands::open_location,
+        commands::reveal_location,
+    ])
 }
 
 /// Writes the TypeScript types and typed command wrappers to `path`.
@@ -41,6 +48,7 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
     });
 
     tauri::Builder::default()
+        .manage(commands::SessionState::default())
         .invoke_handler(specta_builder().invoke_handler())
         .run(context)
         .expect("the Tauri app runs");

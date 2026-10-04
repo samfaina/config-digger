@@ -4,8 +4,8 @@
 //! through `skillOverrides`.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, Entry, Error, Inventory, Item, Plan, ScanOptions,
-    Targets, WarningClass,
+    Action, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Item, Plan,
+    ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -791,11 +791,7 @@ fn off_in_the_user_settings_disables_the_skill_everywhere_and_is_only_read() {
         let entry = &skill(&inventory, "deploy").entries[0];
         assert_eq!(code(entry.state), "disabled");
         assert!(
-            entry
-                .enable
-                .as_deref()
-                .unwrap()
-                .starts_with("Enable is not offered"),
+            matches!(&entry.enable, Some(EnableOption::NotOffered { sentence }) if sentence.starts_with("Enable is not offered")),
             "{:?}",
             entry.enable
         );
