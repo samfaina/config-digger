@@ -27,6 +27,7 @@ const BUILT_IN: &[(&str, &str)] = &[
         include_str!("../../definitions/claude-desktop.toml"),
     ),
     ("vscode.toml", include_str!("../../definitions/vscode.toml")),
+    ("cursor.toml", include_str!("../../definitions/cursor.toml")),
 ];
 
 /// The only `format_version` this release reads.
@@ -172,6 +173,9 @@ pub(crate) enum DefinitionNote {
     /// The Agent's connectors live in the user's account, with no copy on
     /// disk to list, such as Claude Desktop's.
     CloudConnectorsNotOnDisk,
+    /// The plugins the user installs from the Agent's marketplace live in
+    /// the user's account, with no install record on disk, such as Cursor's.
+    MarketplacePluginsNotOnDisk,
 }
 
 /// A range of Agent versions, both ends included. Versions compare
@@ -498,10 +502,13 @@ pub(crate) struct LocationDefinition {
     /// them. While one does not hold, its Entries are Unread.
     #[serde(default)]
     pub when: Vec<Condition>,
-    /// The name the Agent gives an Entry of a location in plugins, made
-    /// of `{plugin}`, the plugin's name, and `{name}`, the Entry's own
-    /// name, such as `{plugin}:{name}`. Without it, an Entry goes by its
-    /// own name.
+    /// The name the Agent gives an Entry of the location, made of `{name}`,
+    /// the Entry's own name; in plugins, `{plugin}`, the plugin's name, such
+    /// as `{plugin}:{name}`; and in a Project, `{folder_index}`, the
+    /// position of the Entry's folder among those of the Project, 0 for a
+    /// folder Project, and `{folder}`, that folder's name, such as Cursor's
+    /// `project-{folder_index}-{folder}-{name}`. Without it, an Entry goes
+    /// by its own name.
     pub name_template: Option<String>,
     /// What the Agent's Disable switches hold an Entry of this location by,
     /// when not by its name, such as the server ids VS Code pairs with
@@ -534,6 +541,21 @@ pub(crate) struct References {
 pub(crate) const PLUGIN_NAME: &str = "{plugin}";
 /// The `name_template` segment that stands for the Entry's own name.
 pub(crate) const ENTRY_NAME: &str = "{name}";
+/// The `name_template` segment that stands for the position of the Entry's
+/// folder among those of its Project.
+pub(crate) const FOLDER_INDEX: &str = "{folder_index}";
+/// The `name_template` segment that stands for the name of the Entry's folder.
+pub(crate) const FOLDER_NAME: &str = "{folder}";
+
+/// What a `name_template` names an Entry by besides its own name.
+#[derive(Default)]
+pub(crate) struct NameParts<'a> {
+    /// The name of the plugin it is part of.
+    pub plugin: Option<&'a str>,
+    /// The position of its folder among those of its Project, and that
+    /// folder's name.
+    pub folder: Option<(usize, &'a str)>,
+}
 
 /// What an Agent does with a location it cannot read. Declared from the
 /// mildest to the strongest: a file several locations of one Agent read
@@ -637,15 +659,18 @@ impl LocationDefinition {
         self.root.iter().any(|key| key == PROJECT_KEY)
     }
 
-    /// The name the Agent gives an Entry named `name` of the plugin named
-    /// `plugin`.
-    pub fn entry_name(&self, name: &str, plugin: &str) -> String {
-        match &self.name_template {
-            Some(template) => template
-                .replace(PLUGIN_NAME, plugin)
-                .replace(ENTRY_NAME, name),
-            None => name.to_owned(),
-        }
+    /// The name the Agent gives an Entry named `name`, of the plugin and
+    /// folder `parts` name.
+    pub fn entry_name(&self, name: &str, parts: &NameParts) -> String {
+        let Some(template) = &self.name_template else {
+            return name.to_owned();
+        };
+        let (index, folder) = parts.folder.unwrap_or_default();
+        template
+            .replace(PLUGIN_NAME, parts.plugin.unwrap_or_default())
+            .replace(FOLDER_INDEX, &index.to_string())
+            .replace(FOLDER_NAME, folder)
+            .replace(ENTRY_NAME, name)
     }
 }
 
@@ -695,8 +720,8 @@ pub(crate) enum Check {
     /// A Disable mechanism's switch is set for the Entry: Disabled.
     Disable,
     /// The Agent has not approved the Entry: Blocked, with `not_approved`.
-    /// Required when a gate of the kind is an approval list or a nonce
-    /// trust, and refused otherwise.
+    /// Required when a gate of the kind is an approval list, an approval
+    /// hash or a nonce trust, and refused otherwise.
     Approval,
     /// The user has not trusted the Entry's Project: Blocked, with
     /// `untrusted_folder`. Required when a gate of the kind is trusted
@@ -958,10 +983,17 @@ impl AgentDefinition {
                 }
             }
             if let Some(template) = &location.name_template {
-                if location.anchor.plugin().is_none() {
-                    return Err(context(
-                        "only a location in plugins takes a name_template".into(),
-                    ));
+                if template.contains(PLUGIN_NAME) && location.anchor.plugin().is_none() {
+                    return Err(context(format!(
+                        "only a location in plugins names `{PLUGIN_NAME}` in its name_template"
+                    )));
+                }
+                let in_folder = location.anchor.in_project() && !location.anchor.project_file();
+                if (template.contains(FOLDER_INDEX) || template.contains(FOLDER_NAME)) && !in_folder
+                {
+                    return Err(context(format!(
+                        "only a location in a Project folder names `{FOLDER_INDEX}` or `{FOLDER_NAME}` in its name_template"
+                    )));
                 }
                 if template.matches(ENTRY_NAME).count() != 1 {
                     return Err(context(format!(
@@ -1136,15 +1168,31 @@ impl AgentDefinition {
             if let Some(id) = declared.difference(&ranked).next() {
                 return Err(context(format!("precedence leaves out location `{id}`")));
             }
+            let same_url = rules.competition.same_url();
             if let Some(id) = rules
                 .competition
                 .endpoint_locations()
                 .iter()
+                .chain(same_url.iter().flat_map(|block| &block.locations))
                 .find(|id| !declared.contains(id.as_str()))
             {
                 return Err(context(format!(
                     "competition names `{id}`, which is not a location of this kind"
                 )));
+            }
+            if let Some(block) = same_url {
+                let Some(gate) = self.feature_gate(&block.gate) else {
+                    return Err(context(format!(
+                        "competition needs undeclared feature gate `{}`",
+                        block.gate
+                    )));
+                };
+                if let Some(id) = block.locations.iter().find(|id| !gate.affects.contains(id)) {
+                    return Err(context(format!(
+                        "feature gate `{}` does not list `{id}` in `affects`",
+                        block.gate
+                    )));
+                }
             }
             for check in [Check::Disable, Check::Precedence] {
                 match rules.checks.iter().filter(|known| **known == check).count() {
@@ -1190,12 +1238,14 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::Approval,
-                    rules
-                        .gates
-                        .iter()
-                        .any(|gate| matches!(gate, Gate::ApprovalList(_) | Gate::NonceTrust(_))),
-                    "which an approval or nonce-trust gate needs",
-                    "but no gate is an approval or a nonce trust",
+                    rules.gates.iter().any(|gate| {
+                        matches!(
+                            gate,
+                            Gate::ApprovalList(_) | Gate::NonceTrust(_) | Gate::ApprovalHash(_)
+                        )
+                    }),
+                    "which an approval, approval-hash or nonce-trust gate needs",
+                    "but no gate is an approval, an approval hash or a nonce trust",
                 )
                 .map_err(context)?;
             rules
@@ -1260,7 +1310,8 @@ impl AgentDefinition {
                     Gate::ApprovalList(_)
                     | Gate::PolicyField(_)
                     | Gate::TrustedFolders(_)
-                    | Gate::NonceTrust(_) => {
+                    | Gate::NonceTrust(_)
+                    | Gate::ApprovalHash(_) => {
                         if let Some(id) = gate
                             .locations()
                             .into_iter()
@@ -1509,7 +1560,7 @@ on_read_failure = "ignores_file"
             .into_iter()
             .map(|definition| definition.agent.id)
             .collect();
-        assert_eq!(ids, ["claude-code", "claude-desktop", "vscode"]);
+        assert_eq!(ids, ["claude-code", "claude-desktop", "vscode", "cursor"]);
     }
 
     #[test]

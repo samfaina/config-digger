@@ -3,8 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    self, Anchored, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed, Parse,
-    PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
+    self, Anchored, ApprovalHash, Compete, Condition, Conform, Gate, Holds, JsonFormat, Malformed,
+    Parse, PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -129,7 +129,7 @@ pub(crate) fn resolve(
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
         let key = if competes(definition, snapshot, entry, project_key.map(String::as_str)) {
-            item_key(definition, &in_context, entry, &unread)
+            item_key(definition, snapshot, &in_context, entry, &unread)
         } else {
             ItemKey::Alone(
                 entry.name.clone(),
@@ -258,18 +258,25 @@ pub(crate) fn resolve(
                     && competes(index)
             };
             let winner = (0..entries.len()).find(|&index| free(index));
+            // The URL each remote Entry competes by, while it does.
+            let urls: Vec<Option<String>> = entries
+                .iter()
+                .map(|entry| url_key(definition, snapshot, entry, &unread))
+                .collect();
             let shadowed_by = |index: usize, winner: usize| {
+                let same_endpoint = definition
+                    .rules(kind)
+                    .competition
+                    .by_endpoint(&entries[index].location)
+                    && blocks::endpoint(&entries[index].config)
+                        == blocks::endpoint(&entries[winner].config);
+                let same_url = urls[index].is_some() && urls[index] == urls[winner];
                 explain::shadowed_by_precedence(
                     agent_name,
                     &definition.location(&entries[winner].location).scope,
                     &locator::render(&entries[winner].path, &entries[winner].key_path),
                     rank(entries[index]) == rank(entries[winner]),
-                    definition
-                        .rules(kind)
-                        .competition
-                        .by_endpoint(&entries[index].location)
-                        && blocks::endpoint(&entries[index].config)
-                            == blocks::endpoint(&entries[winner].config),
+                    same_endpoint || same_url,
                 )
             };
             let api_entries: Vec<api::Entry> = entries
@@ -277,7 +284,18 @@ pub(crate) fn resolve(
                 .enumerate()
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
-                    let gate_caveats = gate_caveats(definition, snapshot, entry);
+                    let mut gate_caveats = gate_caveats(definition, snapshot, entry);
+                    // Servers config-digger cannot see can take part where URLs compete.
+                    let unseen = definition.rules(kind).competition.same_url();
+                    if let (Some(block), Some(_)) = (unseen, &urls[index])
+                        && !block.unseen.is_empty()
+                    {
+                        gate_caveats.push(api::Caveat {
+                            code: api::CaveatCode::UnseenServers,
+                            path: entry.path.clone(),
+                            sentence: explain::unseen_servers(agent_name, &block.unseen),
+                        });
+                    }
                     if let Some(home) = skipped_home(snapshot, entry) {
                         let instead = home
                             .skipped
@@ -709,6 +727,8 @@ pub(crate) fn leftovers(
 enum ItemKey {
     /// The competition key of a name.
     Name(String),
+    /// The URL a remote Entry competes by, while it does.
+    Url(String),
     /// An endpoint no Entry that competes by name has.
     Endpoint(String),
     /// The Entry's own name, path and key path, when it competes with none.
@@ -742,16 +762,21 @@ fn competes(
 /// What `entry`, among the Entries `in_context` of the context, competes
 /// by: its name, or for an Entry of a location that competes by endpoint,
 /// the name of the Entry the Agent ranks highest among those of other
-/// locations that have its endpoint and are read, or else its endpoint.
+/// locations that have its endpoint and are read, or else its endpoint; or
+/// for a remote Entry that competes by URL, its URL.
 fn item_key(
     definition: &AgentDefinition,
+    snapshot: &Snapshot,
     in_context: &[&ScannedEntry],
     entry: &ScannedEntry,
     unread: &dyn Fn(&ScannedEntry) -> bool,
 ) -> ItemKey {
+    if let Some(url) = url_key(definition, snapshot, entry, unread) {
+        return ItemKey::Url(url);
+    }
     let location = definition.location(&entry.location);
     let competition = &definition.rules(location.kind).competition;
-    let by_name = |entry: &ScannedEntry| ItemKey::Name(competition.key(&entry.name));
+    let by_name = |entry: &ScannedEntry| ItemKey::Name(competition.key(&entry.name, &entry.path));
     if !competition.by_endpoint(&location.id) {
         return by_name(entry);
     }
@@ -774,11 +799,10 @@ fn item_key(
     };
     let named = in_context
         .iter()
+        .filter(|other| other.agent_index == entry.agent_index && other.home == entry.home)
         .filter(|other| {
             let other_location = definition.location(&other.location);
-            other.agent_index == entry.agent_index
-                && other.home == entry.home
-                && other_location.kind == location.kind
+            other_location.kind == location.kind
                 && !competition.by_endpoint(&other_location.id)
                 && !unread(other)
                 && blocks::endpoint(&other.config).as_ref() == Some(&endpoint)
@@ -1143,6 +1167,23 @@ fn gates(
                 let reason = explain::untrusted_folder(agent_name, &scanned.path);
                 (!all_trusted).then_some((Check::Trust, reason))
             }
+            Gate::ApprovalHash(block) => {
+                let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
+                let hash = entry.config_hash.as_deref();
+                let approved = (0..block.sources.len()).any(|source| {
+                    let owner = SettingOwner::Gate {
+                        gate: index,
+                        source,
+                    };
+                    snapshot
+                        .settings_for(entry, location.kind, owner, project)
+                        .filter_map(|value| value.value.as_ref())
+                        .any(|value| ApprovalHash::approves(value, id, hash))
+                });
+                let reason =
+                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);
+                (!approved).then_some((Check::Approval, reason))
+            }
             Gate::NonceTrust(block) => {
                 let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
                 let trusted = (0..block.sources.len()).any(|source| {
@@ -1325,7 +1366,8 @@ fn remove(
             Provenance::File
             | Provenance::Plugin
             | Provenance::Managed
-            | Provenance::CloudMirror => api::RemoveOption::Offered,
+            | Provenance::CloudMirror
+            | Provenance::BuiltIn => api::RemoveOption::Offered,
         };
     };
     let command = definition
@@ -1339,7 +1381,11 @@ fn remove(
             api::RemoveNotOffered::Extension,
             explain::extension_not_removed(&plugin.name, agent_name),
         ),
-        Provenance::Plugin | Provenance::File | Provenance::Managed | Provenance::CloudMirror => (
+        Provenance::Plugin
+        | Provenance::File
+        | Provenance::Managed
+        | Provenance::CloudMirror
+        | Provenance::BuiltIn => (
             api::RemoveNotOffered::Plugin,
             explain::plugin_not_removed(&plugin.id, agent_name),
         ),
@@ -1385,4 +1431,20 @@ fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
                 .collect();
         }
     }
+}
+
+/// The URL `entry` competes by, when its location's remote Entries compete
+/// by URL, the Feature gate that makes them is on, and it is read.
+fn url_key(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    unread: &dyn Fn(&ScannedEntry) -> bool,
+) -> Option<String> {
+    let location = definition.location(&entry.location);
+    let block = definition.rules(location.kind).competition.same_url()?;
+    if unread(entry) || !gate_on(definition, snapshot, entry, &block.gate) {
+        return None;
+    }
+    block.url_of(&location.id, &entry.config)
 }

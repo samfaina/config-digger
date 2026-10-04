@@ -7,7 +7,7 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, SettingIs, SkillDefect,
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, SettingIs, SkillDefect, UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
@@ -523,6 +523,7 @@ pub(crate) fn not_approved(
 ) -> Reason {
     let asks = match prompt {
         ApprovalPrompt::OnStart => "which asks about it when it starts in this Project",
+        ApprovalPrompt::McpSettings => "which asks about it in its MCP settings",
     };
     Reason {
         code: ReasonCode::NotApproved,
@@ -1203,10 +1204,56 @@ pub(crate) fn definition_untested(agent_name: &str) -> String {
     )
 }
 
+/// The note of a home of `agent_name`, whose Marketplace plugins live in
+/// the account.
+pub(crate) fn marketplace_plugins_not_on_disk(agent_name: &str) -> String {
+    format!(
+        "{agent_name} keeps the plugins you install from its Marketplace in your account, so they are not listed here."
+    )
+}
+
 /// The note of a home of `agent_name`, whose connectors live in the account.
 pub(crate) fn cloud_connectors_not_on_disk(agent_name: &str) -> String {
     format!(
         "{agent_name}'s connectors live in your account, with no copy on disk, so they are not listed here."
+    )
+}
+
+/// The caveat of an Entry that competes by URL in `agent_name`, which also
+/// counts the `unseen` servers config-digger cannot see.
+pub(crate) fn unseen_servers(agent_name: &str, unseen: &[UnseenServers]) -> String {
+    let sources: Vec<&str> = unseen
+        .iter()
+        .filter_map(|unseen| match unseen {
+            UnseenServers::Extensions => Some("extensions"),
+            UnseenServers::Team => Some("the team"),
+            UnseenServers::MarketplacePlugins => Some("user Marketplace plugins"),
+            UnseenServers::UserPick => None,
+        })
+        .collect();
+    let picked = unseen.contains(&UnseenServers::UserPick);
+    let Some((last, first)) = sources.split_last() else {
+        return format!(
+            "{agent_name} runs one server per URL. One the user picked in {agent_name} may run instead."
+        );
+    };
+    let mut those = String::from("those of ");
+    for source in first {
+        those.push_str(source);
+        those.push_str(", of ");
+    }
+    if !first.is_empty() {
+        those.truncate(those.len() - ", of ".len());
+        those.push_str(" and of ");
+    }
+    those.push_str(last);
+    let picked = if picked {
+        format!(", or one the user picked in {agent_name},")
+    } else {
+        String::new()
+    };
+    format!(
+        "{agent_name} runs one server per URL, and servers config-digger cannot see take part too: {those}. One of them{picked} may run instead."
     )
 }
 

@@ -60,7 +60,13 @@ export type AgentNoteCode =
  *  The Agent's connectors live in the user's account, with no copy on
  *  disk, so they are not listed.
  */
-"cloud_connectors_not_on_disk";
+"cloud_connectors_not_on_disk" | 
+/**
+ *  The plugins the user installs from the Agent's marketplace live in
+ *  the user's account, with no install record on disk, so they are not
+ *  listed.
+ */
+"marketplace_plugins_not_on_disk";
 
 /**  Another Agent home that reads an Entry, and the State the Entry has there. */
 export type AlsoReadBy = {
@@ -113,7 +119,12 @@ export type CaveatCode =
  *  A settings file holding a rule or gate that could apply cannot be
  *  read, so the Entry is resolved as if it held none.
  */
-"setting_read_failure";
+"setting_read_failure" | 
+/**
+ *  The Entry competes with others by URL, and servers config-digger
+ *  cannot see take part too, so one of them may win instead.
+ */
+"unseen_servers";
 
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
@@ -578,7 +589,12 @@ export type Provenance =
  *  Disable goes through its own switch, and Remove is not offered: the
  *  Agent uninstalls it.
  */
-"extension";
+"extension" | 
+/**
+ *  Shipped with the Agent, which keeps it as it ships it, such as
+ *  Cursor's built-in skills. config-digger only reads it.
+ */
+"built_in";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {

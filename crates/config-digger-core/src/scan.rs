@@ -7,11 +7,12 @@ use crate::definitions::blocks::{
     self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, Format, Gate, GateStore,
     HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp, NameFrom,
     Parse, PluginFolders, PluginRecord, PluginRegistry, ProjectWalk, Register, Registry,
-    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
+    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
+    is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
-    ANY_KEY, AgentDefinition, HomeDefinition, ItemKind, LocationDefinition, PROJECT_KEY,
+    ANY_KEY, AgentDefinition, HomeDefinition, ItemKind, LocationDefinition, NameParts, PROJECT_KEY,
     PluginNames, PluginsDefinition, References,
 };
 use crate::folders::{AsIf, PlannedFolder};
@@ -586,6 +587,9 @@ pub(crate) struct ScannedEntry {
     /// What the Agent's Disable switches hold it by, made by its location's
     /// `switch_id`; `None` for a location without one.
     pub switch_id: Option<String>,
+    /// The hash of its configuration as written, Secrets included, for an
+    /// Entry the Agent approves by it; never shown.
+    pub config_hash: Option<String>,
 }
 
 /// The skill manager whose detectors match a skill folder most strongly.
@@ -750,25 +754,31 @@ pub(crate) fn scan_as_if(
                     storage_paths(&scanner.storage, home.agent_index, &home.home, relative)
                         .map(|(path, project)| (path, project.to_owned()))
                         .collect();
+                let start = scanner.entries.len();
                 for (path, project) in folders {
                     scanner.read_location(home, definition, location, path, Some(project), 0);
                 }
+                scanner.name_entries(start, location, &NameParts::default());
                 continue;
             }
             // Every source is read, so that the Entries of those the Agent
             // skips are listed as Unread.
             if let Some(id) = location.anchor.settings() {
                 let found = settings_named(&settings, home.agent_index, id);
+                let start = scanner.entries.len();
                 for path in found
                     .into_iter()
                     .flat_map(|found| found.sources.iter().flatten())
                 {
                     scanner.read_location(home, definition, location, path.clone(), None, 0);
                 }
+                scanner.name_entries(start, location, &NameParts::default());
                 continue;
             }
             if let Some(path) = location.anchor.path(&home.roots, None) {
+                let start = scanner.entries.len();
                 scanner.read_location(home, definition, location, path, None, 0);
+                scanner.name_entries(start, location, &NameParts::default());
             }
         }
     }
@@ -825,7 +835,14 @@ pub(crate) fn scan_as_if(
             for (folder, key, depth) in read {
                 if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
                     let key = Some(key.clone());
+                    let start = scanner.entries.len();
                     scanner.read_location(home, definition, location, path, key, depth);
+                    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+                    let parts = NameParts {
+                        plugin: None,
+                        folder: Some((depth / MEMBER_RANKS, &name)),
+                    };
+                    scanner.name_entries(start, location, &parts);
                 }
             }
         }
@@ -2006,6 +2023,20 @@ impl Scanner<'_> {
                         ),
                     }
                 }
+                Registry::SqliteList(block) => {
+                    let Some(text) = self.reader.sqlite_text(home, &path, &block.key, None) else {
+                        continue;
+                    };
+                    // The store holds much else, which a list it cannot parse
+                    // leaves readable.
+                    let Ok(spellings) = block.spellings(&text) else {
+                        tracing::debug!(path = %path.display(), key = %block.key, "cannot parse the list");
+                        continue;
+                    };
+                    for text in spellings {
+                        self.add_spelling(home, spelling, &text);
+                    }
+                }
                 Registry::JsonFolders(block) => {
                     let mut folders = self.reader.fs.read_dir(&path).unwrap_or_default();
                     folders.sort_by_key(|folder| paths::key(folder));
@@ -2238,6 +2269,7 @@ impl Scanner<'_> {
                 manager: None,
                 plugin: None,
                 switch_id: None,
+                config_hash: None,
             });
             parked.push(ScannedParked {
                 key_path,
@@ -2293,6 +2325,7 @@ impl Scanner<'_> {
                     manager: None,
                     plugin: None,
                     switch_id: None,
+                    config_hash: None,
                 });
             }
             return;
@@ -2316,9 +2349,18 @@ impl Scanner<'_> {
         definition: &AgentDefinition,
         location: &LocationDefinition,
         plugin: &ScannedPlugin,
-        relative: &str,
+        relative: &RelativePaths,
     ) {
-        let path = blocks::join_relative(&plugin.folder, relative);
+        // The first of its paths that exists, or else the first.
+        let candidates = relative
+            .all()
+            .iter()
+            .map(|relative| blocks::join_relative(&plugin.folder, relative));
+        let path = candidates
+            .clone()
+            .find(|path| self.reader.fs.exists(path))
+            .or_else(|| candidates.clone().next())
+            .expect("validation gives a plugin anchor a path");
         let start = self.entries.len();
         match &location.references {
             None => {
@@ -2333,7 +2375,11 @@ impl Scanner<'_> {
             entry.name = if location.one_entry {
                 plugin.name.clone()
             } else {
-                location.entry_name(&entry.name, &plugin.name)
+                let parts = NameParts {
+                    plugin: Some(&plugin.name),
+                    folder: None,
+                };
+                location.entry_name(&entry.name, &parts)
             };
             entry.plugin = Some(plugin.clone());
         }
@@ -2422,6 +2468,14 @@ impl Scanner<'_> {
         }
     }
 
+    /// Gives the Entries read since the first `start` the names the
+    /// `name_template` of `location` makes of theirs and `parts`.
+    fn name_entries(&mut self, start: usize, location: &LocationDefinition, parts: &NameParts) {
+        for entry in &mut self.entries[start..] {
+            entry.name = location.entry_name(&entry.name, parts);
+        }
+    }
+
     /// Records that `location` reads the file or folder at `path`.
     fn add_reader(&mut self, home: &FoundHome, location: &LocationDefinition, path: &Path) {
         let reader = LocationReader {
@@ -2479,6 +2533,17 @@ impl Scanner<'_> {
         depth: usize,
         objects: Vec<RootObject>,
     ) {
+        // How the Agent hashes the configuration of an Entry it approves.
+        let hash = definition
+            .rules(location.kind)
+            .gates
+            .iter()
+            .find_map(|gate| match gate {
+                Gate::ApprovalHash(block) if block.locations.contains(&location.id) => {
+                    Some(block.hash)
+                }
+                _ => None,
+            });
         for object in objects {
             tracing::debug!(
                 agent = %definition.agent.id,
@@ -2515,6 +2580,7 @@ impl Scanner<'_> {
                     manager: None,
                     plugin: None,
                     switch_id: None,
+                    config_hash: hash.and_then(|hash| hash.of(found.value)),
                 });
             }
         }
@@ -2593,6 +2659,7 @@ impl Scanner<'_> {
                         manager: None,
                         plugin: None,
                         switch_id: None,
+                        config_hash: None,
                     });
                     continue;
                 }
@@ -2654,6 +2721,7 @@ impl Scanner<'_> {
             manager: None,
             plugin: None,
             switch_id: None,
+            config_hash: None,
         });
     }
 

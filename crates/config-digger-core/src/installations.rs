@@ -54,6 +54,11 @@ pub(crate) fn of_home(
                 None,
                 explain::cloud_connectors_not_on_disk(agent_name),
             ),
+            DefinitionNote::MarketplacePluginsNotOnDisk => note(
+                api::AgentNoteCode::MarketplacePluginsNotOnDisk,
+                None,
+                explain::marketplace_plugins_not_on_disk(agent_name),
+            ),
         });
     }
     let reading: Vec<&ScannedInstallation> = installations
