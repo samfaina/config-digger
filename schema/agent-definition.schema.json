@@ -1319,6 +1319,13 @@
             "null"
           ]
         },
+        "switch_id": {
+          "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "references": {
           "description": "What the value at `root` of a location in plugins may hold besides\nan object of Entries: a path, relative to the plugin's folder, of\nanother file in the location's format, or a list of such paths and\nobjects of Entries, such as a Claude Code plugin manifest's\n`mcpServers`.",
           "anyOf": [
@@ -1955,6 +1962,35 @@
               "type": "null"
             }
           ]
+        },
+        "sqlite": {
+          "description": "Whether the file is a SQLite store, such as VS Code's `state.vscdb`,\nwhose `ItemTable` holds JSON text under the key path's first key.",
+          "type": "boolean",
+          "default": false
+        },
+        "cached_at": {
+          "description": "The key path, in the same file, of when the Agent cached the value:\nmilliseconds since 1970, or an RFC 3339 time, such as when VS Code\nfetched the account's policy. Omitted for a value the user writes.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "map": {
+          "description": "How the Agent reads the value as the setting's, as `[held, read]`\npairs, such as VS Code reading a policy's `mcp: false` as\n`chat.mcp.access: \"none\"`. A value no pair holds then sets nothing.\nOmitted, the value is read as it is.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              true,
+              true
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "default": []
         }
       },
       "additionalProperties": false,
@@ -2120,9 +2156,14 @@
           "const": "disable"
         },
         {
-          "description": "The Agent has not approved the Entry: Blocked, with `not_approved`.\nRequired when a gate of the kind is an approval list, and refused\notherwise.",
+          "description": "The Agent has not approved the Entry: Blocked, with `not_approved`.\nRequired when a gate of the kind is an approval list or a nonce\ntrust, and refused otherwise.",
           "type": "string",
           "const": "approval"
+        },
+        {
+          "description": "The user has not trusted the Entry's Project: Blocked, with\n`untrusted_folder`. Required when a gate of the kind is trusted\nfolders, and refused otherwise.",
+          "type": "string",
+          "const": "trust"
         },
         {
           "description": "A rule keeps the Entry out: Blocked, with `policy`, when the rule is\nmanaged policy, and Disabled, with `disabled_by_rule` or\n`disabled_globally`, otherwise. Before `precedence`, an Entry a rule\nkeeps out does not compete; after it, a rule applies to the Entry\nthat wins, which still beats the others. Required when the kind has\nrules, and refused otherwise.",
@@ -2270,6 +2311,73 @@
           ]
         },
         {
+          "description": "A list in a JSON value holding an item per Entry it switches, each named\nby its `named_by` field or index, such as the `[id, enabled]` pairs of\nVS Code's `mcp.enablement` or the skill files of its\n`chat.disabledPromptFiles.skill`. An Entry is held by the id its\nlocation's `switch_id` makes, and the switch's key path ends in\n`{name}`, standing for its item. The Agent skips an Entry whose item is\nthere and is not `enabled_item`. Disable replaces the item with\n`disabled_item`, creating the list and any missing parent; Enable takes\nit away, or with `set`, replaces it with `enabled_item`.",
+          "type": "object",
+          "properties": {
+            "switch": {
+              "description": "The list, `{name}` standing for the Entry's item in it.",
+              "$ref": "#/$defs/Switch"
+            },
+            "target": {
+              "description": "Must be `entry`.",
+              "$ref": "#/$defs/MechanismTarget"
+            },
+            "context": {
+              "$ref": "#/$defs/MechanismContext"
+            },
+            "enable_action": {
+              "description": "`remove-item`, or `set` with an `enabled_item`.",
+              "$ref": "#/$defs/EnableAction"
+            },
+            "reason": {
+              "$ref": "#/$defs/DisableReason"
+            },
+            "disabled_item": {
+              "description": "The item Disable writes, each string `{name}` in it standing for the\nEntry's id, such as `[\"{name}\", false]`."
+            },
+            "enabled_item": {
+              "description": "The item that Enables the Entry, likewise, such as `[\"{name}\", true]`,\nwhich beats an item of a later layer. Enable writes it with\n`enable_action = \"set\"`."
+            },
+            "ignore_case": {
+              "description": "Whether the Agent compares ids without regard to case, as it\ncompares Windows paths.",
+              "type": "boolean",
+              "default": false
+            },
+            "enable_offered": {
+              "description": "Whether config-digger writes the switch: Disable through it, and\nEnable lifting it.",
+              "type": "boolean",
+              "default": true
+            },
+            "layered": {
+              "description": "Whether the list is one layer of a setting the Agent merges across\nstores, such as VS Code's `mcp.enablement` in a workspace's store over\nthe profile's: among the layered mechanisms of the Item kind, in the\ndefinition's order, the first whose list holds the Entry decides.",
+              "type": "boolean",
+              "default": false
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "json-item-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "switch",
+            "target",
+            "context",
+            "enable_action",
+            "reason",
+            "disabled_item"
+          ]
+        },
+        {
           "description": "Disables an Entry that has no switch of its own, such as a server in\nClaude Desktop's user file, by moving it out of the Agent's reach into\nconfig-digger's parked-Entry store, where it stays listed as Disabled;\nEnable puts it back (ADR 0002). Disable prefers any switch to it, and\nnever parks an Entry in a git-versioned file.",
           "type": "object",
           "properties": {
@@ -2316,7 +2424,7 @@
           ]
         },
         "store_class": {
-          "description": "How the switch's file behaves while the Agent runs.",
+          "description": "How the switch's file behaves while the Agent runs. A `sqlite` file\nis a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`\nholds JSON text under the key path's first key.",
           "$ref": "#/$defs/StoreClass"
         }
       },
@@ -2495,6 +2603,99 @@
             "block",
             "locations",
             "sources"
+          ]
+        },
+        {
+          "description": "Locations whose Entries the Agent uses only in a Project the user trusts,\nsuch as the servers of a workspace VS Code reads only once its Workspace\nTrust is given: an Entry of one in a Project the user has not trusted is\nBlocked, with `untrusted_folder`. A folder is trusted when an item of a\nsource trusts it or a folder above it, and a workspace file when it and\neach of its folders are. config-digger never trusts a folder.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need trust, each in a Project.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the lists of trusted folders are, every one of them read.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "uri": {
+              "description": "The field of an item that holds the folder's `file:` URI, as text\nor as VS Code's URI object.",
+              "type": "string"
+            },
+            "trusted": {
+              "description": "The field of an item that must hold `true` for it to trust the\nfolder. Omitted, every item trusts its folder.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "trust_all": {
+              "description": "A setting that, while it is met, trusts every folder, such as VS\nCode's `security.workspace.trust.enabled: false`.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SettingIs"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "trusted-folders"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "uri"
+          ]
+        },
+        {
+          "description": "Entries the Agent uses only once the user trusts them, and asks about\nagain whenever their configuration changes, such as the servers VS Code\ndiscovers in other apps' files: one no source trusts is Blocked, with\n`not_approved`. A source holds a list of `[id, record]` pairs, each id\nas the location's `switch_id` makes it, and the Entry is trusted while\nits record's `trusted_at` field equals its `nonce` field. config-digger\ncannot tell whether the configuration changed since the Agent recorded\nthe nonce, and never trusts an Entry.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need trust.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the lists of records are, every one of them read.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "trusted_at": {
+              "description": "The field of a record holding the nonce the user trusted.",
+              "type": "string"
+            },
+            "nonce": {
+              "description": "The field of a record holding the nonce of the configuration the\nAgent last saw.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "nonce-trust"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "trusted_at",
+            "nonce"
           ]
         }
       ]

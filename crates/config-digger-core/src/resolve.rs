@@ -15,7 +15,7 @@ use crate::scan::{
     GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedHome, ScannedParked,
     ScannedReadFailure, SettingOwner, Snapshot,
 };
-use crate::{explain, installations, locator, paths, rules};
+use crate::{explain, folders, installations, locator, paths, rules};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -356,12 +356,13 @@ pub(crate) fn resolve(
                     let mut failed: Vec<(Check, api::State, api::Reason)> = Vec::new();
                     for &check in checks {
                         match check {
-                            Check::Policy | Check::Approval | Check::Rules => failed.extend(
-                                kept[index]
-                                    .iter()
-                                    .filter(|(known, _, _)| *known == check)
-                                    .cloned(),
-                            ),
+                            Check::Policy | Check::Approval | Check::Trust | Check::Rules => failed
+                                .extend(
+                                    kept[index]
+                                        .iter()
+                                        .filter(|(known, _, _)| *known == check)
+                                        .cloned(),
+                                ),
                             Check::Disable => {
                                 if let Some(parked) = parked[index] {
                                     failed.push((
@@ -1102,6 +1103,60 @@ fn gates(
                 let mut reason = explain::policy_field(key, &set.path, agent_name);
                 reason.switch = Some(locator::render(&set.path, &set.key_path));
                 Some((Check::Policy, reason))
+            }
+            Gate::TrustedFolders(block) => {
+                let values = |source: usize| {
+                    let owner = SettingOwner::Gate {
+                        gate: index,
+                        source,
+                    };
+                    snapshot
+                        .settings_for(entry, location.kind, owner, project)
+                        .filter_map(|value| value.value.as_ref())
+                };
+                if let Some(setting) = &block.trust_all {
+                    let first = block.sources.len();
+                    let held = (0..setting.sources.len())
+                        .map(|source| values(first + source).next().cloned());
+                    if setting.is_met(held) {
+                        return None;
+                    }
+                }
+                let trusted: Vec<PathBuf> = (0..block.sources.len())
+                    .flat_map(|source| {
+                        values(source).flat_map(|value| block.trusted_folders(value))
+                    })
+                    .collect();
+                let scanned = snapshot
+                    .projects
+                    .iter()
+                    .find(|known| Some(known.key.as_str()) == entry.project.as_deref())?;
+                // A folder is trusted with the folders above it.
+                let is_trusted = |folder: &Path| {
+                    trusted
+                        .iter()
+                        .any(|trusted| folders::below(folder, trusted).is_some())
+                };
+                let all_trusted = std::iter::once(&scanned.path)
+                    .chain(&scanned.members)
+                    .all(|folder| is_trusted(folder));
+                let reason = explain::untrusted_folder(agent_name, &scanned.path);
+                (!all_trusted).then_some((Check::Trust, reason))
+            }
+            Gate::NonceTrust(block) => {
+                let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
+                let trusted = (0..block.sources.len()).any(|source| {
+                    let owner = SettingOwner::Gate {
+                        gate: index,
+                        source,
+                    };
+                    snapshot
+                        .settings_for(entry, location.kind, owner, project)
+                        .filter_map(|value| value.value.as_ref())
+                        .any(|value| block.trusts(value, id))
+                });
+                let reason = explain::not_trusted(agent_name, &entry.name, &entry.path);
+                (!trusted).then_some((Check::Approval, reason))
             }
         })
         .collect()

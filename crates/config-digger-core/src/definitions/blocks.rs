@@ -2630,9 +2630,32 @@ pub(crate) trait Disables {
     /// leaving it Effective.
     fn partial(&self, value: Option<&Value>) -> bool;
 
-    /// The edit that Disables the Entry named `name` through the switch at
-    /// `key_path`, which holds `value` now.
-    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit;
+    /// The edits that Disable the Entry held by `name` through the switch
+    /// at `key_path`, which holds `value` for it now.
+    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit>;
+
+    /// When the value where `{name}` stands is a list rather than an object
+    /// keyed by name, what of each item holds its name: a field, or an
+    /// index in a list of lists.
+    fn named_by(&self) -> Option<&str> {
+        self.switch().named_by.as_deref()
+    }
+
+    /// Whether Enable takes the switch away rather than setting it to a
+    /// value that Enables, so that a later layer then decides.
+    fn enable_unsets(&self) -> bool;
+
+    /// Whether it holds an Entry only by the id its location's `switch_id`
+    /// makes, so that it cannot hold one of a location without it.
+    fn by_id(&self) -> bool {
+        false
+    }
+
+    /// Whether the Agent compares the ids of a list named by a field
+    /// without regard to case.
+    fn ignores_case(&self) -> bool {
+        false
+    }
 
     /// The edits that lift the switch at `key_path`, which holds `value`
     /// for the Entry named `name`.
@@ -2646,6 +2669,7 @@ pub(crate) trait Disables {
 pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
     JsonField(Box<JsonField>),
+    JsonItemList(JsonItemList),
     Park(Park),
 }
 
@@ -2654,6 +2678,7 @@ impl Validate for DisableMechanism {
         match self {
             DisableMechanism::JsonNameList(block) => block.validate(),
             DisableMechanism::JsonField(block) => block.validate(),
+            DisableMechanism::JsonItemList(block) => block.validate(),
             DisableMechanism::Park(block) => block.validate(),
         }
     }
@@ -2663,8 +2688,19 @@ impl DisableMechanism {
     /// The mechanism as a switch the Agent reads, `None` for parking.
     pub fn switched(&self) -> Option<Switched<'_>> {
         match self {
-            DisableMechanism::JsonNameList(block) => Some(Switched::JsonNameList(block)),
-            DisableMechanism::JsonField(block) => Some(Switched::JsonField(block)),
+            DisableMechanism::JsonNameList(block) => Some(Switched::NameList(block)),
+            DisableMechanism::JsonField(block) => Some(Switched::Field(block)),
+            DisableMechanism::JsonItemList(block) => Some(Switched::ItemList(block)),
+            DisableMechanism::Park(_) => None,
+        }
+    }
+
+    /// The switch it writes, `None` for parking.
+    pub fn switch(&self) -> Option<&Switch> {
+        match self {
+            DisableMechanism::JsonNameList(block) => Some(&block.switch),
+            DisableMechanism::JsonField(block) => Some(&block.switch),
+            DisableMechanism::JsonItemList(block) => Some(&block.switch),
             DisableMechanism::Park(_) => None,
         }
     }
@@ -2680,6 +2716,7 @@ impl DisableMechanism {
         match self {
             DisableMechanism::JsonNameList(block) => block.locations(),
             DisableMechanism::JsonField(block) => block.locations(),
+            DisableMechanism::JsonItemList(block) => block.locations(),
             DisableMechanism::Park(block) => &block.locations,
         }
     }
@@ -2694,86 +2731,81 @@ impl DisableMechanism {
 /// A Disable mechanism that writes a switch the Agent reads.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Switched<'m> {
-    JsonNameList(&'m JsonNameList),
-    JsonField(&'m JsonField),
+    NameList(&'m JsonNameList),
+    Field(&'m JsonField),
+    ItemList(&'m JsonItemList),
+}
+
+impl<'m> Switched<'m> {
+    /// The mechanism's own block.
+    fn block(self) -> &'m dyn Disables {
+        match self {
+            Switched::NameList(block) => block,
+            Switched::Field(block) => block,
+            Switched::ItemList(block) => block,
+        }
+    }
 }
 
 impl Disables for Switched<'_> {
     fn switch(&self) -> &Switch {
-        match self {
-            Switched::JsonNameList(block) => block.switch(),
-            Switched::JsonField(block) => block.switch(),
-        }
+        self.block().switch()
     }
 
     fn target(&self) -> MechanismTarget {
-        match self {
-            Switched::JsonNameList(block) => block.target(),
-            Switched::JsonField(block) => block.target(),
-        }
+        self.block().target()
     }
 
     fn context(&self) -> MechanismContext {
-        match self {
-            Switched::JsonNameList(block) => block.context(),
-            Switched::JsonField(block) => block.context(),
-        }
+        self.block().context()
     }
 
     fn reason(&self) -> DisableReason {
-        match self {
-            Switched::JsonNameList(block) => block.reason(),
-            Switched::JsonField(block) => block.reason(),
-        }
+        self.block().reason()
     }
 
     fn locations(&self) -> &[String] {
-        match self {
-            Switched::JsonNameList(block) => block.locations(),
-            Switched::JsonField(block) => block.locations(),
-        }
+        self.block().locations()
     }
 
     fn enable_offered(&self) -> bool {
-        match self {
-            Switched::JsonNameList(block) => block.enable_offered(),
-            Switched::JsonField(block) => block.enable_offered(),
-        }
+        self.block().enable_offered()
     }
 
     fn layered(&self) -> bool {
-        match self {
-            Switched::JsonNameList(block) => block.layered(),
-            Switched::JsonField(block) => block.layered(),
-        }
+        self.block().layered()
     }
 
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
-        match self {
-            Switched::JsonNameList(block) => block.disables(value, name),
-            Switched::JsonField(block) => block.disables(value, name),
-        }
+        self.block().disables(value, name)
     }
 
     fn partial(&self, value: Option<&Value>) -> bool {
-        match self {
-            Switched::JsonNameList(block) => block.partial(value),
-            Switched::JsonField(block) => block.partial(value),
-        }
+        self.block().partial(value)
     }
 
-    fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit {
-        match self {
-            Switched::JsonNameList(block) => block.disable_edit(key_path, value, name),
-            Switched::JsonField(block) => block.disable_edit(key_path, value, name),
-        }
+    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+        self.block().disable_edits(key_path, value, name)
     }
 
     fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
-        match self {
-            Switched::JsonNameList(block) => block.enable_edits(key_path, value, name),
-            Switched::JsonField(block) => block.enable_edits(key_path, value, name),
-        }
+        self.block().enable_edits(key_path, value, name)
+    }
+
+    fn named_by(&self) -> Option<&str> {
+        self.block().named_by()
+    }
+
+    fn ignores_case(&self) -> bool {
+        self.block().ignores_case()
+    }
+
+    fn enable_unsets(&self) -> bool {
+        self.block().enable_unsets()
+    }
+
+    fn by_id(&self) -> bool {
+        self.block().by_id()
     }
 }
 
@@ -2921,6 +2953,11 @@ impl Disables for JsonNameList {
         self.enable_offered
     }
 
+    /// Enable removes the name.
+    fn enable_unsets(&self) -> bool {
+        true
+    }
+
     /// The Agent concatenates name lists rather than layering them.
     fn layered(&self) -> bool {
         false
@@ -2935,11 +2972,16 @@ impl Disables for JsonNameList {
     }
 
     /// An append, which creates the list when it is missing.
-    fn disable_edit(&self, key_path: Vec<String>, _value: Option<&Value>, name: &str) -> Edit {
-        Edit::Append {
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        _value: Option<&Value>,
+        name: &str,
+    ) -> Vec<Edit> {
+        vec![Edit::Append {
             key_path,
             value: Value::from(name),
-        }
+        }]
     }
 
     fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
@@ -3061,6 +3103,10 @@ impl Disables for JsonField {
         self.enable_offered
     }
 
+    fn enable_unsets(&self) -> bool {
+        self.enable_action != EnableAction::Set
+    }
+
     fn layered(&self) -> bool {
         self.layered
     }
@@ -3075,11 +3121,16 @@ impl Disables for JsonField {
             .is_some_and(|value| self.partial_values.contains(value))
     }
 
-    fn disable_edit(&self, key_path: Vec<String>, _value: Option<&Value>, _name: &str) -> Edit {
-        Edit::Set {
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        _value: Option<&Value>,
+        _name: &str,
+    ) -> Vec<Edit> {
+        vec![Edit::Set {
             key_path,
             value: self.disabled_value.clone(),
-        }
+        }]
     }
 
     fn enable_edits(
@@ -3095,6 +3146,175 @@ impl Disables for JsonField {
             },
             _ => Edit::Remove { key_path },
         }]
+    }
+}
+
+/// A list in a JSON value holding an item per Entry it switches, each named
+/// by its `named_by` field or index, such as the `[id, enabled]` pairs of
+/// VS Code's `mcp.enablement` or the skill files of its
+/// `chat.disabledPromptFiles.skill`. An Entry is held by the id its
+/// location's `switch_id` makes, and the switch's key path ends in
+/// `{name}`, standing for its item. The Agent skips an Entry whose item is
+/// there and is not `enabled_item`. Disable replaces the item with
+/// `disabled_item`, creating the list and any missing parent; Enable takes
+/// it away, or with `set`, replaces it with `enabled_item`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonItemList {
+    /// The list, `{name}` standing for the Entry's item in it.
+    pub switch: Switch,
+    /// Must be `entry`.
+    pub target: MechanismTarget,
+    pub context: MechanismContext,
+    /// `remove-item`, or `set` with an `enabled_item`.
+    pub enable_action: EnableAction,
+    pub reason: DisableReason,
+    /// The item Disable writes, each string `{name}` in it standing for the
+    /// Entry's id, such as `["{name}", false]`.
+    pub disabled_item: Value,
+    /// The item that Enables the Entry, likewise, such as `["{name}", true]`,
+    /// which beats an item of a later layer. Enable writes it with
+    /// `enable_action = "set"`.
+    pub enabled_item: Option<Value>,
+    /// Whether the Agent compares ids without regard to case, as it
+    /// compares Windows paths.
+    #[serde(default)]
+    pub ignore_case: bool,
+    /// Whether config-digger writes the switch: Disable through it, and
+    /// Enable lifting it.
+    #[serde(default = "offered")]
+    pub enable_offered: bool,
+    /// Whether the list is one layer of a setting the Agent merges across
+    /// stores, such as VS Code's `mcp.enablement` in a workspace's store over
+    /// the profile's: among the layered mechanisms of the Item kind, in the
+    /// definition's order, the first whose list holds the Entry decides.
+    #[serde(default)]
+    pub layered: bool,
+    /// The ids of the locations whose Entries it Disables. Omitted, it
+    /// Disables Entries of every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
+}
+
+impl Validate for JsonItemList {
+    fn validate(&self) -> Result<(), String> {
+        validate_mechanism(&self.switch, self.target, self.context)?;
+        if self.switch.named_by.is_none() {
+            return Err("an item list needs named_by, what of each item holds its id".into());
+        }
+        if self.switch.key_path.last().map(String::as_str) != Some(NAME_KEY) {
+            return Err(format!("an item list's key path ends in `{NAME_KEY}`"));
+        }
+        if self.target != MechanismTarget::Entry {
+            return Err("an item list's target must be `entry`".into());
+        }
+        match (self.enable_action, &self.enabled_item) {
+            (_, Some(enabled)) if *enabled == self.disabled_item => {
+                Err("enabled_item must differ from disabled_item".into())
+            }
+            (EnableAction::RemoveItem, _) | (EnableAction::Set, Some(_)) => Ok(()),
+            _ => Err(
+                "an item list's enable_action is `remove-item`, or `set` with an enabled_item"
+                    .into(),
+            ),
+        }
+    }
+}
+
+impl JsonItemList {
+    /// `template` with each string `{name}` in it replaced by `id`.
+    fn item(template: &Value, id: &str) -> Value {
+        match template {
+            Value::String(text) if text == NAME_KEY => Value::from(id),
+            Value::Array(items) => items.iter().map(|item| Self::item(item, id)).collect(),
+            Value::Object(fields) => fields
+                .iter()
+                .map(|(key, value)| (key.clone(), Self::item(value, id)))
+                .collect(),
+            other => other.clone(),
+        }
+    }
+
+    /// The edits that replace `item`, if the list holds one, with `with`, if
+    /// any: `key_path` names the item, and the list is its parent.
+    fn replace(key_path: &[String], item: Option<&Value>, with: Option<Value>) -> Vec<Edit> {
+        let list = key_path[..key_path.len() - 1].to_vec();
+        let removed = item.map(|item| Edit::RemoveItem {
+            key_path: list.clone(),
+            value: item.clone(),
+        });
+        let added = with.map(|value| Edit::Append {
+            key_path: list,
+            value,
+        });
+        removed.into_iter().chain(added).collect()
+    }
+}
+
+impl Disables for JsonItemList {
+    fn switch(&self) -> &Switch {
+        &self.switch
+    }
+
+    fn target(&self) -> MechanismTarget {
+        self.target
+    }
+
+    fn context(&self) -> MechanismContext {
+        self.context
+    }
+
+    fn reason(&self) -> DisableReason {
+        self.reason
+    }
+
+    fn locations(&self) -> &[String] {
+        &self.locations
+    }
+
+    fn enable_offered(&self) -> bool {
+        self.enable_offered
+    }
+
+    fn layered(&self) -> bool {
+        self.layered
+    }
+
+    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
+        let enabled = self
+            .enabled_item
+            .as_ref()
+            .map(|template| Self::item(template, name));
+        value.is_some_and(|item| Some(item) != enabled.as_ref())
+    }
+
+    fn partial(&self, _value: Option<&Value>) -> bool {
+        false
+    }
+
+    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+        let disabled = Self::item(&self.disabled_item, name);
+        Self::replace(&key_path, value, Some(disabled))
+    }
+
+    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+        let enabled = (self.enable_action == EnableAction::Set)
+            .then_some(self.enabled_item.as_ref())
+            .flatten()
+            .map(|template| Self::item(template, name));
+        Self::replace(&key_path, value, enabled)
+    }
+
+    fn ignores_case(&self) -> bool {
+        self.ignore_case
+    }
+
+    fn enable_unsets(&self) -> bool {
+        self.enable_action != EnableAction::Set
+    }
+
+    fn by_id(&self) -> bool {
+        true
     }
 }
 
@@ -3142,7 +3362,9 @@ pub(crate) struct Switch {
     /// such as `name` in the `skills` of the manifest of Claude Desktop's
     /// skill mirror. config-digger only reads such a switch.
     pub named_by: Option<String>,
-    /// How the switch's file behaves while the Agent runs.
+    /// How the switch's file behaves while the Agent runs. A `sqlite` file
+    /// is a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`
+    /// holds JSON text under the key path's first key.
     pub store_class: StoreClass,
 }
 
@@ -3171,6 +3393,11 @@ impl Validate for Switch {
         }
         if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
             return Err("a switch needs a key path, with no empty key".into());
+        }
+        if self.sqlite()
+            && (is_entry_key(&self.key_path[0]) || self.key_path[0] == super::PROJECT_KEY)
+        {
+            return Err("a SQLite switch's key path starts with a key of its `ItemTable`".into());
         }
         if let Some(field) = &self.named_by {
             if field.is_empty() {
@@ -3215,9 +3442,17 @@ impl Validate for Switch {
 }
 
 impl Switch {
+    /// Whether its file is a SQLite store, whose `ItemTable` holds JSON text
+    /// under the key path's first key.
+    pub fn sqlite(&self) -> bool {
+        self.store_class == StoreClass::Sqlite
+    }
+
     /// Whether the switch applies in one Project only, so that it needs one.
     pub fn per_project(&self) -> bool {
-        self.anchor.in_project() || self.key_path.iter().any(|key| key == super::PROJECT_KEY)
+        self.anchor.in_project()
+            || self.anchor.project_storage().is_some()
+            || self.key_path.iter().any(|key| key == super::PROJECT_KEY)
     }
 
     /// Whether its key path holds `{name}`, so that it holds one value per name.
@@ -3250,9 +3485,34 @@ pub(crate) struct SettingPlace {
     pub policy: bool,
     /// The dialect the Agent reads the file in. Omitted for strict JSON.
     pub dialect: Option<JsonDialect>,
+    /// Whether the file is a SQLite store, such as VS Code's `state.vscdb`,
+    /// whose `ItemTable` holds JSON text under the key path's first key.
+    #[serde(default)]
+    pub sqlite: bool,
+    /// The key path, in the same file, of when the Agent cached the value:
+    /// milliseconds since 1970, or an RFC 3339 time, such as when VS Code
+    /// fetched the account's policy. Omitted for a value the user writes.
+    pub cached_at: Option<Vec<String>>,
+    /// How the Agent reads the value as the setting's, as `[held, read]`
+    /// pairs, such as VS Code reading a policy's `mcp: false` as
+    /// `chat.mcp.access: "none"`. A value no pair holds then sets nothing.
+    /// Omitted, the value is read as it is.
+    #[serde(default)]
+    pub map: Vec<(Value, Value)>,
 }
 
 impl SettingPlace {
+    /// The value `held` sets, as the Agent reads it.
+    pub fn read_as(&self, held: Value) -> Option<Value> {
+        if self.map.is_empty() {
+            return Some(held);
+        }
+        self.map
+            .iter()
+            .find(|(known, _)| *known == held)
+            .map(|(_, read)| read.clone())
+    }
+
     /// How the file is parsed.
     pub fn format(&self) -> JsonFormat {
         JsonFormat {
@@ -3290,6 +3550,20 @@ impl Validate for SettingPlace {
         }
         if self.key_path.iter().any(|key| key == NAME_KEY) {
             return Err(format!("a setting key path cannot hold `{NAME_KEY}`"));
+        }
+        if self.sqlite && (self.key_path[0] == super::PROJECT_KEY || self.dialect.is_some()) {
+            return Err(format!(
+                "a SQLite setting's key path starts with a key of its `ItemTable`, not `{}`, and it takes no dialect",
+                super::PROJECT_KEY
+            ));
+        }
+        if let Some(cached_at) = &self.cached_at {
+            validate_key_path(cached_at).map_err(|e| format!("cached_at: {e}"))?;
+            if self.sqlite && cached_at[0] != self.key_path[0] {
+                return Err(
+                    "a SQLite setting's cached_at is under the same key as its value".into(),
+                );
+            }
         }
         Ok(())
     }
@@ -3566,6 +3840,8 @@ pub(crate) enum Gate {
     ManagedExclusive(ManagedExclusive),
     ApprovalList(ApprovalList),
     PolicyField(PolicyField),
+    TrustedFolders(TrustedFolders),
+    NonceTrust(NonceTrust),
 }
 
 impl Validate for Gate {
@@ -3574,6 +3850,8 @@ impl Validate for Gate {
             Gate::ManagedExclusive(block) => block.validate(),
             Gate::ApprovalList(block) => block.validate(),
             Gate::PolicyField(block) => block.validate(),
+            Gate::TrustedFolders(block) => block.validate(),
+            Gate::NonceTrust(block) => block.validate(),
         }
     }
 }
@@ -3583,17 +3861,34 @@ impl Gate {
     pub fn covers(&self, id: &str) -> bool {
         match self {
             Gate::ManagedExclusive(block) => block.covers(id),
-            Gate::ApprovalList(_) | Gate::PolicyField(_) => self.locations().contains(&id),
+            Gate::ApprovalList(_)
+            | Gate::PolicyField(_)
+            | Gate::TrustedFolders(_)
+            | Gate::NonceTrust(_) => self.locations().contains(&id),
         }
     }
 
-    /// The settings it reads.
+    /// Where it reads what keeps Entries out.
     pub fn sources(&self) -> &[SettingPlace] {
         match self {
             Gate::ManagedExclusive(_) => &[],
             Gate::ApprovalList(block) => &block.sources,
             Gate::PolicyField(block) => &block.sources,
+            Gate::TrustedFolders(block) => &block.sources,
+            Gate::NonceTrust(block) => &block.sources,
         }
+    }
+
+    /// Every setting it reads: its sources, in their order, then any
+    /// setting that lifts it.
+    pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
+        let lifted_by = match self {
+            Gate::TrustedFolders(block) => block.trust_all.as_ref(),
+            _ => None,
+        };
+        self.sources()
+            .iter()
+            .chain(lifted_by.into_iter().flat_map(|setting| &setting.sources))
     }
 
     /// The ids of the locations it names.
@@ -3604,7 +3899,112 @@ impl Gate {
                 .collect(),
             Gate::ApprovalList(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::PolicyField(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::TrustedFolders(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::NonceTrust(block) => block.locations.iter().map(String::as_str).collect(),
         }
+    }
+}
+
+/// Locations whose Entries the Agent uses only in a Project the user trusts,
+/// such as the servers of a workspace VS Code reads only once its Workspace
+/// Trust is given: an Entry of one in a Project the user has not trusted is
+/// Blocked, with `untrusted_folder`. A folder is trusted when an item of a
+/// source trusts it or a folder above it, and a workspace file when it and
+/// each of its folders are. config-digger never trusts a folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TrustedFolders {
+    /// The ids of the locations whose Entries need trust, each in a Project.
+    pub locations: Vec<String>,
+    /// Where the lists of trusted folders are, every one of them read.
+    pub sources: Vec<SettingPlace>,
+    /// The field of an item that holds the folder's `file:` URI, as text
+    /// or as VS Code's URI object.
+    pub uri: String,
+    /// The field of an item that must hold `true` for it to trust the
+    /// folder. Omitted, every item trusts its folder.
+    pub trusted: Option<String>,
+    /// A setting that, while it is met, trusts every folder, such as VS
+    /// Code's `security.workspace.trust.enabled: false`.
+    pub trust_all: Option<SettingIs>,
+}
+
+impl Validate for TrustedFolders {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a trusted-folders gate needs locations".into());
+        }
+        if self.uri.is_empty() || self.trusted.as_deref() == Some("") {
+            return Err("a trusted-folders gate needs its fields named".into());
+        }
+        validate_sources(&self.sources)?;
+        if let Some(setting) = &self.trust_all {
+            setting.validate().map_err(|e| format!("trust_all: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl TrustedFolders {
+    /// The folders the items of the list `value` trust.
+    pub fn trusted_folders(&self, value: &Value) -> Vec<PathBuf> {
+        let items = value.as_array().map(Vec::as_slice).unwrap_or_default();
+        items
+            .iter()
+            .filter(|item| {
+                self.trusted
+                    .as_ref()
+                    .is_none_or(|field| item.get(field) == Some(&Value::Bool(true)))
+            })
+            .filter_map(|item| paths::from_uri_value(item.get(&self.uri)?))
+            .collect()
+    }
+}
+
+/// Entries the Agent uses only once the user trusts them, and asks about
+/// again whenever their configuration changes, such as the servers VS Code
+/// discovers in other apps' files: one no source trusts is Blocked, with
+/// `not_approved`. A source holds a list of `[id, record]` pairs, each id
+/// as the location's `switch_id` makes it, and the Entry is trusted while
+/// its record's `trusted_at` field equals its `nonce` field. config-digger
+/// cannot tell whether the configuration changed since the Agent recorded
+/// the nonce, and never trusts an Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NonceTrust {
+    /// The ids of the locations whose Entries need trust.
+    pub locations: Vec<String>,
+    /// Where the lists of records are, every one of them read.
+    pub sources: Vec<SettingPlace>,
+    /// The field of a record holding the nonce the user trusted.
+    pub trusted_at: String,
+    /// The field of a record holding the nonce of the configuration the
+    /// Agent last saw.
+    pub nonce: String,
+}
+
+impl Validate for NonceTrust {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a nonce-trust gate needs locations".into());
+        }
+        if self.trusted_at.is_empty() || self.nonce.is_empty() {
+            return Err("a nonce-trust gate needs its fields named".into());
+        }
+        validate_sources(&self.sources)
+    }
+}
+
+impl NonceTrust {
+    /// Whether the list `value` trusts the Entry whose id is `id`.
+    pub fn trusts(&self, value: &Value, id: &str) -> bool {
+        let pairs = value.as_array().map(Vec::as_slice).unwrap_or_default();
+        pairs.iter().any(|pair| {
+            let record = pair.get(1);
+            let field = |name: &str| record.and_then(|record| record.get(name));
+            pair.get(0).and_then(Value::as_str) == Some(id)
+                && field(&self.trusted_at).is_some_and(|nonce| Some(nonce) == field(&self.nonce))
+        })
     }
 }
 
@@ -3925,15 +4325,20 @@ fn cached_value(
         })
     };
     let on = at_path(key_path)?.as_bool()?;
-    let at = cached_at.and_then(at_path).and_then(|value| match value {
+    let at = cached_at.and_then(at_path).and_then(time_of);
+    Some(Cached { on, at })
+}
+
+/// The time `value` records: milliseconds since 1970, or an RFC 3339 time.
+pub(crate) fn time_of(value: &Value) -> Option<SystemTime> {
+    match value {
         Value::Number(millis) => {
             let millis = millis.as_f64().filter(|millis| *millis >= 0.0)?;
             SystemTime::UNIX_EPOCH.checked_add(Duration::try_from_secs_f64(millis / 1000.0).ok()?)
         }
         Value::String(text) => humantime::parse_rfc3339_weak(text).ok(),
         _ => None,
-    });
-    Some(Cached { on, at })
+    }
 }
 
 /// Statsig's djb2 hash of `name`, as it keys gates in its cache.

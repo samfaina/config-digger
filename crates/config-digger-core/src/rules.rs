@@ -233,7 +233,14 @@ fn global(
     let held = value.value.as_ref()?;
     (*held == block.off).then(|| {
         hit(*policy, value, |policy| {
-            explain::switched_off(policy, key(value), held, &value.path, agent_name)
+            explain::switched_off(
+                policy,
+                key(value),
+                held,
+                &value.path,
+                value.cached_at,
+                agent_name,
+            )
         })
     })
 }

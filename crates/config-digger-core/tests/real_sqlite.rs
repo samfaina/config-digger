@@ -97,3 +97,63 @@ fn a_store_an_agent_holds_locked_fails_after_a_short_wait() {
     assert!(started.elapsed() < std::time::Duration::from_secs(5));
     drop(writer);
 }
+
+#[test]
+fn an_item_table_value_is_written_under_its_key_and_removed_with_none() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = store(folder.path());
+    let fs = RealFileSystem;
+
+    fs.write_sqlite_item(&path, "key", Some(r#"[["a",false]]"#))
+        .unwrap();
+    fs.write_sqlite_item(&path, "new", Some("[]")).unwrap();
+    assert_eq!(
+        fs.read_sqlite_item(&path, "key").unwrap().as_deref(),
+        Some(r#"[["a",false]]"#)
+    );
+    assert_eq!(
+        fs.read_sqlite_item(&path, "new").unwrap().as_deref(),
+        Some("[]")
+    );
+
+    fs.write_sqlite_item(&path, "new", None).unwrap();
+    assert_eq!(fs.read_sqlite_item(&path, "new").unwrap(), None);
+    // The store is closed again: Windows refuses to delete an open file.
+    std::fs::remove_file(&path).unwrap();
+}
+
+#[test]
+fn a_write_never_creates_a_store() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("state.vscdb");
+
+    let error = RealFileSystem
+        .write_sqlite_item(&path, "key", Some("[]"))
+        .unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+    assert!(!path.exists());
+}
+
+#[test]
+fn a_write_to_a_store_an_agent_holds_locked_fails_after_a_short_wait() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = store(folder.path());
+    let writer = Connection::open(&path).unwrap();
+    writer.execute_batch("BEGIN EXCLUSIVE;").unwrap();
+
+    let started = std::time::Instant::now();
+    let error = RealFileSystem
+        .write_sqlite_item(&path, "key", Some("other"))
+        .unwrap_err();
+    assert_ne!(error.kind(), io::ErrorKind::NotFound);
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    drop(writer);
+    assert_eq!(
+        RealFileSystem
+            .read_sqlite_item(&path, "key")
+            .unwrap()
+            .as_deref(),
+        Some("value")
+    );
+}

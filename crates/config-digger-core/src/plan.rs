@@ -8,6 +8,7 @@ use crate::api::{
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
+use crate::definitions::blocks::Disables;
 use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
@@ -16,6 +17,7 @@ use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::scan::{LocationReader, ScannedEntry, Snapshot, SwitchStore};
+use crate::store::{self, Medium, Written};
 use crate::{explain, history, installations, park, resolve, rules, running, scan, select};
 use std::collections::BTreeSet;
 use std::io;
@@ -68,9 +70,20 @@ pub(crate) struct PlannedFile {
     /// The file is the parked-Entry store, whose Secrets are those of the
     /// Entries parked in it.
     pub parked_store: bool,
+    /// What it writes: the file, or values of the SQLite store it is.
+    pub medium: Medium,
 }
 
 impl PlannedFile {
+    /// What it will hold once written.
+    pub fn written(&self) -> Written {
+        Written {
+            path: self.path.clone(),
+            medium: self.medium.clone(),
+            bytes: self.edited.bytes.clone(),
+        }
+    }
+
     /// A diff of the file from `before` to `after`, with every Secret masked.
     pub fn diff(&self, definitions: &[AgentDefinition], before: Side, after: Side) -> FileDiff {
         let store = self.parked_store.then_some(self.path.as_path());
@@ -233,8 +246,8 @@ impl Targeted<'_> {
         let mut files = Vec::new();
         for (path, syntax, edits) in by_file {
             let read = read(self.ports, &path)?;
-            let edited =
-                apply_edits(&read, syntax, &edits).map_err(|failure| failure.into_error(&path))?;
+            let edited = apply_edits(&read, syntax, &edits, &Medium::File)
+                .map_err(|failure| failure.into_error(&path))?;
             files.push(self.planned_file(path, syntax, read, false, edited));
         }
 
@@ -248,10 +261,7 @@ impl Targeted<'_> {
                 .collect();
             self.snapshot.without(&removed)
         } else {
-            let written: Vec<(PathBuf, Vec<u8>)> = files
-                .iter()
-                .map(|file| (file.path.clone(), file.edited.bytes.clone()))
-                .collect();
+            let written: Vec<Written> = files.iter().map(PlannedFile::written).collect();
             scan::scan_as_if(
                 self.definitions,
                 self.ports,
@@ -374,13 +384,21 @@ impl Targeted<'_> {
                         Error::blocked(explain::disable_not_offered(&entry.locator, &sentence))
                     })?;
                     match choice {
-                        Choice::Switch { path, edit, .. } => {
+                        Choice::Switch {
+                            path,
+                            edits,
+                            sqlite,
+                            ..
+                        } => {
                             // Entries Disabled by one name share its switch.
-                            let shared = by_file
-                                .iter()
-                                .any(|file| file.path == path && file.edits.contains(&edit));
+                            let shared = by_file.iter().any(|file| {
+                                file.path == path
+                                    && edits.iter().all(|edit| file.edits.contains(edit))
+                            });
                             if !shared {
-                                add_edit(&mut by_file, path, Syntax::Jsonc, edit, false);
+                                for edit in edits {
+                                    add_switch_edit(&mut by_file, path.clone(), sqlite, edit);
+                                }
                             }
                         }
                         Choice::Park { .. } => parks.push(scanned),
@@ -404,9 +422,12 @@ impl Targeted<'_> {
                     if disabling.is_empty() && parked.is_none() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
+                    // Every layer's switch, or a later one would Disable it again.
+                    let lifts =
+                        disable::lifted_by_enable(definition, self.snapshot, scanned, project);
                     let location = definition.location(&scanned.location);
-                    if !disabling.is_empty()
-                        && let Err(sentence) = disable::enable(location, &disabling)
+                    if !lifts.is_empty()
+                        && let Err(sentence) = disable::enable(location, &lifts)
                     {
                         return Err(Error::blocked(explain::enable_refused(
                             &entry.locator,
@@ -416,14 +437,15 @@ impl Targeted<'_> {
                     if parked.is_some() {
                         self.put_back(&mut by_file, entry, scanned)?;
                     }
-                    for hit in disabling {
+                    for hit in lifts {
                         // Entries Disabled by one name share its switch.
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
+                        let sqlite = hit.mechanism.switch().sqlite();
                         for edit in hit.enable_edits() {
                             let path = hit.switch.path.clone();
-                            add_edit(&mut by_file, path, Syntax::Jsonc, edit, false);
+                            add_switch_edit(&mut by_file, path, sqlite, edit);
                         }
                         lifted.push(hit);
                     }
@@ -434,22 +456,22 @@ impl Targeted<'_> {
 
         let mut files = Vec::new();
         for file in by_file {
+            let medium = file.medium();
             let path = file.path;
-            let (read, created) = match read_if_there(self.ports, &path)? {
+            let (read, created) = match read_if_there(self.ports, &path, &medium)? {
                 Some(bytes) => (bytes, false),
-                None => (empty_file(file.syntax).to_vec(), true),
+                None if medium == Medium::File => (empty_file(file.syntax).to_vec(), true),
+                None => return Err(Error::blocked(explain::store_missing(&path))),
             };
-            let edited = apply_edits(&read, file.syntax, &file.edits)
+            let edited = apply_edits(&read, file.syntax, &file.edits, &medium)
                 .map_err(|failure| failure.into_error(&path))?;
             let mut planned = self.planned_file(path, file.syntax, read, created, edited);
             planned.parking = file.parking;
+            planned.medium = medium;
             files.push(planned);
         }
 
-        let written: Vec<(PathBuf, Vec<u8>)> = files
-            .iter()
-            .map(|file| (file.path.clone(), file.edited.bytes.clone()))
-            .collect();
+        let written: Vec<Written> = files.iter().map(PlannedFile::written).collect();
         let after = scan::scan_as_if(
             self.definitions,
             self.ports,
@@ -475,7 +497,7 @@ impl Targeted<'_> {
         else {
             return Ok(());
         };
-        let mut taken = match read_if_there(self.ports, store)? {
+        let mut taken = match read_if_there(self.ports, store, &Medium::File)? {
             Some(bytes) => parked_ids(&bytes).map_err(|failure| failure.into_error(store))?,
             None => Vec::new(),
         };
@@ -500,7 +522,7 @@ impl Targeted<'_> {
                 })
                 .collect();
             let read = read(self.ports, path)?;
-            let edited = apply_edits(&read, syntax, &removals)
+            let edited = apply_edits(&read, syntax, &removals, &Medium::File)
                 .map_err(|failure| failure.into_error(path))?;
             for edit in removals {
                 add_edit(by_file, path.to_path_buf(), syntax, edit, true);
@@ -552,7 +574,7 @@ impl Targeted<'_> {
             .map_err(|_| Error::blocked(explain::parked_unreadable(&entry.locator, store)))?;
         let syntax = file_syntax(self.definitions, scanned);
         let origin = &parked.origin.path;
-        match read_if_there(self.ports, origin)? {
+        match read_if_there(self.ports, origin, &Medium::File)? {
             Some(bytes) => {
                 let file = EditableFile::decode(&bytes, syntax)
                     .map_err(|reason| EditFailure::ReadOnly(reason).into_error(origin))?;
@@ -653,6 +675,7 @@ impl Targeted<'_> {
             git_versioned: self.snapshot.versioned.contains(&path),
             parked_store: self.snapshot.parked_store.as_ref() == Some(&path),
             parking: false,
+            medium: Medium::File,
             path,
             syntax,
             read,
@@ -714,6 +737,20 @@ struct FileEdits {
     edits: Vec<Edit>,
     /// An Entry is parked out of the file or put back into it.
     parking: bool,
+    /// The file is a SQLite store whose values the edits change.
+    sqlite: bool,
+}
+
+impl FileEdits {
+    /// What the edits write: the file, or the values of the store their
+    /// key paths start with.
+    fn medium(&self) -> Medium {
+        if self.sqlite {
+            Medium::sqlite(self.edits.iter().map(|edit| edit.key_path()[0].as_str()))
+        } else {
+            Medium::File
+        }
+    }
 }
 
 /// Adds `edit` to the edits of the file at `path`, after those it has.
@@ -734,7 +771,17 @@ fn add_edit(
             syntax,
             edits: vec![edit],
             parking,
+            sqlite: false,
         }),
+    }
+}
+
+/// Adds `edit` to the edits of the switch file at `path`, a SQLite store
+/// when `sqlite`.
+fn add_switch_edit(by_file: &mut Vec<FileEdits>, path: PathBuf, sqlite: bool, edit: Edit) {
+    add_edit(by_file, path.clone(), Syntax::Jsonc, edit, false);
+    if let Some(file) = by_file.iter_mut().find(|file| file.path == path) {
+        file.sqlite |= sqlite;
     }
 }
 
@@ -756,9 +803,9 @@ fn parked_ids(bytes: &[u8]) -> Result<Vec<String>, EditFailure> {
     Ok(document.as_ref().map(park::ids).unwrap_or_default())
 }
 
-/// A file's bytes, `None` when it is missing.
-fn read_if_there(ports: &Ports, path: &Path) -> Result<Option<Vec<u8>>, Error> {
-    match ports.fs.read(path) {
+/// A location's bytes, `None` when its file or store is missing.
+fn read_if_there(ports: &Ports, path: &Path, medium: &Medium) -> Result<Option<Vec<u8>>, Error> {
+    match store::read(ports.fs.as_ref(), path, medium) {
         Ok(bytes) => Ok(Some(bytes)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(Error::blocked(format!(
@@ -789,7 +836,7 @@ pub(crate) fn plan_undo(
     let context = Context {
         project: manifest.project.clone(),
     };
-    let scan = |written: &[(PathBuf, Vec<u8>)], folders: &[PlannedFolder]| {
+    let scan = |written: &[Written], folders: &[PlannedFolder]| {
         scan::scan_as_if(definitions, ports, &scan_options.projects, written, folders)
             .map_err(Error::unexpected)
     };
@@ -806,10 +853,7 @@ pub(crate) fn plan_undo(
     }
 
     let before = resolve::resolve(definitions, &snapshot, &context);
-    let written: Vec<(PathBuf, Vec<u8>)> = files
-        .iter()
-        .map(|file| (file.path.clone(), file.edited.bytes.clone()))
-        .collect();
+    let written: Vec<Written> = files.iter().map(PlannedFile::written).collect();
     let after_snapshot = scan(&written, &folders)?;
     let after = resolve::resolve(definitions, &after_snapshot, &context);
     let title = explain::undo_title(id, &manifest.title);
@@ -915,9 +959,17 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
 /// A touched file's bytes for an Undo, and whether it is missing. A missing
 /// file whose folder exists is planned from the minimal structure of its
 /// syntax, so that the Undo recreates it; one whose folder is gone cannot be.
-fn read_or_create(ports: &Ports, path: &Path, syntax: Syntax) -> Result<(Vec<u8>, bool), Error> {
-    match ports.fs.read(path) {
+fn read_or_create(
+    ports: &Ports,
+    path: &Path,
+    syntax: Syntax,
+    medium: &Medium,
+) -> Result<(Vec<u8>, bool), Error> {
+    match store::read(ports.fs.as_ref(), path, medium) {
         Ok(bytes) => Ok((bytes, false)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound && !medium.is_file() => {
+            Err(Error::blocked(explain::store_missing(path)))
+        }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
             match path.parent().filter(|folder| ports.fs.exists(folder)) {
                 Some(_) => Ok((empty_file(syntax).to_vec(), true)),
@@ -981,6 +1033,10 @@ fn undo_edits(bytes: &[u8], location: &history::LocationRecord) -> Result<Edited
             inverse: applied.inverse,
             depends_on: applied.depends_on,
         });
+    }
+    if let Medium::SqliteItems { keys } = &location.medium {
+        edited = store::normalized(&edited, keys)
+            .ok_or(UndoFailure::Other(EditFailure::Edit(EditError::Parse)))?;
     }
     Ok(EditedFile {
         bytes: edited,
@@ -1061,7 +1117,8 @@ pub(crate) fn undo_files<'m>(
     let mut files = Vec::new();
     let mut changed = Vec::new();
     for location in &manifest.locations {
-        let (read, created) = read_or_create(ports, &location.path, location.syntax)?;
+        let (read, created) =
+            read_or_create(ports, &location.path, location.syntax, &location.medium)?;
         match undo_edits(&read, location) {
             Ok(edited) => files.push(PlannedFile {
                 path: location.path.clone(),
@@ -1074,6 +1131,7 @@ pub(crate) fn undo_files<'m>(
                 git_versioned: false,
                 parking: location.parking,
                 parked_store: false,
+                medium: location.medium.clone(),
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
                 location,
@@ -1521,11 +1579,21 @@ pub(crate) fn read(ports: &Ports, path: &Path) -> Result<Vec<u8>, Error> {
     })
 }
 
-/// Applies `edits` to a file's bytes one after the other.
+/// A touched location's bytes, as [`read`] reads a file's.
+pub(crate) fn read_location(ports: &Ports, path: &Path, medium: &Medium) -> Result<Vec<u8>, Error> {
+    store::read(ports.fs.as_ref(), path, medium).map_err(|error| match error.kind() {
+        io::ErrorKind::NotFound => Error::stale(format!("{} is gone", path.display())),
+        _ => Error::blocked(format!("cannot read {}: {error}", path.display())),
+    })
+}
+
+/// Applies `edits` to a location's bytes one after the other. The values
+/// of a store come out laid out as reading them back lays them out.
 pub(crate) fn apply_edits(
     bytes: &[u8],
     syntax: Syntax,
     edits: &[Edit],
+    medium: &Medium,
 ) -> Result<EditedFile, EditFailure> {
     let mut file = EditableFile::decode(bytes, syntax).map_err(EditFailure::ReadOnly)?;
     let mut edited = bytes.to_vec();
@@ -1541,6 +1609,9 @@ pub(crate) fn apply_edits(
             inverse: applied.inverse,
             depends_on: applied.depends_on,
         });
+    }
+    if let Medium::SqliteItems { keys } = medium {
+        edited = store::normalized(&edited, keys).ok_or(EditFailure::Edit(EditError::Parse))?;
     }
     Ok(EditedFile {
         bytes: edited,

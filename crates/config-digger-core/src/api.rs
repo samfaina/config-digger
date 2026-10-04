@@ -1572,6 +1572,9 @@ pub enum ReasonCode {
     Policy,
     /// The Agent has not approved the Entry, which it asks the user to do.
     NotApproved,
+    /// The user has not trusted the folder of the Entry's Project, which
+    /// the Agent needs before it uses the Entry.
+    UntrustedFolder,
     /// The Entry is in a source of settings the Agent skips, since it reads
     /// only the first that holds any.
     SourceSkipped,

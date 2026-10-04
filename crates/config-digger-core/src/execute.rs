@@ -16,6 +16,7 @@ use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, V
 use crate::mask::Side;
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::{FileSystem, Ports};
+use crate::store;
 use crate::{explain, resolve, running, scan};
 use serde_json::Value;
 use std::io;
@@ -118,6 +119,7 @@ pub(crate) fn execute(
             backup,
             sha256_before: write.current.as_deref().map(history::sha256),
             sha256_after: history::sha256(&write.bytes),
+            medium: write.file.medium.clone(),
             edits: write
                 .file
                 .edited
@@ -159,7 +161,10 @@ pub(crate) fn execute(
             Some(folder) => ports.fs.create_dir_all(folder),
             None => Ok(()),
         }
-        .and_then(|()| ports.fs.write_atomic(&write.file.path, &write.bytes));
+        .and_then(|()| {
+            let file = write.file;
+            store::write(ports.fs.as_ref(), &file.path, &file.medium, &write.bytes)
+        });
         if let Err(error) = written_to {
             failure = Some(Failure::new(
                 ErrorCode::WriteFailed,
@@ -257,7 +262,7 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, 
             current: None,
         });
     }
-    let current = plan::read(ports, &file.path)?;
+    let current = plan::read_location(ports, &file.path, &file.medium)?;
     if current == file.read {
         return Ok(PendingWrite {
             file,
@@ -271,7 +276,7 @@ fn reread<'p>(ports: &Ports, file: &'p PlannedFile) -> Result<PendingWrite<'p>, 
         .iter()
         .map(|applied| applied.edit.clone())
         .collect();
-    let edited = plan::apply_edits(&current, file.syntax, &edits)
+    let edited = plan::apply_edits(&current, file.syntax, &edits, &file.medium)
         .map_err(|failure| failure.into_error(&file.path))?;
     let unchanged = edited
         .edits
@@ -555,7 +560,7 @@ fn verify(
         let Some(introduced) = introduced else {
             continue;
         };
-        let ours = ports.fs.read(path).is_ok_and(|bytes| bytes == write.bytes);
+        let ours = read_back(ports, write.file).is_ok_and(|bytes| bytes == write.bytes);
         return Err(if ours {
             Failure::new(
                 ErrorCode::ReadFailureIntroduced,
@@ -592,7 +597,7 @@ fn verify(
 /// away fails the Operation.
 fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result<(), Failure> {
     let path = &write.file.path;
-    let bytes = ports.fs.read(path).map_err(|error| {
+    let bytes = read_back(ports, write.file).map_err(|error| {
         Failure::new(
             ErrorCode::VerifyFailed,
             format!("cannot read {} back: {error}", path.display()),
@@ -751,14 +756,14 @@ fn roll_back(ports: &Ports, writes: &[PendingWrite], written: usize) -> Vec<Roll
 fn restore(ports: &Ports, write: &PendingWrite) -> (RollbackOutcome, Option<String>) {
     let path = &write.file.path;
     let not_restored = |reason: &str| (RollbackOutcome::NotRestored, Some(reason.to_owned()));
-    let current = match ports.fs.read(path) {
+    let current = match read_back(ports, write.file) {
         Ok(current) => Some(current),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
         Err(error) => return not_restored(&format!("Cannot read it: {error}.")),
     };
     if current.as_ref() == Some(&write.bytes) {
         let restored = match &write.current {
-            Some(before) => put_back(ports, path, before),
+            Some(before) => put_back(ports, write.file, before),
             None => ports
                 .fs
                 .remove_file(path)
@@ -785,16 +790,20 @@ fn restore(ports: &Ports, write: &PendingWrite) -> (RollbackOutcome, Option<Stri
 }
 
 /// Writes a file's bytes from before the Operation back, and checks it holds them.
-fn put_back(ports: &Ports, path: &Path, bytes: &[u8]) -> Result<(), String> {
-    ports
-        .fs
-        .write_atomic(path, bytes)
+fn put_back(ports: &Ports, file: &PlannedFile, bytes: &[u8]) -> Result<(), String> {
+    store::write(ports.fs.as_ref(), &file.path, &file.medium, bytes)
         .map_err(|error| format!("Cannot write it back: {error}."))?;
-    match ports.fs.read(path) {
+    match read_back(ports, file) {
         Ok(now) if now == bytes => Ok(()),
         Ok(_) => Err("It does not hold its backup after being written back.".to_owned()),
         Err(error) => Err(format!("Cannot read it back: {error}.")),
     }
+}
+
+/// What a written location holds now: the file's bytes, or the document of
+/// the store's values it wrote.
+fn read_back(ports: &Ports, file: &PlannedFile) -> io::Result<Vec<u8>> {
+    store::read(ports.fs.as_ref(), &file.path, &file.medium)
 }
 
 /// Records a failed Operation with its cause and Rollback, and returns the
@@ -834,7 +843,7 @@ fn fail(
         .zip(&rollback)
         .filter(|(_, location)| location.outcome == RollbackOutcome::NotRestored)
         .map(|(write, _)| {
-            let current = ports.fs.read(&write.file.path).ok();
+            let current = read_back(ports, write.file).ok();
             write.file.diff(
                 definitions,
                 Side {

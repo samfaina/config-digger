@@ -5,7 +5,7 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    Anchored, DisableReason, Disables, MechanismContext, MechanismTarget, Switched,
+    DisableReason, Disables, MechanismContext, MechanismTarget, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
@@ -77,16 +77,23 @@ impl Hit<'_> {
     pub fn holds(&self) -> String {
         let per_project = self.per_project();
         match self.mechanism {
-            Switched::JsonNameList(_) => explain::in_list(
+            Switched::NameList(_) => explain::in_list(
                 self.key,
                 self.key_path.last().expect("validation requires a key"),
                 &self.switch.path,
                 per_project,
             ),
-            Switched::JsonField(block) => explain::field_holds(
+            Switched::Field(block) => explain::field_holds(
                 &self.key_path,
                 self.value,
                 block.default_value.as_ref(),
+                &self.switch.path,
+                per_project,
+            ),
+            Switched::ItemList(_) => explain::item_in_list(
+                self.key,
+                self.value.unwrap_or(&Value::Null),
+                &self.key_path[self.key_path.len().saturating_sub(2)],
                 &self.switch.path,
                 per_project,
             ),
@@ -126,6 +133,32 @@ pub(crate) fn hits<'a>(
     entry: &'a ScannedEntry,
     project: Option<&str>,
 ) -> (Vec<Hit<'a>>, Vec<Hit<'a>>) {
+    set_for(definition, snapshot, entry, project, false)
+}
+
+/// The switches Enable lifts for `entry` in the context of the Project
+/// with the key `project`: those that Disable it, and when Enable takes a
+/// layered switch away, those of the later layers too, so that none
+/// Disables it again, as VS Code takes a server
+/// out of both its workspace's and its profile's `mcp.enablement`.
+pub(crate) fn lifted_by_enable<'a>(
+    definition: &'a AgentDefinition,
+    snapshot: &'a Snapshot,
+    entry: &'a ScannedEntry,
+    project: Option<&str>,
+) -> Vec<Hit<'a>> {
+    set_for(definition, snapshot, entry, project, true).0
+}
+
+/// The switches set for `entry`, as [`hits`] finds them, or with
+/// `every_layer`, as [`lifted_by_enable`] finds them.
+fn set_for<'a>(
+    definition: &'a AgentDefinition,
+    snapshot: &'a Snapshot,
+    entry: &'a ScannedEntry,
+    project: Option<&str>,
+    every_layer: bool,
+) -> (Vec<Hit<'a>>, Vec<Hit<'a>>) {
     let location = definition.location(&entry.location);
     let mut disabling = Vec::new();
     let mut partial = Vec::new();
@@ -150,7 +183,9 @@ pub(crate) fn hits<'a>(
         };
         for switch in switches {
             let value = switch.value_for(key);
-            layer_decided |= mechanism.layered() && value.is_some();
+            // Enable taking a switch away leaves the next layer to decide.
+            let unset = every_layer && mechanism.enable_unsets() && mechanism.disables(value, key);
+            layer_decided |= mechanism.layered() && value.is_some() && !unset;
             let hit = Hit {
                 mechanism,
                 switch,
@@ -169,11 +204,17 @@ pub(crate) fn hits<'a>(
 }
 
 /// What the switch of `mechanism` holds `entry` by: the id of the plugin
-/// it is part of, for a switch keyed by plugin, and its name otherwise.
-/// `None` for an Entry of no plugin under a switch keyed by plugin.
+/// it is part of, for a switch keyed by plugin, the id its location's
+/// `switch_id` makes, for a switch per Entry of a location that has one, and
+/// its name otherwise. `None` for an Entry of no plugin under a switch keyed by
+/// plugin, or one whose id cannot be made.
 fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<&'e str> {
     if mechanism.switch().plugins() {
         entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
+    } else if mechanism.target() == MechanismTarget::Entry
+        && (entry.switch_id.is_some() || mechanism.by_id())
+    {
+        entry.switch_id.as_deref()
     } else {
         Some(&entry.name)
     }
@@ -196,10 +237,12 @@ pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result
 
 /// What Disable does to an Entry: write a switch, or park the Entry.
 pub(crate) enum Choice {
-    /// It makes `edit` to the switch in the file at `path`.
+    /// It makes `edits` to the switch in the file at `path`, a SQLite store
+    /// when `sqlite`.
     Switch {
         path: PathBuf,
-        edit: Edit,
+        edits: Vec<Edit>,
+        sqlite: bool,
         /// What Disable writes, as a sentence.
         sentence: String,
     },
@@ -246,7 +289,6 @@ pub(crate) fn choose(
     if location.provenance.read_only() {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }
-    let roots = snapshot.roots(entry.agent_index, &entry.home);
     // An Entry of a plugin is Disabled through the plugin's own switch only.
     let in_plugin = entry.plugin.is_some();
     let mechanisms = &definition.rules(location.kind).disable;
@@ -276,10 +318,10 @@ pub(crate) fn choose(
             (MechanismContext::Project, Some(project)) => Some(project.key),
             (MechanismContext::All, _) => None,
         };
-        let folder = project
-            .map(|project| project.path)
-            .filter(|_| switch.anchor.in_project());
-        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
+        let context = project.map(|project| (project.key, project.path));
+        let Some(path) = snapshot.file_for(entry, &switch.anchor, context) else {
+            // The Agent keeps no folder for the Project yet.
+            unrecorded |= switch.anchor.project_storage().is_some();
             continue;
         };
         if snapshot.versioned.contains(&path) {
@@ -307,16 +349,17 @@ pub(crate) fn choose(
         };
         let key_path = place.key_path_for(key);
         let value = place.value_for(key);
-        let edit = mechanism.disable_edit(key_path, value, key);
+        let edits = mechanism.disable_edits(key_path, value, key);
         let per_project = mechanism.context() == MechanismContext::Project;
-        let mut sentence = explain::disable_switch(&edit, key, &path, per_project);
+        let mut sentence = explain::disable_switch(&edits, key, &path, per_project);
         if mechanism.target() == MechanismTarget::Plugin {
             sentence.push(' ');
             sentence.push_str(&explain::takes_whole_plugin(key));
         }
         return Ok(Choice::Switch {
             path,
-            edit,
+            edits,
+            sqlite: switch.sqlite(),
             sentence,
         });
     }
@@ -370,7 +413,6 @@ pub(crate) fn failed_switch_files(
     project: Option<&ContextProject>,
 ) -> Vec<PathBuf> {
     let location = definition.location(&entry.location);
-    let roots = snapshot.roots(entry.agent_index, &entry.home);
     let mut files: Vec<PathBuf> = Vec::new();
     for mechanism in &definition.rules(location.kind).disable {
         let Some(mechanism) = mechanism
@@ -380,14 +422,11 @@ pub(crate) fn failed_switch_files(
             continue;
         };
         let switch = mechanism.switch();
-        let folder = match (mechanism.context(), project) {
-            (MechanismContext::Project, None) => continue,
-            (MechanismContext::Project, Some(project)) if switch.anchor.in_project() => {
-                Some(project.path)
-            }
-            _ => None,
-        };
-        let Some(path) = entry.file_of(&switch.anchor, roots, folder) else {
+        if mechanism.context() == MechanismContext::Project && project.is_none() {
+            continue;
+        }
+        let context = project.map(|project| (project.key, project.path));
+        let Some(path) = snapshot.file_for(entry, &switch.anchor, context) else {
             continue;
         };
         if snapshot.unreadable_switches.contains(&path) && !files.contains(&path) {

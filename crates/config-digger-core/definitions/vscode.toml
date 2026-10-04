@@ -45,6 +45,10 @@ folder = { block = "path", path = "%APPDATA%/Code/User" }
 mcp = "mcp.json"
 # The profile's settings.
 settings = "settings.json"
+# The profile's own state [docs, disk], such as which servers and skills
+# are Disabled. A profile keeps its own even when it shares MCP servers
+# [disk].
+state = "globalStorage/state.vscdb"
 
 # Every other profile, as `storage.json` lists it, keeps its files in
 # `User\profiles\<location>` [docs, disk], the built-in Agents profile in
@@ -57,6 +61,7 @@ folder = { block = "json-list", file = "%APPDATA%/Code/User/globalStorage/storag
 [homes.roots]
 mcp = "mcp.json"
 settings = "settings.json"
+state = "globalStorage/state.vscdb"
 
 # The workspaces VS Code opened [disk], which every profile shares: a folder
 # per workspace in `User\workspaceStorage`, whose `workspace.json` names its
@@ -110,6 +115,15 @@ id = "extension"
 [[scopes]]
 id = "discovered"
 
+# A setting the user leaves unset takes the value an ExP experiment assigned
+# as `config.<setting>`, when VS Code marks the setting as one it runs
+# experiments on, before its own default [docs]. VS Code caches the
+# assignment in `memento/experiment.service.memento` of the store every
+# profile reads, as tas-client's feature data [docs]: each setting this
+# definition reads from the user's settings is read there last, as
+# `configs[0].Parameters`, whose shape is inferred from tas-client. Which
+# settings VS Code marks is not read.
+
 # Each collection VS Code builds, lowest order first: `.vscode\mcp.json` (0),
 # `.mcp.json` (1), a `.code-workspace` file's `settings.mcp` (100), the
 # profile's `mcp.json` (200), extensions (300), agent plugins (350) and the
@@ -128,6 +142,7 @@ anchor = { block = "project", path = ".vscode/mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
 kind = "mcp"
+switch_id = "mcp.config.ws{folder_index}.{name}"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
@@ -146,6 +161,7 @@ format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 bare = true
 kind = "mcp"
+switch_id = "workspace-dot-mcp.{folder_index}.{name}"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
@@ -159,6 +175,7 @@ anchor = { block = "project-file" }
 format = { block = "json", dialect = "jsonc" }
 root = ["settings", "mcp", "servers"]
 kind = "mcp"
+switch_id = "mcp.config.workspace.{name}"
 scope = "workspace"
 provenance = "file"
 store_class = "plain"
@@ -181,6 +198,7 @@ anchor = { block = "home", root = "mcp" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
 kind = "mcp"
+switch_id = "mcp.config.usrlocal.{name}"
 scope = "user"
 provenance = "file"
 store_class = "rewritten-while-running"
@@ -202,6 +220,7 @@ format = { block = "sqlite-json", key = "mcp.extCachedServers" }
 root = ["mcp.extCachedServers", "*", "servers"]
 named_by = "label"
 kind = "mcp"
+switch_id = "{extension}/{name}"
 scope = "extension"
 provenance = "extension"
 store_class = "sqlite"
@@ -218,6 +237,7 @@ format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 bare = true
 kind = "mcp"
+switch_id = "plugin.{plugin_uri}.{name}"
 scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
@@ -234,6 +254,7 @@ anchor = { block = "machine", path = "%APPDATA%/Claude/claude_desktop_config.jso
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
+switch_id = "claude-desktop.null.{name}"
 scope = "discovered"
 provenance = "file"
 store_class = "plain"
@@ -247,6 +268,7 @@ sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
   { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.discovery.enabled", "claude-desktop"], sqlite = true },
 ]
 
 [[locations]]
@@ -255,6 +277,7 @@ anchor = { block = "project", path = ".cursor/mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
+switch_id = "cursor-workspace.{folder_index}.{name}"
 scope = "discovered"
 provenance = "file"
 store_class = "plain"
@@ -268,6 +291,7 @@ sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
   { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.discovery.enabled", "cursor-workspace"], sqlite = true },
 ]
 
 [[locations]]
@@ -276,6 +300,7 @@ anchor = { block = "machine", path = "~/.cursor/mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
+switch_id = "cursor.null.{name}"
 scope = "discovered"
 provenance = "file"
 store_class = "plain"
@@ -289,6 +314,7 @@ sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
   { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.discovery.enabled", "cursor-global"], sqlite = true },
 ]
 
 [[locations]]
@@ -297,6 +323,7 @@ anchor = { block = "machine", path = "~/.codeium/windsurf/mcp_config.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
+switch_id = "windsurf.null.{name}"
 scope = "discovered"
 provenance = "file"
 store_class = "plain"
@@ -310,6 +337,7 @@ sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
   { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.discovery.enabled", "windsurf"], sqlite = true },
 ]
 
 # Nothing is merged: each Entry is a server of its own [docs]. While
@@ -322,7 +350,7 @@ sources = [
 # `settings.json` is read all the same.
 [items.mcp]
 precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
-checks = ["disable", "precedence"]
+checks = ["rules", "disable", "precedence", "trust", "approval"]
 
 [items.mcp.competition]
 block = "case-insensitive-name"
@@ -334,13 +362,135 @@ sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.collisionBehavior"], dialect = "jsonc" },
   { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.collisionBehavior"], dialect = "jsonc" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.collisionBehavior"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.collisionBehavior"], sqlite = true },
 ]
+
+# `chat.mcp.access` lets every server run (`"all"`, the default), none
+# (`"none"`), or only those installed from the registry (`"registry"`),
+# which VS Code then reads from the profile's `mcp.json` alone [docs]. That
+# an installed server must also match the registry is not checked. An
+# account's policy replaces the user's value [docs]: VS Code caches the
+# policy it fetched in `defaultAccount.cachedPolicyData` of the store every
+# profile reads, and reads `policyData.mcp: false` as `"none"` and
+# `policyData.mcpAccess: "registry_only"` as `"registry"`, leaving the
+# setting to the user otherwise [docs]. That `entitlementsFetchedAt` is when
+# it fetched the policy is inferred from its name. config-digger never
+# writes either.
+[[items.mcp.rules]]
+block = "global-switch"
+off = "none"
+sources = [
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.access"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.access"], sqlite = true },
+]
+
+[[items.mcp.rules]]
+block = "global-switch"
+off = "registry"
+locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+sources = [
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.access"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.access"], sqlite = true },
+]
+
+# A workspace's own collections, its extensions' included, start only once
+# the user trusts the workspace: VS Code keeps listing them and they still
+# compete, but asks for trust before one starts [docs]. A folder is trusted
+# with every folder below it, and a workspace file only when it and each of
+# its folders are [docs]. VS Code keeps the folders it trusts in
+# `content.trust.model.key` of the store every profile shares, under
+# `uriTrustInfo`, as `{"uri": <URI>, "trusted": true}` items, and moves
+# them there from the default profile's store when it finds them only in
+# the latter [docs]. That stable VS Code shares that store in
+# `~\.vscode-shared` is inferred from its product name. `--disable-workspace-trust`
+# turns trust off for one launch, which nothing on disk shows.
+[[items.mcp.gates]]
+block = "trusted-folders"
+locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "cursor-workspace-mcp"]
+uri = "uri"
+trusted = "trusted"
+sources = [
+  { anchor = { block = "machine", path = "~/.vscode-shared/sharedStorage/state.vscdb" }, key_path = ["content.trust.model.key", "uriTrustInfo"], sqlite = true },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["content.trust.model.key", "uriTrustInfo"], sqlite = true },
+]
+
+[items.mcp.gates.trust_all]
+equals = false
+default = true
+sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["security.workspace.trust.enabled"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.security.workspace.trust.enabled"], sqlite = true },
+]
+
+# The servers VS Code discovers in other apps' files start only once the
+# user trusts them, and VS Code asks again whenever a server's launch
+# configuration changes [docs]. It records each in the `serverTools` of
+# `mcpToolCache`, in the profile's store for a profile's collection and in
+# the workspace's for a workspace's, as `[id, record]` pairs whose record's
+# `trustedAtNonce` is the nonce of the configuration the user trusted and
+# `nonce` that of the one it last saw [docs]. The nonce hashes the launch
+# configuration [docs], which config-digger does not compute: a server is
+# taken as trusted while the two match, though its file may have changed
+# since VS Code last saw it.
+[[items.mcp.gates]]
+block = "nonce-trust"
+locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
+trusted_at = "trustedAtNonce"
+nonce = "nonce"
+sources = [
+  { anchor = { block = "home", root = "state" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
+]
+
+[[items.mcp.gates]]
+block = "nonce-trust"
+locations = ["cursor-workspace-mcp"]
+trusted_at = "trustedAtNonce"
+nonce = "nonce"
+sources = [
+  { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
+]
+
+# VS Code turns a server off or on in the `mcp.enablement` of a `state.vscdb`,
+# the JSON text of a list of `[id, enabled]` pairs, each id the server's
+# collection followed by its name, as each location's `switch_id` makes it
+# [docs]. A workspace's store holds the pairs VS Code writes for that
+# workspace alone, and the profile's those for every workspace; a pair in
+# the workspace's store decides over the profile's, `true` included, and a
+# server without one is on [docs]. Disable writes `false` to the workspace's
+# store in a Project, and to the profile's otherwise; Enable takes the pair
+# out of both, as VS Code's own Enable does [docs]. That a store holds the
+# pairs in this shape, and the ids, come from VS Code's source only, so
+# they are unverified until the release gate confirms them.
+[[items.mcp.disable]]
+block = "json-item-list"
+switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
+target = "entry"
+context = "project"
+enable_action = "remove-item"
+disabled_item = ["{name}", false]
+enabled_item = ["{name}", true]
+reason = "disabled_natively"
+layered = true
+
+[[items.mcp.disable]]
+block = "json-item-list"
+switch = { anchor = { block = "home", root = "state" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
+target = "entry"
+context = "all"
+enable_action = "remove-item"
+disabled_item = ["{name}", false]
+enabled_item = ["{name}", true]
+reason = "disabled_natively"
+layered = true
 
 # Skills are folders holding a `SKILL.md`, read one level down [docs], each
 # named by its folder [docs]. What VS Code does with a `SKILL.md` without a
 # frontmatter, or one whose YAML does not parse, is not known: it is taken
 # to load the first under its folder's name and to skip the second.
-# `chat.useAgentSkills` turns them all off [docs], which is not read.
 
 # A workspace folder's `.agents`, `.github` and `.claude` skills, in that
 # order [docs]. Whether that order is one VS Code keeps is not known.
@@ -349,6 +499,7 @@ id = "folder-agents-skills"
 anchor = { block = "project", path = ".agents/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
@@ -359,6 +510,7 @@ id = "folder-github-skills"
 anchor = { block = "project", path = ".github/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
@@ -370,6 +522,7 @@ id = "folder-claude-skills"
 anchor = { block = "project", path = ".claude/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
@@ -382,6 +535,7 @@ id = "user-agents-skills"
 anchor = { block = "machine", path = "~/.agents/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "user"
 provenance = "file"
 store_class = "plain"
@@ -392,6 +546,7 @@ id = "user-copilot-skills"
 anchor = { block = "machine", path = "~/.copilot/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "user"
 provenance = "file"
 store_class = "plain"
@@ -403,6 +558,7 @@ id = "user-claude-skills"
 anchor = { block = "machine", path = "~/.claude/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "user"
 provenance = "file"
 store_class = "plain"
@@ -414,6 +570,7 @@ id = "plugin-skills"
 anchor = { block = "plugin", plugins = "agent-plugins", path = "skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
@@ -427,6 +584,7 @@ id = "extension-skills"
 anchor = { block = "plugin", plugins = "extensions", path = "package.json" }
 format = { block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" } }
 kind = "skill"
+switch_id = "{uri_path}/SKILL.md"
 scope = "extension"
 provenance = "extension"
 store_class = "plain"
@@ -437,4 +595,32 @@ on_read_failure = "ignores_file"
 [items.skill]
 precedence = ["folder-agents-skills", "folder-github-skills", "folder-claude-skills", "user-agents-skills", "user-copilot-skills", "user-claude-skills", "plugin-skills", "extension-skills"]
 competition = { block = "exact-name" }
-checks = ["frontmatter", "disable", "precedence"]
+checks = ["frontmatter", "rules", "disable", "precedence"]
+
+# VS Code turns a skill off in the profile's `chat.disabledPromptFiles.skill`,
+# the JSON text of a list of the URIs of the `SKILL.md` files it skips, each
+# as VS Code writes a URI: an object whose `path` is the file's, with its
+# drive as the folder spells it, compared without regard to case [docs].
+# Disable adds a URI with its scheme and path only, which is how VS Code
+# reads one back [docs]. Enable takes it out. Which file the URI names, and
+# that a skill VS Code lists there is kept from the model too, come from VS
+# Code's source only, so they are unverified until the release gate
+# confirms them.
+[[items.skill.disable]]
+block = "json-item-list"
+switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", store_class = "sqlite" }
+target = "entry"
+context = "all"
+enable_action = "remove-item"
+disabled_item = { "$mid" = 1, scheme = "file", path = "{name}" }
+ignore_case = true
+reason = "disabled_natively"
+
+# `chat.useAgentSkills: false` turns every skill off [docs].
+[[items.skill.rules]]
+block = "global-switch"
+off = false
+sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["chat.useAgentSkills"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.useAgentSkills"], sqlite = true },
+]
