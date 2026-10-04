@@ -1253,8 +1253,8 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let line = table_line(cells, &widths, location, Style::new());
         out.push_str(&line.fit(width).render());
         // Why it has its State, what it would be once Enabled, the other
-        // checks it fails, its partial switches, then what
-        // Enable or Disable would write.
+        // checks it fails, its partial switches, the other Agents that read
+        // it, then what Enable or Disable would write.
         let reason = entry.reason.iter().map(|reason| reason.sentence.as_str());
         let what_if = entry
             .what_if
@@ -1267,6 +1267,10 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         let secondary: Vec<String> = secondary.collect();
         let notes = entry.notes.iter().map(|note| note.sentence.as_str());
         let caveats = entry.caveats.iter().map(|caveat| caveat.sentence.as_str());
+        let also_read_by = entry
+            .also_read_by
+            .iter()
+            .map(|reader| reader.sentence.as_str());
         // An Entry Remove is not offered for, such as a plugin's, says how
         // to remove it instead, and offers Disable in its place.
         let how_to_remove = match &entry.remove {
@@ -1288,6 +1292,7 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
             .chain(secondary.iter().map(String::as_str))
             .chain(notes)
             .chain(caveats)
+            .chain(also_read_by)
             .chain(how_to_remove)
             .chain([action.as_str()]);
         for sentence in sentences {

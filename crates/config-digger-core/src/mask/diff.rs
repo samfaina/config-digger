@@ -220,17 +220,15 @@ fn secret_spans(
         .parse(text)
         .map_err(|error| unparsed(error.position))?;
     let syntax = format.syntax();
-    let mut objects = Vec::new();
-    scan::find_objects(&document, &location.root, Vec::new(), None, &mut objects)
-        .map_err(|_| unparsed(None))?;
+    let objects = scan::entries_of(location, &document).map_err(|_| unparsed(None))?;
     // Each Secret's key path from the root of the file, with its mask.
     let mut secrets = super::file_fields(location, &document);
     for object in objects {
-        for (name, value) in object.entries {
-            let masked = super::entry(location, value);
+        for found in object.entries {
+            let masked = super::entry(location, found.value);
             for relative in &masked.key_paths {
                 let mut key_path = object.key_path.clone();
-                key_path.push(name.clone());
+                key_path.push(found.key.clone());
                 key_path.extend(relative.iter().cloned());
                 let secret = lookup(&masked.value, relative)
                     .cloned()

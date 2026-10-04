@@ -46,6 +46,7 @@ pub(crate) trait Locate {
 pub(crate) enum Locator {
     Path(PathLocator),
     Env(EnvLocator),
+    JsonList(JsonListLocator),
 }
 
 impl Validate for Locator {
@@ -53,6 +54,7 @@ impl Validate for Locator {
         match self {
             Locator::Path(block) => block.validate(),
             Locator::Env(block) => block.validate(),
+            Locator::JsonList(block) => block.validate(),
         }
     }
 }
@@ -62,6 +64,7 @@ impl Locate for Locator {
         match self {
             Locator::Path(block) => block.folders(env, fs),
             Locator::Env(block) => block.folders(env, fs),
+            Locator::JsonList(block) => block.folders(env, fs),
         }
     }
 
@@ -69,6 +72,7 @@ impl Locate for Locator {
         match self {
             Locator::Path(block) => block.in_home_folder(),
             Locator::Env(block) => block.in_home_folder(),
+            Locator::JsonList(block) => block.in_home_folder(),
         }
     }
 
@@ -76,7 +80,99 @@ impl Locate for Locator {
         match self {
             Locator::Path(block) => block.used_before_it_exists(),
             Locator::Env(block) => block.used_before_it_exists(),
+            Locator::JsonList(block) => block.used_before_it_exists(),
         }
+    }
+}
+
+/// The folders a list in a strict JSON file names, each relative to a base
+/// folder, such as the VS Code profiles `userDataProfiles` in `storage.json`
+/// lists below `User\profiles`. An item whose `unless` holds `true` names no
+/// home of its own, such as a profile that shares its MCP servers with the
+/// default profile, and nor does one whose folder is not a relative path.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonListLocator {
+    /// The file. Starts with `%NAME%` or a drive; `/`-separated.
+    pub file: String,
+    /// The key path of the list, one key per segment.
+    pub key_path: Vec<String>,
+    /// The field of an item that holds its folder, relative to `base`.
+    pub field: String,
+    /// The folder the items' folders are in, written as `file` is.
+    pub base: String,
+    /// The key path in an item of a flag that, while `true`, leaves it out.
+    #[serde(default)]
+    pub unless: Vec<String>,
+}
+
+impl Validate for JsonListLocator {
+    fn validate(&self) -> Result<(), String> {
+        for path in [&self.file, &self.base] {
+            MachineAnchor { path: path.clone() }.validate()?;
+            if path.starts_with("~/") {
+                return Err(format!("path `{path}` must start with `%NAME%` or a drive"));
+            }
+        }
+        validate_key_path(&self.key_path)?;
+        if self.field.is_empty() {
+            return Err("a json-list field must not be empty".into());
+        }
+        if self.unless.iter().any(String::is_empty) {
+            return Err("unless must have no empty key".into());
+        }
+        Ok(())
+    }
+}
+
+impl Locate for JsonListLocator {
+    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
+        let (Some(file), Some(base)) = (
+            paths::expand(&self.file, env),
+            paths::expand(&self.base, env),
+        ) else {
+            return Vec::new();
+        };
+        let document = fs
+            .read(&file)
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|text| JsonFormat::STRICT.parse(&text).ok());
+        let items = document
+            .as_ref()
+            .and_then(|document| {
+                self.key_path
+                    .iter()
+                    .try_fold(document, |value, key| value.get(key))
+            })
+            .and_then(Value::as_array);
+        items
+            .into_iter()
+            .flatten()
+            .filter(|item| {
+                let flag = self
+                    .unless
+                    .iter()
+                    .try_fold(*item, |value, key| value.get(key));
+                flag != Some(&Value::Bool(true))
+            })
+            .filter_map(|item| {
+                let relative = item.get(&self.field)?.as_str()?;
+                if validate_relative(relative).is_err() || relative.contains(':') {
+                    tracing::debug!(folder = %relative, "not a relative folder");
+                    return None;
+                }
+                Some(join_relative(&base, relative))
+            })
+            .collect()
+    }
+
+    fn in_home_folder(&self) -> bool {
+        false
+    }
+
+    fn used_before_it_exists(&self) -> bool {
+        false
     }
 }
 
@@ -286,6 +382,8 @@ pub(crate) enum Anchor {
     Settings(SettingsAnchor),
     Plugin(PluginAnchor),
     Entry(EntryAnchor),
+    ProjectFile(ProjectFileAnchor),
+    ProjectStorage(ProjectStorageAnchor),
 }
 
 impl Validate for Anchor {
@@ -297,6 +395,8 @@ impl Validate for Anchor {
             Anchor::Settings(block) => block.validate(),
             Anchor::Plugin(block) => block.validate(),
             Anchor::Entry(block) => block.validate(),
+            Anchor::ProjectFile(block) => block.validate(),
+            Anchor::ProjectStorage(block) => block.validate(),
         }
     }
 }
@@ -310,6 +410,8 @@ impl Anchored for Anchor {
             Anchor::Settings(block) => block.path(roots, project),
             Anchor::Plugin(block) => block.path(roots, project),
             Anchor::Entry(block) => block.path(roots, project),
+            Anchor::ProjectFile(block) => block.path(roots, project),
+            Anchor::ProjectStorage(block) => block.path(roots, project),
         }
     }
 
@@ -321,6 +423,8 @@ impl Anchored for Anchor {
             Anchor::Settings(block) => block.home_root(),
             Anchor::Plugin(block) => block.home_root(),
             Anchor::Entry(block) => block.home_root(),
+            Anchor::ProjectFile(block) => block.home_root(),
+            Anchor::ProjectStorage(block) => block.home_root(),
         }
     }
 
@@ -332,6 +436,8 @@ impl Anchored for Anchor {
             Anchor::Settings(block) => block.in_project(),
             Anchor::Plugin(block) => block.in_project(),
             Anchor::Entry(block) => block.in_project(),
+            Anchor::ProjectFile(block) => block.in_project(),
+            Anchor::ProjectStorage(block) => block.in_project(),
         }
     }
 
@@ -343,6 +449,8 @@ impl Anchored for Anchor {
             Anchor::Settings(block) => block.machine(),
             Anchor::Plugin(block) => block.machine(),
             Anchor::Entry(block) => block.machine(),
+            Anchor::ProjectFile(block) => block.machine(),
+            Anchor::ProjectStorage(block) => block.machine(),
         }
     }
 
@@ -354,6 +462,8 @@ impl Anchored for Anchor {
             Anchor::Settings(block) => block.walk(),
             Anchor::Plugin(block) => block.walk(),
             Anchor::Entry(block) => block.walk(),
+            Anchor::ProjectFile(block) => block.walk(),
+            Anchor::ProjectStorage(block) => block.walk(),
         }
     }
 }
@@ -527,26 +637,96 @@ impl Anchored for ProjectAnchor {
     }
 }
 
+/// The workspace file a Project is, such as a `.code-workspace` file, read
+/// once per such Project of an Agent that opens them.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectFileAnchor {}
+
+impl Validate for ProjectFileAnchor {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Anchored for ProjectFileAnchor {
+    /// `project` is the workspace file.
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
+        project.map(Path::to_path_buf)
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        true
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
+}
+
+/// A path in the folder the Agent home keeps for each Project, as the
+/// definition's `json-folders` registry finds them, such as the
+/// `state.vscdb` in each of VS Code's `workspaceStorage\<id>` folders. Its
+/// Entries apply in that folder's Project only.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectStorageAnchor {
+    /// A `/`-separated path relative to the Project's folder of storage.
+    pub path: String,
+}
+
+impl Validate for ProjectStorageAnchor {
+    fn validate(&self) -> Result<(), String> {
+        validate_relative(&self.path)
+    }
+}
+
+impl Anchored for ProjectStorageAnchor {
+    /// There is one path per Project, which the scan finds.
+    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+        None
+    }
+
+    fn home_root(&self) -> Option<&str> {
+        None
+    }
+
+    fn in_project(&self) -> bool {
+        false
+    }
+
+    fn machine(&self) -> Option<&str> {
+        None
+    }
+
+    fn walk(&self) -> ProjectWalk {
+        ProjectWalk::None
+    }
+}
+
 /// A fixed path outside any Agent home or Project, read once for every
 /// home of the Agent, such as a folder an organisation deploys to every
-/// user of the machine.
+/// user of the machine, or one in the user's home folder that every home
+/// of the Agent reads, such as VS Code's `~/.agents/skills`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MachineAnchor {
-    /// Starts with `%NAME%`, expanded from the environment, or a drive;
-    /// `/`-separated, without wildcards.
+    /// Starts with `~/`, `%NAME%`, expanded from the environment, or a
+    /// drive; `/`-separated, without wildcards.
     pub path: String,
 }
 
 impl Validate for MachineAnchor {
     fn validate(&self) -> Result<(), String> {
         paths::validate_glob(&self.path)?;
-        if self.path.starts_with("~/") {
-            return Err(format!(
-                "machine path `{}` must start with `%NAME%` or a drive",
-                self.path
-            ));
-        }
         if self.path.contains(['*', '?', '{', '}']) {
             return Err(format!(
                 "machine path `{}` cannot hold wildcards",
@@ -674,7 +854,9 @@ impl Anchor {
             | Anchor::Project(_)
             | Anchor::Machine(_)
             | Anchor::Plugin(_)
-            | Anchor::Entry(_) => None,
+            | Anchor::Entry(_)
+            | Anchor::ProjectFile(_)
+            | Anchor::ProjectStorage(_) => None,
         }
     }
 
@@ -687,7 +869,9 @@ impl Anchor {
             | Anchor::Project(_)
             | Anchor::Machine(_)
             | Anchor::Settings(_)
-            | Anchor::Entry(_) => None,
+            | Anchor::Entry(_)
+            | Anchor::ProjectFile(_)
+            | Anchor::ProjectStorage(_) => None,
         }
     }
 
@@ -721,7 +905,30 @@ impl Anchor {
             | Anchor::Machine(_)
             | Anchor::Settings(_)
             | Anchor::Plugin(_)
-            | Anchor::Entry(_) => false,
+            | Anchor::Entry(_)
+            | Anchor::ProjectFile(_)
+            | Anchor::ProjectStorage(_) => false,
+        }
+    }
+
+    /// Whether it names the workspace file a Project is, rather than a path
+    /// in a Project folder.
+    pub fn project_file(&self) -> bool {
+        matches!(self, Anchor::ProjectFile(_))
+    }
+
+    /// The path in the folder the Agent home keeps for each Project, if it
+    /// names one per such folder.
+    pub fn project_storage(&self) -> Option<&str> {
+        match self {
+            Anchor::ProjectStorage(block) => Some(&block.path),
+            Anchor::Home(_)
+            | Anchor::Project(_)
+            | Anchor::Machine(_)
+            | Anchor::Settings(_)
+            | Anchor::Plugin(_)
+            | Anchor::Entry(_)
+            | Anchor::ProjectFile(_) => None,
         }
     }
 
@@ -733,7 +940,9 @@ impl Anchor {
             | Anchor::Project(_)
             | Anchor::Machine(_)
             | Anchor::Settings(_)
-            | Anchor::Plugin(_) => None,
+            | Anchor::Plugin(_)
+            | Anchor::ProjectFile(_)
+            | Anchor::ProjectStorage(_) => None,
         }
     }
 
@@ -924,6 +1133,9 @@ impl Validate for FilesSource {
     fn validate(&self) -> Result<(), String> {
         for path in std::iter::once(&self.path).chain(&self.drop_ins) {
             MachineAnchor { path: path.clone() }.validate()?;
+            if path.starts_with("~/") {
+                return Err(format!("path `{path}` must start with `%NAME%` or a drive"));
+            }
         }
         Ok(())
     }
@@ -933,11 +1145,11 @@ impl Validate for FilesSource {
 
 /// Lists the Projects an Agent has recorded, in the Agent's own spelling.
 pub(crate) trait Register {
-    /// Where the registry lives.
+    /// Where the registry lives: a file, or a folder of folders.
     fn anchor(&self) -> &Anchor;
 
-    /// The Project paths the registry's text records.
-    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError>;
+    /// How the registry spells a Project.
+    fn spelling(&self) -> Spelling;
 }
 
 /// Where an Agent records the Projects it has been started on.
@@ -945,12 +1157,14 @@ pub(crate) trait Register {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Registry {
     JsonKeys(JsonKeys),
+    JsonFolders(JsonFolders),
 }
 
 impl Validate for Registry {
     fn validate(&self) -> Result<(), String> {
         match self {
             Registry::JsonKeys(block) => block.validate(),
+            Registry::JsonFolders(block) => block.validate(),
         }
     }
 }
@@ -959,36 +1173,71 @@ impl Register for Registry {
     fn anchor(&self) -> &Anchor {
         match self {
             Registry::JsonKeys(block) => block.anchor(),
+            Registry::JsonFolders(block) => block.anchor(),
         }
     }
 
-    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+    fn spelling(&self) -> Spelling {
         match self {
-            Registry::JsonKeys(block) => block.spellings(text),
+            Registry::JsonKeys(block) => block.spelling(),
+            Registry::JsonFolders(block) => block.spelling(),
         }
     }
 }
 
-/// The keys of an object in a strict JSON file, each one a Project path.
+/// How a registry spells a Project.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Spelling {
+    /// A path, such as `E:\x` or `E:/x`.
+    #[default]
+    Path,
+    /// A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,
+    /// such as a remote folder's, names no Project on this machine.
+    FileUri,
+}
+
+impl Spelling {
+    /// The path `text` spells, `None` when it names none on this machine.
+    pub fn path(self, text: &str) -> Option<PathBuf> {
+        match self {
+            Spelling::Path => Some(PathBuf::from(text)),
+            Spelling::FileUri => paths::from_file_uri(text),
+        }
+    }
+}
+
+/// A project registry lies in one file, or one folder, of the Agent home or
+/// the machine, such as VS Code's workspace storage, which every profile
+/// shares.
+fn validate_registry_anchor(anchor: &Anchor) -> Result<(), String> {
+    anchor.validate()?;
+    anchor.one_file()?;
+    if anchor.in_project() {
+        return Err("a project registry must not lie in a Project".into());
+    }
+    if anchor.home_root().is_none() && anchor.machine().is_none() {
+        return Err("a project registry must lie in the Agent home or the machine".into());
+    }
+    Ok(())
+}
+
+/// The keys of an object in a strict JSON file, each one a Project.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonKeys {
     /// Where the file is. It must not lie in a Project.
     pub anchor: Anchor,
-    /// The key path of the object whose keys are Project paths.
+    /// The key path of the object whose keys are Projects.
     pub root: Vec<String>,
+    /// How the keys spell a Project. Omitted for paths.
+    #[serde(default)]
+    pub spelling: Spelling,
 }
 
 impl Validate for JsonKeys {
     fn validate(&self) -> Result<(), String> {
-        self.anchor.validate()?;
-        self.anchor.one_file()?;
-        if self.anchor.in_project() {
-            return Err("a project registry must not lie in a Project".into());
-        }
-        if self.anchor.machine().is_some() {
-            return Err("a project registry must lie in the Agent home".into());
-        }
+        validate_registry_anchor(&self.anchor)?;
         if self.root.is_empty() {
             return Err("a project registry needs a root key path".into());
         }
@@ -1001,7 +1250,14 @@ impl Register for JsonKeys {
         &self.anchor
     }
 
-    fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+    fn spelling(&self) -> Spelling {
+        self.spelling
+    }
+}
+
+impl JsonKeys {
+    /// The Projects the registry's text records, as spelled there.
+    pub fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
         let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
@@ -1011,6 +1267,58 @@ impl Register for JsonKeys {
             Some(serde_json::Value::Object(projects)) => projects.keys().cloned().collect(),
             _ => Vec::new(),
         })
+    }
+}
+
+/// A folder of the Agent home holding a folder per Project, each with a
+/// strict JSON file naming its Project in the first of some fields, such as
+/// VS Code's `workspaceStorage\<id>\workspace.json`, whose `folder` or
+/// `workspace` is the Project. The Agent keeps what it stores for the
+/// Project in that folder, which a `project-storage` anchor reads.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonFolders {
+    /// Where the folder of folders is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The `/`-separated path of the file in each folder.
+    pub file: String,
+    /// The fields of the file that can name the Project, tried in turn.
+    pub fields: Vec<String>,
+    /// How the fields spell a Project. Omitted for paths.
+    #[serde(default)]
+    pub spelling: Spelling,
+}
+
+impl Validate for JsonFolders {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_anchor(&self.anchor)?;
+        validate_relative(&self.file)?;
+        if self.fields.is_empty() || self.fields.iter().any(String::is_empty) {
+            return Err("a json-folders registry needs fields, none of them empty".into());
+        }
+        Ok(())
+    }
+}
+
+impl Register for JsonFolders {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spelling(&self) -> Spelling {
+        self.spelling
+    }
+}
+
+impl JsonFolders {
+    /// The Project the text of one folder's file records, as spelled there.
+    pub fn spelling_in(&self, text: &str) -> Result<Option<String>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        Ok(self
+            .fields
+            .iter()
+            .find_map(|field| document.get(field)?.as_str())
+            .map(str::to_owned))
     }
 }
 
@@ -1062,17 +1370,18 @@ impl ListPlugins for PluginRegistry {
     }
 }
 
-/// The folders, in a folder of the Agent home, that hold a marker file,
-/// each a plugin whose id is the folder's name, such as Claude Desktop's
-/// extensions, each unpacked into `Claude Extensions\<id>` with its
-/// `manifest.json`. A folder without the marker holds no plugin.
+/// The folders, in a folder of the Agent home or the machine, that hold a
+/// marker file, each a plugin whose id is the folder's name, such as Claude
+/// Desktop's extensions, each unpacked into `Claude Extensions\<id>` with
+/// its `manifest.json`. A folder without a marker holds no plugin.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PluginFolders {
     /// The folder the plugins' folders are in.
     pub anchor: Anchor,
-    /// A `/`-separated path relative to a plugin's folder.
-    pub marker: String,
+    /// A `/`-separated path relative to a plugin's folder, or several, any
+    /// of which makes the folder a plugin's.
+    pub marker: Markers,
     /// What the Agent records of each plugin it installed, when it does.
     pub records: Option<InstallRecords>,
 }
@@ -1095,11 +1404,19 @@ impl Validate for PluginFolders {
         for anchor in self.anchors() {
             anchor.validate()?;
             anchor.one_file()?;
-            if anchor.home_root().is_none() {
-                return Err("plugin folders and their records must lie in the Agent home".into());
+            if anchor.home_root().is_none() && anchor.machine().is_none() {
+                return Err(
+                    "plugin folders and their records must lie in the Agent home or the machine"
+                        .into(),
+                );
             }
         }
-        validate_relative(&self.marker)?;
+        if self.marker.all().is_empty() {
+            return Err("plugin folders need a marker".into());
+        }
+        for marker in self.marker.all() {
+            validate_relative(marker)?;
+        }
         if let Some(records) = &self.records {
             validate_key_path(&records.root)?;
             if records.version.is_empty() {
@@ -1107,6 +1424,26 @@ impl Validate for PluginFolders {
             }
         }
         Ok(())
+    }
+}
+
+/// One marker file, or several.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum Markers {
+    /// A `/`-separated path relative to a plugin's folder.
+    One(String),
+    /// Several such paths, any of which marks a plugin.
+    Several(Vec<String>),
+}
+
+impl Markers {
+    /// Every marker.
+    pub fn all(&self) -> &[String] {
+        match self {
+            Markers::One(marker) => std::slice::from_ref(marker),
+            Markers::Several(markers) => markers,
+        }
     }
 }
 
@@ -1388,6 +1725,8 @@ pub(crate) enum Format {
     Json(JsonFormat),
     Toml(TomlFormat),
     SkillFolder(SkillFolder),
+    SkillList(SkillList),
+    SqliteJson(SqliteJson),
 }
 
 impl Validate for Format {
@@ -1396,26 +1735,75 @@ impl Validate for Format {
             Format::Json(block) => block.validate(),
             Format::Toml(block) => block.validate(),
             Format::SkillFolder(block) => block.validate(),
+            Format::SkillList(block) => block.validate(),
+            Format::SqliteJson(block) => block.validate(),
         }
     }
 }
 
 impl Format {
-    /// How a file location is parsed, `None` for a folder of skill folders.
+    /// How a file location is parsed, `None` for a folder of skill folders
+    /// or a SQLite store.
     pub fn file(&self) -> Option<&dyn Parse> {
         match self {
             Format::Json(block) => Some(block),
             Format::Toml(block) => Some(block),
-            Format::SkillFolder(_) => None,
+            Format::SkillFolder(_) | Format::SkillList(_) | Format::SqliteJson(_) => None,
         }
     }
 
-    /// How a folder of skill folders is read, `None` for a file location.
+    /// How a value in a SQLite store is read, `None` for any other location.
+    pub fn sqlite(&self) -> Option<&SqliteJson> {
+        match self {
+            Format::SqliteJson(block) => Some(block),
+            Format::Json(_) | Format::Toml(_) | Format::SkillFolder(_) | Format::SkillList(_) => {
+                None
+            }
+        }
+    }
+
+    /// How a folder of skill folders, or each skill folder a list names, is
+    /// read; `None` for a file location.
     pub fn skill_folder(&self) -> Option<&SkillFolder> {
         match self {
             Format::SkillFolder(block) => Some(block),
-            Format::Json(_) | Format::Toml(_) => None,
+            Format::SkillList(block) => Some(&block.skills),
+            Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => None,
         }
+    }
+}
+
+/// The JSON text an Agent keeps under a key of the `ItemTable` of a SQLite
+/// store, such as VS Code's cache of extension servers under
+/// `mcp.extCachedServers` in a workspace's `state.vscdb`. The store is
+/// opened read-only, waiting briefly for an Agent that holds a write lock,
+/// and closed straight after. The location's `root` starts with the key,
+/// and config-digger never writes its Entries.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SqliteJson {
+    /// The `ItemTable` key whose value is the JSON text.
+    pub key: String,
+}
+
+impl Validate for SqliteJson {
+    fn validate(&self) -> Result<(), String> {
+        if self.key.trim().is_empty() {
+            return Err("a sqlite-json format needs a key".into());
+        }
+        Ok(())
+    }
+}
+
+impl SqliteJson {
+    /// The store's value under the key, `text`, as a document holding it
+    /// under the key.
+    pub fn parse(&self, text: &str) -> Result<Value, ParseError> {
+        let value = JsonFormat::STRICT.parse(text)?;
+        Ok(Value::Object(serde_json::Map::from_iter([(
+            self.key.clone(),
+            value,
+        )])))
     }
 }
 
@@ -1445,6 +1833,34 @@ pub(crate) struct SkillFolder {
     /// What the Agent does with a frontmatter without a `name`, when
     /// `name_from` is `frontmatter`.
     pub no_name: SkillFallback,
+}
+
+/// The skill folders a list in a strict JSON file names, each by a path
+/// relative to the file's folder to the skill folder or its `SKILL.md`, such
+/// as the `contributes.chatSkills` of a VS Code extension's `package.json`.
+/// Each is read as a folder of skill folders reads its skills.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SkillList {
+    /// The key path of the list.
+    pub list: Vec<String>,
+    /// The field of each item that holds the path.
+    pub field: String,
+    /// How each skill folder is read.
+    pub skills: SkillFolder,
+}
+
+impl Validate for SkillList {
+    fn validate(&self) -> Result<(), String> {
+        validate_key_path(&self.list)?;
+        if self.field.is_empty() {
+            return Err("a skill-list field must not be empty".into());
+        }
+        if self.skills.recursive {
+            return Err("a skill list names each skill folder; it cannot be recursive".into());
+        }
+        self.skills.validate()
+    }
 }
 
 /// Where a skill's name comes from.
@@ -1698,7 +2114,8 @@ impl Interpolate for Interpolation {
 }
 
 /// `${NAME}`, where `NAME` is a letter or `_` followed by letters, digits
-/// and `_`, plus `${namespace:argument}` for each listed namespace, and
+/// and `_`, or one of `names` when they are set, plus
+/// `${namespace:argument}` for each listed namespace, and
 /// `${NAME<separator>default}` when a default separator is set, whose
 /// default is literal text.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1712,6 +2129,9 @@ pub(crate) struct Braces {
     pub namespace_separator: Option<String>,
     /// Such as `:-` for `${NAME:-default}`.
     pub default_separator: Option<String>,
+    /// The only names `${NAME}` stands for, such as VS Code's
+    /// `workspaceFolder` and `userHome`. Omitted for any name.
+    pub names: Option<Vec<String>>,
 }
 
 impl Validate for Braces {
@@ -1724,6 +2144,9 @@ impl Validate for Braces {
         }
         if self.namespace_separator.as_deref() == Some("") {
             return Err("namespace_separator must not be empty".into());
+        }
+        if let Some(name) = self.names.iter().flatten().find(|name| !is_name(name)) {
+            return Err(format!("`{name}` is not a name"));
         }
         Ok(())
     }
@@ -1742,7 +2165,7 @@ impl Interpolate for Braces {
             let inner = &text[start + 2..close];
             let reference = match self.default_separator.as_deref() {
                 Some(separator) => match inner.split_once(separator) {
-                    Some((name, _)) if is_name(name) => {
+                    Some((name, _)) if self.is_name(name) => {
                         Some(start + 2 + name.len() + separator.len())
                     }
                     _ => None,
@@ -1778,7 +2201,15 @@ impl Braces {
             Some((namespace, argument)) => {
                 self.namespaces.iter().any(|ns| ns == namespace) && !argument.is_empty()
             }
-            None => is_name(inner),
+            None => self.is_name(inner),
+        }
+    }
+
+    /// Whether `${name}` stands for a value.
+    fn is_name(&self, name: &str) -> bool {
+        match &self.names {
+            Some(names) => names.iter().any(|known| known == name),
+            None => is_name(name),
         }
     }
 }
@@ -1816,12 +2247,14 @@ pub(crate) trait Compete {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Competition {
     ExactName(ExactName),
+    CaseInsensitiveName(CaseInsensitiveName),
 }
 
 impl Validate for Competition {
     fn validate(&self) -> Result<(), String> {
         match self {
             Competition::ExactName(block) => block.validate(),
+            Competition::CaseInsensitiveName(block) => block.validate(),
         }
     }
 }
@@ -1830,12 +2263,14 @@ impl Compete for Competition {
     fn key(&self, name: &str) -> String {
         match self {
             Competition::ExactName(block) => block.key(name),
+            Competition::CaseInsensitiveName(block) => block.key(name),
         }
     }
 
     fn by_endpoint(&self, id: &str) -> bool {
         match self {
             Competition::ExactName(block) => block.by_endpoint(id),
+            Competition::CaseInsensitiveName(block) => block.by_endpoint(id),
         }
     }
 }
@@ -1845,7 +2280,93 @@ impl Competition {
     pub fn endpoint_locations(&self) -> &[String] {
         match self {
             Competition::ExactName(block) => &block.by_endpoint,
+            Competition::CaseInsensitiveName(_) => &[],
         }
+    }
+
+    /// The setting Entries compete only while it holds, if any: while it
+    /// does not, no two Entries compete.
+    pub fn only_while(&self) -> Option<&SettingIs> {
+        match self {
+            Competition::ExactName(_) => None,
+            Competition::CaseInsensitiveName(block) => block.only_while.as_ref(),
+        }
+    }
+}
+
+/// Entries compete when their names are equal without regard to case, as
+/// VS Code compares server labels, and with `only_while`, only while a
+/// setting has a value, such as VS Code's `chat.mcp.collisionBehavior`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CaseInsensitiveName {
+    /// The setting Entries compete only while it holds. Omitted, they
+    /// always do.
+    pub only_while: Option<SettingIs>,
+}
+
+impl Validate for CaseInsensitiveName {
+    fn validate(&self) -> Result<(), String> {
+        match &self.only_while {
+            Some(setting) => setting.validate().map_err(|e| format!("only_while: {e}")),
+            None => Ok(()),
+        }
+    }
+}
+
+impl Compete for CaseInsensitiveName {
+    fn key(&self, name: &str) -> String {
+        name.to_lowercase()
+    }
+
+    fn by_endpoint(&self, _id: &str) -> bool {
+        false
+    }
+}
+
+/// Whether a setting the Agent reads in layers has a value: the first of
+/// its sources that holds it decides, and the Agent's default stands when
+/// none does.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingIs {
+    /// Where the setting is, highest first, such as a folder's settings
+    /// before the user's.
+    pub sources: Vec<SettingPlace>,
+    /// The value it must have.
+    pub equals: Value,
+    /// The value the Agent takes when no source holds the setting.
+    pub default: Value,
+}
+
+impl Validate for SettingIs {
+    fn validate(&self) -> Result<(), String> {
+        validate_sources(&self.sources)
+    }
+}
+
+impl SettingIs {
+    /// Whether it is met, given what each source holds, highest first.
+    pub fn is_met(&self, mut values: impl Iterator<Item = Option<Value>>) -> bool {
+        values
+            .find_map(|value| value)
+            .as_ref()
+            .unwrap_or(&self.default)
+            == &self.equals
+    }
+}
+
+impl Holds for SettingIs {
+    fn holds(
+        &self,
+        _gate_on: &dyn Fn(&str) -> bool,
+        setting: &dyn Fn(usize) -> Option<Value>,
+    ) -> bool {
+        self.is_met((0..self.sources.len()).map(setting))
+    }
+
+    fn gate(&self) -> Option<&str> {
+        None
     }
 }
 
@@ -2727,6 +3248,17 @@ pub(crate) struct SettingPlace {
     /// `policy`, rather than Disabled.
     #[serde(default)]
     pub policy: bool,
+    /// The dialect the Agent reads the file in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
+}
+
+impl SettingPlace {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat {
+            dialect: self.dialect.unwrap_or(JsonDialect::Strict),
+        }
+    }
 }
 
 impl Validate for SettingPlace {
@@ -3560,10 +4092,15 @@ impl Bypasses for EnvBypass {
 // --- Conditions -------------------------------------------------------------
 
 /// Whether something a definition declares applies, such as a location the
-/// Agent reads only while a Feature gate is on.
+/// Agent reads only while a Feature gate is on, or a setting has a value.
 pub(crate) trait Holds {
-    /// Whether it holds, given whether each Feature gate is on, by name.
-    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool;
+    /// Whether it holds, given whether each Feature gate is on, by name,
+    /// and what each source of its setting holds, by index.
+    fn holds(
+        &self,
+        gate_on: &dyn Fn(&str) -> bool,
+        setting: &dyn Fn(usize) -> Option<Value>,
+    ) -> bool;
 
     /// The Feature gate it depends on, if any.
     fn gate(&self) -> Option<&str>;
@@ -3574,26 +4111,44 @@ pub(crate) trait Holds {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Condition {
     FeatureGate(GateCondition),
+    Setting(SettingIs),
 }
 
 impl Validate for Condition {
     fn validate(&self) -> Result<(), String> {
         match self {
             Condition::FeatureGate(block) => block.validate(),
+            Condition::Setting(block) => block.validate(),
         }
     }
 }
 
 impl Holds for Condition {
-    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool {
+    fn holds(
+        &self,
+        gate_on: &dyn Fn(&str) -> bool,
+        setting: &dyn Fn(usize) -> Option<Value>,
+    ) -> bool {
         match self {
-            Condition::FeatureGate(block) => block.holds(gate_on),
+            Condition::FeatureGate(block) => block.holds(gate_on, setting),
+            Condition::Setting(block) => block.holds(gate_on, setting),
         }
     }
 
     fn gate(&self) -> Option<&str> {
         match self {
             Condition::FeatureGate(block) => block.gate(),
+            Condition::Setting(block) => block.gate(),
+        }
+    }
+}
+
+impl Condition {
+    /// The setting it depends on, if any.
+    pub fn setting(&self) -> Option<&SettingIs> {
+        match self {
+            Condition::FeatureGate(_) => None,
+            Condition::Setting(block) => Some(block),
         }
     }
 }
@@ -3624,7 +4179,11 @@ impl Validate for GateCondition {
 }
 
 impl Holds for GateCondition {
-    fn holds(&self, gate_on: &dyn Fn(&str) -> bool) -> bool {
+    fn holds(
+        &self,
+        gate_on: &dyn Fn(&str) -> bool,
+        _setting: &dyn Fn(usize) -> Option<Value>,
+    ) -> bool {
         gate_on(&self.gate) == self.is
     }
 

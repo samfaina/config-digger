@@ -409,11 +409,11 @@
           ]
         },
         {
-          "description": "A fixed path outside any Agent home or Project, read once for every\nhome of the Agent, such as a folder an organisation deploys to every\nuser of the machine.",
+          "description": "A fixed path outside any Agent home or Project, read once for every\nhome of the Agent, such as a folder an organisation deploys to every\nuser of the machine, or one in the user's home folder that every home\nof the Agent reads, such as VS Code's `~/.agents/skills`.",
           "type": "object",
           "properties": {
             "path": {
-              "description": "Starts with `%NAME%`, expanded from the environment, or a drive;\n`/`-separated, without wildcards.",
+              "description": "Starts with `~/`, `%NAME%`, expanded from the environment, or a\ndrive; `/`-separated, without wildcards.",
               "type": "string"
             },
             "block": {
@@ -493,6 +493,39 @@
           "required": [
             "block",
             "up",
+            "path"
+          ]
+        },
+        {
+          "description": "The workspace file a Project is, such as a `.code-workspace` file, read\nonce per such Project of an Agent that opens them.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "project-file"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        },
+        {
+          "description": "A path in the folder the Agent home keeps for each Project, as the\ndefinition's `json-folders` registry finds them, such as the\n`state.vscdb` in each of VS Code's `workspaceStorage\\<id>` folders. Its\nEntries apply in that folder's Project only.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A `/`-separated path relative to the Project's folder of storage.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "project-storage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
             "path"
           ]
         }
@@ -620,6 +653,51 @@
           "required": [
             "block",
             "variable"
+          ]
+        },
+        {
+          "description": "The folders a list in a strict JSON file names, each relative to a base\nfolder, such as the VS Code profiles `userDataProfiles` in `storage.json`\nlists below `User\\profiles`. An item whose `unless` holds `true` names no\nhome of its own, such as a profile that shares its MCP servers with the\ndefault profile, and nor does one whose folder is not a relative path.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "description": "The file. Starts with `%NAME%` or a drive; `/`-separated.",
+              "type": "string"
+            },
+            "key_path": {
+              "description": "The key path of the list, one key per segment.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "field": {
+              "description": "The field of an item that holds its folder, relative to `base`.",
+              "type": "string"
+            },
+            "base": {
+              "description": "The folder the items' folders are in, written as `file` is.",
+              "type": "string"
+            },
+            "unless": {
+              "description": "The key path in an item of a flag that, while `true`, leaves it out.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "json-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "file",
+            "key_path",
+            "field",
+            "base"
           ]
         }
       ]
@@ -815,6 +893,11 @@
           "items": {
             "$ref": "#/$defs/Registry"
           }
+        },
+        "workspace_files": {
+          "description": "Whether the Agent opens `.code-workspace` files: such a Project\nreads `project-file` locations in the file itself, and the other\nlocations in a Project in each of its member folders, the first\nmember ranking highest.",
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false
@@ -823,7 +906,7 @@
       "description": "Where an Agent records the Projects it has been started on.",
       "oneOf": [
         {
-          "description": "The keys of an object in a strict JSON file, each one a Project path.",
+          "description": "The keys of an object in a strict JSON file, each one a Project.",
           "type": "object",
           "properties": {
             "anchor": {
@@ -831,11 +914,15 @@
               "$ref": "#/$defs/Anchor"
             },
             "root": {
-              "description": "The key path of the object whose keys are Project paths.",
+              "description": "The key path of the object whose keys are Projects.",
               "type": "array",
               "items": {
                 "type": "string"
               }
+            },
+            "spelling": {
+              "description": "How the keys spell a Project. Omitted for paths.",
+              "$ref": "#/$defs/Spelling"
             },
             "block": {
               "type": "string",
@@ -848,6 +935,57 @@
             "anchor",
             "root"
           ]
+        },
+        {
+          "description": "A folder of the Agent home holding a folder per Project, each with a\nstrict JSON file naming its Project in the first of some fields, such as\nVS Code's `workspaceStorage\\<id>\\workspace.json`, whose `folder` or\n`workspace` is the Project. The Agent keeps what it stores for the\nProject in that folder, which a `project-storage` anchor reads.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the folder of folders is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "file": {
+              "description": "The `/`-separated path of the file in each folder.",
+              "type": "string"
+            },
+            "fields": {
+              "description": "The fields of the file that can name the Project, tried in turn.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "spelling": {
+              "description": "How the fields spell a Project. Omitted for paths.",
+              "$ref": "#/$defs/Spelling"
+            },
+            "block": {
+              "type": "string",
+              "const": "json-folders"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "file",
+            "fields"
+          ]
+        }
+      ]
+    },
+    "Spelling": {
+      "description": "How a registry spells a Project.",
+      "oneOf": [
+        {
+          "description": "A path, such as `E:\\x` or `E:/x`.",
+          "type": "string",
+          "const": "path"
+        },
+        {
+          "description": "A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,\nsuch as a remote folder's, names no Project on this machine.",
+          "type": "string",
+          "const": "file-uri"
         }
       ]
     },
@@ -964,7 +1102,7 @@
           ]
         },
         {
-          "description": "The folders, in a folder of the Agent home, that hold a marker file,\neach a plugin whose id is the folder's name, such as Claude Desktop's\nextensions, each unpacked into `Claude Extensions\\<id>` with its\n`manifest.json`. A folder without the marker holds no plugin.",
+          "description": "The folders, in a folder of the Agent home or the machine, that hold a\nmarker file, each a plugin whose id is the folder's name, such as Claude\nDesktop's extensions, each unpacked into `Claude Extensions\\<id>` with\nits `manifest.json`. A folder without a marker holds no plugin.",
           "type": "object",
           "properties": {
             "anchor": {
@@ -972,8 +1110,8 @@
               "$ref": "#/$defs/Anchor"
             },
             "marker": {
-              "description": "A `/`-separated path relative to a plugin's folder.",
-              "type": "string"
+              "description": "A `/`-separated path relative to a plugin's folder, or several, any\nof which makes the folder a plugin's.",
+              "$ref": "#/$defs/Markers"
             },
             "records": {
               "description": "What the Agent records of each plugin it installed, when it does.",
@@ -997,6 +1135,22 @@
             "anchor",
             "marker"
           ]
+        }
+      ]
+    },
+    "Markers": {
+      "description": "One marker file, or several.",
+      "anyOf": [
+        {
+          "description": "A `/`-separated path relative to a plugin's folder.",
+          "type": "string"
+        },
+        {
+          "description": "Several such paths, any of which marks a plugin.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
@@ -1075,12 +1229,24 @@
           "$ref": "#/$defs/Format"
         },
         "root": {
-          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project. Omitted for a folder of skill folders.",
+          "description": "The key path of the object whose keys are Entries. One segment may be\n`{project}`: each key there is a Project path, and the Entries below it\napply only in that Project. Any segment may be `*`, which stands for\nevery key there, such as each extension's servers in VS Code's cache.\nOmitted for a folder of skill folders.",
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": []
+        },
+        "named_by": {
+          "description": "When the value at `root` is a list of objects rather than an object\nkeyed by name, the field of each that holds its name, such as the\n`label` of each server in VS Code's cache of extension servers. An\nitem without it is no Entry.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bare": {
+          "description": "Whether a file without `root` holds its Entries at its top level\ninstead, as VS Code reads a `.mcp.json` that is a bare object of\nservers.",
+          "type": "boolean",
+          "default": false
         },
         "one_entry": {
           "description": "Whether the value at `root` is one Entry rather than an object of\nthem, named by the plugin it is part of, such as the server a Claude\nDesktop extension's manifest declares in `server.mcp_config`. Only a\nlocation in plugins can hold one.",
@@ -1269,6 +1435,57 @@
             "malformed_frontmatter",
             "no_name"
           ]
+        },
+        {
+          "description": "The skill folders a list in a strict JSON file names, each by a path\nrelative to the file's folder to the skill folder or its `SKILL.md`, such\nas the `contributes.chatSkills` of a VS Code extension's `package.json`.\nEach is read as a folder of skill folders reads its skills.",
+          "type": "object",
+          "properties": {
+            "list": {
+              "description": "The key path of the list.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "field": {
+              "description": "The field of each item that holds the path.",
+              "type": "string"
+            },
+            "skills": {
+              "description": "How each skill folder is read.",
+              "$ref": "#/$defs/SkillFolder"
+            },
+            "block": {
+              "type": "string",
+              "const": "skill-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "list",
+            "field",
+            "skills"
+          ]
+        },
+        {
+          "description": "The JSON text an Agent keeps under a key of the `ItemTable` of a SQLite\nstore, such as VS Code's cache of extension servers under\n`mcp.extCachedServers` in a workspace's `state.vscdb`. The store is\nopened read-only, waiting briefly for an Agent that holds a write lock,\nand closed straight after. The location's `root` starts with the key,\nand config-digger never writes its Entries.",
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "The `ItemTable` key whose value is the JSON text.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "sqlite-json"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "key"
+          ]
         }
       ]
     },
@@ -1332,6 +1549,59 @@
         }
       ]
     },
+    "SkillFolder": {
+      "description": "A folder whose subfolders holding a `SKILL.md` are skills, each one an\nEntry. A folder whose name starts with `.` is never read, and one\nwithout `SKILL.md` is not an Entry.",
+      "type": "object",
+      "properties": {
+        "recursive": {
+          "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth.\nA skill folder's own subfolders never are.",
+          "type": "boolean",
+          "default": false
+        },
+        "name_from": {
+          "description": "Where a skill's name comes from.",
+          "$ref": "#/$defs/NameFrom"
+        },
+        "sanitize": {
+          "description": "How the Agent rewrites a name into the one it uses, if it does.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sanitize"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reserved": {
+          "description": "Folder names the Agent never loads a skill from, compared\ncase-insensitively, such as a name it keeps for itself.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "no_frontmatter": {
+          "description": "What the Agent does with a `SKILL.md` that does not open with a\n`---` frontmatter.",
+          "$ref": "#/$defs/SkillFallback"
+        },
+        "malformed_frontmatter": {
+          "description": "What the Agent does with a frontmatter that is not YAML it reads.",
+          "$ref": "#/$defs/SkillFallback"
+        },
+        "no_name": {
+          "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
+          "$ref": "#/$defs/SkillFallback"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name_from",
+        "no_frontmatter",
+        "malformed_frontmatter",
+        "no_name"
+      ]
+    },
     "ItemKind": {
       "type": "string",
       "enum": [
@@ -1393,7 +1663,7 @@
       "description": "How an Agent writes a reference to a value it reads elsewhere, such as an\nenvironment variable. A value made only of references is not a Secret.",
       "oneOf": [
         {
-          "description": "`${NAME}`, where `NAME` is a letter or `_` followed by letters, digits\nand `_`, plus `${namespace:argument}` for each listed namespace, and\n`${NAME<separator>default}` when a default separator is set, whose\ndefault is literal text.",
+          "description": "`${NAME}`, where `NAME` is a letter or `_` followed by letters, digits\nand `_`, or one of `names` when they are set, plus\n`${namespace:argument}` for each listed namespace, and\n`${NAME<separator>default}` when a default separator is set, whose\ndefault is literal text.",
           "type": "object",
           "properties": {
             "namespaces": {
@@ -1417,6 +1687,16 @@
                 "string",
                 "null"
               ]
+            },
+            "names": {
+              "description": "The only names `${NAME}` stands for, such as VS Code's\n`workspaceFolder` and `userHome`. Omitted for any name.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
             },
             "block": {
               "type": "string",
@@ -1613,7 +1893,74 @@
             "block",
             "gate"
           ]
+        },
+        {
+          "description": "Whether a setting the Agent reads in layers has a value: the first of\nits sources that holds it decides, and the Agent's default stands when\nnone does.",
+          "type": "object",
+          "properties": {
+            "sources": {
+              "description": "Where the setting is, highest first, such as a folder's settings\nbefore the user's.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "equals": {
+              "description": "The value it must have."
+            },
+            "default": {
+              "description": "The value the Agent takes when no source holds the setting."
+            },
+            "block": {
+              "type": "string",
+              "const": "setting"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "sources",
+            "equals",
+            "default"
+          ]
         }
+      ]
+    },
+    "SettingPlace": {
+      "description": "A value an Agent reads from one of its settings files, such as the list\na rule holds. config-digger only reads it.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the value. One segment may be `{project}`: the\ncontext's Project key, in the Agent's own spelling, so that the\nvalue applies only there.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policy": {
+          "description": "The value is managed policy: what it keeps out is Blocked, by\n`policy`, rather than Disabled.",
+          "type": "boolean",
+          "default": false
+        },
+        "dialect": {
+          "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
       ]
     },
     "References": {
@@ -1706,7 +2053,57 @@
           "required": [
             "block"
           ]
+        },
+        {
+          "description": "Entries compete when their names are equal without regard to case, as\nVS Code compares server labels, and with `only_while`, only while a\nsetting has a value, such as VS Code's `chat.mcp.collisionBehavior`.",
+          "type": "object",
+          "properties": {
+            "only_while": {
+              "description": "The setting Entries compete only while it holds. Omitted, they\nalways do.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SettingIs"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "case-insensitive-name"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
         }
+      ]
+    },
+    "SettingIs": {
+      "description": "Whether a setting the Agent reads in layers has a value: the first of\nits sources that holds it decides, and the Agent's default stands when\nnone does.",
+      "type": "object",
+      "properties": {
+        "sources": {
+          "description": "Where the setting is, highest first, such as a folder's settings\nbefore the user's.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingPlace"
+          }
+        },
+        "equals": {
+          "description": "The value it must have."
+        },
+        "default": {
+          "description": "The value the Agent takes when no source holds the setting."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sources",
+        "equals",
+        "default"
       ]
     },
     "Check": {
@@ -2100,32 +2497,6 @@
             "sources"
           ]
         }
-      ]
-    },
-    "SettingPlace": {
-      "description": "A value an Agent reads from one of its settings files, such as the list\na rule holds. config-digger only reads it.",
-      "type": "object",
-      "properties": {
-        "anchor": {
-          "$ref": "#/$defs/Anchor"
-        },
-        "key_path": {
-          "description": "The key path of the value. One segment may be `{project}`: the\ncontext's Project key, in the Agent's own spelling, so that the\nvalue applies only there.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "policy": {
-          "description": "The value is managed policy: what it keeps out is Blocked, by\n`policy`, rather than Disabled.",
-          "type": "boolean",
-          "default": false
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "anchor",
-        "key_path"
       ]
     },
     "ApprovalPrompt": {

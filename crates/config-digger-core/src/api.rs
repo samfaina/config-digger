@@ -1271,6 +1271,25 @@ pub struct Entry {
     /// What makes its State less certain, such as a Disable switch that
     /// cannot be read.
     pub caveats: Vec<Caveat>,
+    /// Every Agent home of another Agent that reads the same Entry, such as
+    /// Claude Code's for a `.mcp.json` VS Code reads too, with the State it has
+    /// there in the same context, sorted by Agent and home.
+    pub also_read_by: Vec<AlsoReadBy>,
+}
+
+/// Another Agent home that reads an Entry, and the State the Entry has there.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct AlsoReadBy {
+    /// The other Agent's id, such as `claude-code`.
+    pub agent: String,
+    pub agent_name: String,
+    /// The id of the Agent home that reads it.
+    pub home: String,
+    /// The Entry's State there, in the same context.
+    pub state: State,
+    /// Such as "Also read by Claude Code (home default): Effective.",
+    /// rendered by the core.
+    pub sentence: String,
 }
 
 /// Where a parked Entry came from.
@@ -1575,6 +1594,10 @@ pub enum ReasonCode {
     /// The Agent reads the Entry's location only while a Feature gate has
     /// the other value from the one it is resolved with.
     FeatureGate,
+    /// The Agent reads the Entry's location only while one of its settings
+    /// has another value than it has in the context, such as VS Code's
+    /// discovery of another app's servers.
+    SettingValue,
 }
 
 /// A location config-digger could not turn into Entries for one Agent.

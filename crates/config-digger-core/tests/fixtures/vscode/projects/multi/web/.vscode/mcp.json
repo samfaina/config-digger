@@ -1,0 +1,6 @@
+{
+	"servers": {
+		"shared": { "command": "web-shared" },
+		"web-only": { "command": "web-server" },
+	},
+}

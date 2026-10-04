@@ -89,7 +89,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "disable": no_project_switch(),
                     "enable": null,
                     "remove": { "status": "offered" },
-                    "caveats": []
+                    "caveats": [],
+                    "also_read_by": []
                 }],
                 "caveats": []
             },
@@ -120,7 +121,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "disable": no_project_switch(),
                     "enable": null,
                     "remove": { "status": "offered" },
-                    "caveats": []
+                    "caveats": [],
+                    "also_read_by": []
                 }],
                 "caveats": []
             }

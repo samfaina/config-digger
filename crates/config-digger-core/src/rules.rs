@@ -102,7 +102,10 @@ fn hit(policy: bool, value: &ScannedSetting, sentence: impl FnOnce(bool) -> Reas
 /// The index of the setting `value` is read for among its rule's settings.
 fn source_of(value: &ScannedSetting) -> usize {
     match value.owner {
-        SettingOwner::Rule { source, .. } | SettingOwner::Gate { source, .. } => source,
+        SettingOwner::Rule { source, .. }
+        | SettingOwner::Gate { source, .. }
+        | SettingOwner::Competition { source }
+        | SettingOwner::Condition { source, .. } => source,
     }
 }
 

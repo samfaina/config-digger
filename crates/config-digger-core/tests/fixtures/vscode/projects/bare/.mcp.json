@@ -1,0 +1,6 @@
+{
+  "webstorm": {
+    "type": "http",
+    "url": "http://localhost:64342/sse"
+  }
+}

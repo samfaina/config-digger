@@ -429,6 +429,7 @@ fn agents_lists_every_loaded_definition_with_the_homes_found() {
         vec![
             ("Claude Code".into(), true, vec!["default".into()]),
             ("Claude Desktop".into(), true, vec![]),
+            ("VS Code".into(), true, vec![]),
             ("Other Agent".into(), false, vec![]),
         ]
     );

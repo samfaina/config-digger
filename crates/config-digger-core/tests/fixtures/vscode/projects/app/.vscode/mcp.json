@@ -1,0 +1,10 @@
+{
+	"servers": {
+		// The same server as the user's `github`, which VS Code compares
+		// without regard to case.
+		"GitHub": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/",
+		},
+	},
+}

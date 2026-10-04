@@ -2831,3 +2831,24 @@ fn show_of_a_plugin_entry_says_how_to_remove_it_and_offers_disable_instead() {
         show.stdout
     );
 }
+
+#[test]
+fn show_names_the_other_agents_that_read_an_entry_with_their_state() {
+    let harness = Harness::new()
+        .with_file(
+            ".claude/skills/review/SKILL.md",
+            "---\nname: code-review\ndescription: Reviews a change.\n---\n",
+        )
+        .with_cwd_file("AppData/Roaming/Code/User/settings.json", "{}");
+
+    // Claude Code names the skill by its frontmatter, VS Code by its folder.
+    let run = harness.run(&["show", "code-review"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout
+            .contains("Also read by VS Code (home default): Effective."),
+        "{}",
+        run.stdout
+    );
+}

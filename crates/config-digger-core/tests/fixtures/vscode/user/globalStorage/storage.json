@@ -1,0 +1,22 @@
+{
+  "userDataProfiles": [
+    {
+      "location": "builtin/agents",
+      "name": "Agents",
+      "useDefaultFlags": { "settings": true, "prompts": true, "extensions": true }
+    },
+    { "location": "-5a1b2c3d", "name": "Work" },
+    {
+      "location": "6e7f",
+      "name": "Shared",
+      "useDefaultFlags": { "mcp": true }
+    }
+  ],
+  "profileAssociations": {
+    "workspaces": {
+      "file:///e%3A/projects/registered": "__default__profile__",
+      "vscode-remote://wsl%2Bubuntu/home/fixture/remote": "__default__profile__"
+    },
+    "emptyWindows": {}
+  }
+}

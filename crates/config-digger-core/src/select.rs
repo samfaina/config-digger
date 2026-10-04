@@ -161,6 +161,7 @@ mod tests {
                 enable: None,
                 remove: RemoveOption::Offered,
                 caveats: Vec::new(),
+                also_read_by: Vec::new(),
             }],
             caveats: Vec::new(),
         }

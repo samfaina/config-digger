@@ -91,6 +91,42 @@ pub(crate) fn lexical_key(spelling: &Path) -> String {
     key(&lexical(spelling))
 }
 
+/// The path a `file:` URI names on this machine, such as
+/// `file:///e%3A/projects/app` for `E:\projects\app`, or `file://server/share`
+/// for a share; `None` for another scheme, such as a `vscode-remote:` URI.
+pub(crate) fn from_file_uri(uri: &str) -> Option<PathBuf> {
+    let rest = uri
+        .get(..7)
+        .filter(|scheme| scheme.eq_ignore_ascii_case("file://"))
+        .map(|_| &uri[7..])?;
+    let bytes = rest.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        let hex = bytes
+            .get(at + 1..at + 3)
+            .and_then(|hex| u8::from_str_radix(std::str::from_utf8(hex).ok()?, 16).ok());
+        match (bytes[at], hex) {
+            (b'%', Some(byte)) => {
+                decoded.push(byte);
+                at += 3;
+            }
+            (byte, _) => {
+                decoded.push(byte);
+                at += 1;
+            }
+        }
+    }
+    let path = String::from_utf8(decoded).ok()?;
+    // `file:///E:/x` has an empty authority; `file://server/share` names a share.
+    let spelling = match path.strip_prefix('/') {
+        Some(local) => local.to_owned(),
+        None => format!("//{path}"),
+    };
+    let path = lexical(Path::new(&spelling));
+    is_absolute(&path).then_some(path)
+}
+
 /// Checks a path glob of an Agent definition: it starts with `~/`, `%NAME%`
 /// or a drive, and each `{` closes before the next one opens.
 pub(crate) fn validate_glob(glob: &str) -> Result<(), String> {
@@ -287,6 +323,22 @@ mod tests {
         assert_eq!(lexical(r"E:\a\.\b\..\c"), r"E:\a\c");
         assert_eq!(lexical(r"E:\..\a"), r"E:\a");
         assert_eq!(lexical(r"..\a\..\..\b"), r"..\..\b");
+    }
+
+    #[test]
+    fn a_file_uri_names_a_local_folder_or_a_share() {
+        let path = |uri: &str| from_file_uri(uri).map(|path| path.display().to_string());
+        assert_eq!(
+            path("file:///e%3A/projects/my%20app"),
+            Some(r"E:\projects\my app".into())
+        );
+        assert_eq!(path("FILE:///C:/x"), Some(r"C:\x".into()));
+        assert_eq!(
+            path("file://server/share/x"),
+            Some(r"\\server\share\x".into())
+        );
+        assert_eq!(path("vscode-remote://wsl%2Bubuntu/home/x"), None);
+        assert_eq!(path("file:///home/x"), None);
     }
 
     #[test]

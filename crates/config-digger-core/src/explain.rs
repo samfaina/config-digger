@@ -6,7 +6,9 @@ use crate::api::{
     State, Verify,
 };
 use crate::definitions::ItemKind;
-use crate::definitions::blocks::{ApprovalPrompt, FieldType, Malformed, MatchedBy, SkillDefect};
+use crate::definitions::blocks::{
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, SettingIs, SkillDefect,
+};
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
 use serde_json::Value;
@@ -454,6 +456,15 @@ pub(crate) fn what_if_otherwise(
             format!("{from}: would otherwise be Shadowed by the {scope} Entry {effective}.")
         }
     }
+}
+
+/// That `agent_name`, in its Agent home `home`, reads the Entry too, where
+/// it is `state`.
+pub(crate) fn also_read_by(agent_name: &str, home: &str, state: State) -> String {
+    format!(
+        "Also read by {agent_name} (home {home}): {}.",
+        state_name(state)
+    )
 }
 
 /// A State as a sentence names it.
@@ -989,6 +1000,25 @@ pub(crate) fn feature_gate(agent_name: &str, gate: &str, on: bool) -> Reason {
     }
 }
 
+/// An Unread Entry's reason: `agent_name` reads its location only while the
+/// setting `setting` has the value it needs, which it has not in the context.
+pub(crate) fn needs_setting(agent_name: &str, setting: &SettingIs) -> Reason {
+    let key = setting
+        .sources
+        .first()
+        .map(|source| source.key_path.join("` › `"))
+        .unwrap_or_default();
+    Reason {
+        code: ReasonCode::SettingValue,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} reads it only while its setting `{key}` is {}.",
+            setting.equals
+        ),
+    }
+}
+
 fn on_off(on: bool) -> &'static str {
     if on { "on" } else { "off" }
 }
@@ -1185,6 +1215,14 @@ pub(crate) fn plugin_not_removed(plugin: &str, agent_name: &str) -> String {
 /// Why Remove is not offered for the Entry of the extension `extension`.
 pub(crate) fn extension_not_removed(extension: &str, agent_name: &str) -> String {
     format!("Not in v0.1: uninstall the extension {extension} in {agent_name}'s settings.")
+}
+
+/// Why Remove is not offered for a server an extension gives the Agent
+/// named `agent_name`, which it keeps only in a cache.
+pub(crate) fn cached_extension_not_removed(agent_name: &str) -> String {
+    format!(
+        "Not in v0.1: the server comes from an extension, which {agent_name} lists from its cache. Uninstall or disable the extension in {agent_name}."
+    )
 }
 
 /// How to remove an Entry of the plugin `plugin`: uninstall it with `command`.

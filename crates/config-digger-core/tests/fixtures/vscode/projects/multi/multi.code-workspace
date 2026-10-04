@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{ "path": "api" },
+		{ "name": "Web", "path": "web" },
+	],
+	"settings": {
+		"mcp.enterpriseManagedAuth.idp": {
+			"issuer": "https://login.example.com",
+			"clientId": "config-digger-fixture",
+			"clientSecret": "not-a-real-secret",
+		},
+		"mcp": {
+			"servers": {
+				"docs": {
+					"type": "http",
+					"url": "https://docs.example.com/mcp",
+					"headers": { "Authorization": "Bearer ${input:docs-token}" },
+				},
+			},
+		},
+	},
+}

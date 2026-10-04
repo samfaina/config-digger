@@ -52,3 +52,48 @@ fn a_missing_store_or_one_that_is_not_sqlite_is_an_error() {
     .unwrap();
     assert!(fs.read_sqlite_item(&text, "key").is_err());
 }
+
+/// A store with one `ItemTable` row, closed again.
+fn store(folder: &std::path::Path) -> std::path::PathBuf {
+    let path = folder.join("state.vscdb");
+    Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB);
+             INSERT INTO ItemTable VALUES ('key', 'value');",
+        )
+        .unwrap();
+    path
+}
+
+#[test]
+fn the_store_is_closed_straight_after_the_read() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = store(folder.path());
+
+    assert_eq!(
+        RealFileSystem
+            .read_sqlite_item(&path, "key")
+            .unwrap()
+            .as_deref(),
+        Some("value")
+    );
+    // Windows refuses to delete a file that is still open.
+    std::fs::remove_file(&path).unwrap();
+    // A read-only open never leaves a journal behind.
+    assert!(std::fs::read_dir(folder.path()).unwrap().next().is_none());
+}
+
+#[test]
+fn a_store_an_agent_holds_locked_fails_after_a_short_wait() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = store(folder.path());
+    let writer = Connection::open(&path).unwrap();
+    writer.execute_batch("BEGIN EXCLUSIVE;").unwrap();
+
+    let started = std::time::Instant::now();
+    let error = RealFileSystem.read_sqlite_item(&path, "key").unwrap_err();
+    assert_ne!(error.kind(), io::ErrorKind::NotFound);
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    drop(writer);
+}

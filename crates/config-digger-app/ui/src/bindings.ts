@@ -62,6 +62,22 @@ export type AgentNoteCode =
  */
 "cloud_connectors_not_on_disk";
 
+/**  Another Agent home that reads an Entry, and the State the Entry has there. */
+export type AlsoReadBy = {
+	/**  The other Agent's id, such as `claude-code`. */
+	agent: string,
+	agent_name: string,
+	/**  The id of the Agent home that reads it. */
+	home: string,
+	/**  The Entry's State there, in the same context. */
+	state: State,
+	/**
+	 *  Such as "Also read by Claude Code (home default): Effective.",
+	 *  rendered by the core.
+	 */
+	sentence: string,
+};
+
 /**  Something that makes a State less certain than it looks. */
 export type Caveat = {
 	code: CaveatCode,
@@ -223,6 +239,12 @@ export type Entry = {
 	 *  cannot be read.
 	 */
 	caveats: Caveat[],
+	/**
+	 *  Every Agent home of another Agent that reads the same Entry, such as
+	 *  Claude Code's for a `.mcp.json` VS Code reads too, with the State it has
+	 *  there in the same context, sorted by Agent and home.
+	 */
+	also_read_by: AlsoReadBy[],
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
@@ -694,7 +716,13 @@ export type ReasonCode =
  *  The Agent reads the Entry's location only while a Feature gate has
  *  the other value from the one it is resolved with.
  */
-"feature_gate";
+"feature_gate" | 
+/**
+ *  The Agent reads the Entry's location only while one of its settings
+ *  has another value than it has in the context, such as VS Code's
+ *  discovery of another app's servers.
+ */
+"setting_value";
 
 /**  Why Remove is not offered for an Entry. */
 export type RemoveNotOffered = 
