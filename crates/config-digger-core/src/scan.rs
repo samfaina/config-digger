@@ -4,8 +4,8 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, Format, Gate, GateStore,
-    HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp,
+    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, FindsBy, Format, Gate,
+    GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp,
     ManifestSkills, NameFrom, Parse, PluginFolders, PluginRecord, PluginRegistry,
     ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingsSource, SkillDefect,
     SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
@@ -520,12 +520,28 @@ pub(crate) struct Skipped {
 }
 
 /// Where an Agent home came from.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) enum HomeSource {
-    /// The location the Agent definition gives.
+    /// The location the Agent definition gives as its default.
     Default,
+    /// The environment variable, by name, that holds its folder.
+    Environment(String),
+    /// Another location the Agent definition knows of, a fixed path or a
+    /// search such as a glob.
+    KnownLocation,
     /// The user added it, and no definition location finds it.
     Added,
+}
+
+impl HomeSource {
+    /// Where a home that the definition's home `home` finds came from.
+    fn of(home: &HomeDefinition) -> HomeSource {
+        match home.folder.finds_by() {
+            FindsBy::Variable(variable) => HomeSource::Environment(variable.to_owned()),
+            FindsBy::FixedPath if home.default => HomeSource::Default,
+            FindsBy::FixedPath | FindsBy::Search => HomeSource::KnownLocation,
+        }
+    }
 }
 
 /// A Project, found in a registry, added by the user, or asked for.
@@ -1692,8 +1708,9 @@ fn find_homes(
                 let mut roots = home.roots_in(&folder);
                 // A definition home the user added keeps its id, so that it is
                 // the same home before and after its files appear.
-                let source = if roots.values().any(|root| fs.exists(root)) {
-                    HomeSource::Default
+                let configured = roots.values().any(|root| fs.exists(root));
+                let source = if configured {
+                    HomeSource::of(home)
                 } else if added_to(&definition.agent.id, &folder) {
                     HomeSource::Added
                 } else {
@@ -1701,7 +1718,6 @@ fn find_homes(
                     continue;
                 };
                 tracing::debug!(agent = %definition.agent.id, home = %id, "home found");
-                let configured = source == HomeSource::Default;
                 roots.extend(machine_paths(definition, ports));
                 found.push(FoundHome {
                     agent_index,

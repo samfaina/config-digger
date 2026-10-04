@@ -42,6 +42,7 @@ paths = [
 # are in `~\.cursor` instead [disk], which every window reads.
 [[homes]]
 id = "default"
+default = true
 folder = { block = "path", path = "%APPDATA%/Cursor/User" }
 
 [homes.roots]

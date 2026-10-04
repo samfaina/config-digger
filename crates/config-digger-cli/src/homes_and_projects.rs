@@ -242,14 +242,16 @@ fn home_id(home: &api::Home) -> &str {
 
 /// Where an Agent home came from, as `homes list` and `agents` show it.
 fn home_source(home: &api::Home) -> String {
-    let source = match home.source {
-        api::HomeSource::Default => "definition default",
-        api::HomeSource::Added => "added by you",
+    let source = match &home.source {
+        api::HomeSource::Default => "definition default".to_owned(),
+        api::HomeSource::Environment { variable } => format!("environment variable %{variable}%"),
+        api::HomeSource::KnownLocation => "known location".to_owned(),
+        api::HomeSource::Added => "added by you".to_owned(),
     };
     if home.hidden {
         format!("{source}, hidden")
     } else {
-        source.to_owned()
+        source
     }
 }
 

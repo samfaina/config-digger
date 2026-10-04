@@ -399,8 +399,17 @@ export type Home = {
 
 /**  Where an Agent home came from. */
 export type HomeSource = 
-/**  The location the Agent definition gives. */
+/**  The location the Agent definition gives as its default. */
 { kind: "default" } | 
+/**  The environment variable that holds its folder. */
+{ kind: "environment"; 
+/**  The variable's name, such as `CLAUDE_USER_DATA_DIR`. */
+variable: string } | 
+/**
+ *  Another location the Agent definition knows of, such as an MSIX
+ *  package's data folder.
+ */
+{ kind: "known_location" } | 
 /**  The user added it, and no definition location finds it. */
 { kind: "added" };
 

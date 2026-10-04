@@ -42,8 +42,12 @@ pub(crate) fn resolve(
                 agent_name: definition.agent.name.clone(),
                 home: home.home.clone(),
                 folder: home.folder.clone(),
-                source: match home.source {
+                source: match &home.source {
                     HomeSource::Default => api::HomeSource::Default,
+                    HomeSource::Environment(variable) => api::HomeSource::Environment {
+                        variable: variable.clone(),
+                    },
+                    HomeSource::KnownLocation => api::HomeSource::KnownLocation,
                     HomeSource::Added => api::HomeSource::Added,
                 },
                 hidden: home.hidden,
