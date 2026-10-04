@@ -70,7 +70,9 @@ pub(crate) struct Snapshot {
 /// from `origin`.
 #[derive(Clone)]
 pub(crate) struct ScannedParked {
+    /// Its key path in the store.
     pub key_path: Vec<String>,
+    /// The file it was parked from, and its key path there.
     pub origin: PathBuf,
     pub origin_key_path: Vec<String>,
     /// When it was parked, in RFC 3339.
@@ -1777,8 +1779,6 @@ impl Scanner<'_> {
             .collect()
     }
 
-    /// Adds the Entries of one location. `project` is the key of the Project
-    /// whose folder holds the location, if it lies in one.
     /// Adds the Entries of config-digger's parked-Entry store, each one of
     /// the location it was parked from, in its Agent home, at its key path
     /// in the store. A parked Entry of an Agent, home or location not found
@@ -1803,30 +1803,31 @@ impl Scanner<'_> {
             return (Some(store), Vec::new());
         };
         let mut parked = Vec::new();
-        for (id, record) in park::records(&document) {
+        for (id, parked_entry) in park::parked_entries(&document) {
             let home = found.iter().find(|home| {
-                definitions[home.agent_index].agent.id == record.agent && home.home == record.home
+                definitions[home.agent_index].agent.id == parked_entry.origin.agent
+                    && home.home == parked_entry.origin.home
             });
             let location = home.and_then(|home| {
                 definitions[home.agent_index]
                     .locations
                     .iter()
-                    .find(|location| location.id == record.location)
+                    .find(|location| location.id == parked_entry.origin.location)
             });
             let (Some(home), Some(location)) = (home, location) else {
                 tracing::debug!(%id, "parked Entry of no home found");
                 continue;
             };
             let key_path = park::key_path(&id);
-            let masked = mask::entry(location, &record.entry);
+            let masked = mask::entry(location, &parked_entry.entry);
             self.entries.push(ScannedEntry {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
                 location: location.id.clone(),
                 path: store.clone(),
                 key_path: key_path.clone(),
-                name: record.name,
-                project: record.project,
+                name: parked_entry.origin.name,
+                project: parked_entry.origin.project,
                 config: masked.value,
                 masked: masked.key_paths,
                 depth: 0,
@@ -1837,14 +1838,16 @@ impl Scanner<'_> {
             });
             parked.push(ScannedParked {
                 key_path,
-                origin: record.path,
-                origin_key_path: record.key_path,
-                parked_at: record.parked_at,
+                origin: parked_entry.origin.path,
+                origin_key_path: parked_entry.origin.key_path,
+                parked_at: parked_entry.parked_at,
             });
         }
         (Some(store), parked)
     }
 
+    /// Adds the Entries of one location. `project` is the key of the Project
+    /// whose folder holds the location, if it lies in one.
     fn read_location(
         &mut self,
         home: &FoundHome,

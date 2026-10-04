@@ -66,6 +66,8 @@ enum Secrets<'d> {
     Parked(&'d [AgentDefinition]),
 }
 
+/// A diff from `before` to `after` of the file at `path`, with each
+/// Secret that `secrets` finds masked on both sides.
 fn masked_diff(path: &Path, before: Side, after: Side, secrets: &Secrets) -> FileDiff {
     let old = String::from_utf8_lossy(before.bytes.unwrap_or_default());
     let new = String::from_utf8_lossy(after.bytes.unwrap_or_default());

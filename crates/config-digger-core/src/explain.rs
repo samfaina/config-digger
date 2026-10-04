@@ -388,6 +388,21 @@ pub(crate) fn unpark_conflict(locator: &str, key_path: &[String], origin: &Path)
     )
 }
 
+/// Why a plan to put the Entry at `locator` back needs planning again: it
+/// is no longer in the parked-Entry store.
+pub(crate) fn no_longer_parked(locator: &str) -> String {
+    format!("{locator} is no longer parked")
+}
+
+/// Why Enable of the parked Entry at `locator` is refused: what the store at
+/// `store` holds for it does not read as a parked Entry.
+pub(crate) fn parked_unreadable(locator: &str, store: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: what {} holds for it does not read as a parked Entry",
+        store.display()
+    )
+}
+
 /// Why Enable of the parked Entry at `locator` is refused: the folder of
 /// `origin` is gone.
 pub(crate) fn unpark_folder_gone(locator: &str, origin: &Path) -> String {

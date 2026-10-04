@@ -73,11 +73,26 @@ pub(crate) struct PlannedFile {
 impl PlannedFile {
     /// A diff of the file from `before` to `after`, with every Secret masked.
     pub fn diff(&self, definitions: &[AgentDefinition], before: Side, after: Side) -> FileDiff {
-        if self.parked_store {
-            mask::diff_parked(definitions, &self.path, before, after)
-        } else {
-            mask::diff(definitions, &self.readers, &self.path, before, after)
-        }
+        let store = self.parked_store.then_some(self.path.as_path());
+        file_diff(definitions, &self.readers, &self.path, store, before, after)
+    }
+}
+
+/// A diff of the file at `path` from `before` to `after`, with every Secret
+/// masked: those of the Entries parked in it when it is `store`, the
+/// parked-Entry store, and else those of the Entries `readers` read there.
+fn file_diff(
+    definitions: &[AgentDefinition],
+    readers: &[LocationReader],
+    path: &Path,
+    store: Option<&Path>,
+    before: Side,
+    after: Side,
+) -> FileDiff {
+    if store == Some(path) {
+        mask::diff_parked(definitions, path, before, after)
+    } else {
+        mask::diff(definitions, readers, path, before, after)
     }
 }
 
@@ -420,17 +435,9 @@ impl Targeted<'_> {
         let mut files = Vec::new();
         for file in by_file {
             let path = file.path;
-            let (read, created) = match self.ports.fs.read(&path) {
-                Ok(bytes) => (bytes, false),
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                    (empty_file(file.syntax).to_vec(), true)
-                }
-                Err(error) => {
-                    return Err(Error::blocked(format!(
-                        "cannot read {}: {error}",
-                        path.display()
-                    )));
-                }
+            let (read, created) = match read_if_there(self.ports, &path)? {
+                Some(bytes) => (bytes, false),
+                None => (empty_file(file.syntax).to_vec(), true),
             };
             let edited = apply_edits(&read, file.syntax, &file.edits)
                 .map_err(|failure| failure.into_error(&path))?;
@@ -457,8 +464,8 @@ impl Targeted<'_> {
     }
 
     /// Adds the edits that park `parks` to `by_file`: each Entry's key goes
-    /// from its file, and its record, with the Entry verbatim, into the
-    /// parked-Entry store under a free id.
+    /// from its file, and the Entry, verbatim with where it came from, into
+    /// the parked-Entry store under a free id.
     fn park(&self, by_file: &mut Vec<FileEdits>, parks: &[&ScannedEntry]) -> Result<(), Error> {
         let Some(store) = self
             .snapshot
@@ -468,15 +475,9 @@ impl Targeted<'_> {
         else {
             return Ok(());
         };
-        let mut taken = match self.ports.fs.read(store) {
-            Ok(bytes) => parked_ids(&bytes).map_err(|failure| failure.into_error(store))?,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
-            Err(error) => {
-                return Err(Error::blocked(format!(
-                    "cannot read {}: {error}",
-                    store.display()
-                )));
-            }
+        let mut taken = match read_if_there(self.ports, store)? {
+            Some(bytes) => parked_ids(&bytes).map_err(|failure| failure.into_error(store))?,
+            None => Vec::new(),
         };
         let parked_at = humantime::format_rfc3339_seconds(self.ports.clock.now()).to_string();
         // The Entries parked from each file, in the order they were selected.
@@ -515,11 +516,11 @@ impl Targeted<'_> {
                     key_path: entry.key_path.clone(),
                     project: entry.project.clone(),
                 };
-                let record = park::Record::new(origin, parked_at.clone(), &removed.inverse)
+                let parked = park::ParkedEntry::new(origin, parked_at.clone(), &removed.inverse)
                     .ok_or_else(|| Error::unexpected("a removed key comes back by an insertion"))?;
                 let edit = Edit::Set {
                     key_path: park::key_path(&id),
-                    value: record.to_value(),
+                    value: parked.to_value(),
                 };
                 add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
                 taken.push(id);
@@ -529,7 +530,7 @@ impl Targeted<'_> {
     }
 
     /// Adds the edits that put the parked Entry `entry` back to `by_file`:
-    /// its key goes back into its file, and its record out of the store.
+    /// its key goes back into its file, and the Entry out of the store.
     /// Refused when an Entry is at its key again, which it would overwrite,
     /// or when its file's folder is gone. A missing file whose folder exists
     /// is created with the minimal structure.
@@ -546,32 +547,27 @@ impl Targeted<'_> {
         let value = file
             .value_at(&entry.key_path)
             .map_err(|error| EditFailure::Edit(error).into_error(store))?
-            .ok_or_else(|| Error::stale(format!("{} is no longer parked", entry.locator)))?;
-        let record: park::Record = serde_json::from_value(value).map_err(|_| {
-            Error::blocked(format!(
-                "cannot read the record of {} in {}",
-                entry.locator,
-                store.display()
-            ))
-        })?;
+            .ok_or_else(|| Error::stale(explain::no_longer_parked(&entry.locator)))?;
+        let parked: park::ParkedEntry = serde_json::from_value(value)
+            .map_err(|_| Error::blocked(explain::parked_unreadable(&entry.locator, store)))?;
         let syntax = file_syntax(self.definitions, scanned);
-        let origin = &record.path;
-        match self.ports.fs.read(origin) {
-            Ok(bytes) => {
+        let origin = &parked.origin.path;
+        match read_if_there(self.ports, origin)? {
+            Some(bytes) => {
                 let file = EditableFile::decode(&bytes, syntax)
                     .map_err(|reason| EditFailure::ReadOnly(reason).into_error(origin))?;
                 let now = file
-                    .value_at(&record.key_path)
+                    .value_at(&parked.origin.key_path)
                     .map_err(|error| EditFailure::Edit(error).into_error(origin))?;
                 if now.is_some() {
                     return Err(Error::blocked(explain::unpark_conflict(
                         &entry.locator,
-                        &record.key_path,
+                        &parked.origin.key_path,
                         origin,
                     )));
                 }
             }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            None => {
                 if !origin
                     .parent()
                     .is_some_and(|folder| self.ports.fs.exists(folder))
@@ -582,14 +578,8 @@ impl Targeted<'_> {
                     )));
                 }
             }
-            Err(error) => {
-                return Err(Error::blocked(format!(
-                    "cannot read {}: {error}",
-                    origin.display()
-                )));
-            }
         }
-        add_edit(by_file, origin.clone(), syntax, record.put_back(), true);
+        add_edit(by_file, origin.clone(), syntax, parked.put_back(), true);
         let edit = Edit::Remove {
             key_path: entry.key_path.clone(),
         };
@@ -763,13 +753,19 @@ fn file_syntax(definitions: &[AgentDefinition], entry: &ScannedEntry) -> Syntax 
 fn parked_ids(bytes: &[u8]) -> Result<Vec<String>, EditFailure> {
     let file = EditableFile::decode(bytes, Syntax::Jsonc).map_err(EditFailure::ReadOnly)?;
     let document = file.value_at(&[]).map_err(EditFailure::Edit)?;
-    Ok(document
-        .as_ref()
-        .map(park::records)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect())
+    Ok(document.as_ref().map(park::ids).unwrap_or_default())
+}
+
+/// A file's bytes, `None` when it is missing.
+fn read_if_there(ports: &Ports, path: &Path) -> Result<Option<Vec<u8>>, Error> {
+    match ports.fs.read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(Error::blocked(format!(
+            "cannot read {}: {error}",
+            path.display()
+        ))),
+    }
 }
 
 /// Plans the Undo of the Operation `id` in History: the inverse of each of
@@ -1245,11 +1241,9 @@ impl Refused<'_> {
                     bytes: file.current.as_deref(),
                     name: "as it is now",
                 };
-                if park::store_path(self.ports.env.as_ref()).is_ok_and(|store| store == *path) {
-                    mask::diff_parked(definitions, path, before, after)
-                } else {
-                    mask::diff(definitions, &snapshot.readers_of(path), path, before, after)
-                }
+                let readers = snapshot.readers_of(path);
+                let store = snapshot.parked_store.as_deref();
+                file_diff(definitions, &readers, path, store, before, after)
             })
             .collect();
         Error::undo_refused(self.what(), self.folder, diffs)
@@ -1631,11 +1625,7 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
                 agent_name: agent_name.to_owned(),
                 home: item.home.clone(),
                 item: item.name.clone(),
-                path: entry
-                    .parked
-                    .as_ref()
-                    .map_or(&entry.path, |parked| &parked.path)
-                    .clone(),
+                path: entry.identity_path().to_path_buf(),
                 locator: entry.identity().to_owned(),
                 project: before.project.clone(),
                 before: state_before,

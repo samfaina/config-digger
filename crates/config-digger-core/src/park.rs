@@ -12,13 +12,13 @@ use crate::edit::Edit;
 use crate::history;
 use crate::ports::Environment;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::path::PathBuf;
 
 /// The key of the manifest that holds the parked Entries, by id.
 const ENTRIES: &str = "entries";
 
-/// The key of a record that holds the parked Entry's value.
+/// The key of a parked Entry in the manifest that holds its value.
 pub(crate) const ENTRY: &str = "entry";
 
 /// The store's manifest: `%LOCALAPPDATA%\config-digger\parked\manifest.json`.
@@ -33,20 +33,11 @@ pub(crate) fn key_path(id: &str) -> Vec<String> {
     vec![ENTRIES.to_owned(), id.to_owned()]
 }
 
-/// One parked Entry, with where it came from.
+/// One parked Entry as the manifest holds it, with where it came from.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Record {
-    /// The id of the Agent, its home and the location it was read from.
-    pub agent: String,
-    pub home: String,
-    pub location: String,
-    pub name: String,
-    /// The file it was in, and its key path there.
-    pub path: PathBuf,
-    pub key_path: Vec<String>,
-    /// The key of the Project it applied in, `None` for every context.
-    #[serde(default)]
-    pub project: Option<String>,
+pub(crate) struct ParkedEntry {
+    #[serde(flatten)]
+    pub origin: Origin,
     /// When it was parked, in RFC 3339.
     pub parked_at: String,
     /// The sibling it followed, how it was written and the comments that
@@ -61,10 +52,26 @@ pub(crate) struct Record {
     pub entry: Value,
 }
 
-impl Record {
-    /// The record of the Entry that `removal`, the inverse of the edit that
+/// Where a parked Entry came from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct Origin {
+    /// The id of the Agent, its home and the location it was read from.
+    pub agent: String,
+    pub home: String,
+    pub location: String,
+    pub name: String,
+    /// The file it was in, and its key path there.
+    pub path: PathBuf,
+    pub key_path: Vec<String>,
+    /// The key of the Project it applied in, `None` for every context.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
+impl ParkedEntry {
+    /// The Entry from `origin` that `removal`, the inverse of the edit that
     /// took it out of its file, puts back.
-    pub fn new(origin: Origin, parked_at: String, removal: &Edit) -> Option<Record> {
+    pub fn new(origin: Origin, parked_at: String, removal: &Edit) -> Option<ParkedEntry> {
         let Edit::Insert {
             value,
             after,
@@ -75,14 +82,8 @@ impl Record {
         else {
             return None;
         };
-        Some(Record {
-            agent: origin.agent,
-            home: origin.home,
-            location: origin.location,
-            name: origin.name,
-            path: origin.path,
-            key_path: origin.key_path,
-            project: origin.project,
+        Some(ParkedEntry {
+            origin,
             parked_at,
             after: after.clone(),
             inline: *inline,
@@ -94,7 +95,7 @@ impl Record {
     /// The edit that puts the Entry back into its file.
     pub fn put_back(&self) -> Edit {
         Edit::Insert {
-            key_path: self.key_path.clone(),
+            key_path: self.origin.key_path.clone(),
             value: self.entry.clone(),
             after: self.after.clone(),
             inline: self.inline,
@@ -102,39 +103,41 @@ impl Record {
         }
     }
 
+    /// The value the manifest holds for it.
     pub fn to_value(&self) -> Value {
-        serde_json::to_value(self).expect("a record serialises")
+        serde_json::to_value(self).expect("a parked Entry serialises")
     }
 }
 
-/// Where an Entry about to be parked is.
-pub(crate) struct Origin {
-    pub agent: String,
-    pub home: String,
-    pub location: String,
-    pub name: String,
-    pub path: PathBuf,
-    pub key_path: Vec<String>,
-    pub project: Option<String>,
+/// The parked Entries of the manifest `document`, by id, as they are.
+fn entries(document: &Value) -> Option<&Map<String, Value>> {
+    document.get(ENTRIES).and_then(Value::as_object)
 }
 
-/// Every record the manifest `document` holds, by id. One that does not
-/// read as a record is left out, and logged without its value.
-pub(crate) fn records(document: &Value) -> Vec<(String, Record)> {
-    let Some(entries) = document.get(ENTRIES).and_then(Value::as_object) else {
-        return Vec::new();
-    };
-    entries
-        .iter()
+/// Every parked Entry the manifest `document` holds, by id. One that does
+/// not read as a parked Entry is left out, and logged without its value.
+pub(crate) fn parked_entries(document: &Value) -> Vec<(String, ParkedEntry)> {
+    entries(document)
+        .into_iter()
+        .flatten()
         .filter_map(
-            |(id, record)| match serde_json::from_value(record.clone()) {
-                Ok(record) => Some((id.clone(), record)),
+            |(id, parked)| match serde_json::from_value(parked.clone()) {
+                Ok(parked) => Some((id.clone(), parked)),
                 Err(_) => {
                     tracing::warn!(%id, "cannot read a parked Entry");
                     None
                 }
             },
         )
+        .collect()
+}
+
+/// The ids of the parked Entries the manifest `document` holds, read or not.
+pub(crate) fn ids(document: &Value) -> Vec<String> {
+    entries(document)
+        .into_iter()
+        .flatten()
+        .map(|(id, _)| id.clone())
         .collect()
 }
 
@@ -150,20 +153,18 @@ pub(crate) fn free_id(name: &str, taken: &[String]) -> String {
 
 /// Each parked Entry's value in the manifest `document`, by id, with the
 /// location it was parked from when its Agent and location are loaded.
-/// Records are read as they are, so that even one that does not read as a
-/// record has its value found.
+/// Parked Entries are read as they are, so that the value of one that does
+/// not read as a parked Entry is found too.
 pub(crate) fn raw_entries<'d>(
     document: &'d Value,
     definitions: &'d [AgentDefinition],
 ) -> Vec<(&'d str, &'d Value, Option<&'d LocationDefinition>)> {
-    let Some(entries) = document.get(ENTRIES).and_then(Value::as_object) else {
-        return Vec::new();
-    };
-    entries
-        .iter()
-        .filter_map(|(id, record)| {
-            let value = record.get(ENTRY)?;
-            let text = |key: &str| record.get(key).and_then(Value::as_str);
+    entries(document)
+        .into_iter()
+        .flatten()
+        .filter_map(|(id, parked)| {
+            let value = parked.get(ENTRY)?;
+            let text = |key: &str| parked.get(key).and_then(Value::as_str);
             let location = definitions
                 .iter()
                 .find(|definition| Some(definition.agent.id.as_str()) == text("agent"))

@@ -232,9 +232,10 @@ pub(crate) fn option(
 /// switch of the most specific mechanism (target, then context) that covers
 /// the Entry and applies in the context, the first in the definition's order
 /// among equally specific ones, skipping any whose switch file is
-/// git-versioned or cannot be read. With none left, it parks the Entry when
-/// a park mechanism covers it and its file is not git-versioned. Or why
-/// Disable is not offered.
+/// git-versioned or cannot be read. With none left, and none skipped for a
+/// file that cannot be read or a Project the context lacks, it parks the
+/// Entry when a park mechanism covers it and its file is not git-versioned.
+/// Or why Disable is not offered.
 pub(crate) fn choose(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -320,7 +321,12 @@ pub(crate) fn choose(
         });
     }
     let agent = &definition.agent.name;
+    // A switch the Agent has here, but that cannot be written now, is not a
+    // reason to park the Entry instead.
     let parks = !in_plugin
+        && unreadable.is_empty()
+        && !needs_project
+        && !unrecorded
         && mechanisms
             .iter()
             .any(|mechanism| mechanism.parks() && mechanism.covers(&location.id));

@@ -1293,6 +1293,13 @@ impl Entry {
             .as_ref()
             .map_or(&self.locator, |parked| &parked.locator)
     }
+
+    /// The file of the locator a preview names it by, as [`identity`](Self::identity) has it.
+    pub fn identity_path(&self) -> &Path {
+        self.parked
+            .as_ref()
+            .map_or(&self.path, |parked| &parked.path)
+    }
 }
 
 /// Where the junction or symlink of a Linked Entry points.

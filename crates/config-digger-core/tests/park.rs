@@ -687,3 +687,61 @@ fn disable_of_every_entry_of_an_item_parks_one_and_switches_the_extension_off() 
         .collect();
     assert_eq!(states, ["parked", "disabled_natively"]);
 }
+
+#[test]
+fn an_entry_whose_switch_cannot_be_read_is_not_parked_instead() {
+    let definition = PARKING_AGENT.replace(
+        "[[items.mcp.disable]]\nblock = \"park\"",
+        r#"[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "state" }, key_path = ["off", "{name}"], store_class = "plain" }
+target = "entry"
+context = "all"
+enable_action = "delete-key"
+disabled_value = true
+reason = "disabled_natively"
+
+[[items.mcp.disable]]
+block = "park""#,
+    );
+    let fs = parking_fixture().with_file(
+        PathBuf::from(HOME).join(".parking-agent.json"),
+        "{ not json",
+    );
+    let ports = fake::ports(fs.clone(), env());
+    let core = Core::with_extra_definitions(ports, &[("parking-agent.toml", &definition)]).unwrap();
+
+    let error = plan_in_project(&core, Action::Disable).err().unwrap();
+
+    assert_eq!(error.code, ErrorCode::Blocked);
+    assert!(error.message.contains("cannot read"), "{}", error.message);
+    assert_eq!(fs.contents(store()), None);
+}
+
+#[test]
+fn enable_refuses_when_the_folder_of_the_file_is_gone() {
+    let definition = PARKING_AGENT.replace(
+        r#"path = ".parking-agent.json" }"#,
+        r#"path = ".sub/parking-agent.json" }"#,
+    );
+    let folder = PathBuf::from(PROJECT).join(".sub");
+    let fs = FakeFileSystem::new()
+        .with_folder(PROJECT)
+        .with_file(PathBuf::from(HOME).join(".parking-agent.json"), "{}")
+        .with_file(
+            folder.join("parking-agent.json"),
+            r#"{ "servers": { "alpha": { "command": "a" } } }"#,
+        );
+    let ports = fake::ports(fs.clone(), env());
+    let core = Core::with_extra_definitions(ports, &[("parking-agent.toml", &definition)]).unwrap();
+    core.execute(plan_in_project(&core, Action::Disable).unwrap(), &[])
+        .unwrap();
+    let store_before = text(&fs, store());
+    fs.delete_folder(&folder);
+
+    let error = plan_in_project(&core, Action::Enable).err().unwrap();
+
+    assert_eq!(error.code, ErrorCode::Blocked);
+    assert!(error.message.contains("is gone"), "{}", error.message);
+    assert_eq!(text(&fs, store()), store_before);
+}
