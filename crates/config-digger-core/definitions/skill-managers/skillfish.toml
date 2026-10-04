@@ -1,6 +1,6 @@
 #:schema ../../../../schema/skill-manager-definition.schema.json
-# skillfish. Facts from docs/research/skill-managers.md on
-# research/skill-managers (verified against 1.0.39).
+# skillfish. Facts from docs/research/skill-managers.md
+# (verified against 1.0.39).
 
 format_version = 1
 

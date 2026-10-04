@@ -1,6 +1,6 @@
 #:schema ../../../../schema/skill-manager-definition.schema.json
 # `npx skills` (vercel-labs/skills). Facts from docs/research/skill-managers.md
-# on research/skill-managers (verified against 1.7.0).
+# (verified against 1.7.0).
 
 format_version = 1
 
