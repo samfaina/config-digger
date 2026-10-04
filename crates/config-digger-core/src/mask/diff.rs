@@ -4,8 +4,10 @@
 //! Context lines and other Entries are masked too.
 
 use crate::api::{DiffUnavailable, FileDiff};
+use crate::definitions::blocks::{JsonFormat, Parse};
 use crate::definitions::{AgentDefinition, LocationDefinition};
-use crate::edit;
+use crate::edit::{self, Syntax};
+use crate::park;
 use crate::scan::{self, LocationReader};
 use serde_json::Value;
 use similar::{DiffOp, DiffTag, TextDiff};
@@ -40,6 +42,33 @@ pub(crate) fn diff(
         .iter()
         .map(|reader| definitions[reader.agent_index].location(&reader.location))
         .collect();
+    masked_diff(path, before, after, &Secrets::Locations(locations))
+}
+
+/// A diff from `before` to `after` of the parked-Entry store at `path`, with
+/// every Secret of each parked Entry masked on both sides, as the location it
+/// was parked from masks it. Every text value of a parked Entry whose Agent
+/// or location is not loaded is masked.
+pub(crate) fn diff_parked(
+    definitions: &[AgentDefinition],
+    path: &Path,
+    before: Side,
+    after: Side,
+) -> FileDiff {
+    masked_diff(path, before, after, &Secrets::Parked(definitions))
+}
+
+/// Where the Secrets of a file are found.
+enum Secrets<'d> {
+    /// In the Entries of the locations that read it.
+    Locations(Vec<&'d LocationDefinition>),
+    /// In the Entries parked in it: it is the parked-Entry store.
+    Parked(&'d [AgentDefinition]),
+}
+
+/// A diff from `before` to `after` of the file at `path`, with each
+/// Secret that `secrets` finds masked on both sides.
+fn masked_diff(path: &Path, before: Side, after: Side, secrets: &Secrets) -> FileDiff {
     let old = String::from_utf8_lossy(before.bytes.unwrap_or_default());
     let new = String::from_utf8_lossy(after.bytes.unwrap_or_default());
     let text_diff = TextDiff::from_lines(old.as_ref(), new.as_ref());
@@ -51,7 +80,7 @@ pub(crate) fn diff(
         diff_note: Some(note),
         changed_lines,
     };
-    if locations.is_empty() {
+    if matches!(secrets, Secrets::Locations(locations) if locations.is_empty()) {
         return unavailable(
             DiffUnavailable::NoReader,
             format!(
@@ -64,7 +93,7 @@ pub(crate) fn diff(
     let old_real: Vec<&str> = text_diff.iter_old_slices().collect();
     let new_real: Vec<&str> = text_diff.iter_new_slices().collect();
     let masked = |side: &Side, real: &[&str]| {
-        masked_lines(&locations, side.bytes, real)
+        masked_lines(secrets, side.bytes, real)
             .map_err(|failure| (failure.kind(), failure.note(path, side.name, changed_lines)))
     };
     let (old_lines, new_lines) = match (masked(&before, &old_real), masked(&after, &new_real)) {
@@ -151,7 +180,7 @@ fn lines_differ(changed_lines: u32) -> String {
 /// The lines of one side, each with every Secret masked, or why its Secrets
 /// cannot be found. A missing file has no lines.
 fn masked_lines(
-    locations: &[&LocationDefinition],
+    secrets: &Secrets,
     bytes: Option<&[u8]>,
     lines: &[&str],
 ) -> Result<Vec<String>, Unparsed> {
@@ -160,8 +189,13 @@ fn masked_lines(
     };
     let text = std::str::from_utf8(bytes).map_err(|_| Unparsed::Decode)?;
     let mut replacements: Vec<(Range<usize>, String)> = Vec::new();
-    for location in locations {
-        replacements.extend(secret_spans(location, text)?);
+    match secrets {
+        Secrets::Locations(locations) => {
+            for location in locations {
+                replacements.extend(secret_spans(location, text)?);
+            }
+        }
+        Secrets::Parked(definitions) => replacements.extend(parked_spans(definitions, text)?),
     }
     replacements.sort_by_key(|(range, _)| (range.start, range.end));
     replacements.dedup_by(|later, earlier| later.0.start < earlier.0.end);
@@ -213,6 +247,86 @@ fn secret_spans(
         spans.push((span, edit::string_literal(syntax, secret)));
     }
     Ok(spans)
+}
+
+/// Where each Secret of the Entries parked in the store whose text is `text`
+/// is, with what it is masked as.
+fn parked_spans(
+    definitions: &[AgentDefinition],
+    text: &str,
+) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
+    let format = JsonFormat::STRICT;
+    let unparsed = |position| Unparsed::Parse {
+        dialect: format.dialect(),
+        position,
+    };
+    let document = format
+        .parse(text)
+        .map_err(|error| unparsed(error.position))?;
+    let mut secrets: Vec<(Vec<String>, Value)> = Vec::new();
+    for (id, value, location) in park::raw_entries(&document, definitions) {
+        let mut at = park::key_path(id);
+        at.push(park::ENTRY.to_owned());
+        let masked: Vec<(Vec<String>, Value)> = match location {
+            Some(location) => {
+                let masked = super::entry(location, value);
+                masked
+                    .key_paths
+                    .iter()
+                    .map(|relative| {
+                        let secret = lookup(&masked.value, relative)
+                            .cloned()
+                            .expect("a masked key path is in the value");
+                        (relative.clone(), secret)
+                    })
+                    .collect()
+            }
+            // Nothing says where its Secrets are, so every text is one.
+            None => {
+                let mut texts = Vec::new();
+                text_leaves(value, &mut Vec::new(), &mut texts);
+                texts
+                    .into_iter()
+                    .map(|relative| (relative, Value::from(super::MASK)))
+                    .collect()
+            }
+        };
+        for (relative, secret) in masked {
+            let mut key_path = at.clone();
+            key_path.extend(relative);
+            secrets.push((key_path, secret));
+        }
+    }
+    let mut spans = Vec::new();
+    for (key_path, secret) in secrets {
+        let secret = secret.as_str().expect("a masked value is a string");
+        let span =
+            edit::value_span(Syntax::Jsonc, text, &key_path).ok_or_else(|| unparsed(None))?;
+        spans.push((span, edit::string_literal(Syntax::Jsonc, secret)));
+    }
+    Ok(spans)
+}
+
+/// The key paths below `value`, which is at `at`, of every text in it.
+fn text_leaves(value: &Value, at: &mut Vec<String>, found: &mut Vec<Vec<String>>) {
+    match value {
+        Value::String(_) => found.push(at.clone()),
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                at.push(index.to_string());
+                text_leaves(item, at, found);
+                at.pop();
+            }
+        }
+        Value::Object(object) => {
+            for (key, item) in object {
+                at.push(key.clone());
+                text_leaves(item, at, found);
+                at.pop();
+            }
+        }
+        _ => {}
+    }
 }
 
 fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {

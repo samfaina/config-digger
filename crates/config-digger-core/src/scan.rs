@@ -18,7 +18,7 @@ use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
 use crate::user_list::{self, UserList};
-use crate::{mask, paths, skill};
+use crate::{mask, park, paths, skill};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -58,6 +58,37 @@ pub(crate) struct Snapshot {
     /// The files a rule reads that cannot be read or parsed. They set
     /// nothing.
     pub unreadable_settings: BTreeSet<PathBuf>,
+    /// The manifest of config-digger's parked-Entry store, `None` when
+    /// there is no data folder to keep it in.
+    pub parked_store: Option<PathBuf>,
+    /// Where each parked Entry, listed among the Entries at its key path in
+    /// the store, came from.
+    pub parked: Vec<ScannedParked>,
+}
+
+/// A parked Entry: one at `key_path` in the parked-Entry store, moved there
+/// from `origin`.
+#[derive(Clone)]
+pub(crate) struct ScannedParked {
+    /// Its key path in the store.
+    pub key_path: Vec<String>,
+    /// The file it was parked from, and its key path there.
+    pub origin: PathBuf,
+    pub origin_key_path: Vec<String>,
+    /// When it was parked, in RFC 3339.
+    pub parked_at: String,
+}
+
+impl Snapshot {
+    /// Where `entry` came from, when it is parked.
+    pub fn parked_of(&self, entry: &ScannedEntry) -> Option<&ScannedParked> {
+        if self.parked_store.as_ref() != Some(&entry.path) {
+            return None;
+        }
+        self.parked
+            .iter()
+            .find(|parked| parked.key_path == entry.key_path)
+    }
 }
 
 /// A plugin an Agent home loads, as one of its records says.
@@ -681,6 +712,7 @@ pub(crate) fn scan_as_if(
         }
     }
 
+    let (parked_store, parked) = scanner.read_parked(definitions, &found, ports);
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
     for project in &mut projects {
@@ -793,6 +825,8 @@ pub(crate) fn scan_as_if(
         settings,
         setting_values,
         unreadable_settings,
+        parked_store,
+        parked,
     })
 }
 
@@ -992,7 +1026,10 @@ fn read_switches(
         let definition = &definitions[home.agent_index];
         for (&kind, rules) in &definition.items {
             for (mechanism, block) in rules.disable.iter().enumerate() {
-                let switch = block.switch();
+                let Some(switched) = block.switched() else {
+                    continue;
+                };
+                let switch = switched.switch();
                 let places = Places {
                     home,
                     projects,
@@ -1296,7 +1333,10 @@ fn switch_files(
         let definition = &definitions[home.agent_index];
         for (&kind, rules) in &definition.items {
             for mechanism in &rules.disable {
-                let anchor = &mechanism.switch().anchor;
+                let Some(switched) = mechanism.switched() else {
+                    continue;
+                };
+                let anchor = &switched.switch().anchor;
                 if let Some(beside) = anchor.entry() {
                     files.extend(
                         covered(definition, entries, home, kind, mechanism)
@@ -1737,6 +1777,73 @@ impl Scanner<'_> {
                 })
             })
             .collect()
+    }
+
+    /// Adds the Entries of config-digger's parked-Entry store, each one of
+    /// the location it was parked from, in its Agent home, at its key path
+    /// in the store. A parked Entry of an Agent, home or location not found
+    /// now is left out. Returns the store's path and where each Entry came
+    /// from.
+    fn read_parked(
+        &mut self,
+        definitions: &[AgentDefinition],
+        found: &[FoundHome],
+        ports: &Ports,
+    ) -> (Option<PathBuf>, Vec<ScannedParked>) {
+        let Ok(store) = park::store_path(ports.env.as_ref()) else {
+            return (None, Vec::new());
+        };
+        let document = match self.reader.peek(&store) {
+            Ok(None) => return (Some(store), Vec::new()),
+            Ok(Some(text)) => JsonFormat::STRICT.parse(text).ok(),
+            Err(_) => None,
+        };
+        let Some(document) = document else {
+            tracing::warn!(path = %store.display(), "cannot read the parked-Entry store");
+            return (Some(store), Vec::new());
+        };
+        let mut parked = Vec::new();
+        for (id, parked_entry) in park::parked_entries(&document) {
+            let home = found.iter().find(|home| {
+                definitions[home.agent_index].agent.id == parked_entry.origin.agent
+                    && home.home == parked_entry.origin.home
+            });
+            let location = home.and_then(|home| {
+                definitions[home.agent_index]
+                    .locations
+                    .iter()
+                    .find(|location| location.id == parked_entry.origin.location)
+            });
+            let (Some(home), Some(location)) = (home, location) else {
+                tracing::debug!(%id, "parked Entry of no home found");
+                continue;
+            };
+            let key_path = park::key_path(&id);
+            let masked = mask::entry(location, &parked_entry.entry);
+            self.entries.push(ScannedEntry {
+                agent_index: home.agent_index,
+                home: home.home.clone(),
+                location: location.id.clone(),
+                path: store.clone(),
+                key_path: key_path.clone(),
+                name: parked_entry.origin.name,
+                project: parked_entry.origin.project,
+                config: masked.value,
+                masked: masked.key_paths,
+                depth: 0,
+                defect: None,
+                link: None,
+                manager: None,
+                plugin: None,
+            });
+            parked.push(ScannedParked {
+                key_path,
+                origin: parked_entry.origin.path,
+                origin_key_path: parked_entry.origin.key_path,
+                parked_at: parked_entry.parked_at,
+            });
+        }
+        (Some(store), parked)
     }
 
     /// Adds the Entries of one location. `project` is the key of the Project

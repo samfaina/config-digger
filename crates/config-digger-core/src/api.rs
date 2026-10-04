@@ -509,6 +509,9 @@ pub struct Block {
 pub enum BlockCode {
     /// The plan writes a SQLite store while the Agent holding it open runs.
     RunningAgentSqlite,
+    /// The plan parks an Entry out of, or puts one back into, a file the
+    /// running Agent rewrites from memory, which would undo it.
+    RunningAgentParking,
 }
 
 /// What a plan will change, shown before it is confirmed.
@@ -1237,6 +1240,10 @@ pub struct Entry {
     /// For a Linked Entry, a junction or symlink at its own location, where
     /// it points. Removing it removes the link, never its target.
     pub link: Option<Link>,
+    /// For a parked Entry, which config-digger moved into its parked-Entry
+    /// store, where it came from. Its `path` and `key_path` are where it is
+    /// in the store.
+    pub parked: Option<Parked>,
     pub state: State,
     /// Why the Entry has its State, when it is not Effective: the first of
     /// the Agent's checks that it fails.
@@ -1264,6 +1271,35 @@ pub struct Entry {
     /// What makes its State less certain, such as a Disable switch that
     /// cannot be read.
     pub caveats: Vec<Caveat>,
+}
+
+/// Where a parked Entry came from.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Parked {
+    /// The file it was in, and its key path there: where Enable puts it back.
+    pub path: PathBuf,
+    pub key_path: Vec<String>,
+    /// `<path>#<key path>` of where it was, which a preview names it by.
+    pub locator: String,
+    /// When it was parked, in RFC 3339.
+    pub parked_at: String,
+}
+
+impl Entry {
+    /// The locator a preview names it by: where it was, for a parked Entry,
+    /// so that it keeps one name in and out of the store.
+    pub fn identity(&self) -> &str {
+        self.parked
+            .as_ref()
+            .map_or(&self.locator, |parked| &parked.locator)
+    }
+
+    /// The file of the locator a preview names it by, as [`identity`](Self::identity) has it.
+    pub fn identity_path(&self) -> &Path {
+        self.parked
+            .as_ref()
+            .map_or(&self.path, |parked| &parked.path)
+    }
 }
 
 /// Where the junction or symlink of a Linked Entry points.
@@ -1524,6 +1560,10 @@ pub enum ReasonCode {
     MalformedEntry,
     /// The Agent skips the skill because of its `SKILL.md` or its folder's name.
     MalformedSkill,
+    /// config-digger parked the Entry in its parked-Entry store, out of the
+    /// Agent's reach, since the Agent has no switch for it. Enable puts it
+    /// back.
+    Parked,
     /// The Entry is keyed to a Project whose folder no longer exists.
     ProjectMissing,
     /// The Entry is in an Agent home the Agent's lookup order skips for

@@ -32,16 +32,20 @@ pub(crate) struct RunningCheck {
 struct RunningReader<'d> {
     agent_name: &'d str,
     files: BTreeMap<PathBuf, StoreClass>,
+    /// The files among them it rewrites from memory that an Entry is
+    /// parked out of or put back into.
+    parking: BTreeSet<PathBuf>,
     /// An Installation found reads one of those homes. Without one, its
     /// SQLite stores still block, but it gets no warning or hint.
     installed: bool,
 }
 
 impl RunningReader<'_> {
+    /// The files of `class`, but those that block as parking.
     fn paths(&self, class: StoreClass) -> Vec<&Path> {
         self.files
             .iter()
-            .filter(|(_, file_class)| **file_class == class)
+            .filter(|(path, file_class)| **file_class == class && !self.parking.contains(*path))
             .map(|(path, _)| path.as_path())
             .collect()
     }
@@ -86,11 +90,15 @@ pub(crate) fn check(
             let reader = readers.entry(agent_index).or_insert_with(|| RunningReader {
                 agent_name: &definition.agent.name,
                 files: BTreeMap::new(),
+                parking: BTreeSet::new(),
                 installed: false,
             });
             reader.installed |= installed.contains(&(agent_index, home.to_owned()));
             let stored = reader.files.entry(file.path.clone()).or_insert(class);
             *stored = (*stored).max(class);
+            if file.parking && class == StoreClass::RewrittenWhileRunning {
+                reader.parking.insert(file.path.clone());
+            }
         }
     }
 
@@ -103,6 +111,13 @@ pub(crate) fn check(
             blocks.push(Block {
                 code: BlockCode::RunningAgentSqlite,
                 sentence: explain::running_agent_sqlite(reader.agent_name, &sqlite),
+            });
+        }
+        if !reader.parking.is_empty() {
+            let parking: Vec<&Path> = reader.parking.iter().map(PathBuf::as_path).collect();
+            blocks.push(Block {
+                code: BlockCode::RunningAgentParking,
+                sentence: explain::running_agent_parking(reader.agent_name, &parking),
             });
         }
         if !reader.installed {

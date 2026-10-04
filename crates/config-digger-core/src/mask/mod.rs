@@ -10,7 +10,7 @@
 
 mod diff;
 
-pub(crate) use diff::{Side, diff};
+pub(crate) use diff::{Side, diff, diff_parked};
 
 use crate::definitions::LocationDefinition;
 use crate::definitions::blocks::Interpolate;

@@ -8,15 +8,15 @@ use crate::api::{
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
-use crate::disable::{self, ContextProject, Hit};
+use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
 use crate::folders::{self, FolderOp, FolderSize, PlannedFolder};
 use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
-use crate::scan::{LocationReader, Snapshot, SwitchStore};
-use crate::{explain, history, installations, resolve, rules, running, scan, select};
+use crate::scan::{LocationReader, ScannedEntry, Snapshot, SwitchStore};
+use crate::{explain, history, installations, park, resolve, rules, running, scan, select};
 use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -62,6 +62,38 @@ pub(crate) struct PlannedFile {
     /// The file is in the index of its git repo, so the edits show in the
     /// git diff.
     pub git_versioned: bool,
+    /// An Entry is parked out of the file or put back into it, which a
+    /// running Agent that rewrites the file from memory would undo.
+    pub parking: bool,
+    /// The file is the parked-Entry store, whose Secrets are those of the
+    /// Entries parked in it.
+    pub parked_store: bool,
+}
+
+impl PlannedFile {
+    /// A diff of the file from `before` to `after`, with every Secret masked.
+    pub fn diff(&self, definitions: &[AgentDefinition], before: Side, after: Side) -> FileDiff {
+        let store = self.parked_store.then_some(self.path.as_path());
+        file_diff(definitions, &self.readers, &self.path, store, before, after)
+    }
+}
+
+/// A diff of the file at `path` from `before` to `after`, with every Secret
+/// masked: those of the Entries parked in it when it is `store`, the
+/// parked-Entry store, and else those of the Entries `readers` read there.
+fn file_diff(
+    definitions: &[AgentDefinition],
+    readers: &[LocationReader],
+    path: &Path,
+    store: Option<&Path>,
+    before: Side,
+    after: Side,
+) -> FileDiff {
+    if store == Some(path) {
+        mask::diff_parked(definitions, path, before, after)
+    } else {
+        mask::diff(definitions, readers, path, before, after)
+    }
 }
 
 /// A file with every edit of an Operation applied, in order.
@@ -305,16 +337,18 @@ impl Targeted<'_> {
         })
     }
 
-    /// A Disable or an Enable: each Entry's switch is set or lifted, which
-    /// can reach other Entries and Projects than those targeted.
+    /// A Disable or an Enable: each Entry's switch is set or lifted, or the
+    /// Entry parked or put back, which can reach other Entries and Projects
+    /// than those targeted.
     fn switch(&self) -> Result<Planned, Error> {
         let project = resolve::context_project(self.snapshot, self.context);
         let context_project = project
             .as_ref()
             .map(|(path, key)| ContextProject { path, key });
-        // The edits of each switch file, in the order its Entries were selected.
-        let mut by_file: Vec<(PathBuf, Vec<Edit>)> = Vec::new();
+        // The edits of each file, in the order its Entries were selected.
+        let mut by_file: Vec<FileEdits> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
+        let mut parks: Vec<&ScannedEntry> = Vec::new();
         for entry in self.entries {
             // Its switches would be offered as for any Entry of the Project.
             if entry.state == State::Unread {
@@ -339,12 +373,17 @@ impl Targeted<'_> {
                     .map_err(|(_, sentence)| {
                         Error::blocked(explain::disable_not_offered(&entry.locator, &sentence))
                     })?;
-                    // Entries Disabled by one name share its switch.
-                    let shared = by_file
-                        .iter()
-                        .any(|(path, edits)| *path == choice.path && edits.contains(&choice.edit));
-                    if !shared {
-                        add_edit(&mut by_file, choice.path, choice.edit);
+                    match choice {
+                        Choice::Switch { path, edit, .. } => {
+                            // Entries Disabled by one name share its switch.
+                            let shared = by_file
+                                .iter()
+                                .any(|file| file.path == path && file.edits.contains(&edit));
+                            if !shared {
+                                add_edit(&mut by_file, path, Syntax::Jsonc, edit, false);
+                            }
+                        }
+                        Choice::Park { .. } => parks.push(scanned),
                     }
                 }
                 _ => {
@@ -360,16 +399,22 @@ impl Targeted<'_> {
                             &sentence,
                         )));
                     }
+                    let parked = self.snapshot.parked_of(scanned);
                     let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
-                    if disabling.is_empty() {
+                    if disabling.is_empty() && parked.is_none() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
                     let location = definition.location(&scanned.location);
-                    if let Err(sentence) = disable::enable(location, &disabling) {
+                    if !disabling.is_empty()
+                        && let Err(sentence) = disable::enable(location, &disabling)
+                    {
                         return Err(Error::blocked(explain::enable_refused(
                             &entry.locator,
                             &sentence,
                         )));
+                    }
+                    if parked.is_some() {
+                        self.put_back(&mut by_file, entry, scanned)?;
                     }
                     for hit in disabling {
                         // Entries Disabled by one name share its switch.
@@ -377,31 +422,28 @@ impl Targeted<'_> {
                             continue;
                         }
                         for edit in hit.enable_edits() {
-                            add_edit(&mut by_file, hit.switch.path.clone(), edit);
+                            let path = hit.switch.path.clone();
+                            add_edit(&mut by_file, path, Syntax::Jsonc, edit, false);
                         }
                         lifted.push(hit);
                     }
                 }
             }
         }
+        self.park(&mut by_file, &parks)?;
 
         let mut files = Vec::new();
-        for (path, edits) in by_file {
-            let (read, created) = match self.ports.fs.read(&path) {
-                Ok(bytes) => (bytes, false),
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                    (empty_file(Syntax::Jsonc).to_vec(), true)
-                }
-                Err(error) => {
-                    return Err(Error::blocked(format!(
-                        "cannot read {}: {error}",
-                        path.display()
-                    )));
-                }
+        for file in by_file {
+            let path = file.path;
+            let (read, created) = match read_if_there(self.ports, &path)? {
+                Some(bytes) => (bytes, false),
+                None => (empty_file(file.syntax).to_vec(), true),
             };
-            let edited = apply_edits(&read, Syntax::Jsonc, &edits)
+            let edited = apply_edits(&read, file.syntax, &file.edits)
                 .map_err(|failure| failure.into_error(&path))?;
-            files.push(self.planned_file(path, Syntax::Jsonc, read, created, edited));
+            let mut planned = self.planned_file(path, file.syntax, read, created, edited);
+            planned.parking = file.parking;
+            files.push(planned);
         }
 
         let written: Vec<(PathBuf, Vec<u8>)> = files
@@ -419,6 +461,130 @@ impl Targeted<'_> {
         let (changes, effective) = self.reach(&after);
         let wide = self.wide_reach(&changes);
         self.planned(files, Vec::new(), changes, effective, wide)
+    }
+
+    /// Adds the edits that park `parks` to `by_file`: each Entry's key goes
+    /// from its file, and the Entry, verbatim with where it came from, into
+    /// the parked-Entry store under a free id.
+    fn park(&self, by_file: &mut Vec<FileEdits>, parks: &[&ScannedEntry]) -> Result<(), Error> {
+        let Some(store) = self
+            .snapshot
+            .parked_store
+            .as_ref()
+            .filter(|_| !parks.is_empty())
+        else {
+            return Ok(());
+        };
+        let mut taken = match read_if_there(self.ports, store)? {
+            Some(bytes) => parked_ids(&bytes).map_err(|failure| failure.into_error(store))?,
+            None => Vec::new(),
+        };
+        let parked_at = humantime::format_rfc3339_seconds(self.ports.clock.now()).to_string();
+        // The Entries parked from each file, in the order they were selected.
+        let mut origins: Vec<(&Path, Syntax, Vec<&ScannedEntry>)> = Vec::new();
+        for &entry in parks {
+            match origins.iter_mut().find(|(path, ..)| *path == entry.path) {
+                Some((_, _, entries)) => entries.push(entry),
+                None => origins.push((
+                    &entry.path,
+                    file_syntax(self.definitions, entry),
+                    vec![entry],
+                )),
+            }
+        }
+        for (path, syntax, entries) in origins {
+            let removals: Vec<Edit> = entries
+                .iter()
+                .map(|entry| Edit::Remove {
+                    key_path: entry.key_path.clone(),
+                })
+                .collect();
+            let read = read(self.ports, path)?;
+            let edited = apply_edits(&read, syntax, &removals)
+                .map_err(|failure| failure.into_error(path))?;
+            for edit in removals {
+                add_edit(by_file, path.to_path_buf(), syntax, edit, true);
+            }
+            for (entry, removed) in entries.iter().zip(&edited.edits) {
+                let id = park::free_id(&entry.name, &taken);
+                let origin = park::Origin {
+                    agent: self.definitions[entry.agent_index].agent.id.clone(),
+                    home: entry.home.clone(),
+                    location: entry.location.clone(),
+                    name: entry.name.clone(),
+                    path: entry.path.clone(),
+                    key_path: entry.key_path.clone(),
+                    project: entry.project.clone(),
+                };
+                let parked = park::ParkedEntry::new(origin, parked_at.clone(), &removed.inverse)
+                    .ok_or_else(|| Error::unexpected("a removed key comes back by an insertion"))?;
+                let edit = Edit::Set {
+                    key_path: park::key_path(&id),
+                    value: parked.to_value(),
+                };
+                add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
+                taken.push(id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Adds the edits that put the parked Entry `entry` back to `by_file`:
+    /// its key goes back into its file, and the Entry out of the store.
+    /// Refused when an Entry is at its key again, which it would overwrite,
+    /// or when its file's folder is gone. A missing file whose folder exists
+    /// is created with the minimal structure.
+    fn put_back(
+        &self,
+        by_file: &mut Vec<FileEdits>,
+        entry: &api::Entry,
+        scanned: &ScannedEntry,
+    ) -> Result<(), Error> {
+        let store = &entry.path;
+        let bytes = read(self.ports, store)?;
+        let file = EditableFile::decode(&bytes, Syntax::Jsonc)
+            .map_err(|reason| EditFailure::ReadOnly(reason).into_error(store))?;
+        let value = file
+            .value_at(&entry.key_path)
+            .map_err(|error| EditFailure::Edit(error).into_error(store))?
+            .ok_or_else(|| Error::stale(explain::no_longer_parked(&entry.locator)))?;
+        let parked: park::ParkedEntry = serde_json::from_value(value)
+            .map_err(|_| Error::blocked(explain::parked_unreadable(&entry.locator, store)))?;
+        let syntax = file_syntax(self.definitions, scanned);
+        let origin = &parked.origin.path;
+        match read_if_there(self.ports, origin)? {
+            Some(bytes) => {
+                let file = EditableFile::decode(&bytes, syntax)
+                    .map_err(|reason| EditFailure::ReadOnly(reason).into_error(origin))?;
+                let now = file
+                    .value_at(&parked.origin.key_path)
+                    .map_err(|error| EditFailure::Edit(error).into_error(origin))?;
+                if now.is_some() {
+                    return Err(Error::blocked(explain::unpark_conflict(
+                        &entry.locator,
+                        &parked.origin.key_path,
+                        origin,
+                    )));
+                }
+            }
+            None => {
+                if !origin
+                    .parent()
+                    .is_some_and(|folder| self.ports.fs.exists(folder))
+                {
+                    return Err(Error::blocked(explain::unpark_folder_gone(
+                        &entry.locator,
+                        origin,
+                    )));
+                }
+            }
+        }
+        add_edit(by_file, origin.clone(), syntax, parked.put_back(), true);
+        let edit = Edit::Remove {
+            key_path: entry.key_path.clone(),
+        };
+        add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
+        Ok(())
     }
 
     /// What a write reaches: the States it changes in the context, then in
@@ -463,7 +629,7 @@ impl Targeted<'_> {
                         None => Reached::WithoutProject(locator),
                     });
                 }
-                let targeted = self.entries.iter().any(|entry| entry.locator == locator);
+                let targeted = self.entries.iter().any(|entry| entry.identity() == locator);
                 (!targeted).then_some(Reached::Here(locator))
             })
             .collect();
@@ -485,6 +651,8 @@ impl Targeted<'_> {
             readers: self.snapshot.readers_of(&path),
             switches: self.snapshot.switch_stores_of(&path),
             git_versioned: self.snapshot.versioned.contains(&path),
+            parked_store: self.snapshot.parked_store.as_ref() == Some(&path),
+            parking: false,
             path,
             syntax,
             read,
@@ -539,11 +707,64 @@ impl Targeted<'_> {
     }
 }
 
+/// The edits of one file an Operation touches.
+struct FileEdits {
+    path: PathBuf,
+    syntax: Syntax,
+    edits: Vec<Edit>,
+    /// An Entry is parked out of the file or put back into it.
+    parking: bool,
+}
+
 /// Adds `edit` to the edits of the file at `path`, after those it has.
-fn add_edit(by_file: &mut Vec<(PathBuf, Vec<Edit>)>, path: PathBuf, edit: Edit) {
-    match by_file.iter_mut().find(|(known, _)| *known == path) {
-        Some((_, edits)) => edits.push(edit),
-        None => by_file.push((path, vec![edit])),
+fn add_edit(
+    by_file: &mut Vec<FileEdits>,
+    path: PathBuf,
+    syntax: Syntax,
+    edit: Edit,
+    parking: bool,
+) {
+    match by_file.iter_mut().find(|file| file.path == path) {
+        Some(file) => {
+            file.edits.push(edit);
+            file.parking |= parking;
+        }
+        None => by_file.push(FileEdits {
+            path,
+            syntax,
+            edits: vec![edit],
+            parking,
+        }),
+    }
+}
+
+/// The syntax the file of the Entry `entry` is edited in, which holds it
+/// under a key: the file it was parked from, for a parked Entry.
+fn file_syntax(definitions: &[AgentDefinition], entry: &ScannedEntry) -> Syntax {
+    definitions[entry.agent_index]
+        .location(&entry.location)
+        .format
+        .file()
+        .expect("validation parks keys in files only")
+        .syntax()
+}
+
+/// The ids of the Entries parked in the store whose bytes are `bytes`.
+fn parked_ids(bytes: &[u8]) -> Result<Vec<String>, EditFailure> {
+    let file = EditableFile::decode(bytes, Syntax::Jsonc).map_err(EditFailure::ReadOnly)?;
+    let document = file.value_at(&[]).map_err(EditFailure::Edit)?;
+    Ok(document.as_ref().map(park::ids).unwrap_or_default())
+}
+
+/// A file's bytes, `None` when it is missing.
+fn read_if_there(ports: &Ports, path: &Path) -> Result<Option<Vec<u8>>, Error> {
+    match ports.fs.read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(Error::blocked(format!(
+            "cannot read {}: {error}",
+            path.display()
+        ))),
     }
 }
 
@@ -851,6 +1072,8 @@ pub(crate) fn undo_files<'m>(
                 readers: Vec::new(),
                 switches: Vec::new(),
                 git_versioned: false,
+                parking: location.parking,
+                parked_store: false,
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
                 location,
@@ -1010,19 +1233,17 @@ impl Refused<'_> {
                     }
                     None => None,
                 };
-                mask::diff(
-                    definitions,
-                    &snapshot.readers_of(path),
-                    path,
-                    Side {
-                        bytes: backed_up.as_deref(),
-                        name: "in the backup",
-                    },
-                    Side {
-                        bytes: file.current.as_deref(),
-                        name: "as it is now",
-                    },
-                )
+                let before = Side {
+                    bytes: backed_up.as_deref(),
+                    name: "in the backup",
+                };
+                let after = Side {
+                    bytes: file.current.as_deref(),
+                    name: "as it is now",
+                };
+                let readers = snapshot.readers_of(path);
+                let store = snapshot.parked_store.as_deref();
+                file_diff(definitions, &readers, path, store, before, after)
             })
             .collect();
         Error::undo_refused(self.what(), self.folder, diffs)
@@ -1082,10 +1303,8 @@ fn preview(
                     .iter()
                     .map(|applied| EditSummary::from(&applied.edit))
                     .collect();
-                let diff = mask::diff(
+                let diff = file.diff(
                     definitions,
-                    &file.readers,
-                    &file.path,
                     Side {
                         bytes: (!file.created).then_some(file.read.as_slice()),
                         name: "before the Operation",
@@ -1282,6 +1501,10 @@ fn removal(
         return Err(Error::blocked(message));
     }
     let scanned = snapshot.entry(&entry.path, &entry.key_path);
+    // A parked Entry goes from the store, whatever file it came from.
+    if snapshot.parked_of(scanned).is_some() {
+        return Ok(Removal::Key(Syntax::Jsonc));
+    }
     let location = definitions[scanned.agent_index].location(&scanned.location);
     Ok(match location.format.file() {
         Some(format) => Removal::Key(format.syntax()),
@@ -1375,7 +1598,7 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
         let rows = first.iter().chain(
             second
                 .iter()
-                .filter(|entry| !first.iter().any(|row| row.locator == entry.locator)),
+                .filter(|entry| !first.iter().any(|row| row.identity() == entry.identity())),
         );
         let agent_name = before
             .homes
@@ -1386,13 +1609,13 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
         let state = |entries: &[api::Entry], locator: &str| {
             entries
                 .iter()
-                .find(|entry| entry.locator == locator)
+                .find(|entry| entry.identity() == locator)
                 .map_or(StateAfter::Removed, |entry| entry.state.into())
         };
         let mut changed = false;
         for entry in rows {
-            let state_before = state(entries_before, &entry.locator);
-            let state_after = state(entries_after, &entry.locator);
+            let state_before = state(entries_before, entry.identity());
+            let state_after = state(entries_after, entry.identity());
             if state_before == state_after {
                 continue;
             }
@@ -1402,8 +1625,8 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
                 agent_name: agent_name.to_owned(),
                 home: item.home.clone(),
                 item: item.name.clone(),
-                path: entry.path.clone(),
-                locator: entry.locator.clone(),
+                path: entry.identity_path().to_path_buf(),
+                locator: entry.identity().to_owned(),
                 project: before.project.clone(),
                 before: state_before,
                 after: state_after,
@@ -1446,7 +1669,7 @@ fn item_in<'i>(
     inventory.items.iter().find(|item| {
         item.agent == agent
             && item.home == home
-            && item.entries.iter().any(|entry| entry.locator == locator)
+            && item.entries.iter().any(|entry| entry.identity() == locator)
     })
 }
 
@@ -1458,6 +1681,10 @@ pub(crate) fn state_in(
     locator: &str,
 ) -> StateAfter {
     item_in(inventory, agent, home, locator)
-        .and_then(|item| item.entries.iter().find(|entry| entry.locator == locator))
+        .and_then(|item| {
+            item.entries
+                .iter()
+                .find(|entry| entry.identity() == locator)
+        })
         .map_or(StateAfter::Removed, |entry| entry.state.into())
 }

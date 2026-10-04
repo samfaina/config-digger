@@ -183,6 +183,12 @@ export type Entry = {
 	 *  it points. Removing it removes the link, never its target.
 	 */
 	link: Link | null,
+	/**
+	 *  For a parked Entry, which config-digger moved into its parked-Entry
+	 *  store, where it came from. Its `path` and `key_path` are where it is
+	 *  in the store.
+	 */
+	parked: Parked | null,
 	state: State,
 	/**
 	 *  Why the Entry has its State, when it is not Effective: the first of
@@ -466,6 +472,17 @@ export type NoteCode =
  */
 "provenance_by_name_only";
 
+/**  Where a parked Entry came from. */
+export type Parked = {
+	/**  The file it was in, and its key path there: where Enable puts it back. */
+	path: string,
+	key_path: string[],
+	/**  `<path>#<key path>` of where it was, which a preview names it by. */
+	locator: string,
+	/**  When it was parked, in RFC 3339. */
+	parked_at: string,
+};
+
 /**  A plugin or extension an Agent installed, which an Entry is part of. */
 export type Plugin = {
 	/**  The id the Agent knows it by, such as `supabase@claude-plugins-official`. */
@@ -655,6 +672,12 @@ export type ReasonCode =
 "malformed_entry" | 
 /**  The Agent skips the skill because of its `SKILL.md` or its folder's name. */
 "malformed_skill" | 
+/**
+ *  config-digger parked the Entry in its parked-Entry store, out of the
+ *  Agent's reach, since the Agent has no switch for it. Enable puts it
+ *  back.
+ */
+"parked" | 
 /**  The Entry is keyed to a Project whose folder no longer exists. */
 "project_missing" | 
 /**

@@ -350,6 +350,77 @@ pub(crate) fn takes_whole_plugin(plugin: &str) -> String {
     format!("This Disables the whole plugin {plugin}, with every server and skill it carries.")
 }
 
+/// What Disable does to the Entry `name` of `origin`, which `agent_name`
+/// has no switch for: it parks it in the store at `store`.
+pub(crate) fn disable_parks(name: &str, origin: &Path, store: &Path, agent_name: &str) -> String {
+    format!(
+        "Disable moves `{name}` out of {} into config-digger's parked-Entry store {}, since {agent_name} has no switch for it; Enable puts it back.",
+        origin.display(),
+        store.display()
+    )
+}
+
+/// A parked Entry's reason: config-digger moved it from `origin` into the
+/// store at `store`.
+pub(crate) fn parked(origin: &Path, store: &Path, agent_name: &str) -> String {
+    format!(
+        "Disabled: config-digger parked it in {}, out of {}, so {agent_name} no longer reads it.",
+        store.display(),
+        origin.display()
+    )
+}
+
+/// What Enable does to the parked Entry `name`.
+pub(crate) fn enable_unparks(name: &str, origin: &Path) -> String {
+    format!(
+        "Enable puts `{name}` back into {} and takes it out of config-digger's parked-Entry store.",
+        origin.display()
+    )
+}
+
+/// Why Enable of the parked Entry at `locator` is refused: an Entry is at
+/// `key_path` in `origin` again.
+pub(crate) fn unpark_conflict(locator: &str, key_path: &[String], origin: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: `{}` appeared in {} since it was parked, and putting it back would overwrite it",
+        key_path.join("."),
+        origin.display()
+    )
+}
+
+/// Why a plan to put the Entry at `locator` back needs planning again: it
+/// is no longer in the parked-Entry store.
+pub(crate) fn no_longer_parked(locator: &str) -> String {
+    format!("{locator} is no longer parked")
+}
+
+/// Why Enable of the parked Entry at `locator` is refused: what the store at
+/// `store` holds for it does not read as a parked Entry.
+pub(crate) fn parked_unreadable(locator: &str, store: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: what {} holds for it does not read as a parked Entry",
+        store.display()
+    )
+}
+
+/// Why Enable of the parked Entry at `locator` is refused: the folder of
+/// `origin` is gone.
+pub(crate) fn unpark_folder_gone(locator: &str, origin: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: the folder of {} is gone, so there is nowhere to put it back",
+        origin.display()
+    )
+}
+
+/// The block of a plan that parks an Entry out of, or puts one back into,
+/// `files`, which the running `agent_name` rewrites from memory.
+pub(crate) fn running_agent_parking(agent_name: &str, files: &[&Path]) -> String {
+    format!(
+        "{agent_name} is running and rewrites {} from memory, which would undo moving an Entry in or out of it. Close {agent_name} and retry.",
+        path_list(files)
+    )
+}
+
 /// The note on an Entry part of which the partial switch `holds` limits.
 pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
     format!(

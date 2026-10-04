@@ -146,6 +146,7 @@ mod tests {
                 plugin: None,
                 git_versioned: false,
                 link: None,
+                parked: None,
                 state: State::Effective,
                 reason: None,
                 secondary: Vec::new(),

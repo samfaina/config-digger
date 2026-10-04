@@ -1871,6 +1871,28 @@
             "reason",
             "disabled_value"
           ]
+        },
+        {
+          "description": "Disables an Entry that has no switch of its own, such as a server in\nClaude Desktop's user file, by moving it out of the Agent's reach into\nconfig-digger's parked-Entry store, where it stays listed as Disabled;\nEnable puts it back (ADR 0002). Disable prefers any switch to it, and\nnever parks an Entry in a git-versioned file.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries it parks: each a file outside\nany plugin, holding Entries under keys.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "park"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations"
+          ]
         }
       ]
     },
