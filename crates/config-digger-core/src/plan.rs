@@ -442,7 +442,7 @@ impl Targeted<'_> {
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
-                        let sqlite = hit.mechanism.switch().sqlite;
+                        let sqlite = hit.mechanism.switch().sqlite();
                         for edit in hit.enable_edits() {
                             let path = hit.switch.path.clone();
                             add_switch_edit(&mut by_file, path, sqlite, edit);
@@ -745,9 +745,10 @@ impl FileEdits {
     /// What the edits write: the file, or the values of the store their
     /// key paths start with.
     fn medium(&self) -> Medium {
-        match self.sqlite {
-            true => Medium::sqlite(self.edits.iter().map(|edit| edit.key_path()[0].as_str())),
-            false => Medium::File,
+        if self.sqlite {
+            Medium::sqlite(self.edits.iter().map(|edit| edit.key_path()[0].as_str()))
+        } else {
+            Medium::File
         }
     }
 }

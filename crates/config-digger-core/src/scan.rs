@@ -340,9 +340,12 @@ impl ScannedSwitch {
                 item => item.get(field),
             };
             name.and_then(serde_json::Value::as_str)
-                .is_some_and(|name| match self.ignore_case {
-                    true => name.eq_ignore_ascii_case(key),
-                    false => name == key,
+                .is_some_and(|name| {
+                    if self.ignore_case {
+                        name.eq_ignore_ascii_case(key)
+                    } else {
+                        name == key
+                    }
                 })
         })
     }
@@ -427,14 +430,9 @@ impl Snapshot {
             return entry.file_of(anchor, roots, folder);
         };
         let (key, _) = project?;
-        self.storage
-            .iter()
-            .find(|storage| {
-                storage.agent_index == entry.agent_index
-                    && storage.home == entry.home
-                    && storage.project == key
-            })
-            .map(|storage| blocks::join_relative(&storage.folder, relative))
+        storage_paths(&self.storage, entry.agent_index, &entry.home, relative)
+            .find(|(_, project)| *project == key)
+            .map(|(path, _)| path)
     }
 
     /// The places of the switch of the mechanism at `mechanism` among those
@@ -748,17 +746,10 @@ pub(crate) fn scan_as_if(
             // Read in the folder the home keeps for each Project, whose
             // Entries apply in that Project.
             if let Some(relative) = location.anchor.project_storage() {
-                let folders: Vec<(PathBuf, String)> = scanner
-                    .storage
-                    .iter()
-                    .filter(|storage| {
-                        storage.agent_index == home.agent_index && storage.home == home.home
-                    })
-                    .map(|storage| {
-                        let path = blocks::join_relative(&storage.folder, relative);
-                        (path, storage.project.clone())
-                    })
-                    .collect();
+                let folders: Vec<(PathBuf, String)> =
+                    storage_paths(&scanner.storage, home.agent_index, &home.home, relative)
+                        .map(|(path, project)| (path, project.to_owned()))
+                        .collect();
                 for (path, project) in folders {
                     scanner.read_location(home, definition, location, path, Some(project), 0);
                 }
@@ -1181,7 +1172,7 @@ fn read_switches(
                     &switch.anchor,
                     &switch.key_path,
                     &JsonFormat::STRICT,
-                    switch.sqlite,
+                    switch.sqlite(),
                     None,
                     reader,
                     &mut unreadable,
@@ -1300,7 +1291,7 @@ fn read_rules(
                         project: place.project,
                         file_of: place.file_of,
                         key_path: place.key_path,
-                        value: place.value,
+                        value: place.value.and_then(|held| setting.read_as(held)),
                         cached_at: place.cached_at,
                     });
                 }
@@ -1434,15 +1425,8 @@ impl Places<'_> {
                     })
                     .collect()
             } else if let Some(relative) = anchor.project_storage() {
-                self.storage
-                    .iter()
-                    .filter(|storage| {
-                        storage.agent_index == home.agent_index && storage.home == home.home
-                    })
-                    .map(|storage| {
-                        let path = blocks::join_relative(&storage.folder, relative);
-                        (path, Some(storage.project.clone()), None)
-                    })
+                storage_paths(self.storage, home.agent_index, &home.home, relative)
+                    .map(|(path, project)| (path, Some(project.to_owned()), None))
                     .collect()
             } else if anchor.project_file() {
                 self.projects
@@ -1964,6 +1948,23 @@ struct Scanner<'p> {
     /// The folder an Agent home keeps for each Project, as its registry
     /// of such folders records it.
     storage: Vec<StorageFolder>,
+}
+
+/// The path `relative` names in each folder the Agent home `home` of the
+/// Agent at `agent_index` keeps for a Project, with that Project's key.
+fn storage_paths<'s>(
+    storage: &'s [StorageFolder],
+    agent_index: usize,
+    home: &'s str,
+    relative: &'s str,
+) -> impl Iterator<Item = (PathBuf, &'s str)> + 's {
+    storage
+        .iter()
+        .filter(move |storage| storage.agent_index == agent_index && storage.home == home)
+        .map(|storage| {
+            let path = blocks::join_relative(&storage.folder, relative);
+            (path, storage.project.as_str())
+        })
 }
 
 /// The folder an Agent home keeps what it stores for one Project in, such as

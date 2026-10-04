@@ -212,7 +212,7 @@ fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<&'e st
     if mechanism.switch().plugins() {
         entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
     } else if mechanism.target() == MechanismTarget::Entry
-        && (entry.switch_id.is_some() || matches!(mechanism, Switched::ItemList(_)))
+        && (entry.switch_id.is_some() || mechanism.by_id())
     {
         entry.switch_id.as_deref()
     } else {
@@ -359,7 +359,7 @@ pub(crate) fn choose(
         return Ok(Choice::Switch {
             path,
             edits,
-            sqlite: switch.sqlite,
+            sqlite: switch.sqlite(),
             sentence,
         });
     }

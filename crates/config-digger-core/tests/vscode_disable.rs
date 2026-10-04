@@ -476,7 +476,7 @@ fn trusting(fs: FakeFileSystem, uris: &[&str]) -> FakeFileSystem {
 }
 
 #[test]
-fn a_workspace_s_servers_are_blocked_until_its_folder_is_trusted() {
+fn a_project_s_servers_are_blocked_until_its_folder_is_trusted() {
     let fs = trusting(with_project(vscode(), "app"), &["file:///e%3A/elsewhere"]);
     let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
 
@@ -485,7 +485,7 @@ fn a_workspace_s_servers_are_blocked_until_its_folder_is_trusted() {
     let reason = supabase.entries[0].reason.as_ref().unwrap();
     assert_eq!(code(reason.code), "untrusted_folder");
     assert!(
-        reason.sentence.contains("Workspace Trust") || reason.sentence.contains("trust"),
+        reason.sentence.contains("once you trust"),
         "{}",
         reason.sentence
     );
@@ -734,4 +734,68 @@ fn a_profile_store_that_cannot_be_read_disables_nothing_and_takes_no_disable() {
     assert_eq!(code(fetch.state), "effective");
     let disable = serde_json::to_value(&fetch.entries[0].disable).unwrap();
     assert_eq!(disable["code"], "unreadable_switch", "{disable}");
+}
+
+#[test]
+fn the_account_s_policy_replaces_the_user_s_mcp_access() {
+    let fs = with_account_policy(
+        with_project(vscode(), "app"),
+        json!({ "mcpAccess": "registry_only" }),
+    )
+    .with_file(
+        format!(r"{USER}\settings.json"),
+        r#"{ "chat.mcp.access": "none" }"#,
+    );
+    let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
+
+    // VS Code reads the policy's `registry`, not the user's `none`.
+    assert_eq!(code(item(&inventory, "fetch").state), "effective");
+    let supabase = item(&inventory, "supabase");
+    assert_eq!(code(supabase.state), "blocked");
+    assert_eq!(
+        code(supabase.entries[0].reason.as_ref().unwrap().code),
+        "policy"
+    );
+}
+
+#[test]
+fn enable_of_a_skill_takes_its_skill_file_out_of_the_disabled_ones() {
+    let fs = with_home(vscode()).with_sqlite_item(
+        profile_store(),
+        "chat.disabledPromptFiles.skill",
+        r#"[{"$mid":1,"path":"/c:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","scheme":"file"},{"$mid":1,"path":"/c:/elsewhere/SKILL.md","scheme":"file"}]"#,
+    );
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Enable,
+        &[&copilot_skill("jetpack-compose")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        item_value(&fs, &profile_store(), "chat.disabledPromptFiles.skill"),
+        Some(json!([{ "$mid": 1, "path": "/c:/elsewhere/SKILL.md", "scheme": "file" }]))
+    );
+    let inventory = inventory(&core, &context(None));
+    assert_eq!(code(item(&inventory, "jetpack-compose").state), "effective");
+}
+
+#[test]
+fn a_profile_s_discovered_server_is_trusted_only_in_the_profile_s_store() {
+    let cache = json!({ "serverTools": [["claude-desktop.null.filesystem", {
+        "nonce": "n2", "trustedAtNonce": "n2"
+    }]] })
+    .to_string();
+    let fs = with_project(discovering_claude_desktop(vscode()), "app").with_sqlite_item(
+        app_store(),
+        "mcpToolCache",
+        &cache,
+    );
+    let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
+
+    assert_eq!(code(item(&inventory, "filesystem").state), "blocked");
 }

@@ -2645,6 +2645,12 @@ pub(crate) trait Disables {
     /// value that Enables, so that a later layer then decides.
     fn enable_unsets(&self) -> bool;
 
+    /// Whether it holds an Entry only by the id its location's `switch_id`
+    /// makes, so that it cannot hold one of a location without it.
+    fn by_id(&self) -> bool {
+        false
+    }
+
     /// Whether the Agent compares the ids of a list named by a field
     /// without regard to case.
     fn ignores_case(&self) -> bool {
@@ -2796,6 +2802,10 @@ impl Disables for Switched<'_> {
 
     fn enable_unsets(&self) -> bool {
         self.block().enable_unsets()
+    }
+
+    fn by_id(&self) -> bool {
+        self.block().by_id()
     }
 }
 
@@ -3302,6 +3312,10 @@ impl Disables for JsonItemList {
     fn enable_unsets(&self) -> bool {
         self.enable_action != EnableAction::Set
     }
+
+    fn by_id(&self) -> bool {
+        true
+    }
 }
 
 /// Checks what every mechanism shares: its switch, a target that agrees
@@ -3348,12 +3362,9 @@ pub(crate) struct Switch {
     /// such as `name` in the `skills` of the manifest of Claude Desktop's
     /// skill mirror. config-digger only reads such a switch.
     pub named_by: Option<String>,
-    /// Whether the file is a SQLite store, such as VS Code's `state.vscdb`,
-    /// whose `ItemTable` holds JSON text under the key path's first key.
-    /// Its store class must be `sqlite`.
-    #[serde(default)]
-    pub sqlite: bool,
-    /// How the switch's file behaves while the Agent runs.
+    /// How the switch's file behaves while the Agent runs. A `sqlite` file
+    /// is a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`
+    /// holds JSON text under the key path's first key.
     pub store_class: StoreClass,
 }
 
@@ -3383,12 +3394,7 @@ impl Validate for Switch {
         if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
             return Err("a switch needs a key path, with no empty key".into());
         }
-        if self.sqlite != (self.store_class == StoreClass::Sqlite) {
-            return Err(
-                "a switch is in a SQLite store exactly when its store class is `sqlite`".into(),
-            );
-        }
-        if self.sqlite
+        if self.sqlite()
             && (is_entry_key(&self.key_path[0]) || self.key_path[0] == super::PROJECT_KEY)
         {
             return Err("a SQLite switch's key path starts with a key of its `ItemTable`".into());
@@ -3436,6 +3442,12 @@ impl Validate for Switch {
 }
 
 impl Switch {
+    /// Whether its file is a SQLite store, whose `ItemTable` holds JSON text
+    /// under the key path's first key.
+    pub fn sqlite(&self) -> bool {
+        self.store_class == StoreClass::Sqlite
+    }
+
     /// Whether the switch applies in one Project only, so that it needs one.
     pub fn per_project(&self) -> bool {
         self.anchor.in_project()
@@ -3481,9 +3493,26 @@ pub(crate) struct SettingPlace {
     /// milliseconds since 1970, or an RFC 3339 time, such as when VS Code
     /// fetched the account's policy. Omitted for a value the user writes.
     pub cached_at: Option<Vec<String>>,
+    /// How the Agent reads the value as the setting's, as `[held, read]`
+    /// pairs, such as VS Code reading a policy's `mcp: false` as
+    /// `chat.mcp.access: "none"`. A value no pair holds then sets nothing.
+    /// Omitted, the value is read as it is.
+    #[serde(default)]
+    pub map: Vec<(Value, Value)>,
 }
 
 impl SettingPlace {
+    /// The value `held` sets, as the Agent reads it.
+    pub fn read_as(&self, held: Value) -> Option<Value> {
+        if self.map.is_empty() {
+            return Some(held);
+        }
+        self.map
+            .iter()
+            .find(|(known, _)| *known == held)
+            .map(|(_, read)| read.clone())
+    }
+
     /// How the file is parsed.
     pub fn format(&self) -> JsonFormat {
         JsonFormat {

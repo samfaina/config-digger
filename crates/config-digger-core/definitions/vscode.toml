@@ -369,31 +369,19 @@ sources = [
 # (`"none"`), or only those installed from the registry (`"registry"`),
 # which VS Code then reads from the profile's `mcp.json` alone [docs]. That
 # an installed server must also match the registry is not checked. An
-# account's policy sets it first: VS Code caches the policy it fetched in
-# `defaultAccount.cachedPolicyData` of the store every profile reads, where
-# `policyData.mcp: false` stands for `"none"` and `policyData.mcpAccess:
-# "registry_only"` for `"registry"` [docs]. That `entitlementsFetchedAt` is
-# when it fetched the policy is inferred from its name. config-digger never
+# account's policy replaces the user's value [docs]: VS Code caches the
+# policy it fetched in `defaultAccount.cachedPolicyData` of the store every
+# profile reads, and reads `policyData.mcp: false` as `"none"` and
+# `policyData.mcpAccess: "registry_only"` as `"registry"`, leaving the
+# setting to the user otherwise [docs]. That `entitlementsFetchedAt` is when
+# it fetched the policy is inferred from its name. config-digger never
 # writes either.
-[[items.mcp.rules]]
-block = "global-switch"
-off = false
-sources = [
-  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
-]
-
-[[items.mcp.rules]]
-block = "global-switch"
-off = "registry_only"
-locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
-sources = [
-  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
-]
-
 [[items.mcp.rules]]
 block = "global-switch"
 off = "none"
 sources = [
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.access"], dialect = "jsonc" },
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.access"], sqlite = true },
 ]
@@ -403,6 +391,8 @@ block = "global-switch"
 off = "registry"
 locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
 sources = [
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.access"], dialect = "jsonc" },
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.chat.mcp.access"], sqlite = true },
 ]
@@ -433,6 +423,7 @@ equals = false
 default = true
 sources = [
   { anchor = { block = "home", root = "settings" }, key_path = ["security.workspace.trust.enabled"], dialect = "jsonc" },
+  { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["memento/experiment.service.memento", "VSCode.ABExp.FeatureData", "configs", "0", "Parameters", "config.security.workspace.trust.enabled"], sqlite = true },
 ]
 
 # The servers VS Code discovers in other apps' files start only once the
@@ -447,12 +438,20 @@ sources = [
 # since VS Code last saw it.
 [[items.mcp.gates]]
 block = "nonce-trust"
-locations = ["claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
+trusted_at = "trustedAtNonce"
+nonce = "nonce"
+sources = [
+  { anchor = { block = "home", root = "state" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
+]
+
+[[items.mcp.gates]]
+block = "nonce-trust"
+locations = ["cursor-workspace-mcp"]
 trusted_at = "trustedAtNonce"
 nonce = "nonce"
 sources = [
   { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
-  { anchor = { block = "home", root = "state" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
 ]
 
 # VS Code turns a server off or on in the `mcp.enablement` of a `state.vscdb`,
@@ -465,11 +464,10 @@ sources = [
 # store in a Project, and to the profile's otherwise; Enable takes the pair
 # out of both, as VS Code's own Enable does [docs]. That a store holds the
 # pairs in this shape, and the ids, come from VS Code's source only, so
-# they are unverified until the release gate confirms them (#119 makes this
-# a mark).
+# they are unverified until the release gate confirms them.
 [[items.mcp.disable]]
 block = "json-item-list"
-switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", sqlite = true, store_class = "sqlite" }
+switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
 target = "entry"
 context = "project"
 enable_action = "remove-item"
@@ -480,7 +478,7 @@ layered = true
 
 [[items.mcp.disable]]
 block = "json-item-list"
-switch = { anchor = { block = "home", root = "state" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", sqlite = true, store_class = "sqlite" }
+switch = { anchor = { block = "home", root = "state" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
 target = "entry"
 context = "all"
 enable_action = "remove-item"
@@ -607,10 +605,10 @@ checks = ["frontmatter", "rules", "disable", "precedence"]
 # reads one back [docs]. Enable takes it out. Which file the URI names, and
 # that a skill VS Code lists there is kept from the model too, come from VS
 # Code's source only, so they are unverified until the release gate
-# confirms them (#119 makes this a mark).
+# confirms them.
 [[items.skill.disable]]
 block = "json-item-list"
-switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", sqlite = true, store_class = "sqlite" }
+switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", store_class = "sqlite" }
 target = "entry"
 context = "all"
 enable_action = "remove-item"

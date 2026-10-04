@@ -23,6 +23,7 @@ pub(crate) enum Medium {
 }
 
 impl Medium {
+    /// Whether it is a file, written whole.
     pub fn is_file(&self) -> bool {
         *self == Medium::File
     }
@@ -89,9 +90,10 @@ pub(crate) fn document(items: &[(&str, Option<String>)]) -> Vec<u8> {
             Some(format!("  {}: {text}", serde_json::Value::from(*key)))
         })
         .collect();
-    match held.is_empty() {
-        true => b"{\n}\n".to_vec(),
-        false => format!("{{\n{}\n}}\n", held.join(",\n")).into_bytes(),
+    if held.is_empty() {
+        b"{\n}\n".to_vec()
+    } else {
+        format!("{{\n{}\n}}\n", held.join(",\n")).into_bytes()
     }
 }
 

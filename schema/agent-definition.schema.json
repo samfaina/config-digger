@@ -1977,6 +1977,20 @@
           "items": {
             "type": "string"
           }
+        },
+        "map": {
+          "description": "How the Agent reads the value as the setting's, as `[held, read]`\npairs, such as VS Code reading a policy's `mcp: false` as\n`chat.mcp.access: \"none\"`. A value no pair holds then sets nothing.\nOmitted, the value is read as it is.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              true,
+              true
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "default": []
         }
       },
       "additionalProperties": false,
@@ -2409,13 +2423,8 @@
             "null"
           ]
         },
-        "sqlite": {
-          "description": "Whether the file is a SQLite store, such as VS Code's `state.vscdb`,\nwhose `ItemTable` holds JSON text under the key path's first key.\nIts store class must be `sqlite`.",
-          "type": "boolean",
-          "default": false
-        },
         "store_class": {
-          "description": "How the switch's file behaves while the Agent runs.",
+          "description": "How the switch's file behaves while the Agent runs. A `sqlite` file\nis a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`\nholds JSON text under the key path's first key.",
           "$ref": "#/$defs/StoreClass"
         }
       },
