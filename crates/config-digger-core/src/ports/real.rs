@@ -60,6 +60,34 @@ impl FileSystem for RealFileSystem {
             .map_err(sqlite)
     }
 
+    /// Opened read-write without creating the file, waiting briefly for an
+    /// Agent that holds a lock, and closed when the write is done.
+    fn write_sqlite_item(&self, path: &Path, key: &str, value: Option<&str>) -> io::Result<()> {
+        use rusqlite::{Connection, OpenFlags};
+
+        if !path.is_file() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        let sqlite = |error: rusqlite::Error| io::Error::other(error);
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(sqlite)?;
+        connection
+            .busy_timeout(std::time::Duration::from_millis(250))
+            .map_err(sqlite)?;
+        match value {
+            Some(value) => connection.execute(
+                "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?1, ?2)",
+                [key, value],
+            ),
+            None => connection.execute("DELETE FROM ItemTable WHERE key = ?1", [key]),
+        }
+        .map_err(sqlite)?;
+        connection.close().map_err(|(_, error)| sqlite(error))
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }

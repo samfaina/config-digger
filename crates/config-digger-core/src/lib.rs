@@ -23,5 +23,6 @@ mod running;
 mod scan;
 mod select;
 mod skill;
+mod store;
 mod user_list;
 mod version;

@@ -2852,3 +2852,117 @@ fn show_names_the_other_agents_that_read_an_entry_with_their_state() {
         run.stdout
     );
 }
+
+/// A VS Code user `mcp.json` with the server `fetch`, and the profile's
+/// own SQLite store, with `Code.exe` installed by the user setup: a copy of
+/// Windows' `PING.EXE` under that name, which runs while it pings.
+struct VsCode {
+    harness: Harness,
+    code_exe: PathBuf,
+    running: Option<std::process::Child>,
+}
+
+impl Drop for VsCode {
+    fn drop(&mut self) {
+        if let Some(running) = &mut self.running {
+            let _ = running.kill();
+            let _ = running.wait();
+        }
+    }
+}
+
+impl VsCode {
+    fn new() -> Self {
+        let harness = Harness::new();
+        let user = harness.roaming_app_data().join(r"Code\User");
+        std::fs::create_dir_all(user.join("globalStorage")).unwrap();
+        std::fs::write(
+            user.join("mcp.json"),
+            json!({ "servers": { "fetch": { "command": "uvx" } } }).to_string(),
+        )
+        .unwrap();
+        rusqlite::Connection::open(user.join(r"globalStorage\state.vscdb"))
+            .unwrap()
+            .execute_batch(
+                "CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB);
+                 INSERT INTO ItemTable VALUES ('mcp.enablement', '[]');",
+            )
+            .unwrap();
+        let folder = harness.local_app_data().join(r"Programs\Microsoft VS Code");
+        std::fs::create_dir_all(&folder).unwrap();
+        let code_exe = folder.join("Code.exe");
+        let windows = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_owned());
+        std::fs::copy(Path::new(&windows).join(r"System32\PING.EXE"), &code_exe).unwrap();
+        Self {
+            harness,
+            code_exe,
+            running: None,
+        }
+    }
+
+    /// Starts `Code.exe`, pinging long enough for the test.
+    fn running(mut self) -> Self {
+        let code = Command::new(&self.code_exe)
+            .args(["-n", "120", "127.0.0.1"])
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        self.running = Some(code);
+        self
+    }
+
+    fn store(&self) -> PathBuf {
+        self.harness
+            .roaming_app_data()
+            .join(r"Code\User\globalStorage\state.vscdb")
+    }
+
+    fn enablement(&self) -> String {
+        rusqlite::Connection::open(self.store())
+            .unwrap()
+            .query_row(
+                "SELECT value FROM ItemTable WHERE key = 'mcp.enablement'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap()
+    }
+}
+
+#[test]
+fn disable_of_a_vs_code_server_while_code_runs_is_blocked_whatever_is_acknowledged() {
+    let vscode = VsCode::new().running();
+    let disable = ["disable", "fetch", "--no-project", "--yes"];
+
+    let run = vscode.harness.run(&disable);
+    assert_eq!(run.code, 5, "{}\n{}", run.stdout, run.stderr);
+    assert!(
+        run.stderr.contains("Close VS Code and retry"),
+        "{}",
+        run.stderr
+    );
+
+    let acked: Vec<&str> = disable
+        .iter()
+        .copied()
+        .chain(["--ack", "running-agent", "--ack", "wide-reach"])
+        .collect();
+    let run = vscode.harness.run(&acked);
+    assert_eq!(run.code, 5, "{}\n{}", run.stdout, run.stderr);
+    assert_eq!(vscode.enablement(), "[]");
+}
+
+#[test]
+fn disable_of_a_vs_code_server_while_code_is_closed_writes_its_sqlite_store() {
+    let vscode = VsCode::new();
+
+    let run = vscode
+        .harness
+        .run(&["disable", "fetch", "--no-project", "--yes", "--json"]);
+
+    assert_eq!(run.code, 0, "{}\n{}", run.stdout, run.stderr);
+    let document: Value = serde_json::from_str(&run.stdout).unwrap();
+    assert_eq!(document["result"]["verify"], "verified");
+    let enablement: Value = serde_json::from_str(&vscode.enablement()).unwrap();
+    assert_eq!(enablement, json!([["mcp.config.usrlocal.fetch", false]]));
+}

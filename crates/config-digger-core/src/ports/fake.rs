@@ -346,6 +346,31 @@ impl FileSystem for FakeFileSystem {
         Ok(table.get(key).cloned())
     }
 
+    /// Fails like a file write, for a store [`failing_writes_to`]
+    /// (Self::failing_writes_to) names.
+    fn write_sqlite_item(&self, path: &Path, key: &str, value: Option<&str>) -> io::Result<()> {
+        self.read(path)?;
+        let mut files = self.files();
+        let path = files.follow(path);
+        let is = |known: &Path| strip_prefix(&path, known).is_some_and(|rest| rest.is_empty());
+        if let Some((_, successes)) = files.failing.iter_mut().find(|(failing, _)| is(failing)) {
+            if *successes == 0 {
+                return Err(io::Error::other("this fake write fails"));
+            }
+            *successes -= 1;
+        }
+        let (_, table) = files
+            .sqlite
+            .iter_mut()
+            .find(|(store, _)| is(store))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a SQLite store"))?;
+        match value {
+            Some(value) => table.insert(key.to_owned(), value.to_owned()),
+            None => table.remove(key),
+        };
+        Ok(())
+    }
+
     fn exists(&self, path: &Path) -> bool {
         self.real_path(path).is_some()
     }

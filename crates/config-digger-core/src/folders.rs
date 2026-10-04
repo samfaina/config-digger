@@ -287,6 +287,10 @@ impl FileSystem for AsIf<'_> {
         Err(read_only())
     }
 
+    fn write_sqlite_item(&self, _: &Path, _: &str, _: Option<&str>) -> io::Result<()> {
+        Err(read_only())
+    }
+
     fn try_lock(&self, _: &Path) -> io::Result<Option<HeldLock>> {
         Err(read_only())
     }

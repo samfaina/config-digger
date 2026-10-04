@@ -1,0 +1,15 @@
+{
+  "content.trust.model.key": {
+    "uriTrustInfo": [
+      {
+        "uri": {
+          "$mid": 1,
+          "external": "file:///e%3A/projects",
+          "path": "/e:/projects",
+          "scheme": "file"
+        },
+        "trusted": true
+      }
+    ]
+  }
+}

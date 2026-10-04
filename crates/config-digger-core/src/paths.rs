@@ -127,6 +127,65 @@ pub(crate) fn from_file_uri(uri: &str) -> Option<PathBuf> {
     is_absolute(&path).then_some(path)
 }
 
+/// The path a `file:` URI names, as VS Code stores one: as text, or as an
+/// object of its `scheme`, `authority` and unencoded `path`. `None` for
+/// another scheme.
+pub(crate) fn from_uri_value(value: &serde_json::Value) -> Option<PathBuf> {
+    let fields = match value {
+        serde_json::Value::String(uri) => return from_file_uri(uri),
+        serde_json::Value::Object(fields) => fields,
+        _ => return None,
+    };
+    if fields.get("scheme")?.as_str()? != "file" {
+        return None;
+    }
+    let path = fields.get("path")?.as_str()?;
+    let spelling = match fields.get("authority").and_then(serde_json::Value::as_str) {
+        Some(authority) if !authority.is_empty() => format!("//{authority}{path}"),
+        _ => path.strip_prefix('/').unwrap_or(path).to_owned(),
+    };
+    let path = lexical(Path::new(&spelling));
+    is_absolute(&path).then_some(path)
+}
+
+/// The path of the `file:` URI of `path`, as VS Code's URIs hold it:
+/// `/`-separated and starting with `/`, such as `/C:/Users/x` for
+/// `C:\Users\x`, or `//server/share` for a share.
+pub(crate) fn uri_path(path: &Path) -> String {
+    let path = path.to_string_lossy().replace('\\', "/");
+    if path.starts_with('/') {
+        path
+    } else {
+        format!("/{path}")
+    }
+}
+
+/// The `file:` URI of `path` as VS Code writes one: the drive letter in
+/// lower case, its `:` and every character outside the unreserved ones
+/// percent-encoded, such as `file:///c%3A/Users/x` for `C:\Users\x`, or
+/// `file://server/share` for a share.
+pub(crate) fn to_file_uri(path: &Path) -> String {
+    let path = uri_path(path);
+    let (authority, path) = match path.strip_prefix("//") {
+        Some(share) => share.split_at(share.find('/').unwrap_or(share.len())),
+        None => ("", path.as_str()),
+    };
+    let mut uri = format!("file://{authority}");
+    let bytes = path.as_bytes();
+    let drive =
+        bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':';
+    for (at, byte) in bytes.iter().enumerate() {
+        match byte {
+            _ if drive && at == 1 => uri.push(byte.to_ascii_lowercase() as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                uri.push(*byte as char);
+            }
+            byte => uri.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    uri
+}
+
 /// Checks a path glob of an Agent definition: it starts with `~/`, `%NAME%`
 /// or a drive, and each `{` closes before the next one opens.
 pub(crate) fn validate_glob(glob: &str) -> Result<(), String> {

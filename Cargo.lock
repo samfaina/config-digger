@@ -483,6 +483,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "config-digger-core",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",

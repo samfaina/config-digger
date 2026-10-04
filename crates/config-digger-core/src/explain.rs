@@ -248,12 +248,13 @@ fn for_project(per_project: bool) -> &'static str {
     if per_project { " for this Project" } else { "" }
 }
 
-/// What Disable writes for the Entry `name`: `edit` on the switch in
+/// What Disable writes for the Entry `name`: `edits` on the switch in
 /// `path`, which applies in the context's Project only when `per_project`.
-pub(crate) fn disable_switch(edit: &Edit, name: &str, path: &Path, per_project: bool) -> String {
+pub(crate) fn disable_switch(edits: &[Edit], name: &str, path: &Path, per_project: bool) -> String {
     let scope = for_project(per_project);
     let path = path.display();
-    match edit {
+    // An item replaced in a list is said by what it adds.
+    match edits.last().expect("Disable writes a switch") {
         Edit::Append { key_path, .. } => {
             format!(
                 "Disable adds `{name}` to `{}` in {path}{scope}.",
@@ -296,6 +297,21 @@ fn describe(edit: &Edit, path: &str) -> String {
 
 fn last(key_path: &[String]) -> &str {
     key_path.last().map_or("", String::as_str)
+}
+
+/// That the list `list` in `path` holds `item` for the Entry `id`.
+pub(crate) fn item_in_list(
+    id: &str,
+    item: &Value,
+    list: &str,
+    path: &Path,
+    per_project: bool,
+) -> String {
+    format!(
+        "`{list}` in {}{} holds {item} for `{id}`",
+        path.display(),
+        for_project(per_project)
+    )
 }
 
 /// That the list `list` in `path` holds `name`.
@@ -519,6 +535,34 @@ pub(crate) fn not_approved(
     }
 }
 
+/// A Blocked Entry's reason: the user has not trusted the folder of the
+/// Project at `project`, which `agent_name` needs first.
+pub(crate) fn untrusted_folder(agent_name: &str, project: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::UntrustedFolder,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Blocked: {agent_name} uses it only once you trust {}, which it asks about when the Project opens. config-digger never trusts a folder.",
+            project.display()
+        ),
+    }
+}
+
+/// A Blocked Entry's reason: `agent_name` has not trusted the Entry `name`
+/// it discovered in the file `path` as it is now.
+pub(crate) fn not_trusted(agent_name: &str, name: &str, path: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::NotApproved,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Blocked: you have not trusted `{name}` from {} in {agent_name}, which asks when the server starts, and again whenever its configuration changes; config-digger never trusts servers.",
+            path.display()
+        ),
+    }
+}
+
 /// A setting, by its last key, in `path`.
 pub(crate) fn setting(key: &str, path: &Path) -> String {
     format!("`{key}` in {}", path.display())
@@ -571,15 +615,20 @@ pub(crate) fn not_allowed(policy: bool, key: &str, paths: &[&Path], agent_name: 
     kept_out(policy, ReasonCode::DisabledByRule, &why, agent_name)
 }
 
-/// The reason of an Entry the switch `key` in `path` turns off, holding `value`.
+/// The reason of an Entry the switch `key` in `path` turns off, holding
+/// `value`, as of `cached_at` when the Agent cached it then.
 pub(crate) fn switched_off(
     policy: bool,
     key: &str,
     value: &Value,
     path: &Path,
+    cached_at: Option<SystemTime>,
     agent_name: &str,
 ) -> Reason {
-    let why = format!("`{key}` is {value} in {}", path.display());
+    let mut why = format!("`{key}` is {value} in {}", path.display());
+    if let Some(at) = cached_at {
+        why.push_str(&format!(" as of {}", as_of(at)));
+    }
     kept_out(policy, ReasonCode::DisabledGlobally, &why, agent_name)
 }
 
@@ -664,6 +713,15 @@ pub(crate) fn enable_not_offered(holds: &str) -> String {
 /// Why Enable is refused for an Entry it is not offered for: `sentence`.
 pub(crate) fn enable_refused(locator: &str, sentence: &str) -> String {
     format!("cannot Enable {locator}: {sentence}")
+}
+
+/// Why an Operation cannot write the SQLite store at `path`: it is gone,
+/// and config-digger never creates one.
+pub(crate) fn store_missing(path: &Path) -> String {
+    format!(
+        "{} is gone; the Agent creates its store, config-digger never does",
+        path.display()
+    )
 }
 
 /// Why Enable is refused for an Entry that is not Disabled.

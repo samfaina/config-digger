@@ -33,6 +33,12 @@ pub trait FileSystem: Send + Sync {
     /// there. A missing file is an error of kind `NotFound`.
     fn read_sqlite_item(&self, path: &Path, key: &str) -> io::Result<Option<String>>;
 
+    /// Sets the value under `key` in the `ItemTable` of the SQLite store at
+    /// `path` to the text `value`, or deletes the row with `None`, in one
+    /// transaction, waiting briefly for an Agent that holds a lock. It never
+    /// creates a store: a missing file is an error of kind `NotFound`.
+    fn write_sqlite_item(&self, path: &Path, key: &str, value: Option<&str>) -> io::Result<()>;
+
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
 

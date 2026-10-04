@@ -9,6 +9,7 @@ use crate::api::{
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::folders::{FolderOp, FolderSize};
 use crate::ports::{Environment, HeldLock, Ports};
+use crate::store::Medium;
 use crate::{explain, plan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -175,6 +176,10 @@ pub(crate) struct LocationRecord {
     /// An Entry was parked out of the file or put back into it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub parking: bool,
+    /// What was written: the file, or values of the SQLite store it is,
+    /// whose backup is the document of those values.
+    #[serde(default, skip_serializing_if = "Medium::is_file")]
+    pub medium: Medium,
 }
 
 impl LocationRecord {

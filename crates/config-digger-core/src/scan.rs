@@ -17,6 +17,7 @@ use crate::definitions::{
 use crate::folders::{AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
+use crate::store::Written;
 use crate::user_list::{self, UserList};
 use crate::{mask, park, paths, skill};
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,6 +65,8 @@ pub(crate) struct Snapshot {
     /// Where each parked Entry, listed among the Entries at its key path in
     /// the store, came from.
     pub parked: Vec<ScannedParked>,
+    /// The folder each Agent home keeps for each Project.
+    pub storage: Vec<StorageFolder>,
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -127,6 +130,8 @@ pub(crate) struct ScannedSetting {
     pub key_path: Vec<String>,
     /// What the file holds there: `None` when the file or key is missing.
     pub value: Option<serde_json::Value>,
+    /// When the Agent cached the value, for a value it caches.
+    pub cached_at: Option<SystemTime>,
 }
 
 /// The rule or gate a setting is read for, by its index among those of its
@@ -285,9 +290,11 @@ pub(crate) struct ScannedSwitch {
     /// when it has one:
     /// `None` when the file or key is missing.
     pub value: Option<serde_json::Value>,
-    /// When the value is a list of objects, the field of each that holds
-    /// the name it stands for.
+    /// When the value is a list, what of each item holds the name it stands
+    /// for: a field, or an index in a list of lists.
     pub named_by: Option<String>,
+    /// Whether names in the list compare without regard to case.
+    pub ignore_case: bool,
     /// How the file behaves while the Agent runs.
     pub store_class: StoreClass,
 }
@@ -319,20 +326,35 @@ impl ScannedSwitch {
         }
     }
 
-    /// In a list named by a field, the item that names `key`, and its index.
+    /// In a list named by a field or index, the item that names `key`, and
+    /// its index.
     fn item(&self, key: &str) -> Option<(usize, &serde_json::Value)> {
         let field = self.named_by.as_deref()?;
         let items = self.value.as_ref()?.as_array()?;
-        items
-            .iter()
-            .enumerate()
-            .find(|(_, item)| item.get(field).and_then(serde_json::Value::as_str) == Some(key))
+        items.iter().enumerate().find(|(_, item)| {
+            let name = match item {
+                serde_json::Value::Array(values) => field
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|index| values.get(index)),
+                item => item.get(field),
+            };
+            name.and_then(serde_json::Value::as_str)
+                .is_some_and(|name| match self.ignore_case {
+                    true => name.eq_ignore_ascii_case(key),
+                    false => name == key,
+                })
+        })
     }
 }
 
-/// The value at `key_path` below `value`.
+/// The value at `key_path` below `value`, where a key below a list is an
+/// index into it.
 fn lookup<'v>(value: &'v serde_json::Value, key_path: &[String]) -> Option<&'v serde_json::Value> {
-    key_path.iter().try_fold(value, |value, key| value.get(key))
+    key_path.iter().try_fold(value, |value, key| match value {
+        serde_json::Value::Array(items) => items.get(key.parse::<usize>().ok()?),
+        value => value.get(key),
+    })
 }
 
 impl Snapshot {
@@ -385,6 +407,34 @@ impl Snapshot {
             .iter()
             .find(|scanned| scanned.path == path && scanned.key_path == key_path)
             .expect("a resolved Entry comes from the snapshot")
+    }
+
+    /// The file `anchor` names for `entry` in the context of the Project
+    /// with the key `project` and the folder `folder`, as
+    /// [`ScannedEntry::file_of`] finds it, or for an anchor in the folder the
+    /// Agent home keeps for each Project, in that Project's.
+    pub fn file_for(
+        &self,
+        entry: &ScannedEntry,
+        anchor: &Anchor,
+        project: Option<(&str, &Path)>,
+    ) -> Option<PathBuf> {
+        let roots = self.roots(entry.agent_index, &entry.home);
+        let Some(relative) = anchor.project_storage() else {
+            let folder = project
+                .map(|(_, folder)| folder)
+                .filter(|_| anchor.in_project());
+            return entry.file_of(anchor, roots, folder);
+        };
+        let (key, _) = project?;
+        self.storage
+            .iter()
+            .find(|storage| {
+                storage.agent_index == entry.agent_index
+                    && storage.home == entry.home
+                    && storage.project == key
+            })
+            .map(|storage| blocks::join_relative(&storage.folder, relative))
     }
 
     /// The places of the switch of the mechanism at `mechanism` among those
@@ -488,6 +538,8 @@ pub(crate) struct ScannedProject {
     pub exists: bool,
     /// It is a `.code-workspace` file rather than a folder.
     pub workspace_file: bool,
+    /// For a workspace file, the folders it opens, first first.
+    pub members: Vec<PathBuf>,
     /// The keys of every lexically normalised spelling that names this Project.
     pub spellings: BTreeSet<String>,
     /// The Agents whose registries record it.
@@ -533,6 +585,9 @@ pub(crate) struct ScannedEntry {
     pub manager: Option<ManagerMatch>,
     /// For an Entry of a plugin, the plugin.
     pub plugin: Option<ScannedPlugin>,
+    /// What the Agent's Disable switches hold it by, made by its location's
+    /// `switch_id`; `None` for a location without one.
+    pub switch_id: Option<String>,
 }
 
 /// The skill manager whose detectors match a skill folder most strongly.
@@ -630,14 +685,14 @@ pub(crate) fn scan(
     scan_as_if(definitions, ports, extra_projects, &[], &[])
 }
 
-/// Scans as [`scan`] does, as if each file in `written` held the bytes paired
-/// with it and `folders` were done, so that a plan can predict what a scan
+/// Scans as [`scan`] does, as if each location in `written` held what it
+/// will hold and `folders` were done, so that a plan can predict what a scan
 /// will read once it is done.
 pub(crate) fn scan_as_if(
     definitions: &[AgentDefinition],
     ports: &Ports,
     extra_projects: &[PathBuf],
-    written: &[(PathBuf, Vec<u8>)],
+    written: &[Written],
     folders: &[PlannedFolder],
 ) -> Result<Snapshot, ScanError> {
     let as_if = AsIf::new(ports.fs.as_ref(), folders);
@@ -741,6 +796,11 @@ pub(crate) fn scan_as_if(
             workspaces.push((project.path.clone(), project.key.clone(), members));
         }
     }
+    for project in &mut scanner.projects.list {
+        if let Some((_, _, members)) = workspaces.iter().find(|(path, ..)| *path == project.path) {
+            project.members = members.clone();
+        }
+    }
     for home in &found {
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
@@ -793,6 +853,7 @@ pub(crate) fn scan_as_if(
         definitions,
         &found,
         &projects,
+        &scanner.storage,
         &installed,
         &scanner.entries,
         &mut scanner.reader,
@@ -801,6 +862,7 @@ pub(crate) fn scan_as_if(
         definitions,
         &found,
         &projects,
+        &scanner.storage,
         &installed,
         &settings,
         &mut scanner.reader,
@@ -809,6 +871,13 @@ pub(crate) fn scan_as_if(
     let gates = read_gates(definitions, &found, &mut scanner.reader, ports);
     let exclusive = exclusive_files(definitions, &found, &as_if);
     scanner.entries = one_per_entry(definitions, scanner.entries);
+    for entry in &mut scanner.entries {
+        let location = definitions[entry.agent_index].location(&entry.location);
+        entry.switch_id = location
+            .switch_id
+            .as_deref()
+            .map(|template| switch_id(template, entry, &location.root));
+    }
     let managers = skill_managers::built_in().unwrap_or_default();
     for entry in &mut scanner.entries {
         let location = definitions[entry.agent_index].location(&entry.location);
@@ -895,6 +964,7 @@ pub(crate) fn scan_as_if(
         unreadable_settings,
         parked_store,
         parked,
+        storage: scanner.storage,
     })
 }
 
@@ -1084,6 +1154,7 @@ fn read_switches(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
+    storage: &[StorageFolder],
     installed: &Installed,
     entries: &[ScannedEntry],
     reader: &mut Reader,
@@ -1101,6 +1172,7 @@ fn read_switches(
                 let places = Places {
                     home,
                     projects,
+                    storage,
                     settings: &[],
                     plugins: plugins_of(installed, home),
                     entries: covered(definition, entries, home, kind, block),
@@ -1109,6 +1181,8 @@ fn read_switches(
                     &switch.anchor,
                     &switch.key_path,
                     &JsonFormat::STRICT,
+                    switch.sqlite,
+                    None,
                     reader,
                     &mut unreadable,
                 ) {
@@ -1122,7 +1196,8 @@ fn read_switches(
                         file_of: place.file_of,
                         value: place.value,
                         key_path: place.key_path,
-                        named_by: switch.named_by.clone(),
+                        named_by: switched.named_by().map(str::to_owned),
+                        ignore_case: switched.ignores_case(),
                         store_class: switch.store_class,
                     });
                 }
@@ -1139,6 +1214,7 @@ fn read_rules(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
+    storage: &[StorageFolder],
     installed: &Installed,
     settings: &[ScannedSettings],
     reader: &mut Reader,
@@ -1156,8 +1232,7 @@ fn read_rules(
             });
             let gate_sources = rules.gates.iter().enumerate().flat_map(|(gate, block)| {
                 block
-                    .sources()
-                    .iter()
+                    .settings()
                     .enumerate()
                     .map(move |(source, setting)| (SettingOwner::Gate { gate, source }, setting))
             });
@@ -1201,6 +1276,7 @@ fn read_rules(
                 let places = Places {
                     home,
                     projects,
+                    storage,
                     settings,
                     plugins: plugins_of(installed, home),
                     entries: Vec::new(),
@@ -1210,6 +1286,8 @@ fn read_rules(
                     &setting.anchor,
                     &setting.key_path,
                     &format,
+                    setting.sqlite,
+                    setting.cached_at.as_deref(),
                     reader,
                     &mut unreadable,
                 ) {
@@ -1223,6 +1301,7 @@ fn read_rules(
                         file_of: place.file_of,
                         key_path: place.key_path,
                         value: place.value,
+                        cached_at: place.cached_at,
                     });
                 }
             }
@@ -1244,12 +1323,16 @@ struct Place {
     key_path: Vec<String>,
     /// What the file holds at the key path, up to `{name}` when it has one.
     value: Option<serde_json::Value>,
+    /// When the Agent cached the value, where the setting says.
+    cached_at: Option<SystemTime>,
 }
 
 /// Where the values an anchor and a key path name are, for one Agent home.
 struct Places<'a> {
     home: &'a FoundHome,
     projects: &'a [ScannedProject],
+    /// The folders the Agent homes keep for each Project.
+    storage: &'a [StorageFolder],
     /// The settings a settings anchor reads.
     settings: &'a [ScannedSettings],
     /// The plugins of the home, each with a file of an anchor per plugin.
@@ -1296,12 +1379,18 @@ impl Places<'_> {
     /// path holding `{project}`, and once otherwise. A file that is missing
     /// is read as empty; one that cannot be read or parsed as JSON, or that
     /// is a Read failure for the Agent home, goes into `unreadable` and has
-    /// no places.
+    /// no places. With `sqlite`, the file is a SQLite store, read as an
+    /// object of the key path's first key and the JSON its `ItemTable` holds
+    /// there; a missing store has no places. With `cached_at`, each place
+    /// says when the Agent cached the value, read at that key path.
+    #[allow(clippy::too_many_arguments)]
     fn read(
         &self,
         anchor: &Anchor,
         key_path: &[String],
         format: &JsonFormat,
+        sqlite: bool,
+        cached_at: Option<&[String]>,
         reader: &mut Reader,
         unreadable: &mut BTreeSet<PathBuf>,
     ) -> Vec<Place> {
@@ -1344,6 +1433,17 @@ impl Places<'_> {
                         ))
                     })
                     .collect()
+            } else if let Some(relative) = anchor.project_storage() {
+                self.storage
+                    .iter()
+                    .filter(|storage| {
+                        storage.agent_index == home.agent_index && storage.home == home.home
+                    })
+                    .map(|storage| {
+                        let path = blocks::join_relative(&storage.folder, relative);
+                        (path, Some(storage.project.clone()), None)
+                    })
+                    .collect()
             } else if anchor.project_file() {
                 self.projects
                     .iter()
@@ -1379,9 +1479,18 @@ impl Places<'_> {
                 unreadable.insert(path);
                 continue;
             }
-            let document = match reader.peek(&path) {
+            let read = if sqlite {
+                if !reader.fs.exists(&path) {
+                    continue;
+                }
+                reader.peek_item(&path, &key_path[0])
+            } else {
+                reader.peek(&path).map(|text| text.map(str::to_owned))
+            };
+            let document = match read {
                 Ok(None) => None,
-                Ok(Some(text)) => match format.parse(text) {
+                Ok(Some(text)) => match format.parse(&text) {
+                    Ok(document) if sqlite => Some(serde_json::json!({ &key_path[0]: document })),
                     Ok(document) => Some(document),
                     Err(_) => {
                         unreadable.insert(path);
@@ -1393,6 +1502,10 @@ impl Places<'_> {
                     continue;
                 }
             };
+            let cached = cached_at
+                .zip(document.as_ref())
+                .and_then(|(key_path, document)| lookup(document, key_path))
+                .and_then(blocks::time_of);
             let place = |project: Option<String>, key_path: Vec<String>| {
                 let up_to_name = key_path
                     .iter()
@@ -1402,6 +1515,7 @@ impl Places<'_> {
                     path: path.clone(),
                     project,
                     file_of: file_of.clone(),
+                    cached_at: cached,
                     value: document
                         .as_ref()
                         .and_then(|document| lookup(document, &key_path[..up_to_name]))
@@ -1685,6 +1799,35 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .registries
         .iter()
         .map(|registry| registry.anchor());
+    // What rules, gates, switches and conditions read can be on the
+    // machine too, such as a store every profile of VS Code shares.
+    let settings = definition.items.values().flat_map(|rules| {
+        let read = rules
+            .rules
+            .iter()
+            .flat_map(|rule| rule.settings())
+            .chain(rules.gates.iter().flat_map(|gate| gate.settings()))
+            .chain(
+                rules
+                    .competition
+                    .only_while()
+                    .into_iter()
+                    .flat_map(|setting| &setting.sources),
+            )
+            .map(|setting| &setting.anchor);
+        let switches = rules
+            .disable
+            .iter()
+            .filter_map(|mechanism| Some(&mechanism.switch()?.anchor));
+        read.chain(switches)
+    });
+    let conditions = definition
+        .locations
+        .iter()
+        .flat_map(|location| &location.when)
+        .filter_map(|condition| condition.setting())
+        .flat_map(|setting| &setting.sources)
+        .map(|setting| &setting.anchor);
     definition
         .locations
         .iter()
@@ -1692,6 +1835,8 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .chain(env_maps)
         .chain(plugins)
         .chain(registries)
+        .chain(settings)
+        .chain(conditions)
         .filter_map(|anchor| anchor.machine())
         .filter_map(|text| Some((text.to_owned(), paths::expand(text, ports.env.as_ref())?)))
         .collect()
@@ -1754,6 +1899,29 @@ fn folders_read(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf
     }
 }
 
+/// The id `template`, a location's `switch_id`, makes for `entry`, read
+/// at `root`.
+fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
+    // The key `*` stands for in the root, such as `<extension>/<provider>`.
+    let extension = root
+        .iter()
+        .position(|key| key == "*")
+        .and_then(|at| entry.key_path.get(at))
+        .map(|key| key.split('/').next().unwrap_or_default().to_lowercase())
+        .unwrap_or_default();
+    let plugin_uri = entry
+        .plugin
+        .as_ref()
+        .map(|plugin| paths::to_file_uri(&plugin.folder))
+        .unwrap_or_default();
+    template
+        .replace("{name}", &entry.name)
+        .replace("{folder_index}", &(entry.depth / MEMBER_RANKS).to_string())
+        .replace("{uri_path}", &paths::uri_path(&entry.path))
+        .replace("{plugin_uri}", &plugin_uri)
+        .replace("{extension}", &extension)
+}
+
 /// The Entries, each one once: an Entry several locations of an Agent home
 /// reach, such as a skill folder through a linked folder, is
 /// kept once, from the location the Agent ranks highest, and the nearest
@@ -1800,12 +1968,13 @@ struct Scanner<'p> {
 
 /// The folder an Agent home keeps what it stores for one Project in, such as
 /// VS Code's `workspaceStorage\<id>`.
-struct StorageFolder {
-    agent_index: usize,
-    home: String,
-    folder: PathBuf,
+#[derive(Clone)]
+pub(crate) struct StorageFolder {
+    pub agent_index: usize,
+    pub home: String,
+    pub folder: PathBuf,
     /// The Project's key.
-    project: String,
+    pub project: String,
 }
 
 impl Scanner<'_> {
@@ -2067,6 +2236,7 @@ impl Scanner<'_> {
                 link: None,
                 manager: None,
                 plugin: None,
+                switch_id: None,
             });
             parked.push(ScannedParked {
                 key_path,
@@ -2121,6 +2291,7 @@ impl Scanner<'_> {
                     link: None,
                     manager: None,
                     plugin: None,
+                    switch_id: None,
                 });
             }
             return;
@@ -2342,6 +2513,7 @@ impl Scanner<'_> {
                     link: None,
                     manager: None,
                     plugin: None,
+                    switch_id: None,
                 });
             }
         }
@@ -2419,6 +2591,7 @@ impl Scanner<'_> {
                         }),
                         manager: None,
                         plugin: None,
+                        switch_id: None,
                     });
                     continue;
                 }
@@ -2479,6 +2652,7 @@ impl Scanner<'_> {
             link,
             manager: None,
             plugin: None,
+            switch_id: None,
         });
     }
 
@@ -2778,7 +2952,7 @@ struct Reader<'p> {
     /// The file system as the scan reads it.
     fs: &'p dyn FileSystem,
     /// Files read as holding these bytes instead of what is on disk.
-    written: &'p [(PathBuf, Vec<u8>)],
+    written: &'p [Written],
     files: BTreeMap<PathBuf, Result<Option<String>, ReadFailureKind>>,
     /// What SQLite stores hold, by store and key.
     items: BTreeMap<(PathBuf, String), Result<Option<String>, ReadFailureKind>>,
@@ -2787,7 +2961,7 @@ struct Reader<'p> {
 }
 
 impl<'p> Reader<'p> {
-    fn new(fs: &'p dyn FileSystem, written: &'p [(PathBuf, Vec<u8>)]) -> Self {
+    fn new(fs: &'p dyn FileSystem, written: &'p [Written]) -> Self {
         Self {
             fs,
             written,
@@ -2822,9 +2996,25 @@ impl<'p> Reader<'p> {
         key: &str,
         project: Option<&str>,
     ) -> Option<String> {
+        match self.peek_item(path, key) {
+            Ok(text) => text,
+            Err(kind) => {
+                self.fail(home, path, project, kind, None);
+                None
+            }
+        }
+    }
+
+    /// The text under `key` in the `ItemTable` of the SQLite store at
+    /// `path`, `None` when the store or the key is missing, as
+    /// [`sqlite_text`](Self::sqlite_text) reads it but without reporting a
+    /// failure: for a store that holds no Entries, such as a switch's.
+    fn peek_item(&mut self, path: &Path, key: &str) -> Result<Option<String>, ReadFailureKind> {
         let id = (path.to_path_buf(), key.to_owned());
         if !self.items.contains_key(&id) {
-            let read = match self.fs.read_sqlite_item(path, key) {
+            let read = match Written::item(self.written, path, key)
+                .map_or_else(|| self.fs.read_sqlite_item(path, key), Ok)
+            {
                 Ok(text) => Ok(text),
                 Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
                 Err(error) => {
@@ -2834,13 +3024,7 @@ impl<'p> Reader<'p> {
             };
             self.items.insert(id.clone(), read);
         }
-        match self.items[&id].clone() {
-            Ok(text) => text,
-            Err(kind) => {
-                self.fail(home, path, project, kind, None);
-                None
-            }
-        }
+        self.items[&id].clone()
     }
 
     /// A file's text, `None` when it is missing, as [`text`](Self::text)
@@ -2857,8 +3041,8 @@ impl<'p> Reader<'p> {
     }
 
     fn read(&self, path: &Path) -> Result<Option<String>, ReadFailureKind> {
-        match self.written.iter().find(|(written, _)| written == path) {
-            Some((_, bytes)) => decode(bytes.clone()).map(Some),
+        match Written::file(self.written, path) {
+            Some(bytes) => decode(bytes.to_vec()).map(Some),
             None => read(self.fs, path),
         }
     }
@@ -2948,6 +3132,7 @@ impl<'p> Projects<'p> {
                             registered_by: BTreeSet::new(),
                             added: false,
                             hidden: false,
+                            members: Vec::new(),
                         });
                         self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1

@@ -503,6 +503,16 @@ pub(crate) struct LocationDefinition {
     /// name, such as `{plugin}:{name}`. Without it, an Entry goes by its
     /// own name.
     pub name_template: Option<String>,
+    /// What the Agent's Disable switches hold an Entry of this location by,
+    /// when not by its name, such as the server ids VS Code pairs with
+    /// `true` or `false` in `mcp.enablement`: a template of `{name}`, the
+    /// Entry's name; `{folder_index}`, the position of its folder among
+    /// those of the Project, 0 for a folder Project; `{uri_path}`, the path
+    /// of the `file:` URI of its file or skill folder, such as `/C:/x`;
+    /// `{plugin_uri}`, the `file:` URI of its plugin's folder; and
+    /// `{extension}`, the key `*` stands for in its root up to a `/`, in
+    /// lower case.
+    pub switch_id: Option<String>,
     /// What the value at `root` of a location in plugins may hold besides
     /// an object of Entries: a path, relative to the plugin's folder, of
     /// another file in the location's format, or a list of such paths and
@@ -685,9 +695,13 @@ pub(crate) enum Check {
     /// A Disable mechanism's switch is set for the Entry: Disabled.
     Disable,
     /// The Agent has not approved the Entry: Blocked, with `not_approved`.
-    /// Required when a gate of the kind is an approval list, and refused
-    /// otherwise.
+    /// Required when a gate of the kind is an approval list or a nonce
+    /// trust, and refused otherwise.
     Approval,
+    /// The user has not trusted the Entry's Project: Blocked, with
+    /// `untrusted_folder`. Required when a gate of the kind is trusted
+    /// folders, and refused otherwise.
+    Trust,
     /// A rule keeps the Entry out: Blocked, with `policy`, when the rule is
     /// managed policy, and Disabled, with `disabled_by_rule` or
     /// `disabled_globally`, otherwise. Before `precedence`, an Entry a rule
@@ -1179,9 +1193,20 @@ impl AgentDefinition {
                     rules
                         .gates
                         .iter()
-                        .any(|gate| matches!(gate, Gate::ApprovalList(_))),
-                    "which an approval gate needs",
-                    "but no gate is an approval",
+                        .any(|gate| matches!(gate, Gate::ApprovalList(_) | Gate::NonceTrust(_))),
+                    "which an approval or nonce-trust gate needs",
+                    "but no gate is an approval or a nonce trust",
+                )
+                .map_err(context)?;
+            rules
+                .check_when(
+                    Check::Trust,
+                    rules
+                        .gates
+                        .iter()
+                        .any(|gate| matches!(gate, Gate::TrustedFolders(_))),
+                    "which a trusted-folders gate needs",
+                    "but no gate is trusted folders",
                 )
                 .map_err(context)?;
             rules
@@ -1232,7 +1257,10 @@ impl AgentDefinition {
                             return Err(context(format!("`{id}` is not a location of this kind")));
                         }
                     }
-                    Gate::ApprovalList(_) | Gate::PolicyField(_) => {
+                    Gate::ApprovalList(_)
+                    | Gate::PolicyField(_)
+                    | Gate::TrustedFolders(_)
+                    | Gate::NonceTrust(_) => {
                         if let Some(id) = gate
                             .locations()
                             .into_iter()
@@ -1242,7 +1270,7 @@ impl AgentDefinition {
                         }
                     }
                 }
-                for source in gate.sources() {
+                for source in gate.settings() {
                     self.validate_setting(&source.anchor).map_err(context)?;
                 }
             }
@@ -1378,6 +1406,7 @@ impl Check {
             Check::Disable => "disable",
             Check::Rules => "rules",
             Check::Approval => "approval",
+            Check::Trust => "trust",
             Check::Precedence => "precedence",
             Check::Shape => "shape",
             Check::Frontmatter => "frontmatter",
