@@ -1168,8 +1168,6 @@ impl AgentDefinition {
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
-                self.validate_home_root(&mechanism.switch().anchor)
-                    .map_err(context)?;
                 if let Some(id) = mechanism
                     .locations()
                     .iter()
@@ -1177,6 +1175,22 @@ impl AgentDefinition {
                 {
                     return Err(context(format!("`{id}` is not a location of this kind")));
                 }
+                let Some(mechanism) = mechanism.switched() else {
+                    // Parking moves a key out of a file and back.
+                    if let Some(id) = mechanism.locations().iter().find(|id| {
+                        let location = self.location(id);
+                        location.format.file().is_none()
+                            || location.anchor.plugin().is_some()
+                            || location.one_entry
+                    }) {
+                        return Err(context(format!(
+                            "park covers keys in files outside plugins only, not `{id}`"
+                        )));
+                    }
+                    continue;
+                };
+                self.validate_home_root(&mechanism.switch().anchor)
+                    .map_err(context)?;
                 if mechanism.target() == MechanismTarget::Plugin {
                     if mechanism.locations().is_empty() {
                         return Err(context("target `plugin` needs its locations listed".into()));

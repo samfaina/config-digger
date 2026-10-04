@@ -13,7 +13,7 @@ use crate::definitions::AgentDefinition;
 use crate::edit::EditableFile;
 use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
-use crate::mask::{self, Side};
+use crate::mask::Side;
 use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::{FileSystem, Ports};
 use crate::{explain, resolve, running, scan};
@@ -130,6 +130,7 @@ pub(crate) fn execute(
                 })
                 .collect(),
             deleted_edits: Vec::new(),
+            parking: write.file.parking,
         });
     }
     let mut pending = Vec::new();
@@ -834,10 +835,8 @@ fn fail(
         .filter(|(_, location)| location.outcome == RollbackOutcome::NotRestored)
         .map(|(write, _)| {
             let current = ports.fs.read(&write.file.path).ok();
-            mask::diff(
+            write.file.diff(
                 definitions,
-                &write.file.readers,
-                &write.file.path,
                 Side {
                     bytes: write.current.as_deref(),
                     name: "before the Operation",

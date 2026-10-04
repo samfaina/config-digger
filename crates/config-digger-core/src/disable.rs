@@ -5,7 +5,7 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    Anchored, DisableMechanism, DisableReason, Disables, MechanismContext, MechanismTarget,
+    Anchored, DisableReason, Disables, MechanismContext, MechanismTarget, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
@@ -24,7 +24,7 @@ pub(crate) struct ContextProject<'p> {
 
 /// A switch set for an Entry: one that Disables it, or a partial switch.
 pub(crate) struct Hit<'a> {
-    pub mechanism: &'a DisableMechanism,
+    pub mechanism: Switched<'a>,
     pub switch: &'a ScannedSwitch,
     /// The switch's key path for the Entry.
     pub key_path: Vec<String>,
@@ -77,13 +77,13 @@ impl Hit<'_> {
     pub fn holds(&self) -> String {
         let per_project = self.per_project();
         match self.mechanism {
-            DisableMechanism::JsonNameList(_) => explain::in_list(
+            Switched::JsonNameList(_) => explain::in_list(
                 self.key,
                 self.key_path.last().expect("validation requires a key"),
                 &self.switch.path,
                 per_project,
             ),
-            DisableMechanism::JsonField(block) => explain::field_holds(
+            Switched::JsonField(block) => explain::field_holds(
                 &self.key_path,
                 self.value,
                 block.default_value.as_ref(),
@@ -132,7 +132,13 @@ pub(crate) fn hits<'a>(
     // Whether a layered switch already holds a value for the Entry, which
     // the later layers then leave as it is.
     let mut layer_decided = false;
-    for (index, mechanism) in definition.rules(location.kind).disable.iter().enumerate() {
+    let switched = definition
+        .rules(location.kind)
+        .disable
+        .iter()
+        .enumerate()
+        .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)));
+    for (index, mechanism) in switched {
         if !mechanism.covers(&location.id) || (mechanism.layered() && layer_decided) {
             continue;
         }
@@ -165,7 +171,7 @@ pub(crate) fn hits<'a>(
 /// What the switch of `mechanism` holds `entry` by: the id of the plugin
 /// it is part of, for a switch keyed by plugin, and its name otherwise.
 /// `None` for an Entry of no plugin under a switch keyed by plugin.
-fn switch_key<'e>(mechanism: &DisableMechanism, entry: &'e ScannedEntry) -> Option<&'e str> {
+fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<&'e str> {
     if mechanism.switch().plugins() {
         entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
     } else {
@@ -188,12 +194,21 @@ pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result
     Ok(sentences.join(" "))
 }
 
-/// The switch Disable writes for an Entry, and the edit it makes there.
-pub(crate) struct Choice {
-    pub path: PathBuf,
-    pub edit: Edit,
-    /// What Disable writes, as a sentence.
-    pub sentence: String,
+/// What Disable does to an Entry: write a switch, or park the Entry.
+pub(crate) enum Choice {
+    /// It makes `edit` to the switch in the file at `path`.
+    Switch {
+        path: PathBuf,
+        edit: Edit,
+        /// What Disable writes, as a sentence.
+        sentence: String,
+    },
+    /// It moves the Entry into the parked-Entry store at `store`.
+    Park {
+        store: PathBuf,
+        /// What Disable does, as a sentence.
+        sentence: String,
+    },
 }
 
 /// What Disable would do to `entry` in the context of `project`.
@@ -204,19 +219,22 @@ pub(crate) fn option(
     project: Option<&ContextProject>,
 ) -> DisableOption {
     match choose(definition, snapshot, entry, project) {
-        Ok(choice) => DisableOption::Offered {
-            path: choice.path,
-            sentence: choice.sentence,
+        Ok(Choice::Switch { path, sentence, .. }) => DisableOption::Offered { path, sentence },
+        Ok(Choice::Park { store, sentence }) => DisableOption::Offered {
+            path: store,
+            sentence,
         },
         Err((code, sentence)) => DisableOption::NotOffered { code, sentence },
     }
 }
 
-/// The switch Disable writes for `entry` in the context of `project`: that
-/// of the most specific mechanism (target, then context) that covers the
-/// Entry and applies in the context, the first in the definition's order
+/// What Disable does to `entry` in the context of `project`: it writes the
+/// switch of the most specific mechanism (target, then context) that covers
+/// the Entry and applies in the context, the first in the definition's order
 /// among equally specific ones, skipping any whose switch file is
-/// git-versioned or cannot be read. Or why Disable is not offered.
+/// git-versioned or cannot be read. With none left, it parks the Entry when
+/// a park mechanism covers it and its file is not git-versioned. Or why
+/// Disable is not offered.
 pub(crate) fn choose(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -230,24 +248,24 @@ pub(crate) fn choose(
     let roots = snapshot.roots(entry.agent_index, &entry.home);
     // An Entry of a plugin is Disabled through the plugin's own switch only.
     let in_plugin = entry.plugin.is_some();
-    let mut mechanisms: Vec<(usize, &DisableMechanism)> = definition
-        .rules(location.kind)
-        .disable
+    let mechanisms = &definition.rules(location.kind).disable;
+    let mut switched: Vec<(usize, Switched)> = mechanisms
         .iter()
         .enumerate()
+        .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
         .filter(|(_, mechanism)| {
             mechanism.covers(&location.id)
                 && mechanism.enable_offered()
                 && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
         })
         .collect();
-    mechanisms.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
+    switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
 
     let mut versioned: Vec<PathBuf> = Vec::new();
     let mut unreadable: Vec<PathBuf> = Vec::new();
     let mut needs_project = false;
     let mut unrecorded = false;
-    for (index, mechanism) in mechanisms {
+    for (index, mechanism) in switched {
         let switch = mechanism.switch();
         let project_key = match (mechanism.context(), project) {
             (MechanismContext::Project, None) => {
@@ -295,13 +313,28 @@ pub(crate) fn choose(
             sentence.push(' ');
             sentence.push_str(&explain::takes_whole_plugin(key));
         }
-        return Ok(Choice {
+        return Ok(Choice::Switch {
             path,
             edit,
             sentence,
         });
     }
     let agent = &definition.agent.name;
+    let parks = !in_plugin
+        && mechanisms
+            .iter()
+            .any(|mechanism| mechanism.parks() && mechanism.covers(&location.id));
+    if parks {
+        // Moving an Entry out of a git-versioned file reaches every clone.
+        if snapshot.versioned.contains(&entry.path) {
+            versioned.push(entry.path.clone());
+        } else if let Some(store) = &snapshot.parked_store {
+            return Ok(Choice::Park {
+                sentence: explain::disable_parks(&entry.name, &entry.path, store, agent),
+                store: store.clone(),
+            });
+        }
+    }
     // A file that cannot be read comes first: fixing it makes Disable available.
     Err(if !unreadable.is_empty() {
         (
@@ -334,9 +367,12 @@ pub(crate) fn failed_switch_files(
     let roots = snapshot.roots(entry.agent_index, &entry.home);
     let mut files: Vec<PathBuf> = Vec::new();
     for mechanism in &definition.rules(location.kind).disable {
-        if !mechanism.covers(&location.id) {
+        let Some(mechanism) = mechanism
+            .switched()
+            .filter(|mechanism| mechanism.covers(&location.id))
+        else {
             continue;
-        }
+        };
         let switch = mechanism.switch();
         let folder = match (mechanism.context(), project) {
             (MechanismContext::Project, None) => continue,

@@ -12,8 +12,8 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedHome, ScannedReadFailure,
-    SettingOwner, Snapshot,
+    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedHome, ScannedParked,
+    ScannedReadFailure, SettingOwner, Snapshot,
 };
 use crate::{explain, installations, locator, paths, rules};
 use std::collections::{BTreeMap, BTreeSet};
@@ -161,6 +161,11 @@ pub(crate) fn resolve(
                     disable::hits(definition, snapshot, entry, project_key.map(String::as_str))
                 })
                 .collect();
+            // Where each parked Entry came from.
+            let parked: Vec<Option<&ScannedParked>> = entries
+                .iter()
+                .map(|entry| snapshot.parked_of(entry))
+                .collect();
             // Why each Entry lacks the minimal shape its location declares.
             let malformed: Vec<Option<Malformed>> = entries
                 .iter()
@@ -232,6 +237,7 @@ pub(crate) fn resolve(
             // that does not compete, so the highest of the others wins.
             let free = |index: usize| {
                 hits[index].0.is_empty()
+                    && parked[index].is_none()
                     && !kept[index]
                         .iter()
                         .any(|(check, _, _)| before_precedence(*check))
@@ -338,6 +344,22 @@ pub(crate) fn resolve(
                                     .cloned(),
                             ),
                             Check::Disable => {
+                                if let Some(parked) = parked[index] {
+                                    failed.push((
+                                        check,
+                                        api::State::Disabled,
+                                        api::Reason {
+                                            code: api::ReasonCode::Parked,
+                                            effective: None,
+                                            switch: None,
+                                            sentence: explain::parked(
+                                                &parked.origin,
+                                                &entry.path,
+                                                agent_name,
+                                            ),
+                                        },
+                                    ));
+                                }
                                 failed.extend(disabling.iter().map(|hit| {
                                     (check, api::State::Disabled, hit.reason(agent_name))
                                 }))
@@ -381,18 +403,19 @@ pub(crate) fn resolve(
                     // with them those of the Entries they Disable too.
                     let what_if =
                         matches!(state, api::State::Disabled | api::State::Blocked).then(|| {
-                            let lifted =
-                                |other: usize| match state {
-                                    api::State::Disabled => {
-                                        hits[other].0.iter().all(|hit| {
+                            let lifted = |other: usize| match state {
+                                api::State::Disabled => {
+                                    parked[other].is_none()
+                                        && hits[other].0.iter().all(|hit| {
                                             disabling.iter().any(|own| own.same_switch(hit))
-                                        }) && !kept[other]
+                                        })
+                                        && !kept[other]
                                             .iter()
                                             .any(|(check, _, _)| before_precedence(*check))
-                                            && competes(other)
-                                    }
-                                    _ => free(other),
-                                };
+                                        && competes(other)
+                                }
+                                _ => free(other),
+                            };
                             let render = |next: api::State, shadowed_by: Option<(&str, &str)>| {
                                 if state == api::State::Disabled && by_rule.is_empty() {
                                     explain::what_if(next, shadowed_by)
@@ -440,18 +463,23 @@ pub(crate) fn resolve(
                         });
                     // Enable lifts no rule.
                     let enable = rules::enable_not_offered(&by_rule).or_else(|| {
-                        (!disabling.is_empty()).then(|| {
+                        let unparks = parked[index]
+                            .map(|parked| explain::enable_unparks(&entry.name, &parked.origin));
+                        let lifts = (!disabling.is_empty()).then(|| {
                             disable::enable(location, disabling).unwrap_or_else(|refused| refused)
-                        })
+                        });
+                        let sentences: Vec<String> = unparks.into_iter().chain(lifts).collect();
+                        (!sentences.is_empty()).then(|| sentences.join(" "))
                     });
-                    let disable = if disabling.is_empty() && by_rule.is_empty() {
-                        disable::option(definition, snapshot, entry, context_project.as_ref())
-                    } else {
-                        api::DisableOption::NotOffered {
-                            code: api::DisableNotOffered::AlreadyDisabled,
-                            sentence: explain::already_disabled_option(),
-                        }
-                    };
+                    let disable =
+                        if disabling.is_empty() && by_rule.is_empty() && parked[index].is_none() {
+                            disable::option(definition, snapshot, entry, context_project.as_ref())
+                        } else {
+                            api::DisableOption::NotOffered {
+                                code: api::DisableNotOffered::AlreadyDisabled,
+                                sentence: explain::already_disabled_option(),
+                            }
+                        };
                     api::Entry {
                         path: entry.path.clone(),
                         key_path: entry.key_path.clone(),
@@ -462,6 +490,7 @@ pub(crate) fn resolve(
                         plugin: plugin(entry),
                         git_versioned: snapshot.versioned.contains(&entry.path),
                         link: link(entry),
+                        parked: parked_from(snapshot, entry),
                         state,
                         reason,
                         secondary: failed
@@ -719,6 +748,16 @@ fn skipped_home<'s>(snapshot: &'s Snapshot, entry: &ScannedEntry) -> Option<&'s 
     })
 }
 
+/// Where `entry` came from, when it is parked.
+fn parked_from(snapshot: &Snapshot, entry: &ScannedEntry) -> Option<api::Parked> {
+    snapshot.parked_of(entry).map(|parked| api::Parked {
+        path: parked.origin.clone(),
+        key_path: parked.origin_key_path.clone(),
+        locator: locator::render(&parked.origin, &parked.origin_key_path),
+        parked_at: parked.parked_at.clone(),
+    })
+}
+
 /// Whether the Entry is a link whose target is gone.
 fn is_broken(entry: &ScannedEntry) -> bool {
     entry.link.as_ref().is_some_and(|link| link.broken())
@@ -746,6 +785,7 @@ fn unread_entry(
         plugin: plugin(entry),
         git_versioned: snapshot.versioned.contains(&entry.path),
         link: link(entry),
+        parked: parked_from(snapshot, entry),
         state: api::State::Unread,
         reason: Some(reason),
         secondary: Vec::new(),

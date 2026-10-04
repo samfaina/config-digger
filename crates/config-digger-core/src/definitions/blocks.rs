@@ -2125,6 +2125,7 @@ pub(crate) trait Disables {
 pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
     JsonField(Box<JsonField>),
+    Park(Park),
 }
 
 impl Validate for DisableMechanism {
@@ -2132,85 +2133,148 @@ impl Validate for DisableMechanism {
         match self {
             DisableMechanism::JsonNameList(block) => block.validate(),
             DisableMechanism::JsonField(block) => block.validate(),
+            DisableMechanism::Park(block) => block.validate(),
         }
     }
 }
 
-impl Disables for DisableMechanism {
+impl DisableMechanism {
+    /// The mechanism as a switch the Agent reads, `None` for parking.
+    pub fn switched(&self) -> Option<Switched<'_>> {
+        match self {
+            DisableMechanism::JsonNameList(block) => Some(Switched::JsonNameList(block)),
+            DisableMechanism::JsonField(block) => Some(Switched::JsonField(block)),
+            DisableMechanism::Park(_) => None,
+        }
+    }
+
+    /// Whether it parks the Entries it covers rather than writing a switch.
+    pub fn parks(&self) -> bool {
+        matches!(self, DisableMechanism::Park(_))
+    }
+
+    /// The ids of the locations whose Entries it Disables, empty for every
+    /// location of the Item kind.
+    pub fn locations(&self) -> &[String] {
+        match self {
+            DisableMechanism::JsonNameList(block) => block.locations(),
+            DisableMechanism::JsonField(block) => block.locations(),
+            DisableMechanism::Park(block) => &block.locations,
+        }
+    }
+
+    /// Whether it Disables the Entries of the location `id`.
+    pub fn covers(&self, id: &str) -> bool {
+        let locations = self.locations();
+        locations.is_empty() || locations.iter().any(|location| location == id)
+    }
+}
+
+/// A Disable mechanism that writes a switch the Agent reads.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Switched<'m> {
+    JsonNameList(&'m JsonNameList),
+    JsonField(&'m JsonField),
+}
+
+impl Disables for Switched<'_> {
     fn switch(&self) -> &Switch {
         match self {
-            DisableMechanism::JsonNameList(block) => block.switch(),
-            DisableMechanism::JsonField(block) => block.switch(),
+            Switched::JsonNameList(block) => block.switch(),
+            Switched::JsonField(block) => block.switch(),
         }
     }
 
     fn target(&self) -> MechanismTarget {
         match self {
-            DisableMechanism::JsonNameList(block) => block.target(),
-            DisableMechanism::JsonField(block) => block.target(),
+            Switched::JsonNameList(block) => block.target(),
+            Switched::JsonField(block) => block.target(),
         }
     }
 
     fn context(&self) -> MechanismContext {
         match self {
-            DisableMechanism::JsonNameList(block) => block.context(),
-            DisableMechanism::JsonField(block) => block.context(),
+            Switched::JsonNameList(block) => block.context(),
+            Switched::JsonField(block) => block.context(),
         }
     }
 
     fn reason(&self) -> DisableReason {
         match self {
-            DisableMechanism::JsonNameList(block) => block.reason(),
-            DisableMechanism::JsonField(block) => block.reason(),
+            Switched::JsonNameList(block) => block.reason(),
+            Switched::JsonField(block) => block.reason(),
         }
     }
 
     fn locations(&self) -> &[String] {
         match self {
-            DisableMechanism::JsonNameList(block) => block.locations(),
-            DisableMechanism::JsonField(block) => block.locations(),
+            Switched::JsonNameList(block) => block.locations(),
+            Switched::JsonField(block) => block.locations(),
         }
     }
+
     fn enable_offered(&self) -> bool {
         match self {
-            DisableMechanism::JsonNameList(block) => block.enable_offered(),
-            DisableMechanism::JsonField(block) => block.enable_offered(),
+            Switched::JsonNameList(block) => block.enable_offered(),
+            Switched::JsonField(block) => block.enable_offered(),
         }
     }
 
     fn layered(&self) -> bool {
         match self {
-            DisableMechanism::JsonNameList(block) => block.layered(),
-            DisableMechanism::JsonField(block) => block.layered(),
+            Switched::JsonNameList(block) => block.layered(),
+            Switched::JsonField(block) => block.layered(),
         }
     }
 
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
         match self {
-            DisableMechanism::JsonNameList(block) => block.disables(value, name),
-            DisableMechanism::JsonField(block) => block.disables(value, name),
+            Switched::JsonNameList(block) => block.disables(value, name),
+            Switched::JsonField(block) => block.disables(value, name),
         }
     }
 
     fn partial(&self, value: Option<&Value>) -> bool {
         match self {
-            DisableMechanism::JsonNameList(block) => block.partial(value),
-            DisableMechanism::JsonField(block) => block.partial(value),
+            Switched::JsonNameList(block) => block.partial(value),
+            Switched::JsonField(block) => block.partial(value),
         }
     }
 
     fn disable_edit(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Edit {
         match self {
-            DisableMechanism::JsonNameList(block) => block.disable_edit(key_path, value, name),
-            DisableMechanism::JsonField(block) => block.disable_edit(key_path, value, name),
+            Switched::JsonNameList(block) => block.disable_edit(key_path, value, name),
+            Switched::JsonField(block) => block.disable_edit(key_path, value, name),
         }
     }
 
     fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
         match self {
-            DisableMechanism::JsonNameList(block) => block.enable_edits(key_path, value, name),
-            DisableMechanism::JsonField(block) => block.enable_edits(key_path, value, name),
+            Switched::JsonNameList(block) => block.enable_edits(key_path, value, name),
+            Switched::JsonField(block) => block.enable_edits(key_path, value, name),
         }
+    }
+}
+
+/// Disables an Entry that has no switch of its own, such as a server in
+/// Claude Desktop's user file, by moving it out of the Agent's reach into
+/// config-digger's parked-Entry store, where it stays listed as Disabled;
+/// Enable puts it back (ADR 0002). Disable prefers any switch to it, and
+/// never parks an Entry in a git-versioned file.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Park {
+    /// The ids of the locations whose Entries it parks: each a file outside
+    /// any plugin, holding Entries under keys.
+    pub locations: Vec<String>,
+}
+
+impl Validate for Park {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("park needs its locations listed".into());
+        }
+        Ok(())
     }
 }
 

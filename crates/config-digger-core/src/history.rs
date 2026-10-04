@@ -172,6 +172,9 @@ pub(crate) struct LocationRecord {
     /// What each edit did, without its values, once the backup is deleted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub deleted_edits: Vec<EditSummary>,
+    /// An Entry was parked out of the file or put back into it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub parking: bool,
 }
 
 impl LocationRecord {

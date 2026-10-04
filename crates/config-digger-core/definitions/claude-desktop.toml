@@ -248,9 +248,15 @@ sources = [
   { anchor = { block = "home", root = "extension_settings", path = "{plugin_id}.json" }, key_path = ["orgBlockedReason"] },
 ]
 
+# The user file has no switch per server [bundle]: config-digger parks a
+# server it Disables in its own store, and puts it back on Enable.
+[[items.mcp.disable]]
+block = "park"
+locations = ["user-mcp"]
+
 # The Settings > Extensions toggle: `isEnabled` in the extension's settings.
 # The app loads only an extension that has `isEnabled: true`, so one without
-# a settings file is off [bundle]. config-digger only reads it for now.
+# a settings file is off [bundle].
 [[items.mcp.disable]]
 block = "json-field"
 switch = { anchor = { block = "home", root = "extension_settings", path = "{plugin_id}.json" }, key_path = ["isEnabled"], store_class = "plain" }
@@ -262,7 +268,6 @@ disabled_value = false
 default_value = false
 reason = "disabled_natively"
 locations = ["extension-mcp"]
-enable_offered = false
 
 # Skills exist on disk only as Claude Desktop's mirror of the account's
 # skills, in `skills-plugin/<org>/<account>/skills/<name>` [disk]. They are
