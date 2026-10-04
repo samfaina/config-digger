@@ -411,8 +411,9 @@ fn a_deny_list_in_a_user_file_disables_by_rule_without_enable() {
             "sentence": r"Disabled by rule: `deniedMcpServers` in C:\Users\fixture\.claude\settings.json names it by name, so Claude Code skips it.",
         })
     );
+    assert_eq!(entry["enable"]["status"], "not_offered");
     assert_eq!(
-        entry["enable"],
+        entry["enable"]["sentence"],
         r"Enable is not offered: `deniedMcpServers` in C:\Users\fixture\.claude\settings.json is a rule config-digger never lifts; change it there by hand."
     );
     assert_eq!(entry["disable"]["code"], "already_disabled");
@@ -769,8 +770,9 @@ fn a_global_switch_in_a_user_file_disables_globally_without_enable() {
             "sentence": r"Disabled globally: `syncClaudeAiSkills` is false in C:\Users\fixture\.claude\settings.json, so Claude Code skips it.",
         })
     );
+    assert_eq!(pdf["enable"]["status"], "not_offered");
     assert_eq!(
-        pdf["enable"],
+        pdf["enable"]["sentence"],
         r"Enable is not offered: `syncClaudeAiSkills` in C:\Users\fixture\.claude\settings.json is a rule config-digger never lifts; change it there by hand."
     );
 }

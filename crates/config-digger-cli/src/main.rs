@@ -1281,7 +1281,7 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
             _ => None,
         };
         let action = match (&entry.enable, how_to_remove, &entry.disable) {
-            (Some(enable), _, _) => enable.clone(),
+            (Some(enable), _, _) => enable.sentence().to_owned(),
             (None, Some(_), api::DisableOption::Offered { sentence, .. }) => {
                 format!("Disable instead: {sentence}")
             }

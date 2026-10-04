@@ -504,15 +504,26 @@ pub(crate) fn resolve(
                             }
                         });
                     // Enable lifts no rule.
-                    let enable = rules::enable_not_offered(&by_rule).or_else(|| {
-                        let unparks = parked[index]
-                            .map(|parked| explain::enable_unparks(&entry.name, &parked.origin));
-                        let lifts = (!disabling.is_empty()).then(|| {
-                            disable::enable(location, disabling).unwrap_or_else(|refused| refused)
-                        });
-                        let sentences: Vec<String> = unparks.into_iter().chain(lifts).collect();
-                        (!sentences.is_empty()).then(|| sentences.join(" "))
-                    });
+                    let enable = match rules::enable_not_offered(&by_rule) {
+                        Some(sentence) => Some(api::EnableOption::NotOffered { sentence }),
+                        None => {
+                            let unparks = parked[index]
+                                .map(|parked| explain::enable_unparks(&entry.name, &parked.origin));
+                            let lifts = (!disabling.is_empty())
+                                .then(|| disable::enable(location, disabling))
+                                .transpose();
+                            match lifts {
+                                Err(sentence) => Some(api::EnableOption::NotOffered { sentence }),
+                                Ok(lifts) => {
+                                    let sentences: Vec<String> =
+                                        unparks.into_iter().chain(lifts).collect();
+                                    (!sentences.is_empty()).then(|| api::EnableOption::Offered {
+                                        sentence: sentences.join(" "),
+                                    })
+                                }
+                            }
+                        }
+                    };
                     let disable =
                         if disabling.is_empty() && by_rule.is_empty() && parked[index].is_none() {
                             disable::option(definition, snapshot, entry, context_project.as_ref())

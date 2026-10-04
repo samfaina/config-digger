@@ -193,6 +193,12 @@ impl Core {
         history::detail(&self.ports, id)
     }
 
+    /// The copies of the file at `path` that History still holds, newest
+    /// first, such as those a Read failure's detail links to.
+    pub fn backups_of(&self, path: &Path) -> Result<Vec<Backup>, Error> {
+        history::backups_of(&self.ports, path)
+    }
+
     /// Dismisses an Operation that needs attention, once its files have been
     /// recovered by hand: it is no longer flagged, and pruning treats it like
     /// any other. It is refused for any other Operation.
@@ -963,6 +969,19 @@ pub struct OperationLocation {
     pub edits: Vec<EditSummary>,
 }
 
+/// A copy of one file that an Operation in History backed up.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Backup {
+    /// The id of the Operation.
+    pub operation: String,
+    /// When the Operation started, in RFC 3339.
+    pub created_at: String,
+    /// What the Operation does, as its preview titled it.
+    pub title: String,
+    /// The copy, as the file was before the Operation.
+    pub copy: PathBuf,
+}
+
 /// Every Item found, with the Agent homes they belong to.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Inventory {
@@ -1284,9 +1303,8 @@ pub struct Entry {
     pub masked: Vec<Vec<String>>,
     /// What Disable would do to it in this context.
     pub disable: DisableOption,
-    /// For a Disabled Entry, what Enable writes, as a sentence rendered by
-    /// the core.
-    pub enable: Option<String>,
+    /// For a Disabled Entry, what Enable writes, or why it is not offered.
+    pub enable: Option<EnableOption>,
     /// Whether Remove is offered for it.
     pub remove: RemoveOption,
     /// What makes its State less certain, such as a Disable switch that
@@ -1413,6 +1431,34 @@ impl DisableOption {
         match self {
             DisableOption::Offered { sentence, .. }
             | DisableOption::NotOffered { sentence, .. } => sentence,
+        }
+    }
+}
+
+/// What Enable would do to a Disabled Entry: lift what Disables it, or
+/// nothing, with the reason.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum EnableOption {
+    /// Enable lifts every switch that Disables the Entry, or puts a parked
+    /// Entry back.
+    Offered {
+        /// What Enable writes, as a sentence rendered by the core.
+        sentence: String,
+    },
+    /// Enable is not offered: a rule, or a switch config-digger only reads,
+    /// keeps the Entry out, or config-digger only reads the Entry.
+    NotOffered {
+        /// The reason as a sentence, rendered by the core.
+        sentence: String,
+    },
+}
+
+impl EnableOption {
+    /// What Enable writes, or why it is not offered.
+    pub fn sentence(&self) -> &str {
+        match self {
+            EnableOption::Offered { sentence } | EnableOption::NotOffered { sentence } => sentence,
         }
     }
 }

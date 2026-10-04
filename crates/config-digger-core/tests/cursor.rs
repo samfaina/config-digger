@@ -6,7 +6,8 @@
 //! Agents' folders, and the Projects it records.
 
 use config_digger_core::api::{
-    Action, Context, Core, Entry, Inventory, Item, Plan, ScanOptions, Targets, WarningClass,
+    Action, Context, Core, EnableOption, Entry, Inventory, Item, Plan, ScanOptions, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -959,7 +960,7 @@ fn turning_third_party_configs_off_disables_what_cursor_imports() {
             "{name}"
         );
         assert!(
-            entry.enable.is_some(),
+            matches!(entry.enable, Some(EnableOption::NotOffered { .. })),
             "{name}: Enable not offered says why"
         );
     }

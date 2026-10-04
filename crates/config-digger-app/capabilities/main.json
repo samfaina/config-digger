@@ -3,5 +3,11 @@
   "identifier": "main",
   "description": "The only capability: the main window may call the task-level commands, nothing else.",
   "windows": ["main"],
-  "permissions": ["allow-read-inventory"]
+  "permissions": [
+    "allow-read-inventory",
+    "allow-switch-project",
+    "allow-backups-of",
+    "allow-open-location",
+    "allow-reveal-location"
+  ]
 }

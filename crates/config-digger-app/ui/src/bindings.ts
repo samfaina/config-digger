@@ -6,10 +6,31 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	/**
-	 *  Reads every Agent home and resolves its Items with no Project, leaving
-	 *  out the Agent homes and Projects the user hid.
+	 *  Reads every Agent home and resolves its Items for `project`, or for no
+	 *  Project, leaving out the Agent homes and Projects the user hid.
 	 */
-	readInventory: () => typedError<Inventory, Error>(__TAURI_INVOKE("read_inventory")),
+	readInventory: (project: string | null) => typedError<Inventory, Error>(__TAURI_INVOKE("read_inventory", { project })),
+	/**
+	 *  Resolves the last inventory read for `project`, or for no Project,
+	 *  without reading the disk again. Reads it first if it was never read.
+	 */
+	switchProject: (project: string | null) => typedError<Inventory, Error>(__TAURI_INVOKE("switch_project", { project })),
+	/**
+	 *  The backups History holds of `path`, a location the inventory shows,
+	 *  newest first.
+	 */
+	backupsOf: (path: string) => typedError<Backup[], Error>(__TAURI_INVOKE("backups_of", { path })),
+	/**
+	 *  Opens `path`, a location the inventory shows, in the app Windows
+	 *  associates with it, or shows it selected in Explorer when it is a
+	 *  folder, such as a skill's.
+	 */
+	openLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("open_location", { path })),
+	/**
+	 *  Shows `path`, a location the inventory shows or a backup copy of one,
+	 *  selected in Explorer.
+	 */
+	revealLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("reveal_location", { path })),
 };
 
 /* Types */
@@ -82,6 +103,18 @@ export type AlsoReadBy = {
 	 *  rendered by the core.
 	 */
 	sentence: string,
+};
+
+/**  A copy of one file that an Operation in History backed up. */
+export type Backup = {
+	/**  The id of the Operation. */
+	operation: string,
+	/**  When the Operation started, in RFC 3339. */
+	created_at: string,
+	/**  What the Operation does, as its preview titled it. */
+	title: string,
+	/**  The copy, as the file was before the Operation. */
+	copy: string,
 };
 
 /**  Something that makes a State less certain than it looks. */
@@ -189,6 +222,26 @@ sentence: string } |
 /**  The reason as a sentence, rendered by the core. */
 sentence: string };
 
+/**
+ *  What Enable would do to a Disabled Entry: lift what Disables it, or
+ *  nothing, with the reason.
+ */
+export type EnableOption = 
+/**
+ *  Enable lifts every switch that Disables the Entry, or puts a parked
+ *  Entry back.
+ */
+{ status: "offered"; 
+/**  What Enable writes, as a sentence rendered by the core. */
+sentence: string } | 
+/**
+ *  Enable is not offered: a rule, or a switch config-digger only reads,
+ *  keeps the Entry out, or config-digger only reads the Entry.
+ */
+{ status: "not_offered"; 
+/**  The reason as a sentence, rendered by the core. */
+sentence: string };
+
 export type Entry = {
 	path: string,
 	key_path: string[],
@@ -238,11 +291,8 @@ export type Entry = {
 	masked: string[][],
 	/**  What Disable would do to it in this context. */
 	disable: DisableOption,
-	/**
-	 *  For a Disabled Entry, what Enable writes, as a sentence rendered by
-	 *  the core.
-	 */
-	enable: string | null,
+	/**  For a Disabled Entry, what Enable writes, or why it is not offered. */
+	enable: EnableOption | null,
 	/**  Whether Remove is offered for it. */
 	remove: RemoveOption,
 	/**

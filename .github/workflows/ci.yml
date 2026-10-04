@@ -30,8 +30,9 @@ jobs:
         run: cargo xtask schema --check
       - name: TypeScript bindings are current
         run: cargo xtask bindings --check
-      - name: UI typecheck and build
+      - name: UI typecheck, tests and build
         working-directory: crates/config-digger-app/ui
         run: |
           npm ci
+          npm test
           npm run build

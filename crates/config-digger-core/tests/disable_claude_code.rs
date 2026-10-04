@@ -4,7 +4,8 @@
 //! plans that write and lift them.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, Entry, Error, Inventory, Plan, ScanOptions, Targets,
+    Action, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Plan, ScanOptions,
+    Targets,
 };
 use config_digger_core::ports::RunningProcess;
 use config_digger_core::ports::fake::{
@@ -643,11 +644,7 @@ fn enable_lifts_the_name_under_every_spelling_of_the_project_key() {
     assert_eq!(states(&inventory, "notes"), pairs(&[("user", "disabled")]));
     let notes_entry = &entries(&inventory, "notes")[0];
     assert!(
-        notes_entry
-            .enable
-            .as_deref()
-            .unwrap()
-            .contains("disabledMcpServers"),
+        matches!(&notes_entry.enable, Some(EnableOption::Offered { sentence }) if sentence.contains("disabledMcpServers")),
         "{:?}",
         notes_entry.enable
     );
@@ -934,7 +931,9 @@ fn enable_is_not_offered_through_a_switch_config_digger_only_reads() {
     let core = core(&fs);
     let supabase = &entries(&inventory(&core, &in_petme()), "supabase")[0];
     assert_eq!(code(supabase.state), "disabled");
-    let enable = supabase.enable.as_deref().unwrap();
+    let Some(EnableOption::NotOffered { sentence: enable }) = &supabase.enable else {
+        panic!("Enable offered: {:?}", supabase.enable);
+    };
     assert!(enable.starts_with("Enable is not offered"), "{enable}");
     assert!(
         enable.contains(&shared_settings().display().to_string()),
