@@ -62,9 +62,9 @@ export type AgentNoteCode =
  */
 "cloud_connectors_not_on_disk" | 
 /**
- *  The plugins the user installs from the Agent's marketplace live in
- *  the user's account, with no install record on disk, so they are not
- *  listed.
+ *  The plugins the user installs for themself from the Agent's
+ *  marketplace live in the user's account, with no install record on
+ *  disk, so they are not listed.
  */
 "marketplace_plugins_not_on_disk";
 

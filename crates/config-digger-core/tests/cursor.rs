@@ -6,7 +6,7 @@
 //! Agents' folders, and the Projects it records.
 
 use config_digger_core::api::{
-    Action, Context, Core, Entry, Inventory, Item, ScanOptions, Targets,
+    Action, Context, Core, Entry, Inventory, Item, Plan, ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -1087,7 +1087,7 @@ fn cursor_notes_the_plugins_it_keeps_in_the_account() {
         .expect("the note");
     assert_eq!(
         note.sentence,
-        "Cursor keeps the plugins you install from its Marketplace in your account, so they are not listed here."
+        "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
     );
 }
 
@@ -1317,4 +1317,447 @@ fn a_workspace_file_cursor_opened_is_a_project() {
         );
 
     assert!(recorded_by_cursor(&inventory(&fs), &workspace));
+}
+
+// --- Cursor's own plugins ---------------------------------------------------
+
+/// Where Cursor keeps the files of the plugins it installs from a
+/// marketplace, a folder per version.
+fn cursor_plugin_cache(relative: &str) -> PathBuf {
+    in_home(r".cursor\plugins\cache").join(relative)
+}
+
+/// The version folder of the plugin `name` of `marketplace` in Cursor's cache.
+fn cached(marketplace: &str, name: &str) -> PathBuf {
+    cursor_plugin_cache(&format!(
+        r"{marketplace}\{name}\2eb7ed4613cfc8f098dfe464a23680ea44d84c5e"
+    ))
+}
+
+/// `fs` with the files of a plugin in `folder`, each a path in it and its
+/// JSON.
+fn with_files(mut fs: FakeFileSystem, folder: &Path, files: &[(&str, Value)]) -> FakeFileSystem {
+    for (relative, value) in files {
+        fs = fs.with_file(folder.join(relative), value.to_string());
+    }
+    fs
+}
+
+/// `fs` with the plugin `name` of `marketplace` in Cursor's cache, complete,
+/// holding `files` and the skill `<name>-skill`.
+fn with_cached(
+    fs: FakeFileSystem,
+    marketplace: &str,
+    name: &str,
+    files: &[(&str, Value)],
+) -> FakeFileSystem {
+    let folder = cached(marketplace, name);
+    let fs = with_files(fs, &folder, files).with_file(folder.join(".cache-complete"), "");
+    with_skill(fs, folder.join(format!(r"skills\{name}-skill")))
+}
+
+/// PostHog's plugin, a manifest and an `mcp.json` with one remote server.
+fn posthog(fs: FakeFileSystem) -> FakeFileSystem {
+    with_cached(
+        fs,
+        "cursor-public",
+        "posthog-mcp",
+        &[
+            (
+                r".cursor-plugin\plugin.json",
+                json!({ "name": "posthog-mcp" }),
+            ),
+            (
+                "mcp.json",
+                json!({ "mcpServers": { "posthog": { "url": "https://mcp.posthog.com/mcp" } } }),
+            ),
+        ],
+    )
+}
+
+/// `fs` with `plugins` as the `plugins` of the Project `app`'s
+/// `.cursor\settings.json`.
+fn with_project_plugins(fs: FakeFileSystem, plugins: Value) -> FakeFileSystem {
+    fs.with_file(
+        project(r"app\.cursor\settings.json"),
+        json!({ "plugins": plugins }).to_string(),
+    )
+}
+
+/// PostHog's plugin, which the Project `app` installs.
+fn posthog_in_app() -> FakeFileSystem {
+    with_project_plugins(
+        posthog(cursor()),
+        json!({ "posthog-mcp": { "enabled": true } }),
+    )
+}
+
+#[test]
+fn a_project_s_marketplace_plugin_s_servers_and_skills_are_items_of_the_plugin() {
+    let inventory = inventory_at(&posthog_in_app(), &project("app"));
+
+    let server = item(&inventory, "plugin-posthog-mcp-posthog");
+    assert_eq!(code(server.state), "effective");
+    let entry = entry_json(&server.entries[0]);
+    assert_eq!(
+        entry["path"],
+        cached("cursor-public", "posthog-mcp")
+            .join("mcp.json")
+            .display()
+            .to_string()
+    );
+    assert_eq!(entry["scope"], "plugin");
+    assert_eq!(entry["provenance"], "plugin");
+    assert_eq!(entry["plugin"]["id"], "posthog-mcp");
+    let skill = entry_json(&item(&inventory, "posthog-mcp-skill").entries[0]);
+    assert_eq!(skill["state"], "effective");
+    assert_eq!(skill["provenance"], "plugin");
+    assert_eq!(skill["plugin"]["id"], "posthog-mcp");
+}
+
+#[test]
+fn a_project_s_plugins_apply_in_that_project_only() {
+    let fs = posthog_in_app().with_folder(project("other"));
+
+    let in_other = inventory_at(&fs, &project("other"));
+
+    assert!(cursor_items(&in_other).all(|item| item.name != "plugin-posthog-mcp-posthog"));
+}
+
+#[test]
+fn a_key_naming_a_marketplace_is_read_in_that_marketplace_s_cache() {
+    let fs = with_cached(
+        cursor(),
+        "acme",
+        "tracker",
+        &[(
+            ".mcp.json",
+            json!({ "mcpServers": { "issues": { "command": "tracker-mcp" } } }),
+        )],
+    );
+    let fs = with_project_plugins(fs, json!({ "acme/tracker": { "enabled": true } }));
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let entry = entry_json(&item(&inventory, "plugin-tracker-issues").entries[0]);
+    assert_eq!(entry["state"], "effective");
+    assert_eq!(entry["plugin"]["id"], "acme/tracker");
+}
+
+#[test]
+fn a_plugin_whose_cache_is_incomplete_has_no_entries() {
+    let fs = with_project_plugins(cursor(), json!({ "posthog-mcp": { "enabled": true } }))
+        .with_file(
+            cached("cursor-public", "posthog-mcp").join("mcp.json"),
+            json!({ "mcpServers": { "posthog": { "url": "https://mcp.posthog.com/mcp" } } })
+                .to_string(),
+        );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert!(cursor_items(&inventory).all(|item| item.name != "plugin-posthog-mcp-posthog"));
+}
+
+#[test]
+fn a_project_plugin_not_enabled_is_disabled_by_its_enabled_value() {
+    for enabled in [json!({ "enabled": false }), json!({})] {
+        let fs = with_project_plugins(posthog(cursor()), json!({ "posthog-mcp": enabled }));
+
+        let inventory = inventory_at(&fs, &project("app"));
+
+        for name in ["plugin-posthog-mcp-posthog", "posthog-mcp-skill"] {
+            let entry = &item(&inventory, name).entries[0];
+            assert_eq!(code(entry.state), "disabled", "{name} with {enabled}");
+            let reason = entry.reason.as_ref().unwrap();
+            assert_eq!(code(reason.code), "plugin_disabled", "{name}");
+            assert_eq!(
+                reason.switch.as_deref(),
+                Some(r"E:\projects\app\.cursor\settings.json#plugins.posthog-mcp.enabled")
+            );
+        }
+    }
+}
+
+/// The plan of `action` on the Items `selectors` in the Project `app`.
+fn plan_in_app(fs: &FakeFileSystem, action: Action, selectors: &[&str]) -> (Core, Plan) {
+    let core = core(fs);
+    let options = ScanOptions {
+        projects: vec![project("app")],
+    };
+    let snapshot = core.scan(&options).unwrap();
+    let context = Context {
+        project: Some(project("app")),
+    };
+    let targets = Targets {
+        selectors: selectors
+            .iter()
+            .map(|&selector| selector.to_owned())
+            .collect(),
+        all: false,
+    };
+    let plan = core.plan(&snapshot, &context, action, &targets).unwrap();
+    (core, plan)
+}
+
+#[test]
+fn disable_of_a_project_plugin_sets_its_enabled_to_false_keeping_comments() {
+    let settings = project(r"app\.cursor\settings.json");
+    let fs = posthog(cursor()).with_file(
+        &settings,
+        "{\n  // Installed from the Marketplace.\n  \"plugins\": {\n    \"posthog-mcp\": { \"enabled\": true, },\n  },\n}\n",
+    );
+
+    let (core, plan) = plan_in_app(&fs, Action::Disable, &["plugin-posthog-mcp-posthog"]);
+
+    let reached: Vec<(String, String)> = plan
+        .preview()
+        .changes
+        .iter()
+        .map(|change| (change.item.clone(), code(change.after)))
+        .collect();
+    for name in ["plugin-posthog-mcp-posthog", "posthog-mcp-skill"] {
+        assert!(
+            reached.contains(&(name.to_owned(), "disabled".to_owned())),
+            "{name} not in {reached:?}"
+        );
+    }
+    assert_eq!(plan.preview().files.len(), 1);
+    assert_eq!(plan.preview().files[0].path, settings);
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+    let text = String::from_utf8(fs.contents(&settings).unwrap()).unwrap();
+    assert!(
+        text.contains("// Installed from the Marketplace."),
+        "{text}"
+    );
+    let inventory = inventory_at(&fs, &project("app"));
+    assert_eq!(
+        code(item(&inventory, "plugin-posthog-mcp-posthog").state),
+        "disabled"
+    );
+}
+
+#[test]
+fn enable_of_a_project_plugin_sets_its_enabled_to_true() {
+    let settings = project(r"app\.cursor\settings.json");
+    let fs = with_project_plugins(
+        posthog(cursor()),
+        json!({ "posthog-mcp": { "enabled": false } }),
+    );
+
+    let (core, plan) = plan_in_app(&fs, Action::Enable, &["posthog-mcp-skill"]);
+
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+    let written: Value = serde_json::from_slice(&fs.contents(&settings).unwrap()).unwrap();
+    assert_eq!(written["plugins"]["posthog-mcp"]["enabled"], true);
+    let inventory = inventory_at(&fs, &project("app"));
+    assert_eq!(
+        code(item(&inventory, "plugin-posthog-mcp-posthog").state),
+        "effective"
+    );
+}
+
+/// The folder of the local plugin `name`.
+fn local_plugin(name: &str) -> PathBuf {
+    in_home(r".cursor\plugins\local").join(name)
+}
+
+#[test]
+fn local_plugins_are_items_of_the_plugin_in_every_context() {
+    let folder = local_plugin("kit");
+    let fs = with_files(
+        cursor(),
+        &folder,
+        &[
+            (r".cursor-plugin\plugin.json", json!({ "name": "kit" })),
+            (
+                ".mcp.json",
+                json!({ "mcpServers": { "lint": { "command": "kit-lint" } } }),
+            ),
+        ],
+    );
+    let fs = with_skill(fs, folder.join(r"skills\kit-review"));
+
+    let inventory = inventory(&fs);
+
+    let server = entry_json(&item(&inventory, "plugin-kit-lint").entries[0]);
+    assert_eq!(server["state"], "effective");
+    assert_eq!(server["provenance"], "plugin");
+    assert_eq!(server["plugin"]["id"], "kit");
+    let skill = entry_json(&item(&inventory, "kit-review").entries[0]);
+    assert_eq!(skill["state"], "effective");
+    assert_eq!(skill["plugin"]["id"], "kit");
+}
+
+#[test]
+fn a_plugin_s_skills_in_a_folder_its_manifest_declares_are_read() {
+    let folder = local_plugin("kit");
+    let fs = with_files(
+        cursor(),
+        &folder,
+        &[(
+            r".cursor-plugin\plugin.json",
+            json!({ "name": "kit", "skills": "./kit-skills/" }),
+        )],
+    );
+    let fs = with_skill(fs, folder.join(r"kit-skills\kit-review"));
+
+    let inventory = inventory(&fs);
+
+    let skill = entry_json(&item(&inventory, "kit-review").entries[0]);
+    assert_eq!(skill["state"], "effective");
+    assert_eq!(skill["plugin"]["id"], "kit");
+}
+
+#[test]
+fn a_manifest_s_list_names_skill_folders_or_folders_of_them() {
+    let folder = local_plugin("kit");
+    let fs = with_files(
+        cursor(),
+        &folder,
+        &[(
+            r".cursor-plugin\plugin.json",
+            json!({ "name": "kit", "skills": ["./one/kit-solo", "./many/"] }),
+        )],
+    );
+    let fs = with_skill(fs, folder.join(r"one\kit-solo"));
+    let fs = with_skill(fs, folder.join(r"many\kit-review"));
+    // Left out once the manifest declares where its skills are.
+    let fs = with_skill(fs, folder.join(r"skills\kit-default"));
+    let unset = local_plugin("unset");
+    let fs = with_files(
+        fs,
+        &unset,
+        &[(r".cursor-plugin\plugin.json", json!({ "skills": null }))],
+    );
+    let fs = with_skill(fs, unset.join(r"skills\unset-skill"));
+
+    let inventory = inventory(&fs);
+
+    for name in ["kit-solo", "kit-review"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+    for name in ["kit-default", "unset-skill"] {
+        assert!(
+            cursor_items(&inventory).all(|item| item.name != name),
+            "{name} is read"
+        );
+    }
+}
+
+#[test]
+fn a_plugin_s_manifests_are_tried_in_cursor_s_order() {
+    let folder = local_plugin("kit-folder");
+    let fs = with_files(
+        cursor(),
+        &folder,
+        &[
+            (
+                r".claude-plugin\plugin.json",
+                json!({ "name": "kit-claude", "mcpServers": { "claude-only": { "command": "x" } } }),
+            ),
+            (
+                "plugin.json",
+                json!({ "name": "kit-plain", "mcpServers": { "plain-only": { "command": "y" } } }),
+            ),
+        ],
+    );
+
+    let inventory = inventory(&fs);
+
+    // Named by its folder, whatever its manifest says.
+    assert_eq!(
+        code(item(&inventory, "plugin-kit-folder-claude-only").state),
+        "effective"
+    );
+    assert!(cursor_items(&inventory).all(|item| !item.name.contains("plain-only")));
+}
+
+#[test]
+fn a_project_plugin_is_named_by_its_key_and_a_dot_folder_is_no_local_plugin() {
+    let fs = with_cached(
+        cursor(),
+        "acme",
+        "tracker",
+        &[
+            (r".cursor-plugin\plugin.json", json!({ "name": "Tracker" })),
+            (
+                ".mcp.json",
+                json!({ "mcpServers": { "issues": { "command": "tracker-mcp" } } }),
+            ),
+        ],
+    );
+    let fs = with_project_plugins(fs, json!({ "tracker": { "enabled": true } })).with_file(
+        local_plugin(r".trash\.mcp.json"),
+        json!({ "mcpServers": { "old": { "command": "old-mcp" } } }).to_string(),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    // A key naming no marketplace is found in any marketplace's cache.
+    assert_eq!(
+        code(item(&inventory, "plugin-tracker-issues").state),
+        "effective"
+    );
+    assert!(cursor_items(&inventory).all(|item| item.name != "plugin-.trash-old"));
+}
+
+#[test]
+fn a_project_plugin_s_server_loses_to_a_user_server_with_the_same_url() {
+    let fs = posthog_in_app().with_file(
+        user_mcp(),
+        json!({ "mcpServers": { "posthog": { "url": "https://mcp.posthog.com/mcp/" } } })
+            .to_string(),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let user = item(&inventory, "user-posthog");
+    let states: Vec<(String, String)> = user
+        .entries
+        .iter()
+        .map(|entry| (entry.locator.clone(), code(entry.state)))
+        .collect();
+    assert_eq!(states.len(), 2, "{states:?}");
+    assert_eq!(states[0].1, "effective");
+    assert_eq!(states[1].1, "shadowed");
+    assert!(states[1].0.contains("posthog-mcp"), "{states:?}");
+}
+
+#[test]
+fn cursor_s_own_plugins_need_neither_the_import_gate_nor_third_party_configs() {
+    let fs = with_gates(posthog_in_app(), &[("enable_cc_plugin_import", false)]);
+    let fs = with_third_party(fs, false);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    for name in ["plugin-posthog-mcp-posthog", "posthog-mcp-skill"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+}
+
+#[test]
+fn a_cursor_plugin_s_servers_secrets_are_masked() {
+    let fs = with_project_plugins(
+        with_cached(
+            cursor(),
+            "cursor-public",
+            "posthog-mcp",
+            &[(
+                "mcp.json",
+                json!({ "mcpServers": { "posthog": {
+                    "url": "https://mcp.posthog.com/mcp",
+                    "auth": { "CLIENT_ID": "posthog-client", "CLIENT_SECRET": SECRET },
+                } } }),
+            )],
+        ),
+        json!({ "posthog-mcp": { "enabled": true } }),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let entry = &item(&inventory, "plugin-posthog-mcp-posthog").entries[0];
+    assert_eq!(entry.config["auth"]["CLIENT_SECRET"], "••••");
+    assert_eq!(entry.config["auth"]["CLIENT_ID"], "posthog-client");
+    let cursor: Vec<&Item> = cursor_items(&inventory).collect();
+    assert!(!json_of(&cursor).to_string().contains(SECRET));
 }

@@ -185,7 +185,7 @@
           "const": "cloud_connectors_not_on_disk"
         },
         {
-          "description": "The plugins the user installs from the Agent's marketplace live in\nthe user's account, with no install record on disk, such as Cursor's.",
+          "description": "The plugins the user installs for themself from the Agent's\nmarketplace live in the user's account, with no install record on\ndisk, such as Cursor's.",
           "type": "string",
           "const": "marketplace_plugins_not_on_disk"
         }
@@ -456,8 +456,8 @@
           "type": "object",
           "properties": {
             "plugins": {
-              "description": "The id of a declared `[[plugins]]`.",
-              "type": "string"
+              "description": "The id of a declared `[[plugins]]`, or several, such as Cursor's\nplugins of a Project and its local ones, which it reads alike.",
+              "$ref": "#/$defs/PluginIds"
             },
             "path": {
               "description": "A `/`-separated path relative to the plugin's folder, or several,\nof which the first that exists is read, such as the first manifest\nCursor finds of `.cursor-plugin/plugin.json` and\n`.claude-plugin/plugin.json`.",
@@ -548,6 +548,22 @@
           "description": "In the Project folder and each parent up to the root of its git\nrepo, the folder holding `.git`. Outside a repo, in the Project\nfolder only.",
           "type": "string",
           "const": "up-to-repo-root"
+        }
+      ]
+    },
+    "PluginIds": {
+      "description": "The id of a declared `[[plugins]]`, or several.",
+      "anyOf": [
+        {
+          "description": "The id of one `[[plugins]]`.",
+          "type": "string"
+        },
+        {
+          "description": "Several such ids, in order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
@@ -1170,7 +1186,7 @@
           ]
         },
         {
-          "description": "The folders, in a folder of the Agent home or the machine, that hold a\nmarker file, each a plugin whose id is the folder's name, such as Claude\nDesktop's extensions, each unpacked into `Claude Extensions\\<id>` with\nits `manifest.json`. A folder without a marker holds no plugin.",
+          "description": "The folders, in a folder of the Agent home or the machine, that hold a\nmarker file, each a plugin whose id is the folder's name, such as Claude\nDesktop's extensions, each unpacked into `Claude Extensions\\<id>` with\nits `manifest.json`. A folder without a marker holds no plugin. Without\na marker, every folder whose name does not start with `.` is a plugin's,\nsuch as Cursor's local plugins.",
           "type": "object",
           "properties": {
             "anchor": {
@@ -1179,7 +1195,14 @@
             },
             "marker": {
               "description": "A `/`-separated path relative to a plugin's folder, or several, any\nof which makes the folder a plugin's.",
-              "$ref": "#/$defs/RelativePaths"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RelativePaths"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "records": {
               "description": "What the Agent records of each plugin it installed, when it does.",
@@ -1200,7 +1223,59 @@
           "additionalProperties": false,
           "required": [
             "block",
+            "anchor"
+          ]
+        },
+        {
+          "description": "The keys of an object in a file of each Project folder, each a plugin\nthe Project installs from a marketplace, such as the `plugins` of\nCursor's `.cursor/settings.json`. A key is the plugin's name, or its\nmarketplace's and its name joined by `/`, and holds an object; the\nplugin is named by the name. Its files are in a folder of a cache on\nthe machine, `<marketplace>/<name>/<version>`, the version being a\nfolder that holds the marker. The marketplace of a key that names none\nis the first, by name, whose cache holds the plugin. A key whose plugin\nis not in the cache installs nothing on disk yet, and is left out.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "The file, in the Project folder.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "dialect": {
+              "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JsonDialect"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "root": {
+              "description": "The key path of the object whose keys are plugins.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope": {
+              "description": "The Scope the plugins are recorded at, such as `project`.",
+              "type": "string"
+            },
+            "cache": {
+              "description": "The folder of the cache, on the machine.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "marker": {
+              "description": "A `/`-separated path relative to a version folder whose presence\nsays the folder is complete, such as `.cache-complete`.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "project-plugin-keys"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
             "anchor",
+            "root",
+            "scope",
+            "cache",
             "marker"
           ]
         }
@@ -1230,6 +1305,26 @@
         "anchor",
         "root",
         "version"
+      ]
+    },
+    "JsonDialect": {
+      "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
+      "oneOf": [
+        {
+          "description": "No comments, no trailing commas.",
+          "type": "string",
+          "const": "strict"
+        },
+        {
+          "description": "`//` and `/* */` comments, and no trailing comma, such as Gemini\nCLI's settings.",
+          "type": "string",
+          "const": "with-comments"
+        },
+        {
+          "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
+          "type": "string",
+          "const": "jsonc"
+        }
       ]
     },
     "PluginNames": {
@@ -1528,6 +1623,38 @@
           ]
         },
         {
+          "description": "The skills a plugin's manifest declares in a field,\na path relative to the plugin's folder or a list of them, such as the\n`skills` of a Cursor plugin's `plugin.json`. A path is a folder of skill\nfolders; an item of a list may instead name one skill folder or its\n`SKILL.md`. A manifest that declares none, or a plugin with no\nmanifest, has its skills in the `default` folder instead. Only a\nlocation in plugins, anchored at the manifest, reads them.",
+          "type": "object",
+          "properties": {
+            "field": {
+              "description": "The key path of the field in the strict JSON manifest.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "default": {
+              "description": "A `/`-separated path relative to the plugin's folder.",
+              "type": "string"
+            },
+            "skills": {
+              "description": "How each folder of skill folders is read.",
+              "$ref": "#/$defs/SkillFolder"
+            },
+            "block": {
+              "type": "string",
+              "const": "manifest-skills"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "field",
+            "default",
+            "skills"
+          ]
+        },
+        {
           "description": "The JSON text an Agent keeps under a key of the `ItemTable` of a SQLite\nstore, such as VS Code's cache of extension servers under\n`mcp.extCachedServers` in a workspace's `state.vscdb`. The store is\nopened read-only, waiting briefly for an Agent that holds a write lock,\nand closed straight after. The location's `root` starts with the key,\nand config-digger never writes its Entries.",
           "type": "object",
           "properties": {
@@ -1545,26 +1672,6 @@
             "block",
             "key"
           ]
-        }
-      ]
-    },
-    "JsonDialect": {
-      "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
-      "oneOf": [
-        {
-          "description": "No comments, no trailing commas.",
-          "type": "string",
-          "const": "strict"
-        },
-        {
-          "description": "`//` and `/* */` comments, and no trailing comma, such as Gemini\nCLI's settings.",
-          "type": "string",
-          "const": "with-comments"
-        },
-        {
-          "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
-          "type": "string",
-          "const": "jsonc"
         }
       ]
     },
@@ -2572,6 +2679,17 @@
         "store_class": {
           "description": "How the switch's file behaves while the Agent runs. A `sqlite` file\nis a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`\nholds JSON text under the key path's first key.",
           "$ref": "#/$defs/StoreClass"
+        },
+        "dialect": {
+          "description": "The dialect the Agent reads the file in, such as Cursor's JSONC\n`.cursor/settings.json`. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
