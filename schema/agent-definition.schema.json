@@ -183,6 +183,11 @@
           "description": "The Agent's connectors live in the user's account, with no copy on\ndisk to list, such as Claude Desktop's.",
           "type": "string",
           "const": "cloud_connectors_not_on_disk"
+        },
+        {
+          "description": "The plugins the user installs from the Agent's marketplace live in\nthe user's account, with no install record on disk, such as Cursor's.",
+          "type": "string",
+          "const": "marketplace_plugins_not_on_disk"
         }
       ]
     },
@@ -455,8 +460,8 @@
               "type": "string"
             },
             "path": {
-              "description": "A `/`-separated path relative to the plugin's folder.",
-              "type": "string"
+              "description": "A `/`-separated path relative to the plugin's folder, or several,\nof which the first that exists is read, such as the first manifest\nCursor finds of `.cursor-plugin/plugin.json` and\n`.claude-plugin/plugin.json`.",
+              "$ref": "#/$defs/RelativePaths"
             },
             "block": {
               "type": "string",
@@ -543,6 +548,22 @@
           "description": "In the Project folder and each parent up to the root of its git\nrepo, the folder holding `.git`. Outside a repo, in the Project\nfolder only.",
           "type": "string",
           "const": "up-to-repo-root"
+        }
+      ]
+    },
+    "RelativePaths": {
+      "description": "One `/`-separated relative path, or several.",
+      "anyOf": [
+        {
+          "description": "A `/`-separated relative path.",
+          "type": "string"
+        },
+        {
+          "description": "Several such paths, in order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
@@ -971,6 +992,53 @@
             "file",
             "fields"
           ]
+        },
+        {
+          "description": "A list in the JSON text an Agent keeps under a key of the `ItemTable` of\na SQLite store, each item naming a Project in the first of some fields,\nsuch as Cursor's `workspaceMetadata.entries`, whose `entries` each name\ntheir folder in `folderUri`. The store is opened read-only and closed\nstraight after.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the store is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "key": {
+              "description": "The `ItemTable` key whose value is the JSON text.",
+              "type": "string"
+            },
+            "list": {
+              "description": "The key path of the list in the JSON, one key per segment. Omitted\nwhen the JSON is the list.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "fields": {
+              "description": "The key paths in an item of the fields that can name its Project,\ntried in turn.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "spelling": {
+              "description": "How the fields spell a Project. Omitted for paths.",
+              "$ref": "#/$defs/Spelling"
+            },
+            "block": {
+              "type": "string",
+              "const": "sqlite-list"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "key",
+            "fields"
+          ]
         }
       ]
     },
@@ -1111,7 +1179,7 @@
             },
             "marker": {
               "description": "A `/`-separated path relative to a plugin's folder, or several, any\nof which makes the folder a plugin's.",
-              "$ref": "#/$defs/Markers"
+              "$ref": "#/$defs/RelativePaths"
             },
             "records": {
               "description": "What the Agent records of each plugin it installed, when it does.",
@@ -1135,22 +1203,6 @@
             "anchor",
             "marker"
           ]
-        }
-      ]
-    },
-    "Markers": {
-      "description": "One marker file, or several.",
-      "anyOf": [
-        {
-          "description": "A `/`-separated path relative to a plugin's folder.",
-          "type": "string"
-        },
-        {
-          "description": "Several such paths, any of which marks a plugin.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       ]
     },
@@ -1313,7 +1365,7 @@
           }
         },
         "name_template": {
-          "description": "The name the Agent gives an Entry of a location in plugins, made\nof `{plugin}`, the plugin's name, and `{name}`, the Entry's own\nname, such as `{plugin}:{name}`. Without it, an Entry goes by its\nown name.",
+          "description": "The name the Agent gives an Entry of the location, made of `{name}`,\nthe Entry's own name; in plugins, `{plugin}`, the plugin's name, such\nas `{plugin}:{name}`; and in a Project, `{folder_index}`, the\nposition of the Entry's folder among those of the Project, 0 for a\nfolder Project, and `{folder}`, that folder's name, such as Cursor's\n`project-{folder_index}-{folder}-{name}`. Without it, an Entry goes\nby its own name.",
           "type": [
             "string",
             "null"
@@ -1643,6 +1695,11 @@
           "description": "An extension the Agent installed, such as a Claude Desktop `.mcpb`,\nread as a plugin is: config-digger Disables it only through its own\nswitch, and never Removes it.",
           "type": "string",
           "const": "extension"
+        },
+        {
+          "description": "Shipped with the Agent, which restores it as it ships it, such as\nCursor's built-in skills. config-digger only reads it.",
+          "type": "string",
+          "const": "built-in"
         }
       ]
     },
@@ -1696,7 +1753,7 @@
               ]
             },
             "names": {
-              "description": "The only names `${NAME}` stands for, such as VS Code's\n`workspaceFolder` and `userHome`. Omitted for any name.",
+              "description": "The only names `${NAME}` stands for, such as VS Code's\n`workspaceFolder` and `userHome`, or Cursor's `/`. Omitted for any\nname.",
               "type": [
                 "array",
                 "null"
@@ -2114,6 +2171,62 @@
           "required": [
             "block"
           ]
+        },
+        {
+          "description": "Entries compete when they lie at the same path below the same folder,\nwhatever their names, once each path is cut at the first of `markers` it\npasses through, as Cursor compares skills: `~\\.claude\\skills\\review` and\n`~\\.agents\\skills\\review` both lie at `skills\\review` below `~`, while\n`~\\.claude\\skills\\x\\review` does not. Paths compare without regard to\ncase. An Entry whose path passes through no marker competes with none.",
+          "type": "object",
+          "properties": {
+            "markers": {
+              "description": "Folder names, such as `.cursor` and `.claude`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "path-key"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "markers"
+          ]
+        },
+        {
+          "description": "Entries compete when their names are exactly equal, except that, while\nthe Feature gate `gate` is on, the remote Entries of `locations` compete\nby URL instead, as Cursor runs one server per URL: the one the Agent ranks\nhighest wins. A remote Entry has a `url` and no `command`.\nURLs compare as WHATWG URLs, by scheme, host and port, path without a\ntrailing `/`, and query, a URL without a scheme taking `http://`.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose remote Entries compete by URL.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "gate": {
+              "description": "The name of a declared Feature gate, which must list `locations` in\nits `affects`.",
+              "type": "string"
+            },
+            "unseen": {
+              "description": "What else takes part that config-digger cannot see, which every\nEntry that competes by URL notes.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/UnseenServers"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "same-url"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "gate"
+          ]
         }
       ]
     },
@@ -2142,6 +2255,31 @@
         "default"
       ]
     },
+    "UnseenServers": {
+      "description": "Servers an Agent counts that config-digger cannot see.",
+      "oneOf": [
+        {
+          "description": "Those extensions give the Agent while it runs.",
+          "type": "string",
+          "const": "extensions"
+        },
+        {
+          "description": "Those the user's team configures for them.",
+          "type": "string",
+          "const": "team"
+        },
+        {
+          "description": "Those of the plugins the user installs from a marketplace, which\nthe Agent keeps in the user's account.",
+          "type": "string",
+          "const": "marketplace-plugins"
+        },
+        {
+          "description": "The one the user picked among those with the same URL.",
+          "type": "string",
+          "const": "user-pick"
+        }
+      ]
+    },
     "Check": {
       "description": "One of an Agent's checks that decides an Entry's State.",
       "oneOf": [
@@ -2156,7 +2294,7 @@
           "const": "disable"
         },
         {
-          "description": "The Agent has not approved the Entry: Blocked, with `not_approved`.\nRequired when a gate of the kind is an approval list or a nonce\ntrust, and refused otherwise.",
+          "description": "The Agent has not approved the Entry: Blocked, with `not_approved`.\nRequired when a gate of the kind is an approval list, an approval\nhash or a nonce trust, and refused otherwise.",
           "type": "string",
           "const": "approval"
         },
@@ -2268,7 +2406,7 @@
               "description": "The value Enable sets, with `enable_action = \"set\"`."
             },
             "default_value": {
-              "description": "The value the Agent takes while the field, or its file, is missing,\nsuch as `false` for Claude Desktop's `isEnabled`, which an extension\nwithout a settings file has. Omitted, a missing field Disables nothing."
+              "description": "The value the Agent takes while the field, or its file, is missing,\nsuch as `false` for Claude Desktop's `isEnabled`, which an extension\nwithout a settings file has. Of layered fields, the Agent takes the\nlast one's while no layer holds a value. Omitted, a missing field\nDisables nothing."
             },
             "partial_values": {
               "description": "Values that are partial switches, limiting part of the Entry, such\nas a skill listed by name only: the Entry stays Effective, with a note.",
@@ -2288,6 +2426,14 @@
             },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "plugin_scopes": {
+              "description": "With target `plugin`, the Scopes a plugin must be installed at for\nthe field to apply to it, as the Agent records them, such as Cursor\nreading a user install's `enabledPlugins` in the user settings alone.\nOmitted, it applies to every plugin.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -2697,6 +2843,46 @@
             "trusted_at",
             "nonce"
           ]
+        },
+        {
+          "description": "Entries the Agent uses only once the user approves them as they are\nconfigured, such as Cursor's Project servers: a source holds a list of\n`<id>:<hash>` texts, each id as the location's `switch_id` makes it, or\nelse the Entry's name, and each hash that of the configuration approved;\na bare `<id>` approves the Entry however it is configured. One no source\napproves is Blocked, with `not_approved`, so that changing an approved\nEntry Blocks it again. config-digger never approves an Entry.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need approval.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the lists of approvals are, every one of them read.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "hash": {
+              "description": "How the Agent hashes an Entry's configuration.",
+              "$ref": "#/$defs/ConfigHash"
+            },
+            "prompt": {
+              "description": "Where the Agent asks the user to approve an Entry.",
+              "$ref": "#/$defs/ApprovalPrompt"
+            },
+            "block": {
+              "type": "string",
+              "const": "approval-hash"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "hash",
+            "prompt"
+          ]
         }
       ]
     },
@@ -2707,6 +2893,21 @@
           "description": "When it starts in the Project.",
           "type": "string",
           "const": "on-start"
+        },
+        {
+          "description": "In its settings of MCP servers.",
+          "type": "string",
+          "const": "mcp-settings"
+        }
+      ]
+    },
+    "ConfigHash": {
+      "description": "How an Agent hashes an Entry's configuration to tell whether it changed\nsince the user approved it. config-digger computes it from the Entry as\nwritten, Secrets included, and never shows it.",
+      "oneOf": [
+        {
+          "description": "Cursor's: VS Code's 32-bit string hash, written in hexadecimal with\na `-` when negative, of the JSON text of the fields of the server's\ntransport, in this order: its `command`, `args`, `env` and `envFile`\nwhen it has a `command`, and otherwise its `url`, given `http://`\nwhen it names no scheme, `headers` and `auth`.",
+          "type": "string",
+          "const": "cursor"
         }
       ]
     },

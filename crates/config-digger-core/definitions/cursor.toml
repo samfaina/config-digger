@@ -1,0 +1,555 @@
+#:schema ../../../schema/agent-definition.schema.json
+# Cursor, the IDE. Facts from docs/research/cursor.md (verified against
+# 3.22.12). The Cursor CLI, `cursor-agent`, is another Agent: its own files
+# in `~\.cursor\projects\<slug>` are not read here.
+
+format_version = 1
+
+verified = { min = "3.22.12", max = "3.22.12" }
+
+[agent]
+id = "cursor"
+name = "Cursor"
+# The plugins the user installs from Cursor's Marketplace are installed in
+# the Cursor account: only a cache of them is on disk [code, disk].
+notes = ["marketplace_plugins_not_on_disk"]
+
+# The user setup installs to `%LOCALAPPDATA%\Programs\cursor`, the system
+# setup to `%ProgramFiles%\cursor` [docs, disk]. `Cursor.exe` carries the
+# version, as does the top-level `version` of `product.json` [disk].
+[[installations]]
+id = "user"
+folder = "%LOCALAPPDATA%/Programs/cursor"
+executable = "Cursor.exe"
+versions = [{ block = "exe-version" }, { block = "json-value", file = "resources/app/product.json", key_path = ["version"] }]
+
+[[installations]]
+id = "system"
+folder = "%ProgramFiles%/cursor"
+executable = "Cursor.exe"
+versions = [{ block = "exe-version" }, { block = "json-value", file = "resources/app/product.json", key_path = ["version"] }]
+
+# Cursor runs as `Cursor.exe`, its stdio servers as its children [disk].
+[process]
+images = ["Cursor.exe"]
+paths = [
+  "%LOCALAPPDATA%/Programs/cursor/Cursor.exe",
+  "%ProgramFiles%/cursor/Cursor.exe",
+]
+
+# Cursor keeps the user's data in `%APPDATA%\Cursor\User` [disk], as VS Code,
+# which it is a fork of, keeps its own. Its MCP servers, skills and plugins
+# are in `~\.cursor` instead [disk], which every window reads.
+[[homes]]
+id = "default"
+folder = { block = "path", path = "%APPDATA%/Cursor/User" }
+
+[homes.roots]
+settings = "settings.json"
+# The application's state, every window's [disk].
+state = "globalStorage/state.vscdb"
+
+[[scopes]]
+id = "user"
+
+[[scopes]]
+id = "project"
+
+[[scopes]]
+id = "built-in"
+
+[[scopes]]
+id = "plugin"
+
+# Cursor opens a folder, or a `.code-workspace` file whose every folder it
+# reads in turn, the first ranking highest [code]. It records the Projects
+# it opened [disk]: a folder per workspace in `workspaceStorage`, whose
+# `workspace.json` names its folder or its `.code-workspace` file, the
+# Agents Window's list in `cursor/glass.additionalProjects` of the
+# application's state, and the folders `workspaceMetadata.entries` there
+# describes, each as a `file:` URI. The Cursor CLI's folders in
+# `~\.cursor\projects` are not read: their names cannot be turned back into
+# paths [code].
+[projects]
+workspace_files = true
+registries = [
+  { block = "json-folders", anchor = { block = "machine", path = "%APPDATA%/Cursor/User/workspaceStorage" }, file = "workspace.json", fields = ["folder", "workspace"], spelling = "file-uri" },
+  { block = "sqlite-list", anchor = { block = "home", root = "state" }, key = "cursor/glass.additionalProjects", fields = [["workspaceIdentifier", "uri", "external"]], spelling = "file-uri" },
+  { block = "sqlite-list", anchor = { block = "home", root = "state" }, key = "workspaceMetadata.entries", list = ["entries"], fields = [["folderUri"]], spelling = "file-uri" },
+]
+
+# The plugins Claude Code installed, which Cursor loads too [code, disk]: it
+# reads `installed_plugins.json` for the folder of each install, a `local`
+# or `project` one applying only in the Project it names [code]. A plugin is
+# named by the first manifest it has, `.cursor-plugin\plugin.json`,
+# `.claude-plugin\plugin.json` or `plugin.json` [code], or else by its id up
+# to `@`. Claude Code uninstalls it. Cursor's own plugins, those of its
+# Marketplace a Project's `.cursor\settings.json` installs and the local
+# ones in `~\.cursor\plugins\local` [docs, code], are not read.
+[[plugins]]
+id = "claude-code"
+registry = { block = "json-plugin-records", anchor = { block = "machine", path = "~/.claude/plugins/installed_plugins.json" }, root = ["plugins"], folder = "installPath", scope = "scope", project = "projectPath", version = "version" }
+name = [{ file = ".cursor-plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = "plugin.json", key_path = ["name"] }]
+id_separator = "@"
+uninstall = "claude plugin uninstall {id} --scope {scope}"
+
+# Each server is one of its own, under an identifier its Scope prefixes
+# [code]: two servers of the same name never compete. A server with a
+# `command` runs it, and one with only a `url` connects to it, whatever its
+# `type` says [code]. Cursor skips one with neither, or with a `command` or
+# `url` that is not text, with an error [code]. It ignores `cwd` [code].
+#
+# Cursor replaces `${env:NAME}`, `${userHome}`, `${workspaceFolder}`,
+# `${workspaceFolderBasename}`, `${pathSeparator}` and `${/}` in a server's
+# values [docs], and in a plugin's also `${CURSOR_PLUGIN_ROOT}` and
+# `${CLAUDE_PLUGIN_ROOT}` [docs, code]. `auth.CLIENT_SECRET` holds the OAuth
+# client's Secret [docs]. `envFile` is the path of a file of variables, and
+# shown.
+
+# `~\.cursor\mcp.json` [docs, disk]. No variable moves it [code].
+[[locations]]
+id = "user-mcp"
+anchor = { block = "machine", path = "~/.cursor/mcp.json" }
+name_template = "user-{name}"
+format = { block = "json", dialect = "jsonc" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
+secrets.fields = [["auth", "CLIENT_SECRET"]]
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
+
+# `.cursor\mcp.json` at the root of each folder of the Project, read in no
+# folder above or below it [code]. `0` in its servers' identifiers is the
+# folder's position in the Project, followed by its name [code, disk]. A
+# `name` a `.code-workspace` file gives a folder, which Cursor may name it
+# by instead, is not read.
+[[locations]]
+id = "project-mcp"
+anchor = { block = "project", path = ".cursor/mcp.json" }
+name_template = "project-{folder_index}-{folder}-{name}"
+format = { block = "json", dialect = "jsonc" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "project"
+provenance = "file"
+store_class = "rewritten-while-running"
+interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
+secrets.fields = [["auth", "CLIENT_SECRET"]]
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
+
+# The servers of a Claude Code plugin, read only while Cursor's gate
+# `enable_cc_plugin_import` is on [code]: those its first manifest declares
+# in `mcpServers`, inline, as a path to a file of the plugin or a list of
+# either [code, disk], and those of its `.mcp.json`, or else its `mcp.json`
+# [code]. That Cursor reads the latter only when the manifest declares none
+# is not known: a server both declare under one name is one identifier, and
+# the manifest's is taken to win. Its servers' identifiers start with
+# `plugin-` and the plugin's name [disk].
+[[locations]]
+id = "claude-plugin-manifest-mcp"
+anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
+name_template = "plugin-{plugin}-{name}"
+references = { root = ["mcpServers"] }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
+secrets.fields = [["auth", "CLIENT_SECRET"]]
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
+when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
+
+[[locations]]
+id = "claude-plugin-mcp"
+anchor = { block = "plugin", plugins = "claude-code", path = [".mcp.json", "mcp.json"] }
+name_template = "plugin-{plugin}-{name}"
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
+secrets.fields = [["auth", "CLIENT_SECRET"]]
+on_read_failure = "unknown"
+shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
+when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
+
+[items.mcp]
+precedence = ["user-mcp", "project-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+checks = ["shape", "rules", "approval", "disable", "precedence"]
+
+# Servers compete by name only under the same identifier, as one a plugin's
+# manifest and its `.mcp.json` both declare. While Cursor's gate
+# `dedupe_mcp_servers` is on, it runs one of the servers with the same URL
+# and no `command`, Project servers excepted: a user's first, then an
+# extension's, the team's, then a plugin's, unless the user picked another
+# in its MCP settings [code]. Extensions' and the team's
+# servers, user Marketplace plugins, and the pick, which Cursor keeps in
+# `mcpService.selectionPreferences`, are not read. That a server Disabled
+# in Cursor still wins over the others [code] is not modelled.
+[items.mcp.competition]
+block = "same-url"
+locations = ["user-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+gate = "dedupe_mcp_servers"
+unseen = ["extensions", "team", "marketplace-plugins", "user-pick"]
+
+# Cursor loads a Claude Code plugin only while Claude Code's
+# `enabledPlugins["<name>@<marketplace>"]` holds `true` for it in the
+# settings of its install [code]: a user install's in the user settings, and
+# never while a Project's settings hold `false` for it there; a `local` or
+# `project` install's in the Project's settings, the local file over the
+# shared one. A plugin none of them names is off. These switches are Claude
+# Code's, which reads them in layers of its own, so Disable through them
+# reaches Claude Code too. They are repeated for skills below.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+enable_offered = false
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["user"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["project", "local"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+plugin_scopes = ["project", "local"]
+enable_offered = false
+
+# Cursor starts a Project server only once the user approves it in its MCP
+# settings, as it is configured: it keeps `<identifier>:<hash>` in
+# `cursor/approvedProjectMcpServers` of the application's state, or, from
+# older versions, the bare identifier, and drops the approval of a server
+# whose hash changes [code, disk]. The hash covers the fields of the
+# server's transport [code], which config-digger hashes as Cursor does: a
+# server with a `command` hashes its `command`, `args`, `env` and
+# `envFile`, one without its `url`, given `http://` when it names no
+# scheme, `headers` and `auth` [code].
+[[items.mcp.gates]]
+block = "approval-hash"
+locations = ["project-mcp"]
+hash = "cursor"
+prompt = "mcp-settings"
+sources = [
+  { anchor = { block = "home", root = "state" }, key_path = ["cursor/approvedProjectMcpServers"], sqlite = true },
+]
+
+# Skills are folders holding a `SKILL.md`, found at any depth below each
+# skills folder, skipping folders whose name starts with `.` [code, disk].
+# A skill is named by its folder, which its frontmatter `name` must match
+# [docs]. What Cursor does with a `SKILL.md` without a frontmatter, or whose
+# YAML does not parse, is not known: it is taken to load the first under
+# its folder's name and to skip the second.
+#
+# Cursor reads the `.cursor`, `.claude`, `.codex`, `.grok` and `.agents`
+# skills folders, in that order, in the user's home folder and at the root
+# of each folder of the Project [code]. The `.claude`, `.codex` and `.grok`
+# ones are other Agents' [code]. It also reads every `.cursor\skills` and
+# `.agents\skills` deeper in the Project [docs], which are not read here.
+
+[[locations]]
+id = "user-cursor-skills"
+anchor = { block = "machine", path = "~/.cursor/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "user-claude-skills"
+anchor = { block = "machine", path = "~/.claude/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Cursor never loads the skills Codex ships under these names [code].
+[[locations]]
+id = "user-codex-skills"
+anchor = { block = "machine", path = "~/.codex/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "user-grok-skills"
+anchor = { block = "machine", path = "~/.grok/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "user-agents-skills"
+anchor = { block = "machine", path = "~/.agents/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-cursor-skills"
+anchor = { block = "project", path = ".cursor/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-claude-skills"
+anchor = { block = "project", path = ".claude/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-codex-skills"
+anchor = { block = "project", path = ".codex/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-grok-skills"
+anchor = { block = "project", path = ".grok/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-agents-skills"
+anchor = { block = "project", path = ".agents/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# The skills Cursor ships, which it syncs into `~\.cursor\skills-cursor`
+# while it runs [code, disk].
+[[locations]]
+id = "built-in-skills"
+anchor = { block = "machine", path = "~/.cursor/skills-cursor" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "built-in"
+provenance = "built-in"
+store_class = "rewritten-while-running"
+on_read_failure = "ignores_file"
+
+# A Claude Code plugin's skills, in its `skills` folder [docs, disk]. A
+# folder its manifest names in `skills` instead [docs] is not read.
+[[locations]]
+id = "claude-plugin-skills"
+anchor = { block = "plugin", plugins = "claude-code", path = "skills" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Skills are not overridden by name [code]. Two compete only when they lie
+# at the same path below the folder holding their `.cursor`, `.claude`,
+# `.codex`, `.grok` or `.agents` folder, such as `~\.claude\skills\review`
+# and `~\.agents\skills\review`, and the first in that order wins [code,
+# disk]. Which of two same-named skills of different paths `/name` runs is
+# not known.
+[items.skill]
+precedence = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "claude-plugin-skills"]
+competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
+checks = ["frontmatter", "rules", "disable", "precedence"]
+
+# Claude Code's plugin switches, as for servers above.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
+enable_offered = false
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "machine", path = "~/.claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["user"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["project", "local"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+default_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["claude-plugin-skills"]
+plugin_scopes = ["project", "local"]
+enable_offered = false
+
+# Cursor caches the Statsig gates of the signed-in account in the
+# application's state, under `workbench.experiments.statsigBootstrap`, each
+# by the djb2 hash of its name, and when it fetched them in milliseconds
+# [disk]. What each gate does comes from Cursor's code. Claude Code plugins'
+# servers load while `enable_cc_plugin_import` is on [code], which it was
+# on the research machine [disk].
+[[feature_gates]]
+name = "enable_cc_plugin_import"
+assumed = true
+affects = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
+
+# Servers with the same URL collapse while `dedupe_mcp_servers` is on
+# [code], which it was on the research machine [disk].
+[[feature_gates]]
+name = "dedupe_mcp_servers"
+assumed = true
+affects = ["user-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
+
+# Settings > Agents > Include Third-Party Plugins, Skills, and Other Configs,
+# `cursor/thirdPartyExtensibilityEnabled` in the application's state, on
+# unless it holds `false` [docs, code]. Off, Cursor reads none of the skills
+# folders of Claude Code, Codex and Grok, nor any Claude Code plugin [code],
+# so the next folder's skill at the same path wins. config-digger never
+# turns it on.
+[[items.mcp.rules]]
+block = "global-switch"
+off = false
+locations = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+sources = [
+  { anchor = { block = "home", root = "state" }, key_path = ["cursor/thirdPartyExtensibilityEnabled"], sqlite = true },
+]
+
+[[items.skill.rules]]
+block = "global-switch"
+off = false
+locations = ["user-claude-skills", "user-codex-skills", "user-grok-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "claude-plugin-skills"]
+sources = [
+  { anchor = { block = "home", root = "state" }, key_path = ["cursor/thirdPartyExtensibilityEnabled"], sqlite = true },
+]

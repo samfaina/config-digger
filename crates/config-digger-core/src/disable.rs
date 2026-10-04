@@ -126,7 +126,8 @@ impl Hit<'_> {
 /// The switches of the mechanisms covering `entry` that are set for it in
 /// the context of the Project with the key `project`: those that Disable
 /// it, and the partial switches. Each in the definition's order. Of the
-/// layered switches, only the first that holds a value for the Entry counts.
+/// layered switches, only the first that holds a value for the Entry counts,
+/// or when none does, the last one's default.
 pub(crate) fn hits<'a>(
     definition: &'a AgentDefinition,
     snapshot: &'a Snapshot,
@@ -165,6 +166,9 @@ fn set_for<'a>(
     // Whether a layered switch already holds a value for the Entry, which
     // the later layers then leave as it is.
     let mut layer_decided = false;
+    // The last layered switch that holds nothing for the Entry, whose
+    // default the Agent takes when no layer holds a value.
+    let mut by_default: Option<Hit> = None;
     let switched = definition
         .rules(location.kind)
         .disable
@@ -172,7 +176,10 @@ fn set_for<'a>(
         .enumerate()
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)));
     for (index, mechanism) in switched {
-        if !mechanism.covers(&location.id) || (mechanism.layered() && layer_decided) {
+        if !mechanism.covers(&location.id)
+            || !mechanism.covers_plugin(plugin_scope(entry))
+            || (mechanism.layered() && layer_decided)
+        {
             continue;
         }
         let switches = snapshot
@@ -193,11 +200,23 @@ fn set_for<'a>(
                 value,
                 key,
             };
+            // A layer that holds nothing leaves the next one to decide.
+            if mechanism.layered() && value.is_none() {
+                by_default = Some(hit);
+                continue;
+            }
             if mechanism.disables(value, key) {
                 disabling.push(hit);
             } else if mechanism.partial(value) {
                 partial.push(hit);
             }
+        }
+    }
+    if let Some(hit) = by_default.filter(|_| !layer_decided) {
+        if hit.mechanism.disables(None, hit.key) {
+            disabling.push(hit);
+        } else if hit.mechanism.partial(None) {
+            partial.push(hit);
         }
     }
     (disabling, partial)
@@ -298,6 +317,7 @@ pub(crate) fn choose(
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
         .filter(|(_, mechanism)| {
             mechanism.covers(&location.id)
+                && mechanism.covers_plugin(plugin_scope(entry))
                 && mechanism.enable_offered()
                 && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
         })
@@ -415,10 +435,9 @@ pub(crate) fn failed_switch_files(
     let location = definition.location(&entry.location);
     let mut files: Vec<PathBuf> = Vec::new();
     for mechanism in &definition.rules(location.kind).disable {
-        let Some(mechanism) = mechanism
-            .switched()
-            .filter(|mechanism| mechanism.covers(&location.id))
-        else {
+        let Some(mechanism) = mechanism.switched().filter(|mechanism| {
+            mechanism.covers(&location.id) && mechanism.covers_plugin(plugin_scope(entry))
+        }) else {
             continue;
         };
         let switch = mechanism.switch();
@@ -434,4 +453,9 @@ pub(crate) fn failed_switch_files(
         }
     }
     files
+}
+
+/// The Scope the plugin of `entry` is installed at, as the Agent records it.
+fn plugin_scope(entry: &ScannedEntry) -> Option<&str> {
+    entry.plugin.as_ref()?.scope.as_deref()
 }

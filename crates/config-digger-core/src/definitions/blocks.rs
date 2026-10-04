@@ -809,8 +809,11 @@ impl Anchored for SettingsAnchor {
 pub(crate) struct PluginAnchor {
     /// The id of a declared `[[plugins]]`.
     pub plugins: String,
-    /// A `/`-separated path relative to the plugin's folder.
-    pub path: String,
+    /// A `/`-separated path relative to the plugin's folder, or several,
+    /// of which the first that exists is read, such as the first manifest
+    /// Cursor finds of `.cursor-plugin/plugin.json` and
+    /// `.claude-plugin/plugin.json`.
+    pub path: RelativePaths,
 }
 
 impl Validate for PluginAnchor {
@@ -818,7 +821,13 @@ impl Validate for PluginAnchor {
         if self.plugins.trim().is_empty() {
             return Err("a plugin anchor needs a plugins id".into());
         }
-        validate_relative(&self.path)
+        if self.path.all().is_empty() {
+            return Err("a plugin anchor needs a path".into());
+        }
+        self.path
+            .all()
+            .iter()
+            .try_for_each(|path| validate_relative(path))
     }
 }
 
@@ -1158,6 +1167,7 @@ pub(crate) trait Register {
 pub(crate) enum Registry {
     JsonKeys(JsonKeys),
     JsonFolders(JsonFolders),
+    SqliteList(SqliteList),
 }
 
 impl Validate for Registry {
@@ -1165,6 +1175,7 @@ impl Validate for Registry {
         match self {
             Registry::JsonKeys(block) => block.validate(),
             Registry::JsonFolders(block) => block.validate(),
+            Registry::SqliteList(block) => block.validate(),
         }
     }
 }
@@ -1174,6 +1185,7 @@ impl Register for Registry {
         match self {
             Registry::JsonKeys(block) => block.anchor(),
             Registry::JsonFolders(block) => block.anchor(),
+            Registry::SqliteList(block) => block.anchor(),
         }
     }
 
@@ -1181,6 +1193,7 @@ impl Register for Registry {
         match self {
             Registry::JsonKeys(block) => block.spelling(),
             Registry::JsonFolders(block) => block.spelling(),
+            Registry::SqliteList(block) => block.spelling(),
         }
     }
 }
@@ -1322,6 +1335,80 @@ impl JsonFolders {
     }
 }
 
+/// A list in the JSON text an Agent keeps under a key of the `ItemTable` of
+/// a SQLite store, each item naming a Project in the first of some fields,
+/// such as Cursor's `workspaceMetadata.entries`, whose `entries` each name
+/// their folder in `folderUri`. The store is opened read-only and closed
+/// straight after.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SqliteList {
+    /// Where the store is. It must not lie in a Project.
+    pub anchor: Anchor,
+    /// The `ItemTable` key whose value is the JSON text.
+    pub key: String,
+    /// The key path of the list in the JSON, one key per segment. Omitted
+    /// when the JSON is the list.
+    #[serde(default)]
+    pub list: Vec<String>,
+    /// The key paths in an item of the fields that can name its Project,
+    /// tried in turn.
+    pub fields: Vec<Vec<String>>,
+    /// How the fields spell a Project. Omitted for paths.
+    #[serde(default)]
+    pub spelling: Spelling,
+}
+
+impl Validate for SqliteList {
+    fn validate(&self) -> Result<(), String> {
+        validate_registry_anchor(&self.anchor)?;
+        if self.key.trim().is_empty() {
+            return Err("a sqlite-list registry needs a key".into());
+        }
+        if self.list.iter().any(String::is_empty) {
+            return Err("a sqlite-list registry's list must have no empty key".into());
+        }
+        if self.fields.is_empty() {
+            return Err("a sqlite-list registry needs fields".into());
+        }
+        self.fields
+            .iter()
+            .try_for_each(|field| validate_key_path(field))
+    }
+}
+
+impl Register for SqliteList {
+    fn anchor(&self) -> &Anchor {
+        &self.anchor
+    }
+
+    fn spelling(&self) -> Spelling {
+        self.spelling
+    }
+}
+
+impl SqliteList {
+    /// The Projects the store's text under the key records, as spelled there.
+    pub fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        let items = self
+            .list
+            .iter()
+            .try_fold(&document, |value, key| value.get(key))
+            .and_then(Value::as_array);
+        Ok(items
+            .into_iter()
+            .flatten()
+            .filter_map(|item| {
+                self.fields.iter().find_map(|field| {
+                    let value = field.iter().try_fold(item, |value, key| value.get(key))?;
+                    value.as_str().map(str::to_owned)
+                })
+            })
+            .collect())
+    }
+}
+
 // --- Plugin registries ------------------------------------------------------
 
 /// What the Agent records of a plugin it installed, at one Scope.
@@ -1381,7 +1468,7 @@ pub(crate) struct PluginFolders {
     pub anchor: Anchor,
     /// A `/`-separated path relative to a plugin's folder, or several, any
     /// of which makes the folder a plugin's.
-    pub marker: Markers,
+    pub marker: RelativePaths,
     /// What the Agent records of each plugin it installed, when it does.
     pub records: Option<InstallRecords>,
 }
@@ -1427,22 +1514,22 @@ impl Validate for PluginFolders {
     }
 }
 
-/// One marker file, or several.
+/// One `/`-separated relative path, or several.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(untagged)]
-pub(crate) enum Markers {
-    /// A `/`-separated path relative to a plugin's folder.
+pub(crate) enum RelativePaths {
+    /// A `/`-separated relative path.
     One(String),
-    /// Several such paths, any of which marks a plugin.
+    /// Several such paths, in order.
     Several(Vec<String>),
 }
 
-impl Markers {
-    /// Every marker.
+impl RelativePaths {
+    /// Every path, in order.
     pub fn all(&self) -> &[String] {
         match self {
-            Markers::One(marker) => std::slice::from_ref(marker),
-            Markers::Several(markers) => markers,
+            RelativePaths::One(path) => std::slice::from_ref(path),
+            RelativePaths::Several(paths) => paths,
         }
     }
 }
@@ -1501,8 +1588,8 @@ impl Validate for JsonPluginRecords {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
         self.anchor.one_file()?;
-        if self.anchor.home_root().is_none() {
-            return Err("a plugin registry must lie in the Agent home".into());
+        if self.anchor.home_root().is_none() && self.anchor.machine().is_none() {
+            return Err("a plugin registry must lie in the Agent home or the machine".into());
         }
         if self.root.is_empty() || self.root.iter().any(String::is_empty) {
             return Err("a plugin registry needs a root key path, with no empty key".into());
@@ -1586,6 +1673,9 @@ pub(crate) enum Provenance {
     /// read as a plugin is: config-digger Disables it only through its own
     /// switch, and never Removes it.
     Extension,
+    /// Shipped with the Agent, which restores it as it ships it, such as
+    /// Cursor's built-in skills. config-digger only reads it.
+    BuiltIn,
 }
 
 impl Provenance {
@@ -1594,7 +1684,7 @@ impl Provenance {
     pub fn read_only(self) -> bool {
         match self {
             Provenance::File | Provenance::Plugin | Provenance::Extension => false,
-            Provenance::Managed | Provenance::CloudMirror => true,
+            Provenance::Managed | Provenance::CloudMirror | Provenance::BuiltIn => true,
         }
     }
 }
@@ -2130,7 +2220,8 @@ pub(crate) struct Braces {
     /// Such as `:-` for `${NAME:-default}`.
     pub default_separator: Option<String>,
     /// The only names `${NAME}` stands for, such as VS Code's
-    /// `workspaceFolder` and `userHome`. Omitted for any name.
+    /// `workspaceFolder` and `userHome`, or Cursor's `/`. Omitted for any
+    /// name.
     pub names: Option<Vec<String>>,
 }
 
@@ -2145,7 +2236,12 @@ impl Validate for Braces {
         if self.namespace_separator.as_deref() == Some("") {
             return Err("namespace_separator must not be empty".into());
         }
-        if let Some(name) = self.names.iter().flatten().find(|name| !is_name(name)) {
+        if let Some(name) = self
+            .names
+            .iter()
+            .flatten()
+            .find(|name| name.is_empty() || name.contains(['{', '}', ':']))
+        {
             return Err(format!("`{name}` is not a name"));
         }
         Ok(())
@@ -2234,8 +2330,9 @@ fn is_name(text: &str) -> bool {
 
 /// Decides which Entries of one Agent home compete as the same Item.
 pub(crate) trait Compete {
-    /// Entries with equal keys are the same Item.
-    fn key(&self, name: &str) -> String;
+    /// Entries with equal keys are the same Item: this is the key of the
+    /// Entry named `name` at `path`.
+    fn key(&self, name: &str, path: &Path) -> String;
 
     /// Whether the Entries of the location `id` compete by endpoint
     /// instead of by name.
@@ -2248,6 +2345,8 @@ pub(crate) trait Compete {
 pub(crate) enum Competition {
     ExactName(ExactName),
     CaseInsensitiveName(CaseInsensitiveName),
+    PathKey(PathKey),
+    SameUrl(SameUrl),
 }
 
 impl Validate for Competition {
@@ -2255,15 +2354,19 @@ impl Validate for Competition {
         match self {
             Competition::ExactName(block) => block.validate(),
             Competition::CaseInsensitiveName(block) => block.validate(),
+            Competition::PathKey(block) => block.validate(),
+            Competition::SameUrl(block) => block.validate(),
         }
     }
 }
 
 impl Compete for Competition {
-    fn key(&self, name: &str) -> String {
+    fn key(&self, name: &str, path: &Path) -> String {
         match self {
-            Competition::ExactName(block) => block.key(name),
-            Competition::CaseInsensitiveName(block) => block.key(name),
+            Competition::ExactName(block) => block.key(name, path),
+            Competition::CaseInsensitiveName(block) => block.key(name, path),
+            Competition::PathKey(block) => block.key(name, path),
+            Competition::SameUrl(block) => block.key(name, path),
         }
     }
 
@@ -2271,6 +2374,8 @@ impl Compete for Competition {
         match self {
             Competition::ExactName(block) => block.by_endpoint(id),
             Competition::CaseInsensitiveName(block) => block.by_endpoint(id),
+            Competition::PathKey(block) => block.by_endpoint(id),
+            Competition::SameUrl(block) => block.by_endpoint(id),
         }
     }
 }
@@ -2280,7 +2385,9 @@ impl Competition {
     pub fn endpoint_locations(&self) -> &[String] {
         match self {
             Competition::ExactName(block) => &block.by_endpoint,
-            Competition::CaseInsensitiveName(_) => &[],
+            Competition::CaseInsensitiveName(_)
+            | Competition::PathKey(_)
+            | Competition::SameUrl(_) => &[],
         }
     }
 
@@ -2288,8 +2395,18 @@ impl Competition {
     /// does not, no two Entries compete.
     pub fn only_while(&self) -> Option<&SettingIs> {
         match self {
-            Competition::ExactName(_) => None,
+            Competition::ExactName(_) | Competition::PathKey(_) | Competition::SameUrl(_) => None,
             Competition::CaseInsensitiveName(block) => block.only_while.as_ref(),
+        }
+    }
+
+    /// How remote Entries also compete by URL, if they do.
+    pub fn same_url(&self) -> Option<&SameUrl> {
+        match self {
+            Competition::SameUrl(block) => Some(block),
+            Competition::ExactName(_)
+            | Competition::CaseInsensitiveName(_)
+            | Competition::PathKey(_) => None,
         }
     }
 }
@@ -2315,7 +2432,7 @@ impl Validate for CaseInsensitiveName {
 }
 
 impl Compete for CaseInsensitiveName {
-    fn key(&self, name: &str) -> String {
+    fn key(&self, name: &str, _path: &Path) -> String {
         name.to_lowercase()
     }
 
@@ -2391,13 +2508,164 @@ impl Validate for ExactName {
 }
 
 impl Compete for ExactName {
-    fn key(&self, name: &str) -> String {
+    fn key(&self, name: &str, _path: &Path) -> String {
         name.to_owned()
     }
 
     fn by_endpoint(&self, id: &str) -> bool {
         self.by_endpoint.iter().any(|known| known == id)
     }
+}
+
+/// Entries compete when they lie at the same path below the same folder,
+/// whatever their names, once each path is cut at the first of `markers` it
+/// passes through, as Cursor compares skills: `~\.claude\skills\review` and
+/// `~\.agents\skills\review` both lie at `skills\review` below `~`, while
+/// `~\.claude\skills\x\review` does not. Paths compare without regard to
+/// case. An Entry whose path passes through no marker competes with none.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PathKey {
+    /// Folder names, such as `.cursor` and `.claude`.
+    pub markers: Vec<String>,
+}
+
+impl Validate for PathKey {
+    fn validate(&self) -> Result<(), String> {
+        if self.markers.is_empty() {
+            return Err("a path-key competition needs markers".into());
+        }
+        if let Some(marker) = self
+            .markers
+            .iter()
+            .find(|marker| marker.is_empty() || marker.contains(['/', '\\']))
+        {
+            return Err(format!("marker `{marker}` must be one folder name"));
+        }
+        Ok(())
+    }
+}
+
+impl Compete for PathKey {
+    fn key(&self, _name: &str, path: &Path) -> String {
+        let components: Vec<_> = path.components().collect();
+        let cut = components.iter().position(|component| {
+            let name = component.as_os_str().to_string_lossy();
+            self.markers
+                .iter()
+                .any(|marker| marker.eq_ignore_ascii_case(&name))
+        });
+        let Some(cut) = cut else {
+            return paths::key(path);
+        };
+        let root: PathBuf = components[..cut].iter().collect();
+        let below: PathBuf = components[cut + 1..].iter().collect();
+        format!("{}::{}", paths::key(&root), paths::key(&below))
+    }
+
+    fn by_endpoint(&self, _id: &str) -> bool {
+        false
+    }
+}
+
+/// Entries compete when their names are exactly equal, except that, while
+/// the Feature gate `gate` is on, the remote Entries of `locations` compete
+/// by URL instead, as Cursor runs one server per URL: the one the Agent ranks
+/// highest wins. A remote Entry has a `url` and no `command`.
+/// URLs compare as WHATWG URLs, by scheme, host and port, path without a
+/// trailing `/`, and query, a URL without a scheme taking `http://`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SameUrl {
+    /// The ids of the locations whose remote Entries compete by URL.
+    pub locations: Vec<String>,
+    /// The name of a declared Feature gate, which must list `locations` in
+    /// its `affects`.
+    pub gate: String,
+    /// What else takes part that config-digger cannot see, which every
+    /// Entry that competes by URL notes.
+    #[serde(default)]
+    pub unseen: Vec<UnseenServers>,
+}
+
+/// Servers an Agent counts that config-digger cannot see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum UnseenServers {
+    /// Those extensions give the Agent while it runs.
+    Extensions,
+    /// Those the user's team configures for them.
+    Team,
+    /// Those of the plugins the user installs from a marketplace, which
+    /// the Agent keeps in the user's account.
+    MarketplacePlugins,
+    /// The one the user picked among those with the same URL.
+    UserPick,
+}
+
+impl Validate for SameUrl {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a same-url competition needs locations".into());
+        }
+        if self.gate.trim().is_empty() {
+            return Err("a same-url competition needs a gate".into());
+        }
+        Ok(())
+    }
+}
+
+impl Compete for SameUrl {
+    fn key(&self, name: &str, _path: &Path) -> String {
+        name.to_owned()
+    }
+
+    fn by_endpoint(&self, _id: &str) -> bool {
+        false
+    }
+}
+
+impl SameUrl {
+    /// The URL an Entry of the location `id` whose value is `config`
+    /// competes by, `None` for one that does not compete by URL.
+    pub fn url_of(&self, id: &str, config: &Value) -> Option<String> {
+        if !self.locations.iter().any(|known| known == id) {
+            return None;
+        }
+        if truthy(config, "command") {
+            return None;
+        }
+        let url = config.get("url")?.as_str().filter(|url| !url.is_empty())?;
+        Some(whatwg_url(url))
+    }
+}
+
+/// `url` as Cursor compares it, given `http://` when it names no scheme: an
+/// `http`, `https`, `ws` or `wss` URL's host in lower case,
+/// without user info, the scheme's default port or a fragment, and with no
+/// `/` ending its path; any other URL in lower case.
+fn whatwg_url(url: &str) -> String {
+    let url = with_scheme(url);
+    let (scheme, rest) = url.split_once("://").expect("a scheme is given");
+    let default_port = match scheme {
+        "http" | "ws" => ":80",
+        "https" | "wss" => ":443",
+        _ => return url.trim().to_lowercase(),
+    };
+    let rest = rest.split('#').next().unwrap_or_default();
+    let (authority, rest) = rest.split_at(rest.find(['/', '?']).unwrap_or(rest.len()));
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let host = host.to_ascii_lowercase();
+    let host = host.strip_suffix(default_port).unwrap_or(&host);
+    let (path, query) = rest.split_at(rest.find('?').unwrap_or(rest.len()));
+    let path = match path.strip_suffix('/') {
+        Some(trimmed) if !trimmed.is_empty() => trimmed,
+        _ if path == "/" => "",
+        _ => path,
+    };
+    format!("{scheme}://{host}{path}{query}")
 }
 
 /// A server's endpoint as an Agent compares it: its URL with the scheme
@@ -2616,6 +2884,19 @@ pub(crate) trait Disables {
 
     fn locations(&self) -> &[String];
 
+    /// The Scopes a plugin must be installed at for the switch to apply to
+    /// its Entries, as the Agent records them; empty for any.
+    fn plugin_scopes(&self) -> &[String] {
+        &[]
+    }
+
+    /// Whether it applies to the Entries of a plugin installed at `scope`,
+    /// or to an Entry of no plugin.
+    fn covers_plugin(&self, scope: Option<&str>) -> bool {
+        let scopes = self.plugin_scopes();
+        scopes.is_empty() || scope.is_some_and(|scope| scopes.iter().any(|known| known == scope))
+    }
+
     /// Whether it Disables the Entries of the location `id`.
     fn covers(&self, id: &str) -> bool {
         let locations = self.locations();
@@ -2806,6 +3087,10 @@ impl Disables for Switched<'_> {
 
     fn by_id(&self) -> bool {
         self.block().by_id()
+    }
+
+    fn plugin_scopes(&self) -> &[String] {
+        self.block().plugin_scopes()
     }
 }
 
@@ -3029,7 +3314,9 @@ pub(crate) struct JsonField {
     pub enabled_value: Option<Value>,
     /// The value the Agent takes while the field, or its file, is missing,
     /// such as `false` for Claude Desktop's `isEnabled`, which an extension
-    /// without a settings file has. Omitted, a missing field Disables nothing.
+    /// without a settings file has. Of layered fields, the Agent takes the
+    /// last one's while no layer holds a value. Omitted, a missing field
+    /// Disables nothing.
     pub default_value: Option<Value>,
     /// Values that are partial switches, limiting part of the Entry, such
     /// as a skill listed by name only: the Entry stays Effective, with a note.
@@ -3050,11 +3337,23 @@ pub(crate) struct JsonField {
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// With target `plugin`, the Scopes a plugin must be installed at for
+    /// the field to apply to it, as the Agent records them, such as Cursor
+    /// reading a user install's `enabledPlugins` in the user settings alone.
+    /// Omitted, it applies to every plugin.
+    #[serde(default)]
+    pub plugin_scopes: Vec<String>,
 }
 
 impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
         validate_mechanism(&self.switch, self.target, self.context)?;
+        if !self.plugin_scopes.is_empty() && self.target != MechanismTarget::Plugin {
+            return Err("plugin_scopes needs target `plugin`".into());
+        }
+        if self.plugin_scopes.iter().any(String::is_empty) {
+            return Err("a plugin scope must not be empty".into());
+        }
         if self.switch.named_by.is_some() && self.enable_offered {
             return Err(
                 "a switch named_by a list item is only read: enable_offered must be false".into(),
@@ -3082,6 +3381,10 @@ impl Validate for JsonField {
 impl Disables for JsonField {
     fn switch(&self) -> &Switch {
         &self.switch
+    }
+
+    fn plugin_scopes(&self) -> &[String] {
+        &self.plugin_scopes
     }
 
     fn target(&self) -> MechanismTarget {
@@ -3842,6 +4145,7 @@ pub(crate) enum Gate {
     PolicyField(PolicyField),
     TrustedFolders(TrustedFolders),
     NonceTrust(NonceTrust),
+    ApprovalHash(ApprovalHash),
 }
 
 impl Validate for Gate {
@@ -3852,6 +4156,7 @@ impl Validate for Gate {
             Gate::PolicyField(block) => block.validate(),
             Gate::TrustedFolders(block) => block.validate(),
             Gate::NonceTrust(block) => block.validate(),
+            Gate::ApprovalHash(block) => block.validate(),
         }
     }
 }
@@ -3864,7 +4169,8 @@ impl Gate {
             Gate::ApprovalList(_)
             | Gate::PolicyField(_)
             | Gate::TrustedFolders(_)
-            | Gate::NonceTrust(_) => self.locations().contains(&id),
+            | Gate::NonceTrust(_)
+            | Gate::ApprovalHash(_) => self.locations().contains(&id),
         }
     }
 
@@ -3876,6 +4182,7 @@ impl Gate {
             Gate::PolicyField(block) => &block.sources,
             Gate::TrustedFolders(block) => &block.sources,
             Gate::NonceTrust(block) => &block.sources,
+            Gate::ApprovalHash(block) => &block.sources,
         }
     }
 
@@ -3901,6 +4208,7 @@ impl Gate {
             Gate::PolicyField(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::TrustedFolders(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::NonceTrust(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::ApprovalHash(block) => block.locations.iter().map(String::as_str).collect(),
         }
     }
 }
@@ -4059,6 +4367,177 @@ pub(crate) struct ApprovalList {
 pub(crate) enum ApprovalPrompt {
     /// When it starts in the Project.
     OnStart,
+    /// In its settings of MCP servers.
+    McpSettings,
+}
+
+/// Entries the Agent uses only once the user approves them as they are
+/// configured, such as Cursor's Project servers: a source holds a list of
+/// `<id>:<hash>` texts, each id as the location's `switch_id` makes it, or
+/// else the Entry's name, and each hash that of the configuration approved;
+/// a bare `<id>` approves the Entry however it is configured. One no source
+/// approves is Blocked, with `not_approved`, so that changing an approved
+/// Entry Blocks it again. config-digger never approves an Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApprovalHash {
+    /// The ids of the locations whose Entries need approval.
+    pub locations: Vec<String>,
+    /// Where the lists of approvals are, every one of them read.
+    pub sources: Vec<SettingPlace>,
+    /// How the Agent hashes an Entry's configuration.
+    pub hash: ConfigHash,
+    /// Where the Agent asks the user to approve an Entry.
+    pub prompt: ApprovalPrompt,
+}
+
+impl Validate for ApprovalHash {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("an approval-hash gate needs locations".into());
+        }
+        validate_sources(&self.sources)?;
+        if self.sources.iter().any(|source| source.policy) {
+            return Err("an approval is no policy".into());
+        }
+        Ok(())
+    }
+}
+
+impl ApprovalHash {
+    /// Whether `value`, what a source holds, approves the Entry whose id is
+    /// `id` and whose configuration hashes to `hash`.
+    pub fn approves(value: &Value, id: &str, hash: Option<&str>) -> bool {
+        let approval = hash.map(|hash| format!("{id}:{hash}"));
+        let approvals = value.as_array().map(Vec::as_slice).unwrap_or_default();
+        approvals
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|known| known == id || approval.as_deref() == Some(known))
+    }
+}
+
+/// How an Agent hashes an Entry's configuration to tell whether it changed
+/// since the user approved it. config-digger computes it from the Entry as
+/// written, Secrets included, and never shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ConfigHash {
+    /// Cursor's: VS Code's 32-bit string hash, written in hexadecimal with
+    /// a `-` when negative, of the JSON text of the fields of the server's
+    /// transport, in this order: its `command`, `args`, `env` and `envFile`
+    /// when it has a `command`, and otherwise its `url`, given `http://`
+    /// when it names no scheme, `headers` and `auth`.
+    Cursor,
+}
+
+impl ConfigHash {
+    /// The hash of the Entry `config`, as written; `None` for an Entry the
+    /// Agent cannot run.
+    pub fn of(self, config: &Value) -> Option<String> {
+        match self {
+            ConfigHash::Cursor => {
+                let mut fields = serde_json::Map::new();
+                let keep: &[&str] = if truthy(config, "command") {
+                    &["command", "args", "env", "envFile"]
+                } else if truthy(config, "url") {
+                    &["url", "headers", "auth"]
+                } else {
+                    return None;
+                };
+                for &field in keep {
+                    let Some(value) = config.get(field) else {
+                        continue;
+                    };
+                    let value = match (field, value) {
+                        ("url", Value::String(url)) => Value::from(with_scheme(url)),
+                        _ => value.clone(),
+                    };
+                    fields.insert(field.to_owned(), value);
+                }
+                let mut text = String::new();
+                js_stringify(&Value::Object(fields), &mut text);
+                let hash = text.encode_utf16().fold(149_417i32, |hash, unit| {
+                    hash.wrapping_mul(31).wrapping_add(i32::from(unit))
+                });
+                let hash = i64::from(hash);
+                Some(if hash < 0 {
+                    format!("-{:x}", -hash)
+                } else {
+                    format!("{hash:x}")
+                })
+            }
+        }
+    }
+}
+
+/// Whether `config` holds a value at `field` that JavaScript takes as true,
+/// as Cursor tests a server's `command` and `url`.
+fn truthy(config: &Value, field: &str) -> bool {
+    config.get(field).is_some_and(|value| match value {
+        Value::Null | Value::Bool(false) => false,
+        Value::String(text) => !text.is_empty(),
+        Value::Number(number) => number.as_f64() != Some(0.0),
+        Value::Bool(true) | Value::Array(_) | Value::Object(_) => true,
+    })
+}
+
+/// `url`, given `http://` unless it starts with a scheme of one to eight
+/// lower-case letters and `://`, as Cursor gives a server's URL one.
+fn with_scheme(url: &str) -> String {
+    let has_scheme = url.split_once("://").is_some_and(|(scheme, _)| {
+        (1..=8).contains(&scheme.len()) && scheme.bytes().all(|byte| byte.is_ascii_lowercase())
+    });
+    if has_scheme {
+        url.to_owned()
+    } else {
+        format!("http://{url}")
+    }
+}
+
+/// `value` as JavaScript's `JSON.stringify` writes it: no spaces, an
+/// object's keys that are array indexes first, in numeric order, then the
+/// others in their order, and a whole number without a fraction.
+fn js_stringify(value: &Value, out: &mut String) {
+    match value {
+        Value::Object(object) => {
+            let index = |key: &str| {
+                key.parse::<u32>()
+                    .ok()
+                    .filter(|index| *index != u32::MAX && index.to_string() == key)
+            };
+            let mut keys: Vec<&String> = object.keys().filter(|key| index(key).is_some()).collect();
+            keys.sort_by_key(|key| index(key));
+            keys.extend(object.keys().filter(|key| index(key).is_none()));
+            out.push('{');
+            for (at, key) in keys.into_iter().enumerate() {
+                if at > 0 {
+                    out.push(',');
+                }
+                out.push_str(&Value::from(key.as_str()).to_string());
+                out.push(':');
+                js_stringify(&object[key], out);
+            }
+            out.push('}');
+        }
+        Value::Array(items) => {
+            out.push('[');
+            for (at, item) in items.iter().enumerate() {
+                if at > 0 {
+                    out.push(',');
+                }
+                js_stringify(item, out);
+            }
+            out.push(']');
+        }
+        Value::Number(number) => match number.as_f64() {
+            Some(float) if number.is_f64() && float.fract() == 0.0 && float.abs() < 1e21 => {
+                out.push_str(&format!("{float:.0}"));
+            }
+            _ => out.push_str(&number.to_string()),
+        },
+        other => out.push_str(&other.to_string()),
+    }
 }
 
 impl Validate for ApprovalList {

@@ -586,7 +586,8 @@ impl AgentNoteCode {
             AgentNoteCode::VersionUnreadable => Some(InfoCode::VersionUnreadable),
             AgentNoteCode::NoInstallationFound => Some(InfoCode::NoInstallationFound),
             AgentNoteCode::DefinitionUntested => Some(InfoCode::DefinitionUntested),
-            AgentNoteCode::CloudConnectorsNotOnDisk => None,
+            AgentNoteCode::CloudConnectorsNotOnDisk
+            | AgentNoteCode::MarketplacePluginsNotOnDisk => None,
         }
     }
 }
@@ -1171,6 +1172,10 @@ pub enum AgentNoteCode {
     /// The Agent's connectors live in the user's account, with no copy on
     /// disk, so they are not listed.
     CloudConnectorsNotOnDisk,
+    /// The plugins the user installs from the Agent's marketplace live in
+    /// the user's account, with no install record on disk, so they are not
+    /// listed.
+    MarketplacePluginsNotOnDisk,
 }
 
 /// The versions an Agent definition was tested with, both ends included.
@@ -1481,6 +1486,9 @@ pub enum Provenance {
     /// Disable goes through its own switch, and Remove is not offered: the
     /// Agent uninstalls it.
     Extension,
+    /// Shipped with the Agent, which restores it as it ships it, such as
+    /// Cursor's built-in skills. config-digger only reads it.
+    BuiltIn,
 }
 
 /// A skill manager, such as `npx skills`, as its definition names it.
@@ -1513,6 +1521,7 @@ impl From<DefinitionProvenance> for Provenance {
             DefinitionProvenance::CloudMirror => Provenance::CloudMirror,
             DefinitionProvenance::Plugin => Provenance::Plugin,
             DefinitionProvenance::Extension => Provenance::Extension,
+            DefinitionProvenance::BuiltIn => Provenance::BuiltIn,
         }
     }
 }
@@ -1736,6 +1745,9 @@ pub enum CaveatCode {
     /// A settings file holding a rule or gate that could apply cannot be
     /// read, so the Entry is resolved as if it held none.
     SettingReadFailure,
+    /// The Entry competes with others by URL, and servers config-digger
+    /// cannot see take part too, so one of them may win instead.
+    UnseenServers,
 }
 
 /// A place in a file's text.
