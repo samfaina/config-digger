@@ -8,11 +8,11 @@ use crate::api::{
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
-use crate::definitions::blocks::Disables;
+use crate::definitions::blocks::{Disables, Gate};
 use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
-use crate::folders::{self, FolderOp, FolderSize, PlannedFolder};
+use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
@@ -232,6 +232,20 @@ impl Targeted<'_> {
                     continue;
                 }
             };
+            // A parked skill's folder goes from the store with its record.
+            let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+            if let Some(folder) = self
+                .snapshot
+                .parked_of(scanned)
+                .and_then(|parked| parked.folder.as_ref())
+            {
+                planned_folders.push(PlannedFolder {
+                    path: folder.clone(),
+                    op: FolderOp::MoveToBackup,
+                    size: folders::measure(self.ports.fs.as_ref(), folder)?,
+                    git_versioned: false,
+                });
+            }
             let edit = Edit::Remove {
                 key_path: entry.key_path.clone(),
             };
@@ -246,8 +260,14 @@ impl Targeted<'_> {
         let mut files = Vec::new();
         for (path, syntax, edits) in by_file {
             let read = read(self.ports, &path)?;
-            let edited = apply_edits(&read, syntax, &edits, &Medium::File)
+            let mut edited = apply_edits(&read, syntax, &edits, &Medium::File)
                 .map_err(|failure| failure.into_error(&path))?;
+            // Undo puts the Entry back without the comments above it.
+            if keeps_comments_out(self.definitions, self.snapshot, &path) {
+                for applied in &mut edited.edits {
+                    applied.inverse = applied.inverse.clone().without_comments();
+                }
+            }
             files.push(self.planned_file(path, syntax, read, false, edited));
         }
 
@@ -290,7 +310,44 @@ impl Targeted<'_> {
             changes.extend(predict(&before, &after).0);
         }
         let breaks = self.breaks_links(&planned_folders);
-        self.planned(files, planned_folders, changes, effective, breaks)
+        let mut planned = self.planned(files, planned_folders, changes, effective, breaks)?;
+        planned.preview.info.extend(self.approvals_kept());
+        Ok(planned)
+    }
+
+    /// The notes of a Remove on the approvals it leaves as they are: one per
+    /// Entry it targets that an approval gate covers and that its Agent
+    /// approved.
+    fn approvals_kept(&self) -> Vec<Info> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.state != State::Unread)
+            .filter(|entry| {
+                let reasons = entry.reason.iter().chain(&entry.secondary);
+                !reasons
+                    .into_iter()
+                    .any(|reason| reason.code == api::ReasonCode::NotApproved)
+            })
+            .filter_map(|entry| {
+                let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+                let definition = &self.definitions[scanned.agent_index];
+                let location = definition.location(&scanned.location);
+                let gate = definition.rules(location.kind).gates.iter().find(|gate| {
+                    matches!(gate, Gate::ApprovalList(_) | Gate::ApprovalHash(_))
+                        && gate.covers(&location.id)
+                })?;
+                let by_hash = matches!(gate, Gate::ApprovalHash(_));
+                Some(Info {
+                    code: InfoCode::ApprovalKept,
+                    path: entry.path.clone(),
+                    sentence: explain::approval_kept(
+                        &definition.agent.name,
+                        &scanned.name,
+                        by_hash,
+                    ),
+                })
+            })
+            .collect()
     }
 
     /// What Remove does at the location of the skill Entry `entry`: it
@@ -301,10 +358,7 @@ impl Targeted<'_> {
         let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
         let (op, size) = match &scanned.link {
             Some(link) => {
-                let size = match &link.real {
-                    Some(real) => folders::measure(fs, real)?,
-                    None => FolderSize { files: 0, bytes: 0 },
-                };
+                let size = folders::measure_target(fs, link.real.as_deref())?;
                 let target = link.target.clone();
                 (FolderOp::RemoveLink { target }, size)
             }
@@ -357,6 +411,7 @@ impl Targeted<'_> {
             .map(|(path, key)| ContextProject { path, key });
         // The edits of each file, in the order its Entries were selected.
         let mut by_file: Vec<FileEdits> = Vec::new();
+        let mut planned_folders: Vec<PlannedFolder> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
         let mut parks: Vec<&ScannedEntry> = Vec::new();
         for entry in self.entries {
@@ -435,7 +490,7 @@ impl Targeted<'_> {
                         )));
                     }
                     if parked.is_some() {
-                        self.put_back(&mut by_file, entry, scanned)?;
+                        self.put_back(&mut by_file, &mut planned_folders, entry, scanned)?;
                     }
                     for hit in lifts {
                         // Entries Disabled by one name share its switch.
@@ -452,7 +507,7 @@ impl Targeted<'_> {
                 }
             }
         }
-        self.park(&mut by_file, &parks)?;
+        self.park(&mut by_file, &mut planned_folders, &parks)?;
 
         let mut files = Vec::new();
         for file in by_file {
@@ -477,18 +532,25 @@ impl Targeted<'_> {
             self.ports,
             &self.scan_options.projects,
             &written,
-            &[],
+            &planned_folders,
         )
         .map_err(Error::unexpected)?;
         let (changes, effective) = self.reach(&after);
         let wide = self.wide_reach(&changes);
-        self.planned(files, Vec::new(), changes, effective, wide)
+        self.planned(files, planned_folders, changes, effective, wide)
     }
 
-    /// Adds the edits that park `parks` to `by_file`: each Entry's key goes
-    /// from its file, and the Entry, verbatim with where it came from, into
-    /// the parked-Entry store under a free id.
-    fn park(&self, by_file: &mut Vec<FileEdits>, parks: &[&ScannedEntry]) -> Result<(), Error> {
+    /// Adds the edits that park `parks` to `by_file`, and the moves to
+    /// `planned_folders`: each Entry's key goes from its file, or each
+    /// skill's folder into the store's `folders`, or its link away, and the
+    /// Entry, verbatim with where it came from, into the parked-Entry store
+    /// under a free id.
+    fn park(
+        &self,
+        by_file: &mut Vec<FileEdits>,
+        planned_folders: &mut Vec<PlannedFolder>,
+        parks: &[&ScannedEntry],
+    ) -> Result<(), Error> {
         let Some(store) = self
             .snapshot
             .parked_store
@@ -502,9 +564,23 @@ impl Targeted<'_> {
             None => Vec::new(),
         };
         let parked_at = humantime::format_rfc3339_seconds(self.ports.clock.now()).to_string();
+        let origin_of = |entry: &ScannedEntry| park::Origin {
+            agent: self.definitions[entry.agent_index].agent.id.clone(),
+            home: entry.home.clone(),
+            location: entry.location.clone(),
+            name: entry.name.clone(),
+            path: entry.path.clone(),
+            key_path: entry.key_path.clone(),
+            project: entry.project.clone(),
+        };
+        let (skills, keys): (Vec<&ScannedEntry>, Vec<&ScannedEntry>) =
+            parks.iter().partition(|entry| {
+                let definition = &self.definitions[entry.agent_index];
+                definition.location(&entry.location).format.file().is_none()
+            });
         // The Entries parked from each file, in the order they were selected.
         let mut origins: Vec<(&Path, Syntax, Vec<&ScannedEntry>)> = Vec::new();
-        for &entry in parks {
+        for entry in keys {
             match origins.iter_mut().find(|(path, ..)| *path == entry.path) {
                 Some((_, _, entries)) => entries.push(entry),
                 None => origins.push((
@@ -529,17 +605,12 @@ impl Targeted<'_> {
             }
             for (entry, removed) in entries.iter().zip(&edited.edits) {
                 let id = park::free_id(&entry.name, &taken);
-                let origin = park::Origin {
-                    agent: self.definitions[entry.agent_index].agent.id.clone(),
-                    home: entry.home.clone(),
-                    location: entry.location.clone(),
-                    name: entry.name.clone(),
-                    path: entry.path.clone(),
-                    key_path: entry.key_path.clone(),
-                    project: entry.project.clone(),
-                };
-                let parked = park::ParkedEntry::new(origin, parked_at.clone(), &removed.inverse)
-                    .ok_or_else(|| Error::unexpected("a removed key comes back by an insertion"))?;
+                let parked = park::ParkedEntry::new(
+                    origin_of(entry),
+                    parked_at.clone(),
+                    &removed.inverse,
+                )
+                .ok_or_else(|| Error::unexpected("a removed key comes back by an insertion"))?;
                 let edit = Edit::Set {
                     key_path: park::key_path(&id),
                     value: parked.to_value(),
@@ -548,17 +619,63 @@ impl Targeted<'_> {
                 taken.push(id);
             }
         }
+        let fs = self.ports.fs.as_ref();
+        let kept_in = park::folders_path(store);
+        for entry in skills {
+            // A folder an earlier Operation left in the store keeps its name.
+            let mut id = park::free_id(&entry.name, &taken);
+            while folders::taken(fs, &kept_in.join(&id)) {
+                taken.push(id);
+                id = park::free_id(&entry.name, &taken);
+            }
+            let (kept, op, size) = match &entry.link {
+                Some(link) => {
+                    let size = folders::measure_target(fs, link.real.as_deref())?;
+                    let target = link.target.clone();
+                    (
+                        park::Kept::Link(target.clone()),
+                        FolderOp::RemoveLink { target },
+                        size,
+                    )
+                }
+                None => {
+                    let to = kept_in.join(&id);
+                    let size = folders::measure(fs, &entry.path)?;
+                    (park::Kept::Folder(id.clone()), FolderOp::Park { to }, size)
+                }
+            };
+            let parked = park::ParkedEntry::skill(
+                origin_of(entry),
+                parked_at.clone(),
+                entry.config.clone(),
+                kept,
+            );
+            let edit = Edit::Set {
+                key_path: park::key_path(&id),
+                value: parked.to_value(),
+            };
+            add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
+            planned_folders.push(PlannedFolder {
+                git_versioned: self.snapshot.versioned.contains(&entry.path),
+                path: entry.path.clone(),
+                op,
+                size,
+            });
+            taken.push(id);
+        }
         Ok(())
     }
 
-    /// Adds the edits that put the parked Entry `entry` back to `by_file`:
-    /// its key goes back into its file, and the Entry out of the store.
-    /// Refused when an Entry is at its key again, which it would overwrite,
-    /// or when its file's folder is gone. A missing file whose folder exists
-    /// is created with the minimal structure.
+    /// Adds the edits that put the parked Entry `entry` back to `by_file`,
+    /// and the moves to `planned_folders`: its key goes back into its file,
+    /// or a skill's folder or link back where it was, and the Entry out of
+    /// the store. Refused when an Entry is at its key or folder again, which
+    /// it would overwrite, or when the folder it goes in is gone. A missing
+    /// file whose folder exists is created with the minimal structure.
     fn put_back(
         &self,
         by_file: &mut Vec<FileEdits>,
+        planned_folders: &mut Vec<PlannedFolder>,
         entry: &api::Entry,
         scanned: &ScannedEntry,
     ) -> Result<(), Error> {
@@ -572,6 +689,20 @@ impl Targeted<'_> {
             .ok_or_else(|| Error::stale(explain::no_longer_parked(&entry.locator)))?;
         let parked: park::ParkedEntry = serde_json::from_value(value)
             .map_err(|_| Error::blocked(explain::parked_unreadable(&entry.locator, store)))?;
+        let remove_record = Edit::Remove {
+            key_path: entry.key_path.clone(),
+        };
+        let definition = &self.definitions[scanned.agent_index];
+        if definition
+            .location(&scanned.location)
+            .format
+            .file()
+            .is_none()
+        {
+            planned_folders.push(self.unparked_folder(entry, scanned, &parked)?);
+            add_edit(by_file, store.clone(), Syntax::Jsonc, remove_record, false);
+            return Ok(());
+        }
         let syntax = file_syntax(self.definitions, scanned);
         let origin = &parked.origin.path;
         match read_if_there(self.ports, origin, &Medium::File)? {
@@ -601,12 +732,74 @@ impl Targeted<'_> {
                 }
             }
         }
-        add_edit(by_file, origin.clone(), syntax, parked.put_back(), true);
-        let edit = Edit::Remove {
-            key_path: entry.key_path.clone(),
-        };
-        add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
+        let mut put_back = parked.put_back();
+        if keeps_comments_out(self.definitions, self.snapshot, origin) {
+            put_back = put_back.without_comments();
+        }
+        add_edit(by_file, origin.clone(), syntax, put_back, true);
+        add_edit(by_file, store.clone(), Syntax::Jsonc, remove_record, false);
         Ok(())
+    }
+
+    /// What Enable does at the folder of the parked skill `entry`, `parked`
+    /// as the store holds it: it moves the folder back from the store, or
+    /// creates the link again. Refused when something is at the folder
+    /// again, when the Project it applies in is gone, or when the store no
+    /// longer keeps the folder.
+    fn unparked_folder(
+        &self,
+        entry: &api::Entry,
+        scanned: &ScannedEntry,
+        parked: &park::ParkedEntry,
+    ) -> Result<PlannedFolder, Error> {
+        let fs = self.ports.fs.as_ref();
+        let origin = &parked.origin.path;
+        if folders::taken(fs, origin) {
+            return Err(Error::blocked(explain::unpark_folder_taken(
+                &entry.locator,
+                origin,
+            )));
+        }
+        let project_gone = scanned.project.as_ref().is_some_and(|key| {
+            self.snapshot
+                .projects
+                .iter()
+                .any(|project| project.key == *key && !project.exists)
+        });
+        if project_gone {
+            return Err(Error::blocked(explain::unpark_folder_gone(
+                &entry.locator,
+                origin,
+            )));
+        }
+        let kept = self
+            .snapshot
+            .parked_of(scanned)
+            .and_then(|at| at.folder.as_ref());
+        let (op, size) = match (&parked.link, kept) {
+            (Some(target), _) => {
+                let size = folders::measure_target(fs, fs.real_path(target).as_deref())?;
+                let target = target.clone();
+                (FolderOp::CreateLink { target }, size)
+            }
+            (None, Some(from)) if fs.exists(from) => {
+                let size = folders::measure(fs, from)?;
+                let from = from.clone();
+                (FolderOp::Unpark { from }, size)
+            }
+            (None, _) => {
+                return Err(Error::blocked(explain::parked_folder_gone(
+                    &entry.locator,
+                    origin,
+                )));
+            }
+        };
+        Ok(PlannedFolder {
+            path: origin.clone(),
+            op,
+            size,
+            git_versioned: self.ports.git.is_versioned(origin),
+        })
     }
 
     /// What a write reaches: the States it changes in the context, then in
@@ -783,6 +976,15 @@ fn add_switch_edit(by_file: &mut Vec<FileEdits>, path: PathBuf, sqlite: bool, ed
     if let Some(file) = by_file.iter_mut().find(|file| file.path == path) {
         file.sqlite |= sqlite;
     }
+}
+
+/// Whether a location that reads the file at `path` keeps comments out of it.
+fn keeps_comments_out(definitions: &[AgentDefinition], snapshot: &Snapshot, path: &Path) -> bool {
+    snapshot.readers_of(path).iter().any(|reader| {
+        definitions[reader.agent_index]
+            .location(&reader.location)
+            .no_comments
+    })
 }
 
 /// The syntax the file of the Entry `entry` is edited in, which holds it
@@ -1164,8 +1366,9 @@ pub(crate) fn undo_files<'m>(
 
 /// The skill folders and links of an Operation, each with the inverse of
 /// what it did there, last first, or why its Undo is refused: something is
-/// at a location it emptied, its copy in the backup is gone, or what it
-/// put back changed since. History runs the same check.
+/// at a location it emptied, its copy in the backup or the parked-Entry
+/// store is gone, or what it put back changed since. History runs the same
+/// check.
 pub(crate) fn undo_folders(
     ports: &Ports,
     manifest: &history::Manifest,
@@ -1212,10 +1415,36 @@ pub(crate) fn undo_folders(
                 let target = target.clone();
                 (FolderOp::RemoveLink { target }, record.size)
             }
+            FolderOpRecord::Parked { to } => {
+                if !fs.exists(to) {
+                    return Err(refused(format!(
+                        "the copy of {} in the parked-Entry store is gone",
+                        path.display()
+                    )));
+                }
+                (FolderOp::Unpark { from: to.clone() }, record.size)
+            }
+            FolderOpRecord::Unparked { from } => {
+                if !folders::holds(fs, path, record.size) {
+                    return Err(refused(format!(
+                        "the skill folder {} changed since the Operation",
+                        path.display()
+                    )));
+                }
+                if folders::taken(fs, from) {
+                    return Err(refused(format!(
+                        "something is at {} again since the Operation",
+                        from.display()
+                    )));
+                }
+                (FolderOp::Park { to: from.clone() }, record.size)
+            }
         };
         let empties = matches!(
             record.op,
-            FolderOpRecord::MovedToBackup { .. } | FolderOpRecord::LinkRemoved { .. }
+            FolderOpRecord::MovedToBackup { .. }
+                | FolderOpRecord::LinkRemoved { .. }
+                | FolderOpRecord::Parked { .. }
         );
         if empties && folders::taken(fs, path) {
             return Err(refused(format!(

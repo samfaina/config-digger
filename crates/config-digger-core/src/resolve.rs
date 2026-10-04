@@ -776,7 +776,13 @@ fn item_key(
     }
     let location = definition.location(&entry.location);
     let competition = &definition.rules(location.kind).competition;
-    let by_name = |entry: &ScannedEntry| ItemKey::Name(competition.key(&entry.name, &entry.path));
+    // A parked Entry competes as from where it was.
+    let by_name = |entry: &ScannedEntry| {
+        let path = snapshot
+            .parked_of(entry)
+            .map_or(&entry.path, |parked| &parked.origin);
+        ItemKey::Name(competition.key(&entry.name, path))
+    };
     if !competition.by_endpoint(&location.id) {
         return by_name(entry);
     }
@@ -1205,7 +1211,7 @@ fn gates(
 
 /// Whether the Feature gate `name` of the Agent home of `entry` is on: the
 /// value the Agent last cached, or else the definition's assumed default.
-fn gate_on(
+pub(crate) fn gate_on(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,

@@ -81,6 +81,8 @@ pub(crate) struct ScannedParked {
     pub origin_key_path: Vec<String>,
     /// When it was parked, in RFC 3339.
     pub parked_at: String,
+    /// For a skill, where the store keeps its folder.
+    pub folder: Option<PathBuf>,
 }
 
 impl Snapshot {
@@ -2391,6 +2393,9 @@ impl Scanner<'_> {
                 origin: parked_entry.origin.path,
                 origin_key_path: parked_entry.origin.key_path,
                 parked_at: parked_entry.parked_at,
+                folder: parked_entry
+                    .folder
+                    .map(|name| park::folders_path(&store).join(name)),
             });
         }
         (Some(store), parked)

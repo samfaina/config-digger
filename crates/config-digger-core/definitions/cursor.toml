@@ -130,6 +130,14 @@ registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.
 # client's Secret [docs]. `envFile` is the path of a file of variables, and
 # shown.
 
+# Cursor writes both `mcp.json` files again with `JSON.stringify`, dropping
+# their comments, and its deeplink installer parses the user's as strict
+# JSON: one it cannot parse it writes again from `{"mcpServers":{}}`,
+# dropping every server [code]. Cursor keeps the sign-in of remote servers
+# in its state [disk]; that it forgets the sign-in of the servers it no
+# longer sees is not known. config-digger never writes a comment into
+# either.
+#
 # `~\.cursor\mcp.json` [docs, disk]. No variable moves it [code].
 [[locations]]
 id = "user-mcp"
@@ -144,6 +152,8 @@ store_class = "rewritten-while-running"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
 on_read_failure = "unknown"
+risks = ["agent_may_drop_entries", "agent_may_clear_auth"]
+no_comments = true
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
 # `.cursor\mcp.json` at the root of each folder of the Project, read in no
@@ -164,6 +174,8 @@ store_class = "rewritten-while-running"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
 on_read_failure = "unknown"
+risks = ["agent_may_drop_entries", "agent_may_clear_auth"]
+no_comments = true
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
 # The servers of one of Cursor's own plugins, a Project's or a local one:
@@ -262,6 +274,46 @@ block = "same-url"
 locations = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 gate = "dedupe_mcp_servers"
 unseen = ["extensions", "team", "marketplace-plugins", "user-pick"]
+
+# The toggle of each server in Cursor's MCP settings adds its identifier to
+# `cursor/disabledMcpServers` in the workspace's store, a list Cursor
+# compares identifiers with, so a server is Disabled in that Project only;
+# Enable takes it out [code]. A window with no folder has none, so a user's
+# server is Disabled in a Project only. While Cursor's gate
+# `mcp_profile_scoped_global_disabled_state` is on, the toggle of a server
+# that is not a Project's writes `cursor/disabledGlobalMcpServers` in the
+# profile's store instead, the application's state for the default profile,
+# so that it is Disabled in every Project [code]. That a list of
+# identifiers is what a toggled server leaves in either is not known:
+# Cursor reads one [code], but none was toggled on the research machine.
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["cursor/disabledMcpServers"], store_class = "sqlite" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_natively"
+locations = ["project-mcp"]
+
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["cursor/disabledMcpServers"], store_class = "sqlite" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_natively"
+locations = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+when = [{ block = "feature-gate", gate = "mcp_profile_scoped_global_disabled_state", is = false }]
+
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "state" }, key_path = ["cursor/disabledGlobalMcpServers"], store_class = "sqlite" }
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_natively"
+locations = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+when = [{ block = "feature-gate", gate = "mcp_profile_scoped_global_disabled_state" }]
 
 # Cursor loads a Claude Code plugin only while Claude Code's
 # `enabledPlugins["<name>@<marketplace>"]` holds `true` for it in the
@@ -537,6 +589,14 @@ precedence = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
 checks = ["frontmatter", "rules", "disable", "precedence"]
 
+# Cursor has no switch for one skill [docs, code]: config-digger parks the
+# folder of one it Disables in its own store, and puts it back on Enable.
+# A skill in a git-versioned folder is never parked, so it has no Disable.
+# Parking a skill of another Agent's folder takes it from that Agent too.
+[[items.skill.disable]]
+block = "park"
+locations = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills"]
+
 # The `enabled` of a Project's plugin, as for servers above.
 [[items.skill.disable]]
 block = "json-field"
@@ -636,6 +696,16 @@ lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, k
 [[feature_gates]]
 name = "dedupe_mcp_servers"
 assumed = true
+affects = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
+lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
+
+# Servers outside Projects are Disabled in the profile's store while
+# `mcp_profile_scoped_global_disabled_state` is on [code]. The research
+# machine held no `cursor/disabledGlobalMcpServers` [disk], so it is taken
+# to be off.
+[[feature_gates]]
+name = "mcp_profile_scoped_global_disabled_state"
+assumed = false
 affects = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
 

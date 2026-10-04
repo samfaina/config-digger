@@ -1441,6 +1441,11 @@
             "$ref": "#/$defs/RiskCode"
           }
         },
+        "no_comments": {
+          "description": "Whether config-digger keeps comments out of the location's file: it\nwrites none, not even those an Undo would put back above an Entry,\nsuch as into Cursor's `mcp.json`, which a writer of Cursor's that\nparses it as strict JSON empties when it holds one.",
+          "type": "boolean",
+          "default": false
+        },
         "shape": {
           "description": "The minimal shape the Agent requires of the location's Entries:\none without it is Invalid. Without it, no Entry here is Invalid.",
           "anyOf": [
@@ -2470,6 +2475,13 @@
               },
               "default": []
             },
+            "when": {
+              "description": "Feature gates under which the Agent reads the switch, every one of\nthem, such as one that moves it to another store. While one does not\nhold, the switch Disables nothing and Disable skips it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Condition"
+              }
+            },
             "block": {
               "type": "string",
               "const": "json-name-list"
@@ -2538,6 +2550,13 @@
                 "type": "string"
               },
               "default": []
+            },
+            "when": {
+              "description": "Feature gates under which the Agent reads the switch, every one of\nthem, such as one that moves it to another store. While one does not\nhold, the switch Disables nothing and Disable skips it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Condition"
+              }
             },
             "plugin_scopes": {
               "description": "With target `plugin`, the Scopes a plugin must be installed at for\nthe field to apply to it, as the Agent records them, such as Cursor\nreading a user install's `enabledPlugins` in the user settings alone.\nOmitted, it applies to every plugin.",
@@ -2614,6 +2633,13 @@
               },
               "default": []
             },
+            "when": {
+              "description": "Feature gates under which the Agent reads the switch, every one of\nthem, such as one that moves it to another store. While one does not\nhold, the switch Disables nothing and Disable skips it.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Condition"
+              }
+            },
             "block": {
               "type": "string",
               "const": "json-item-list"
@@ -2631,11 +2657,11 @@
           ]
         },
         {
-          "description": "Disables an Entry that has no switch of its own, such as a server in\nClaude Desktop's user file, by moving it out of the Agent's reach into\nconfig-digger's parked-Entry store, where it stays listed as Disabled;\nEnable puts it back (ADR 0002). Disable prefers any switch to it, and\nnever parks an Entry in a git-versioned file.",
+          "description": "Disables an Entry that has no switch of its own, such as a server in\nClaude Desktop's user file or a skill in Cursor, by moving it out of the\nAgent's reach into config-digger's parked-Entry store, where it stays\nlisted as Disabled; Enable puts it back (ADR 0002). Disable prefers any\nswitch to it, and never parks an Entry in a git-versioned file or folder.",
           "type": "object",
           "properties": {
             "locations": {
-              "description": "The ids of the locations whose Entries it parks: each a file outside\nany plugin, holding Entries under keys.",
+              "description": "The ids of the locations whose Entries it parks: each a file outside\nany plugin, holding Entries under keys, or a folder of skill folders\noutside any plugin.",
               "type": "array",
               "items": {
                 "type": "string"

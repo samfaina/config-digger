@@ -3111,6 +3111,10 @@ pub(crate) trait Disables {
 
     fn locations(&self) -> &[String];
 
+    /// The Feature gates under which the Agent reads the switch, every one
+    /// of them.
+    fn when(&self) -> &[Condition];
+
     /// The Scopes a plugin must be installed at for the switch to apply to
     /// its Entries, as the Agent records them; empty for any.
     fn plugin_scopes(&self) -> &[String] {
@@ -3276,6 +3280,10 @@ impl Disables for Switched<'_> {
         self.block().locations()
     }
 
+    fn when(&self) -> &[Condition] {
+        self.block().when()
+    }
+
     fn enable_offered(&self) -> bool {
         self.block().enable_offered()
     }
@@ -3322,15 +3330,16 @@ impl Disables for Switched<'_> {
 }
 
 /// Disables an Entry that has no switch of its own, such as a server in
-/// Claude Desktop's user file, by moving it out of the Agent's reach into
-/// config-digger's parked-Entry store, where it stays listed as Disabled;
-/// Enable puts it back (ADR 0002). Disable prefers any switch to it, and
-/// never parks an Entry in a git-versioned file.
+/// Claude Desktop's user file or a skill in Cursor, by moving it out of the
+/// Agent's reach into config-digger's parked-Entry store, where it stays
+/// listed as Disabled; Enable puts it back (ADR 0002). Disable prefers any
+/// switch to it, and never parks an Entry in a git-versioned file or folder.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Park {
     /// The ids of the locations whose Entries it parks: each a file outside
-    /// any plugin, holding Entries under keys.
+    /// any plugin, holding Entries under keys, or a folder of skill folders
+    /// outside any plugin.
     pub locations: Vec<String>,
 }
 
@@ -3418,11 +3427,16 @@ pub(crate) struct JsonNameList {
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// Feature gates under which the Agent reads the switch, every one of
+    /// them, such as one that moves it to another store. While one does not
+    /// hold, the switch Disables nothing and Disable skips it.
+    #[serde(default)]
+    pub when: Vec<Condition>,
 }
 
 impl Validate for JsonNameList {
     fn validate(&self) -> Result<(), String> {
-        validate_mechanism(&self.switch, self.target, self.context)?;
+        validate_mechanism(&self.switch, self.target, self.context, &self.when)?;
         if self.switch.named_by.is_some() {
             return Err("a name list takes no named_by".into());
         }
@@ -3460,6 +3474,10 @@ impl Disables for JsonNameList {
 
     fn locations(&self) -> &[String] {
         &self.locations
+    }
+
+    fn when(&self) -> &[Condition] {
+        &self.when
     }
     fn enable_offered(&self) -> bool {
         self.enable_offered
@@ -3564,6 +3582,11 @@ pub(crate) struct JsonField {
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// Feature gates under which the Agent reads the switch, every one of
+    /// them, such as one that moves it to another store. While one does not
+    /// hold, the switch Disables nothing and Disable skips it.
+    #[serde(default)]
+    pub when: Vec<Condition>,
     /// With target `plugin`, the Scopes a plugin must be installed at for
     /// the field to apply to it, as the Agent records them, such as Cursor
     /// reading a user install's `enabledPlugins` in the user settings alone.
@@ -3574,7 +3597,7 @@ pub(crate) struct JsonField {
 
 impl Validate for JsonField {
     fn validate(&self) -> Result<(), String> {
-        validate_mechanism(&self.switch, self.target, self.context)?;
+        validate_mechanism(&self.switch, self.target, self.context, &self.when)?;
         if !self.plugin_scopes.is_empty() && self.target != MechanismTarget::Plugin {
             return Err("plugin_scopes needs target `plugin`".into());
         }
@@ -3628,6 +3651,10 @@ impl Disables for JsonField {
 
     fn locations(&self) -> &[String] {
         &self.locations
+    }
+
+    fn when(&self) -> &[Condition] {
+        &self.when
     }
     fn enable_offered(&self) -> bool {
         self.enable_offered
@@ -3724,11 +3751,16 @@ pub(crate) struct JsonItemList {
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// Feature gates under which the Agent reads the switch, every one of
+    /// them, such as one that moves it to another store. While one does not
+    /// hold, the switch Disables nothing and Disable skips it.
+    #[serde(default)]
+    pub when: Vec<Condition>,
 }
 
 impl Validate for JsonItemList {
     fn validate(&self) -> Result<(), String> {
-        validate_mechanism(&self.switch, self.target, self.context)?;
+        validate_mechanism(&self.switch, self.target, self.context, &self.when)?;
         if self.switch.named_by.is_none() {
             return Err("an item list needs named_by, what of each item holds its id".into());
         }
@@ -3802,6 +3834,10 @@ impl Disables for JsonItemList {
         &self.locations
     }
 
+    fn when(&self) -> &[Condition] {
+        &self.when
+    }
+
     fn enable_offered(&self) -> bool {
         self.enable_offered
     }
@@ -3849,14 +3885,21 @@ impl Disables for JsonItemList {
 }
 
 /// Checks what every mechanism shares: its switch, a target that agrees
-/// with what the switch is keyed by, and a context that agrees with where
-/// the switch is.
+/// with what the switch is keyed by, a context that agrees with where the
+/// switch is, and conditions that are Feature gates.
 fn validate_mechanism(
     switch: &Switch,
     target: MechanismTarget,
     context: MechanismContext,
+    when: &[Condition],
 ) -> Result<(), String> {
     switch.validate()?;
+    for condition in when {
+        condition.validate()?;
+        if condition.gate().is_none() {
+            return Err("a Disable mechanism's `when` takes feature-gate conditions only".into());
+        }
+    }
     if (target == MechanismTarget::Plugin) != switch.plugins() {
         return Err(format!(
             "a switch key path holds `{PLUGIN_KEY}` exactly when the target is `plugin`"

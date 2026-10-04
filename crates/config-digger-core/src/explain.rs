@@ -421,6 +421,37 @@ pub(crate) fn parked_unreadable(locator: &str, store: &Path) -> String {
     )
 }
 
+/// The note of a Remove of the Entry `name`, which `agent_name` approved
+/// by its name, or with `by_hash`, as it is configured.
+pub(crate) fn approval_kept(agent_name: &str, name: &str, by_hash: bool) -> String {
+    let again = if by_hash {
+        "a server added again under that name and configured the same"
+    } else {
+        "a server added again under that name"
+    };
+    format!(
+        "{agent_name}'s approval of `{name}` is left as it is, since config-digger never edits approvals: {agent_name} may run {again} without asking."
+    )
+}
+
+/// Why Enable of the parked skill at `locator` is refused: something is at
+/// its folder `origin` again.
+pub(crate) fn unpark_folder_taken(locator: &str, origin: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: something is at {} again since it was parked, and putting it back would overwrite it",
+        origin.display()
+    )
+}
+
+/// Why Enable of the parked skill at `locator` is refused: config-digger's
+/// store no longer keeps the folder it parked from `origin`.
+pub(crate) fn parked_folder_gone(locator: &str, origin: &Path) -> String {
+    format!(
+        "cannot Enable {locator}: the folder parked from {} is no longer in config-digger's parked-Entry store",
+        origin.display()
+    )
+}
+
 /// Why Enable of the parked Entry at `locator` is refused: the folder of
 /// `origin` is gone.
 pub(crate) fn unpark_folder_gone(locator: &str, origin: &Path) -> String {
@@ -683,7 +714,7 @@ pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
         })
         .collect();
     format!(
-        "This {verb} reaches more than what it targets: the switch it writes also changes the State of {}.",
+        "This {verb} reaches more than what it targets: what it writes also changes the State of {}.",
         rows.join(", ")
     )
 }
@@ -1365,6 +1396,12 @@ pub(crate) fn folder_change(
             format!("Moves the skill folder {path} ({size}) back from the backup.")
         }
         FolderChangeKind::LinkCreated => format!("Creates the link {path} to {target} again."),
+        FolderChangeKind::Parked => format!(
+            "Moves the skill folder {path} ({size}) into config-digger's parked-Entry store."
+        ),
+        FolderChangeKind::PutBack => format!(
+            "Moves the skill folder {path} ({size}) back from config-digger's parked-Entry store."
+        ),
     }
 }
 
@@ -1427,6 +1464,10 @@ pub(crate) fn folder_failed(op: &FolderOp, path: &Path, error: &std::io::Error) 
         FolderOp::RemoveLink { .. } => format!("cannot remove the link {path}: {error}"),
         FolderOp::MoveBack { .. } => format!("cannot move {path} back: {error}"),
         FolderOp::CreateLink { .. } => format!("cannot create the link {path}: {error}"),
+        FolderOp::Park { .. } => {
+            format!("cannot move {path} into the parked-Entry store: {error}")
+        }
+        FolderOp::Unpark { .. } => format!("cannot move {path} back: {error}"),
     }
 }
 

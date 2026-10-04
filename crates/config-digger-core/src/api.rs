@@ -575,6 +575,9 @@ pub enum InfoCode {
     NoInstallationFound,
     /// The definition of an Agent it touches has no tested range.
     DefinitionUntested,
+    /// The Agent's approval of an Entry it Removes is left as it is:
+    /// config-digger never edits approvals.
+    ApprovalKept,
 }
 
 impl AgentNoteCode {
@@ -710,6 +713,11 @@ pub enum FolderChangeKind {
     MovedBack,
     /// The link is created again.
     LinkCreated,
+    /// The skill folder is moved into config-digger's parked-Entry store.
+    Parked,
+    /// The skill folder is moved back from config-digger's parked-Entry
+    /// store.
+    PutBack,
 }
 
 /// A diff of two versions of one file, with every Secret masked in both,

@@ -496,6 +496,12 @@ pub(crate) struct LocationDefinition {
     /// configuration, shown as warnings on the Read failure.
     #[serde(default)]
     pub risks: Vec<RiskCode>,
+    /// Whether config-digger keeps comments out of the location's file: it
+    /// writes none, not even those an Undo would put back above an Entry,
+    /// such as into Cursor's `mcp.json`, which a writer of Cursor's that
+    /// parses it as strict JSON empties when it holds one.
+    #[serde(default)]
+    pub no_comments: bool,
     /// The minimal shape the Agent requires of the location's Entries:
     /// one without it is Invalid. Without it, no Entry here is Invalid.
     pub shape: Option<Shape>,
@@ -1118,6 +1124,9 @@ impl AgentDefinition {
             if !self.scopes.iter().any(|scope| scope.id == location.scope) {
                 return Err(context(format!("undeclared scope `{}`", location.scope)));
             }
+            if location.no_comments && location.format.file().is_none() {
+                return Err(context("no_comments needs a file format".into()));
+            }
             for condition in &location.when {
                 condition.validate().map_err(context)?;
                 for source in condition
@@ -1347,21 +1356,40 @@ impl AgentDefinition {
                     return Err(context(format!("`{id}` is not a location of this kind")));
                 }
                 let Some(mechanism) = mechanism.switched() else {
-                    // Parking moves a key out of a file and back.
+                    // Parking moves a key out of a file, or a skill's folder
+                    // out of a folder of skill folders, and back.
                     if let Some(id) = mechanism.locations().iter().find(|id| {
                         let location = self.location(id);
-                        location.format.file().is_none()
+                        (location.format.file().is_none()
+                            && !matches!(location.format, Format::SkillFolder(_)))
                             || location.anchor.plugin().is_some()
                             || location.one_entry
                     }) {
                         return Err(context(format!(
-                            "park covers keys in files outside plugins only, not `{id}`"
+                            "park covers keys in files and folders of skill folders outside plugins only, not `{id}`"
                         )));
                     }
                     continue;
                 };
                 self.validate_home_root(&mechanism.switch().anchor)
                     .map_err(context)?;
+                for name in mechanism.when().iter().filter_map(Condition::gate) {
+                    let Some(gate) = self.feature_gate(name) else {
+                        return Err(context(format!("undeclared feature gate `{name}`")));
+                    };
+                    let covered: Vec<&str> = match mechanism.locations() {
+                        [] => declared.iter().copied().collect(),
+                        listed => listed.iter().map(String::as_str).collect(),
+                    };
+                    if let Some(id) = covered
+                        .iter()
+                        .find(|id| !gate.affects.iter().any(|known| known == *id))
+                    {
+                        return Err(context(format!(
+                            "feature gate `{name}` does not list `{id}` in `affects`"
+                        )));
+                    }
+                }
                 if mechanism.target() == MechanismTarget::Plugin {
                     if mechanism.locations().is_empty() {
                         return Err(context("target `plugin` needs its locations listed".into()));
@@ -2842,6 +2870,82 @@ enable_offered = false
         let text = text.replace("enable_offered = false\n", "");
         assert!(
             error(&text).contains("enable_offered must be false"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_disable_mechanism_is_read_under_feature_gates_that_affect_its_locations() {
+        let mechanism = r#"
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "state" }, key_path = ["off"], store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_natively"
+when = [{ block = "feature-gate", gate = "moved", is = false }]
+"#;
+        let gate = format!(
+            "\n[[feature_gates]]\nname = \"moved\"\nassumed = false\naffects = [\"user-mcp\"]\nlookup = {JSON_LOOKUP}\n"
+        );
+        let text = format!("{VALID}{mechanism}{gate}");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let undeclared = format!("{VALID}{mechanism}");
+        assert!(
+            error(&undeclared).contains("undeclared feature gate `moved`"),
+            "{}",
+            error(&undeclared)
+        );
+        let unaffected = text.replace("affects = [\"user-mcp\"]", "affects = []");
+        assert!(
+            error(&unaffected).contains("affects"),
+            "{}",
+            error(&unaffected)
+        );
+        let setting = text.replace(
+            r#"{ block = "feature-gate", gate = "moved", is = false }"#,
+            r#"{ block = "setting", sources = [{ anchor = { block = "home", root = "state" }, key_path = ["x"] }], equals = true, default = false }"#,
+        );
+        assert!(
+            error(&setting).contains("feature-gate conditions only"),
+            "{}",
+            error(&setting)
+        );
+    }
+
+    #[test]
+    fn only_a_file_keeps_comments_out() {
+        let text = VALID.replace(
+            "on_read_failure = \"ignores_file\"
+",
+            "on_read_failure = \"ignores_file\"
+no_comments = true
+",
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let skills = r#"
+[[locations]]
+id = "skills"
+anchor = { block = "home", root = "state" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+no_comments = true
+
+[items.skill]
+precedence = ["skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "disable", "precedence"]
+"#;
+        let text = format!("{VALID}{skills}");
+        assert!(
+            error(&text).contains("no_comments needs a file format"),
             "{}",
             error(&text)
         );
