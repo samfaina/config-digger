@@ -216,6 +216,11 @@ pub(crate) enum FolderOpRecord {
     MovedBack { from: PathBuf },
     /// It created the link to `target`.
     LinkCreated { target: PathBuf },
+    /// It moved the folder to `to`, in config-digger's parked-Entry store.
+    Parked { to: PathBuf },
+    /// It moved the folder back from `from`, in config-digger's parked-Entry
+    /// store.
+    Unparked { from: PathBuf },
 }
 
 impl FolderRecord {
@@ -233,6 +238,8 @@ impl FolderRecord {
             FolderOp::CreateLink { target } => FolderOpRecord::LinkCreated {
                 target: target.clone(),
             },
+            FolderOp::Park { to } => FolderOpRecord::Parked { to: to.clone() },
+            FolderOp::Unpark { from } => FolderOpRecord::Unparked { from: from.clone() },
         };
         Self {
             path: path.to_path_buf(),

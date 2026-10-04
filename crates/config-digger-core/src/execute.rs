@@ -316,8 +316,11 @@ fn check_folder(ports: &Ports, folder: &PlannedFolder) -> Result<(), Error> {
     let unchanged = match &folder.op {
         FolderOp::MoveToBackup => folders::holds(fs, path, folder.size),
         FolderOp::RemoveLink { target } => folders::links_to(fs, path, target),
-        FolderOp::MoveBack { from } => !folders::taken(fs, path) && fs.exists(from),
+        FolderOp::MoveBack { from } | FolderOp::Unpark { from } => {
+            !folders::taken(fs, path) && fs.exists(from)
+        }
         FolderOp::CreateLink { .. } => !folders::taken(fs, path),
+        FolderOp::Park { to } => folders::holds(fs, path, folder.size) && !folders::taken(fs, to),
     };
     if unchanged {
         return Ok(());
@@ -336,12 +339,13 @@ fn do_folder(ports: &Ports, touched: &PendingFolder) -> io::Result<()> {
         (FolderOp::MoveToBackup, Some(backup)) => fs.move_folder(path, backup),
         (FolderOp::MoveToBackup, None) => Err(io::Error::other("no backup to move it to")),
         (FolderOp::RemoveLink { .. }, _) => fs.remove_link(path),
-        (FolderOp::MoveBack { from }, _) => {
+        (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _) => {
             parent(fs, path).and_then(|()| fs.move_folder(from, path))
         }
         (FolderOp::CreateLink { target }, _) => {
             parent(fs, path).and_then(|()| fs.create_link(path, target))
         }
+        (FolderOp::Park { to }, _) => parent(fs, to).and_then(|()| fs.move_folder(path, to)),
     }
 }
 
@@ -352,9 +356,10 @@ fn parent(fs: &dyn FileSystem, path: &Path) -> io::Result<()> {
 }
 
 /// Verify of one skill folder's location: a folder moved into the backup
-/// is gone and its copy holds as many files of the same total size; a link
-/// removed is gone and its target is intact; a folder moved back holds its
-/// files again; a link created points to its target.
+/// or the parked-Entry store is gone and its copy holds as many files of the
+/// same total size; a link removed is gone and its target is intact; a
+/// folder moved back holds its files again; a link created points to its
+/// target.
 fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> {
     let fs = ports.fs.as_ref();
     let folder = touched.folder;
@@ -362,9 +367,15 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
     let failed = |cause: String| Err(Failure::new(ErrorCode::VerifyFailed, cause));
     let size = explain::folder_size(folder.size);
     match (&folder.op, &touched.backup) {
-        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. } | FolderOp::Park { .. }, _)
+            if folders::taken(fs, path) =>
+        {
             failed(format!("{} is still there", path.display()))
         }
+        (FolderOp::Park { to }, _) if !folders::holds(fs, to, folder.size) => failed(format!(
+            "the copy of {} in the parked-Entry store does not hold its {size}",
+            path.display()
+        )),
         (FolderOp::MoveToBackup, Some(backup)) if !folders::holds(fs, backup, folder.size) => {
             failed(format!(
                 "the copy of {} in the backup does not hold its {size}",
@@ -382,7 +393,9 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
                 path.display()
             ))
         }
-        (FolderOp::MoveBack { from }, _) if !folders::holds(fs, path, folder.size) || fs.exists(from) => {
+        (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _)
+            if !folders::holds(fs, path, folder.size) || fs.exists(from) =>
+        {
             failed(format!(
                 "the skill folder {} does not hold its {size} again",
                 path.display()
@@ -430,7 +443,9 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
     let occupied =
         || not_restored("Something else is there since config-digger touched it.".into());
     let restored = match (&touched.folder.op, &touched.backup) {
-        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. }, _) if folders::taken(fs, path) => {
+        (FolderOp::MoveToBackup | FolderOp::RemoveLink { .. } | FolderOp::Park { .. }, _)
+            if folders::taken(fs, path) =>
+        {
             return occupied();
         }
         (FolderOp::MoveToBackup, Some(backup)) => {
@@ -440,8 +455,15 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
         (FolderOp::RemoveLink { target }, _) => {
             parent(fs, path).and_then(|()| fs.create_link(path, target))
         }
-        (FolderOp::MoveBack { from }, _) if folders::taken(fs, from) => return occupied(),
-        (FolderOp::MoveBack { from }, _) => fs.move_folder(path, from),
+        (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _)
+            if folders::taken(fs, from) =>
+        {
+            return occupied();
+        }
+        (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _) => {
+            parent(fs, from).and_then(|()| fs.move_folder(path, from))
+        }
+        (FolderOp::Park { to }, _) => parent(fs, path).and_then(|()| fs.move_folder(to, path)),
         (FolderOp::CreateLink { target }, _) if folders::links_to(fs, path, target) => {
             fs.remove_link(path)
         }

@@ -72,6 +72,26 @@ impl Edit {
             | Edit::RemoveItem { key_path, .. } => key_path,
         }
     }
+
+    /// The edit, writing no comment.
+    pub fn without_comments(self) -> Edit {
+        match self {
+            Edit::Insert {
+                key_path,
+                value,
+                after,
+                inline,
+                ..
+            } => Edit::Insert {
+                key_path,
+                value,
+                after,
+                inline,
+                comments: Vec::new(),
+            },
+            edit => edit,
+        }
+    }
 }
 
 /// An edit computed on a file, ready to be written.

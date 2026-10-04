@@ -1,10 +1,12 @@
 //! The parked-Entry store (ADR 0002): where Disable moves an Entry that has
 //! no switch of its own, out of the Agent's reach, until Enable puts it back.
 //! It is one JSON manifest in config-digger's data folder, holding each
-//! parked Entry under `entries.<id>` with where it came from. The store is
-//! part of the inventory, not a backup: History never prunes it. Parking and
-//! putting back are edits of the Entry's file and of the manifest, so they
-//! are backed up, verified and undone as any other Operation.
+//! parked Entry under `entries.<id>` with where it came from, and beside it
+//! a `folders` folder holding each parked skill's folder under its id. The
+//! store is part of the inventory, not a backup: History never prunes it.
+//! Parking and putting back are edits of the Entry's file and of the
+//! manifest, and moves of a skill's folder, so they are backed up, verified
+//! and undone as any other Operation.
 
 use crate::api::Error;
 use crate::definitions::{AgentDefinition, LocationDefinition};
@@ -13,7 +15,7 @@ use crate::history;
 use crate::ports::Environment;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The key of the manifest that holds the parked Entries, by id.
 const ENTRIES: &str = "entries";
@@ -26,6 +28,12 @@ pub(crate) fn store_path(env: &dyn Environment) -> Result<PathBuf, Error> {
     Ok(history::data_folder(env)?
         .join("parked")
         .join("manifest.json"))
+}
+
+/// The folder that holds the folders of parked skills, beside the manifest
+/// at `store`.
+pub(crate) fn folders_path(store: &Path) -> PathBuf {
+    store.with_file_name("folders")
 }
 
 /// The key path of the parked Entry `id` in the manifest.
@@ -48,8 +56,23 @@ pub(crate) struct ParkedEntry {
     pub inline: bool,
     #[serde(default)]
     pub comments: Vec<String>,
+    /// For a skill, the name its folder has in the store's `folders`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
+    /// For a skill reached through a link, where the link pointed: parking
+    /// it took the link away, and Enable creates it again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<PathBuf>,
     /// Its value, verbatim, Secrets included.
     pub entry: Value,
+}
+
+/// What the store keeps of a parked skill.
+pub(crate) enum Kept {
+    /// Its folder, under this name in the store's `folders`.
+    Folder(String),
+    /// Where the link it was reached through pointed.
+    Link(PathBuf),
 }
 
 /// Where a parked Entry came from.
@@ -88,8 +111,30 @@ impl ParkedEntry {
             after: after.clone(),
             inline: *inline,
             comments: comments.clone(),
+            folder: None,
+            link: None,
             entry: value.clone(),
         })
+    }
+
+    /// The skill from `origin`, with the value `entry`, whose folder goes
+    /// into the store's `folders` under the name `folder`, or for a skill
+    /// reached through a link, whose link to `link` goes away.
+    pub fn skill(origin: Origin, parked_at: String, entry: Value, kept: Kept) -> ParkedEntry {
+        let (folder, link) = match kept {
+            Kept::Folder(name) => (Some(name), None),
+            Kept::Link(target) => (None, Some(target)),
+        };
+        ParkedEntry {
+            origin,
+            parked_at,
+            after: None,
+            inline: false,
+            comments: Vec::new(),
+            folder,
+            link,
+            entry,
+        }
     }
 
     /// The edit that puts the Entry back into its file.

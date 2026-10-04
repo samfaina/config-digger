@@ -5,12 +5,13 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    DisableReason, Disables, MechanismContext, MechanismTarget, Switched,
+    DisableReason, Disables, Holds, MechanismContext, MechanismTarget, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::Edit;
 use crate::explain;
 use crate::locator;
+use crate::resolve;
 use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -178,6 +179,7 @@ fn set_for<'a>(
     for (index, mechanism) in switched {
         if !mechanism.covers(&location.id)
             || !mechanism.covers_plugin(plugin_scope(entry))
+            || !switch_read(definition, snapshot, entry, mechanism)
             || (mechanism.layered() && layer_decided)
         {
             continue;
@@ -318,6 +320,7 @@ pub(crate) fn choose(
         .filter(|(_, mechanism)| {
             mechanism.covers(&location.id)
                 && mechanism.covers_plugin(plugin_scope(entry))
+                && switch_read(definition, snapshot, entry, *mechanism)
                 && mechanism.enable_offered()
                 && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
         })
@@ -436,7 +439,9 @@ pub(crate) fn failed_switch_files(
     let mut files: Vec<PathBuf> = Vec::new();
     for mechanism in &definition.rules(location.kind).disable {
         let Some(mechanism) = mechanism.switched().filter(|mechanism| {
-            mechanism.covers(&location.id) && mechanism.covers_plugin(plugin_scope(entry))
+            mechanism.covers(&location.id)
+                && mechanism.covers_plugin(plugin_scope(entry))
+                && switch_read(definition, snapshot, entry, *mechanism)
         }) else {
             continue;
         };
@@ -458,4 +463,19 @@ pub(crate) fn failed_switch_files(
 /// The Scope the plugin of `entry` is installed at, as the Agent records it.
 fn plugin_scope(entry: &ScannedEntry) -> Option<&str> {
     entry.plugin.as_ref()?.scope.as_deref()
+}
+
+/// Whether the Agent home of `entry` reads the switch of `mechanism`: each
+/// Feature gate its `when` names has the value it needs.
+fn switch_read(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    mechanism: Switched,
+) -> bool {
+    let gate_on = |name: &str| resolve::gate_on(definition, snapshot, entry, name);
+    mechanism
+        .when()
+        .iter()
+        .all(|condition| condition.holds(&gate_on, &|_| None))
 }

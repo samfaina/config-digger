@@ -28,6 +28,18 @@ pub(crate) fn measure(fs: &dyn FileSystem, folder: &Path) -> Result<FolderSize, 
     })
 }
 
+/// The size of a link's target, `real` once resolved: nothing when the
+/// target is gone.
+pub(crate) fn measure_target(
+    fs: &dyn FileSystem,
+    real: Option<&Path>,
+) -> Result<FolderSize, Error> {
+    match real {
+        Some(real) => measure(fs, real),
+        None => Ok(FolderSize { files: 0, bytes: 0 }),
+    }
+}
+
 /// What an Operation does at one skill folder's location.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FolderOp {
@@ -40,6 +52,11 @@ pub(crate) enum FolderOp {
     MoveBack { from: PathBuf },
     /// Creates the link to `target` there again.
     CreateLink { target: PathBuf },
+    /// Moves the folder into config-digger's parked-Entry store, at `to`.
+    Park { to: PathBuf },
+    /// Moves the folder back from `from`, where the parked-Entry store
+    /// keeps it.
+    Unpark { from: PathBuf },
 }
 
 /// One skill folder's location an Operation touches.
@@ -61,6 +78,8 @@ impl PlannedFolder {
             FolderOp::RemoveLink { target } => (FolderChangeKind::LinkRemoved, Some(target)),
             FolderOp::MoveBack { .. } => (FolderChangeKind::MovedBack, None),
             FolderOp::CreateLink { target } => (FolderChangeKind::LinkCreated, Some(target)),
+            FolderOp::Park { .. } => (FolderChangeKind::Parked, None),
+            FolderOp::Unpark { .. } => (FolderChangeKind::PutBack, None),
         };
         FolderChange {
             sentence: explain::folder_change(change, &self.path, target, self.size),
@@ -77,7 +96,8 @@ impl PlannedFolder {
 /// The file system as it will be once `folders` are done, for reading
 /// only: a folder moved away or a link removed is gone, along with what
 /// is reached through it; a folder moved back holds its copy, which is
-/// gone from the backup; a link created points to its target.
+/// gone from the backup or the parked-Entry store; a link created points to
+/// its target.
 pub(crate) struct AsIf<'f> {
     fs: &'f dyn FileSystem,
     /// Paths with nothing at them or below.
@@ -106,10 +126,10 @@ impl<'f> AsIf<'f> {
         let mut shown = Vec::new();
         for folder in folders {
             match &folder.op {
-                FolderOp::MoveToBackup | FolderOp::RemoveLink { .. } => {
+                FolderOp::MoveToBackup | FolderOp::RemoveLink { .. } | FolderOp::Park { .. } => {
                     gone.push(folder.path.clone());
                 }
-                FolderOp::MoveBack { from } => {
+                FolderOp::MoveBack { from } | FolderOp::Unpark { from } => {
                     gone.push(from.clone());
                     shown.push(Shown {
                         at: folder.path.clone(),
