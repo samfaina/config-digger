@@ -5,10 +5,10 @@
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, Format, Gate, GateStore,
-    HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp, NameFrom,
-    Parse, PluginFolders, PluginRecord, PluginRegistry, ProjectWalk, Register, Registry,
-    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
-    is_entry_key,
+    HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp,
+    ManifestSkills, NameFrom, Parse, PluginFolders, PluginRecord, PluginRegistry,
+    ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingsSource, SkillDefect,
+    SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -726,25 +726,17 @@ pub(crate) fn scan_as_if(
     let mut installed = Installed::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
+        // A Project's own plugins wait for every Project.
         let plugins: Vec<ScannedPlugin> = definition
             .plugins
             .iter()
-            .flat_map(|plugins| scanner.read_plugins(home, plugins))
+            .filter(|plugins| !plugins.registry.in_project())
+            .flat_map(|plugins| scanner.read_plugins(home, plugins, None))
             .collect();
         installed.insert((home.agent_index, home.home.clone()), plugins.clone());
+        scanner.read_plugin_locations(home, definition, &plugins);
         for location in definition.locations.iter() {
-            if location.anchor.in_project() {
-                continue;
-            }
-            // Read in the folder of each plugin, whose Entries apply where
-            // the plugin does.
-            if let Some(anchor) = location.anchor.plugin() {
-                for plugin in plugins
-                    .iter()
-                    .filter(|plugin| plugin.plugins == anchor.plugins)
-                {
-                    scanner.read_plugin_location(home, definition, location, plugin, &anchor.path);
-                }
+            if location.anchor.in_project() || location.anchor.plugin().is_some() {
                 continue;
             }
             // Read in the folder the home keeps for each Project, whose
@@ -801,6 +793,23 @@ pub(crate) fn scan_as_if(
         if let Some((_, _, members)) = workspaces.iter().find(|(path, ..)| *path == project.path) {
             project.members = members.clone();
         }
+    }
+    // The plugins each Project folder installs, whose Entries apply there.
+    for home in &found {
+        let definition = &definitions[home.agent_index];
+        let mut plugins = Vec::new();
+        for list in definition.plugins.iter() {
+            if list.registry.in_project() {
+                for (folder, key) in &folders {
+                    plugins.extend(scanner.read_plugins(home, list, Some((folder, key))));
+                }
+            }
+        }
+        scanner.read_plugin_locations(home, definition, &plugins);
+        installed
+            .entry((home.agent_index, home.home.clone()))
+            .or_default()
+            .extend(plugins);
     }
     for home in &found {
         let definition = &definitions[home.agent_index];
@@ -1188,7 +1197,7 @@ fn read_switches(
                 for place in places.read(
                     &switch.anchor,
                     &switch.key_path,
-                    &JsonFormat::STRICT,
+                    &switch.format(),
                     switch.sqlite(),
                     None,
                     reader,
@@ -2078,17 +2087,44 @@ impl Scanner<'_> {
         self.projects.add(&path, Some(home.agent_index))
     }
 
+    /// Adds the Entries of every location in plugins, in the folder of each
+    /// of `plugins` it reads, which apply where the plugin does.
+    fn read_plugin_locations(
+        &mut self,
+        home: &FoundHome,
+        definition: &AgentDefinition,
+        plugins: &[ScannedPlugin],
+    ) {
+        for location in definition.locations.iter() {
+            let Some(anchor) = location.anchor.plugin() else {
+                continue;
+            };
+            for plugin in plugins
+                .iter()
+                .filter(|plugin| anchor.plugins.names(&plugin.plugins))
+            {
+                self.read_plugin_location(home, definition, location, plugin, &anchor.path);
+            }
+        }
+    }
+
     /// The plugins of `plugins` that the Agent home installed, each record
     /// once, leaving out those whose folder carries the superseded marker.
-    /// The Project a record applies in is recorded as a Project.
+    /// The Project a record applies in is recorded as a Project. A registry
+    /// in a Project is read in `folder`, a Project folder and its key.
     fn read_plugins(
         &mut self,
         home: &FoundHome,
         plugins: &PluginsDefinition,
+        folder: Option<(&Path, &str)>,
     ) -> Vec<ScannedPlugin> {
         let records = match &plugins.registry {
             PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
             PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
+            PluginRegistry::ProjectPluginKeys(block) => match folder {
+                Some((folder, key)) => self.project_plugin_keys(home, block, folder, key),
+                None => Vec::new(),
+            },
         };
         let mut found = Vec::new();
         for record in records {
@@ -2115,12 +2151,14 @@ impl Scanner<'_> {
                 None => None,
             };
             let names = plugins.name.iter().flat_map(PluginNames::places);
-            let named = names.into_iter().find_map(|name| {
-                let file = blocks::join_relative(&folder, &name.file);
-                let text = self.reader.peek(&file).ok()??;
-                let document = JsonFormat::STRICT.parse(text).ok()?;
-                let named = lookup(&document, &name.key_path)?.as_str()?;
-                (!named.is_empty()).then(|| named.to_owned())
+            let named = record.name.clone().or_else(|| {
+                names.into_iter().find_map(|name| {
+                    let file = blocks::join_relative(&folder, &name.file);
+                    let text = self.reader.peek(&file).ok()??;
+                    let document = JsonFormat::STRICT.parse(text).ok()?;
+                    let named = lookup(&document, &name.key_path)?.as_str()?;
+                    (!named.is_empty()).then(|| named.to_owned())
+                })
             });
             let name = named.unwrap_or_else(|| {
                 let id = record.id.as_str();
@@ -2165,7 +2203,80 @@ impl Scanner<'_> {
         }
     }
 
-    /// A record for each folder that holds the marker, sorted by name, with
+    /// A record for each plugin the Project folder `folder`, whose key is
+    /// `project`, installs that is in the cache, in the file's order,
+    /// applying in that Project. Of several complete versions, the last by
+    /// name is taken.
+    fn project_plugin_keys(
+        &mut self,
+        home: &FoundHome,
+        block: &ProjectPluginKeys,
+        folder: &Path,
+        project: &str,
+    ) -> Vec<PluginRecord> {
+        let (Some(path), Some(cache)) = (
+            block.anchor.path(&home.roots, Some(folder)),
+            block.cache.path(&home.roots, None),
+        ) else {
+            return Vec::new();
+        };
+        let Some(text) = self.reader.text(home, &path, Some(project)) else {
+            return Vec::new();
+        };
+        let keys = match block.keys(text) {
+            Ok(keys) => keys,
+            Err(error) => {
+                self.reader.fail(
+                    home,
+                    &path,
+                    Some(project),
+                    ReadFailureKind::Parse,
+                    error.position,
+                );
+                return Vec::new();
+            }
+        };
+        // As the Project is spelled for its records.
+        let spelling = folder.display().to_string();
+        let fs = self.reader.fs;
+        let complete = |plugin: PathBuf| {
+            let mut versions = fs.read_dir(&plugin).unwrap_or_default();
+            versions.retain(|version| fs.exists(&blocks::join_relative(version, &block.marker)));
+            versions.sort_by_key(|version| paths::key(version));
+            versions.pop()
+        };
+        keys.into_iter()
+            .filter_map(|plugin| {
+                let version = match &plugin.marketplace {
+                    Some(marketplace) => complete(cache.join(marketplace).join(&plugin.name)),
+                    None => {
+                        let mut marketplaces = fs.read_dir(&cache).unwrap_or_default();
+                        marketplaces.sort_by_key(|marketplace| paths::key(marketplace));
+                        marketplaces
+                            .into_iter()
+                            .find_map(|marketplace| complete(marketplace.join(&plugin.name)))
+                    }
+                };
+                let Some(version) = version else {
+                    tracing::debug!(plugin = %plugin.key, "plugin not in the cache");
+                    return None;
+                };
+                Some(PluginRecord {
+                    id: plugin.key,
+                    name: Some(plugin.name),
+                    folder: version.display().to_string(),
+                    scope: Some(block.scope.clone()),
+                    project: Some(spelling.clone()),
+                    version: version
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned()),
+                })
+            })
+            .collect()
+    }
+
+    /// A record for each folder that holds the marker, or with no marker
+    /// each folder whose name does not start with `.`, sorted by name, with
     /// the version its install record gives.
     fn plugin_folders(&mut self, home: &FoundHome, block: &PluginFolders) -> Vec<PluginRecord> {
         let Some(folder) = block.anchor.path(&home.roots, None) else {
@@ -2192,19 +2303,23 @@ impl Scanner<'_> {
         children.sort_by_key(|child| paths::key(child));
         children
             .into_iter()
-            .filter(|child| {
-                block
-                    .marker
-                    .all()
-                    .iter()
-                    .any(|marker| fs.exists(&blocks::join_relative(child, marker)))
-            })
             .filter_map(|child| {
                 let id = child.file_name()?.to_str()?.to_owned();
+                let plugin = match &block.marker {
+                    Some(marker) => marker
+                        .all()
+                        .iter()
+                        .any(|marker| fs.exists(&blocks::join_relative(&child, marker))),
+                    None => !id.starts_with('.') && fs.read_dir(&child).is_ok(),
+                };
+                if !plugin {
+                    return None;
+                }
                 Some(PluginRecord {
                     version: versions.get(&id).cloned(),
                     folder: child.display().to_string(),
                     id,
+                    name: None,
                     scope: None,
                     project: None,
                 })
@@ -2300,6 +2415,8 @@ impl Scanner<'_> {
             Format::SkillList(list) => {
                 return self.read_skill_list(home, location, list, &path, project, depth);
             }
+            // Read in the folder of each plugin alone.
+            Format::ManifestSkills(_) => return,
             Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => {}
         }
         let Some(document) = self.document(home, location, &path, project.as_deref()) else {
@@ -2363,6 +2480,9 @@ impl Scanner<'_> {
             .expect("validation gives a plugin anchor a path");
         let start = self.entries.len();
         match &location.references {
+            None if let Format::ManifestSkills(block) = &location.format => {
+                self.read_manifest_skills(home, location, block, plugin, path);
+            }
             None => {
                 let project = plugin.project.clone();
                 self.read_location(home, definition, location, path, project, 0);
@@ -2382,6 +2502,53 @@ impl Scanner<'_> {
                 location.entry_name(&entry.name, &parts)
             };
             entry.plugin = Some(plugin.clone());
+        }
+    }
+
+    /// Adds the skills at the paths the manifest `manifest` of `plugin`
+    /// declares, or else of its default folder. A folder outside the
+    /// plugin's is skipped.
+    fn read_manifest_skills(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        block: &ManifestSkills,
+        plugin: &ScannedPlugin,
+        manifest: PathBuf,
+    ) {
+        let project = plugin.project.clone();
+        let text = match self.reader.fs.exists(&manifest) {
+            true => {
+                self.add_reader(home, location, &manifest);
+                self.reader
+                    .text(home, &manifest, project.as_deref())
+                    .map(str::to_owned)
+            }
+            false => None,
+        };
+        for declared in block.paths(text.as_deref()) {
+            let base = &plugin.folder;
+            if declared.may_name_one {
+                let added = self.add_named_skill(
+                    home,
+                    location,
+                    &block.skills,
+                    base,
+                    &declared.path,
+                    &project,
+                    0,
+                );
+                if added {
+                    continue;
+                }
+            }
+            let folder = paths::lexical(&base.join(&declared.path));
+            if !folder.starts_with(base) {
+                tracing::debug!(plugin = %plugin.id, "skills folder outside the plugin");
+                continue;
+            }
+            self.add_reader(home, location, &folder);
+            self.read_skills(home, location, &block.skills, &folder, project.clone(), 0);
         }
     }
 
@@ -2759,33 +2926,61 @@ impl Scanner<'_> {
             .flatten()
             .filter_map(|item| Some(item.get(&list.field)?.as_str()?.to_owned()))
             .collect();
-        let fs = self.reader.fs;
         for relative in relatives {
-            let mut folder = paths::lexical(&base.join(&relative));
-            let names_file = folder
-                .file_name()
-                .is_some_and(|name| name.eq_ignore_ascii_case(SKILL_MD));
-            if names_file {
-                folder.pop();
-            }
-            if !folder.starts_with(base) || !fs.exists(&folder.join(SKILL_MD)) {
+            let added = self.add_named_skill(
+                home,
+                location,
+                &list.skills,
+                base,
+                &relative,
+                &project,
+                depth,
+            );
+            if !added {
                 tracing::debug!(path = %relative, "names no skill");
-                continue;
             }
-            let Some(name) = folder.file_name().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            let name = name.to_owned();
-            let real = fs
-                .real_path(&folder)
-                .map_or_else(|| folder.clone(), |real| paths::lexical(&real));
-            let skill = SkillAt {
-                folder: &folder,
-                path: real,
-                name: &name,
-            };
-            self.add_skill(home, location, &list.skills, skill, &project, depth);
         }
+    }
+
+    /// Adds the skill whose folder, or its `SKILL.md`, `relative` names
+    /// below `base`. Returns `false`, adding nothing, when it names no
+    /// skill folder there.
+    #[allow(clippy::too_many_arguments)]
+    fn add_named_skill(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        skills: &SkillFolder,
+        base: &Path,
+        relative: &str,
+        project: &Option<String>,
+        depth: usize,
+    ) -> bool {
+        let fs = self.reader.fs;
+        let mut folder = paths::lexical(&base.join(relative));
+        let names_file = folder
+            .file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case(SKILL_MD));
+        if names_file {
+            folder.pop();
+        }
+        if !folder.starts_with(base) || !fs.exists(&folder.join(SKILL_MD)) {
+            return false;
+        }
+        let Some(name) = folder.file_name().and_then(|name| name.to_str()) else {
+            return false;
+        };
+        let name = name.to_owned();
+        let real = fs
+            .real_path(&folder)
+            .map_or_else(|| folder.clone(), |real| paths::lexical(&real));
+        let skill = SkillAt {
+            folder: &folder,
+            path: real,
+            name: &name,
+        };
+        self.add_skill(home, location, skills, skill, project, depth);
+        true
     }
 }
 

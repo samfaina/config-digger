@@ -173,8 +173,9 @@ pub(crate) enum DefinitionNote {
     /// The Agent's connectors live in the user's account, with no copy on
     /// disk to list, such as Claude Desktop's.
     CloudConnectorsNotOnDisk,
-    /// The plugins the user installs from the Agent's marketplace live in
-    /// the user's account, with no install record on disk, such as Cursor's.
+    /// The plugins the user installs for themself from the Agent's
+    /// marketplace live in the user's account, with no install record on
+    /// disk, such as Cursor's.
     MarketplacePluginsNotOnDisk,
 }
 
@@ -975,12 +976,22 @@ impl AgentDefinition {
                 }
             }
             if let Some(anchor) = location.anchor.plugin() {
-                self.declared_plugins(&anchor.plugins).map_err(context)?;
+                for id in anchor.plugins.all() {
+                    self.declared_plugins(id).map_err(context)?;
+                }
                 if location.keyed_by_project() {
                     return Err(context(format!(
                         "a location in plugins cannot be keyed by `{PROJECT_KEY}`"
                     )));
                 }
+            }
+            let manifest_skills = matches!(location.format, Format::ManifestSkills(_));
+            if manifest_skills
+                && (location.anchor.plugin().is_none() || location.references.is_some())
+            {
+                return Err(context(
+                    "only a location in plugins, with no references, reads manifest skills".into(),
+                ));
             }
             if let Some(template) = &location.name_template {
                 if template.contains(PLUGIN_NAME) && location.anchor.plugin().is_none() {
@@ -2617,6 +2628,62 @@ locations = {locations}
     fn plugins_and_their_switch_load() {
         let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", r#"["plugin-mcp"]"#));
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    const MANIFEST_SKILLS: &str = r#"{ block = "manifest-skills", field = ["skills"], default = "skills", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" } }"#;
+
+    #[test]
+    fn manifest_skills_are_read_in_plugins_alone() {
+        let in_plugins = with_plugins("")
+            + &format!(
+                r#"
+[[locations]]
+id = "plugin-skills"
+anchor = {{ block = "plugin", plugins = ["installed"], path = ["plugin.json"] }}
+format = {MANIFEST_SKILLS}
+kind = "skill"
+scope = "user"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["plugin-skills"]
+competition = {{ block = "exact-name" }}
+checks = {CHECKS}
+"#
+            );
+        assert!(
+            parse("test.toml", &in_plugins).is_ok(),
+            "{}",
+            error(&in_plugins)
+        );
+        let in_home = with_skills(STATE, MANIFEST_SKILLS, CHECKS);
+        assert!(
+            error(&in_home).contains("only a location in plugins"),
+            "{}",
+            error(&in_home)
+        );
+    }
+
+    #[test]
+    fn a_project_s_plugin_keys_lie_in_the_project_folder() {
+        let keys = |anchor: &str| {
+            with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "project-plugin-keys", anchor = {anchor}, root = ["plugins"], scope = "project", cache = {{ block = "machine", path = "~/.agent/cache" }}, marker = ".complete" }}"#
+                ),
+            )
+        };
+        let text = keys(IN_PROJECT);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = keys(STATE);
+        assert!(
+            error(&text).contains("lie in a file of the Project folder"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

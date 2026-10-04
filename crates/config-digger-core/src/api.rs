@@ -1172,9 +1172,9 @@ pub enum AgentNoteCode {
     /// The Agent's connectors live in the user's account, with no copy on
     /// disk, so they are not listed.
     CloudConnectorsNotOnDisk,
-    /// The plugins the user installs from the Agent's marketplace live in
-    /// the user's account, with no install record on disk, so they are not
-    /// listed.
+    /// The plugins the user installs for themself from the Agent's
+    /// marketplace live in the user's account, with no install record on
+    /// disk, so they are not listed.
     MarketplacePluginsNotOnDisk,
 }
 

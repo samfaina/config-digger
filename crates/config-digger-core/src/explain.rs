@@ -1204,11 +1204,11 @@ pub(crate) fn definition_untested(agent_name: &str) -> String {
     )
 }
 
-/// The note of a home of `agent_name`, whose Marketplace plugins live in
+/// The note of a home of `agent_name`, whose user Marketplace plugins live in
 /// the account.
 pub(crate) fn marketplace_plugins_not_on_disk(agent_name: &str) -> String {
     format!(
-        "{agent_name} keeps the plugins you install from its Marketplace in your account, so they are not listed here."
+        "{agent_name} keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
     )
 }
 

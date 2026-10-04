@@ -807,8 +807,9 @@ impl Anchored for SettingsAnchor {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PluginAnchor {
-    /// The id of a declared `[[plugins]]`.
-    pub plugins: String,
+    /// The id of a declared `[[plugins]]`, or several, such as Cursor's
+    /// plugins of a Project and its local ones, which it reads alike.
+    pub plugins: PluginIds,
     /// A `/`-separated path relative to the plugin's folder, or several,
     /// of which the first that exists is read, such as the first manifest
     /// Cursor finds of `.cursor-plugin/plugin.json` and
@@ -818,8 +819,9 @@ pub(crate) struct PluginAnchor {
 
 impl Validate for PluginAnchor {
     fn validate(&self) -> Result<(), String> {
-        if self.plugins.trim().is_empty() {
-            return Err("a plugin anchor needs a plugins id".into());
+        let ids = self.plugins.all();
+        if ids.is_empty() || ids.iter().any(|id| id.trim().is_empty()) {
+            return Err("a plugin anchor needs a plugins id, none of them empty".into());
         }
         if self.path.all().is_empty() {
             return Err("a plugin anchor needs a path".into());
@@ -1415,6 +1417,9 @@ impl SqliteList {
 pub(crate) struct PluginRecord {
     /// The plugin's id, such as `supabase@claude-plugins-official`.
     pub id: String,
+    /// The name the Agent gives the plugin, when the registry says it, such
+    /// as the name in a Cursor Project's plugin key.
+    pub name: Option<String>,
     /// The folder the plugin's files are in, as recorded.
     pub folder: String,
     /// The Scope it is installed at, as recorded.
@@ -1437,6 +1442,7 @@ pub(crate) trait ListPlugins {
 pub(crate) enum PluginRegistry {
     JsonPluginRecords(JsonPluginRecords),
     PluginFolders(PluginFolders),
+    ProjectPluginKeys(ProjectPluginKeys),
 }
 
 impl Validate for PluginRegistry {
@@ -1444,6 +1450,7 @@ impl Validate for PluginRegistry {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.validate(),
             PluginRegistry::PluginFolders(block) => block.validate(),
+            PluginRegistry::ProjectPluginKeys(block) => block.validate(),
         }
     }
 }
@@ -1453,14 +1460,128 @@ impl ListPlugins for PluginRegistry {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.anchors(),
             PluginRegistry::PluginFolders(block) => block.anchors(),
+            PluginRegistry::ProjectPluginKeys(block) => block.anchors(),
         }
+    }
+}
+
+impl PluginRegistry {
+    /// Whether it lies in each Project folder, so that it is read once
+    /// every Project is known, and its plugins apply in that Project only.
+    pub fn in_project(&self) -> bool {
+        matches!(self, PluginRegistry::ProjectPluginKeys(_))
+    }
+}
+
+/// The keys of an object in a file of each Project folder, each a plugin
+/// the Project installs from a marketplace, such as the `plugins` of
+/// Cursor's `.cursor/settings.json`. A key is the plugin's name, or its
+/// marketplace's and its name joined by `/`, and holds an object; the
+/// plugin is named by the name. Its files are in a folder of a cache on
+/// the machine, `<marketplace>/<name>/<version>`, the version being a
+/// folder that holds the marker. The marketplace of a key that names none
+/// is the first, by name, whose cache holds the plugin. A key whose plugin
+/// is not in the cache installs nothing on disk yet, and is left out.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProjectPluginKeys {
+    /// The file, in the Project folder.
+    pub anchor: Anchor,
+    /// The dialect the Agent reads the file in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
+    /// The key path of the object whose keys are plugins.
+    pub root: Vec<String>,
+    /// The Scope the plugins are recorded at, such as `project`.
+    pub scope: String,
+    /// The folder of the cache, on the machine.
+    pub cache: Anchor,
+    /// A `/`-separated path relative to a version folder whose presence
+    /// says the folder is complete, such as `.cache-complete`.
+    pub marker: String,
+}
+
+/// A plugin a key of a Project's file names.
+pub(crate) struct PluginKey {
+    /// The key, the plugin's id.
+    pub key: String,
+    /// The marketplace it names, if it names one.
+    pub marketplace: Option<String>,
+    /// The plugin's name.
+    pub name: String,
+}
+
+impl Validate for ProjectPluginKeys {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        self.anchor.one_file()?;
+        if !self.anchor.in_project() || self.anchor.project_file() {
+            return Err("a Project's plugin keys lie in a file of the Project folder".into());
+        }
+        if self.anchor.walk() != ProjectWalk::None {
+            return Err("a Project's plugin keys cannot walk up from the Project folder".into());
+        }
+        self.cache.validate()?;
+        if self.cache.machine().is_none() {
+            return Err("a plugin cache must lie on the machine".into());
+        }
+        validate_key_path(&self.root)?;
+        if self.scope.is_empty() {
+            return Err("a Project's plugin keys need a scope".into());
+        }
+        validate_relative(&self.marker)
+    }
+}
+
+impl ListPlugins for ProjectPluginKeys {
+    fn anchors(&self) -> Vec<&Anchor> {
+        vec![&self.anchor, &self.cache]
+    }
+}
+
+impl ProjectPluginKeys {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
+
+    /// The plugins the file's text names, in its order. A key whose parts
+    /// are not each one folder name names none.
+    pub fn keys(&self, text: &str) -> Result<Vec<PluginKey>, ParseError> {
+        let document = self.format().parse(text)?;
+        let root = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        let Some(Value::Object(plugins)) = root else {
+            return Ok(Vec::new());
+        };
+        let one_folder = |part: &str| {
+            !part.is_empty() && !matches!(part, "." | "..") && !part.contains(['/', '\\'])
+        };
+        Ok(plugins
+            .iter()
+            .filter(|(_, value)| value.is_object())
+            .filter_map(|(key, _)| {
+                let (marketplace, name) = match key.split_once('/') {
+                    Some((marketplace, name)) => (Some(marketplace), name),
+                    None => (None, key.as_str()),
+                };
+                (marketplace.is_none_or(one_folder) && one_folder(name)).then(|| PluginKey {
+                    key: key.clone(),
+                    marketplace: marketplace.map(str::to_owned),
+                    name: name.to_owned(),
+                })
+            })
+            .collect())
     }
 }
 
 /// The folders, in a folder of the Agent home or the machine, that hold a
 /// marker file, each a plugin whose id is the folder's name, such as Claude
 /// Desktop's extensions, each unpacked into `Claude Extensions\<id>` with
-/// its `manifest.json`. A folder without a marker holds no plugin.
+/// its `manifest.json`. A folder without a marker holds no plugin. Without
+/// a marker, every folder whose name does not start with `.` is a plugin's,
+/// such as Cursor's local plugins.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PluginFolders {
@@ -1468,7 +1589,7 @@ pub(crate) struct PluginFolders {
     pub anchor: Anchor,
     /// A `/`-separated path relative to a plugin's folder, or several, any
     /// of which makes the folder a plugin's.
-    pub marker: RelativePaths,
+    pub marker: Option<RelativePaths>,
     /// What the Agent records of each plugin it installed, when it does.
     pub records: Option<InstallRecords>,
 }
@@ -1498,11 +1619,13 @@ impl Validate for PluginFolders {
                 );
             }
         }
-        if self.marker.all().is_empty() {
-            return Err("plugin folders need a marker".into());
-        }
-        for marker in self.marker.all() {
-            validate_relative(marker)?;
+        if let Some(marker) = &self.marker {
+            if marker.all().is_empty() {
+                return Err("a plugin folders marker needs a path".into());
+            }
+            for marker in marker.all() {
+                validate_relative(marker)?;
+            }
         }
         if let Some(records) = &self.records {
             validate_key_path(&records.root)?;
@@ -1511,6 +1634,31 @@ impl Validate for PluginFolders {
             }
         }
         Ok(())
+    }
+}
+
+/// The id of a declared `[[plugins]]`, or several.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum PluginIds {
+    /// The id of one `[[plugins]]`.
+    One(String),
+    /// Several such ids, in order.
+    Several(Vec<String>),
+}
+
+impl PluginIds {
+    /// Every id, in order.
+    pub fn all(&self) -> &[String] {
+        match self {
+            PluginIds::One(id) => std::slice::from_ref(id),
+            PluginIds::Several(ids) => ids,
+        }
+    }
+
+    /// Whether it names the `[[plugins]]` with the id `id`.
+    pub fn names(&self, id: &str) -> bool {
+        self.all().iter().any(|known| known == id)
     }
 }
 
@@ -1639,6 +1787,7 @@ impl JsonPluginRecords {
                 };
                 records.push(PluginRecord {
                     id: id.clone(),
+                    name: None,
                     folder,
                     scope: text_of(record, self.scope.as_ref()),
                     project: text_of(record, self.project.as_ref()),
@@ -1816,6 +1965,7 @@ pub(crate) enum Format {
     Toml(TomlFormat),
     SkillFolder(SkillFolder),
     SkillList(SkillList),
+    ManifestSkills(ManifestSkills),
     SqliteJson(SqliteJson),
 }
 
@@ -1826,6 +1976,7 @@ impl Validate for Format {
             Format::Toml(block) => block.validate(),
             Format::SkillFolder(block) => block.validate(),
             Format::SkillList(block) => block.validate(),
+            Format::ManifestSkills(block) => block.validate(),
             Format::SqliteJson(block) => block.validate(),
         }
     }
@@ -1838,7 +1989,10 @@ impl Format {
         match self {
             Format::Json(block) => Some(block),
             Format::Toml(block) => Some(block),
-            Format::SkillFolder(_) | Format::SkillList(_) | Format::SqliteJson(_) => None,
+            Format::SkillFolder(_)
+            | Format::SkillList(_)
+            | Format::ManifestSkills(_)
+            | Format::SqliteJson(_) => None,
         }
     }
 
@@ -1846,9 +2000,11 @@ impl Format {
     pub fn sqlite(&self) -> Option<&SqliteJson> {
         match self {
             Format::SqliteJson(block) => Some(block),
-            Format::Json(_) | Format::Toml(_) | Format::SkillFolder(_) | Format::SkillList(_) => {
-                None
-            }
+            Format::Json(_)
+            | Format::Toml(_)
+            | Format::SkillFolder(_)
+            | Format::SkillList(_)
+            | Format::ManifestSkills(_) => None,
         }
     }
 
@@ -1858,7 +2014,71 @@ impl Format {
         match self {
             Format::SkillFolder(block) => Some(block),
             Format::SkillList(block) => Some(&block.skills),
+            Format::ManifestSkills(block) => Some(&block.skills),
             Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => None,
+        }
+    }
+}
+
+/// The skills a plugin's manifest declares in a field,
+/// a path relative to the plugin's folder or a list of them, such as the
+/// `skills` of a Cursor plugin's `plugin.json`. A path is a folder of skill
+/// folders; an item of a list may instead name one skill folder or its
+/// `SKILL.md`. A manifest that declares none, or a plugin with no
+/// manifest, has its skills in the `default` folder instead. Only a
+/// location in plugins, anchored at the manifest, reads them.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ManifestSkills {
+    /// The key path of the field in the strict JSON manifest.
+    pub field: Vec<String>,
+    /// A `/`-separated path relative to the plugin's folder.
+    pub default: String,
+    /// How each folder of skill folders is read.
+    pub skills: SkillFolder,
+}
+
+impl Validate for ManifestSkills {
+    fn validate(&self) -> Result<(), String> {
+        validate_key_path(&self.field)?;
+        validate_relative(&self.default)?;
+        self.skills.validate()
+    }
+}
+
+/// A path a plugin's manifest declares skills at, relative to the plugin's
+/// folder.
+pub(crate) struct DeclaredSkills {
+    pub path: String,
+    /// Whether it may name one skill folder, or its `SKILL.md`, rather than
+    /// a folder of skill folders, as an item of a list may.
+    pub may_name_one: bool,
+}
+
+impl ManifestSkills {
+    /// The paths the manifest's text `manifest` declares, or else the
+    /// default folder when it declares none. A manifest that does not
+    /// parse declares none; a field that is neither a path nor a list of
+    /// paths declares no skills.
+    pub fn paths(&self, manifest: Option<&str>) -> Vec<DeclaredSkills> {
+        let document = manifest.and_then(|text| JsonFormat::STRICT.parse(text).ok());
+        let declared = document.as_ref().and_then(|document| {
+            self.field
+                .iter()
+                .try_fold(document, |value, key| value.get(key))
+        });
+        let folder = |path: &str, may_name_one| DeclaredSkills {
+            path: path.to_owned(),
+            may_name_one,
+        };
+        match declared {
+            None => vec![folder(&self.default, false)],
+            Some(Value::String(path)) => vec![folder(path, false)],
+            Some(Value::Array(paths)) => paths
+                .iter()
+                .filter_map(|path| Some(folder(path.as_str()?, true)))
+                .collect(),
+            Some(_) => Vec::new(),
         }
     }
 }
@@ -2078,6 +2298,13 @@ impl JsonFormat {
     pub const STRICT: JsonFormat = JsonFormat {
         dialect: JsonDialect::Strict,
     };
+
+    /// The dialect `dialect` names, or else strict JSON.
+    pub fn of(dialect: Option<JsonDialect>) -> JsonFormat {
+        JsonFormat {
+            dialect: dialect.unwrap_or(JsonDialect::Strict),
+        }
+    }
 }
 
 impl Parse for JsonFormat {
@@ -3669,6 +3896,9 @@ pub(crate) struct Switch {
     /// is a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`
     /// holds JSON text under the key path's first key.
     pub store_class: StoreClass,
+    /// The dialect the Agent reads the file in, such as Cursor's JSONC
+    /// `.cursor/settings.json`. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
 }
 
 /// The switch `key_path` segment that stands for the Entry's name.
@@ -3751,6 +3981,11 @@ impl Switch {
         self.store_class == StoreClass::Sqlite
     }
 
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
+
     /// Whether the switch applies in one Project only, so that it needs one.
     pub fn per_project(&self) -> bool {
         self.anchor.in_project()
@@ -3818,9 +4053,7 @@ impl SettingPlace {
 
     /// How the file is parsed.
     pub fn format(&self) -> JsonFormat {
-        JsonFormat {
-            dialect: self.dialect.unwrap_or(JsonDialect::Strict),
-        }
+        JsonFormat::of(self.dialect)
     }
 }
 

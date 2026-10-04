@@ -138,8 +138,12 @@ Skill folders are defined as a single list [code] [X]: `Bt=[{configDir:".cursor"
 
 ### Plugins
 
-- Local `~/.cursor/plugins/local` vs marketplace: "If a marketplace plugin with the same name is already installed, that install takes precedence over the local copy" [docs] [D-plugins].
-- Project-scope plugin keys are deduplicated across workspace folders, and the first folder wins [code] [X] `function up(e){…r.has(t)||(r.add(t),n.push(…))}`.
+- Local `~/.cursor/plugins/local` vs marketplace: "If a marketplace plugin with the same name is already installed, that install takes precedence over the local copy" [docs] [D-plugins]. **[contradicts docs]**: the loader never dedupes a `"user-local"` plugin by name, only by the real path of its folder [code] [X] `cd()` returns `undefined` for `"user-local"`.
+- Local plugins: every folder or link in `~/.cursor/plugins/local` whose name does not start with `.`, with or without a manifest, named by the folder [code] [X] `if(r.name.startsWith("."))continue;`, `{source:"user-local",sourceInfo:{name:r.name,localPath:n}}`. A team admin can turn them all off (`allowUserLocalPluginImports`) [code] [W].
+- A plugin's servers are named `plugin-<name>-<server>` after the name of its key or folder, not its manifest's `name` [code] [X] `` `plugin-${n}-${e}` `` with `n=r.identifier.sourceInfo.name`.
+- A manifest's `skills`, a path or a list of paths, replaces the `skills` folder [code] [X] `void 0!==s?.skills?this.discoverFromManifestPaths(n,s.skills,!0,hu):i.has("skills")?this.discoverSkills(…)`.
+- Neither a Feature gate nor the third-party switch holds back Cursor's own plugins [code] [X] `loadCursorFirstParty:!0`, `filter(l=>t&&n||l.pluginSource!=="claude-plugin")`.
+- Project-scope plugin keys are deduplicated across workspace folders, and the first folder wins [code] [X] `function up(e){…r.has(t)||(r.add(t),n.push(…))}`. A key without `gitUrl` goes to Cursor's server, which picks the marketplace of a bare `<name>` [code] [X] `resolveProjectPlugins`. The commit is resolved over the network on each load, and the folder `cache\<marketplace>\<name>\<commit>` is used once it holds `.cache-complete`; the other commits are pruned [code] [X] `markCacheComplete`, `pruneOldVersions`.
 - Claude Code plugins: one install per plugin id. A project/local install whose `projectPath` matches the workspace beats the user install [code] [X] `function Pl(e,t,r,n)`.
 
 ---
