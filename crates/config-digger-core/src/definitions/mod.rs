@@ -563,6 +563,13 @@ pub(crate) struct LocationDefinition {
     /// objects of Entries, such as a Claude Code plugin manifest's
     /// `mcpServers`.
     pub references: Option<References>,
+    /// The key path, in the file as its format reads it, of when the Agent
+    /// cached the file's copy of configuration held elsewhere, such as the
+    /// bundle Codex caches from the account: milliseconds since 1970, or an
+    /// RFC 3339 time. Each Entry then carries a caveat that it is as of
+    /// then, or that the Agent does not record when, if the file does not
+    /// say. Omitted for a file the Agent reads as it is.
+    pub cached_at: Option<Vec<String>>,
 }
 
 /// Files a value can point to, each holding Entries in the format of the
@@ -1150,6 +1157,20 @@ impl AgentDefinition {
                 }
                 blocks::validate_key_path(&references.root).map_err(context)?;
             }
+            if let Some(cached_at) = &location.cached_at {
+                if location.format.file().is_none() {
+                    return Err(context("only a file location takes cached_at".into()));
+                }
+                blocks::validate_key_path(cached_at).map_err(context)?;
+            }
+            // Its key paths are in the TOML it holds, not in its own text.
+            if matches!(location.format, Format::TomlFragments(_))
+                && !location.provenance.read_only()
+            {
+                return Err(context(
+                    "a toml-fragments location is read only: its provenance must be".into(),
+                ));
+            }
             let project_keys = location.root.iter().filter(|key| *key == PROJECT_KEY);
             if project_keys.count() > 1 {
                 return Err(context(format!("root holds `{PROJECT_KEY}` twice")));
@@ -1362,6 +1383,20 @@ impl AgentDefinition {
                 .map_err(context)?;
             if let Some(merge) = &rules.merge {
                 merge.validate().map_err(context)?;
+                if let Some(id) = merge
+                    .locations()
+                    .iter()
+                    .find(|id| !declared.contains(id.as_str()))
+                {
+                    return Err(context(format!("`{id}` is not a location of this kind")));
+                }
+                // The server built from the merging locations wins over the others.
+                let merging = rules.precedence.iter().map(|id| merge.covers(id));
+                if merging.skip_while(|covers| *covers).any(|covers| covers) {
+                    return Err(context(
+                        "merging locations must rank above every other location".into(),
+                    ));
+                }
                 if !matches!(
                     rules.competition,
                     Competition::ExactName(_) | Competition::CaseInsensitiveName(_)
@@ -3271,6 +3306,63 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
             r#"exclusive = ["command"]"#,
         );
         assert!(error(&text).contains("two or more"), "{}", error(&text));
+    }
+
+    #[test]
+    fn the_locations_that_merge_rank_above_the_others() {
+        let merging = |locations: &str| {
+            with_projects(STATE, STATE, r#"["projects", "{project}", "servers"]"#).replace(
+                r#"checks = ["disable", "precedence"]"#,
+                &format!(
+                    "merge = {{ block = \"deep-merge\", locations = {locations} }}\nchecks = [\"merge\", \"disable\", \"precedence\"]"
+                ),
+            )
+        };
+        let text = merging(r#"["local-mcp"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = merging(r#"["user-mcp"]"#);
+        assert!(error(&text).contains("rank above"), "{}", error(&text));
+        let text = merging(r#"["other-mcp"]"#);
+        assert!(
+            error(&text).contains("`other-mcp` is not a location"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_location_of_toml_fragments_is_read_only() {
+        let fragments = |provenance: &str| {
+            VALID
+                .replace(
+                    r#"format = { block = "json", dialect = "strict" }"#,
+                    "format = { block = \"toml-fragments\", lists = [[\"bundle\"]], contents = \"contents\" }\ncached_at = [\"cached_at\"]",
+                )
+                .replace(
+                    r#"provenance = "file""#,
+                    &format!("provenance = \"{provenance}\""),
+                )
+        };
+        let text = fragments("managed");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = fragments("file");
+        assert!(error(&text).contains("read only"), "{}", error(&text));
+    }
+
+    #[test]
+    fn only_a_file_location_says_when_it_was_cached() {
+        let text = VALID
+            .replace(
+                r#"format = { block = "json", dialect = "strict" }"#,
+                "format = { block = \"skill-folder\", name_from = \"folder\", no_frontmatter = \"skip\", malformed_frontmatter = \"skip\", no_name = \"skip\" }\ncached_at = [\"cached_at\"]",
+            )
+            .replace("root = [\"servers\"]\nkind = \"mcp\"", "kind = \"skill\"")
+            .replace("[items.mcp]", "[items.skill]");
+        assert!(
+            error(&text).contains("only a file location takes cached_at"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

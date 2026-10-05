@@ -1794,6 +1794,7 @@ fn provenance_label(entry: &api::Entry) -> String {
         (api::Provenance::Plugin, _) => owned_by("plugin", entry),
         (api::Provenance::Extension, _) => owned_by("extension", entry),
         (api::Provenance::BuiltIn, _) => "built-in".to_owned(),
+        (api::Provenance::AccountManaged, _) => owned_by("account-managed", entry),
     }
 }
 

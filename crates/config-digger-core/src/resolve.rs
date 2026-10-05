@@ -218,30 +218,6 @@ pub(crate) fn resolve(
                     })
                     .unzip();
             let checks = &definition.rules(kind).checks;
-            // The rules that keep each Entry out.
-            let ruled: Vec<Vec<rules::RuleHit>> = entries
-                .iter()
-                .map(|entry| {
-                    rules::hits(definition, snapshot, entry, project_key.map(String::as_str))
-                })
-                .collect();
-            // The gates and rules that keep each Entry out, each with the
-            // check it belongs to.
-            let kept: Vec<Vec<(Check, api::State, api::Reason)>> = entries
-                .iter()
-                .zip(&ruled)
-                .map(|(entry, ruled)| {
-                    gates(definition, snapshot, entry, project_key.map(String::as_str))
-                        .into_iter()
-                        .map(|(check, reason)| (check, api::State::Blocked, reason))
-                        .chain(
-                            ruled
-                                .iter()
-                                .map(|hit| (Check::Rules, hit.state, hit.reason.clone())),
-                        )
-                        .collect()
-                })
-                .collect();
             // A gate or rule checked before precedence takes the Entry out of
             // the competition; one checked after applies to the Entry that wins.
             let before_precedence = |check: Check| {
@@ -260,25 +236,73 @@ pub(crate) fn resolve(
                             .as_ref()
                             .is_some_and(Conform::still_competes))
             };
-            // The Agent skips a Disabled or Blocked Entry, and an Invalid one
-            // that does not compete, so the highest of the others wins.
-            let free = |index: usize| {
+            // The gates that keep each Entry out, each with its check.
+            let gated: Vec<Vec<(Check, api::Reason)>> = entries
+                .iter()
+                .map(|entry| gates(definition, snapshot, entry, project_key.map(String::as_str)))
+                .collect();
+            // Whether the Agent keeps the Entry at `index` as far as its
+            // switches, its gates and its shape go.
+            let clear = |index: usize| {
                 hits[index].0.is_empty()
                     && parked[index].is_none()
-                    && !kept[index]
+                    && !gated[index]
                         .iter()
-                        .any(|(check, _, _)| before_precedence(*check))
+                        .any(|(check, _)| before_precedence(*check))
                     && competes(index)
             };
-            let winner = (0..entries.len()).find(|&index| free(index));
             // Where the Agent merges same-named Entries, those it would let
             // win take part in the server it builds, highest first.
             let merge = definition.rules(kind).merge.as_ref();
-            let merging: Vec<usize> = match merge {
-                Some(_) => (0..entries.len()).filter(|&index| free(index)).collect(),
-                None => Vec::new(),
-            };
+            // Whether the Entry at `index` is of a location that merges.
+            let merges =
+                |index: usize| merge.is_some_and(|merge| merge.covers(&entries[index].location));
+            let merging: Vec<usize> = (0..entries.len())
+                .filter(|&index| merges(index) && clear(index))
+                .collect();
             let merged = Merged::of(merge, &entries, &merging);
+            // The rules that keep each Entry out, which see the server the
+            // Agent builds in place of an Entry that takes part in it.
+            let ruled: Vec<Vec<rules::RuleHit>> = entries
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| {
+                    let built = merged
+                        .as_ref()
+                        .filter(|merged| merged.takes_part(index))
+                        .map(|merged| &merged.built.config);
+                    let project = project_key.map(String::as_str);
+                    rules::hits(definition, snapshot, entry, project, built)
+                })
+                .collect();
+            // The gates and rules that keep each Entry out, each with the
+            // check it belongs to.
+            let kept: Vec<Vec<(Check, api::State, api::Reason)>> = gated
+                .iter()
+                .zip(&ruled)
+                .map(|(gated, ruled)| {
+                    gated
+                        .iter()
+                        .map(|(check, reason)| (*check, api::State::Blocked, reason.clone()))
+                        .chain(
+                            ruled
+                                .iter()
+                                .map(|hit| (Check::Rules, hit.state, hit.reason.clone())),
+                        )
+                        .collect()
+                })
+                .collect();
+            // The Agent skips a Disabled or Blocked Entry, and an Invalid one
+            // that does not compete, so the highest of the others wins. A rule
+            // keeps out a server the Agent builds whole, which still holds
+            // its name.
+            let free = |index: usize| {
+                clear(index)
+                    && (merges(index)
+                        || ruled[index].is_empty()
+                        || !before_precedence(Check::Rules))
+            };
+            let winner = (0..entries.len()).find(|&index| free(index));
             // The URL each remote Entry competes by, while it does.
             let urls: Vec<Option<String>> = entries
                 .iter()
@@ -306,6 +330,15 @@ pub(crate) fn resolve(
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
                     let mut gate_caveats = gate_caveats(definition, snapshot, entry);
+                    if location.cached_at.is_some()
+                        && let Some(&at) = snapshot.cached.get(&entry.path)
+                    {
+                        gate_caveats.push(api::Caveat {
+                            code: api::CaveatCode::CachedCopy,
+                            path: entry.path.clone(),
+                            sentence: explain::cached_copy(agent_name, at),
+                        });
+                    }
                     // Servers config-digger cannot see can take part where URLs compete.
                     let unseen = definition.rules(kind).competition.same_url();
                     if let (Some(block), Some(_)) = (unseen, &urls[index])
@@ -423,8 +456,12 @@ pub(crate) fn resolve(
                                     (check, api::State::Disabled, hit.reason(agent_name))
                                 }));
                                 // A field that turns the built server off
-                                // turns off every Entry of the Item.
-                                if let Some(off) = merged.as_ref().and_then(Merged::off) {
+                                // turns off every Entry that could take part.
+                                if let Some(off) = merged
+                                    .as_ref()
+                                    .and_then(Merged::off)
+                                    .filter(|_| merges(index))
+                                {
                                     failed.push((
                                         check,
                                         api::State::Disabled,
@@ -475,7 +512,7 @@ pub(crate) fn resolve(
                             }
                             // Same-named Entries the Agent merges take part
                             // together, and none Shadows another.
-                            Check::Precedence if merge.is_some() => {
+                            Check::Precedence if merges(index) => {
                                 if let Some(merged) = merged
                                     .as_ref()
                                     .filter(|merged| merged.takes_part(index))
@@ -539,9 +576,10 @@ pub(crate) fn resolve(
                             };
                             for &check in checks {
                                 // It would take part with the others that would.
-                                if check == Check::Precedence && merge.is_some() {
-                                    let with_others = (0..entries.len())
-                                        .any(|other| other != index && lifted(other));
+                                if check == Check::Precedence && merges(index) {
+                                    let with_others = (0..entries.len()).any(|other| {
+                                        other != index && merges(other) && lifted(other)
+                                    });
                                     let next = if with_others {
                                         api::State::Merged
                                     } else {
@@ -1679,7 +1717,8 @@ fn remove(
             | Provenance::Plugin
             | Provenance::Managed
             | Provenance::CloudMirror
-            | Provenance::BuiltIn => api::RemoveOption::Offered,
+            | Provenance::BuiltIn
+            | Provenance::AccountManaged => api::RemoveOption::Offered,
         };
     };
     let command = definition
@@ -1697,7 +1736,8 @@ fn remove(
         | Provenance::File
         | Provenance::Managed
         | Provenance::CloudMirror
-        | Provenance::BuiltIn => (
+        | Provenance::BuiltIn
+        | Provenance::AccountManaged => (
             api::RemoveNotOffered::Plugin,
             explain::plugin_not_removed(&plugin.id, agent_name),
         ),

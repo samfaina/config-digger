@@ -200,5 +200,7 @@ function provenanceLabel(entry: Entry): string {
       return entry.plugin ? `extension · ${entry.plugin.id}` : "extension";
     case "built_in":
       return "built-in";
+    case "account_managed":
+      return entry.plugin ? `account-managed · ${entry.plugin.id}` : "account-managed";
   }
 }

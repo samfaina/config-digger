@@ -5,7 +5,8 @@
 
 use crate::api::{Reason, State};
 use crate::definitions::blocks::{
-    AllowDenyList, Anchored, Gate, GlobalSwitch, ListKind, MatchedBy, Rule, ServerIdentity,
+    AllowDenyList, Anchored, Gate, GlobalSwitch, IdentityAllowlist, ListKind, MatchedBy, Rule,
+    ServerIdentity,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::scan::{ScannedEntry, ScannedSetting, SettingOwner, Snapshot};
@@ -23,13 +24,17 @@ pub(crate) struct RuleHit {
 }
 
 /// The rules of its Item kind that keep `entry` out in the context of the
-/// Project with the key `project`, in the definition's order.
+/// Project with the key `project`, in the definition's order. Where the
+/// Agent builds a server from `entry` and others, `built` is its config,
+/// which the rules see in place of the Entry's own.
 pub(crate) fn hits(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
+    built: Option<&Value>,
 ) -> Vec<RuleHit> {
+    let config = built.unwrap_or(&entry.config);
     let location = definition.location(&entry.location);
     let agent_name = &definition.agent.name;
     let mut hits = Vec::new();
@@ -62,7 +67,7 @@ pub(crate) fn hits(
         match rule {
             Rule::AllowDenyList(block) => match block.list {
                 ListKind::Deny => {
-                    hits.extend(deny(block, location, entry, values, agent_name));
+                    hits.extend(deny(block, location, entry, config, values, agent_name));
                 }
                 ListKind::Allow => {
                     // Only the policy lists count while a policy-only
@@ -75,10 +80,15 @@ pub(crate) fn hits(
                         .copied()
                         .filter(|(policy, _)| *policy || !policy_only)
                         .collect();
-                    hits.extend(allow(block, location, entry, &values, agent_name));
+                    hits.extend(allow(block, location, entry, config, &values, agent_name));
                 }
             },
             Rule::GlobalSwitch(block) => hits.extend(global(block, values, agent_name)),
+            Rule::IdentityAllowlist(block) => {
+                hits.extend(unmet_requirement(
+                    block, location, entry, config, values, agent_name,
+                ));
+            }
         }
     }
     hits
@@ -119,10 +129,11 @@ fn deny(
     block: &AllowDenyList,
     location: &LocationDefinition,
     entry: &ScannedEntry,
+    config: &Value,
     values: &[(bool, &ScannedSetting)],
     agent_name: &str,
 ) -> Vec<RuleHit> {
-    let server = identity(entry);
+    let server = identity(entry, config);
     values
         .iter()
         .filter_map(|&(policy, value)| {
@@ -143,6 +154,7 @@ fn allow(
     block: &AllowDenyList,
     location: &LocationDefinition,
     entry: &ScannedEntry,
+    config: &Value,
     values: &[(bool, &ScannedSetting)],
     agent_name: &str,
 ) -> Option<RuleHit> {
@@ -151,7 +163,7 @@ fn allow(
         .filter_map(|&(policy, value)| Some((policy, value, value.value.as_ref()?.as_array()?)))
         .collect();
     let items = || lists.iter().flat_map(|(_, _, items)| items.iter());
-    let server = identity(entry);
+    let server = identity(entry, config);
     let (by_command, by_url) = items().fold((false, false), |(command, url), item| {
         let (has_command, has_url) = block.kinds(item);
         (command || has_command, url || has_url)
@@ -245,11 +257,72 @@ fn global(
     })
 }
 
-/// The server `entry` declares, as a list item matches it.
-fn identity(entry: &ScannedEntry) -> ServerIdentity<'_> {
-    let command = entry.config.get("command").and_then(Value::as_str);
-    let args: Vec<&str> = entry
-        .config
+/// The allowlists, merged name by name, when any source holds one for the
+/// server's plugin, or for servers of no plugin, and the requirement of the
+/// highest that names the server is not met. It is policy when any source
+/// holding a list is.
+fn unmet_requirement(
+    block: &IdentityAllowlist,
+    location: &LocationDefinition,
+    entry: &ScannedEntry,
+    config: &Value,
+    values: &[(bool, &ScannedSetting)],
+    agent_name: &str,
+) -> Option<RuleHit> {
+    let plugin = entry.plugin.as_ref().map(|plugin| plugin.id.as_str());
+    let lists: Vec<(bool, &ScannedSetting)> = values
+        .iter()
+        .copied()
+        .filter(|(_, value)| {
+            value
+                .value
+                .as_ref()
+                .is_some_and(|held| block.holds_table(held))
+        })
+        .collect();
+    if lists.is_empty() {
+        return None;
+    }
+    let requirement = lists
+        .iter()
+        .find_map(|(_, value)| block.table(value.value.as_ref()?, plugin)?.get(&entry.name));
+    let shown_command = |command: &str| {
+        masked_command(location, &[command])
+            .into_iter()
+            .next()
+            .unwrap_or_default()
+    };
+    let met = requirement.is_some_and(|requirement| {
+        block.meets(
+            requirement,
+            config.get("command").and_then(Value::as_str),
+            config.get("url").and_then(Value::as_str),
+            &shown_command,
+            &|url| masked_url(location, url),
+        )
+    });
+    if met {
+        return None;
+    }
+    let policy = lists.iter().any(|(policy, _)| *policy);
+    let holding: Vec<&ScannedSetting> = lists
+        .iter()
+        .filter(|(known, _)| *known == policy)
+        .map(|(_, value)| *value)
+        .collect();
+    let places: Vec<(&Path, Option<std::time::SystemTime>)> = holding
+        .iter()
+        .map(|value| (value.path.as_path(), value.cached_at))
+        .collect();
+    Some(hit(policy, holding[0], |policy| {
+        explain::not_in_allowlist(policy, key(holding[0]), &entry.name, &places, agent_name)
+    }))
+}
+
+/// The server `entry`, holding `config`, declares, as a list item matches it.
+fn identity<'e>(entry: &'e ScannedEntry, config: &'e Value) -> ServerIdentity<'e> {
+    let command = config.get("command").and_then(Value::as_str);
+    let args: Vec<&str> = config
         .get("args")
         .and_then(Value::as_array)
         .map(|args| args.iter().filter_map(Value::as_str).collect())
@@ -257,7 +330,7 @@ fn identity(entry: &ScannedEntry) -> ServerIdentity<'_> {
     ServerIdentity {
         name: &entry.name,
         command: command.map(|command| std::iter::once(command).chain(args).collect()),
-        url: entry.config.get("url").and_then(Value::as_str),
+        url: config.get("url").and_then(Value::as_str),
     }
 }
 
