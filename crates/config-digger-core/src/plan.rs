@@ -141,50 +141,8 @@ pub(crate) fn plan(
     let mut leftovers = resolve::leftovers(definitions, snapshot);
     leftovers.retain(|leftovers| before.project.as_ref() != Some(&leftovers.project));
     let selected = select::select_entries(&before, &leftovers, &targets.selectors, targets.all)?;
-    // An action on an Entry of a Mirrored home goes to the Entry it was
-    // copied from, and reaches the mirror through the tool that copies it.
-    let mut targeted: Vec<&api::Entry> = Vec::new();
-    let mut mirrors: Vec<&scan::ScannedHome> = Vec::new();
-    for entry in selected {
-        let scanned = snapshot.entry(&entry.path, &entry.key_path);
-        let Some(mirror) = snapshot.mirror_of(scanned) else {
-            if !targeted
-                .iter()
-                .any(|known| known.identity() == entry.identity())
-            {
-                targeted.push(entry);
-            }
-            continue;
-        };
-        let source = snapshot.source_of(scanned).and_then(|source| {
-            let locator = crate::locator::render(&source.path, &source.key_path);
-            before
-                .items
-                .iter()
-                .filter(|item| item.home == source.home)
-                .flat_map(|item| &item.entries)
-                .find(|known| known.locator == locator)
-        });
-        let Some(source) = source else {
-            return Err(Error::blocked(explain::mirrored_without_source(
-                explain::action_verb(action),
-                &entry.locator,
-                &mirror.owner,
-                mirror.source_folder.as_deref(),
-            )));
-        };
-        if !targeted
-            .iter()
-            .any(|known| known.identity() == source.identity())
-        {
-            targeted.push(source);
-        }
-        let home = snapshot.home_of(scanned);
-        if !mirrors.iter().any(|known| known.home == home.home) {
-            mirrors.push(home);
-        }
-    }
-    let planned = Targeted {
+    let (targeted, mirrored) = redirected(definitions, snapshot, &before, selected, action)?;
+    let targeted_entries = Targeted {
         definitions,
         ports,
         snapshot,
@@ -196,8 +154,8 @@ pub(crate) fn plan(
         entries: &targeted,
     };
     let mut planned = match action {
-        Action::Remove => planned.remove(),
-        Action::Disable | Action::Enable => planned.switch(),
+        Action::Remove => targeted_entries.remove(),
+        Action::Disable | Action::Enable => targeted_entries.switch(),
         Action::Undo => Err(Error::unexpected(
             "an Undo targets an Operation, not Entries: plan it with plan_undo",
         )),
@@ -205,12 +163,22 @@ pub(crate) fn plan(
             "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
         )),
     }?;
-    for home in mirrors {
+    for home in mirrored {
         let mirror = home.mirror.as_ref().expect("a Mirrored home has a mirror");
+        // What it writes outside the home it copies, such as a Project's
+        // file, which both homes read, reaches the mirror as it is.
+        let copied = mirror.source_folder.as_deref().is_none_or(|source| {
+            let written = planned.preview.files.iter().map(|file| &file.path);
+            let moved = planned.preview.folders.iter().map(|folder| &folder.path);
+            written.chain(moved).any(|path| path.starts_with(source))
+        });
+        if !copied {
+            continue;
+        }
         planned.preview.info.push(Info {
-            code: InfoCode::ReachesMirror,
+            code: InfoCode::ReachesMirroredHome,
             path: home.folder.clone(),
-            sentence: explain::reaches_mirror(
+            sentence: explain::reaches_mirrored_home(
                 &mirror.owner,
                 &home.folder,
                 mirror.source_folder.as_deref(),
@@ -218,6 +186,71 @@ pub(crate) fn plan(
         });
     }
     Ok(planned)
+}
+
+/// The Entries an action on `selected` goes to, each once: each Entry
+/// itself, or for one of a Mirrored home, the Entry it was copied from, as
+/// `before` holds it. With them, the Mirrored homes the action reaches
+/// through the tool that copies them. Refused for an Entry of a Mirrored
+/// home that the home it is copied from lacks.
+fn redirected<'i, 's>(
+    definitions: &[AgentDefinition],
+    snapshot: &'s Snapshot,
+    before: &'i Inventory,
+    selected: Vec<&'i api::Entry>,
+    action: Action,
+) -> Result<(Vec<&'i api::Entry>, Vec<&'s scan::ScannedHome>), Error> {
+    let mut targeted: Vec<&api::Entry> = Vec::new();
+    let mut mirrored: Vec<&scan::ScannedHome> = Vec::new();
+    for entry in selected {
+        // Several homes can read one file, so the Entry is the one of the
+        // home whose Item holds it.
+        let held_by = before
+            .items
+            .iter()
+            .find(|item| item.entries.iter().any(|own| std::ptr::eq(own, entry)));
+        let scanned = held_by
+            .and_then(|item| {
+                let agent = definitions
+                    .iter()
+                    .position(|definition| definition.agent.id == item.agent)?;
+                snapshot.entry_in(agent, &item.home, &entry.path, &entry.key_path)
+            })
+            .unwrap_or_else(|| snapshot.entry(&entry.path, &entry.key_path));
+        let target = match snapshot.mirror_of(scanned) {
+            None => entry,
+            Some(mirror) => {
+                let agent = &definitions[scanned.agent_index].agent.id;
+                let source = snapshot.copied_from(scanned).and_then(|source| {
+                    let locator = crate::locator::render(&source.path, &source.key_path);
+                    item_in(before, agent, &source.home, &locator)?
+                        .entries
+                        .iter()
+                        .find(|known| known.identity() == locator)
+                });
+                let Some(source) = source else {
+                    return Err(Error::blocked(explain::mirrored_without_source(
+                        explain::action_verb(action),
+                        &entry.locator,
+                        &mirror.owner,
+                        mirror.source_folder.as_deref(),
+                    )));
+                };
+                let home = snapshot.home_of(scanned);
+                if !mirrored.iter().any(|known| known.home == home.home) {
+                    mirrored.push(home);
+                }
+                source
+            }
+        };
+        if !targeted
+            .iter()
+            .any(|known| known.identity() == target.identity())
+        {
+            targeted.push(target);
+        }
+    }
+    Ok((targeted, mirrored))
 }
 
 /// Plans the Remove of every leftover of the missing Project `project`, in

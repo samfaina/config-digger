@@ -416,7 +416,10 @@ fn check_lines(before: &str, after: &str, allowed: &[Range<usize>]) -> Result<()
     let mut widened: Vec<Range<usize>> = allowed
         .iter()
         .map(|range| {
-            let mut range = range.clone();
+            // A key added at the end of a file may be said to go after its
+            // last line.
+            let start = range.start.min(before.len());
+            let mut range = start..range.end.clamp(start, before.len());
             while range.start > 0 && is_blank(&before[range.start - 1]) {
                 range.start -= 1;
             }

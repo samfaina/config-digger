@@ -1642,7 +1642,7 @@
           ]
         },
         "switch_id": {
-          "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{skill_file}`, the absolute path of a skill's `SKILL.md`, its\nfolder's links resolved;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
+          "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{skill_file}`, the absolute path of a skill's `SKILL.md`, the links\nof its folder and of the folders above it resolved;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
           "type": [
             "string",
             "null"
@@ -2995,7 +2995,7 @@
           ]
         },
         {
-          "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one: Disable then writes it where the\nhighest layer sets it. Enable is left to the merge's own rules.",
+          "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one. Enable is left to the merge's own\nrules.",
           "type": "object",
           "properties": {
             "locations": {
@@ -3073,6 +3073,11 @@
             "string",
             "null"
           ]
+        },
+        "later_wins": {
+          "description": "With `named_by`, whether of several items naming an Entry the\nAgent takes the last, such as the rules of Codex's\n`[[skills.config]]`, rather than the first.",
+          "type": "boolean",
+          "default": false
         },
         "store_class": {
           "description": "How the switch's file behaves while the Agent runs. A `sqlite` file\nis a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`\nholds JSON text under the key path's first key.",

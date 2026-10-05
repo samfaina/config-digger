@@ -302,6 +302,8 @@ pub(crate) struct ScannedSwitch {
     pub named_by: Option<String>,
     /// Whether names in the list compare without regard to case.
     pub ignore_case: bool,
+    /// Whether of several items naming one Entry, the last counts.
+    pub later_wins: bool,
     /// How the file behaves while the Agent runs.
     pub store_class: StoreClass,
 }
@@ -338,7 +340,7 @@ impl ScannedSwitch {
     fn item(&self, key: &str) -> Option<(usize, &serde_json::Value)> {
         let field = self.named_by.as_deref()?;
         let items = self.value.as_ref()?.as_array()?;
-        items.iter().enumerate().find(|(_, item)| {
+        let names_key = |(_, item): &(usize, &serde_json::Value)| {
             let name = match item {
                 serde_json::Value::Array(values) => field
                     .parse::<usize>()
@@ -354,7 +356,13 @@ impl ScannedSwitch {
                         name == key
                     }
                 })
-        })
+        };
+        let mut naming = items.iter().enumerate();
+        if self.later_wins {
+            naming.rfind(names_key)
+        } else {
+            naming.find(names_key)
+        }
     }
 }
 
@@ -429,7 +437,7 @@ impl Snapshot {
     /// Entry of the same location, Project and key path in the source home,
     /// in the file at the same place below the source home's folder. `None`
     /// for an Entry of no Mirrored home, or one the source home lacks.
-    pub fn source_of(&self, entry: &ScannedEntry) -> Option<&ScannedEntry> {
+    pub fn copied_from(&self, entry: &ScannedEntry) -> Option<&ScannedEntry> {
         let mirror = self.mirror_of(entry)?;
         let folder_of = |home: &str| {
             self.homes
@@ -449,6 +457,23 @@ impl Snapshot {
                 && source.project == entry.project
                 && source.key_path == entry.key_path
                 && source.path == path
+        })
+    }
+
+    /// The Entry at `path` and `key_path` that the Agent home `home` of the
+    /// Agent at `agent_index` reads, where several homes read one file.
+    pub fn entry_in(
+        &self,
+        agent_index: usize,
+        home: &str,
+        path: &Path,
+        key_path: &[String],
+    ) -> Option<&ScannedEntry> {
+        self.entries.iter().find(|scanned| {
+            scanned.agent_index == agent_index
+                && scanned.home == home
+                && scanned.path == path
+                && scanned.key_path == key_path
         })
     }
 
@@ -1313,6 +1338,7 @@ fn read_switches(
                         value: place.value,
                         key_path: place.key_path,
                         named_by: switched.named_by().map(str::to_owned),
+                        later_wins: switch.later_wins,
                         ignore_case: switched.ignores_case(),
                         store_class: switch.store_class,
                     });
@@ -2165,6 +2191,17 @@ fn repository(fs: &dyn FileSystem, folder: &Path) -> (Option<PathBuf>, Option<Pa
     (Some(root.clone()), Some(main.unwrap_or(root)))
 }
 
+/// The `SKILL.md` of the skill Entry `entry` at its real path: through the
+/// link a Linked Entry is, when it leads somewhere.
+fn skill_file(entry: &ScannedEntry) -> PathBuf {
+    let folder = entry
+        .link
+        .as_ref()
+        .and_then(|link| link.real.as_ref())
+        .unwrap_or(&entry.path);
+    folder.join("SKILL.md")
+}
+
 /// The id `template`, a location's `switch_id`, makes for `entry`, read
 /// at `root`.
 fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
@@ -2184,10 +2221,7 @@ fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
         .replace(ENTRY_NAME, &entry.name)
         .replace(FOLDER_INDEX, &(entry.depth / MEMBER_RANKS).to_string())
         .replace("{uri_path}", &paths::uri_path(&entry.path))
-        .replace(
-            "{skill_file}",
-            &entry.path.join("SKILL.md").display().to_string(),
-        )
+        .replace("{skill_file}", &skill_file(entry).display().to_string())
         .replace("{plugin_uri}", &plugin_uri)
         .replace("{extension}", &extension)
 }

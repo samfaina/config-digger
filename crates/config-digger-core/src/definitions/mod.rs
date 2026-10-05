@@ -553,8 +553,8 @@ pub(crate) struct LocationDefinition {
     /// Entry's name; `{folder_index}`, the position of its folder among
     /// those of the Project, 0 for a folder Project; `{uri_path}`, the path
     /// of the `file:` URI of its file or skill folder, such as `/C:/x`;
-    /// `{skill_file}`, the absolute path of a skill's `SKILL.md`, its
-    /// folder's links resolved;
+    /// `{skill_file}`, the absolute path of a skill's `SKILL.md`, the links
+    /// of its folder and of the folders above it resolved;
     /// `{plugin_uri}`, the `file:` URI of its plugin's folder; and
     /// `{extension}`, the key `*` stands for in its root up to a `/`, in
     /// lower case.

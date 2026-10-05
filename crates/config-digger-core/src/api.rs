@@ -585,9 +585,9 @@ pub enum InfoCode {
     /// config-digger never edits approvals.
     ApprovalKept,
     /// It targets Entries of a Mirrored home, and changes the Entries they
-    /// were copied from instead: the change reaches the mirror through the
-    /// tool that copies it. Its path is the Mirrored home's folder.
-    ReachesMirror,
+    /// were copied from instead: the change reaches the Mirrored home through
+    /// the tool that copies it. Its path is the Mirrored home's folder.
+    ReachesMirroredHome,
 }
 
 impl AgentNoteCode {
@@ -1374,8 +1374,9 @@ pub struct Entry {
     pub also_read_by: Vec<AlsoReadBy>,
     /// For an Entry of a Mirrored home, the `<path>#<key path>` locator of the
     /// Entry it was copied from, which its actions go to: they are those of
-    /// that Entry. `None` otherwise, and when the source home lacks it.
-    pub source: Option<String>,
+    /// that Entry. `None` otherwise, and when the home it is copied from
+    /// lacks it.
+    pub copied_from: Option<String>,
 }
 
 /// Another Agent home that reads an Entry, and the State the Entry has there.
@@ -1545,8 +1546,9 @@ pub enum DisableNotOffered {
     /// The Entry is managed, or a copy of the user's account, and
     /// config-digger only reads it.
     ReadOnly,
-    /// The Entry is in a Mirrored home, which another tool copies from
-    /// another Agent home: config-digger never writes to it.
+    /// The Entry is in a Mirrored home, which config-digger never writes
+    /// to, and the Agent home it is copied from holds no Entry it was
+    /// copied from to act on instead.
     Mirrored,
 }
 
@@ -1575,8 +1577,9 @@ pub enum RemoveNotOffered {
     /// The Entry is managed, or a copy of the user's account, and
     /// config-digger only reads it.
     ReadOnly,
-    /// The Entry is in a Mirrored home, which another tool copies from
-    /// another Agent home: config-digger never writes to it.
+    /// The Entry is in a Mirrored home, which config-digger never writes
+    /// to, and the Agent home it is copied from holds no Entry it was
+    /// copied from to act on instead.
     Mirrored,
     /// The Entry is part of a plugin, which only the Agent uninstalls.
     Plugin,

@@ -183,18 +183,33 @@ fn in_app() -> Context {
 }
 
 #[test]
-fn disable_writes_enabled_false_where_a_higher_layer_sets_enabled() {
+fn disable_is_not_offered_below_a_layer_that_sets_enabled_and_is_offered_there() {
     let fs = app(
         "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
         "[mcp_servers.docs]\nenabled = true\n",
     );
     let core = core(&fs);
 
+    // The user's `enabled = false` would lose to the Project's `true`.
+    let before = inventory(&core, &in_app());
+    let user = json_of(&item(&before, "docs").entries[1]);
+    assert_eq!(
+        user["disable"]["status"], "not_offered",
+        "{}",
+        user["disable"]
+    );
+    let sentence = user["disable"]["sentence"].as_str().unwrap();
+    assert!(
+        sentence.contains(&layer("app").display().to_string()),
+        "{sentence}"
+    );
+
+    // The Project's own Entry is Disabled in its own table.
     let plan = plan(
         &core,
         &in_app(),
         Action::Disable,
-        &[&server(&user_config(), "docs")],
+        &[&server(&layer("app"), "docs")],
     )
     .unwrap();
     assert_eq!(plan.preview().files[0].path, layer("app"));
@@ -505,7 +520,7 @@ fn an_entry_of_the_mirrored_home_offers_the_actions_of_the_entry_it_was_copied_f
     let inventory = inventory(&core(&with_orca()), &context(None));
 
     let entry = json_of(&item_in(&inventory, "orca", "fetch").entries[0]);
-    assert_eq!(entry["source"], server(&user_config(), "fetch"));
+    assert_eq!(entry["copied_from"], server(&user_config(), "fetch"));
     assert_eq!(
         entry["disable"]["status"], "offered",
         "{}",
@@ -542,7 +557,7 @@ fn disable_of_an_entry_of_the_mirrored_home_goes_to_its_source_entry() {
         .preview()
         .info
         .iter()
-        .find(|info| code(info.code) == "reaches_mirror")
+        .find(|info| code(info.code) == "reaches_mirrored_home")
         .expect("the preview says how the change reaches the mirror");
     assert_eq!(info.path, Path::new(ORCA));
     assert!(info.sentence.contains("Orca"), "{}", info.sentence);
@@ -572,7 +587,7 @@ fn remove_of_an_entry_of_the_mirrored_home_goes_to_its_source_entry() {
         plan.preview()
             .info
             .iter()
-            .any(|info| code(info.code) == "reaches_mirror")
+            .any(|info| code(info.code) == "reaches_mirrored_home")
     );
     core.execute(plan, &[]).unwrap();
 
@@ -586,7 +601,7 @@ fn an_action_on_an_entry_only_the_mirrored_home_has_is_refused() {
 
     let inventory = inventory(&core, &context(None));
     let entry = json_of(&item_in(&inventory, "orca", "orca-only").entries[0]);
-    assert_eq!(entry["source"], Value::Null);
+    assert_eq!(entry["copied_from"], Value::Null);
     assert_eq!(entry["disable"]["code"], "mirrored");
     assert_eq!(entry["remove"]["code"], "mirrored");
 
@@ -730,4 +745,77 @@ fn a_config_toml_codex_rewrote_after_the_preview_is_read_again_before_the_write(
     let error = core.execute(second, &[]).unwrap_err();
     assert_eq!(error.code, ErrorCode::Stale);
     assert_eq!(text(&fs, &user_config()), changed);
+}
+
+#[test]
+fn a_rule_for_a_skill_folder_that_is_a_link_names_the_skill_md_it_leads_to() {
+    let target = Path::new(r"D:\skills\review");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), "")
+        .with_file(target.join("SKILL.md"), skill_md("review"))
+        .with_folder(Path::new(HOME).join(r".agents\skills"))
+        .with_link(agents_skill("review"), target);
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Disable,
+        &[&agents_skill("review").display().to_string()],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        skill_rules(&fs),
+        json!([{ "path": skill_file(target), "enabled": false }])
+    );
+    let after = inventory(&core, &context(None));
+    assert_eq!(code(item(&after, "review").state), "disabled");
+}
+
+#[test]
+fn of_several_rules_for_a_skill_the_later_one_wins_as_codex_reads_them() {
+    let file = skill_file(&agents_skill("review"));
+    let fs = FakeFileSystem::new()
+        .with_file(
+            user_config(),
+            format!(
+                "[[skills.config]]\npath = '{file}'\nenabled = false\n\n[[skills.config]]\npath = '{}'\nenabled = true\n",
+                file.to_lowercase()
+            ),
+        )
+        .with_file(agents_skill("review").join("SKILL.md"), skill_md("review"));
+
+    let inventory = inventory(&core(&fs), &context(None));
+
+    assert_eq!(code(item(&inventory, "review").state), "effective");
+}
+
+#[test]
+fn an_entry_of_a_project_layer_both_homes_read_is_acted_on_where_it_is() {
+    let trust = "[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n";
+    let fs =
+        app("", "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n").with_file(orca_config(), trust);
+    let core = core(&fs);
+
+    let inventory = inventory(&core, &in_app());
+    let mirrored = json_of(&item_in(&inventory, "orca", "docs").entries[0]);
+    assert_eq!(mirrored["copied_from"], server(&layer("app"), "docs"));
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    assert_eq!(plan.preview().files[0].path, layer("app"));
+    // Orca copies nothing there: the change reaches both homes as it is.
+    assert!(
+        plan.preview()
+            .info
+            .iter()
+            .all(|info| code(info.code) != "reaches_mirrored_home")
+    );
 }

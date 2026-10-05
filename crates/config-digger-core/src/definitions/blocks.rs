@@ -3942,8 +3942,8 @@ impl Validate for Park {
 /// `false` to the field its merge turns servers off by, such as Codex's
 /// `enabled`, in the Entry's own table. The field merges like any other, so
 /// what it Disables is every Entry of the Item, and a higher layer that sets
-/// the field decides over a lower one: Disable then writes it where the
-/// highest layer sets it. Enable is left to the merge's own rules.
+/// the field decides over a lower one. Enable is left to the merge's own
+/// rules.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MergedField {
@@ -4418,6 +4418,34 @@ impl JsonItemList {
         }
     }
 
+    /// Whether `item` holds what `template` holds, each string `{name}` in
+    /// it standing for `id`: every field of an object, other fields left
+    /// aside, every value of a list in its order, and the id compared as the
+    /// Agent compares ids.
+    fn holds(&self, template: &Value, item: &Value, id: &str) -> bool {
+        match (template, item) {
+            (Value::String(text), Value::String(held)) if text == NAME_KEY => {
+                if self.ignore_case {
+                    held.eq_ignore_ascii_case(id)
+                } else {
+                    held == id
+                }
+            }
+            (Value::Object(fields), Value::Object(held)) => fields.iter().all(|(key, value)| {
+                held.get(key)
+                    .is_some_and(|held| self.holds(value, held, id))
+            }),
+            (Value::Array(values), Value::Array(held)) => {
+                values.len() == held.len()
+                    && values
+                        .iter()
+                        .zip(held)
+                        .all(|(value, held)| self.holds(value, held, id))
+            }
+            _ => template == item,
+        }
+    }
+
     /// The edits that replace `item`, if the list holds one, with `with`, if
     /// any: `key_path` names the item, and the list is its parent.
     fn replace(key_path: &[String], item: Option<&Value>, with: Option<Value>) -> Vec<Edit> {
@@ -4467,12 +4495,17 @@ impl Disables for JsonItemList {
         self.layered
     }
 
+    /// An item Disables unless it holds what `enabled_item` holds: each of
+    /// its fields or values, the id compared as the Agent compares ids, and
+    /// any other field left aside.
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
-        let enabled = self
+        let Some(item) = value else {
+            return false;
+        };
+        !self
             .enabled_item
             .as_ref()
-            .map(|template| Self::item(template, name));
-        value.is_some_and(|item| Some(item) != enabled.as_ref())
+            .is_some_and(|template| self.holds(template, item, name))
     }
 
     fn partial(&self, _value: Option<&Value>) -> bool {
@@ -4563,6 +4596,11 @@ pub(crate) struct Switch {
     /// such as `name` in the `skills` of the manifest of Claude Desktop's
     /// skill mirror. config-digger only reads such a switch.
     pub named_by: Option<String>,
+    /// With `named_by`, whether of several items naming an Entry the
+    /// Agent takes the last, such as the rules of Codex's
+    /// `[[skills.config]]`, rather than the first.
+    #[serde(default)]
+    pub later_wins: bool,
     /// How the switch's file behaves while the Agent runs. A `sqlite` file
     /// is a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`
     /// holds JSON text under the key path's first key.
@@ -4616,6 +4654,8 @@ impl Validate for Switch {
             if !self.names() {
                 return Err(format!("named_by needs `{NAME_KEY}` in the key path"));
             }
+        } else if self.later_wins {
+            return Err("later_wins needs named_by".into());
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();
@@ -4671,7 +4711,11 @@ impl Switch {
 
     /// The syntax the file is edited in.
     pub fn syntax(&self) -> Syntax {
-        self.format().syntax()
+        if self.toml {
+            Syntax::Toml
+        } else {
+            Syntax::Jsonc
+        }
     }
 
     /// Whether the switch applies in one Project only, so that it needs one.

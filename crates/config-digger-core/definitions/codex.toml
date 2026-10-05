@@ -105,8 +105,8 @@ registries = [
 # highest version being the one it loads [source]. Codex knows each by
 # `<plugin>@<marketplace>`, and names it by its folder [source]. Its own
 # switch, `[plugins."<id>"] enabled`, is with the Disable mechanisms below.
-# Codex has no command
-# that uninstalls a plugin: `/plugins` in its TUI does [docs].
+# Codex has no command that uninstalls a plugin: `/plugins` in its TUI does
+# [docs].
 [[plugins]]
 id = "installed"
 registry = { block = "plugin-cache", anchor = { block = "home", root = "plugins", path = "cache" }, separator = "@", excludes = ".codex-remote-plugin-install.json" }
@@ -254,14 +254,14 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # Codex's own switch for a server is `enabled = false` in its table, in
 # any layer [docs, source]: the field merges with the others, so it turns
 # off the server built from every layer, and the highest layer that sets it
-# decides. Disable writes it in the Entry's own table, or where a higher
-# layer sets it, as long as no layer above sets it too; for an Entry of a
-# git-versioned Project layer, in a table holding `enabled` alone in the
-# user's `config.toml`. That a lower layer's `enabled = false` holds while
-# no higher one sets it follows from the merge [source, sandbox]. That a
-# higher layer's `enabled = true` wins over it, and that Codex starts with
-# a table holding `enabled` alone where no other layer has the server, are
-# unverified until the release gate.
+# decides. Disable writes it in the Entry's own table, and is not offered
+# below a layer that sets it; for an Entry of a git-versioned Project layer,
+# it writes a table holding `enabled` alone in the user's `config.toml`,
+# unless a layer above that sets it. That a lower layer's `enabled = false`
+# holds while no higher one sets it follows from the merge [source,
+# sandbox]. That a higher layer's `enabled = true` wins over it, and that
+# Codex starts with a table holding `enabled` alone where no other layer has
+# the server, are unverified until the release gate.
 [[items.mcp.disable]]
 block = "merged-field"
 locations = ["project-mcp", "user-mcp"]
@@ -271,8 +271,8 @@ fallback = "user-mcp"
 # A plugin's server has its own switch, `enabled = false` under
 # `[plugins."<id>".mcp_servers.<name>]`, the only key `config.toml` can set
 # for it besides approval and tool settings [source]. Enable takes the
-# field away. That a plugin the account installed honours it too comes from
-# the source; config-digger only reads such a plugin. Codex reads it from
+# field away. A plugin the account installed honours it too [source], but
+# config-digger only reads such a plugin. Codex reads it from
 # the merged layers, but config-digger reads and writes it in the user's
 # `config.toml` alone. Both plugin switches come from Codex's source only,
 # so they are unverified until the release gate.
@@ -478,10 +478,11 @@ checks = ["frontmatter", "disable", "precedence"]
 # canonicalises the paths of rules before it compares them [source]; how a
 # canonical path is spelled on Windows, with or without `\\?\`, is
 # unverified until the release gate. Enable takes the rule out. Of several
-# rules for one skill, the first is read.
+# rules by path, or by name, for one skill the later counts, but a rule by
+# path and one by name are each read on their own.
 [[items.skill.disable]]
 block = "json-item-list"
-switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}"], named_by = "path", store_class = "rewritten-while-running", toml = true }
+switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}"], named_by = "path", later_wins = true, store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"
 enable_action = "remove-item"
@@ -495,7 +496,7 @@ locations = ["project-skills", "project-agents-skills", "user-skills", "agents-s
 # reads it.
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}", "enabled"], named_by = "name", store_class = "rewritten-while-running", toml = true }
+switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}", "enabled"], named_by = "name", later_wins = true, store_class = "rewritten-while-running", toml = true }
 target = "name"
 context = "all"
 enable_action = "delete-key"

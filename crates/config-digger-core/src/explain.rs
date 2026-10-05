@@ -451,22 +451,22 @@ pub(crate) fn turns_off_built(agent_name: &str, name: &str) -> String {
 }
 
 /// Why Disable is not offered for an Entry of a server `agent_name` builds
-/// when the field that turns it off is set at `at`, above every layer
-/// config-digger could write it in: `versioned` says a layer it would
-/// write is git-versioned.
+/// when the field that turns it off is set at `at`, in a higher layer than
+/// any config-digger could write it in: `versioned` says that layer's file
+/// is git-versioned, so that Disable is not offered there either.
 pub(crate) fn merged_field_set_above(
     agent_name: &str,
     field: &str,
     at: &str,
     versioned: bool,
 ) -> String {
-    let reach = if versioned {
-        ", where a change reaches every clone"
+    let instead = if versioned {
+        "; that file is git-versioned, where a change reaches every clone"
     } else {
-        ""
+        ": Disable the Entry there instead"
     };
     format!(
-        "Disable is not offered: {at} sets `{field}` above every layer config-digger can write{reach}, and {agent_name} takes the highest layer's `{field}`."
+        "Disable is not offered: {at} sets `{field}` in a higher layer, and {agent_name} takes the highest layer's `{field}`{instead}."
     )
 }
 
@@ -1536,18 +1536,18 @@ pub(crate) fn mirrored_without_source(
 }
 
 /// What a preview says of an Operation on Entries copied into the Agent
-/// home at `mirror`, which `owner` copies from `source`: it changes the
-/// Entries they were copied from, and the change reaches `mirror` through
+/// home at `mirrored`, which `owner` copies from `source`: it changes the
+/// Entries they were copied from, and the change reaches `mirrored` through
 /// `owner`.
-pub(crate) fn reaches_mirror(owner: &str, mirror: &Path, source: Option<&Path>) -> String {
+pub(crate) fn reaches_mirrored_home(owner: &str, mirrored: &Path, source: Option<&Path>) -> String {
     let from = source.map_or_else(
         || "the Agent home it copies".to_owned(),
         |source| source.display().to_string(),
     );
     format!(
-        "{} is Mirrored by {owner}: this changes the Entries it copies in {from}, and the change reaches {} only once {owner} copies it there.",
-        mirror.display(),
-        mirror.display()
+        "{} is a Mirrored home {owner} copies from {from}: this changes the Entries there that it copied, and the change reaches {} through {owner}, once {owner} copies it.",
+        mirrored.display(),
+        mirrored.display()
     )
 }
 

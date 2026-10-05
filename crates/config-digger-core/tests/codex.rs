@@ -243,7 +243,7 @@ fn orca_s_codex_home_is_a_read_only_mirrored_home_of_the_default_one() {
     );
     // Its actions are those of the Entry it was copied from, which they go to.
     assert_eq!(
-        entry["source"],
+        entry["copied_from"],
         format!("{}#mcp_servers.fetch", user_config().display())
     );
     assert_eq!(

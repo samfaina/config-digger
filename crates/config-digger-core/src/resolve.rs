@@ -730,7 +730,7 @@ pub(crate) fn resolve(
                         .chain(gate_caveats)
                         .collect(),
                         also_read_by: Vec::new(),
-                        source: None,
+                        copied_from: None,
                     }
                 })
                 .collect();
@@ -785,7 +785,7 @@ pub(crate) fn resolve(
         .collect();
 
     also_read_by(definitions, &mut items);
-    from_sources(snapshot, &mut items);
+    from_copied(definitions, snapshot, &mut items);
 
     let read_failures = snapshot
         .read_failures
@@ -1188,7 +1188,7 @@ fn unread_entry(
         remove: remove(definition, snapshot, location, entry),
         caveats,
         also_read_by: Vec::new(),
-        source: None,
+        copied_from: None,
     }
 }
 
@@ -1755,46 +1755,47 @@ fn remove(
     }
 }
 
-/// Fills in, on each Entry of `items`, every Agent home of another Agent
-/// whose Items hold the same Entry, with its State there.
 /// Gives each Entry of a Mirrored home the actions of the Entry it was
-/// copied from, which they go to, and its locator as the Entry's source.
-/// An Entry whose source is not among `items` keeps its own, which refuse.
-fn from_sources(snapshot: &Snapshot, items: &mut [api::Item]) {
-    let mut sourced: Vec<((usize, usize), String, String)> = Vec::new();
+/// copied from, which they go to, and that Entry's locator. An Entry the
+/// home it is copied from lacks keeps its own actions, which refuse.
+fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut [api::Item]) {
+    let mut copied: Vec<(usize, usize, api::Entry)> = Vec::new();
     for (at, item) in items.iter().enumerate() {
+        let Some(agent) = definitions
+            .iter()
+            .position(|definition| definition.agent.id == item.agent)
+        else {
+            continue;
+        };
         for (index, entry) in item.entries.iter().enumerate() {
-            let scanned = snapshot.entry(&entry.path, &entry.key_path);
-            if let Some(source) = snapshot.source_of(scanned) {
-                let locator = locator::render(&source.path, &source.key_path);
-                sourced.push(((at, index), source.home.clone(), locator));
+            let source = snapshot
+                .entry_in(agent, &item.home, &entry.path, &entry.key_path)
+                .and_then(|scanned| snapshot.copied_from(scanned));
+            let Some(source) = source else {
+                continue;
+            };
+            let locator = locator::render(&source.path, &source.key_path);
+            let found = items
+                .iter()
+                .filter(|other| other.agent == item.agent && other.home == source.home)
+                .flat_map(|other| &other.entries)
+                .find(|other| other.locator == locator);
+            if let Some(found) = found {
+                copied.push((at, index, found.clone()));
             }
         }
     }
-    for ((at, index), home, locator) in sourced {
-        let agent = items[at].agent.clone();
-        let source = items
-            .iter()
-            .filter(|item| item.agent == agent && item.home == home)
-            .flat_map(|item| &item.entries)
-            .find(|entry| entry.locator == locator)
-            .map(|source| {
-                (
-                    source.disable.clone(),
-                    source.enable.clone(),
-                    source.remove.clone(),
-                )
-            });
-        if let Some((disable, enable, remove)) = source {
-            let entry = &mut items[at].entries[index];
-            entry.disable = disable;
-            entry.enable = enable;
-            entry.remove = remove;
-            entry.source = Some(locator);
-        }
+    for (at, index, source) in copied {
+        let entry = &mut items[at].entries[index];
+        entry.disable = source.disable;
+        entry.enable = source.enable;
+        entry.remove = source.remove;
+        entry.copied_from = Some(source.locator);
     }
 }
 
+/// Fills in, on each Entry of `items`, every Agent home of another Agent
+/// whose Items hold the same Entry, with its State there.
 fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
     // Every Entry once per Agent home that holds it, by its locator.
     let mut readers: Vec<(String, api::AlsoReadBy)> = Vec::new();

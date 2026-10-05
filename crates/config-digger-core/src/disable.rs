@@ -443,12 +443,22 @@ pub(crate) fn choose(
     })
 }
 
+/// A table Disable could write a merged field in.
+struct FieldTable<'d> {
+    path: PathBuf,
+    key_path: Vec<String>,
+    /// How the Agent ranks its layer, as a merge orders Entries: lower is
+    /// higher, the deepest Project layer first.
+    rank: (usize, usize),
+    location: &'d LocationDefinition,
+}
+
 /// What Disable writes for `entry`, an Entry of a server its Agent builds
-/// from same-named Entries, through the field `block` writes: `false` where
-/// the highest layer that sets the field has it, or else in the Entry's own
-/// table, or failing both, a table holding the field alone in the
-/// fallback's file. A write counts only where no higher layer sets the
-/// field, when the block requires it, and none goes in a git-versioned file.
+/// from same-named Entries, through the field `block` writes: `false` in
+/// the Entry's own table, or when that file is git-versioned or read only,
+/// in a table holding the field alone in the fallback's file. A write counts
+/// only where no higher layer sets the field, when the block requires it,
+/// and none goes in a git-versioned file.
 fn through_merged_field(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -493,33 +503,42 @@ fn through_merged_field(
             .filter(|setter| rank(setter) < at)
             .min_by_key(|setter| rank(setter))
     };
-    let own = highest_above(rank(entry)).unwrap_or(entry);
-    let mut targets = vec![(
-        own.path.clone(),
-        own.key_path.clone(),
-        rank(own),
-        definition.location(&own.location),
-    )];
+    let mut targets = vec![FieldTable {
+        path: entry.path.clone(),
+        key_path: entry.key_path.clone(),
+        rank: rank(entry),
+        location,
+    }];
     if let Some(fallback) = block.fallback.as_deref().map(|id| definition.location(id))
         && let Some(path) = snapshot.file_for(entry, &fallback.anchor, None)
     {
         let name = &entry.key_path[location.root.len()..];
-        let key_path = fallback.root.iter().chain(name).cloned().collect();
-        targets.push((path, key_path, (definition.rank(fallback), 0), fallback));
+        targets.push(FieldTable {
+            path,
+            key_path: fallback.root.iter().chain(name).cloned().collect(),
+            rank: (definition.rank(fallback), 0),
+            location: fallback,
+        });
     }
     let mut versioned: Vec<PathBuf> = Vec::new();
     let mut set_above: Option<&ScannedEntry> = None;
-    for (path, mut key_path, at, target) in targets {
+    for target in targets {
+        let FieldTable {
+            path,
+            mut key_path,
+            rank,
+            location: layer,
+        } = target;
         if snapshot.versioned.contains(&path) {
             if !versioned.contains(&path) {
                 versioned.push(path);
             }
             continue;
         }
-        if target.provenance.read_only() {
+        if layer.provenance.read_only() {
             continue;
         }
-        if let Some(above) = highest_above(at).filter(|_| block.requires_unset_above) {
+        if let Some(above) = highest_above(rank).filter(|_| block.requires_unset_above) {
             set_above.get_or_insert(above);
             continue;
         }
@@ -533,7 +552,7 @@ fn through_merged_field(
             explain::disable_switch(&edits, &entry.name, &path, false),
             explain::turns_off_built(&definition.agent.name, &entry.name)
         );
-        let syntax = target
+        let syntax = layer
             .format
             .file()
             .expect("validation merges Entries of files only")
@@ -559,7 +578,12 @@ fn through_merged_field(
             };
             (
                 code,
-                explain::merged_field_set_above(agent, field, &at, !versioned.is_empty()),
+                explain::merged_field_set_above(
+                    agent,
+                    field,
+                    &at,
+                    code == DisableNotOffered::GitVersioned,
+                ),
             )
         }
         None => (
