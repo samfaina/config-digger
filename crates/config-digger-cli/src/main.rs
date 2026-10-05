@@ -1307,6 +1307,31 @@ fn render_show(inventory: &Inventory, item: &api::Item, width: Option<usize>) ->
         // never cut: compact JSON has no spaces to wrap at.
         out.push_str(&format!("{reason_indent}{DIM}{}{DIM:#}\n", entry.config));
     }
+    // The server the Agent builds from Merged Entries, then the Entry each
+    // of its fields comes from.
+    if let Some(built) = &item.built {
+        out.push('\n');
+        out.push_str(&plain_line(&format!("{INDENT}{agent_name} builds:"), width));
+        out.push_str(&format!("{INDENT}{INDENT}{DIM}{}{DIM:#}\n", built.config));
+        let fields: Vec<String> = built
+            .origins
+            .iter()
+            .map(|origin| origin.key_path.join("."))
+            .collect();
+        let field_width = fields
+            .iter()
+            .map(|field| terminal::columns(field))
+            .max()
+            .unwrap_or(0);
+        for (field, origin) in fields.iter().zip(&built.origins) {
+            let mut line = Line::default();
+            line.push(format!("{INDENT}{INDENT}"), Style::new())
+                .push_padded(field, field_width, Style::new())
+                .push(GAP, Style::new())
+                .push(&origin.entry, DIM);
+            out.push_str(&line.fit(width).render());
+        }
+    }
     // What makes the whole Item less certain, such as a location that could
     // hold a winning Entry and could not be read.
     for caveat in &item.caveats {
@@ -1706,6 +1731,7 @@ fn state_after_label(state: api::StateAfter) -> &'static str {
     match state {
         api::StateAfter::Effective => state_label(api::State::Effective),
         api::StateAfter::Shadowed => state_label(api::State::Shadowed),
+        api::StateAfter::Merged => state_label(api::State::Merged),
         api::StateAfter::Disabled => state_label(api::State::Disabled),
         api::StateAfter::Blocked => state_label(api::State::Blocked),
         api::StateAfter::Invalid => state_label(api::State::Invalid),
@@ -1718,6 +1744,7 @@ fn state_after_style(state: api::StateAfter) -> Style {
     match state {
         api::StateAfter::Effective => state_style(api::State::Effective),
         api::StateAfter::Shadowed => state_style(api::State::Shadowed),
+        api::StateAfter::Merged => state_style(api::State::Merged),
         api::StateAfter::Disabled => state_style(api::State::Disabled),
         api::StateAfter::Blocked => state_style(api::State::Blocked),
         api::StateAfter::Invalid => state_style(api::State::Invalid),
@@ -1730,6 +1757,7 @@ fn state_label(state: api::State) -> &'static str {
     match state {
         api::State::Effective => "Effective",
         api::State::Shadowed => "Shadowed",
+        api::State::Merged => "Merged",
         api::State::Disabled => "Disabled",
         api::State::Blocked => "Blocked",
         api::State::Invalid => "Invalid",
@@ -1737,12 +1765,13 @@ fn state_label(state: api::State) -> &'static str {
     }
 }
 
-/// The app's State colours: green Effective, grey Shadowed, amber Disabled,
-/// orange Blocked, red Invalid, dim Unread.
+/// The app's State colours: green Effective, grey Shadowed, teal Merged,
+/// amber Disabled, orange Blocked, red Invalid, dim Unread.
 fn state_style(state: api::State) -> Style {
     match state {
         api::State::Effective => AnsiColor::Green.on_default(),
         api::State::Shadowed => AnsiColor::BrightBlack.on_default(),
+        api::State::Merged => AnsiColor::Cyan.on_default(),
         api::State::Disabled => AnsiColor::Yellow.on_default(),
         api::State::Blocked => {
             Style::new().fg_color(Some(anstyle::Color::Ansi256(anstyle::Ansi256Color(208))))

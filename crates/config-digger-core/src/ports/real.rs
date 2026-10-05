@@ -60,6 +60,49 @@ impl FileSystem for RealFileSystem {
             .map_err(sqlite)
     }
 
+    /// Opened read-only, waiting briefly for an Agent that holds a write
+    /// lock, and closed when the query is done. The table and column are
+    /// quoted as identifiers.
+    fn read_sqlite_column(
+        &self,
+        path: &Path,
+        table: &str,
+        column: &str,
+    ) -> io::Result<Vec<String>> {
+        use rusqlite::types::ValueRef;
+        use rusqlite::{Connection, OpenFlags};
+
+        if !path.is_file() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        let sqlite = |error: rusqlite::Error| io::Error::other(error);
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(sqlite)?;
+        connection
+            .busy_timeout(std::time::Duration::from_millis(250))
+            .map_err(sqlite)?;
+        let quoted = |name: &str| format!("\"{}\"", name.replace('"', "\"\""));
+        let mut statement = connection
+            .prepare(&format!("SELECT {} FROM {}", quoted(column), quoted(table)))
+            .map_err(sqlite)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(match row.get_ref(0)? {
+                    ValueRef::Text(bytes) => Some(String::from_utf8_lossy(bytes).into_owned()),
+                    _ => None,
+                })
+            })
+            .map_err(sqlite)?;
+        let mut values = Vec::new();
+        for value in rows {
+            values.extend(value.map_err(sqlite)?);
+        }
+        Ok(values)
+    }
+
     /// Opened read-write without creating the file, waiting briefly for an
     /// Agent that holds a lock, and closed when the write is done.
     fn write_sqlite_item(&self, path: &Path, key: &str, value: Option<&str>) -> io::Result<()> {

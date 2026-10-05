@@ -60,6 +60,9 @@ struct FakeFiles {
     /// The `ItemTable` of each SQLite store, by the store's path as
     /// spelled on disk.
     sqlite: BTreeMap<PathBuf, BTreeMap<String, String>>,
+    /// The text values of each column of each other table of each SQLite
+    /// store, by the store's path as spelled on disk, then table and column.
+    sqlite_rows: BTreeMap<PathBuf, BTreeMap<(String, String), Vec<String>>>,
 }
 
 impl FakeFileSystem {
@@ -109,6 +112,30 @@ impl FakeFileSystem {
             .entry(path)
             .or_default()
             .insert(key.to_owned(), value.to_owned());
+        drop(files);
+        self
+    }
+
+    /// A SQLite store at `path` whose table `table` holds a row per value of
+    /// `values` in its column `column`, next to what it held already.
+    pub fn with_sqlite_rows(
+        self,
+        path: impl Into<PathBuf>,
+        table: &str,
+        column: &str,
+        values: &[&str],
+    ) -> Self {
+        let path = path.into();
+        let mut files = self.files();
+        files.files.insert(path.clone(), SQLITE_HEADER.to_vec());
+        files.sqlite.entry(path.clone()).or_default();
+        files
+            .sqlite_rows
+            .entry(path)
+            .or_default()
+            .entry((table.to_owned(), column.to_owned()))
+            .or_default()
+            .extend(values.iter().map(|value| (*value).to_owned()));
         drop(files);
         self
     }
@@ -344,6 +371,31 @@ impl FileSystem for FakeFileSystem {
             .find(|(store, _)| strip_prefix(store, &path).is_some_and(|rest| rest.is_empty()))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a SQLite store"))?;
         Ok(table.get(key).cloned())
+    }
+
+    fn read_sqlite_column(
+        &self,
+        path: &Path,
+        table: &str,
+        column: &str,
+    ) -> io::Result<Vec<String>> {
+        self.read(path)?;
+        let files = self.files();
+        let path = files.follow(path);
+        let is = |store: &Path| strip_prefix(store, &path).is_some_and(|rest| rest.is_empty());
+        if !files.sqlite.keys().any(|store| is(store)) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not a SQLite store",
+            ));
+        }
+        files
+            .sqlite_rows
+            .iter()
+            .find(|(store, _)| is(store))
+            .and_then(|(_, tables)| tables.get(&(table.to_owned(), column.to_owned())))
+            .cloned()
+            .ok_or_else(|| io::Error::other(format!("no such table or column: {table}.{column}")))
     }
 
     /// Fails like a file write, for a store [`failing_writes_to`]

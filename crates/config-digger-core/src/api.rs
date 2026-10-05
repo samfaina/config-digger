@@ -622,6 +622,7 @@ pub struct Change {
 pub enum StateAfter {
     Effective,
     Shadowed,
+    Merged,
     Disabled,
     Blocked,
     Invalid,
@@ -634,6 +635,7 @@ impl From<State> for StateAfter {
         match state {
             State::Effective => StateAfter::Effective,
             State::Shadowed => StateAfter::Shadowed,
+            State::Merged => StateAfter::Merged,
             State::Disabled => StateAfter::Disabled,
             State::Blocked => StateAfter::Blocked,
             State::Invalid => StateAfter::Invalid,
@@ -1128,6 +1130,9 @@ pub struct Home {
     /// When the Agent's lookup order skips it, so that the Agent never
     /// reads it and its Entries are Unread, what it reads instead.
     pub not_read: Option<NotRead>,
+    /// When another tool copies it from another Agent home of the Agent,
+    /// which it is: config-digger never writes to it.
+    pub mirror: Option<Mirror>,
     /// When none of the files the Agent reads there exists, the sentence
     /// saying so, rendered by the core.
     pub no_configuration: Option<String>,
@@ -1152,6 +1157,22 @@ pub struct NotRead {
     /// The id of the home the order picks, `None` when it picks none that is there.
     pub read_instead: Option<String>,
     /// The reason as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+/// An Agent home another tool copies from a source Agent home, such as the
+/// Codex home Orca keeps in sync with `~\.codex`. It is read-only.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Mirror {
+    /// The tool that keeps the copy, such as `Orca`.
+    pub owner: String,
+    /// The id of the Agent home it copies.
+    pub source: String,
+    /// That home's folder, `None` when the environment cannot say where it is.
+    pub source_folder: Option<PathBuf>,
+    /// Such as "Mirrored by Orca", rendered by the core.
+    pub label: String,
+    /// What it is and why it is read-only, rendered by the core.
     pub sentence: String,
 }
 
@@ -1241,9 +1262,36 @@ pub struct Item {
     pub state: State,
     /// In precedence order, highest first.
     pub entries: Vec<Entry>,
+    /// For an Item whose Agent combines same-named Entries field by field,
+    /// the server it builds, when more than one Entry takes part.
+    pub built: Option<BuiltServer>,
     /// What makes its State less certain, such as a location that could
     /// take part and could not be read.
     pub caveats: Vec<Caveat>,
+}
+
+/// The server an Agent builds by merging same-named Entries field by field,
+/// as Codex does across its layers.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct BuiltServer {
+    /// The server, with every Secret masked as `••••`.
+    #[specta(type = JsonValue)]
+    pub config: serde_json::Value,
+    /// The key paths in `config` whose values were masked.
+    pub masked: Vec<Vec<String>>,
+    /// Where each field of `config` comes from, in its order: each value
+    /// that is not an object, and each empty object.
+    pub origins: Vec<FieldOrigin>,
+}
+
+/// The Entry one field of a built server comes from.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct FieldOrigin {
+    /// The field's key path in the server. An array item is not a field of
+    /// its own: an array comes whole from one Entry.
+    pub key_path: Vec<String>,
+    /// The `<path>#<key path>` locator of the Entry.
+    pub entry: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -1483,6 +1531,9 @@ pub enum DisableNotOffered {
     /// The Entry is managed, or a copy of the user's account, and
     /// config-digger only reads it.
     ReadOnly,
+    /// The Entry is in a Mirrored home, which another tool copies from
+    /// another Agent home: config-digger never writes to it.
+    Mirrored,
 }
 
 /// Whether Remove is offered for an Entry, and if not, why, and what to
@@ -1510,6 +1561,9 @@ pub enum RemoveNotOffered {
     /// The Entry is managed, or a copy of the user's account, and
     /// config-digger only reads it.
     ReadOnly,
+    /// The Entry is in a Mirrored home, which another tool copies from
+    /// another Agent home: config-digger never writes to it.
+    Mirrored,
     /// The Entry is part of a plugin, which only the Agent uninstalls.
     Plugin,
     /// The Entry is an extension's, which only the Agent uninstalls.
@@ -1593,6 +1647,10 @@ impl From<DefinitionProvenance> for Provenance {
 pub enum State {
     Effective,
     Shadowed,
+    /// The Agent builds the server it uses by combining same-named Entries
+    /// field by field, and this one supplies some of its fields, so that no
+    /// single Entry is Effective.
+    Merged,
     /// The Agent skips it because a switch Disables it, natively or set by
     /// config-digger.
     Disabled,
@@ -1625,6 +1683,13 @@ pub struct Reason {
 pub enum ReasonCode {
     /// A same-named Entry at a location the Agent ranks higher is Effective.
     ShadowedByPrecedence,
+    /// The Agent builds the server it uses from this Entry and other
+    /// same-named ones, field by field.
+    Merged,
+    /// The server the Agent builds from the Item's Entries holds fields of
+    /// two transports, such as Codex's `command` and `url`, which it
+    /// rejects, refusing to start.
+    TransportConflict,
     /// A switch names the Item, so the Agent skips every Entry of it that
     /// the switch covers.
     DisabledByName,

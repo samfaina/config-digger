@@ -307,6 +307,11 @@ pub(crate) fn choose(
     project: Option<&ContextProject>,
 ) -> Result<Choice, (DisableNotOffered, String)> {
     let location = definition.location(&entry.location);
+    if let Some(mirror) = snapshot.mirror_of(entry) {
+        let sentence =
+            explain::mirrored_option("Disable", &mirror.owner, mirror.source_folder.as_deref());
+        return Err((DisableNotOffered::Mirrored, sentence));
+    }
     if location.provenance.read_only() {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }

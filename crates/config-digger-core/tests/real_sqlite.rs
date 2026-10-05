@@ -1,5 +1,6 @@
 //! The real SQLite read against a real store laid out as VS Code and Cursor
-//! keep `state.vscdb`: a value under a key of its `ItemTable`.
+//! keep `state.vscdb`: a value under a key of its `ItemTable`; and a column
+//! of another table, as Codex keeps the folder of each thread.
 
 use config_digger_core::ports::FileSystem;
 use config_digger_core::ports::real::RealFileSystem;
@@ -156,4 +157,28 @@ fn a_write_to_a_store_an_agent_holds_locked_fails_after_a_short_wait() {
             .as_deref(),
         Some("value")
     );
+}
+
+#[test]
+fn a_column_s_text_values_are_read_from_every_row() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("state_5.sqlite");
+    Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            r"CREATE TABLE threads (id TEXT, cwd TEXT);
+             INSERT INTO threads VALUES ('a', 'E:\projects\app');
+             INSERT INTO threads VALUES ('b', NULL);
+             INSERT INTO threads VALUES ('c', 'E:\projects\api');",
+        )
+        .unwrap();
+    let fs = RealFileSystem;
+
+    assert_eq!(
+        fs.read_sqlite_column(&path, "threads", "cwd").unwrap(),
+        [r"E:\projects\app", r"E:\projects\api"]
+    );
+    assert!(fs.read_sqlite_column(&path, "projects", "path").is_err());
+    // The store is closed again: Windows refuses to delete an open file.
+    std::fs::remove_file(&path).unwrap();
 }

@@ -407,6 +407,15 @@ impl Snapshot {
             .roots
     }
 
+    /// What the Agent home of `entry` is a copy of, when another tool
+    /// copies it from another home.
+    pub fn mirror_of(&self, entry: &ScannedEntry) -> Option<&Mirror> {
+        self.homes
+            .iter()
+            .find(|found| found.agent_index == entry.agent_index && found.home == entry.home)
+            .and_then(|found| found.mirror.as_ref())
+    }
+
     /// The Entry at `path` and `key_path`, which a resolved Entry comes from.
     pub fn entry(&self, path: &Path, key_path: &[String]) -> &ScannedEntry {
         self.entries
@@ -508,6 +517,20 @@ pub(crate) struct ScannedHome {
     pub last_ran: Option<String>,
     /// When the Agent's lookup order skips it, what it reads instead.
     pub skipped: Option<Skipped>,
+    /// For a home another tool copies from one of the Agent's, which.
+    pub mirror: Option<Mirror>,
+}
+
+/// An Agent home another tool copies from a source Agent home of the same
+/// Agent. config-digger never writes to it.
+#[derive(Clone)]
+pub(crate) struct Mirror {
+    /// The tool that keeps the copy, such as `Orca`.
+    pub owner: String,
+    /// The id of the home it copies.
+    pub source: String,
+    /// That home's folder, `None` when the environment cannot say where it is.
+    pub source_folder: Option<PathBuf>,
 }
 
 /// An Agent home the Agent's lookup order skips: the Agent never reads it.
@@ -557,6 +580,12 @@ pub(crate) struct ScannedProject {
     pub workspace_file: bool,
     /// For a workspace file, the folders it opens, first first.
     pub members: Vec<PathBuf>,
+    /// For a folder, the folder at or above it that holds `.git`, the root of
+    /// its git repository.
+    pub repo_root: Option<PathBuf>,
+    /// For a folder in a git repository, the repository's main checkout: its
+    /// root, or for a linked worktree, the checkout the worktree belongs to.
+    pub main_checkout: Option<PathBuf>,
     /// The keys of every lexically normalised spelling that names this Project.
     pub spellings: BTreeSet<String>,
     /// The Agents whose registries record it.
@@ -694,6 +723,7 @@ struct FoundHome {
     /// Any of its own roots exists.
     configured: bool,
     skipped: Option<Skipped>,
+    mirror: Option<Mirror>,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -859,8 +889,17 @@ pub(crate) fn scan_as_if(
                     }
                 }
             }
+            // A file of the Agent home itself, such as `~\.codex\config.toml`
+            // in a Project at the user's home folder, is the home's alone.
+            let own: BTreeSet<String> = home
+                .roots
+                .values()
+                .map(|root| paths::canonical_key(ports.fs.as_ref(), root))
+                .collect();
             for (folder, key, depth) in read {
-                if let Some(path) = location.anchor.path(&home.roots, Some(&folder)) {
+                if let Some(path) = location.anchor.path(&home.roots, Some(&folder))
+                    && !own.contains(&paths::canonical_key(ports.fs.as_ref(), &path))
+                {
                     let key = Some(key.clone());
                     let start = scanner.entries.len();
                     scanner.read_location(home, definition, location, path, key, depth);
@@ -879,6 +918,9 @@ pub(crate) fn scan_as_if(
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
     for project in &mut projects {
+        if project.is_folder() {
+            (project.repo_root, project.main_checkout) = repository(&as_if, &project.path);
+        }
         project.hidden = user_list
             .hidden_projects
             .iter()
@@ -972,6 +1014,7 @@ pub(crate) fn scan_as_if(
             .map(|(home, last_ran)| ScannedHome {
                 last_ran,
                 skipped: home.skipped,
+                mirror: home.mirror,
                 declared: home.declared,
                 configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
@@ -1320,7 +1363,7 @@ fn read_rules(
                 for place in places.read(
                     &setting.anchor,
                     &setting.key_path,
-                    &format,
+                    format.as_ref(),
                     setting.sqlite,
                     setting.cached_at.as_deref(),
                     reader,
@@ -1423,7 +1466,7 @@ impl Places<'_> {
         &self,
         anchor: &Anchor,
         key_path: &[String],
-        format: &JsonFormat,
+        format: &dyn Parse,
         sqlite: bool,
         cached_at: Option<&[String]>,
         reader: &mut Reader,
@@ -1688,15 +1731,31 @@ fn find_homes(
             .iter()
             .map(|order| (order, pick(order, &located, ports)))
             .collect();
+        // Roots are one Agent home however many homes of the definition find
+        // them: a mirrored home's, else the first home's that finds them.
+        let mirrors = mirrored(definition, ports);
+        let mut taken: Vec<(String, String)> = mirrors
+            .iter()
+            .map(|mirror| (roots_key(fs, &mirror.roots), mirror.home.clone()))
+            .collect();
+        // Each home not listed for its roots, with the home listed instead.
+        let mut same: Vec<(String, String)> = Vec::new();
         let start = found.len();
         for (home, folders) in located {
             for (id, folder) in folders {
-                definition_folders.push((agent_index, paths::canonical_key(fs, &folder)));
-                // Skipped when an order holds it and none picks it, for
-                // what the first order that holds it picks.
-                let picks_it = picked
-                    .iter()
-                    .any(|(_, pick)| pick.as_ref().is_some_and(|(pick, _)| *pick == id));
+                let key = paths::canonical_key(fs, &folder);
+                definition_folders.push((agent_index, key.clone()));
+                let same_roots = roots_key(fs, &home.roots_in(&folder));
+                if let Some((_, listed)) = taken.iter().find(|(known, _)| *known == same_roots) {
+                    same.push((id, listed.clone()));
+                    continue;
+                }
+                // Skipped when an order holds it and none picks its folder,
+                // for what the first order that holds it picks.
+                let picks_it = picked.iter().any(|(_, pick)| {
+                    pick.as_ref()
+                        .is_some_and(|(_, pick)| paths::canonical_key(fs, pick) == key)
+                });
                 let skipped = picked
                     .iter()
                     .find(|(order, _)| order.contains(&home.id))
@@ -1719,6 +1778,7 @@ fn find_homes(
                 };
                 tracing::debug!(agent = %definition.agent.id, home = %id, "home found");
                 roots.extend(machine_paths(definition, ports));
+                taken.push((same_roots, id.clone()));
                 found.push(FoundHome {
                     agent_index,
                     home: id,
@@ -1728,10 +1788,28 @@ fn find_homes(
                     source,
                     configured,
                     skipped,
+                    mirror: None,
                 });
             }
         }
-        // The home an order picks is named only when it is listed.
+        for mirror in mirrors {
+            tracing::debug!(agent = %definition.agent.id, home = %mirror.home, "mirrored home found");
+            let mut roots = mirror.roots;
+            roots.extend(machine_paths(definition, ports));
+            found.push(FoundHome {
+                agent_index,
+                declared: Some(mirror.home.clone()),
+                home: mirror.home,
+                folder: mirror.folder,
+                roots,
+                source: HomeSource::KnownLocation,
+                configured: true,
+                skipped: None,
+                mirror: Some(mirror.mirror),
+            });
+        }
+        // The home an order picks is named only when it is listed, as
+        // itself or as the home listed for its folder.
         let listed: Vec<String> = found[start..]
             .iter()
             .map(|home| home.home.clone())
@@ -1740,6 +1818,12 @@ fn find_homes(
             .iter_mut()
             .filter_map(|home| home.skipped.as_mut())
         {
+            if let Some((_, listed)) = same
+                .iter()
+                .find(|(id, _)| skipped.instead.as_ref() == Some(id))
+            {
+                skipped.instead = Some(listed.clone());
+            }
             if skipped
                 .instead
                 .as_ref()
@@ -1776,6 +1860,7 @@ fn find_homes(
             configured,
             declared: None,
             skipped: None,
+            mirror: None,
         });
     }
     Ok(found)
@@ -1783,6 +1868,69 @@ fn find_homes(
 
 /// A folder of a home, with the home's id there.
 type HomeFolder = (String, PathBuf);
+
+/// A mirrored home of a definition found on this machine.
+struct FoundMirror {
+    home: String,
+    folder: PathBuf,
+    /// Its roots by name, laid out like its source home's.
+    roots: BTreeMap<String, PathBuf>,
+    mirror: Mirror,
+}
+
+/// What two homes compare by: the real path of each of their roots, by name.
+fn roots_key(fs: &dyn FileSystem, roots: &BTreeMap<String, PathBuf>) -> String {
+    let keys: Vec<String> = roots
+        .iter()
+        .map(|(name, path)| format!("{name}={}", paths::canonical_key(fs, path)))
+        .collect();
+    keys.join("|")
+}
+
+/// The mirrored homes of `definition` whose folders hold any of their
+/// roots, each set of roots once. A glob that matches several folders gives one
+/// home per folder, with its folder as its id.
+fn mirrored(definition: &AgentDefinition, ports: &Ports) -> Vec<FoundMirror> {
+    let fs = ports.fs.as_ref();
+    let mut found: Vec<FoundMirror> = Vec::new();
+    for mirror in &definition.mirrored_homes {
+        let source = definition
+            .homes
+            .iter()
+            .find(|home| home.id == mirror.source)
+            .expect("validation declares a mirrored home's source");
+        let source_folder = source
+            .folder
+            .folders(ports.env.as_ref(), fs)
+            .into_iter()
+            .next();
+        let folders = mirror.folder.folders(ports.env.as_ref(), fs);
+        let several = folders.len() > 1;
+        for folder in folders {
+            let roots = source.roots_in(&folder);
+            let key = roots_key(fs, &roots);
+            let known = found.iter().any(|other| roots_key(fs, &other.roots) == key);
+            if known || !roots.values().any(|root| fs.exists(root)) {
+                continue;
+            }
+            found.push(FoundMirror {
+                home: if several {
+                    folder.display().to_string()
+                } else {
+                    mirror.id.clone()
+                },
+                folder,
+                roots,
+                mirror: Mirror {
+                    owner: mirror.owner.clone(),
+                    source: mirror.source.clone(),
+                    source_folder: source_folder.clone(),
+                },
+            });
+        }
+    }
+    found
+}
 
 /// The id and folder of the home `order` picks among the `located` folders
 /// of the homes of a definition: the first whose conditions hold and whose
@@ -1927,6 +2075,39 @@ fn folders_read(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf
     }
 }
 
+/// The root of the git repository the folder `folder` is in, the folder at
+/// or above it that holds `.git`, and the repository's main checkout: the
+/// root itself, or for a linked worktree, whose `.git` is a file naming
+/// `<main>\.git\worktrees\<name>`, that `<main>`.
+fn repository(fs: &dyn FileSystem, folder: &Path) -> (Option<PathBuf>, Option<PathBuf>) {
+    let Some(root) = folder
+        .ancestors()
+        .find(|parent| fs.exists(&parent.join(".git")))
+    else {
+        return (None, None);
+    };
+    // A `.git` folder cannot be read as a file.
+    let main = fs
+        .read(&root.join(".git"))
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .and_then(|text| {
+            let gitdir = text.lines().find_map(|line| line.strip_prefix("gitdir:"))?;
+            let gitdir = paths::lexical(&root.join(gitdir.trim()));
+            let worktrees = gitdir.parent()?;
+            let dot_git = worktrees.parent()?;
+            let named = |path: &Path, name: &str| {
+                path.file_name()
+                    .is_some_and(|known| known.eq_ignore_ascii_case(name))
+            };
+            (named(worktrees, "worktrees") && named(dot_git, ".git"))
+                .then(|| dot_git.parent().map(Path::to_path_buf))
+                .flatten()
+        });
+    let root = root.to_path_buf();
+    (Some(root.clone()), Some(main.unwrap_or(root)))
+}
+
 /// The id `template`, a location's `switch_id`, makes for `entry`, read
 /// at `root`.
 fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
@@ -2061,6 +2242,56 @@ impl Scanner<'_> {
                         continue;
                     };
                     for text in spellings {
+                        self.add_spelling(home, spelling, &text);
+                    }
+                }
+                Registry::TomlKeys(block) => {
+                    let Some(text) = self.reader.text(home, &path, None) else {
+                        continue;
+                    };
+                    match block.spellings(text) {
+                        Ok(spellings) => {
+                            for text in spellings {
+                                self.add_spelling(home, spelling, &text);
+                            }
+                        }
+                        Err(error) => self.reader.fail(
+                            home,
+                            &path,
+                            None,
+                            ReadFailureKind::Parse,
+                            error.position,
+                        ),
+                    }
+                }
+                // Session files are many and large, and hold nothing else
+                // config-digger reads: one that cannot be read records no
+                // Project, and is no Read failure.
+                Registry::JsonlHeads(block) => {
+                    let fs = self.reader.fs;
+                    for file in paths::expand_relative(fs, &path, &block.files) {
+                        match block.spelling_in(fs, &file) {
+                            Some(text) => {
+                                self.add_spelling(home, spelling, &text);
+                            }
+                            None => {
+                                tracing::debug!(path = %file.display(), "names no Project");
+                            }
+                        }
+                    }
+                }
+                // The store holds much else, which a table it lacks, as in
+                // another version of the Agent, leaves readable.
+                Registry::SqliteColumn(block) => {
+                    let fs = self.reader.fs;
+                    let values = match fs.read_sqlite_column(&path, &block.table, &block.column) {
+                        Ok(values) => values,
+                        Err(error) => {
+                            tracing::debug!(path = %path.display(), table = %block.table, %error, "cannot read the column");
+                            continue;
+                        }
+                    };
+                    for text in values {
                         self.add_spelling(home, spelling, &text);
                     }
                 }
@@ -3418,6 +3649,8 @@ impl<'p> Projects<'p> {
                             added: false,
                             hidden: false,
                             members: Vec::new(),
+                            repo_root: None,
+                            main_checkout: None,
                         });
                         self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1

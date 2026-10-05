@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AgentFlag, AlsoReadBy, Home, Inventory, Item, State } from "./bindings";
+import type { AgentFlag, AlsoReadBy, BuiltServer, Home, Inventory, Item, State } from "./bindings";
 import type { Notify } from "./desktop";
 import { EntryCard } from "./EntryCard";
 import { Icon } from "./icons";
@@ -414,6 +414,13 @@ type HomesPaneProps = {
 function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const all = inventory?.homes ?? [];
   const failuresOf = (home: Home) => homeFailures(inventory?.read_failures ?? [], home);
+  // Another tool copies a Mirrored home, so config-digger only reads it.
+  const mirrored = (home: Home) =>
+    home.mirror && (
+      <span className="tag" title={home.mirror.sentence}>
+        {home.mirror.label}
+      </span>
+    );
   const notRead = (home: Home) =>
     home.not_read && (
       <span className="tag" title={home.not_read.sentence}>
@@ -434,6 +441,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
         <div className="home-row" key={agent}>
           <span>{agentName}</span>
           <span className="grow" />
+          {mirrored(chosen)}
           {notRead(chosen)}
           <FailureBadge count={failuresOf(chosen)} where="this home" />
           {own.length > 1 ? (
@@ -469,6 +477,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
           >
             <span className="home-name">{home.home}</span>
             <span className="grow" />
+            {mirrored(home)}
             {notRead(home)}
             <FailureBadge count={failuresOf(home)} where="this home" />
           </button>
@@ -485,6 +494,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
 
 function homeLabel(home: Home, failed: number): string {
   let label = home.home;
+  if (home.mirror) label += ` · ${home.mirror.label}`;
   if (home.not_read) label += " · not read";
   if (failed > 0) label += ` · ${couldNotBeRead(failed)}`;
   return label;
@@ -590,6 +600,7 @@ function ItemDetail({ inventory, item, flash, onShowWinner, onReader, onAction, 
             {caveat.sentence}
           </div>
         ))}
+        {item.built && <BuiltServerCard built={item.built} agentName={agentName} onShowEntry={onShowWinner} />}
         {item.entries.map((entry, index) => (
           <div key={entry.locator} data-locator={entry.locator}>
             <EntryCard
@@ -607,6 +618,38 @@ function ItemDetail({ inventory, item, flash, onShowWinner, onReader, onAction, 
         ))}
       </div>
     </>
+  );
+}
+
+/** The server an Agent builds from Merged Entries, and the Entry each of its fields comes from. */
+function BuiltServerCard({
+  built,
+  agentName,
+  onShowEntry,
+}: {
+  built: BuiltServer;
+  agentName: string;
+  onShowEntry: (locator: string) => void;
+}) {
+  return (
+    <article className="entry-card built-server">
+      <div className="caption">{agentName} builds</div>
+      <div className="config">
+        <pre className="mono">{JSON.stringify(built.config, null, 2)}</pre>
+      </div>
+      <dl className="field-origins">
+        {built.origins.map((origin) => (
+          <div key={origin.key_path.join(".")}>
+            <dt className="mono">{origin.key_path.join(".")}</dt>
+            <dd>
+              <button type="button" className="link mono" onClick={() => onShowEntry(origin.entry)}>
+                {origin.entry}
+              </button>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
   );
 }
 

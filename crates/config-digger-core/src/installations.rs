@@ -154,7 +154,11 @@ fn reads(
     let Some(homes) = &declared.homes else {
         return true;
     };
-    let laid_out_as = home.declared.as_ref().unwrap_or(&definition.homes[0].id);
+    // A Mirrored home is laid out like the home it copies.
+    let laid_out_as = match &home.mirror {
+        Some(mirror) => &mirror.source,
+        None => home.declared.as_ref().unwrap_or(&definition.homes[0].id),
+    };
     homes.contains(laid_out_as)
 }
 

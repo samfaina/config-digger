@@ -218,6 +218,18 @@ impl FileSystem for AsIf<'_> {
         }
     }
 
+    fn read_sqlite_column(
+        &self,
+        path: &Path,
+        table: &str,
+        column: &str,
+    ) -> io::Result<Vec<String>> {
+        match self.seen(path) {
+            Seen::Gone => Err(io::ErrorKind::NotFound.into()),
+            Seen::At(at) => self.fs.read_sqlite_column(&at, table, column),
+        }
+    }
+
     fn exists(&self, path: &Path) -> bool {
         match self.seen(path) {
             Seen::Gone => false,

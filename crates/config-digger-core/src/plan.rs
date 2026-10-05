@@ -423,6 +423,18 @@ impl Targeted<'_> {
                 )));
             }
             let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+            if let Some(mirror) = self.snapshot.mirror_of(scanned) {
+                let action = match self.action {
+                    Action::Disable => "Disable",
+                    _ => "Enable",
+                };
+                return Err(Error::blocked(explain::mirrored_refused(
+                    action,
+                    &entry.locator,
+                    &mirror.owner,
+                    mirror.source_folder.as_deref(),
+                )));
+            }
             let definition = &self.definitions[scanned.agent_index];
             match self.action {
                 Action::Disable => {
@@ -460,6 +472,14 @@ impl Targeted<'_> {
                     }
                 }
                 _ => {
+                    // Such as for an Entry a field of the server its Agent
+                    // builds turns off, which no switch of its own holds.
+                    if let Some(api::EnableOption::NotOffered { sentence }) = &entry.enable {
+                        return Err(Error::blocked(explain::enable_refused(
+                            &entry.locator,
+                            sentence,
+                        )));
+                    }
                     let project = project.as_ref().map(|(_, key)| key.as_str());
                     let ruled = rules::hits(definition, self.snapshot, scanned, project);
                     let by_rule: Vec<&rules::RuleHit> = ruled
@@ -1778,6 +1798,18 @@ fn removal(
     {
         let message = match code {
             api::RemoveNotOffered::ReadOnly => explain::read_only_remove(&entry.locator),
+            api::RemoveNotOffered::Mirrored => {
+                let scanned = snapshot.entry(&entry.path, &entry.key_path);
+                let mirror = snapshot
+                    .mirror_of(scanned)
+                    .expect("a mirrored Entry is in a Mirrored home");
+                explain::mirrored_refused(
+                    "Remove",
+                    &entry.locator,
+                    &mirror.owner,
+                    mirror.source_folder.as_deref(),
+                )
+            }
             api::RemoveNotOffered::Plugin | api::RemoveNotOffered::Extension => {
                 let how = how_to_remove
                     .as_ref()

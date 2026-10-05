@@ -22,7 +22,7 @@ export type HomeChoice = Record<string, string>;
 export type Selection = { agent: string; homes: HomeChoice };
 
 /** The States in the order the screen lists them. */
-export const STATE_ORDER: State[] = ["effective", "shadowed", "disabled", "blocked", "unread", "invalid"];
+export const STATE_ORDER: State[] = ["effective", "shadowed", "merged", "disabled", "blocked", "unread", "invalid"];
 
 /** Each Agent once, in the order of its first home. */
 export function agentsOf(homes: Home[]): { agent: string; agentName: string }[] {

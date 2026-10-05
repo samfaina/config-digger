@@ -4,6 +4,7 @@ import type { State } from "./bindings";
 export const STATE_LABELS: Record<State, string> = {
   effective: "Effective",
   shadowed: "Shadowed",
+  merged: "Merged",
   disabled: "Disabled",
   blocked: "Blocked",
   invalid: "Invalid",

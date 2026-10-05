@@ -60,6 +60,13 @@
         "$ref": "#/$defs/HomeDefinition"
       }
     },
+    "mirrored_homes": {
+      "description": "Agent homes another tool copies from one of `homes`, such as the\nCodex home Orca keeps in sync with `~\\.codex`. config-digger reads\nthem and never writes to them.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/MirroredHomeDefinition"
+      }
+    },
     "lookup_orders": {
       "description": "The orders in which a launch of the Agent picks one of its homes,\neach a list of home ids, such as the candidates for Claude Desktop's\ndata folder of each of its packages: it reads the first whose `when`\nholds and whose folder exists, or that it uses before it exists. A\nhome some order holds and none picks is skipped, and shown as not\nread. A home outside every order is read wherever it is found.",
       "type": "array",
@@ -810,6 +817,35 @@
         }
       ]
     },
+    "MirroredHomeDefinition": {
+      "description": "An Agent home whose content another tool copies from a source Agent\nhome, laid out like it. It is found, as a known location, when any of\nits roots exists. A folder another home of the Agent finds too is this\nhome, whichever finds it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Unique among the definition's homes.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "The tool that keeps the copy, as it names itself, such as `Orca`.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "The folder the home's roots are in.",
+          "$ref": "#/$defs/Locator"
+        },
+        "source": {
+          "description": "The id of the home it copies, one of the definition's `homes`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "owner",
+        "folder",
+        "source"
+      ]
+    },
     "ScopeDefinition": {
       "type": "object",
       "properties": {
@@ -1059,6 +1095,97 @@
             "anchor",
             "key",
             "fields"
+          ]
+        },
+        {
+          "description": "The keys of a table in a TOML file, each one a Project, such as the\nfolders Codex records a trust level for under `projects` in its\n`config.toml`.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the file is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "root": {
+              "description": "The key path of the table whose keys are Projects.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "toml-keys"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "root"
+          ]
+        },
+        {
+          "description": "Files of JSON lines below a folder, each naming the Project it was\nwritten in on its first line, such as the `session_meta` line that opens\neach Codex session's `rollout-*.jsonl`. A file whose first line is no\nJSON object naming a folder records none.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the folder is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "files": {
+              "description": "The `/`-separated path of the files below the folder, where `*` and\n`?` stand for any name, such as `*/*/*/rollout-*.jsonl`.",
+              "type": "string"
+            },
+            "fields": {
+              "description": "The key paths in the first line of the fields that can name the\nProject, tried in turn.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "jsonl-heads"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "files",
+            "fields"
+          ]
+        },
+        {
+          "description": "A column of a table of a SQLite store, each text value of it naming a\nProject, such as the `cwd` of each thread Codex records in the `threads`\ntable of its `state_5.sqlite`. The store is opened read-only and closed\nstraight after. A store without the table records none.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the store is. It must not lie in a Project.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "table": {
+              "description": "The table's name.",
+              "type": "string"
+            },
+            "column": {
+              "description": "The column's name.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "sqlite-column"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "table",
+            "column"
           ]
         }
       ]
@@ -2142,6 +2269,11 @@
           "type": "boolean",
           "default": false
         },
+        "toml": {
+          "description": "Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.",
+          "type": "boolean",
+          "default": false
+        },
         "cached_at": {
           "description": "The key path, in the same file, of when the Agent cached the value:\nmilliseconds since 1970, or an RFC 3339 time, such as when VS Code\nfetched the account's policy. Omitted for a value the user writes.",
           "type": [
@@ -2202,6 +2334,17 @@
         },
         "competition": {
           "$ref": "#/$defs/Competition"
+        },
+        "merge": {
+          "description": "How the Agent combines same-named Entries into the one it uses, field\nby field. Omitted, the highest wins whole and Shadows the others.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Merge"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "checks": {
           "description": "The Agent's checks, in the order it applies them: an Entry's State\ncomes from the first it fails, and the others it fails are listed as\nsecondary reasons. Each check appears once.",
@@ -2344,6 +2487,20 @@
             "locations",
             "gate"
           ]
+        },
+        {
+          "description": "Entries never compete: each is an Item of its own, whatever its name, as\nCodex lists every skill it finds, same-named ones included.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "never"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
         }
       ]
     },
@@ -2397,6 +2554,40 @@
         }
       ]
     },
+    "Merge": {
+      "description": "How an Agent combines same-named Entries into the one server it uses,\nrather than letting the highest win whole. Each Entry that takes part is\nMerged, and the Item shows the server built, with the Entry each field\ncomes from.",
+      "oneOf": [
+        {
+          "description": "Tables merge key by key at any depth, from the lowest Entry up, and any\nother value of a higher Entry replaces the lower one's whole, arrays\nincluded, as Codex folds `[mcp_servers.<name>]` across its layers. An\nEntry may hold only some fields, such as only `enabled = false`.",
+          "type": "object",
+          "properties": {
+            "exclusive": {
+              "description": "Fields of which the built server may hold one at most, such as\nCodex's `command` and `url`: holding more, it is rejected, every\nEntry that takes part is Invalid, and the Agent is flagged as unable\nto start in the context.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "enabled": {
+              "description": "The field whose `false` in the built server turns it off, such as\nCodex's `enabled`: every Entry of the Item is then Disabled, by the\nEntry the field comes from.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "deep-merge"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
+        }
+      ]
+    },
     "Check": {
       "description": "One of an Agent's checks that decides an Entry's State.",
       "oneOf": [
@@ -2426,9 +2617,14 @@
           "const": "rules"
         },
         {
-          "description": "A same-named Entry the Agent ranks higher is not Disabled: Shadowed.",
+          "description": "A same-named Entry the Agent ranks higher is not Disabled: Shadowed.\nWhere the kind merges, each Entry that takes part, with another, in\nthe server the Agent builds is Merged instead.",
           "type": "string",
           "const": "precedence"
+        },
+        {
+          "description": "The server the Agent builds from the Item's Entries holds fields that\nexclude each other: every Entry that takes part is Invalid, with\n`transport_conflict`. Required when the kind merges, and refused\notherwise.",
+          "type": "string",
+          "const": "merge"
         },
         {
           "description": "The Entry lacks the minimal shape its location declares: Invalid.\nRequired when a location of the kind declares a shape, and refused\notherwise.",
@@ -3031,6 +3227,46 @@
             "sources",
             "hash",
             "prompt"
+          ]
+        },
+        {
+          "description": "Locations in each folder from a Project's root down to its own folder\nthat the Agent reads only once the user trusts a folder, as Codex reads a\n`<folder>\\.codex\\config.toml`: it looks up the folder itself, then the\nProject's root, the folder holding `.git`, then the main checkout of its\ngit repository, among the keys of a table of folders, and the first it\nfinds with a trust level decides. An Entry of a folder whose level is not\n`trusted`, or that none of them has, is Blocked, with `untrusted_folder`.\nKeys compare as paths, without regard to case. config-digger never\ntrusts a folder.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need trust, each in a Project.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the tables of folders are, each keyed by a folder's path,\nhighest first: the first that gives a folder a trust level decides.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "field": {
+              "description": "The field of a folder's record that holds its trust level.",
+              "type": "string"
+            },
+            "trusted": {
+              "description": "The trust level that trusts the folder.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "project-trust"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "field",
+            "trusted"
           ]
         }
       ]

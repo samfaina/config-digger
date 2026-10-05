@@ -132,6 +132,9 @@ impl Harness {
             // homes and Projects the user added or hid) stay in the temporary folder.
             .env("LOCALAPPDATA", self.local_app_data())
             .env("APPDATA", self.roaming_app_data())
+            // The machine's Codex layer stays in the temporary folder too.
+            .env("ProgramData", self.root.path().join("ProgramData"))
+            .env_remove("CODEX_HOME")
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("CLAUDE_USER_DATA_DIR")
             .env_remove("RUST_LOG");
@@ -553,6 +556,7 @@ fn list_json_prints_one_document_with_schema_version() {
             "source": {"kind": "default"},
             "hidden": false,
             "not_read": null,
+            "mirror": null,
             "no_configuration": null,
             "scopes": ["managed", "local", "project", "user", "plugin"],
             "installations": [],
@@ -3020,4 +3024,53 @@ fn disable_of_a_vs_code_server_while_code_is_closed_writes_its_sqlite_store() {
     assert_eq!(document["result"]["verify"], "verified");
     let enablement: Value = serde_json::from_str(&vscode.enablement()).unwrap();
     assert_eq!(enablement, json!([["mcp.config.usrlocal.fetch", false]]));
+}
+
+#[test]
+fn show_of_a_merged_codex_server_prints_the_server_codex_builds_and_where_each_field_comes_from() {
+    let harness = Harness::new()
+        .with_file(
+            ".codex/config.toml",
+            "[mcp_servers.docs]\nargs = [\"--user\"]\n",
+        )
+        .with_cwd_file(
+            "ProgramData/OpenAI/Codex/config.toml",
+            "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        );
+    let user = locator(
+        &harness.path(".codex").join("config.toml"),
+        "mcp_servers.docs",
+    );
+
+    let run = harness.run(&["show", "docs", "--no-project", "--wide"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("Merged"), "{}", run.stdout);
+    let builds = run
+        .stdout
+        .lines()
+        .position(|line| line.trim() == "Codex builds:")
+        .unwrap_or_else(|| panic!("no built server:\n{}", run.stdout));
+    let args = run
+        .stdout
+        .lines()
+        .skip(builds)
+        .find(|line| line.trim_start().starts_with("args"))
+        .unwrap_or_else(|| panic!("no origin of `args`:\n{}", run.stdout));
+    assert!(args.contains(&user), "{}", run.stdout);
+}
+
+#[test]
+fn homes_list_labels_orca_s_codex_home_as_mirrored() {
+    let harness = Harness::new().with_file(".codex/config.toml", "");
+    let orca = harness
+        .roaming_app_data()
+        .join("orca/codex-runtime-home/home/config.toml");
+    std::fs::create_dir_all(orca.parent().unwrap()).unwrap();
+    std::fs::write(&orca, "").unwrap();
+
+    let run = harness.run(&["homes", "list", "--wide"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.contains("Mirrored by Orca"), "{}", run.stdout);
 }
