@@ -1,8 +1,9 @@
 //! Task-level commands: each one is a thin async wrapper that runs the
 //! synchronous core on a blocking thread.
 
+use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
 use crate::session::{self, Session};
-use config_digger_core::api::{self, Backup, Core, Inventory};
+use config_digger_core::api::{self, Backup, Core, Inventory, WarningClass};
 use config_digger_core::ports::Ports;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -104,14 +105,101 @@ pub async fn open_location(app: AppHandle, path: PathBuf) -> Result<(), api::Err
     .await
 }
 
-/// Shows `path`, a location the inventory shows or a backup copy of one,
-/// selected in Explorer.
+/// Shows `path`, a location the inventory shows, a backup copy of one, or
+/// the backup folder of an Operation the dialog executed, selected in
+/// Explorer.
 #[tauri::command]
 #[specta::specta]
 pub async fn reveal_location(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
     blocking(move || {
-        ensure_shown(&app, &path)?;
+        if !app.state::<ActionsState>().reported(&path) {
+            ensure_shown(&app, &path)?;
+        }
         select_in_explorer(&path)
+    })
+    .await
+}
+
+/// The plans the action dialog holds, once one was planned.
+#[derive(Default)]
+pub struct ActionsState(Mutex<Option<Actions>>);
+
+impl ActionsState {
+    fn lock(&self) -> MutexGuard<'_, Option<Actions>> {
+        // A panic in another command leaves the plans as they were.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Runs `task` on the plans, starting with none on its first call.
+    fn with<T>(
+        &self,
+        task: impl FnOnce(&mut Actions) -> Result<T, api::Error>,
+    ) -> Result<T, api::Error> {
+        let mut actions = self.lock();
+        if actions.is_none() {
+            *actions = Some(Actions::new(Core::new(Ports::real())?));
+        }
+        task(actions.as_mut().expect("set above"))
+    }
+
+    /// Whether `path` is the backup folder of an Operation executed here.
+    fn reported(&self, path: &Path) -> bool {
+        self.lock()
+            .as_ref()
+            .is_some_and(|actions| actions.can_reveal(path))
+    }
+}
+
+/// Plans `request` against what the disk holds now, without writing
+/// anything, and holds the plan under the id the preview carries.
+#[tauri::command]
+#[specta::specta]
+pub async fn plan_action(
+    app: AppHandle,
+    request: ActionRequest,
+) -> Result<ActionPreview, api::Error> {
+    blocking(move || {
+        app.state::<ActionsState>()
+            .with(|actions| actions.plan(&request))
+    })
+    .await
+}
+
+/// Executes the plan held under `plan_id` with the warnings the user
+/// acknowledged, and drops it.
+#[tauri::command]
+#[specta::specta]
+pub async fn execute_plan(
+    app: AppHandle,
+    plan_id: String,
+    acknowledged: Vec<WarningClass>,
+) -> Result<Executed, api::Error> {
+    let result = blocking(move || {
+        app.state::<ActionsState>()
+            .with(|actions| actions.execute(&plan_id, &acknowledged))
+    })
+    .await;
+    match &result {
+        Ok(Executed::Applied { outcome }) => {
+            tracing::info!(operation = %outcome.operation, "operation applied")
+        }
+        Ok(Executed::Replanned { .. }) => tracing::info!("stale preview planned again"),
+        Err(error) => tracing::warn!(code = error.code.code(), "operation not applied"),
+    }
+    result
+}
+
+/// Drops the plan held under `plan_id`, as when the dialog is cancelled.
+#[tauri::command]
+#[specta::specta]
+pub async fn cancel_plan(app: AppHandle, plan_id: String) -> Result<(), api::Error> {
+    blocking(move || {
+        app.state::<ActionsState>().with(|actions| {
+            actions.cancel(&plan_id);
+            Ok(())
+        })
     })
     .await
 }

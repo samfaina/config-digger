@@ -7,6 +7,9 @@ fn main() {
         "backups_of",
         "open_location",
         "reveal_location",
+        "plan_action",
+        "execute_plan",
+        "cancel_plan",
     ]);
 
     // Tauri embeds its Windows application manifest (Common Controls v6) in

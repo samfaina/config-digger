@@ -3,7 +3,8 @@
 //! an Agent that reads it runs, and the hints its result adds.
 
 use config_digger_core::api::{
-    Action, BlockCode, Context, Core, ErrorCode, Plan, ScanOptions, Targets, WarningClass,
+    Action, BlockCode, Context, Core, ErrorCode, Plan, ScanOptions, StoreClass, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::RunningProcess;
 use config_digger_core::ports::fake::{
@@ -353,6 +354,36 @@ fn a_write_to_a_sqlite_store_while_its_agent_runs_is_blocked_whatever_is_acknowl
         error.message
     );
     assert_eq!(fs.contents(store()).unwrap(), STORE.as_bytes());
+}
+
+/// The store class of each file the plan writes, as its preview tags it.
+fn store_classes(plan: &Plan) -> Vec<(PathBuf, StoreClass)> {
+    plan.preview()
+        .files
+        .iter()
+        .map(|file| (file.path.clone(), file.store_class))
+        .collect()
+}
+
+#[test]
+fn the_preview_tags_each_file_with_its_store_class_whether_or_not_its_agent_runs() {
+    let fs = fixture();
+    let core = core(&fs, &[]);
+    assert_eq!(
+        store_classes(&remove(&core, "notes")),
+        [(claude_json(), StoreClass::RewrittenWhileRunning)]
+    );
+    assert_eq!(
+        store_classes(&remove(&core, "linear")),
+        [(mcp_json(), StoreClass::Plain)]
+    );
+
+    let fs = store_fs();
+    let core = core_with(&fs, SQLITE_AGENT, &FakeProcesses::default());
+    assert_eq!(
+        store_classes(&remove(&core, "search")),
+        [(store(), StoreClass::Sqlite)]
+    );
 }
 
 #[test]

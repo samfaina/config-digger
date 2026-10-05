@@ -1,9 +1,9 @@
-import type { AlsoReadBy, Entry } from "./bindings";
+import type { AlsoReadBy, Entry, Verb } from "./bindings";
 import { copy, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import { LinkTag, Location } from "./Location";
 import { StatePill } from "./StatePill";
-import { entryActions, type ActionVerb } from "./view";
+import { entryActions } from "./view";
 
 type Props = {
   entry: Entry;
@@ -17,7 +17,7 @@ type Props = {
   onShowWinner: (locator: string) => void;
   /** Opens the Item of another Agent that reads this Entry, when that home is listed. */
   onReader: ((reader: AlsoReadBy) => void) | null;
-  onAction: (verb: ActionVerb, entry: Entry) => void;
+  onAction: (verb: Verb, entry: Entry) => void;
   notify: Notify;
 };
 
