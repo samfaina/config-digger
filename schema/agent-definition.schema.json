@@ -129,6 +129,13 @@
       "items": {
         "$ref": "#/$defs/FeatureGateDefinition"
       }
+    },
+    "machine_files": {
+      "description": "Files on the machine that the Agent reads somewhere else while an\nenvironment variable says so, or only while an administrator owns\nthem. Every anchor that names one's path reads it so.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/MachineFileDefinition"
+      }
     }
   },
   "additionalProperties": false,
@@ -763,6 +770,14 @@
             "type": "string"
           }
         },
+        "shared_roots": {
+          "description": "The names of roots other Agents read too, such as `~\\.agents\\skills`,\nwhich do not on their own say the Agent keeps its configuration in\nthe home: it is found when any other root exists.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
         "process": {
           "description": "How to tell that the Agent of this home is running, in place of the\ndefinition's `[process]`, such as for a home read by another\nInstallation of the Agent.",
           "anyOf": [
@@ -992,7 +1007,7 @@
               "$ref": "#/$defs/Anchor"
             },
             "root": {
-              "description": "The key path of the object whose keys are Projects.",
+              "description": "The key path of the object whose keys are Projects. Empty for the\nfile's own keys, as Gemini CLI's `trustedFolders.json` holds them.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -1247,6 +1262,11 @@
           "type": "boolean",
           "default": false
         },
+        "same_names_invalid": {
+          "description": "Whether the Agent refuses plugins that share a name, as Gemini CLI\nrefuses two extensions whose manifests give one `name`: the Entries\nof each are Invalid, with `duplicate_plugin_name`.",
+          "type": "boolean",
+          "default": false
+        },
         "uninstall": {
           "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out. Without it,\nthe Agent uninstalls a plugin only through its own interface.",
           "type": [
@@ -1341,6 +1361,17 @@
               "anyOf": [
                 {
                   "$ref": "#/$defs/InstallRecords"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "linked": {
+              "description": "A file in a plugin's folder that can say the plugin's files are in\nanother folder, as for an extension Gemini CLI links.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LinkedFolder"
                 },
                 {
                   "type": "null"
@@ -1475,6 +1506,35 @@
         "anchor",
         "root",
         "version"
+      ]
+    },
+    "LinkedFolder": {
+      "description": "A strict JSON file in a plugin's folder, such as the\n`.gemini-extension-install.json` Gemini CLI writes for each extension:\nwhile its `kind_field` holds `kind`, such as `type` holding `link`, the\nplugin's files are in the absolute folder its `folder` field names, which\nthe user owns.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "A `/`-separated path relative to the plugin's folder.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "The field that names the folder.",
+          "type": "string"
+        },
+        "kind_field": {
+          "description": "The field that says how the plugin was installed.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "What that field holds for a linked plugin.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "folder",
+        "kind_field",
+        "kind"
       ]
     },
     "JsonDialect": {
@@ -1917,6 +1977,11 @@
           "description": "Lower case, each run of characters other than `a`-`z` and `0`-`9`\nreplaced by one `-`, with no `-` at either end.",
           "type": "string",
           "const": "lowercase-hyphens"
+        },
+        {
+          "description": "Each character a Windows file name cannot hold, `: \\ / < > * ? \" |`,\nreplaced by `-`, as Gemini CLI names a skill.",
+          "type": "string",
+          "const": "path-chars"
         }
       ]
     },
@@ -2059,7 +2124,7 @@
       "description": "How an Agent writes a reference to a value it reads elsewhere, such as an\nenvironment variable. A value made only of references is not a Secret.",
       "oneOf": [
         {
-          "description": "`${NAME}`, where `NAME` is a letter or `_` followed by letters, digits\nand `_`, or one of `names` when they are set, plus\n`${namespace:argument}` for each listed namespace, and\n`${NAME<separator>default}` when a default separator is set, whose\ndefault is literal text.",
+          "description": "`${NAME}`, where `NAME` is a letter or `_` followed by letters, digits\nand `_`, or one of `names` when they are set, plus\n`${namespace:argument}` for each listed namespace, and\n`${NAME<separator>default}` when a default separator is set, whose\ndefault is literal text, and with `bare`, `$NAME`.",
           "type": "object",
           "properties": {
             "namespaces": {
@@ -2094,6 +2159,11 @@
                 "type": "string"
               }
             },
+            "bare": {
+              "description": "Whether `$NAME` without braces is a reference too, `NAME` being the\nletters, digits and `_` that follow, as Gemini CLI reads it.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "braces"
@@ -2123,6 +2193,17 @@
         },
         "variable_names": {
           "description": "Fields that hold the name of a variable, such as Codex's\n`bearer_token_env_var`: never a Secret, whatever else says so.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
+        },
+        "urls": {
+          "description": "Fields that hold a URL, besides `url`, such as Gemini CLI's\n`httpUrl`: their userinfo and query values are Secrets, and the rest\nof the URL, its host included, is shown.",
           "type": "array",
           "items": {
             "type": "array",
@@ -2722,6 +2803,59 @@
           "required": [
             "block"
           ]
+        },
+        {
+          "description": "The highest Entry of the locations outside `under` lies over the highest\nof `under`, as Gemini CLI lays a settings server over an extension's\nserver of the same name: each wins whole among its own, and the two make\none server, field by field. A field of the Entry on top replaces the one\nunderneath, except the objects of `merged`, which merge key by key, the\nlists of `union`, which keep the items of both, and those of\n`intersection`, which keep, once both hold one, the items both hold.",
+          "type": "object",
+          "properties": {
+            "under": {
+              "description": "The ids of the locations whose Entries lie underneath, such as\nGemini CLI's extension servers.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "merged": {
+              "description": "Objects merged key by key, such as `env`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "union": {
+              "description": "Lists holding the items of both Entries, such as `excludeTools`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "intersection": {
+              "description": "Lists holding the items both Entries list, such as `includeTools`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "cli_lists_overlay": {
+              "description": "The Agent's own command that lists the server built as the Entry on\ntop alone, such as `gemini mcp list`: the Entry underneath notes\n`cli_view_differs`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "overlay-fields"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "under"
+          ]
         }
       ]
     },
@@ -2744,7 +2878,7 @@
           "const": "approval"
         },
         {
-          "description": "The user has not trusted the Entry's Project: Blocked, with\n`untrusted_folder`. Required when a gate of the kind is trusted\nfolders, and refused otherwise.",
+          "description": "The user has not trusted the Entry's Project: Blocked, with\n`untrusted_folder`. Required when a gate of the kind is trusted\nfolders, project trust or folder trust, and refused otherwise.",
           "type": "string",
           "const": "trust"
         },
@@ -2759,7 +2893,7 @@
           "const": "precedence"
         },
         {
-          "description": "The server the Agent builds from the Item's Entries holds fields that\nexclude each other: every Entry that takes part is Invalid, with\n`transport_conflict`. Required when the kind merges, and refused\notherwise.",
+          "description": "The server the Agent builds from the Item's Entries holds fields that\nexclude each other: every Entry that takes part is Invalid, with\n`transport_conflict`. Required when the kind merges with exclusive\nfields, and refused otherwise.",
           "type": "string",
           "const": "merge"
         },
@@ -2772,6 +2906,11 @@
           "description": "The Agent skips the skill because of its `SKILL.md` or its folder's\nname: Invalid. Required when a location of the kind is a folder of\nskill folders, and refused otherwise.",
           "type": "string",
           "const": "frontmatter"
+        },
+        {
+          "description": "The Agent refuses the plugin the Entry is part of, since another of\nits list has the same name: Invalid, with `duplicate_plugin_name`.\nRequired when a location of the kind is in plugins whose list refuses\nsame names, and refused otherwise.",
+          "type": "string",
+          "const": "plugin-name"
         }
       ]
     },
@@ -3449,6 +3588,63 @@
             "field",
             "trusted"
           ]
+        },
+        {
+          "description": "Locations whose Entries the Agent uses only when it starts in a folder\nthe user trusts, user Entries included, as Gemini CLI starts no server at\nall in a folder it does not trust: in the context of a Project no rule\ntrusts, each is Blocked, with `untrusted_folder`, and with no Project,\neach notes that such a folder Blocks it. A source holds an object of\nrules, each a folder's path and its level; of the rules for the\nProject's folder or a folder above it, the one whose path is written\nlongest decides. config-digger never trusts a folder.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries need trust.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "description": "Where the objects of rules are, the first that holds one read.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "trusted": {
+              "description": "The levels that trust their rule's folder, such as `TRUST_FOLDER`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "parent": {
+              "description": "The levels that trust the folder above their rule's, such as\n`TRUST_PARENT`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "trust_all": {
+              "description": "A setting that, while it is met, trusts every folder, such as Gemini\nCLI's `security.folderTrust.enabled: false`.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SettingIs"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "folder-trust"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations",
+            "sources",
+            "trusted"
+          ]
         }
       ]
     },
@@ -3675,14 +3871,32 @@
           }
         },
         "lookup": {
-          "description": "Where the Agent caches the gate's value.",
-          "$ref": "#/$defs/GateLookup"
+          "description": "Where the Agent caches the gate's value. Omitted when it caches it\nnowhere config-digger reads, such as the admin controls Gemini CLI\nfetches when it signs in.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GateLookup"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "bypass": {
-          "description": "When the Agent ignores its cache and uses its own default.",
+          "description": "When the Agent ignores its cache and uses its own default. Only a\ngate with a lookup takes one.",
           "anyOf": [
             {
               "$ref": "#/$defs/Bypass"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "when": {
+          "description": "For a gate without a lookup, when the Agent fetches it at all, such\nas Gemini CLI's admin controls for an account signed in through\nGoogle: while this setting holds, each Entry the gate affects gets\nthe caveat `gate_may_apply`, since the vendor's side may turn it off\nwhere config-digger cannot see, and otherwise none.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettingOneOf"
             },
             {
               "type": "null"
@@ -3694,8 +3908,7 @@
       "required": [
         "name",
         "assumed",
-        "affects",
-        "lookup"
+        "affects"
       ]
     },
     "GateLookup": {
@@ -3908,6 +4121,62 @@
       "required": [
         "anchor",
         "key_path"
+      ]
+    },
+    "SettingOneOf": {
+      "description": "Whether a setting the Agent reads in layers holds one of some values:\nthe first of its sources that holds it decides, and while none does, it\ndoes not hold.",
+      "type": "object",
+      "properties": {
+        "sources": {
+          "description": "Where the setting is, highest first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingPlace"
+          }
+        },
+        "one_of": {
+          "description": "The values it may hold, such as the ways of signing in that fetch\nan organisation's controls.",
+          "type": "array",
+          "items": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sources",
+        "one_of"
+      ]
+    },
+    "MachineFileDefinition": {
+      "description": "A file on the machine, by the path the definition's machine anchors\nname it with, such as Gemini CLI's system settings, which\n`GEMINI_CLI_SYSTEM_SETTINGS_PATH` moves. It is where its variable says\nwhile that is set to an absolute path; else, with `beside`, in the folder\nof that other file, wherever that is, under its own name; else at its\npath.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Starts with `%NAME%` or a drive; `/`-separated, without wildcards.",
+          "type": "string"
+        },
+        "variable": {
+          "description": "The environment variable that holds the path of the file the Agent\nreads instead.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "beside": {
+          "description": "The path of another of `machine_files`, one with no `beside` of its\nown, whose folder this file follows, such as Gemini CLI's\n`system-defaults.json` beside its system settings.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "admin_owned": {
+          "description": "Whether the Agent reads the file only while only an administrator\ncan change it and the folders above it, as Gemini CLI reads its\nsystem settings: otherwise its Entries are Unread, and nothing it\nholds is read.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
       ]
     }
   }

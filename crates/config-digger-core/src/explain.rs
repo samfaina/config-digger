@@ -81,6 +81,27 @@ pub(crate) fn merged(agent_name: &str, name: &str, count: usize, fields: &[Vec<S
     }
 }
 
+/// The note on an Entry that lies underneath the Entry at `over`: the
+/// Agent's own `command` lists the server built from both as that one alone.
+pub(crate) fn cli_view_differs(agent_name: &str, command: &str, over: &str) -> String {
+    format!(
+        "`{command}` lists this server as {over} alone and hides this Entry, though {agent_name} builds the server it runs from both."
+    )
+}
+
+/// An Invalid Entry's reason: `agent_name` refuses the plugin `plugin` it
+/// is part of, since another of its plugins has that name.
+pub(crate) fn duplicate_plugin_name(agent_name: &str, plugin: &str) -> Reason {
+    Reason {
+        code: ReasonCode::DuplicatePluginName,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Invalid: {agent_name} refuses to load `{plugin}`, since another of its extensions has that name."
+        ),
+    }
+}
+
 /// An Invalid Entry's reason: the server `agent_name` builds from the
 /// Entries of `name` holds `fields`, which exclude each other.
 pub(crate) fn transport_conflict(agent_name: &str, name: &str, fields: &[&str]) -> Reason {
@@ -197,6 +218,21 @@ pub(crate) fn source_skipped(agent_name: &str, settings: &str, read: &Path) -> R
         sentence: format!(
             "{agent_name} never reads it: it reads its {settings} settings only from the first source that holds any, which is {}.",
             read.display()
+        ),
+    }
+}
+
+/// An Unread Entry's reason: `agent_name` skips the system file at `path`
+/// unread, since someone other than an administrator can change it or a
+/// folder above it.
+pub(crate) fn system_file_not_admin_owned(agent_name: &str, path: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::SystemFileNotAdminOwned,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} never reads it: it skips {} with a security warning, since someone other than an administrator can change it or a folder above it.",
+            path.display()
         ),
     }
 }
@@ -687,6 +723,14 @@ pub(crate) fn untrusted_folder(agent_name: &str, project: &Path) -> Reason {
             project.display()
         ),
     }
+}
+
+/// The note on an Entry, with no Project, that `agent_name` uses it only when
+/// it starts in a folder the user trusts.
+pub(crate) fn untrusted_folder_blocks(agent_name: &str) -> String {
+    format!(
+        "{agent_name} uses it only in a folder you trust: started in any other, it Blocks every server, this one included. Pick a Project to see whether it trusts that folder."
+    )
 }
 
 /// A Blocked Entry's reason: `agent_name` has not trusted the Entry `name`
@@ -1202,6 +1246,14 @@ pub(crate) fn cached_copy(agent_name: &str, at: Option<SystemTime>) -> String {
             "Read from the copy {agent_name} cached, at a time it does not record: what it copies may have changed since."
         ),
     }
+}
+
+/// The caveat of an Entry that depends on `agent_name`'s gate `gate`, which
+/// it fetches from the vendor's side and caches nowhere config-digger reads.
+pub(crate) fn gate_may_apply(agent_name: &str, gate: &str) -> String {
+    format!(
+        "{agent_name} fetches its gate {gate} when it signs in and keeps it nowhere config-digger can read: an organisation admin may turn this off there."
+    )
 }
 
 /// The caveat of an Entry that depends on `agent_name`'s gate `gate`,

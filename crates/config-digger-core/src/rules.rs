@@ -115,7 +115,8 @@ fn source_of(value: &ScannedSetting) -> usize {
         SettingOwner::Rule { source, .. }
         | SettingOwner::Gate { source, .. }
         | SettingOwner::Competition { source }
-        | SettingOwner::Condition { source, .. } => source,
+        | SettingOwner::Condition { source, .. }
+        | SettingOwner::FeatureGate { source, .. } => source,
     }
 }
 

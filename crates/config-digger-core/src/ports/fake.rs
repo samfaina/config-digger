@@ -57,6 +57,8 @@ struct FakeFiles {
     rewrites: Vec<(PathBuf, Vec<u8>)>,
     /// The lowercased paths of the files whose reads are denied.
     denied: BTreeSet<String>,
+    /// Files and folders someone other than an administrator can change.
+    not_admin_owned: Vec<PathBuf>,
     /// The `ItemTable` of each SQLite store, by the store's path as
     /// spelled on disk.
     sqlite: BTreeMap<PathBuf, BTreeMap<String, String>>,
@@ -161,6 +163,15 @@ impl FakeFileSystem {
     /// given, and a folder moved there has one file changed.
     pub fn corrupting_writes_below(self, folder: impl Into<PathBuf>) -> Self {
         self.files().corrupting.push(folder.into());
+        self
+    }
+
+    /// The file or folder at `path`, and so every file below it, lets
+    /// someone other than an administrator change it. Every other one is
+    /// administrators' alone.
+    pub fn not_admin_owned(self, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref().to_path_buf();
+        self.files().not_admin_owned.push(path);
         self
     }
 
@@ -425,6 +436,16 @@ impl FileSystem for FakeFileSystem {
 
     fn exists(&self, path: &Path) -> bool {
         self.real_path(path).is_some()
+    }
+
+    fn admin_owned(&self, path: &Path) -> bool {
+        self.count_access();
+        let files = self.files();
+        let path = files.follow(path);
+        !files
+            .not_admin_owned
+            .iter()
+            .any(|known| strip_prefix(&path, known).is_some())
     }
 
     fn real_path(&self, path: &Path) -> Option<PathBuf> {

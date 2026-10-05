@@ -1463,6 +1463,12 @@ pub enum NoteCode {
     /// The skill manager is recognised only by the folder's name or where it
     /// is, which a folder made by hand there matches too.
     ProvenanceByNameOnly,
+    /// The Agent uses the Entry only when it starts in a folder the user
+    /// trusts, which config-digger cannot tell with no Project.
+    UntrustedFolderBlocks,
+    /// The Agent's own command that lists servers shows the server built
+    /// from this Entry and another as that other alone, hiding this one.
+    CliViewDiffers,
 }
 
 /// What Disable would do to an Entry in its context: write the Agent's own
@@ -1736,10 +1742,16 @@ pub enum ReasonCode {
     /// The Entry is in a source of settings the Agent skips, since it reads
     /// only the first that holds any.
     SourceSkipped,
+    /// The Entry is in a system file the Agent skips unread, since someone
+    /// other than an administrator can change it or a folder above it.
+    SystemFileNotAdminOwned,
     /// The Entry lacks the minimal shape the Agent requires of it.
     MalformedEntry,
     /// The Agent skips the skill because of its `SKILL.md` or its folder's name.
     MalformedSkill,
+    /// The Agent refuses the plugin the Entry is part of, since another of
+    /// its plugins has the same name.
+    DuplicatePluginName,
     /// config-digger parked the Entry in its parked-Entry store, out of the
     /// Agent's reach, since the Agent has no switch for it. Enable puts it
     /// back.
@@ -1897,6 +1909,10 @@ pub enum CaveatCode {
     /// The Entry competes with others by URL, and servers config-digger
     /// cannot see take part too, so one of them may win instead.
     UnseenServers,
+    /// The Entry depends on a Feature gate the Agent fetches from the
+    /// vendor's side and caches nowhere to read, such as an organisation's
+    /// controls, which may turn it off where config-digger cannot see.
+    GateMayApply,
     /// The Entry is read from a copy of configuration held elsewhere, such as
     /// in the user's account, as of when the Agent cached it.
     CachedCopy,

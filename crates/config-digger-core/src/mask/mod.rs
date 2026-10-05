@@ -3,7 +3,8 @@
 //!
 //! On the common server model, env and header values, a URL's userinfo and
 //! query values, and args after a token-like flag are Secrets; a location's
-//! definition marks more fields, and fields that hold a variable name. A
+//! definition marks more fields, other fields that hold a URL, and fields
+//! that hold a variable name. A
 //! reference in the Agent's interpolation syntax is not a Secret: a value
 //! made only of references is shown as it is, and in a mixed value only the
 //! literal text beyond a recognised prefix is masked.
@@ -228,6 +229,9 @@ impl Rules<'_> {
         }
         let secret = match (path.as_slice(), &*value) {
             ([field], Value::String(text)) if field == "url" => self.url(text).map(Value::String),
+            (_, Value::String(text)) if self.is_url_field(path) => {
+                self.url(text).map(Value::String)
+            }
             ([field], Value::Array(_)) if field == "args" => {
                 self.args(value, path, masked);
                 return;
@@ -465,6 +469,14 @@ impl Rules<'_> {
         self.location
             .secrets
             .fields
+            .iter()
+            .any(|field| matches(field, path))
+    }
+
+    fn is_url_field(&self, path: &[String]) -> bool {
+        self.location
+            .secrets
+            .urls
             .iter()
             .any(|field| matches(field, path))
     }

@@ -432,6 +432,7 @@ fn agents_lists_every_loaded_definition_with_the_homes_found() {
             ("VS Code".into(), true, vec![]),
             ("Cursor".into(), true, vec![]),
             ("Codex".into(), true, vec![]),
+            ("Gemini CLI".into(), true, vec![]),
             ("Other Agent".into(), false, vec![]),
         ]
     );

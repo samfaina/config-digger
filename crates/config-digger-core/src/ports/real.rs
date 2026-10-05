@@ -135,6 +135,77 @@ impl FileSystem for RealFileSystem {
         path.exists()
     }
 
+    /// Asks `Get-Acl` about the file and each folder above it, as Gemini
+    /// CLI does, the paths of the links resolved too: the crate forbids
+    /// the unsafe code that would read the permissions itself. The paths
+    /// reach PowerShell through the environment, never in the script.
+    #[cfg(windows)]
+    fn admin_owned(&self, path: &Path) -> bool {
+        use std::os::windows::process::CommandExt;
+
+        const SCRIPT: &str = r#"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$trusted = { param($sid) $sid -eq 'S-1-5-32-544' -or $sid -eq 'S-1-5-18' -or $sid -like 'S-1-5-80-*' -or $sid -eq 'S-1-3-0' -or $sid -eq 'S-1-3-1' }
+foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
+  try {
+    $acl = Get-Acl -LiteralPath $path
+    if (-not (& $trusted $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value)) { 'UNSAFE'; continue }
+    $writers = $acl.Access | Where-Object {
+      $_.AccessControlType -eq 'Allow' -and
+      $_.FileSystemRights -match 'Write|Modify|FullControl|CreateFiles|AppendData|CreateDirectories|Delete|TakeOwnership|ChangePermissions' -and
+      -not (& $trusted $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value)
+    }
+    if ($writers) { 'UNSAFE' } else { 'SAFE' }
+  } catch { 'UNSAFE' }
+}
+"#;
+        let mut paths: Vec<String> = Vec::new();
+        let real = self.real_path(path);
+        for found in acl_chain(path)
+            .into_iter()
+            .chain(real.iter().flat_map(|real| acl_chain(real)))
+        {
+            let found = found.display().to_string();
+            if !paths.iter().any(|known| known.eq_ignore_ascii_case(&found)) {
+                paths.push(found);
+            }
+        }
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
+            .arg(encoded_command(SCRIPT))
+            .env("CONFIG_DIGGER_ACL_PATHS", paths.join("\n"))
+            // The one PowerShell 7 sets keeps Windows PowerShell from loading `Get-Acl`.
+            .env_remove("PSModulePath")
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output();
+        let Ok(output) = output else {
+            return false;
+        };
+        // PowerShell can write progress records there too, as `#< CLIXML`.
+        let answers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|line| line.trim().to_owned())
+            .filter(|line| line == "SAFE" || line == "UNSAFE")
+            .collect();
+        answers.len() == paths.len() && answers.iter().all(|answer| answer == "SAFE")
+    }
+
+    /// Gemini CLI wants the file and each folder above it to belong to root
+    /// and be writable by no one else.
+    #[cfg(unix)]
+    fn admin_owned(&self, path: &Path) -> bool {
+        use std::os::unix::fs::MetadataExt;
+
+        path.ancestors()
+            .filter(|path| !path.as_os_str().is_empty())
+            .all(|path| {
+                std::fs::metadata(path)
+                    .is_ok_and(|found| found.uid() == 0 && found.mode() & 0o022 == 0)
+            })
+    }
+
     /// `canonicalize` asks Windows through `GetFinalPathNameByHandle`, which
     /// answers with a verbatim path whose `\\?\` prefix is dropped here.
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
@@ -310,6 +381,39 @@ impl FileSystem for RealFileSystem {
 
 /// Copies the folder `from` and everything below it to `to`. A link inside
 /// it is refused: copying it would copy what it points to, or never end.
+/// The file at `path` and each folder above it but the drive's root, whose
+/// permissions Gemini CLI leaves to whoever owns the drive.
+#[cfg(windows)]
+fn acl_chain(path: &Path) -> Vec<PathBuf> {
+    path.ancestors()
+        .filter(|path| path.parent().is_some() && !path.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .collect()
+}
+
+/// `script` as PowerShell's `-EncodedCommand` takes it: its UTF-16LE bytes
+/// in base64.
+#[cfg(windows)]
+fn encoded_command(script: &str) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut encoded = String::new();
+    for chunk in bytes.chunks(3) {
+        let group = chunk.iter().enumerate().fold(0u32, |group, (at, &byte)| {
+            group | u32::from(byte) << (16 - 8 * at)
+        });
+        for at in 0..4 {
+            if at <= chunk.len() {
+                let index = (group >> (18 - 6 * at)) & 0x3f;
+                encoded.push(char::from(ALPHABET[index as usize]));
+            } else {
+                encoded.push('=');
+            }
+        }
+    }
+    encoded
+}
+
 fn copy_folder(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::create_dir(to)?;
     for entry in std::fs::read_dir(from)? {

@@ -72,6 +72,9 @@ pub(crate) struct Snapshot {
     /// Each file read for a location that is a copy the Agent caches, with
     /// when it cached it, when the file says.
     pub cached: BTreeMap<PathBuf, Option<SystemTime>>,
+    /// The files each Agent, by its index, skips without reading them,
+    /// since someone other than an administrator can change them.
+    pub not_admin_owned: BTreeSet<(usize, PathBuf)>,
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -118,6 +121,9 @@ pub(crate) struct ScannedPlugin {
     pub project: Option<String>,
     /// Its version, as the Agent records it.
     pub version: Option<String>,
+    /// Another plugin of the same list has its name, and the Agent refuses
+    /// both.
+    pub name_shared: bool,
 }
 
 /// A value a rule or gate reads, at one place, for one Agent home.
@@ -163,6 +169,12 @@ pub(crate) enum SettingOwner {
     Condition {
         location: usize,
         condition: usize,
+        source: usize,
+    },
+    /// A source of the setting under which the Agent fetches the Feature
+    /// gate at `gate` among the definition's.
+    FeatureGate {
+        gate: usize,
         source: usize,
     },
 }
@@ -820,6 +832,7 @@ pub(crate) fn scan_as_if(
         storage: Vec::new(),
         cached: BTreeMap::new(),
     };
+    scanner.reader.not_admin_owned = not_admin_owned(definitions, &found, ports, &as_if);
 
     let settings = read_settings(definitions, ports, &mut scanner.reader);
     for home in &found {
@@ -1054,6 +1067,10 @@ pub(crate) fn scan_as_if(
         !settings
             .iter()
             .any(|known| known.agent_index == failure.agent_index && known.skips(&failure.path))
+            && !scanner
+                .reader
+                .not_admin_owned
+                .contains(&(failure.agent_index, failure.path.clone()))
             && !found.iter().any(|home| {
                 home.agent_index == failure.agent_index
                     && home.home == failure.home
@@ -1106,6 +1123,7 @@ pub(crate) fn scan_as_if(
         parked,
         storage: scanner.storage,
         cached: scanner.cached,
+        not_admin_owned: scanner.reader.not_admin_owned,
     })
 }
 
@@ -1183,6 +1201,28 @@ fn read_settings(
     scanned
 }
 
+/// The machine files that each Agent with a found home reads only while
+/// an administrator owns them, and that exist but someone else can change,
+/// by the Agent's index.
+fn not_admin_owned(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    ports: &Ports,
+    fs: &dyn FileSystem,
+) -> BTreeSet<(usize, PathBuf)> {
+    let agents: BTreeSet<usize> = found.iter().map(|home| home.agent_index).collect();
+    agents
+        .into_iter()
+        .flat_map(|agent_index| {
+            definitions[agent_index]
+                .admin_owned_files(ports.env.as_ref())
+                .into_iter()
+                .filter(|path| fs.exists(path) && !fs.admin_owned(path))
+                .map(move |path| (agent_index, path))
+        })
+        .collect()
+}
+
 /// The file of each managed-exclusive gate of each found Agent home that
 /// exists, whatever it holds.
 fn exclusive_files(
@@ -1235,8 +1275,11 @@ fn read_gates(
     for home in found {
         let definition = &definitions[home.agent_index];
         for gate in &definition.feature_gates {
-            let path = gate
-                .lookup
+            // A gate the Agent caches nowhere is read through its `when`.
+            let Some(cache) = &gate.lookup else {
+                continue;
+            };
+            let path = cache
                 .anchor()
                 .path(&home.roots, None)
                 .expect("validation puts a lookup in the Agent home");
@@ -1262,14 +1305,14 @@ fn read_gates(
             let reading = match bypassed {
                 Some(variable) => GateReading::Bypassed(variable),
                 None => {
-                    let text = match gate.lookup.store() {
+                    let text = match cache.store() {
                         GateStore::JsonFile => reader.peek(&path).ok().flatten().map(str::to_owned),
                         GateStore::SqliteItem(key) => {
                             reader.fs.read_sqlite_item(&path, key).ok().flatten()
                         }
                     };
                     text.and_then(|text| JsonFormat::STRICT.parse(&text).ok())
-                        .and_then(|document| gate.lookup.cached(&document, &gate.name))
+                        .and_then(|document| cache.cached(&document, &gate.name))
                         .map_or(GateReading::Unreadable, GateReading::Cached)
                 }
             };
@@ -1410,10 +1453,26 @@ fn read_rules(
                                 })
                             })
                     });
+            let feature_gate_sources =
+                definition
+                    .feature_gates
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(gate, block)| {
+                        block.when.iter().flat_map(move |when| {
+                            when.sources
+                                .iter()
+                                .enumerate()
+                                .map(move |(source, setting)| {
+                                    (SettingOwner::FeatureGate { gate, source }, setting)
+                                })
+                        })
+                    });
             let sources = rule_sources
                 .chain(gate_sources)
                 .chain(competition_sources)
-                .chain(condition_sources);
+                .chain(condition_sources)
+                .chain(feature_gate_sources);
             for (owner, setting) in sources {
                 let places = Places {
                     home,
@@ -1614,7 +1673,13 @@ impl Places<'_> {
                 unreadable.insert(path);
                 continue;
             }
-            let read = if sqlite {
+            // A file the Agent skips unread holds nothing for it.
+            let skipped = reader
+                .not_admin_owned
+                .contains(&(home.agent_index, path.clone()));
+            let read = if skipped {
+                Ok(None)
+            } else if sqlite {
                 if !reader.fs.exists(&path) {
                     continue;
                 }
@@ -1850,7 +1915,7 @@ fn find_homes(
                 let mut roots = home.roots_in(&folder);
                 // A definition home the user added keeps its id, so that it is
                 // the same home before and after its files appear.
-                let configured = roots.values().any(|root| fs.exists(root));
+                let configured = home.configured(&roots, fs);
                 let source = if configured {
                     HomeSource::of(home)
                 } else if added_to(&definition.agent.id, &folder) {
@@ -1932,7 +1997,7 @@ fn find_homes(
         }
         let definition = &definitions[agent_index];
         let mut roots = definition.homes[0].roots_in(&added.folder);
-        let configured = roots.values().any(|root| fs.exists(root));
+        let configured = definition.homes[0].configured(&roots, fs);
         roots.extend(machine_paths(definition, ports));
         found.push(FoundHome {
             agent_index,
@@ -1993,7 +2058,7 @@ fn mirrored(definition: &AgentDefinition, ports: &Ports) -> Vec<FoundMirror> {
             let roots = source.roots_in(&folder);
             let key = roots_key(fs, &roots);
             let known = found.iter().any(|other| roots_key(fs, &other.roots) == key);
-            if known || !roots.values().any(|root| fs.exists(root)) {
+            if known || !source.configured(&roots, fs) {
                 continue;
             }
             found.push(FoundMirror {
@@ -2086,6 +2151,13 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .flat_map(|location| &location.when)
         .filter_map(|condition| condition.setting())
         .flat_map(|setting| &setting.sources)
+        .chain(
+            definition
+                .feature_gates
+                .iter()
+                .filter_map(|gate| gate.when.as_ref())
+                .flat_map(|when| &when.sources),
+        )
         .map(|setting| &setting.anchor);
     definition
         .locations
@@ -2097,7 +2169,10 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .chain(settings)
         .chain(conditions)
         .filter_map(|anchor| anchor.machine())
-        .filter_map(|text| Some((text.to_owned(), paths::expand(text, ports.env.as_ref())?)))
+        .filter_map(|text| {
+            let path = definition.machine_path(text, ports.env.as_ref())?;
+            Some((text.to_owned(), path))
+        })
         .collect()
 }
 
@@ -2528,7 +2603,14 @@ impl Scanner<'_> {
                 scope: record.scope,
                 project,
                 version: record.version,
+                name_shared: false,
             });
+        }
+        if plugins.same_names_invalid {
+            let names: Vec<String> = found.iter().map(|plugin| plugin.name.clone()).collect();
+            for plugin in &mut found {
+                plugin.name_shared = names.iter().filter(|name| **name == plugin.name).count() > 1;
+            }
         }
         found
     }
@@ -2663,9 +2745,14 @@ impl Scanner<'_> {
                 if !plugin {
                     return None;
                 }
+                let linked = block.linked.as_ref().and_then(|linked| {
+                    let file = blocks::join_relative(&child, &linked.file);
+                    let text = String::from_utf8(fs.read(&file).ok()?).ok()?;
+                    linked.target(&text)
+                });
                 Some(PluginRecord {
                     version: versions.get(&id).cloned(),
-                    folder: child.display().to_string(),
+                    folder: linked.as_ref().unwrap_or(&child).display().to_string(),
                     id,
                     name: None,
                     scope: None,
@@ -3642,6 +3729,9 @@ struct Reader<'p> {
     items: BTreeMap<(PathBuf, String), Result<Option<String>, ReadFailureKind>>,
     reported: BTreeSet<(usize, String, PathBuf)>,
     failures: Vec<ScannedReadFailure>,
+    /// The files each Agent, by its index, skips without reading them, since
+    /// someone other than an administrator can change them.
+    not_admin_owned: BTreeSet<(usize, PathBuf)>,
 }
 
 impl<'p> Reader<'p> {
@@ -3653,6 +3743,7 @@ impl<'p> Reader<'p> {
             items: BTreeMap::new(),
             reported: BTreeSet::new(),
             failures: Vec::new(),
+            not_admin_owned: BTreeSet::new(),
         }
     }
 
