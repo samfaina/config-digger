@@ -503,6 +503,8 @@ impl Targeted<'_> {
         let mut planned_folders: Vec<PlannedFolder> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
         let mut parks: Vec<&ScannedEntry> = Vec::new();
+        // The names written to switches that hold them in every context.
+        let mut by_name: Vec<String> = Vec::new();
         for entry in self.entries {
             // Its switches would be offered as for any Entry of the Project.
             if entry.state == State::Unread {
@@ -533,8 +535,12 @@ impl Targeted<'_> {
                             edits,
                             syntax,
                             sqlite,
+                            by_name_everywhere,
                             ..
                         } => {
+                            if by_name_everywhere && !by_name.contains(&scanned.name) {
+                                by_name.push(scanned.name.clone());
+                            }
                             // Entries Disabled by one name share its switch.
                             let shared = by_file.iter().any(|file| {
                                 file.path == path
@@ -603,6 +609,11 @@ impl Targeted<'_> {
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
+                        if disable::by_name_everywhere(hit.mechanism)
+                            && !by_name.contains(&scanned.name)
+                        {
+                            by_name.push(scanned.name.clone());
+                        }
                         let sqlite = hit.mechanism.switch().sqlite();
                         let syntax = hit.mechanism.switch().syntax();
                         for edit in hit.enable_edits() {
@@ -643,7 +654,7 @@ impl Targeted<'_> {
         )
         .map_err(Error::unexpected)?;
         let (changes, effective) = self.reach(&after);
-        let wide = self.wide_reach(&changes);
+        let wide = self.wide_reach(&changes, &by_name);
         self.planned(files, planned_folders, changes, effective, wide)
     }
 
@@ -938,7 +949,9 @@ impl Targeted<'_> {
     /// than its own. An Entry that only wins or loses against one that the
     /// switches reach is not reached itself. An Entry reached in every
     /// context, or in every other one when it is targeted, is named once.
-    fn wide_reach(&self, changes: &[Change]) -> Option<Warning> {
+    /// Switches written for `by_name`, names they hold in every context,
+    /// reach every Entry of those names, in all projects, wherever it is.
+    fn wide_reach(&self, changes: &[Change], by_name: &[String]) -> Option<Warning> {
         let reached: Vec<&Change> = changes
             .iter()
             .filter(|change| {
@@ -980,9 +993,9 @@ impl Targeted<'_> {
                 (!targeted(&locator)).then_some(Reached::Here(locator))
             })
             .collect();
-        (!others.is_empty()).then(|| Warning {
+        (!others.is_empty() || !by_name.is_empty()).then(|| Warning {
             class: WarningClass::WideReach,
-            sentence: explain::wide_reach(self.action, &others),
+            sentence: explain::wide_reach(self.action, &others, by_name),
         })
     }
 

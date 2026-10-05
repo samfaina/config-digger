@@ -186,10 +186,9 @@ fn set_for<'a>(
     // default the Agent takes when no layer holds a value.
     let mut by_default: Option<Hit> = None;
     // The folder of the context's Project, which path rules are read for.
-    let folder = project.and_then(|key| {
-        let project = snapshot.projects.iter().find(|known| known.key == key)?;
-        Some(project.path.as_path())
-    });
+    let folder = project
+        .and_then(|key| snapshot.project(key))
+        .map(|project| project.path.as_path());
     let switched = definition
         .rules(location.kind)
         .disable
@@ -293,6 +292,9 @@ pub(crate) enum Choice {
         edits: Vec<Edit>,
         syntax: Syntax,
         sqlite: bool,
+        /// The switch holds the Entry by its name in every context, so that
+        /// it reaches every Entry of that name wherever it is.
+        by_name_everywhere: bool,
         /// What Disable writes, as a sentence.
         sentence: String,
     },
@@ -379,17 +381,20 @@ pub(crate) fn choose(
     let mut versioned: Vec<PathBuf> = Vec::new();
     let mut unreadable: Vec<PathBuf> = Vec::new();
     let mut needs_project = false;
+    // A switch of path rules needs a Project's folder to write a rule for.
+    let mut needs_folder = false;
     let mut unrecorded = false;
     for (index, mechanism) in switched {
         let switch = mechanism.switch();
         let project_key = match (mechanism.context(), project) {
             (MechanismContext::Project, None) => {
                 needs_project = true;
+                needs_folder |= matches!(mechanism, Switched::PathRules(_));
                 continue;
             }
-            // Path rules in a file for every Project are read for this one.
             (MechanismContext::Project, Some(project)) if switch.per_project() => Some(project.key),
-            _ => None,
+            // Path rules in a file for every Project are read for this one.
+            (MechanismContext::Project, Some(_)) | (MechanismContext::All, _) => None,
         };
         let context = project.map(|project| (project.key, project.path));
         let Some(path) = snapshot.file_for(entry, &switch.anchor, context) else {
@@ -438,6 +443,7 @@ pub(crate) fn choose(
             edits,
             syntax: switch.syntax(),
             sqlite: switch.sqlite(),
+            by_name_everywhere: by_name_everywhere(mechanism),
             sentence,
         });
     }
@@ -472,6 +478,11 @@ pub(crate) fn choose(
         (
             DisableNotOffered::GitVersioned,
             explain::disable_only_in_versioned(agent, &versioned, needs_project),
+        )
+    } else if needs_folder {
+        (
+            DisableNotOffered::NoMechanism,
+            explain::disable_needs_folder(agent),
         )
     } else {
         (
@@ -600,6 +611,7 @@ fn through_merged_field(
             edits,
             syntax,
             sqlite: false,
+            by_name_everywhere: false,
             sentence,
         });
     }
@@ -669,6 +681,12 @@ pub(crate) fn failed_switch_files(
         }
     }
     files
+}
+
+/// Whether the switch of `mechanism` holds Entries by their names in every
+/// context, so that a write reaches every Entry of a name wherever it is.
+pub(crate) fn by_name_everywhere(mechanism: Switched) -> bool {
+    mechanism.target() == MechanismTarget::Name && mechanism.context() == MechanismContext::All
 }
 
 /// The Scope the plugin of `entry` is installed at, as the Agent records it.

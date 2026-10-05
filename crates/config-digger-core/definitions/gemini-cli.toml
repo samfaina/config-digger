@@ -270,8 +270,9 @@ reason = "disabled_by_name"
 # turns it off there; a rule for a Project or a drive's root reaches every
 # Project below it. With no Project there is no folder to read the rules
 # for. Gemini CLI compares the folders as written, with regard to case
-# [source], and config-digger without: both, and rules for a drive other
-# than the home folder's, are unverified until the release gate.
+# [source], and config-digger does too but for the drive letter, which it
+# takes in upper case: that, and rules for a drive other than the home
+# folder's, are unverified until the release gate.
 [[items.mcp.disable]]
 block = "json-path-rules"
 switch = { anchor = { block = "home", root = "extension_enablement" }, key_path = ["{plugin_id}", "overrides"], store_class = "plain" }

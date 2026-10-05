@@ -4511,7 +4511,7 @@ impl JsonNameList {
         names.filter(move |item| {
             item.as_str().is_some_and(|held| {
                 if self.ignore_case {
-                    held.eq_ignore_ascii_case(name)
+                    held.to_lowercase() == name.to_lowercase()
                 } else {
                     held == name
                 }
@@ -4918,7 +4918,7 @@ impl Disables for JsonItemList {
 /// `/E:/proj/`, `!` before it turning the plugin off rather than on, and
 /// `*` after it reaching the folders below too; of the rules that reach
 /// the folder, the last decides, and with none the plugin is on. Folders
-/// compare without regard to case. Disable takes the Project's own rules
+/// compare as written, but for the drive letter. Disable takes the Project's own rules
 /// out and appends one turning the plugin off in the Project and the
 /// folders below; Enable takes them out, and appends one turning it on
 /// when another rule still turns it off there. With no Project there is
@@ -4960,13 +4960,14 @@ impl Validate for JsonPathRules {
 struct PathRule {
     /// The rule turns the plugin off.
     off: bool,
-    /// Its folder, `/` before and after, in lower case.
+    /// Its folder, as [`JsonPathRules::spelled`] spells it.
     folder: String,
     /// It reaches the folders below too.
     below: bool,
 }
 
 impl PathRule {
+    /// The rule `rule` as the list holds it, such as `!/E:/proj/*`.
     fn parse(rule: &str) -> PathRule {
         let (off, rule) = match rule.strip_prefix('!') {
             Some(rule) => (true, rule),
@@ -4978,13 +4979,13 @@ impl PathRule {
         };
         PathRule {
             off,
-            folder: JsonPathRules::spelled(rule).to_lowercase(),
+            folder: JsonPathRules::spelled(rule),
             below,
         }
     }
 
-    /// Whether it reaches the folder `spelled` as [`JsonPathRules::spelled`]
-    /// spells it, in lower case.
+    /// Whether it reaches the folder `spelled`, as [`JsonPathRules::spelled`]
+    /// spells it.
     fn reaches(&self, spelled: &str) -> bool {
         if self.below {
             spelled.starts_with(&self.folder)
@@ -5011,6 +5012,11 @@ impl JsonPathRules {
         spelled
     }
 
+    /// The folder `folder` as a rule spells it.
+    fn spelled_folder(folder: &Path) -> String {
+        Self::spelled(&folder.display().to_string())
+    }
+
     /// The rules of `value`, each with the item that holds it.
     fn rules(value: Option<&Value>) -> impl Iterator<Item = (&Value, PathRule)> {
         let items = value.and_then(Value::as_array).into_iter().flatten();
@@ -5020,7 +5026,7 @@ impl JsonPathRules {
     /// The rule of the list `value` that decides for `folder`: the last that
     /// reaches it.
     pub fn deciding<'v>(value: Option<&'v Value>, folder: &Path) -> Option<&'v str> {
-        let spelled = Self::spelled(&folder.display().to_string()).to_lowercase();
+        let spelled = Self::spelled_folder(folder);
         Self::rules(value)
             .filter(|(_, rule)| rule.reaches(&spelled))
             .last()
@@ -5029,7 +5035,7 @@ impl JsonPathRules {
 
     /// Whether the rules `rules` turn the plugin off in `folder`.
     fn off_in<'v>(rules: impl Iterator<Item = (&'v Value, PathRule)>, folder: &Path) -> bool {
-        let spelled = Self::spelled(&folder.display().to_string()).to_lowercase();
+        let spelled = Self::spelled_folder(folder);
         rules
             .filter(|(_, rule)| rule.reaches(&spelled))
             .last()
@@ -5044,7 +5050,7 @@ impl JsonPathRules {
         folder: &Path,
         rule: Option<String>,
     ) -> Vec<Edit> {
-        let own = Self::spelled(&folder.display().to_string()).to_lowercase();
+        let own = Self::spelled_folder(folder);
         let removed = Self::rules(value)
             .filter(|(_, rule)| rule.folder == own)
             .map(|(item, _)| Edit::RemoveItem {
@@ -5066,7 +5072,7 @@ impl JsonPathRules {
     /// off with `off`.
     fn rule_for(folder: &Path, off: bool) -> String {
         let bang = if off { "!" } else { "" };
-        format!("{bang}{}*", Self::spelled(&folder.display().to_string()))
+        format!("{bang}{}*", Self::spelled_folder(folder))
     }
 }
 
@@ -5138,7 +5144,7 @@ impl Disables for JsonPathRules {
         let Some(folder) = folder else {
             return Vec::new();
         };
-        let own = Self::spelled(&folder.display().to_string()).to_lowercase();
+        let own = Self::spelled_folder(folder);
         let others = Self::rules(value).filter(|(_, rule)| rule.folder != own);
         let still_off = Self::off_in(others, folder);
         let rule = still_off.then(|| Self::rule_for(folder, false));

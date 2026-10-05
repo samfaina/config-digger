@@ -24,14 +24,17 @@ fn gemini() -> PathBuf {
     Path::new(HOME).join(".gemini")
 }
 
+/// `~\.gemini\settings.json`.
 fn user_settings() -> PathBuf {
     gemini().join("settings.json")
 }
 
+/// `~\.gemini\mcp-server-enablement.json`.
 fn enablement() -> PathBuf {
     gemini().join("mcp-server-enablement.json")
 }
 
+/// The fixture Project folder `name`.
 fn project(name: &str) -> PathBuf {
     Path::new(PROJECTS).join(name)
 }
@@ -247,7 +250,9 @@ fn enable_takes_the_lower_cased_name_out_of_the_enablement_file() {
         &[&locator(&user_settings(), "Docs")],
     )
     .unwrap();
-    core.execute(plan, &[]).unwrap();
+    let sentence = wide_reach(&plan);
+    assert!(sentence.contains("`Docs` in all projects"), "{sentence}");
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
 
     let written: Value = serde_json::from_str(&text(&fs, &enablement())).unwrap();
     assert_eq!(written["fetch"], json!({ "enabled": false }));
@@ -411,7 +416,7 @@ fn skills_disabled_holds_names_without_regard_to_case() {
         &[&user_skill("review")],
     )
     .unwrap();
-    core.execute(plan, &[]).unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
 
     let written: Value = serde_json::from_str(&text(&fs, &user_settings())).unwrap();
     assert_eq!(written, json!({ "skills": { "disabled": [] } }));
@@ -626,8 +631,10 @@ fn with_no_project_an_extension_takes_no_disable() {
     ] {
         let disable = json_of(&entry.disable);
         assert_eq!(disable["status"], "not_offered", "{disable}");
-        let sentence = disable["sentence"].as_str().unwrap();
-        assert!(sentence.contains("per Project"), "{sentence}");
+        assert_eq!(
+            disable["sentence"],
+            "Disable is not offered: Gemini CLI turns an extension off per folder; choose a Project."
+        );
     }
 }
 
@@ -656,4 +663,34 @@ fn an_extension_s_entries_have_no_remove_and_say_how_to_uninstall_it() {
             "gemini extensions uninstall weather"
         );
     }
+}
+
+#[test]
+fn with_no_project_known_a_server_s_disable_still_warns_that_it_reaches_all_projects() {
+    let fs = FakeFileSystem::new().with_file(
+        user_settings(),
+        r#"{ "mcpServers": { "docs": { "command": "user-docs" } } }"#,
+    );
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Disable,
+        &[&locator(&user_settings(), "docs")],
+    )
+    .unwrap();
+
+    let sentence = wide_reach(&plan);
+    assert!(sentence.contains("`docs` in all projects"), "{sentence}");
+    let refused = core.execute(plan, &[]).unwrap_err();
+    assert_eq!(code(refused.code), "ack_required");
+}
+
+#[test]
+fn a_rule_reaches_only_the_folder_spelled_with_its_case() {
+    let fs = with_rules(weather_and_projects(), &["!/E:/Projects/App/*"]);
+    let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
+
+    assert_eq!(code(server(&inventory, "forecast").state), "effective");
 }

@@ -919,12 +919,18 @@ pub(crate) enum Reached {
 }
 
 /// The warning of a plan whose switches reach the Entries `others` beyond
-/// those it targets.
-pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
+/// those it targets, or hold the names `by_name` in every context, so that
+/// they reach every Entry of those names wherever it is.
+pub(crate) fn wide_reach(action: Action, others: &[Reached], by_name: &[String]) -> String {
     let verb = match action {
         Action::Enable => "Enable",
         _ => "Disable",
     };
+    let names: Vec<String> = by_name.iter().map(|name| format!("`{name}`")).collect();
+    let everywhere = format!(
+        "every Entry named {} in all projects and with no Project",
+        names.join(", ")
+    );
     let rows: Vec<String> = others
         .iter()
         .map(|reached| match reached {
@@ -933,13 +939,23 @@ pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
                 format!("{locator} in Project {}", project.display())
             }
             Reached::WithoutProject(locator) => format!("{locator} with no Project"),
-            Reached::Everywhere(locator) => format!("{locator} in all projects"),
+            Reached::Everywhere(locator) => {
+                format!("{locator} in all projects and with no Project")
+            }
         })
         .collect();
-    format!(
-        "This {verb} reaches more than what it targets: what it writes also changes the State of {}.",
-        rows.join(", ")
-    )
+    let reaches = format!("This {verb} reaches more than what it targets");
+    match (rows.is_empty(), by_name.is_empty()) {
+        (_, true) => format!(
+            "{reaches}: what it writes also changes the State of {}.",
+            rows.join(", ")
+        ),
+        (true, false) => format!("{reaches}: what it writes applies to {everywhere}."),
+        (false, false) => format!(
+            "{reaches}: what it writes applies to {everywhere}, and changes the State of {} now.",
+            rows.join(", ")
+        ),
+    }
 }
 
 /// Why Disable is refused for an Entry it is not offered for: `sentence`.
@@ -1034,6 +1050,14 @@ pub(crate) fn no_disable_mechanism(
     } else {
         format!("Disable is not offered: {agent_name} has no switch for this Entry here.")
     }
+}
+
+/// Why Disable is not offered for an Entry of an extension that
+/// `agent_name` turns off by path rules, in the context of no Project.
+pub(crate) fn disable_needs_folder(agent_name: &str) -> String {
+    format!(
+        "Disable is not offered: {agent_name} turns an extension off per folder; choose a Project."
+    )
 }
 
 /// Paths as a sentence lists them, separated by commas.

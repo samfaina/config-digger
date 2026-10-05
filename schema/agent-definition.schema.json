@@ -3139,7 +3139,7 @@
           ]
         },
         {
-          "description": "A list of path rules per plugin, such as the `overrides` of each\nextension in Gemini CLI's `extension-enablement.json`, which the Agent\nreads for the folder it starts in. Each rule is a folder spelled\n`/E:/proj/`, `!` before it turning the plugin off rather than on, and\n`*` after it reaching the folders below too; of the rules that reach\nthe folder, the last decides, and with none the plugin is on. Folders\ncompare without regard to case. Disable takes the Project's own rules\nout and appends one turning the plugin off in the Project and the\nfolders below; Enable takes them out, and appends one turning it on\nwhen another rule still turns it off there. With no Project there is\nno folder to read the rules for: the plugin is on, and Disable is not\noffered.",
+          "description": "A list of path rules per plugin, such as the `overrides` of each\nextension in Gemini CLI's `extension-enablement.json`, which the Agent\nreads for the folder it starts in. Each rule is a folder spelled\n`/E:/proj/`, `!` before it turning the plugin off rather than on, and\n`*` after it reaching the folders below too; of the rules that reach\nthe folder, the last decides, and with none the plugin is on. Folders\ncompare as written, but for the drive letter. Disable takes the Project's own rules\nout and appends one turning the plugin off in the Project and the\nfolders below; Enable takes them out, and appends one turning it on\nwhen another rule still turns it off there. With no Project there is\nno folder to read the rules for: the plugin is on, and Disable is not\noffered.",
           "type": "object",
           "properties": {
             "switch": {

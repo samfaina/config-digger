@@ -1759,9 +1759,7 @@ pub(crate) fn project_trusted(
     kind: ItemKind,
     project: Option<&str>,
 ) -> bool {
-    let Some(scanned) =
-        project.and_then(|key| snapshot.projects.iter().find(|known| known.key == key))
-    else {
+    let Some(scanned) = project.and_then(|key| snapshot.project(key)) else {
         return true;
     };
     definition
