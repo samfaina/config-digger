@@ -97,7 +97,7 @@ pub(crate) fn duplicate_plugin_name(agent_name: &str, plugin: &str) -> Reason {
         effective: None,
         switch: None,
         sentence: format!(
-            "Invalid: {agent_name} refuses to load `{plugin}`, since another of its extensions has that name."
+            "Invalid: {agent_name} refuses to load `{plugin}`, since another it installed has that name."
         ),
     }
 }
@@ -729,7 +729,7 @@ pub(crate) fn untrusted_folder(agent_name: &str, project: &Path) -> Reason {
 /// it starts in a folder the user trusts.
 pub(crate) fn untrusted_folder_blocks(agent_name: &str) -> String {
     format!(
-        "{agent_name} uses it only in a folder you trust: started in any other, it Blocks every server, this one included. Pick a Project to see whether it trusts that folder."
+        "{agent_name} uses it only when it starts in a folder you trust, and Blocks it in any other. Pick a Project to see whether it trusts that folder."
     )
 }
 
@@ -1252,7 +1252,7 @@ pub(crate) fn cached_copy(agent_name: &str, at: Option<SystemTime>) -> String {
 /// it fetches from the vendor's side and caches nowhere config-digger reads.
 pub(crate) fn gate_may_apply(agent_name: &str, gate: &str) -> String {
     format!(
-        "{agent_name} fetches its gate {gate} when it signs in and keeps it nowhere config-digger can read: an organisation admin may turn this off there."
+        "{agent_name} fetches its gate {gate} from the account it signs in with and keeps it nowhere config-digger can read: whoever administers that account may turn this off there."
     )
 }
 

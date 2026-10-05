@@ -3647,4 +3647,76 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
         let text = registry("threads; DROP TABLE threads");
         assert!(error(&text).contains("plain names"), "{}", error(&text));
     }
+
+    #[test]
+    fn a_machine_file_beside_another_needs_that_one_declared() {
+        let with_files = |files: &str| format!("{VALID}\n{files}");
+        let beside = r#"
+[[machine_files]]
+path = "%ProgramData%/x/settings.json"
+variable = "X_SETTINGS"
+
+[[machine_files]]
+path = "%ProgramData%/x/defaults.json"
+beside = "%ProgramData%/x/settings.json"
+admin_owned = true
+"#;
+        let text = with_files(beside);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_files(&beside.replace(
+            r#"beside = "%ProgramData%/x/settings.json""#,
+            r#"beside = "%ProgramData%/x/other.json""#,
+        ));
+        assert!(
+            error(&text).contains("another machine file"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_shared_root_is_one_of_the_home_s_and_not_every_one() {
+        let text = VALID.replace(
+            "roots.state = \".test.json\"",
+            "shared_roots = [\"skills\"]\nroots.state = \".test.json\"",
+        );
+        assert!(
+            error(&text).contains("undeclared root `skills`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            "roots.state = \".test.json\"",
+            "shared_roots = [\"state\"]\nroots.state = \".test.json\"",
+        );
+        assert!(
+            error(&text).contains("shares every root"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_feature_gate_has_a_lookup_or_a_when() {
+        let gate = |lookup: &str| {
+            format!(
+                "{VALID}\n[[feature_gates]]\nname = \"admin\"\nassumed = true\naffects = [\"user-mcp\"]\n{lookup}"
+            )
+        };
+        let when = r#"when = { sources = [{ anchor = { block = "home", root = "state" }, key_path = ["auth"] }], one_of = ["google"] }"#;
+        let text = gate(when);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = gate("");
+        assert!(
+            error(&text).contains("a lookup or a `when`"),
+            "{}",
+            error(&text)
+        );
+        let text = gate(&when.replace(r#"["google"]"#, "[]"));
+        assert!(
+            error(&text).contains("one_of needs a value"),
+            "{}",
+            error(&text)
+        );
+    }
 }

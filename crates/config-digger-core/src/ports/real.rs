@@ -379,8 +379,6 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
     }
 }
 
-/// Copies the folder `from` and everything below it to `to`. A link inside
-/// it is refused: copying it would copy what it points to, or never end.
 /// The file at `path` and each folder above it but the drive's root, whose
 /// permissions Gemini CLI leaves to whoever owns the drive.
 #[cfg(windows)]
@@ -414,6 +412,8 @@ fn encoded_command(script: &str) -> String {
     encoded
 }
 
+/// Copies the folder `from` and everything below it to `to`. A link inside
+/// it is refused: copying it would copy what it points to, or never end.
 fn copy_folder(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::create_dir(to)?;
     for entry in std::fs::read_dir(from)? {

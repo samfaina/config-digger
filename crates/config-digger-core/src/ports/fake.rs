@@ -169,7 +169,7 @@ impl FakeFileSystem {
     /// The file or folder at `path`, and so every file below it, lets
     /// someone other than an administrator change it. Every other one is
     /// administrators' alone.
-    pub fn not_admin_owned(self, path: impl AsRef<Path>) -> Self {
+    pub fn writable_by_others(self, path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_path_buf();
         self.files().not_admin_owned.push(path);
         self

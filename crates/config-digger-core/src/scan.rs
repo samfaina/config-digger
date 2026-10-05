@@ -74,7 +74,7 @@ pub(crate) struct Snapshot {
     pub cached: BTreeMap<PathBuf, Option<SystemTime>>,
     /// The files each Agent, by its index, skips without reading them,
     /// since someone other than an administrator can change them.
-    pub not_admin_owned: BTreeSet<(usize, PathBuf)>,
+    pub not_admin_owned: NotAdminOwned,
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -832,7 +832,7 @@ pub(crate) fn scan_as_if(
         storage: Vec::new(),
         cached: BTreeMap::new(),
     };
-    scanner.reader.not_admin_owned = not_admin_owned(definitions, &found, ports, &as_if);
+    scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
 
     let settings = read_settings(definitions, ports, &mut scanner.reader);
     for home in &found {
@@ -1070,7 +1070,7 @@ pub(crate) fn scan_as_if(
             && !scanner
                 .reader
                 .not_admin_owned
-                .contains(&(failure.agent_index, failure.path.clone()))
+                .holds(failure.agent_index, &failure.path)
             && !found.iter().any(|home| {
                 home.agent_index == failure.agent_index
                     && home.home == failure.home
@@ -1204,23 +1204,35 @@ fn read_settings(
 /// The machine files that each Agent with a found home reads only while
 /// an administrator owns them, and that exist but someone else can change,
 /// by the Agent's index.
-fn not_admin_owned(
+fn find_not_admin_owned(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     ports: &Ports,
     fs: &dyn FileSystem,
-) -> BTreeSet<(usize, PathBuf)> {
+) -> NotAdminOwned {
     let agents: BTreeSet<usize> = found.iter().map(|home| home.agent_index).collect();
-    agents
-        .into_iter()
-        .flat_map(|agent_index| {
-            definitions[agent_index]
-                .admin_owned_files(ports.env.as_ref())
-                .into_iter()
-                .filter(|path| fs.exists(path) && !fs.admin_owned(path))
-                .map(move |path| (agent_index, path))
-        })
-        .collect()
+    let files = agents.into_iter().flat_map(|agent_index| {
+        definitions[agent_index]
+            .admin_owned_files(ports.env.as_ref())
+            .into_iter()
+            .filter(|path| fs.exists(path) && !fs.admin_owned(path))
+            .map(move |path| (agent_index, path))
+    });
+    NotAdminOwned(files.collect())
+}
+
+/// The files each Agent, by its index, skips without reading them, since
+/// someone other than an administrator can change them.
+#[derive(Clone, Default)]
+pub(crate) struct NotAdminOwned(BTreeSet<(usize, PathBuf)>);
+
+impl NotAdminOwned {
+    /// Whether the Agent at `agent_index` skips the file at `path`.
+    pub fn holds(&self, agent_index: usize, path: &Path) -> bool {
+        self.0
+            .iter()
+            .any(|(agent, skipped)| *agent == agent_index && skipped == path)
+    }
 }
 
 /// The file of each managed-exclusive gate of each found Agent home that
@@ -1674,9 +1686,7 @@ impl Places<'_> {
                 continue;
             }
             // A file the Agent skips unread holds nothing for it.
-            let skipped = reader
-                .not_admin_owned
-                .contains(&(home.agent_index, path.clone()));
+            let skipped = reader.not_admin_owned.holds(home.agent_index, &path);
             let read = if skipped {
                 Ok(None)
             } else if sqlite {
@@ -3731,7 +3741,7 @@ struct Reader<'p> {
     failures: Vec<ScannedReadFailure>,
     /// The files each Agent, by its index, skips without reading them, since
     /// someone other than an administrator can change them.
-    not_admin_owned: BTreeSet<(usize, PathBuf)>,
+    not_admin_owned: NotAdminOwned,
 }
 
 impl<'p> Reader<'p> {
@@ -3743,7 +3753,7 @@ impl<'p> Reader<'p> {
             items: BTreeMap::new(),
             reported: BTreeSet::new(),
             failures: Vec::new(),
-            not_admin_owned: BTreeSet::new(),
+            not_admin_owned: NotAdminOwned::default(),
         }
     }
 

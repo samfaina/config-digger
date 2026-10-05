@@ -366,7 +366,7 @@ fn a_system_file_no_administrator_owns_is_unread() {
     let fs = FakeFileSystem::new()
         .with_file(user_settings(), docs("user"))
         .with_file(system_settings(), docs("system"))
-        .not_admin_owned(system_settings());
+        .writable_by_others(system_settings());
 
     let inventory = inventory(&fs);
 
@@ -397,7 +397,7 @@ fn a_folder_above_a_system_file_that_others_can_write_to_makes_it_unread() {
     let fs = FakeFileSystem::new()
         .with_file(user_settings(), "{}")
         .with_file(system_defaults(), docs("defaults"))
-        .not_admin_owned(Path::new(PROGRAM_DATA).join("gemini-cli"));
+        .writable_by_others(Path::new(PROGRAM_DATA).join("gemini-cli"));
 
     let inventory = inventory(&fs);
 
@@ -409,7 +409,7 @@ fn a_system_file_gemini_cli_skips_is_no_read_failure() {
     let fs = FakeFileSystem::new()
         .with_file(user_settings(), docs("user"))
         .with_file(system_settings(), "{ not json")
-        .not_admin_owned(system_settings());
+        .writable_by_others(system_settings());
 
     let inventory = inventory(&fs);
 
@@ -700,6 +700,10 @@ fn two_extensions_whose_manifests_share_a_name_are_invalid() {
         FakeFileSystem::new().with_file(user_settings(), "{}"),
         "kit",
         json!({ "first": { "command": "a" } }),
+    )
+    .with_file(
+        extensions().join(r"kit-copy\.gemini-extension-install.json"),
+        json!({ "source": r"E:\src\kit", "type": "local" }).to_string(),
     )
     .with_file(
         extensions().join(r"kit-copy\gemini-extension.json"),
@@ -1185,4 +1189,56 @@ fn secrets_are_masked_and_references_gemini_cli_expands_are_shown() {
         assert_eq!(config["oauth"]["clientSecret"], "••••", "{name}");
         assert_eq!(config["oauth"]["clientId"], "client", "{name}");
     }
+}
+
+#[test]
+fn with_folder_trust_off_no_entry_notes_that_an_untrusted_folder_blocks_it() {
+    let fs = FakeFileSystem::new().with_file(
+        user_settings(),
+        r#"{ "security": { "folderTrust": { "enabled": false } }, "mcpServers": { "docs": { "command": "x" } } }"#,
+    );
+
+    let inventory = inventory(&fs);
+
+    let entry = &server(&inventory, "docs").entries[0];
+    assert!(
+        entry
+            .notes
+            .iter()
+            .all(|note| code(note.code) != "untrusted_folder_blocks")
+    );
+}
+
+#[test]
+fn a_project_signed_in_with_google_gets_the_admin_controls_caveat() {
+    let folder = project("app");
+    let fs = trusting(
+        FakeFileSystem::new()
+            .with_file(user_settings(), docs("user"))
+            .with_file(
+                project_settings(&folder),
+                r#"{ "security": { "auth": { "selectedType": "oauth-personal" } } }"#,
+            ),
+        &folder,
+    );
+
+    let inventory = inventory_at(&fs, &folder);
+
+    let entry = &server(&inventory, "docs").entries[0];
+    assert_eq!(caveat_codes(entry), ["gate_may_apply"]);
+    assert_eq!(entry.caveats[0].path, project_settings(&folder));
+}
+
+#[test]
+fn a_folder_without_an_install_record_is_no_extension() {
+    let fs = FakeFileSystem::new()
+        .with_file(user_settings(), "{}")
+        .with_file(
+            extensions().join(r"stray\gemini-extension.json"),
+            json!({ "name": "stray", "mcpServers": { "stray": { "command": "x" } } }).to_string(),
+        );
+
+    let inventory = inventory(&fs);
+
+    assert!(gemini_items(&inventory).all(|item| item.name != "stray"));
 }

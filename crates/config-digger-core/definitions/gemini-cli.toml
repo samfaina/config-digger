@@ -87,7 +87,7 @@ id = "system"
 # user's alone: no Project has its own [source].
 [[plugins]]
 id = "extensions"
-registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = [".gemini-extension-install.json", "gemini-extension.json"], linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }
+registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = ".gemini-extension-install.json", linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }
 name = { file = "gemini-extension.json", key_path = ["name"] }
 uninstall = "gemini extensions uninstall {id}"
 same_names_invalid = true
@@ -164,7 +164,8 @@ on_read_failure = "stops_agent"
 
 # A Project's servers, in `<folder>\.gemini\settings.json`: the folder
 # Gemini CLI starts in, and no folder above it [source]. In the user's home
-# folder that file is the user's own, which is no Project layer [source].
+# folder that file is the user's own, which Gemini CLI does not read again
+# as the Project's [source].
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".gemini/settings.json" }
@@ -352,9 +353,9 @@ trust_all = { sources = [
 # the older `cloud-shell` [source]. They can turn off every server,
 # extension or skill, or allow only some, and are kept in memory only
 # [source]: config-digger notes they may apply. An API key or Vertex AI
-# fetches none. `admin` set in any settings file is ignored [source]. Where
-# `security.auth.selectedType` is set is read from the system, user and
-# system defaults settings; a Project's is not read.
+# fetches none. `admin` set in any settings file is ignored [source].
+# `security.auth.selectedType` is read from the settings files, highest
+# first, a Project's included whether or not its folder is trusted.
 [[feature_gates]]
 name = "admin-controls"
 assumed = true
@@ -364,6 +365,7 @@ affects = [
 ]
 when = { sources = [
   { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/settings.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
+  { anchor = { block = "project", path = ".gemini/settings.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
   { anchor = { block = "home", root = "settings" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
   { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
 ], one_of = ["oauth-personal", "compute-default-credentials", "cloud-shell"] }

@@ -804,6 +804,7 @@ pub(crate) fn resolve(
                             .chain(origin.by_name_only)
                             .chain(needs_trusted_folder(
                                 definition,
+                                snapshot,
                                 entry,
                                 project_key.map(String::as_str),
                             ))
@@ -1510,7 +1511,7 @@ fn overridden(definition: &AgentDefinition, snapshot: &Snapshot, entry: &Scanned
 fn not_admin_owned(snapshot: &Snapshot, entry: &ScannedEntry) -> bool {
     snapshot
         .not_admin_owned
-        .contains(&(entry.agent_index, entry.path.clone()))
+        .holds(entry.agent_index, &entry.path)
 }
 
 /// For an Entry in a source of settings the Agent skips, the settings' id
@@ -1657,15 +1658,15 @@ pub(crate) fn gates(
                     .projects
                     .iter()
                     .find(|known| Some(known.key.as_str()) == project)?;
-                if folder_trusted(
+                let rules = TrustRules {
                     snapshot,
                     entry,
-                    location.kind,
-                    index,
+                    kind: location.kind,
+                    gate: index,
                     block,
                     project,
-                    &scanned.path,
-                ) {
+                };
+                if rules.trusts(&scanned.path) {
                     return None;
                 }
                 let reason = explain::untrusted_folder(agent_name, &scanned.path);
@@ -1707,39 +1708,53 @@ pub(crate) fn gates(
         .collect()
 }
 
-/// Whether the folder-trust gate `block`, the gate at `gate` among those of
-/// `kind`, trusts `folder` for `entry`, in the context of the Project with
-/// the key `project`: the first of its sources that holds rules decides,
-/// unless its setting trusts every folder.
-fn folder_trusted(
-    snapshot: &Snapshot,
-    entry: &ScannedEntry,
+/// A folder-trust gate, the gate at `gate` among those of `kind`, as the
+/// Agent home of `entry` reads it in the context of the Project with the
+/// key `project`.
+struct TrustRules<'a> {
+    snapshot: &'a Snapshot,
+    entry: &'a ScannedEntry,
     kind: ItemKind,
     gate: usize,
-    block: &FolderTrust,
-    project: Option<&str>,
-    folder: &Path,
-) -> bool {
-    let value = |source: usize| {
-        let owner = SettingOwner::Gate { gate, source };
-        setting_value(snapshot, entry, kind, owner, project)
-    };
-    if let Some(setting) = &block.trust_all {
-        let first = block.sources.len();
-        if setting.is_met((0..setting.sources.len()).map(|source| value(first + source))) {
-            return true;
-        }
+    block: &'a FolderTrust,
+    project: Option<&'a str>,
+}
+
+impl TrustRules<'_> {
+    /// What the gate's source at `source` holds, its setting's after them.
+    fn value(&self, source: usize) -> Option<serde_json::Value> {
+        let owner = SettingOwner::Gate {
+            gate: self.gate,
+            source,
+        };
+        setting_value(self.snapshot, self.entry, self.kind, owner, self.project)
     }
-    (0..block.sources.len())
-        .find_map(value)
-        .is_some_and(|rules| block.trusts(&rules, folder))
+
+    /// Whether its setting trusts every folder.
+    fn trust_all(&self) -> bool {
+        let Some(setting) = &self.block.trust_all else {
+            return false;
+        };
+        let first = self.block.sources.len();
+        setting.is_met((0..setting.sources.len()).map(|source| self.value(first + source)))
+    }
+
+    /// Whether it trusts `folder`: the first of its sources that holds
+    /// rules decides, unless its setting trusts every folder.
+    fn trusts(&self, folder: &Path) -> bool {
+        self.trust_all()
+            || (0..self.block.sources.len())
+                .find_map(|source| self.value(source))
+                .is_some_and(|rules| self.block.trusts(&rules, folder))
+    }
 }
 
 /// The note on an Entry, in the context of no Project, that a folder-trust
 /// gate of its Item kind Blocks it wherever the Agent starts in a folder
-/// the user has not trusted.
+/// the user has not trusted, unless the gate trusts every folder.
 fn needs_trusted_folder(
     definition: &AgentDefinition,
+    snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
 ) -> Option<api::Note> {
@@ -1747,11 +1762,26 @@ fn needs_trusted_folder(
         return None;
     }
     let location = definition.location(&entry.location);
+    let kind = location.kind;
     definition
-        .rules(location.kind)
+        .rules(kind)
         .gates
         .iter()
-        .any(|gate| matches!(gate, Gate::FolderTrust(_)) && gate.covers(&location.id))
+        .enumerate()
+        .any(|(gate, block)| match block {
+            Gate::FolderTrust(block) if block.locations.contains(&location.id) => {
+                let rules = TrustRules {
+                    snapshot,
+                    entry,
+                    kind,
+                    gate,
+                    block,
+                    project,
+                };
+                !rules.trust_all()
+            }
+            _ => false,
+        })
         .then(|| api::Note {
             code: api::NoteCode::UntrustedFolderBlocks,
             switch: None,
