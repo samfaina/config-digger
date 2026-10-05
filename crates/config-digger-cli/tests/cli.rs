@@ -3038,7 +3038,7 @@ fn show_of_a_merged_codex_server_prints_the_server_codex_builds_and_where_each_f
             "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
         );
     let user = locator(
-        &real_path(&harness.path(".codex/config.toml")),
+        &harness.path(".codex").join("config.toml"),
         "mcp_servers.docs",
     );
 
