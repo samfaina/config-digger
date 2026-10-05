@@ -3756,6 +3756,7 @@ pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
     JsonField(Box<JsonField>),
     JsonItemList(JsonItemList),
+    MergedField(MergedField),
     Park(Park),
 }
 
@@ -3765,35 +3766,45 @@ impl Validate for DisableMechanism {
             DisableMechanism::JsonNameList(block) => block.validate(),
             DisableMechanism::JsonField(block) => block.validate(),
             DisableMechanism::JsonItemList(block) => block.validate(),
+            DisableMechanism::MergedField(block) => block.validate(),
             DisableMechanism::Park(block) => block.validate(),
         }
     }
 }
 
 impl DisableMechanism {
-    /// The mechanism as a switch the Agent reads, `None` for parking.
+    /// The mechanism as a switch the Agent reads, `None` for parking and
+    /// for a merged field.
     pub fn switched(&self) -> Option<Switched<'_>> {
         match self {
             DisableMechanism::JsonNameList(block) => Some(Switched::NameList(block)),
             DisableMechanism::JsonField(block) => Some(Switched::Field(block)),
             DisableMechanism::JsonItemList(block) => Some(Switched::ItemList(block)),
-            DisableMechanism::Park(_) => None,
+            DisableMechanism::MergedField(_) | DisableMechanism::Park(_) => None,
         }
     }
 
-    /// The switch it writes, `None` for parking.
+    /// The switch it writes, `None` for parking and for a merged field.
     pub fn switch(&self) -> Option<&Switch> {
         match self {
             DisableMechanism::JsonNameList(block) => Some(&block.switch),
             DisableMechanism::JsonField(block) => Some(&block.switch),
             DisableMechanism::JsonItemList(block) => Some(&block.switch),
-            DisableMechanism::Park(_) => None,
+            DisableMechanism::MergedField(_) | DisableMechanism::Park(_) => None,
         }
     }
 
     /// Whether it parks the Entries it covers rather than writing a switch.
     pub fn parks(&self) -> bool {
         matches!(self, DisableMechanism::Park(_))
+    }
+
+    /// The mechanism as a field of the server the Agent builds, if it is one.
+    pub fn merged_field(&self) -> Option<&MergedField> {
+        match self {
+            DisableMechanism::MergedField(block) => Some(block),
+            _ => None,
+        }
     }
 
     /// The ids of the locations whose Entries it Disables, empty for every
@@ -3803,6 +3814,7 @@ impl DisableMechanism {
             DisableMechanism::JsonNameList(block) => block.locations(),
             DisableMechanism::JsonField(block) => block.locations(),
             DisableMechanism::JsonItemList(block) => block.locations(),
+            DisableMechanism::MergedField(block) => &block.locations,
             DisableMechanism::Park(block) => &block.locations,
         }
     }
@@ -3921,6 +3933,41 @@ impl Validate for Park {
     fn validate(&self) -> Result<(), String> {
         if self.locations.is_empty() {
             return Err("park needs its locations listed".into());
+        }
+        Ok(())
+    }
+}
+
+/// Disables a server the Agent builds from same-named Entries by writing
+/// `false` to the field its merge turns servers off by, such as Codex's
+/// `enabled`, in the Entry's own table. The field merges like any other, so
+/// what it Disables is every Entry of the Item, and a higher layer that sets
+/// the field decides over a lower one. Enable is left to the merge's own
+/// rules.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MergedField {
+    /// The ids of the locations whose Entries it Disables, each one that
+    /// merges.
+    pub locations: Vec<String>,
+    /// Whether a write counts only while no higher layer sets the field,
+    /// such as Codex's: Disable skips a layer below one that sets it.
+    #[serde(default)]
+    pub requires_unset_above: bool,
+    /// The id of the location that takes a table holding the field alone,
+    /// named as the Entry is, when the Entry's own file is git-versioned or
+    /// read only, such as Codex's user `config.toml`. Omitted, such an Entry
+    /// has no Disable.
+    pub fallback: Option<String>,
+}
+
+impl Validate for MergedField {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("merged-field needs its locations listed".into());
+        }
+        if self.fallback.as_ref().is_some_and(String::is_empty) {
+            return Err("a merged field's fallback must not be empty".into());
         }
         Ok(())
     }
@@ -4371,6 +4418,34 @@ impl JsonItemList {
         }
     }
 
+    /// Whether `item` holds what `template` holds, each string `{name}` in
+    /// it standing for `id`: every field of an object, other fields left
+    /// aside, every value of a list in its order, and the id compared as the
+    /// Agent compares ids.
+    fn holds(&self, template: &Value, item: &Value, id: &str) -> bool {
+        match (template, item) {
+            (Value::String(text), Value::String(held)) if text == NAME_KEY => {
+                if self.ignore_case {
+                    held.eq_ignore_ascii_case(id)
+                } else {
+                    held == id
+                }
+            }
+            (Value::Object(fields), Value::Object(held)) => fields.iter().all(|(key, value)| {
+                held.get(key)
+                    .is_some_and(|held| self.holds(value, held, id))
+            }),
+            (Value::Array(values), Value::Array(held)) => {
+                values.len() == held.len()
+                    && values
+                        .iter()
+                        .zip(held)
+                        .all(|(value, held)| self.holds(value, held, id))
+            }
+            _ => template == item,
+        }
+    }
+
     /// The edits that replace `item`, if the list holds one, with `with`, if
     /// any: `key_path` names the item, and the list is its parent.
     fn replace(key_path: &[String], item: Option<&Value>, with: Option<Value>) -> Vec<Edit> {
@@ -4420,12 +4495,17 @@ impl Disables for JsonItemList {
         self.layered
     }
 
+    /// An item Disables unless it holds what `enabled_item` holds: each of
+    /// its fields or values, the id compared as the Agent compares ids, and
+    /// any other field left aside.
     fn disables(&self, value: Option<&Value>, name: &str) -> bool {
-        let enabled = self
+        let Some(item) = value else {
+            return false;
+        };
+        !self
             .enabled_item
             .as_ref()
-            .map(|template| Self::item(template, name));
-        value.is_some_and(|item| Some(item) != enabled.as_ref())
+            .is_some_and(|template| self.holds(template, item, name))
     }
 
     fn partial(&self, _value: Option<&Value>) -> bool {
@@ -4474,9 +4554,14 @@ fn validate_mechanism(
             return Err("a Disable mechanism's `when` takes feature-gate conditions only".into());
         }
     }
-    if (target == MechanismTarget::Plugin) != switch.plugins() {
+    if (target == MechanismTarget::Plugin) != switch.per_plugin() {
         return Err(format!(
-            "a switch key path holds `{PLUGIN_KEY}` exactly when the target is `plugin`"
+            "a switch key path holds `{PLUGIN_KEY}` without `{NAME_KEY}` exactly when the target is `plugin`"
+        ));
+    }
+    if switch.plugins() && switch.names() && target != MechanismTarget::Entry {
+        return Err(format!(
+            "a switch keyed by `{PLUGIN_KEY}` and `{NAME_KEY}` is a plugin Entry's own: its target must be `entry`"
         ));
     }
     match (context, switch.per_project()) {
@@ -4502,13 +4587,20 @@ pub(crate) struct Switch {
     /// The key path of the value written. One segment may be `{project}`:
     /// the context's Project key, in the Agent's own spelling, so that the
     /// switch applies only there. One segment after it may be `{name}`,
-    /// the Entry's name, or `{plugin_id}`, the id of the plugin it is part of.
+    /// the Entry's name, or `{plugin_id}`, the id of the plugin it is part
+    /// of, or both, `{plugin_id}` first, for a switch of each Entry of a
+    /// plugin, such as Codex's `plugins.<id>.mcp_servers.<name>.enabled`.
     pub key_path: Vec<String>,
     /// When the value where `{name}` stands is a list of objects rather
     /// than an object keyed by name, the field of each that holds its name,
     /// such as `name` in the `skills` of the manifest of Claude Desktop's
     /// skill mirror. config-digger only reads such a switch.
     pub named_by: Option<String>,
+    /// With `named_by`, whether of several items naming an Entry the
+    /// Agent takes the last, such as the rules of Codex's
+    /// `[[skills.config]]`, rather than the first.
+    #[serde(default)]
+    pub later_wins: bool,
     /// How the switch's file behaves while the Agent runs. A `sqlite` file
     /// is a SQLite store, such as VS Code's `state.vscdb`, whose `ItemTable`
     /// holds JSON text under the key path's first key.
@@ -4516,6 +4608,9 @@ pub(crate) struct Switch {
     /// The dialect the Agent reads the file in, such as Cursor's JSONC
     /// `.cursor/settings.json`. Omitted for strict JSON.
     pub dialect: Option<JsonDialect>,
+    /// Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.
+    #[serde(default)]
+    pub toml: bool,
 }
 
 /// The switch `key_path` segment that stands for the Entry's name.
@@ -4544,6 +4639,9 @@ impl Validate for Switch {
         if self.key_path.is_empty() || self.key_path.iter().any(String::is_empty) {
             return Err("a switch needs a key path, with no empty key".into());
         }
+        if self.toml && (self.sqlite() || self.dialect.is_some()) {
+            return Err("a TOML switch takes no dialect and is no SQLite store".into());
+        }
         if self.sqlite()
             && (is_entry_key(&self.key_path[0]) || self.key_path[0] == super::PROJECT_KEY)
         {
@@ -4556,6 +4654,8 @@ impl Validate for Switch {
             if !self.names() {
                 return Err(format!("named_by needs `{NAME_KEY}` in the key path"));
             }
+        } else if self.later_wins {
+            return Err("later_wins needs named_by".into());
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();
@@ -4564,9 +4664,11 @@ impl Validate for Switch {
                 return Err(format!("a switch key path holds `{template}` twice"));
             }
         }
-        if self.names() && self.plugins() {
+        if let (Some(name), Some(plugin)) = (position(NAME_KEY), position(PLUGIN_KEY))
+            && name < plugin
+        {
             return Err(format!(
-                "a switch key path cannot hold both `{NAME_KEY}` and `{PLUGIN_KEY}`"
+                "`{PLUGIN_KEY}` must come before `{NAME_KEY}` in a switch key path"
             ));
         }
         if self.anchor.walk() != ProjectWalk::None {
@@ -4599,8 +4701,21 @@ impl Switch {
     }
 
     /// How the file is parsed.
-    pub fn format(&self) -> JsonFormat {
-        JsonFormat::of(self.dialect)
+    pub fn format(&self) -> Box<dyn Parse> {
+        if self.toml {
+            Box::new(TomlFormat {})
+        } else {
+            Box::new(JsonFormat::of(self.dialect))
+        }
+    }
+
+    /// The syntax the file is edited in.
+    pub fn syntax(&self) -> Syntax {
+        if self.toml {
+            Syntax::Toml
+        } else {
+            Syntax::Jsonc
+        }
     }
 
     /// Whether the switch applies in one Project only, so that it needs one.
@@ -4619,6 +4734,12 @@ impl Switch {
     /// that it holds one value per plugin.
     pub fn plugins(&self) -> bool {
         self.key_path.iter().any(|key| key == PLUGIN_KEY) || self.anchor.per_plugin()
+    }
+
+    /// Whether it holds one value per plugin, by its id alone, rather than
+    /// one per Entry of each plugin.
+    pub fn per_plugin(&self) -> bool {
+        self.plugins() && !self.names()
     }
 }
 

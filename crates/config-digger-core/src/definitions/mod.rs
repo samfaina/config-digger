@@ -8,8 +8,8 @@ use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locate,
-    Locator, LookUp, MechanismTarget, Merge, PluginRegistry, ProjectWalk, Provenance, Register,
-    Registry, Rule, SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
+    SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -553,6 +553,8 @@ pub(crate) struct LocationDefinition {
     /// Entry's name; `{folder_index}`, the position of its folder among
     /// those of the Project, 0 for a folder Project; `{uri_path}`, the path
     /// of the `file:` URI of its file or skill folder, such as `/C:/x`;
+    /// `{skill_file}`, the absolute path of a skill's `SKILL.md`, the links
+    /// of its folder and of the folders above it resolved;
     /// `{plugin_uri}`, the `file:` URI of its plugin's folder; and
     /// `{extension}`, the key `*` stands for in its root up to a `/`, in
     /// lower case.
@@ -1491,6 +1493,34 @@ impl AgentDefinition {
                 {
                     return Err(context(format!("`{id}` is not a location of this kind")));
                 }
+                if let Some(block) = mechanism.merged_field() {
+                    let Some(merge) = rules.merge.as_ref().filter(|m| m.enabled().is_some()) else {
+                        return Err(context(
+                            "merged-field needs a merge with an `enabled` field".into(),
+                        ));
+                    };
+                    if let Some(id) = block.locations.iter().find(|id| !merge.covers(id)) {
+                        return Err(context(format!("`{id}` does not merge")));
+                    }
+                    if let Some(id) = &block.fallback {
+                        let fallback = declared
+                            .contains(id.as_str())
+                            .then(|| self.location(id))
+                            .filter(|fallback| {
+                                merge.covers(id)
+                                    && fallback.format.file().is_some()
+                                    && !fallback.anchor.in_project()
+                                    && fallback.anchor.plugin().is_none()
+                                    && !fallback.provenance.read_only()
+                            });
+                        if fallback.is_none() {
+                            return Err(context(format!(
+                                "fallback `{id}` is no writable file outside Projects and plugins that merges"
+                            )));
+                        }
+                    }
+                    continue;
+                }
                 let Some(mechanism) = mechanism.switched() else {
                     // Parking moves a key out of a file, or a skill's folder
                     // out of a folder of skill folders, and back.
@@ -1526,9 +1556,11 @@ impl AgentDefinition {
                         )));
                     }
                 }
-                if mechanism.target() == MechanismTarget::Plugin {
+                if mechanism.switch().plugins() {
                     if mechanism.locations().is_empty() {
-                        return Err(context("target `plugin` needs its locations listed".into()));
+                        return Err(context(
+                            "a switch keyed by plugin needs its locations listed".into(),
+                        ));
                     }
                     if let Some(id) = mechanism
                         .locations()
@@ -1536,7 +1568,7 @@ impl AgentDefinition {
                         .find(|id| self.location(id).anchor.plugin().is_none())
                     {
                         return Err(context(format!(
-                            "target `plugin` covers locations in plugins only, not `{id}`"
+                            "a switch keyed by plugin covers locations in plugins only, not `{id}`"
                         )));
                     }
                 }

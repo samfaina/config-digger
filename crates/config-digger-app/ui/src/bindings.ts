@@ -222,8 +222,9 @@ export type DisableNotOffered =
  */
 "read_only" | 
 /**
- *  The Entry is in a Mirrored home, which another tool copies from
- *  another Agent home: config-digger never writes to it.
+ *  The Entry is in a Mirrored home, which config-digger never writes
+ *  to, and the Agent home it is copied from holds no Entry it was
+ *  copied from to act on instead.
  */
 "mirrored";
 
@@ -332,6 +333,13 @@ export type Entry = {
 	 *  there in the same context, sorted by Agent and home.
 	 */
 	also_read_by: AlsoReadBy[],
+	/**
+	 *  For an Entry of a Mirrored home, the `<path>#<key path>` locator of the
+	 *  Entry it was copied from, which its actions go to: they are those of
+	 *  that Entry. `None` otherwise, and when the home it is copied from
+	 *  lacks it.
+	 */
+	copied_from: string | null,
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */
@@ -893,8 +901,9 @@ export type RemoveNotOffered =
  */
 "read_only" | 
 /**
- *  The Entry is in a Mirrored home, which another tool copies from
- *  another Agent home: config-digger never writes to it.
+ *  The Entry is in a Mirrored home, which config-digger never writes
+ *  to, and the Agent home it is copied from holds no Entry it was
+ *  copied from to act on instead.
  */
 "mirrored" | 
 /**  The Entry is part of a plugin, which only the Agent uninstalls. */

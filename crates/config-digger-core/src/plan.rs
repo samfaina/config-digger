@@ -140,8 +140,9 @@ pub(crate) fn plan(
     // The leftovers of the context's own Project are in it already.
     let mut leftovers = resolve::leftovers(definitions, snapshot);
     leftovers.retain(|leftovers| before.project.as_ref() != Some(&leftovers.project));
-    let targeted = select::select_entries(&before, &leftovers, &targets.selectors, targets.all)?;
-    let planned = Targeted {
+    let selected = select::select_entries(&before, &leftovers, &targets.selectors, targets.all)?;
+    let (targeted, mirrored) = redirected(definitions, snapshot, &before, selected, action)?;
+    let targeted_entries = Targeted {
         definitions,
         ports,
         snapshot,
@@ -152,16 +153,104 @@ pub(crate) fn plan(
         leftovers: &leftovers,
         entries: &targeted,
     };
-    match action {
-        Action::Remove => planned.remove(),
-        Action::Disable | Action::Enable => planned.switch(),
+    let mut planned = match action {
+        Action::Remove => targeted_entries.remove(),
+        Action::Disable | Action::Enable => targeted_entries.switch(),
         Action::Undo => Err(Error::unexpected(
             "an Undo targets an Operation, not Entries: plan it with plan_undo",
         )),
         Action::DeleteBackup => Err(Error::unexpected(
             "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
         )),
+    }?;
+    for home in mirrored {
+        let mirror = home.mirror.as_ref().expect("a Mirrored home has a mirror");
+        // What it writes outside the home it copies, such as a Project's
+        // file, which both homes read, reaches the mirror as it is.
+        let copied = mirror.source_folder.as_deref().is_none_or(|source| {
+            let written = planned.preview.files.iter().map(|file| &file.path);
+            let moved = planned.preview.folders.iter().map(|folder| &folder.path);
+            written.chain(moved).any(|path| path.starts_with(source))
+        });
+        if !copied {
+            continue;
+        }
+        planned.preview.info.push(Info {
+            code: InfoCode::ReachesMirroredHome,
+            path: home.folder.clone(),
+            sentence: explain::reaches_mirrored_home(
+                &mirror.owner,
+                &home.folder,
+                mirror.source_folder.as_deref(),
+            ),
+        });
     }
+    Ok(planned)
+}
+
+/// The Entries an action on `selected` goes to, each once: each Entry
+/// itself, or for one of a Mirrored home, the Entry it was copied from, as
+/// `before` holds it. With them, the Mirrored homes the action reaches
+/// through the tool that copies them. Refused for an Entry of a Mirrored
+/// home that the home it is copied from lacks.
+fn redirected<'i, 's>(
+    definitions: &[AgentDefinition],
+    snapshot: &'s Snapshot,
+    before: &'i Inventory,
+    selected: Vec<&'i api::Entry>,
+    action: Action,
+) -> Result<(Vec<&'i api::Entry>, Vec<&'s scan::ScannedHome>), Error> {
+    let mut targeted: Vec<&api::Entry> = Vec::new();
+    let mut mirrored: Vec<&scan::ScannedHome> = Vec::new();
+    for entry in selected {
+        // Several homes can read one file, so the Entry is the one of the
+        // home whose Item holds it.
+        let held_by = before
+            .items
+            .iter()
+            .find(|item| item.entries.iter().any(|own| std::ptr::eq(own, entry)));
+        let scanned = held_by
+            .and_then(|item| {
+                let agent = definitions
+                    .iter()
+                    .position(|definition| definition.agent.id == item.agent)?;
+                snapshot.entry_in(agent, &item.home, &entry.path, &entry.key_path)
+            })
+            .unwrap_or_else(|| snapshot.entry(&entry.path, &entry.key_path));
+        let target = match snapshot.mirror_of(scanned) {
+            None => entry,
+            Some(mirror) => {
+                let agent = &definitions[scanned.agent_index].agent.id;
+                let source = snapshot.copied_from(scanned).and_then(|source| {
+                    let locator = crate::locator::render(&source.path, &source.key_path);
+                    item_in(before, agent, &source.home, &locator)?
+                        .entries
+                        .iter()
+                        .find(|known| known.identity() == locator)
+                });
+                let Some(source) = source else {
+                    return Err(Error::blocked(explain::mirrored_without_source(
+                        explain::action_verb(action),
+                        &entry.locator,
+                        &mirror.owner,
+                        mirror.source_folder.as_deref(),
+                    )));
+                };
+                let home = snapshot.home_of(scanned);
+                if !mirrored.iter().any(|known| known.home == home.home) {
+                    mirrored.push(home);
+                }
+                source
+            }
+        };
+        if !targeted
+            .iter()
+            .any(|known| known.identity() == target.identity())
+        {
+            targeted.push(target);
+        }
+    }
+    Ok((targeted, mirrored))
 }
 
 /// Plans the Remove of every leftover of the missing Project `project`, in
@@ -423,18 +512,6 @@ impl Targeted<'_> {
                 )));
             }
             let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
-            if let Some(mirror) = self.snapshot.mirror_of(scanned) {
-                let action = match self.action {
-                    Action::Disable => "Disable",
-                    _ => "Enable",
-                };
-                return Err(Error::blocked(explain::mirrored_refused(
-                    action,
-                    &entry.locator,
-                    &mirror.owner,
-                    mirror.source_folder.as_deref(),
-                )));
-            }
             let definition = &self.definitions[scanned.agent_index];
             match self.action {
                 Action::Disable => {
@@ -454,6 +531,7 @@ impl Targeted<'_> {
                         Choice::Switch {
                             path,
                             edits,
+                            syntax,
                             sqlite,
                             ..
                         } => {
@@ -464,7 +542,13 @@ impl Targeted<'_> {
                             });
                             if !shared {
                                 for edit in edits {
-                                    add_switch_edit(&mut by_file, path.clone(), sqlite, edit);
+                                    add_switch_edit(
+                                        &mut by_file,
+                                        path.clone(),
+                                        syntax,
+                                        sqlite,
+                                        edit,
+                                    );
                                 }
                             }
                         }
@@ -520,9 +604,10 @@ impl Targeted<'_> {
                             continue;
                         }
                         let sqlite = hit.mechanism.switch().sqlite();
+                        let syntax = hit.mechanism.switch().syntax();
                         for edit in hit.enable_edits() {
                             let path = hit.switch.path.clone();
-                            add_switch_edit(&mut by_file, path, sqlite, edit);
+                            add_switch_edit(&mut by_file, path, syntax, sqlite, edit);
                         }
                         lifted.push(hit);
                     }
@@ -991,10 +1076,16 @@ fn add_edit(
     }
 }
 
-/// Adds `edit` to the edits of the switch file at `path`, a SQLite store
-/// when `sqlite`.
-fn add_switch_edit(by_file: &mut Vec<FileEdits>, path: PathBuf, sqlite: bool, edit: Edit) {
-    add_edit(by_file, path.clone(), Syntax::Jsonc, edit, false);
+/// Adds `edit` to the edits of the switch file at `path`, edited in
+/// `syntax`, a SQLite store when `sqlite`.
+fn add_switch_edit(
+    by_file: &mut Vec<FileEdits>,
+    path: PathBuf,
+    syntax: Syntax,
+    sqlite: bool,
+    edit: Edit,
+) {
+    add_edit(by_file, path.clone(), syntax, edit, false);
     if let Some(file) = by_file.iter_mut().find(|file| file.path == path) {
         file.sqlite |= sqlite;
     }
@@ -1975,7 +2066,15 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
             };
             let before_locator = effective_in(item_before);
             let after_locator = effective_in(item_after);
+            let merges = item_before.built.is_some() || item_after.built.is_some();
+            let (built_before, built_after) = if merges {
+                (built_by(item_before), built_by(item_after))
+            } else {
+                (None, None)
+            };
             effective.push(EffectiveChange {
+                built_before,
+                built_after,
                 agent: item.agent.clone(),
                 home: item.home.clone(),
                 item: item.name.clone(),
@@ -1991,6 +2090,51 @@ fn predict(before: &Inventory, after: &Inventory) -> (Vec<Change>, Vec<Effective
         }
     }
     (changes, effective)
+}
+
+/// The server the Agent uses for `item`: the one it builds from several
+/// Entries, or else the Effective Entry's, every field from it.
+fn built_by(item: &api::Item) -> Option<api::BuiltServer> {
+    if let Some(built) = &item.built {
+        return Some(built.clone());
+    }
+    let entry = item
+        .entries
+        .iter()
+        .find(|entry| entry.state == State::Effective)?;
+    let mut origins = Vec::new();
+    leaf_fields(&entry.config, &mut Vec::new(), &mut |key_path| {
+        origins.push(api::FieldOrigin {
+            key_path,
+            entry: entry.locator.clone(),
+        });
+    });
+    Some(api::BuiltServer {
+        config: entry.config.clone(),
+        masked: entry.masked.clone(),
+        origins,
+    })
+}
+
+/// Calls `visit` with the key path of each value below `value` that is not
+/// an object, and of each empty object, in order: the fields a built
+/// server's origins name.
+fn leaf_fields(
+    value: &serde_json::Value,
+    at: &mut Vec<String>,
+    visit: &mut impl FnMut(Vec<String>),
+) {
+    match value.as_object() {
+        Some(object) if !object.is_empty() => {
+            for (key, child) in object {
+                at.push(key.clone());
+                leaf_fields(child, at, visit);
+                at.pop();
+            }
+        }
+        _ if !at.is_empty() => visit(at.clone()),
+        _ => {}
+    }
 }
 
 /// The Item of an Agent home that has an Entry at `locator`.

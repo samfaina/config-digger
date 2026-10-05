@@ -163,6 +163,7 @@ mod tests {
                 remove: RemoveOption::Offered,
                 caveats: Vec::new(),
                 also_read_by: Vec::new(),
+                copied_from: None,
             }],
             caveats: Vec::new(),
         }

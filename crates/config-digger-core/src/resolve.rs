@@ -730,6 +730,7 @@ pub(crate) fn resolve(
                         .chain(gate_caveats)
                         .collect(),
                         also_read_by: Vec::new(),
+                        copied_from: None,
                     }
                 })
                 .collect();
@@ -784,6 +785,7 @@ pub(crate) fn resolve(
         .collect();
 
     also_read_by(definitions, &mut items);
+    from_copied(definitions, snapshot, &mut items);
 
     let read_failures = snapshot
         .read_failures
@@ -1186,6 +1188,7 @@ fn unread_entry(
         remove: remove(definition, snapshot, location, entry),
         caveats,
         also_read_by: Vec::new(),
+        copied_from: None,
     }
 }
 
@@ -1385,7 +1388,7 @@ fn skipped_source<'s>(
 /// The gates of its Item kind that Block `entry` in the context of the
 /// Project with the key `project`, each with the check it belongs to and
 /// why, in the definition's order.
-fn gates(
+pub(crate) fn gates(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
@@ -1749,6 +1752,45 @@ fn remove(
             sentence: explain::how_to_remove_plugin(&plugin.id, &command),
             command,
         }),
+    }
+}
+
+/// Gives each Entry of a Mirrored home the actions of the Entry it was
+/// copied from, which they go to, and that Entry's locator. An Entry the
+/// home it is copied from lacks keeps its own actions, which refuse.
+fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut [api::Item]) {
+    let mut copied: Vec<(usize, usize, api::Entry)> = Vec::new();
+    for (at, item) in items.iter().enumerate() {
+        let Some(agent) = definitions
+            .iter()
+            .position(|definition| definition.agent.id == item.agent)
+        else {
+            continue;
+        };
+        for (index, entry) in item.entries.iter().enumerate() {
+            let source = snapshot
+                .entry_in(agent, &item.home, &entry.path, &entry.key_path)
+                .and_then(|scanned| snapshot.copied_from(scanned));
+            let Some(source) = source else {
+                continue;
+            };
+            let locator = locator::render(&source.path, &source.key_path);
+            let found = items
+                .iter()
+                .filter(|other| other.agent == item.agent && other.home == source.home)
+                .flat_map(|other| &other.entries)
+                .find(|other| other.locator == locator);
+            if let Some(found) = found {
+                copied.push((at, index, found.clone()));
+            }
+        }
+    }
+    for (at, index, source) in copied {
+        let entry = &mut items[at].entries[index];
+        entry.disable = source.disable;
+        entry.enable = source.enable;
+        entry.remove = source.remove;
+        entry.copied_from = Some(source.locator);
     }
 }
 

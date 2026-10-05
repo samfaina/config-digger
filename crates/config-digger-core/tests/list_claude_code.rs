@@ -91,7 +91,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "enable": null,
                     "remove": { "status": "offered" },
                     "caveats": [],
-                    "also_read_by": []
+                    "also_read_by": [],
+                    "copied_from": null
                 }],
                 "built": null,
                 "caveats": []
@@ -124,7 +125,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
                     "enable": null,
                     "remove": { "status": "offered" },
                     "caveats": [],
-                    "also_read_by": []
+                    "also_read_by": [],
+                    "copied_from": null
                 }],
                 "built": null,
                 "caveats": []
