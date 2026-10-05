@@ -157,7 +157,7 @@ describe("a diff", () => {
       "@@ -1,1 +1,1 @@",
       '-  "TOKEN": "ghp_••••"',
       '+  "TOKEN": "ghp_••••"',
-      "\ secret value changed",
+      String.raw`\ secret value changed`,
       "",
     ].join("\n");
 

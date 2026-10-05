@@ -13,6 +13,7 @@ import type {
   ItemKind,
   ReadFailure,
   State,
+  Verb,
 } from "./bindings";
 
 /** The Agent home shown for each Agent, by Agent id. */
@@ -157,8 +158,7 @@ export function couldNotBeRead(count: number): string {
   return count === 1 ? "1 location couldn't be read" : `${count} locations couldn't be read`;
 }
 
-export type ActionVerb = "disable" | "enable" | "remove";
-export type PrimaryAction = { verb: Exclude<ActionVerb, "remove">; offered: boolean; note: string };
+export type PrimaryAction = { verb: Exclude<Verb, "remove">; offered: boolean; note: string };
 export type RemoveAction = { offered: boolean; danger: boolean; note: string };
 export type EntryActions = {
   /** Disable, or Enable for a Disabled Entry. None for an Entry that can only be Removed. */

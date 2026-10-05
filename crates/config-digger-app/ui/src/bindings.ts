@@ -74,7 +74,9 @@ export type Action =
 
 /**  A plan held under `plan_id`, as the dialog shows it. */
 export type ActionPreview = {
+	/**  The id the plan is held under, which executes or cancels it. */
 	plan_id: string,
+	/**  What the plan changes. */
 	preview: Preview,
 	/**  What the user must acknowledge, each on its own. */
 	warnings: Warning[],
@@ -541,7 +543,9 @@ export type ErrorCode = "unexpected" |
 "invalid_path";
 
 /**  What executing a plan did. */
-export type Executed = { kind: "applied"; outcome: Outcome } | 
+export type Executed = 
+/**  Backed up, written and verified. */
+{ kind: "applied"; outcome: Outcome } | 
 /**
  *  Something the plan touched changed after its preview, so nothing was
  *  written: this is a fresh preview of the same action, under a new id.
@@ -1340,18 +1344,24 @@ export type StateAfter = "effective" | "shadowed" | "merged" | "disabled" | "blo
  *  runs, which decides whether that write warns or is blocked then.
  */
 export type StoreClass = 
-/**  A SQLite database the Agent holds open. */
-"sqlite" | 
+/**  A file the Agent reads and leaves alone. */
+"plain" | 
 /**
  *  A file the Agent rewrites from memory while it runs, such as
  *  `~/.claude.json`.
  */
 "rewritten-while-running" | 
-/**  A file the Agent reads and leaves alone. */
-"plain";
+/**  A SQLite database the Agent holds open. */
+"sqlite";
 
 /**  What the dialog does to one Entry. */
-export type Verb = "disable" | "enable" | "remove";
+export type Verb = 
+/**  Makes the Entry stop taking effect while keeping it. */
+"disable" | 
+/**  Makes a Disabled Entry take effect again. */
+"enable" | 
+/**  Deletes the Entry for every Agent that reads it. */
+"remove";
 
 /**  What Verify found once every edit had landed. */
 export type Verify = 

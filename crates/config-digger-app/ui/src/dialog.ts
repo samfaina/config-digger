@@ -79,14 +79,16 @@ export function locations(preview: Preview): Location[] {
   ];
 }
 
+/** One line of a masked diff. `secret` is the note under a line whose only change is a Secret. */
 export type DiffLine = { kind: "hunk" | "context" | "added" | "removed" | "secret"; text: string };
 
 /** A file's masked diff line by line, or the core's notice of why it cannot be shown. */
 export type DiffView = { kind: "lines"; lines: DiffLine[] } | { kind: "notice"; sentence: string };
 
 /** The note the core puts under a line whose only change is a Secret. */
-const SECRET_CHANGED = "\ secret value changed";
+const SECRET_CHANGED = String.raw`\ secret value changed`;
 
+/** A file's masked diff, without its file headers, or the notice that replaces it. */
 export function diffView(diff: Pick<FileChange, "diff" | "diff_note">): DiffView {
   if (diff.diff === null) return { kind: "notice", sentence: diff.diff_note ?? "No diff can be shown." };
   const lines: DiffLine[] = [];
@@ -101,9 +103,11 @@ export function diffView(diff: Pick<FileChange, "diff" | "diff_note">): DiffView
   return { kind: "lines", lines };
 }
 
+/** The chain Apply runs, and the Rollback that follows a failure once anything was written. */
 export type StepName = "Back up" | "Write" | "Verify" | "Rollback";
 /** `warn` is a Verify that found States other than the predicted ones. */
 export type StepStatus = "done" | "warn" | "failed";
+/** One step of the chain, as far as it got. */
 export type Step = { name: StepName; status: StepStatus };
 
 /** What Apply did, as the dialog shows it once it is done. */
@@ -142,6 +146,7 @@ export type Result =
 const done = (name: StepName): Step => ({ name, status: "done" });
 const failed = (name: StepName): Step => ({ name, status: "failed" });
 
+/** What an applied Operation did, with Verify amber when States differ from the prediction. */
 export function appliedResult(outcome: Outcome): Result {
   return {
     kind: "applied",
@@ -173,6 +178,7 @@ function failedSteps(code: ErrorCode | null): Step[] | null {
   }
 }
 
+/** What a failed Apply did: how far the chain got, and where the Rollback left each location. */
 export function failedResult(error: ApiError): Result {
   const cause = error.message;
   const rollback = error.failed?.rollback ?? [];

@@ -712,23 +712,23 @@ impl FileChange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum StoreClass {
-    /// A SQLite database the Agent holds open.
-    Sqlite,
+    /// A file the Agent reads and leaves alone.
+    Plain,
     /// A file the Agent rewrites from memory while it runs, such as
     /// `~/.claude.json`.
     RewrittenWhileRunning,
-    /// A file the Agent reads and leaves alone.
-    Plain,
+    /// A SQLite database the Agent holds open.
+    Sqlite,
 }
 
 impl From<definitions::blocks::StoreClass> for StoreClass {
     fn from(class: definitions::blocks::StoreClass) -> Self {
         match class {
-            definitions::blocks::StoreClass::Sqlite => StoreClass::Sqlite,
+            definitions::blocks::StoreClass::Plain => StoreClass::Plain,
             definitions::blocks::StoreClass::RewrittenWhileRunning => {
                 StoreClass::RewrittenWhileRunning
             }
-            definitions::blocks::StoreClass::Plain => StoreClass::Plain,
+            definitions::blocks::StoreClass::Sqlite => StoreClass::Sqlite,
         }
     }
 }

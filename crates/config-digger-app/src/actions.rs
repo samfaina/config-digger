@@ -3,6 +3,7 @@
 //! it by id with the warnings the user acknowledged. A plan is dropped once
 //! it is executed or cancelled, and with the app when it exits.
 
+use crate::session;
 use config_digger_core::api::{
     Action, Block, Context, Core, Error, ErrorCode, Outcome, Plan, Preview, ScanOptions, Targets,
     Warning, WarningClass,
@@ -30,8 +31,11 @@ pub enum ActionRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Verb {
+    /// Makes the Entry stop taking effect while keeping it.
     Disable,
+    /// Makes a Disabled Entry take effect again.
     Enable,
+    /// Deletes the Entry for every Agent that reads it.
     Remove,
 }
 
@@ -48,7 +52,9 @@ impl From<Verb> for Action {
 /// A plan held under `plan_id`, as the dialog shows it.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct ActionPreview {
+    /// The id the plan is held under, which executes or cancels it.
     pub plan_id: String,
+    /// What the plan changes.
     pub preview: Preview,
     /// What the user must acknowledge, each on its own.
     pub warnings: Vec<Warning>,
@@ -60,9 +66,8 @@ pub struct ActionPreview {
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Executed {
-    Applied {
-        outcome: Outcome,
-    },
+    /// Backed up, written and verified.
+    Applied { outcome: Outcome },
     /// Something the plan touched changed after its preview, so nothing was
     /// written: this is a fresh preview of the same action, under a new id.
     Replanned {
@@ -78,7 +83,8 @@ pub struct Actions {
     held: HashMap<String, Held>,
     /// The number of the last plan, from which each plan's id is made.
     planned: u64,
-    /// The backup folders of the Operations executed, which can be revealed.
+    /// The backup folders reported by an Operation or a refused Undo, which
+    /// can be revealed.
     reported: HashSet<String>,
 }
 
@@ -89,6 +95,7 @@ struct Held {
 }
 
 impl Actions {
+    /// No plans yet, planned and executed through `core`.
     pub fn new(core: Core) -> Self {
         Self {
             core,
@@ -100,7 +107,25 @@ impl Actions {
 
     /// Plans `request` against what the disk holds now, and holds the plan.
     pub fn plan(&mut self, request: &ActionRequest) -> Result<ActionPreview, Error> {
-        let plan = match request {
+        let plan = self.planned_from(request).inspect_err(|error| {
+            // A refused Undo points at the backup to recover from.
+            self.report(error.backup.as_deref());
+        })?;
+        self.planned += 1;
+        let plan_id = format!("plan-{}", self.planned);
+        let preview = ActionPreview {
+            plan_id: plan_id.clone(),
+            preview: plan.preview().clone(),
+            warnings: plan.warnings().to_vec(),
+            blocks: plan.blocks().to_vec(),
+        };
+        let request = request.clone();
+        self.held.insert(plan_id, Held { plan, request });
+        Ok(preview)
+    }
+
+    fn planned_from(&self, request: &ActionRequest) -> Result<Plan, Error> {
+        match request {
             ActionRequest::Entry {
                 verb,
                 locator,
@@ -117,21 +142,10 @@ impl Actions {
                     all: false,
                 };
                 self.core
-                    .plan(&snapshot, &context, (*verb).into(), &targets)?
+                    .plan(&snapshot, &context, (*verb).into(), &targets)
             }
-            ActionRequest::Undo { operation } => self.core.plan_undo(operation)?,
-        };
-        self.planned += 1;
-        let plan_id = format!("plan-{}", self.planned);
-        let preview = ActionPreview {
-            plan_id: plan_id.clone(),
-            preview: plan.preview().clone(),
-            warnings: plan.warnings().to_vec(),
-            blocks: plan.blocks().to_vec(),
-        };
-        let request = request.clone();
-        self.held.insert(plan_id, Held { plan, request });
-        Ok(preview)
+            ActionRequest::Undo { operation } => self.core.plan_undo(operation),
+        }
     }
 
     /// Executes the plan held under `plan_id` with the warnings in
@@ -144,23 +158,25 @@ impl Actions {
     ) -> Result<Executed, Error> {
         let Held { plan, request } = self.held.remove(plan_id).ok_or_else(|| not_held(plan_id))?;
         let executed = self.core.execute(plan, acknowledged);
-        let backup = match &executed {
-            Ok(outcome) => Some(&outcome.backup),
-            Err(error) => error.backup.as_ref(),
-        };
-        if let Some(backup) = backup {
-            self.reported.insert(key(backup));
+        match &executed {
+            Ok(outcome) => self.report(Some(&outcome.backup)),
+            Err(error) => self.report(error.backup.as_deref()),
         }
         match executed {
             Ok(outcome) => Ok(Executed::Applied { outcome }),
             Err(error) if error.code == ErrorCode::Stale => {
                 // The core tells a script to plan again, which is done here.
                 let cause = error.message.trim_end_matches("; plan again").to_owned();
-                let preview = self.plan(&request)?;
-                Ok(Executed::Replanned {
-                    preview: Box::new(preview),
-                    cause,
-                })
+                match self.plan(&request) {
+                    Ok(preview) => Ok(Executed::Replanned {
+                        preview: Box::new(preview),
+                        cause,
+                    }),
+                    Err(replan) => Err(Error {
+                        message: format!("Nothing was written: {cause}. {}", replan.message),
+                        ..replan
+                    }),
+                }
             }
             Err(error) => Err(error),
         }
@@ -171,16 +187,17 @@ impl Actions {
         self.held.remove(plan_id);
     }
 
-    /// Whether `path` is the backup folder of an Operation executed here,
-    /// in any letter case: the webview reveals no other.
+    /// Whether `path` is a backup folder an Operation or a refused Undo
+    /// reported here, in any letter case: the webview reveals no other.
     pub fn can_reveal(&self, path: &Path) -> bool {
-        self.reported.contains(&key(path))
+        self.reported.contains(&session::key(path))
     }
-}
 
-/// Windows compares paths without regard to letter case.
-fn key(path: &Path) -> String {
-    path.to_string_lossy().to_lowercase()
+    fn report(&mut self, backup: Option<&Path>) {
+        if let Some(backup) = backup {
+            self.reported.insert(session::key(backup));
+        }
+    }
 }
 
 /// Why a plan id is not one held.
@@ -326,5 +343,58 @@ mod tests {
         assert!(actions.can_reveal(&outcome.backup));
         assert!(!actions.can_reveal(&planned.preview.backup_folder));
         assert!(!actions.can_reveal(Path::new(r"C:\Windows")));
+    }
+
+    #[test]
+    fn a_refused_undo_reports_a_backup_folder_that_can_be_revealed() {
+        let fs = fixture();
+        let mut actions = actions(&fs);
+        let planned = actions.plan(&remove_notes()).unwrap();
+        let Executed::Applied { outcome } = actions.execute(&planned.plan_id, &[]).unwrap() else {
+            panic!("applied");
+        };
+        let undo = actions
+            .plan(&ActionRequest::Undo {
+                operation: outcome.operation,
+            })
+            .unwrap();
+        let Executed::Applied { outcome } = actions.execute(&undo.plan_id, &[]).unwrap() else {
+            panic!("undone");
+        };
+        // The Entry the Undo put back changes since.
+        fs.put_file(
+            claude_json(),
+            CLAUDE_JSON.replace("notes-mcp", "notes-mcp-2"),
+        );
+        // The Operation ran before the app restarted.
+        let mut actions = self::actions(&fs);
+
+        let refused = actions
+            .plan(&ActionRequest::Undo {
+                operation: outcome.operation,
+            })
+            .unwrap_err();
+
+        assert_eq!(refused.code, ErrorCode::UndoRefused);
+        assert!(actions.can_reveal(refused.backup.as_deref().unwrap()));
+    }
+
+    #[test]
+    fn a_stale_preview_that_cannot_be_planned_again_says_nothing_was_written() {
+        let fs = fixture();
+        let mut actions = actions(&fs);
+        let planned = actions.plan(&remove_notes()).unwrap();
+        let gone = r#"{ "mcpServers": {}, "projects": { "E:/projects/app": {} } }"#;
+        fs.put_file(claude_json(), gone);
+
+        let error = actions.execute(&planned.plan_id, &[]).unwrap_err();
+
+        assert_eq!(fs.contents(claude_json()).unwrap(), gone.as_bytes());
+        assert!(
+            error.message.starts_with("Nothing was written:"),
+            "{}",
+            error.message
+        );
+        assert!(error.message.contains(".claude.json"), "{}", error.message);
     }
 }

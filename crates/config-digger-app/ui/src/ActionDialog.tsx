@@ -39,10 +39,13 @@ type Phase =
   | { kind: "applying"; planned: ActionPreview }
   | { kind: "done"; planned: ActionPreview; result: Result };
 
+/** An Operation the dialog applied, which the Undo snackbar offers to undo. */
+export type Applied = { operation: string; sentence: string };
+
 type Props = {
   request: ActionRequest;
   /** Closes the dialog, with the Operation applied, if any, for the Undo snackbar. */
-  onClose: (applied: { operation: string; sentence: string } | null) => void;
+  onClose: (applied: Applied | null) => void;
   /** Opens the dialog on the Undo of `operation`. */
   onUndo: (operation: string) => void;
   onOpenHistory: () => void;
@@ -130,6 +133,10 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
     // Executing drops the plan in Rust, whatever it does.
     held.current = null;
     const result = await call(() => commands.executePlan(planned.plan_id, [...acknowledged]));
+    if (!mounted.current) {
+      if (result.status === "ok" && result.data.kind === "replanned") void commands.cancelPlan(result.data.preview.plan_id);
+      return;
+    }
     if (result.status === "error") {
       setPhase({ kind: "done", planned, result: failedResult(result.error) });
     } else if (result.data.kind === "applied") {
@@ -146,7 +153,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
     void plan(null);
   };
 
-  const applied =
+  const applied: Applied | null =
     phase.kind === "done" && phase.result.kind === "applied"
       ? { operation: phase.result.undo, sentence: phase.result.sentence }
       : null;
@@ -184,8 +191,10 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
                 {phase.error.message}
               </div>
             </div>
+            <BackupDiffs diffs={phase.error.diffs} />
             <footer className="dialog-foot">
               <span className="grow" />
+              <BackupFolderButton backup={phase.error.backup} notify={notify} />
               <button type="button" className="cta secondary" onClick={retry}>
                 <Icon name="refresh" small />
                 Check again
@@ -237,10 +246,11 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
   );
 }
 
+/** What a command returns. */
+type CommandResult<T> = { status: "ok"; data: T } | { status: "error"; error: ApiError };
+
 /** Runs a command, turning a thrown failure into an error result. */
-async function call<T>(
-  command: () => Promise<{ status: "ok"; data: T } | { status: "error"; error: ApiError }>,
-): Promise<{ status: "ok"; data: T } | { status: "error"; error: ApiError }> {
+async function call<T>(command: () => Promise<CommandResult<T>>): Promise<CommandResult<T>> {
   try {
     return await command();
   } catch (thrown) {
@@ -261,6 +271,7 @@ type PreviewBodyProps = {
   onApply: () => void;
 };
 
+/** The preview: What changes, Before you apply, Files, and the footer with Cancel and Apply. */
 function PreviewBody({ planned, acknowledged, fresh, onToggle, onCheckAgain, onCancel, onApply }: PreviewBodyProps) {
   const { preview, warnings, blocks } = planned;
   const button = applyButton(planned, acknowledged);
@@ -318,7 +329,7 @@ function PreviewBody({ planned, acknowledged, fresh, onToggle, onCheckAgain, onC
               <label key={warning.class} className={`check warning${git ? " git" : ""}`}>
                 <input type="checkbox" checked={ticked} onChange={() => onToggle(warning.class)} />
                 <div>
-                  <span className="check-kind">{git ? "Shared file" : "Warning"}</span>
+                  <span className="check-kind">{git ? "Git-versioned" : "Warning"}</span>
                   {warning.sentence}
                 </div>
               </label>
@@ -354,6 +365,7 @@ function PreviewBody({ planned, acknowledged, fresh, onToggle, onCheckAgain, onC
   );
 }
 
+/** A titled section of the dialog, its title ruled to the edge. */
 function DialogSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="dialog-section">
@@ -366,6 +378,7 @@ function DialogSection({ title, children }: { title: string; children: React.Rea
   );
 }
 
+/** One (Agent, Entry, Project) whose State the Operation changes, before → after. */
 function ChangeRow({ change }: { change: Change }) {
   return (
     <div className="change-row">
@@ -386,6 +399,7 @@ function ChangeRow({ change }: { change: Change }) {
   );
 }
 
+/** A State after an Operation, or that the Entry is removed. */
 function StateAfterPill({ state }: { state: StateAfter }) {
   if (state === "removed") return <span className="state-pill small removed">Removed</span>;
   return <StatePill state={state} small />;
@@ -430,7 +444,43 @@ function Diff({ diff }: { diff: Pick<FileDiff, "diff" | "diff_note"> }) {
   );
 }
 
+/** A masked diff from each backed-up file to what it holds now, as for a refused Undo or an incomplete Rollback. */
+function BackupDiffs({ diffs }: { diffs: FileDiff[] }) {
+  if (diffs.length === 0) return null;
+  return (
+    <DialogSection title="Backup → now">
+      {diffs.map((diff) => (
+        <div key={diff.path} className="file-block">
+          <div className="file-head static">
+            <Icon name="doc" small />
+            <span className="mono file-path">{diff.path}</span>
+          </div>
+          <Diff diff={diff} />
+        </div>
+      ))}
+    </DialogSection>
+  );
+}
+
+/** Shows the backup folder an error points at in Explorer. */
+function BackupFolderButton({ backup, notify }: { backup: string | null; notify: Notify }) {
+  if (backup === null) return null;
+  return (
+    <button type="button" className="cta secondary" onClick={() => void revealLocation(backup, notify)}>
+      <Icon name="folder" small />
+      Open backup folder
+    </button>
+  );
+}
+
 const STEP_NAMES = ["Back up", "Write", "Verify"] as const;
+
+/** What each step's dot shows once it ran; a step yet to run shows its number. */
+const STEP_GLYPHS: Partial<Record<Step["status"] | "running" | "pending", string>> = {
+  done: "✓",
+  warn: "!",
+  failed: "✗",
+};
 
 /** The Back up → Write → Verify chain, then Rollback when it ran. While `running`, the write is under way. */
 function Steps({ steps, running = false }: { steps: Step[]; running?: boolean }) {
@@ -441,9 +491,7 @@ function Steps({ steps, running = false }: { steps: Step[]; running?: boolean })
     <ol className="steps" aria-live="polite">
       {shown.map((step, index) => (
         <li key={step.name} className={`step ${step.status}`}>
-          <span className="step-dot">
-            {step.status === "done" ? "✓" : step.status === "failed" ? "✗" : step.status === "warn" ? "!" : index + 1}
-          </span>
+          <span className="step-dot">{STEP_GLYPHS[step.status] ?? index + 1}</span>
           {step.status === "failed" ? `${step.name} failed` : step.name}
           {step.status === "warn" && <span className="dim"> · with differences</span>}
         </li>
@@ -461,6 +509,7 @@ type ResultBodyProps = {
   notify: Notify;
 };
 
+/** The chain as far as it got, then what Apply did and what can be done next. */
 function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }: ResultBodyProps) {
   return (
     <>
@@ -585,27 +634,10 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
               </div>
             ))}
           </DialogSection>
-          {result.diffs.length > 0 && (
-            <DialogSection title="Backup → now">
-              {result.diffs.map((diff) => (
-                <div key={diff.path} className="file-block">
-                  <div className="file-head static">
-                    <Icon name="doc" small />
-                    <span className="mono file-path">{diff.path}</span>
-                  </div>
-                  <Diff diff={diff} />
-                </div>
-              ))}
-            </DialogSection>
-          )}
+          <BackupDiffs diffs={result.diffs} />
           <footer className="dialog-foot">
             <span className="grow" />
-            {result.backup !== null && (
-              <button type="button" className="cta secondary" onClick={() => void revealLocation(result.backup!, notify)}>
-                <Icon name="folder" small />
-                Open backup folder
-              </button>
-            )}
+            <BackupFolderButton backup={result.backup} notify={notify} />
             <button type="button" className="cta secondary" onClick={onOpenHistory}>
               Open History
             </button>

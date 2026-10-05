@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActionDialog } from "./ActionDialog";
-import type { ActionRequest, AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State } from "./bindings";
+import { ActionDialog, type Applied } from "./ActionDialog";
+import type { ActionRequest, AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
 import type { Notify } from "./desktop";
 import { EntryCard } from "./EntryCard";
 import { Icon } from "./icons";
@@ -27,7 +27,6 @@ import {
   readerItem,
   samePath,
   stateCounts,
-  type ActionVerb,
   type AgentStats,
   type HomeChoice,
   type ItemFilter,
@@ -52,7 +51,7 @@ export function InventoryScreen({ onOpenHistory }: { onOpenHistory: () => void }
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);
   // The action open in the dialog, numbered so that each one opens afresh.
   const [dialog, setDialog] = useState<{ request: ActionRequest; key: number } | null>(null);
-  const [snackbar, setSnackbar] = useTransient<{ operation: string; sentence: string }>(SNACKBAR_MS);
+  const [snackbar, setSnackbar] = useTransient<Applied>(SNACKBAR_MS);
   const openDialog = (request: ActionRequest) => {
     setSnackbar(null);
     setDialog((current) => ({ request, key: (current?.key ?? 0) + 1 }));
@@ -92,7 +91,7 @@ export function InventoryScreen({ onOpenHistory }: { onOpenHistory: () => void }
     setFlash(locator);
   };
   // The action dialog that previews each action comes later.
-  const onAction = (verb: ActionVerb, entry: Entry) =>
+  const onAction = (verb: Verb, entry: Entry) =>
     openDialog({ kind: "entry", verb, locator: entry.locator, project: inventory?.project ?? null });
 
   return (
@@ -621,7 +620,7 @@ type ItemDetailProps = {
   flash: string | null;
   onShowWinner: (locator: string) => void;
   onReader: (reader: AlsoReadBy, locator: string) => void;
-  onAction: (verb: ActionVerb, entry: Entry) => void;
+  onAction: (verb: Verb, entry: Entry) => void;
   notify: Notify;
 };
 
