@@ -2959,6 +2959,11 @@
                 "$ref": "#/$defs/Condition"
               }
             },
+            "ignore_case": {
+              "description": "Whether the Agent compares the names in the list without regard to\ncase, such as Gemini CLI's `skills.disabled`.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "json-name-list"
@@ -3134,6 +3139,38 @@
           ]
         },
         {
+          "description": "A list of path rules per plugin, such as the `overrides` of each\nextension in Gemini CLI's `extension-enablement.json`, which the Agent\nreads for the folder it starts in. Each rule is a folder spelled\n`/E:/proj/`, `!` before it turning the plugin off rather than on, and\n`*` after it reaching the folders below too; of the rules that reach\nthe folder, the last decides, and with none the plugin is on. Folders\ncompare without regard to case. Disable takes the Project's own rules\nout and appends one turning the plugin off in the Project and the\nfolders below; Enable takes them out, and appends one turning it on\nwhen another rule still turns it off there. With no Project there is\nno folder to read the rules for: the plugin is on, and Disable is not\noffered.",
+          "type": "object",
+          "properties": {
+            "switch": {
+              "description": "The list, its key path naming the plugin with `{plugin_id}`.",
+              "$ref": "#/$defs/Switch"
+            },
+            "reason": {
+              "description": "Must be `plugin_disabled`.",
+              "$ref": "#/$defs/DisableReason"
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it Disables, each in plugins.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "block": {
+              "type": "string",
+              "const": "json-path-rules"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "switch",
+            "reason",
+            "locations"
+          ]
+        },
+        {
           "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one. Enable is left to the merge's own\nrules.",
           "type": "object",
           "properties": {
@@ -3235,6 +3272,16 @@
         },
         "toml": {
           "description": "Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.",
+          "type": "boolean",
+          "default": false
+        },
+        "lower_names": {
+          "description": "Whether `{name}` stands for the Entry's name trimmed and in lower\ncase, such as in Gemini CLI's `mcp-server-enablement.json`, so that\nnames that differ in case alone share one switch.",
+          "type": "boolean",
+          "default": false
+        },
+        "trusted_only": {
+          "description": "Whether the Agent reads the switch, in a Project's file, only when it\nstarts in a folder its Item kind's folder-trust gates trust, such as\nGemini CLI, which ignores a Project's settings in a folder the user\nhas not trusted. Elsewhere it Disables nothing and Disable skips it.",
           "type": "boolean",
           "default": false
         }

@@ -462,6 +462,50 @@ pub(crate) fn field_holds(
     )
 }
 
+/// That `rule`, in the list of path rules at `key_path` in `path`, is the
+/// last that reaches the folder of the context's Project, `folder`.
+pub(crate) fn path_rule_holds(
+    rule: &str,
+    key_path: &[String],
+    path: &Path,
+    folder: Option<&Path>,
+) -> String {
+    let folder = folder.map_or_else(String::new, |folder| format!(" {}", folder.display()));
+    format!(
+        "`{rule}` in `{}` in {} is the last rule that reaches the Project folder{folder}",
+        key_path.join("."),
+        path.display()
+    )
+}
+
+/// What Disable writes in a list of path rules in `path`: `edits`, which
+/// take the Project's own rules out and add one for it and the folders
+/// below it.
+pub(crate) fn disable_path_rule(edits: &[Edit], path: &Path) -> String {
+    format!(
+        "Disable {}, a rule for this Project and the folders below it.",
+        describe_all(edits, path)
+    )
+}
+
+/// What Enable writes in a list of path rules in `path`: `edits`.
+pub(crate) fn enable_path_rules(edits: &[Edit], path: &Path) -> String {
+    if edits.is_empty() {
+        return format!("Enable leaves {} as it is.", path.display());
+    }
+    format!(
+        "Enable {}, for this Project and the folders below it.",
+        describe_all(edits, path)
+    )
+}
+
+/// Edits of a switch in `path` as a sentence says them, one after another.
+fn describe_all(edits: &[Edit], path: &Path) -> String {
+    let path = path.display().to_string();
+    let described: Vec<String> = edits.iter().map(|edit| describe(edit, &path)).collect();
+    described.join(", then ")
+}
+
 /// A Disabled Entry's reason, when the switch `holds` names its Item.
 pub(crate) fn disabled_by_name(holds: &str, agent_name: &str) -> String {
     format!("Disabled by name: {holds}, so {agent_name} skips the Entries with that name.")
@@ -870,6 +914,8 @@ pub(crate) enum Reached {
     InProject(String, PathBuf),
     /// With no Project.
     WithoutProject(String),
+    /// In every Project and with none.
+    Everywhere(String),
 }
 
 /// The warning of a plan whose switches reach the Entries `others` beyond
@@ -887,6 +933,7 @@ pub(crate) fn wide_reach(action: Action, others: &[Reached]) -> String {
                 format!("{locator} in Project {}", project.display())
             }
             Reached::WithoutProject(locator) => format!("{locator} with no Project"),
+            Reached::Everywhere(locator) => format!("{locator} in all projects"),
         })
         .collect();
     format!(

@@ -936,23 +936,48 @@ impl Targeted<'_> {
     /// The `wide-reach` warning when the switches written Disable, or lift
     /// for, Entries the action does not target, or apply in other contexts
     /// than its own. An Entry that only wins or loses against one that the
-    /// switches reach is not reached itself.
+    /// switches reach is not reached itself. An Entry reached in every
+    /// context, or in every other one when it is targeted, is named once.
     fn wide_reach(&self, changes: &[Change]) -> Option<Warning> {
-        let others: Vec<Reached> = changes
+        let reached: Vec<&Change> = changes
             .iter()
             .filter(|change| {
                 change.before == StateAfter::Disabled || change.after == StateAfter::Disabled
             })
+            .collect();
+        let targeted = |locator: &str| self.entries.iter().any(|entry| entry.identity() == locator);
+        // Every Project and none.
+        let contexts = self.before.projects.len() + 1;
+        let everywhere = |locator: &str| {
+            let mut projects: Vec<Option<&PathBuf>> = reached
+                .iter()
+                .filter(|change| change.locator == locator)
+                .map(|change| change.project.as_ref())
+                .chain(targeted(locator).then_some(self.before.project.as_ref()))
+                .collect();
+            projects.sort();
+            projects.dedup();
+            contexts > 1 && projects.len() == contexts
+        };
+        let mut named: Vec<&str> = Vec::new();
+        let others: Vec<Reached> = reached
+            .iter()
             .filter_map(|change| {
                 let locator = change.locator.clone();
+                if everywhere(&locator) {
+                    if named.contains(&change.locator.as_str()) {
+                        return None;
+                    }
+                    named.push(&change.locator);
+                    return Some(Reached::Everywhere(locator));
+                }
                 if change.project != self.before.project {
                     return Some(match &change.project {
                         Some(project) => Reached::InProject(locator, project.clone()),
                         None => Reached::WithoutProject(locator),
                     });
                 }
-                let targeted = self.entries.iter().any(|entry| entry.identity() == locator);
-                (!targeted).then_some(Reached::Here(locator))
+                (!targeted(&locator)).then_some(Reached::Here(locator))
             })
             .collect();
         (!others.is_empty()).then(|| Warning {
