@@ -332,6 +332,12 @@ export type Entry = {
 	 *  there in the same context, sorted by Agent and home.
 	 */
 	also_read_by: AlsoReadBy[],
+	/**
+	 *  For an Entry of a Mirrored home, the `<path>#<key path>` locator of the
+	 *  Entry it was copied from, which its actions go to: they are those of
+	 *  that Entry. `None` otherwise, and when the source home lacks it.
+	 */
+	source: string | null,
 };
 
 /**  A failure of the call itself, as opposed to a Read failure. */

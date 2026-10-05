@@ -104,7 +104,8 @@ registries = [
 # `%CODEX_HOME%\plugins\cache\<marketplace>\<plugin>\<version>`, its
 # highest version being the one it loads [source]. Codex knows each by
 # `<plugin>@<marketplace>`, and names it by its folder [source]. Its own
-# switch, `[plugins."<id>"] enabled`, is not read yet. Codex has no command
+# switch, `[plugins."<id>"] enabled`, is with the Disable mechanisms below.
+# Codex has no command
 # that uninstalls a plugin: `/plugins` in its TUI does [docs].
 [[plugins]]
 id = "installed"
@@ -250,6 +251,57 @@ competition = { block = "exact-name" }
 merge = { block = "deep-merge", exclusive = ["command", "url"], enabled = "enabled", locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"] }
 checks = ["trust", "rules", "merge", "disable", "precedence"]
 
+# Codex's own switch for a server is `enabled = false` in its table, in
+# any layer [docs, source]: the field merges with the others, so it turns
+# off the server built from every layer, and the highest layer that sets it
+# decides. Disable writes it in the Entry's own table, or where a higher
+# layer sets it, as long as no layer above sets it too; for an Entry of a
+# git-versioned Project layer, in a table holding `enabled` alone in the
+# user's `config.toml`. That a lower layer's `enabled = false` holds while
+# no higher one sets it follows from the merge [source, sandbox]. That a
+# higher layer's `enabled = true` wins over it, and that Codex starts with
+# a table holding `enabled` alone where no other layer has the server, are
+# unverified until the release gate.
+[[items.mcp.disable]]
+block = "merged-field"
+locations = ["project-mcp", "user-mcp"]
+requires_unset_above = true
+fallback = "user-mcp"
+
+# A plugin's server has its own switch, `enabled = false` under
+# `[plugins."<id>".mcp_servers.<name>]`, the only key `config.toml` can set
+# for it besides approval and tool settings [source]. Enable takes the
+# field away. That a plugin the account installed honours it too comes from
+# the source; config-digger only reads such a plugin. Codex reads it from
+# the merged layers, but config-digger reads and writes it in the user's
+# `config.toml` alone. Both plugin switches come from Codex's source only,
+# so they are unverified until the release gate.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "mcp_servers", "{name}", "enabled"], store_class = "rewritten-while-running", toml = true }
+target = "entry"
+context = "all"
+enable_action = "delete-key"
+disabled_value = false
+reason = "disabled_natively"
+locations = ["plugin-mcp", "remote-plugin-mcp"]
+
+# A plugin is on or off with every server and skill it carries by
+# `[plugins."<id>"] enabled`, which Codex writes `true` when it installs the
+# plugin and its `/plugins` turns `false` and back [source, docs]. A plugin
+# missing from the file is taken as on. These switches are repeated for
+# skills below.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "enabled"], store_class = "rewritten-while-running", toml = true }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-mcp"]
+
 # A Project's layer counts only once the user trusts its folder, written by
 # Codex's trust prompt as `[projects.'<path>'] trust_level = "trusted"` in
 # the user's `config.toml`, the path lower-cased [source, disk]. Codex looks
@@ -314,6 +366,7 @@ id = "project-skills"
 anchor = { block = "project", path = ".codex/skills", walk = "up-to-repo-root" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
+switch_id = "{skill_file}"
 scope = "project"
 provenance = "file"
 store_class = "plain"
@@ -327,6 +380,7 @@ id = "project-agents-skills"
 anchor = { block = "project", path = ".agents/skills", walk = "up-to-repo-root" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
+switch_id = "{skill_file}"
 scope = "project"
 provenance = "file"
 store_class = "plain"
@@ -339,6 +393,7 @@ id = "user-skills"
 anchor = { block = "home", root = "skills" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
+switch_id = "{skill_file}"
 scope = "user"
 provenance = "file"
 store_class = "plain"
@@ -351,6 +406,7 @@ id = "agents-skills"
 anchor = { block = "machine", path = "~/.agents/skills" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
+switch_id = "{skill_file}"
 scope = "user"
 provenance = "file"
 store_class = "plain"
@@ -412,3 +468,49 @@ on_read_failure = "ignores_file"
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
 checks = ["frontmatter", "disable", "precedence"]
+
+# Codex turns a skill off by a `[[skills.config]]` rule in the user's
+# `config.toml` alone, a Project's layer holding none it reads [docs,
+# source, sandbox]: `path`, the skill's `SKILL.md`, or `name`, every skill
+# of that name, with `enabled = false`, the later rule winning [source].
+# Disable adds a rule by path, which reaches the one skill, written as an
+# absolute path with the links of its folders resolved, since Codex
+# canonicalises the paths of rules before it compares them [source]; how a
+# canonical path is spelled on Windows, with or without `\\?\`, is
+# unverified until the release gate. Enable takes the rule out. Of several
+# rules for one skill, the first is read.
+[[items.skill.disable]]
+block = "json-item-list"
+switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}"], named_by = "path", store_class = "rewritten-while-running", toml = true }
+target = "entry"
+context = "all"
+enable_action = "remove-item"
+disabled_item = { path = "{name}", enabled = false }
+enabled_item = { path = "{name}", enabled = true }
+ignore_case = true
+reason = "disabled_natively"
+locations = ["project-skills", "project-agents-skills", "user-skills", "agents-skills"]
+
+# A rule by name turns off every skill of that name; config-digger only
+# reads it.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}", "enabled"], named_by = "name", store_class = "rewritten-while-running", toml = true }
+target = "name"
+context = "all"
+enable_action = "delete-key"
+disabled_value = false
+enable_offered = false
+reason = "disabled_by_name"
+locations = ["project-skills", "project-agents-skills", "user-skills", "agents-skills"]
+
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "enabled"], store_class = "rewritten-while-running", toml = true }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+locations = ["plugin-skills"]

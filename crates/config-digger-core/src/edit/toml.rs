@@ -163,11 +163,12 @@ impl File<'_> {
         let (parent_path, name) = split_key_path(key_path)?;
         if let (Some(parent), Value::Object(_)) =
             (table_at(self.spans.as_table(), parent_path), value)
-            && parent.is_implicit()
+            && (parent.is_implicit() || parent_path.is_empty())
             && !parent.contains_key(name)
         {
-            // A table with no header of its own holds only tables, so the
-            // new object becomes one too, after the last of them.
+            // A table with no header of its own holds only tables, and an
+            // object at the top of the file reads best as one, so the new
+            // object becomes a table too, after the last of them.
             let last = parent.iter().last().map(|(key, _)| key.to_owned());
             return self.insert(key_path, value, last.as_deref(), false, &[]);
         }
@@ -237,6 +238,10 @@ impl File<'_> {
 
         if let (true, false, Value::Object(object)) = (into_table, inline, value) {
             let mut table = to_toml_table(object, key_path)?;
+            // Its comments go above a header of its own.
+            if !comments.is_empty() {
+                table.set_implicit(false);
+            }
             table.decor_mut().set_prefix(format!("\n{comment_block}"));
             let position = self.table_position(parent_path, after)?;
             let line = self.line_before_table_after(position);
@@ -280,6 +285,9 @@ impl File<'_> {
     }
 
     fn append(mut self, key_path: &[String], value: &Value) -> Result<Change, EditError> {
+        if let (Some(_), Value::Object(object)) = (self.tables_at(key_path), value) {
+            return self.append_table(key_path, object);
+        }
         let mut new = to_toml(value, key_path)?;
         let allowed = self.lines_of(key_path)?;
         let array = array_mut(&mut self.doc, key_path)?;
@@ -305,6 +313,9 @@ impl File<'_> {
     }
 
     fn remove_item(mut self, key_path: &[String], value: &Value) -> Result<Change, EditError> {
+        if self.tables_at(key_path).is_some() {
+            return self.remove_table(key_path, value);
+        }
         let allowed = self.lines_of(key_path)?;
         let array = array_mut(&mut self.doc, key_path)?;
         let index = (0..array.len())
@@ -332,6 +343,106 @@ impl File<'_> {
                 value: value.clone(),
             },
             allowed: vec![allowed],
+        })
+    }
+
+    /// The tables of the array of tables at `key_path`, such as
+    /// `[[skills.config]]`, if the key holds one.
+    fn tables_at(&self, key_path: &[String]) -> Option<&toml_edit::ArrayOfTables> {
+        let (parent_path, name) = split_key_path(key_path).ok()?;
+        table_like_at(self.spans.as_table(), parent_path)?
+            .get(name)?
+            .as_array_of_tables()
+    }
+
+    /// Appends `object` to the array of tables at `key_path` as a table
+    /// header of its own, right after the array's last table.
+    fn append_table(
+        mut self,
+        key_path: &[String],
+        object: &serde_json::Map<String, Value>,
+    ) -> Result<Change, EditError> {
+        let (parent_path, name) = split_key_path(key_path)?;
+        let tables = self.tables_at(key_path).ok_or(EditError::Parse)?;
+        let position = tables
+            .iter()
+            .filter_map(positions)
+            .map(|(_, last)| last)
+            .max()
+            .ok_or(EditError::Parse)?;
+        let line = self.line_before_table_after(position);
+        let insertion = line..line;
+        let mut table = to_toml_table(object, key_path)?;
+        table.set_implicit(false);
+        table.decor_mut().set_prefix("\n");
+        let mut count = 1;
+        for_each_table(&mut table, &mut |_| count += 1);
+        for_each_table(self.doc.as_table_mut(), &mut |table| {
+            if let Some(later) = table.position().filter(|later| *later > position) {
+                table.set_position(Some(later + count));
+            }
+        });
+        table.set_position(Some(position + 1));
+        let mut next = position + 2;
+        for_each_table(&mut table, &mut |table| {
+            table.set_position(Some(next));
+            next += 1;
+        });
+        parent_mut(&mut self.doc, parent_path)?
+            .into_item(name)
+            .and_then(Item::as_array_of_tables_mut)
+            .ok_or(EditError::Parse)?
+            .push(table);
+        Ok(Change {
+            text: self.doc.to_string(),
+            inverse: Edit::RemoveItem {
+                key_path: key_path.to_vec(),
+                value: Value::Object(object.clone()),
+            },
+            allowed: vec![insertion],
+        })
+    }
+
+    /// Removes the last table equal to `value` from the array of tables at
+    /// `key_path`, with its header and the comments attached above it. An
+    /// array left with no table is not written.
+    fn remove_table(mut self, key_path: &[String], value: &Value) -> Result<Change, EditError> {
+        let (parent_path, name) = split_key_path(key_path)?;
+        let tables = self.tables_at(key_path).ok_or(EditError::Parse)?;
+        let index = (0..tables.len())
+            .rev()
+            .find(|index| {
+                tables
+                    .get(*index)
+                    .map(|table| table_to_json(table))
+                    .as_ref()
+                    == Some(value)
+            })
+            .ok_or_else(|| EditError::ItemNotFound {
+                key_path: key_path.to_vec(),
+                value: value.clone(),
+            })?;
+        let mut allowed = Vec::new();
+        if let Some(table) = tables.get(index) {
+            self.header_ranges(table, &mut allowed);
+        }
+        let mut parent = parent_mut(&mut self.doc, parent_path)?;
+        let tables = parent
+            .table_like()
+            .get_mut(name)
+            .and_then(Item::as_array_of_tables_mut)
+            .ok_or(EditError::Parse)?;
+        tables.remove(index);
+        if tables.is_empty() {
+            parent.table_like().remove(name);
+        }
+        Ok(Change {
+            text: self.doc.to_string(),
+            inverse: Edit::Append {
+                key_path: key_path.to_vec(),
+                value: value.clone(),
+            },
+            allowed,
         })
     }
 
@@ -836,10 +947,28 @@ fn to_toml_table(
                 child.decor_mut().set_prefix("\n");
                 Item::Table(child)
             }
+            // A list of objects is a `[[table]]` per object.
+            Value::Array(items) if !items.is_empty() && items.iter().all(Value::is_object) => {
+                let mut tables = toml_edit::ArrayOfTables::new();
+                for item in items.iter().filter_map(Value::as_object) {
+                    let mut child = to_toml_table(item, key_path)?;
+                    child.set_implicit(false);
+                    child.decor_mut().set_prefix("\n");
+                    tables.push(child);
+                }
+                Item::ArrayOfTables(tables)
+            }
             value => Item::Value(to_toml(value, key_path)?),
         };
         table.insert(name, item);
     }
+    // A table of tables alone needs no header of its own.
+    table.set_implicit(
+        !table.is_empty()
+            && table
+                .iter()
+                .all(|(_, item)| item.is_table() || item.is_array_of_tables()),
+    );
     Ok(table)
 }
 

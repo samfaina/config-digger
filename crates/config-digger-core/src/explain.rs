@@ -232,14 +232,18 @@ pub(crate) fn effective_after(
 
 /// What an Operation does, as a title: "Remove 2 Entries".
 pub(crate) fn operation_title(action: Action, entries: usize) -> String {
-    let verb = match action {
+    format!("{} {}", action_verb(action), count(entries))
+}
+
+/// The verb an action is said by, such as "Remove".
+pub(crate) fn action_verb(action: Action) -> &'static str {
+    match action {
         Action::Disable => "Disable",
         Action::Enable => "Enable",
         Action::Remove => "Remove",
         Action::Undo => "Undo",
         Action::DeleteBackup => "Delete the backup of",
-    };
-    format!("{verb} {}", count(entries))
+    }
 }
 
 /// The title of an Undo: `Undo 20261001-143012-a3f "Remove 1 Entry"`.
@@ -437,6 +441,32 @@ pub(crate) fn disabled_natively(holds: &str, agent_name: &str) -> String {
 pub(crate) fn plugin_disabled(plugin: &str, holds: &str, agent_name: &str) -> String {
     format!(
         "Disabled with its plugin {plugin}: {holds}, so {agent_name} skips every server and skill of the plugin."
+    )
+}
+
+/// What Disable of an Entry of the server `name` that `agent_name` builds
+/// from same-named Entries takes with it.
+pub(crate) fn turns_off_built(agent_name: &str, name: &str) -> String {
+    format!("This turns off the server {agent_name} builds from every Entry of `{name}`.")
+}
+
+/// Why Disable is not offered for an Entry of a server `agent_name` builds
+/// when the field that turns it off is set at `at`, above every layer
+/// config-digger could write it in: `versioned` says a layer it would
+/// write is git-versioned.
+pub(crate) fn merged_field_set_above(
+    agent_name: &str,
+    field: &str,
+    at: &str,
+    versioned: bool,
+) -> String {
+    let reach = if versioned {
+        ", where a change reaches every clone"
+    } else {
+        ""
+    };
+    format!(
+        "Disable is not offered: {at} sets `{field}` above every layer config-digger can write{reach}, and {agent_name} takes the highest layer's `{field}`."
     )
 }
 
@@ -1489,6 +1519,36 @@ pub(crate) fn mirrored_refused(
     source: Option<&Path>,
 ) -> String {
     format!("cannot {action} {locator}: {}", mirrored(owner, source))
+}
+
+/// Why `action` is refused for the Entry at `locator`, of an Agent home
+/// `owner` copies from `source`, which holds no Entry it was copied from.
+pub(crate) fn mirrored_without_source(
+    action: &str,
+    locator: &str,
+    owner: &str,
+    source: Option<&Path>,
+) -> String {
+    format!(
+        "{}, and that home holds no Entry it was copied from to {action} instead",
+        mirrored_refused(action, locator, owner, source)
+    )
+}
+
+/// What a preview says of an Operation on Entries copied into the Agent
+/// home at `mirror`, which `owner` copies from `source`: it changes the
+/// Entries they were copied from, and the change reaches `mirror` through
+/// `owner`.
+pub(crate) fn reaches_mirror(owner: &str, mirror: &Path, source: Option<&Path>) -> String {
+    let from = source.map_or_else(
+        || "the Agent home it copies".to_owned(),
+        |source| source.display().to_string(),
+    );
+    format!(
+        "{} is Mirrored by {owner}: this changes the Entries it copies in {from}, and the change reaches {} only once {owner} copies it there.",
+        mirror.display(),
+        mirror.display()
+    )
 }
 
 /// Why Remove is not offered for an Entry of the plugin `plugin`.

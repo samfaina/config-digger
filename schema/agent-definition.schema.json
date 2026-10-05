@@ -1642,7 +1642,7 @@
           ]
         },
         "switch_id": {
-          "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
+          "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{skill_file}`, the absolute path of a skill's `SKILL.md`, its\nfolder's links resolved;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
           "type": [
             "string",
             "null"
@@ -2995,6 +2995,40 @@
           ]
         },
         {
+          "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one: Disable then writes it where the\nhighest layer sets it. Enable is left to the merge's own rules.",
+          "type": "object",
+          "properties": {
+            "locations": {
+              "description": "The ids of the locations whose Entries it Disables, each one that\nmerges.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "requires_unset_above": {
+              "description": "Whether a write counts only while no higher layer sets the field,\nsuch as Codex's: Disable skips a layer below one that sets it.",
+              "type": "boolean",
+              "default": false
+            },
+            "fallback": {
+              "description": "The id of the location that takes a table holding the field alone,\nnamed as the Entry is, when the Entry's own file is git-versioned or\nread only, such as Codex's user `config.toml`. Omitted, such an Entry\nhas no Disable.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "merged-field"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "locations"
+          ]
+        },
+        {
           "description": "Disables an Entry that has no switch of its own, such as a server in\nClaude Desktop's user file or a skill in Cursor, by moving it out of the\nAgent's reach into config-digger's parked-Entry store, where it stays\nlisted as Disabled; Enable puts it back (ADR 0002). Disable prefers any\nswitch to it, and never parks an Entry in a git-versioned file or folder.",
           "type": "object",
           "properties": {
@@ -3027,7 +3061,7 @@
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
-          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`,\nthe Entry's name, or `{plugin_id}`, the id of the plugin it is part of.",
+          "description": "The key path of the value written. One segment may be `{project}`:\nthe context's Project key, in the Agent's own spelling, so that the\nswitch applies only there. One segment after it may be `{name}`,\nthe Entry's name, or `{plugin_id}`, the id of the plugin it is part\nof, or both, `{plugin_id}` first, for a switch of each Entry of a\nplugin, such as Codex's `plugins.<id>.mcp_servers.<name>.enabled`.",
           "type": "array",
           "items": {
             "type": "string"
@@ -3054,6 +3088,11 @@
               "type": "null"
             }
           ]
+        },
+        "toml": {
+          "description": "Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.",
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false,

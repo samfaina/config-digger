@@ -5,10 +5,11 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    DisableReason, Disables, Holds, MechanismContext, MechanismTarget, Switched,
+    DisableMechanism, DisableReason, Disables, Holds, MechanismContext, MechanismTarget,
+    MergedField, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
-use crate::edit::Edit;
+use crate::edit::{Edit, Syntax};
 use crate::explain;
 use crate::locator;
 use crate::resolve;
@@ -225,12 +226,12 @@ fn set_for<'a>(
 }
 
 /// What the switch of `mechanism` holds `entry` by: the id of the plugin
-/// it is part of, for a switch keyed by plugin, the id its location's
+/// it is part of, for a switch keyed by plugin alone, the id its location's
 /// `switch_id` makes, for a switch per Entry of a location that has one, and
 /// its name otherwise. `None` for an Entry of no plugin under a switch keyed by
 /// plugin, or one whose id cannot be made.
 fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<&'e str> {
-    if mechanism.switch().plugins() {
+    if mechanism.switch().per_plugin() {
         entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
     } else if mechanism.target() == MechanismTarget::Entry
         && (entry.switch_id.is_some() || mechanism.by_id())
@@ -258,11 +259,12 @@ pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result
 
 /// What Disable does to an Entry: write a switch, or park the Entry.
 pub(crate) enum Choice {
-    /// It makes `edits` to the switch in the file at `path`, a SQLite store
-    /// when `sqlite`.
+    /// It makes `edits` to the switch in the file at `path`, edited in
+    /// `syntax`, a SQLite store when `sqlite`.
     Switch {
         path: PathBuf,
         edits: Vec<Edit>,
+        syntax: Syntax,
         sqlite: bool,
         /// What Disable writes, as a sentence.
         sentence: String,
@@ -315,6 +317,15 @@ pub(crate) fn choose(
     if location.provenance.read_only() {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }
+    let merged_field = definition
+        .rules(location.kind)
+        .disable
+        .iter()
+        .filter_map(DisableMechanism::merged_field)
+        .find(|block| block.locations.contains(&location.id));
+    if let Some(block) = merged_field {
+        return through_merged_field(definition, snapshot, entry, project, block);
+    }
     // An Entry of a plugin is Disabled through the plugin's own switch only.
     let in_plugin = entry.plugin.is_some();
     let mechanisms = &definition.rules(location.kind).disable;
@@ -327,7 +338,7 @@ pub(crate) fn choose(
                 && mechanism.covers_plugin(plugin_scope(entry))
                 && switch_read(definition, snapshot, entry, *mechanism)
                 && mechanism.enable_offered()
-                && (mechanism.target() == MechanismTarget::Plugin) == in_plugin
+                && mechanism.switch().plugins() == in_plugin
         })
         .collect();
     switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
@@ -387,6 +398,7 @@ pub(crate) fn choose(
         return Ok(Choice::Switch {
             path,
             edits,
+            syntax: switch.syntax(),
             sqlite: switch.sqlite(),
             sentence,
         });
@@ -428,6 +440,132 @@ pub(crate) fn choose(
             DisableNotOffered::NoMechanism,
             explain::no_disable_mechanism(agent, needs_project, unrecorded),
         )
+    })
+}
+
+/// What Disable writes for `entry`, an Entry of a server its Agent builds
+/// from same-named Entries, through the field `block` writes: `false` where
+/// the highest layer that sets the field has it, or else in the Entry's own
+/// table, or failing both, a table holding the field alone in the
+/// fallback's file. A write counts only where no higher layer sets the
+/// field, when the block requires it, and none goes in a git-versioned file.
+fn through_merged_field(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&ContextProject>,
+    block: &MergedField,
+) -> Result<Choice, (DisableNotOffered, String)> {
+    let location = definition.location(&entry.location);
+    let merge = definition
+        .rules(location.kind)
+        .merge
+        .as_ref()
+        .expect("validation gives a merged field a merge");
+    let field = merge
+        .enabled()
+        .expect("validation gives a merged field's merge an `enabled` field");
+    let project_key = project.map(|project| project.key);
+    // Lower is higher: the deepest Project layer first.
+    let rank = |entry: &ScannedEntry| {
+        let location = definition.location(&entry.location);
+        (definition.rank(location), entry.depth)
+    };
+    // The Entries of the Item the Agent merges in the context that set the field.
+    let setters: Vec<&ScannedEntry> = snapshot
+        .entries
+        .iter()
+        .filter(|other| {
+            other.agent_index == entry.agent_index
+                && other.home == entry.home
+                && other.name == entry.name
+                && definition.location(&other.location).kind == location.kind
+                && merge.covers(&other.location)
+                && (other.project.is_none() || other.project.as_deref() == project_key)
+                && other.config.get(field).is_some()
+                && resolve::gates(definition, snapshot, other, project_key).is_empty()
+        })
+        .collect();
+    let highest_above = |at: (usize, usize)| {
+        setters
+            .iter()
+            .copied()
+            .filter(|setter| rank(setter) < at)
+            .min_by_key(|setter| rank(setter))
+    };
+    let own = highest_above(rank(entry)).unwrap_or(entry);
+    let mut targets = vec![(
+        own.path.clone(),
+        own.key_path.clone(),
+        rank(own),
+        definition.location(&own.location),
+    )];
+    if let Some(fallback) = block.fallback.as_deref().map(|id| definition.location(id))
+        && let Some(path) = snapshot.file_for(entry, &fallback.anchor, None)
+    {
+        let name = &entry.key_path[location.root.len()..];
+        let key_path = fallback.root.iter().chain(name).cloned().collect();
+        targets.push((path, key_path, (definition.rank(fallback), 0), fallback));
+    }
+    let mut versioned: Vec<PathBuf> = Vec::new();
+    let mut set_above: Option<&ScannedEntry> = None;
+    for (path, mut key_path, at, target) in targets {
+        if snapshot.versioned.contains(&path) {
+            if !versioned.contains(&path) {
+                versioned.push(path);
+            }
+            continue;
+        }
+        if target.provenance.read_only() {
+            continue;
+        }
+        if let Some(above) = highest_above(at).filter(|_| block.requires_unset_above) {
+            set_above.get_or_insert(above);
+            continue;
+        }
+        key_path.push(field.to_owned());
+        let edits = vec![Edit::Set {
+            key_path,
+            value: Value::Bool(false),
+        }];
+        let sentence = format!(
+            "{} {}",
+            explain::disable_switch(&edits, &entry.name, &path, false),
+            explain::turns_off_built(&definition.agent.name, &entry.name)
+        );
+        let syntax = target
+            .format
+            .file()
+            .expect("validation merges Entries of files only")
+            .syntax();
+        return Ok(Choice::Switch {
+            path,
+            edits,
+            syntax,
+            sqlite: false,
+            sentence,
+        });
+    }
+    let agent = &definition.agent.name;
+    Err(match set_above {
+        Some(above) => {
+            let mut key_path = above.key_path.clone();
+            key_path.push(field.to_owned());
+            let at = locator::render(&above.path, &key_path);
+            let code = if snapshot.versioned.contains(&above.path) {
+                DisableNotOffered::GitVersioned
+            } else {
+                DisableNotOffered::NoMechanism
+            };
+            (
+                code,
+                explain::merged_field_set_above(agent, field, &at, !versioned.is_empty()),
+            )
+        }
+        None => (
+            DisableNotOffered::GitVersioned,
+            explain::disable_only_in_versioned(agent, &versioned, false),
+        ),
     })
 }
 

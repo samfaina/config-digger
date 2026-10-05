@@ -236,8 +236,9 @@ impl EditableFile {
         let mut expected = expected(&before_value, edit).ok_or(EditError::Unverified)?;
         let mut actual = after_value.clone();
         if self.syntax == Syntax::Toml {
-            // A table left without keys is not written, so it is gone once
-            // the file is read again.
+            // A table left without keys, or an array of tables without
+            // tables, is not written, so it is gone once the file is read
+            // again.
             remove_empty_objects(&mut expected);
             remove_empty_objects(&mut actual);
         }
@@ -391,13 +392,18 @@ fn expected(value: &Value, edit: &Edit) -> Option<Value> {
     Some(value)
 }
 
-/// Removes the objects that hold nothing but empty objects, at any depth.
+/// Removes the empty objects and the empty lists, and so the objects
+/// that held nothing else, at any depth.
 fn remove_empty_objects(value: &mut Value) {
     if let Value::Object(object) = value {
         for child in object.values_mut() {
             remove_empty_objects(child);
         }
-        object.retain(|_, child| !child.as_object().is_some_and(serde_json::Map::is_empty));
+        object.retain(|_, child| match child {
+            Value::Object(child) => !child.is_empty(),
+            Value::Array(items) => !items.is_empty(),
+            _ => true,
+        });
     }
 }
 

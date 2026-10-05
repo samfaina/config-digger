@@ -584,6 +584,10 @@ pub enum InfoCode {
     /// The Agent's approval of an Entry it Removes is left as it is:
     /// config-digger never edits approvals.
     ApprovalKept,
+    /// It targets Entries of a Mirrored home, and changes the Entries they
+    /// were copied from instead: the change reaches the mirror through the
+    /// tool that copies it. Its path is the Mirrored home's folder.
+    ReachesMirror,
 }
 
 impl AgentNoteCode {
@@ -657,6 +661,12 @@ pub struct EffectiveChange {
     pub after: Option<String>,
     /// The change as a sentence, rendered by the core.
     pub sentence: String,
+    /// For an Item whose Agent builds a server from several same-named
+    /// Entries on either side, the server it builds before: the one built
+    /// from them, or the Effective Entry's alone. `None` when it uses none.
+    pub built_before: Option<BuiltServer>,
+    /// The same, after.
+    pub built_after: Option<BuiltServer>,
 }
 
 /// The edits to one file and their diff.
@@ -1362,6 +1372,10 @@ pub struct Entry {
     /// Claude Code's for a `.mcp.json` VS Code reads too, with the State it has
     /// there in the same context, sorted by Agent and home.
     pub also_read_by: Vec<AlsoReadBy>,
+    /// For an Entry of a Mirrored home, the `<path>#<key path>` locator of the
+    /// Entry it was copied from, which its actions go to: they are those of
+    /// that Entry. `None` otherwise, and when the source home lacks it.
+    pub source: Option<String>,
 }
 
 /// Another Agent home that reads an Entry, and the State the Entry has there.

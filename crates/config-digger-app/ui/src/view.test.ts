@@ -40,6 +40,7 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     remove: { status: "offered" },
     caveats: [],
     also_read_by: [],
+    source: null,
     ...overrides,
   };
 }

@@ -241,17 +241,14 @@ fn orca_s_codex_home_is_a_read_only_mirrored_home_of_the_default_one() {
         entry["path"],
         Path::new(ORCA).join("config.toml").display().to_string()
     );
-    assert_eq!(entry["disable"]["status"], "not_offered");
-    assert_eq!(entry["disable"]["code"], "mirrored");
-    assert_eq!(entry["remove"]["status"], "not_offered");
-    assert_eq!(entry["remove"]["code"], "mirrored");
-    assert!(
-        entry["remove"]["sentence"]
-            .as_str()
-            .unwrap()
-            .contains("Orca"),
-        "{}",
-        entry["remove"]["sentence"]
+    // Its actions are those of the Entry it was copied from, which they go to.
+    assert_eq!(
+        entry["source"],
+        format!("{}#mcp_servers.fetch", user_config().display())
+    );
+    assert_eq!(
+        entry["disable"]["path"],
+        user_config().display().to_string()
     );
 }
 
@@ -268,34 +265,6 @@ fn orca_s_codex_home_named_by_codex_home_is_still_its_mirrored_home() {
         .collect();
     assert_eq!(ids, ["default", "orca"]);
     assert!(home(&inventory, "orca").mirror.is_some());
-}
-
-#[test]
-fn an_action_on_an_entry_of_the_mirrored_home_is_refused() {
-    use config_digger_core::api::{Action, Targets};
-    let fs = with_orca(
-        FakeFileSystem::new().with_file(user_config(), "[mcp_servers.fetch]\ncommand = \"uvx\"\n"),
-    );
-    let core = core_with(&fs, env());
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    let locator = format!(
-        "{}#mcp_servers.fetch",
-        Path::new(ORCA).join("config.toml").display()
-    );
-
-    let Err(error) = core.plan(
-        &snapshot,
-        &Context::default(),
-        Action::Remove,
-        &Targets {
-            selectors: vec![locator],
-            all: false,
-        },
-    ) else {
-        panic!("a Remove in the Mirrored home is planned");
-    };
-
-    assert!(error.message.contains("Orca"), "{}", error.message);
 }
 
 /// A `SKILL.md` naming its skill `name`.
