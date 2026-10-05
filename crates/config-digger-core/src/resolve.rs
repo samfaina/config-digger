@@ -3,8 +3,9 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Gate, Holds, JsonFormat,
-    Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
+    self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, FolderTrust, Gate, Holds,
+    JsonFormat, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect,
+    SkillFallback,
 };
 use crate::definitions::skill_managers::{self, Strength};
 use crate::definitions::{
@@ -120,6 +121,7 @@ pub(crate) fn resolve(
             )
             .is_some()
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
+            || not_admin_owned(snapshot, entry)
     };
 
     let reactions: Vec<Reaction> = snapshot
@@ -229,6 +231,10 @@ pub(crate) fn resolve(
             let competes = |index: usize| {
                 !unread(entries[index])
                     && skipped[index].is_none()
+                    && !entries[index]
+                        .plugin
+                        .as_ref()
+                        .is_some_and(|plugin| plugin.name_shared)
                     && (malformed[index].is_none()
                         || definition
                             .location(&entries[index].location)
@@ -257,10 +263,37 @@ pub(crate) fn resolve(
             // Whether the Entry at `index` is of a location that merges.
             let merges =
                 |index: usize| merge.is_some_and(|merge| merge.covers(&entries[index].location));
-            let merging: Vec<usize> = (0..entries.len())
-                .filter(|&index| merges(index) && clear(index))
-                .collect();
+            // Of the Entries at `candidates`, those that take part.
+            let taking_part = |candidates: Vec<usize>| -> Vec<usize> {
+                let Some(merge) = merge else {
+                    return Vec::new();
+                };
+                let ids: Vec<&str> = candidates
+                    .iter()
+                    .map(|&index| entries[index].location.as_str())
+                    .collect();
+                merge
+                    .taking_part(&ids)
+                    .into_iter()
+                    .map(|at| candidates[at])
+                    .collect()
+            };
+            let merging = taking_part(
+                (0..entries.len())
+                    .filter(|&index| merges(index) && clear(index))
+                    .collect(),
+            );
             let merged = Merged::of(merge, &entries, &merging);
+            // Of the Entries at `taking`, the one on the same side of an
+            // overlay as the Entry at `index`, which wins over it.
+            let same_side = |taking: &[usize], index: usize| {
+                let underneath =
+                    |at: usize| merge.is_some_and(|merge| merge.underneath(&entries[at].location));
+                taking
+                    .iter()
+                    .copied()
+                    .find(|&other| underneath(other) == underneath(index))
+            };
             // The rules that keep each Entry out, which see the server the
             // Agent builds in place of an Entry that takes part in it.
             let ruled: Vec<Vec<rules::RuleHit>> = entries
@@ -329,7 +362,8 @@ pub(crate) fn resolve(
                 .enumerate()
                 .map(|(index, entry)| {
                     let location = definition.location(&entry.location);
-                    let mut gate_caveats = gate_caveats(definition, snapshot, entry);
+                    let mut gate_caveats =
+                        gate_caveats(definition, snapshot, entry, project_key.map(String::as_str));
                     if location.cached_at.is_some()
                         && let Some(&at) = snapshot.cached.get(&entry.path)
                     {
@@ -397,6 +431,17 @@ pub(crate) fn resolve(
                             Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
                             Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
                         };
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
+                    }
+                    if not_admin_owned(snapshot, entry) {
+                        let reason = explain::system_file_not_admin_owned(agent_name, &entry.path);
                         return unread_entry(
                             definition,
                             snapshot,
@@ -484,6 +529,17 @@ pub(crate) fn resolve(
                                     ));
                                 }
                             }
+                            Check::PluginName => {
+                                if let Some(plugin) =
+                                    entry.plugin.as_ref().filter(|plugin| plugin.name_shared)
+                                {
+                                    failed.push((
+                                        check,
+                                        api::State::Invalid,
+                                        explain::duplicate_plugin_name(agent_name, &plugin.name),
+                                    ));
+                                }
+                            }
                             Check::Frontmatter => {
                                 if let Some(defect) = skipped[index] {
                                     failed.push((
@@ -512,24 +568,33 @@ pub(crate) fn resolve(
                             }
                             // Same-named Entries the Agent merges take part
                             // together, and none Shadows another.
-                            Check::Precedence if merges(index) => {
-                                if let Some(merged) = merged
-                                    .as_ref()
-                                    .filter(|merged| merged.takes_part(index))
-                                    .filter(|merged| merged.with_others())
-                                {
-                                    failed.push((
-                                        check,
-                                        api::State::Merged,
-                                        explain::merged(
-                                            agent_name,
-                                            &name,
-                                            merged.taking_part.len(),
-                                            &merged.fields_of(index),
-                                        ),
-                                    ));
+                            Check::Precedence if merges(index) => match merged.as_ref() {
+                                Some(merged) if merged.takes_part(index) => {
+                                    if merged.with_others() {
+                                        failed.push((
+                                            check,
+                                            api::State::Merged,
+                                            explain::merged(
+                                                agent_name,
+                                                &name,
+                                                merged.taking_part.len(),
+                                                &merged.fields_of(index),
+                                            ),
+                                        ));
+                                    }
                                 }
-                            }
+                                // One the Entry it lies with wins over.
+                                Some(merged) if clear(index) => {
+                                    if let Some(winner) = same_side(&merged.taking_part, index) {
+                                        failed.push((
+                                            check,
+                                            api::State::Shadowed,
+                                            shadowed_by(index, winner),
+                                        ));
+                                    }
+                                }
+                                _ => {}
+                            },
                             Check::Precedence => {
                                 if let Some(winner) = winner.filter(|&winner| winner < index) {
                                     failed.push((
@@ -575,12 +640,35 @@ pub(crate) fn resolve(
                                 }
                             };
                             for &check in checks {
-                                // It would take part with the others that would.
+                                // It would take part with the others that
+                                // would, or lose to the one it lies with.
                                 if check == Check::Precedence && merges(index) {
-                                    let with_others = (0..entries.len()).any(|other| {
-                                        other != index && merges(other) && lifted(other)
-                                    });
-                                    let next = if with_others {
+                                    let would = taking_part(
+                                        (0..entries.len())
+                                            .filter(|&other| {
+                                                merges(other) && (other == index || lifted(other))
+                                            })
+                                            .collect(),
+                                    );
+                                    if let Some(winner) =
+                                        same_side(&would, index).filter(|_| !would.contains(&index))
+                                    {
+                                        let scope =
+                                            &definition.location(&entries[winner].location).scope;
+                                        let effective = locator::render(
+                                            &entries[winner].path,
+                                            &entries[winner].key_path,
+                                        );
+                                        return api::WhatIf {
+                                            state: api::State::Shadowed,
+                                            sentence: render(
+                                                api::State::Shadowed,
+                                                Some((scope, &effective)),
+                                            ),
+                                            effective: Some(effective),
+                                        };
+                                    }
+                                    let next = if would.len() > 1 {
                                         api::State::Merged
                                     } else {
                                         api::State::Effective
@@ -714,6 +802,19 @@ pub(crate) fn resolve(
                                 sentence: explain::partial_switch(&hit.holds(), agent_name),
                             }))
                             .chain(origin.by_name_only)
+                            .chain(needs_trusted_folder(
+                                definition,
+                                snapshot,
+                                entry,
+                                project_key.map(String::as_str),
+                            ))
+                            .chain(cli_view_differs(
+                                merge,
+                                merged.as_ref(),
+                                index,
+                                entry,
+                                agent_name,
+                            ))
                             .collect(),
                         config: entry.config.clone(),
                         masked: entry.masked.clone(),
@@ -969,14 +1070,30 @@ impl<'m> Merged<'m> {
         self.taking_part.len() > 1
     }
 
-    /// The fields of the server that come from the Entry at `index`.
+    /// The fields of the server that come from the Entry at `index`, a
+    /// list it supplies items of once.
     fn fields_of(&self, index: usize) -> Vec<Vec<String>> {
-        self.built
+        let mut fields: Vec<Vec<String>> = Vec::new();
+        for (field, _) in self
+            .built
             .origins
             .iter()
             .filter(|(_, origin)| *origin == index)
-            .map(|(field, _)| field.clone())
-            .collect()
+        {
+            let mut field = field.clone();
+            let in_list = field.split_last().is_some_and(|(_, list)| {
+                list.iter()
+                    .try_fold(&self.built.config, |value, key| value.get(key))
+                    .is_some_and(serde_json::Value::is_array)
+            });
+            if in_list {
+                field.pop();
+            }
+            if !fields.contains(&field) {
+                fields.push(field);
+            }
+        }
+        fields
     }
 
     /// The field that turns the server off, when it holds `false`, and the
@@ -1028,6 +1145,25 @@ impl<'m> Merged<'m> {
                 .collect(),
         }
     }
+}
+
+/// The note that the Agent's own command lists the server built from the
+/// Entry at `index`, which lies underneath another, as that other alone.
+fn cli_view_differs(
+    merge: Option<&Merge>,
+    merged: Option<&Merged>,
+    index: usize,
+    entry: &ScannedEntry,
+    agent_name: &str,
+) -> Option<api::Note> {
+    let command = merge?.cli_lists_overlay()?;
+    let merged = merged.filter(|merged| merged.takes_part(index) && merged.with_others())?;
+    let over = merged.taking_part[0];
+    (merge?.underneath(&entry.location)).then(|| api::Note {
+        code: api::NoteCode::CliViewDiffers,
+        switch: None,
+        sentence: explain::cli_view_differs(agent_name, command, &merged.locator(over)),
+    })
 }
 
 /// What an Entry competes by: Entries with the same key are one Item.
@@ -1370,6 +1506,14 @@ fn overridden(definition: &AgentDefinition, snapshot: &Snapshot, entry: &Scanned
         .unwrap_or(0)
 }
 
+/// Whether `entry` is in a file its Agent skips unread, since someone other
+/// than an administrator can change it.
+fn not_admin_owned(snapshot: &Snapshot, entry: &ScannedEntry) -> bool {
+    snapshot
+        .not_admin_owned
+        .holds(entry.agent_index, &entry.path)
+}
+
 /// For an Entry in a source of settings the Agent skips, the settings' id
 /// and the first file of the source it reads instead.
 fn skipped_source<'s>(
@@ -1508,6 +1652,26 @@ pub(crate) fn gates(
                 let reason = explain::untrusted_folder(agent_name, folder);
                 (level != Some(block.trusted.as_str())).then_some((Check::Trust, reason))
             }
+            // The folder the Agent starts in, whatever the Entry's location.
+            Gate::FolderTrust(block) => {
+                let scanned = snapshot
+                    .projects
+                    .iter()
+                    .find(|known| Some(known.key.as_str()) == project)?;
+                let rules = TrustRules {
+                    snapshot,
+                    entry,
+                    kind: location.kind,
+                    gate: index,
+                    block,
+                    project,
+                };
+                if rules.trusts(&scanned.path) {
+                    return None;
+                }
+                let reason = explain::untrusted_folder(agent_name, &scanned.path);
+                Some((Check::Trust, reason))
+            }
             Gate::ApprovalHash(block) => {
                 let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
                 let hash = entry.config_hash.as_deref();
@@ -1542,6 +1706,87 @@ pub(crate) fn gates(
             }
         })
         .collect()
+}
+
+/// A folder-trust gate, the gate at `gate` among those of `kind`, as the
+/// Agent home of `entry` reads it in the context of the Project with the
+/// key `project`.
+struct TrustRules<'a> {
+    snapshot: &'a Snapshot,
+    entry: &'a ScannedEntry,
+    kind: ItemKind,
+    gate: usize,
+    block: &'a FolderTrust,
+    project: Option<&'a str>,
+}
+
+impl TrustRules<'_> {
+    /// What the gate's source at `source` holds, its setting's after them.
+    fn value(&self, source: usize) -> Option<serde_json::Value> {
+        let owner = SettingOwner::Gate {
+            gate: self.gate,
+            source,
+        };
+        setting_value(self.snapshot, self.entry, self.kind, owner, self.project)
+    }
+
+    /// Whether its setting trusts every folder.
+    fn trust_all(&self) -> bool {
+        let Some(setting) = &self.block.trust_all else {
+            return false;
+        };
+        let first = self.block.sources.len();
+        setting.is_met((0..setting.sources.len()).map(|source| self.value(first + source)))
+    }
+
+    /// Whether it trusts `folder`: the first of its sources that holds
+    /// rules decides, unless its setting trusts every folder.
+    fn trusts(&self, folder: &Path) -> bool {
+        self.trust_all()
+            || (0..self.block.sources.len())
+                .find_map(|source| self.value(source))
+                .is_some_and(|rules| self.block.trusts(&rules, folder))
+    }
+}
+
+/// The note on an Entry, in the context of no Project, that a folder-trust
+/// gate of its Item kind Blocks it wherever the Agent starts in a folder
+/// the user has not trusted, unless the gate trusts every folder.
+fn needs_trusted_folder(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<api::Note> {
+    if project.is_some() {
+        return None;
+    }
+    let location = definition.location(&entry.location);
+    let kind = location.kind;
+    definition
+        .rules(kind)
+        .gates
+        .iter()
+        .enumerate()
+        .any(|(gate, block)| match block {
+            Gate::FolderTrust(block) if block.locations.contains(&location.id) => {
+                let rules = TrustRules {
+                    snapshot,
+                    entry,
+                    kind,
+                    gate,
+                    block,
+                    project,
+                };
+                !rules.trust_all()
+            }
+            _ => false,
+        })
+        .then(|| api::Note {
+            code: api::NoteCode::UntrustedFolderBlocks,
+            switch: None,
+            sentence: explain::untrusted_folder_blocks(&definition.agent.name),
+        })
 }
 
 /// Whether the Feature gate `name` of the Agent home of `entry` is on: the
@@ -1633,18 +1878,45 @@ fn closed<'d>(
 }
 
 /// A caveat per Feature gate that affects the location of `entry`, saying
-/// which value it is resolved with and how certain that is.
+/// which value it is resolved with and how certain that is, or for a gate
+/// the Agent caches nowhere, that it may apply in the context of the
+/// Project with the key `project`.
 fn gate_caveats(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
+    project: Option<&str>,
 ) -> Vec<api::Caveat> {
     let agent_name = &definition.agent.name;
+    let kind = definition.location(&entry.location).kind;
     definition
         .feature_gates
         .iter()
-        .filter(|gate| gate.affects.contains(&entry.location))
-        .filter_map(|gate| {
+        .enumerate()
+        .filter(|(_, gate)| gate.affects.contains(&entry.location))
+        .filter_map(|(index, gate)| {
+            // The Agent fetches the gate, and caches it nowhere to read.
+            if let Some(when) = &gate.when {
+                let held = (0..when.sources.len()).map(|source| {
+                    let owner = SettingOwner::FeatureGate {
+                        gate: index,
+                        source,
+                    };
+                    let found = snapshot
+                        .settings_for(entry, kind, owner, project)
+                        .find(|value| value.value.is_some());
+                    (
+                        found.and_then(|value| value.value.clone()),
+                        found.map(|value| value.path.clone()),
+                    )
+                });
+                let path = when.met_at(held)??;
+                return Some(api::Caveat {
+                    code: api::CaveatCode::GateMayApply,
+                    path,
+                    sentence: explain::gate_may_apply(agent_name, &gate.name),
+                });
+            }
             let scanned = scanned_gate(snapshot, entry, &gate.name)?;
             let (code, sentence) = match &scanned.reading {
                 GateReading::Cached(cached) => (

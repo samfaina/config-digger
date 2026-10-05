@@ -1,0 +1,371 @@
+#:schema ../../../schema/agent-definition.schema.json
+# Gemini CLI, installed from npm. Facts from docs/research/gemini-cli.md
+# (verified against 0.62.0).
+
+format_version = 1
+verified = { min = "0.62.0", max = "0.62.0" }
+
+[agent]
+id = "gemini-cli"
+name = "Gemini CLI"
+
+# Gemini CLI runs as `node.exe` on its `bundle\gemini.js`, which starts
+# itself again as a child `node.exe` [disk, source].
+[process]
+images = ["node.exe"]
+cmdline_contains = ["gemini-cli", "gemini.js"]
+
+# The user's home folder, where Gemini CLI keeps `.gemini` [source]. Other
+# Agents read its `.agents\skills` too [disk], so that folder alone does not
+# say Gemini CLI is there.
+[[homes]]
+id = "default"
+default = true
+folder = { block = "path", path = "~" }
+shared_roots = ["agents_skills"]
+
+[homes.roots]
+settings = ".gemini/settings.json"
+extensions = ".gemini/extensions"
+trusted_folders = ".gemini/trustedFolders.json"
+skills = ".gemini/skills"
+agents_skills = ".agents/skills"
+projects = ".gemini/projects.json"
+
+# Another folder `GEMINI_CLI_HOME` names, which Gemini CLI uses in place of
+# the user's home folder for everything it keeps there, `.gemini` and
+# `.agents` alike [source]. A launch without it still reads the user's.
+[[homes]]
+id = "gemini-cli-home"
+folder = { block = "env", variable = "GEMINI_CLI_HOME" }
+shared_roots = ["agents_skills"]
+
+[homes.roots]
+settings = ".gemini/settings.json"
+extensions = ".gemini/extensions"
+trusted_folders = ".gemini/trustedFolders.json"
+skills = ".gemini/skills"
+agents_skills = ".agents/skills"
+projects = ".gemini/projects.json"
+
+[[scopes]]
+id = "managed"
+
+[[scopes]]
+id = "user"
+
+[[scopes]]
+id = "project"
+
+# Gemini CLI records every folder it starts in, the user's home folder
+# included, as a key of `projects` in `projects.json`, lower-cased and with
+# backslashes [source, disk]. The folders `trustedFolders.json` trusts or
+# distrusts are its keys, lower-cased and with forward slashes [source, disk].
+[projects]
+registries = [
+  { block = "json-keys", anchor = { block = "home", root = "projects" }, root = ["projects"] },
+  { block = "json-keys", anchor = { block = "home", root = "trusted_folders" }, root = [] },
+]
+
+# The Scope of an extension's servers and skills.
+[[scopes]]
+id = "extension"
+
+# The skills Gemini CLI ships.
+[[scopes]]
+id = "system"
+
+# Extensions Gemini CLI installed, each in
+# `~\.gemini\extensions\<manifest name>`, loaded in the order of the folder's
+# listing [source, disk]. Each holds `.gemini-extension-install.json`, whose
+# `type` says how it was installed: copied from git, a release or a local
+# folder, which the folder then holds, or `link`, which reads the extension's
+# files from the folder `source` names [source, disk]. An extension is named
+# by its manifest's `name`, and Gemini CLI stops loading extensions with an
+# error when two manifests give one `name` [source]: both are taken to be
+# refused, and what becomes of the others is not known. Extensions are the
+# user's alone: no Project has its own [source].
+[[plugins]]
+id = "extensions"
+registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = ".gemini-extension-install.json", linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }
+name = { file = "gemini-extension.json", key_path = ["name"] }
+uninstall = "gemini extensions uninstall {id}"
+same_names_invalid = true
+
+# `GEMINI_CLI_SYSTEM_SETTINGS_PATH` moves the system settings, and
+# `GEMINI_CLI_SYSTEM_DEFAULTS_PATH` the system defaults, which otherwise
+# follow the system settings' folder [source]. Gemini CLI skips either file,
+# with a warning, unless it and every folder above it but the drive's root
+# belong to an administrator, SYSTEM, a service or the creator owner and let
+# no one else write to them, which it asks `Get-Acl` [source].
+[[machine_files]]
+path = "%ProgramData%/gemini-cli/settings.json"
+variable = "GEMINI_CLI_SYSTEM_SETTINGS_PATH"
+admin_owned = true
+
+[[machine_files]]
+path = "%ProgramData%/gemini-cli/system-defaults.json"
+variable = "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"
+beside = "%ProgramData%/gemini-cli/settings.json"
+admin_owned = true
+
+# An organisation's settings for every user of the machine, which override
+# everyone else's: `%ProgramData%\gemini-cli\settings.json` [docs, source].
+[[locations]]
+id = "system-mcp"
+anchor = { block = "machine", path = "%ProgramData%/gemini-cli/settings.json" }
+format = { block = "json", dialect = "with-comments" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-", bare = true }
+secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
+on_read_failure = "stops_agent"
+
+# An organisation's defaults, which every other file overrides:
+# `system-defaults.json` beside the system settings [docs, source].
+[[locations]]
+id = "system-defaults-mcp"
+anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }
+format = { block = "json", dialect = "with-comments" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-", bare = true }
+secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
+on_read_failure = "stops_agent"
+
+# The user's servers, in `mcpServers` of `~\.gemini\settings.json`
+# [docs, disk]. Gemini CLI reads its settings files as JSON with comments,
+# where a trailing comma is a syntax error, and refuses to start on one it
+# cannot parse [source].
+#
+# In every server, settings and extensions alike, Gemini CLI replaces
+# `$NAME`, `${NAME}` and `${NAME:-default}` with environment variables
+# [source]. A server is stdio with `command`, or remote with `url` or the
+# older `httpUrl`, whose userinfo and query can hold Secrets as `url`'s can;
+# the OAuth client's `clientSecret` is one [source].
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "settings" }
+format = { block = "json", dialect = "with-comments" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+interpolation = { block = "braces", default_separator = ":-", bare = true }
+secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
+on_read_failure = "stops_agent"
+
+# A Project's servers, in `<folder>\.gemini\settings.json`: the folder
+# Gemini CLI starts in, and no folder above it [source]. In the user's home
+# folder that file is the user's own, which Gemini CLI does not read again
+# as the Project's [source].
+[[locations]]
+id = "project-mcp"
+anchor = { block = "project", path = ".gemini/settings.json" }
+format = { block = "json", dialect = "with-comments" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "project"
+provenance = "file"
+store_class = "rewritten-while-running"
+interpolation = { block = "braces", default_separator = ":-", bare = true }
+secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
+on_read_failure = "stops_agent"
+
+# An extension's servers, in `mcpServers` of its `gemini-extension.json`,
+# where `${extensionPath}`, `${workspacePath}` and `${/}` stand for its
+# folder, the Project's and the path separator [source, disk]. Gemini CLI
+# drops a `trust` it finds there [source]. What it does with a manifest it
+# cannot parse is not known.
+[[locations]]
+id = "extension-mcp"
+anchor = { block = "plugin", plugins = "extensions", path = "gemini-extension.json" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "extension"
+provenance = "extension"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-", bare = true }
+secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
+on_read_failure = "unknown"
+
+# Settings files fold `mcpServers` name by name: of same-named servers, the
+# one in the highest file wins whole, system override first, then the
+# Project's, the user's and the system defaults [source]. Of two
+# extensions with a server of one name, the first loaded wins whole, and the
+# other is skipped with a warning [source]. The settings server that wins
+# lies over the extension server that wins, field by field: its fields
+# replace the extension's, but `env` merges key by key, `excludeTools` keeps
+# the tools either excludes and `includeTools` those both include [source].
+# A settings server with `excludeTools` alone thus narrows an extension's.
+# `gemini mcp list` shows the settings server alone [source].
+[items.mcp]
+precedence = ["system-mcp", "project-mcp", "user-mcp", "system-defaults-mcp", "extension-mcp"]
+competition = { block = "exact-name" }
+merge = { block = "overlay-fields", under = ["extension-mcp"], merged = ["env"], union = ["excludeTools"], intersection = ["includeTools"], cli_lists_overlay = "gemini mcp list" }
+checks = ["plugin-name", "disable", "trust", "precedence"]
+
+# Folder trust is on unless `security.folderTrust.enabled` is `false` in
+# the system, user or system defaults settings, against the docs [source,
+# disk]. In a folder the user has not trusted, Gemini CLI starts no server
+# at all, the user's and extensions' included, and ignores the Project's
+# settings [source]. Its rules are `trustedFolders.json`'s keys, each a
+# folder, lower-cased and with forward slashes when Gemini CLI writes it,
+# with `TRUST_FOLDER`, `TRUST_PARENT`, which trusts the folder above it, or
+# `DO_NOT_TRUST`; of those for the folder Gemini CLI starts in or a folder
+# above it, the longest key decides, and a folder none is for is not
+# trusted [source]. `GEMINI_CLI_TRUSTED_FOLDERS_PATH`, which moves the file,
+# and `GEMINI_CLI_TRUST_WORKSPACE`, which trusts or distrusts every folder
+# for a launch, are not read.
+[[items.mcp.gates]]
+block = "folder-trust"
+locations = ["system-mcp", "project-mcp", "user-mcp", "system-defaults-mcp", "extension-mcp"]
+sources = [{ anchor = { block = "home", root = "trusted_folders" }, key_path = [] }]
+trusted = ["TRUST_FOLDER"]
+parent = ["TRUST_PARENT"]
+trust_all = { sources = [
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/settings.json" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+  { anchor = { block = "home", root = "settings" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+], equals = false, default = true }
+
+# Skills are folders holding a `SKILL.md`, read one level deep in each root
+# [source]; a `SKILL.md` directly in a root, which Gemini CLI reads too, is
+# not read. A skill is named by the `name` of its frontmatter, each
+# character a file name cannot hold replaced by `-` [source, disk]. One
+# without a frontmatter, or whose frontmatter lacks a `name` or a
+# `description`, is skipped [source]. Gemini CLI reads a frontmatter that is
+# not YAML line by line instead [source], which config-digger does not:
+# such a skill is taken to be skipped.
+#
+# `<folder>\.agents\skills` and `<folder>\.gemini\skills`, read only in a
+# folder the user trusts [source].
+[[locations]]
+id = "project-agents-skills"
+anchor = { block = "project", path = ".agents/skills" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "project-skills"
+anchor = { block = "project", path = ".gemini/skills" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# `~\.agents\skills`, which follows `GEMINI_CLI_HOME`, and which VS Code and
+# Codex read too [source, disk].
+[[locations]]
+id = "agents-skills"
+anchor = { block = "home", root = "agents_skills" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# `~\.gemini\skills`, where `gemini skills install` copies a skill and
+# `gemini skills link` makes a junction [source].
+[[locations]]
+id = "user-skills"
+anchor = { block = "home", root = "skills" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# An extension's skills, in its `skills` folder [source, disk].
+[[locations]]
+id = "extension-skills"
+anchor = { block = "plugin", plugins = "extensions", path = "skills" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "extension"
+provenance = "extension"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# The skills Gemini CLI ships, `antigravity-support` and `skill-creator` in
+# 0.62.0, in `bundle\builtin` of its package [source, disk]: installed with
+# npm, or with Volta.
+[[locations]]
+id = "npm-builtin-skills"
+anchor = { block = "machine", path = "%APPDATA%/npm/node_modules/@google/gemini-cli/bundle/builtin" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "system"
+provenance = "built-in"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "volta-builtin-skills"
+anchor = { block = "machine", path = "%LOCALAPPDATA%/Volta/tools/image/packages/@google/gemini-cli/node_modules/@google/gemini-cli/bundle/builtin" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "system"
+provenance = "built-in"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Of same-named skills, the last one loaded wins: built-in, then
+# extensions, `~\.gemini\skills`, `~\.agents\skills`, `.gemini\skills` and
+# `.agents\skills` [source].
+[items.skill]
+precedence = ["project-agents-skills", "project-skills", "agents-skills", "user-skills", "extension-skills", "npm-builtin-skills", "volta-builtin-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "plugin-name", "disable", "trust", "precedence"]
+
+# A Project's skills need the folder trusted, as its servers do [source].
+[[items.skill.gates]]
+block = "folder-trust"
+locations = ["project-agents-skills", "project-skills"]
+sources = [{ anchor = { block = "home", root = "trusted_folders" }, key_path = [] }]
+trusted = ["TRUST_FOLDER"]
+parent = ["TRUST_PARENT"]
+trust_all = { sources = [
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/settings.json" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+  { anchor = { block = "home", root = "settings" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
+], equals = false, default = true }
+
+# An organisation's admin controls, which Gemini CLI fetches from Code
+# Assist for an account signed in through Google, `oauth-personal`, or
+# through Application Default Credentials, `compute-default-credentials` or
+# the older `cloud-shell` [source]. They can turn off every server,
+# extension or skill, or allow only some, and are kept in memory only
+# [source]: config-digger notes they may apply. An API key or Vertex AI
+# fetches none. `admin` set in any settings file is ignored [source].
+# `security.auth.selectedType` is read from the settings files, highest
+# first, a Project's included whether or not its folder is trusted.
+[[feature_gates]]
+name = "admin-controls"
+assumed = true
+affects = [
+  "system-mcp", "project-mcp", "user-mcp", "system-defaults-mcp", "extension-mcp",
+  "project-agents-skills", "project-skills", "agents-skills", "user-skills", "extension-skills", "npm-builtin-skills", "volta-builtin-skills",
+]
+when = { sources = [
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/settings.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
+  { anchor = { block = "project", path = ".gemini/settings.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
+  { anchor = { block = "home", root = "settings" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
+  { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }, key_path = ["security", "auth", "selectedType"], dialect = "with-comments" },
+], one_of = ["oauth-personal", "compute-default-credentials", "cloud-shell"] }

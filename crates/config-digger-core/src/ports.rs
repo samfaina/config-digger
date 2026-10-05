@@ -50,6 +50,14 @@ pub trait FileSystem: Send + Sync {
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
 
+    /// Whether only an administrator can change the existing file at
+    /// `path`, as Gemini CLI checks its system settings before it reads
+    /// them: the file and each folder above it, but a drive's root, belong
+    /// to Administrators, SYSTEM, a service or the creator owner, and let
+    /// no one else write, delete or change permissions. A file whose
+    /// permissions cannot be read is not.
+    fn admin_owned(&self, path: &Path) -> bool;
+
     /// The real path of an existing file or folder, with every link and
     /// junction resolved and each name spelled as on disk; `None` when nothing
     /// exists at `path`.

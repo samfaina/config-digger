@@ -4,12 +4,13 @@
 pub(crate) mod blocks;
 pub mod skill_managers;
 
+use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locate,
     Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
-    SessionFiles, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -29,6 +30,10 @@ const BUILT_IN: &[(&str, &str)] = &[
     ("vscode.toml", include_str!("../../definitions/vscode.toml")),
     ("cursor.toml", include_str!("../../definitions/cursor.toml")),
     ("codex.toml", include_str!("../../definitions/codex.toml")),
+    (
+        "gemini-cli.toml",
+        include_str!("../../definitions/gemini-cli.toml"),
+    ),
 ];
 
 /// The only `format_version` this release reads.
@@ -126,6 +131,58 @@ pub(crate) struct AgentDefinition {
     /// its configuration, only those that change a State.
     #[serde(default)]
     pub feature_gates: Vec<FeatureGateDefinition>,
+    /// Files on the machine that the Agent reads somewhere else while an
+    /// environment variable says so, or only while an administrator owns
+    /// them. Every anchor that names one's path reads it so.
+    #[serde(default)]
+    pub machine_files: Vec<MachineFileDefinition>,
+}
+
+/// A file on the machine, by the path the definition's machine anchors
+/// name it with, such as Gemini CLI's system settings, which
+/// `GEMINI_CLI_SYSTEM_SETTINGS_PATH` moves. It is where its variable says
+/// while that is set to an absolute path; else, with `beside`, in the folder
+/// of that other file, wherever that is, under its own name; else at its
+/// path.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MachineFileDefinition {
+    /// Starts with `%NAME%` or a drive; `/`-separated, without wildcards.
+    pub path: String,
+    /// The environment variable that holds the path of the file the Agent
+    /// reads instead.
+    pub variable: Option<String>,
+    /// The path of another of `machine_files`, one with no `beside` of its
+    /// own, whose folder this file follows, such as Gemini CLI's
+    /// `system-defaults.json` beside its system settings.
+    pub beside: Option<String>,
+    /// Whether the Agent reads the file only while only an administrator
+    /// can change it and the folders above it, as Gemini CLI reads its
+    /// system settings: otherwise its Entries are Unread, and nothing it
+    /// holds is read.
+    #[serde(default)]
+    pub admin_owned: bool,
+}
+
+impl MachineFileDefinition {
+    /// Where the file is on this machine, given where the file it is beside
+    /// is, as far as the environment says.
+    fn locate(&self, env: &dyn Environment, beside: Option<PathBuf>) -> Option<PathBuf> {
+        if let Some(moved) = self
+            .variable
+            .as_deref()
+            .and_then(|variable| env.var(variable))
+            .map(|value| crate::paths::lexical(Path::new(value.trim())))
+            .filter(|path| crate::paths::is_absolute(path))
+        {
+            return Some(moved);
+        }
+        if self.beside.is_some() {
+            let name = self.path.rsplit('/').next().unwrap_or_default();
+            return Some(beside?.parent()?.join(name));
+        }
+        crate::paths::expand(&self.path, env)
+    }
 }
 
 /// A switch on the Agent vendor's side, such as whether Claude Code syncs
@@ -141,10 +198,19 @@ pub(crate) struct FeatureGateDefinition {
     pub assumed: bool,
     /// The ids of the locations whose Entries depend on it.
     pub affects: Vec<String>,
-    /// Where the Agent caches the gate's value.
-    pub lookup: GateLookup,
-    /// When the Agent ignores its cache and uses its own default.
+    /// Where the Agent caches the gate's value. Omitted when it caches it
+    /// nowhere config-digger reads, such as the admin controls Gemini CLI
+    /// fetches when it signs in.
+    pub lookup: Option<GateLookup>,
+    /// When the Agent ignores its cache and uses its own default. Only a
+    /// gate with a lookup takes one.
     pub bypass: Option<Bypass>,
+    /// For a gate without a lookup, when the Agent fetches it at all, such
+    /// as Gemini CLI's admin controls for an account signed in through
+    /// Google: while this setting holds, each Entry the gate affects gets
+    /// the caveat `gate_may_apply`, since the vendor's side may turn it off
+    /// where config-digger cannot see, and otherwise none.
+    pub when: Option<SettingOneOf>,
 }
 
 /// One set of settings, which the Agent reads from the first of its
@@ -256,6 +322,11 @@ pub(crate) struct HomeDefinition {
     /// folder. The home is found when any root exists. An Agent home the
     /// user adds is laid out like the definition's first home.
     pub roots: BTreeMap<String, String>,
+    /// The names of roots other Agents read too, such as `~\.agents\skills`,
+    /// which do not on their own say the Agent keeps its configuration in
+    /// the home: it is found when any other root exists.
+    #[serde(default)]
+    pub shared_roots: Vec<String>,
     /// How to tell that the Agent of this home is running, in place of the
     /// definition's `[process]`, such as for a home read by another
     /// Installation of the Agent.
@@ -388,6 +459,11 @@ pub(crate) struct PluginsDefinition {
     /// extensions, so that their Entries never share a name.
     #[serde(default)]
     pub unique_names: bool,
+    /// Whether the Agent refuses plugins that share a name, as Gemini CLI
+    /// refuses two extensions whose manifests give one `name`: the Entries
+    /// of each are Invalid, with `duplicate_plugin_name`.
+    #[serde(default)]
+    pub same_names_invalid: bool,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -442,6 +518,9 @@ impl PluginsDefinition {
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
+        }
+        if self.unique_names && self.same_names_invalid {
+            return Err("plugins that share a name are renamed or invalid, not both".into());
         }
         if self
             .uninstall
@@ -648,6 +727,11 @@ pub(crate) struct SecretFields {
     /// `bearer_token_env_var`: never a Secret, whatever else says so.
     #[serde(default)]
     pub variable_names: Vec<Vec<String>>,
+    /// Fields that hold a URL, besides `url`, such as Gemini CLI's
+    /// `httpUrl`: their userinfo and query values are Secrets, and the rest
+    /// of the URL, its host included, is shown.
+    #[serde(default)]
+    pub urls: Vec<Vec<String>>,
     /// Key paths from the root of the file, outside any Entry, whose values
     /// are Secrets, such as an API key stored next to the Entries. They are
     /// masked wherever the file's text is shown, as in a diff's context lines.
@@ -665,6 +749,7 @@ impl SecretFields {
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
             && self.variable_names.is_empty()
+            && self.urls.is_empty()
             && self.file_fields.is_empty()
             && self.encrypted_prefixes.is_empty()
     }
@@ -684,6 +769,7 @@ impl Validate for SecretFields {
             .fields
             .iter()
             .chain(&self.variable_names)
+            .chain(&self.urls)
             .chain(&self.file_fields)
         {
             if field.is_empty() || field.iter().any(String::is_empty) {
@@ -774,7 +860,7 @@ pub(crate) enum Check {
     Approval,
     /// The user has not trusted the Entry's Project: Blocked, with
     /// `untrusted_folder`. Required when a gate of the kind is trusted
-    /// folders, and refused otherwise.
+    /// folders, project trust or folder trust, and refused otherwise.
     Trust,
     /// A rule keeps the Entry out: Blocked, with `policy`, when the rule is
     /// managed policy, and Disabled, with `disabled_by_rule` or
@@ -789,8 +875,8 @@ pub(crate) enum Check {
     Precedence,
     /// The server the Agent builds from the Item's Entries holds fields that
     /// exclude each other: every Entry that takes part is Invalid, with
-    /// `transport_conflict`. Required when the kind merges, and refused
-    /// otherwise.
+    /// `transport_conflict`. Required when the kind merges with exclusive
+    /// fields, and refused otherwise.
     Merge,
     /// The Entry lacks the minimal shape its location declares: Invalid.
     /// Required when a location of the kind declares a shape, and refused
@@ -800,6 +886,11 @@ pub(crate) enum Check {
     /// name: Invalid. Required when a location of the kind is a folder of
     /// skill folders, and refused otherwise.
     Frontmatter,
+    /// The Agent refuses the plugin the Entry is part of, since another of
+    /// its list has the same name: Invalid, with `duplicate_plugin_name`.
+    /// Required when a location of the kind is in plugins whose list refuses
+    /// same names, and refused otherwise.
+    PluginName,
 }
 
 impl AgentDefinition {
@@ -835,6 +926,32 @@ impl AgentDefinition {
     /// The Feature gate named `name`, if the definition declares one.
     pub fn feature_gate(&self, name: &str) -> Option<&FeatureGateDefinition> {
         self.feature_gates.iter().find(|gate| gate.name == name)
+    }
+
+    /// Where the machine-wide path `text` that an anchor names is on this
+    /// machine, as far as the environment says: where a declared machine
+    /// file of that path is, or else `text` expanded.
+    pub fn machine_path(&self, text: &str, env: &dyn Environment) -> Option<PathBuf> {
+        let declared = |path: &str| self.machine_files.iter().find(|file| file.path == path);
+        let Some(file) = declared(text) else {
+            return crate::paths::expand(text, env);
+        };
+        let beside = file
+            .beside
+            .as_deref()
+            .and_then(declared)
+            .and_then(|other| other.locate(env, None));
+        file.locate(env, beside)
+    }
+
+    /// The machine files the Agent reads only while an administrator owns
+    /// them, where they are on this machine.
+    pub fn admin_owned_files(&self, env: &dyn Environment) -> Vec<PathBuf> {
+        self.machine_files
+            .iter()
+            .filter(|file| file.admin_owned)
+            .filter_map(|file| self.machine_path(&file.path, env))
+            .collect()
     }
 
     pub fn location(&self, id: &str) -> &LocationDefinition {
@@ -894,6 +1011,23 @@ impl AgentDefinition {
             for (name, path) in &home.roots {
                 blocks::validate_relative(path)
                     .map_err(|e| format!("home `{}` root `{name}`: {e}", home.id))?;
+            }
+            if let Some(name) = home
+                .shared_roots
+                .iter()
+                .find(|name| !home.roots.contains_key(*name))
+            {
+                return Err(format!(
+                    "home `{}` shares undeclared root `{name}`",
+                    home.id
+                ));
+            }
+            if home
+                .roots
+                .keys()
+                .all(|name| home.shared_roots.contains(name))
+            {
+                return Err(format!("home `{}` shares every root", home.id));
             }
             if let Some(process) = &home.process {
                 process
@@ -1001,6 +1135,36 @@ impl AgentDefinition {
         }
 
         unique(
+            "machine file",
+            self.machine_files.iter().map(|file| file.path.as_str()),
+        )?;
+        for file in &self.machine_files {
+            let context = |e: String| format!("machine file `{}`: {e}", file.path);
+            blocks::MachineAnchor {
+                path: file.path.clone(),
+            }
+            .validate()
+            .map_err(context)?;
+            if file.path.starts_with("~/") {
+                return Err(context("must start with `%NAME%` or a drive".into()));
+            }
+            if let Some(variable) = &file.variable {
+                non_empty("variable", variable).map_err(context)?;
+            }
+            if let Some(beside) = &file.beside {
+                let other = self
+                    .machine_files
+                    .iter()
+                    .find(|other| other.path == *beside && other.path != file.path);
+                if other.is_none_or(|other| other.beside.is_some()) {
+                    return Err(context(format!(
+                        "beside `{beside}` must be another machine file, one with no `beside`"
+                    )));
+                }
+            }
+        }
+
+        unique(
             "feature gate",
             self.feature_gates.iter().map(|gate| gate.name.as_str()),
         )?;
@@ -1016,9 +1180,22 @@ impl AgentDefinition {
             {
                 return Err(context(format!("affects undeclared location `{id}`")));
             }
-            gate.lookup.validate().map_err(context)?;
-            self.validate_home_root(gate.lookup.anchor())
-                .map_err(context)?;
+            match (&gate.lookup, &gate.when) {
+                (Some(lookup), None) => {
+                    lookup.validate().map_err(context)?;
+                    self.validate_home_root(lookup.anchor()).map_err(context)?;
+                }
+                (None, Some(when)) => {
+                    when.validate().map_err(context)?;
+                    for source in &when.sources {
+                        self.validate_setting(&source.anchor).map_err(context)?;
+                    }
+                    if gate.bypass.is_some() {
+                        return Err(context("only a gate with a lookup takes a bypass".into()));
+                    }
+                }
+                _ => return Err(context("needs a lookup or a `when`, not both".into())),
+            }
             if let Some(bypass) = &gate.bypass {
                 bypass.validate().map_err(context)?;
                 for map in bypass.env_maps() {
@@ -1334,6 +1511,23 @@ impl AgentDefinition {
                     "but no location is a folder of skill folders",
                 )
                 .map_err(context)?;
+            let refused = self.locations.iter().any(|location| {
+                location.kind == *kind
+                    && location.anchor.plugin().is_some_and(|anchor| {
+                        anchor.plugins.all().iter().any(|id| {
+                            self.declared_plugins(id)
+                                .is_ok_and(|plugins| plugins.same_names_invalid)
+                        })
+                    })
+            });
+            rules
+                .check_when(
+                    Check::PluginName,
+                    refused,
+                    "which plugins that refuse same names need",
+                    "but no location is in plugins that refuse same names",
+                )
+                .map_err(context)?;
             rules
                 .check_when(
                     Check::Policy,
@@ -1361,10 +1555,13 @@ impl AgentDefinition {
                 .check_when(
                     Check::Trust,
                     rules.gates.iter().any(|gate| {
-                        matches!(gate, Gate::TrustedFolders(_) | Gate::ProjectTrust(_))
+                        matches!(
+                            gate,
+                            Gate::TrustedFolders(_) | Gate::ProjectTrust(_) | Gate::FolderTrust(_)
+                        )
                     }),
-                    "which a trusted-folders or project-trust gate needs",
-                    "but no gate is trusted folders or project trust",
+                    "which a trusted-folders, project-trust or folder-trust gate needs",
+                    "but no gate is trusted folders, project trust or folder trust",
                 )
                 .map_err(context)?;
             rules
@@ -1378,9 +1575,9 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::Merge,
-                    rules.merge.is_some(),
-                    "which a merge needs",
-                    "but the kind does not merge",
+                    rules.merge.as_ref().is_some_and(Merge::excludes),
+                    "which a merge with exclusive fields needs",
+                    "but the kind does not merge exclusive fields",
                 )
                 .map_err(context)?;
             if let Some(merge) = &rules.merge {
@@ -1461,7 +1658,8 @@ impl AgentDefinition {
                     | Gate::TrustedFolders(_)
                     | Gate::NonceTrust(_)
                     | Gate::ApprovalHash(_)
-                    | Gate::ProjectTrust(_) => {
+                    | Gate::ProjectTrust(_)
+                    | Gate::FolderTrust(_) => {
                         if let Some(id) = gate
                             .locations()
                             .into_iter()
@@ -1586,6 +1784,15 @@ impl HomeDefinition {
             .map(|(name, path)| (name.clone(), blocks::join_relative(folder, path)))
             .collect()
     }
+
+    /// Whether `roots`, laid out like this home's, say the Agent keeps its
+    /// configuration there: any of them but the shared ones exists.
+    pub fn configured(&self, roots: &BTreeMap<String, PathBuf>, fs: &dyn FileSystem) -> bool {
+        roots
+            .iter()
+            .filter(|(name, _)| !self.shared_roots.contains(name))
+            .any(|(_, root)| fs.exists(root))
+    }
 }
 
 impl AgentDefinition {
@@ -1669,6 +1876,7 @@ impl Check {
             Check::Merge => "merge",
             Check::Shape => "shape",
             Check::Frontmatter => "frontmatter",
+            Check::PluginName => "plugin-name",
         }
     }
 }
@@ -1770,7 +1978,14 @@ on_read_failure = "ignores_file"
             .collect();
         assert_eq!(
             ids,
-            ["claude-code", "claude-desktop", "vscode", "cursor", "codex"]
+            [
+                "claude-code",
+                "claude-desktop",
+                "vscode",
+                "cursor",
+                "codex",
+                "gemini-cli"
+            ]
         );
     }
 
@@ -3346,7 +3561,7 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
             with_projects(STATE, STATE, r#"["projects", "{project}", "servers"]"#).replace(
                 r#"checks = ["disable", "precedence"]"#,
                 &format!(
-                    "merge = {{ block = \"deep-merge\", locations = {locations} }}\nchecks = [\"merge\", \"disable\", \"precedence\"]"
+                    "merge = {{ block = \"deep-merge\", locations = {locations} }}\nchecks = [\"disable\", \"precedence\"]"
                 ),
             )
         };
@@ -3431,5 +3646,77 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
         assert!(parse("test.toml", &registry("threads")).is_ok());
         let text = registry("threads; DROP TABLE threads");
         assert!(error(&text).contains("plain names"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_machine_file_beside_another_needs_that_one_declared() {
+        let with_files = |files: &str| format!("{VALID}\n{files}");
+        let beside = r#"
+[[machine_files]]
+path = "%ProgramData%/x/settings.json"
+variable = "X_SETTINGS"
+
+[[machine_files]]
+path = "%ProgramData%/x/defaults.json"
+beside = "%ProgramData%/x/settings.json"
+admin_owned = true
+"#;
+        let text = with_files(beside);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_files(&beside.replace(
+            r#"beside = "%ProgramData%/x/settings.json""#,
+            r#"beside = "%ProgramData%/x/other.json""#,
+        ));
+        assert!(
+            error(&text).contains("another machine file"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_shared_root_is_one_of_the_home_s_and_not_every_one() {
+        let text = VALID.replace(
+            "roots.state = \".test.json\"",
+            "shared_roots = [\"skills\"]\nroots.state = \".test.json\"",
+        );
+        assert!(
+            error(&text).contains("undeclared root `skills`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            "roots.state = \".test.json\"",
+            "shared_roots = [\"state\"]\nroots.state = \".test.json\"",
+        );
+        assert!(
+            error(&text).contains("shares every root"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_feature_gate_has_a_lookup_or_a_when() {
+        let gate = |lookup: &str| {
+            format!(
+                "{VALID}\n[[feature_gates]]\nname = \"admin\"\nassumed = true\naffects = [\"user-mcp\"]\n{lookup}"
+            )
+        };
+        let when = r#"when = { sources = [{ anchor = { block = "home", root = "state" }, key_path = ["auth"] }], one_of = ["google"] }"#;
+        let text = gate(when);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = gate("");
+        assert!(
+            error(&text).contains("a lookup or a `when`"),
+            "{}",
+            error(&text)
+        );
+        let text = gate(&when.replace(r#"["google"]"#, "[]"));
+        assert!(
+            error(&text).contains("one_of needs a value"),
+            "{}",
+            error(&text)
+        );
     }
 }

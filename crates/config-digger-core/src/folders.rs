@@ -237,6 +237,13 @@ impl FileSystem for AsIf<'_> {
         }
     }
 
+    fn admin_owned(&self, path: &Path) -> bool {
+        match self.seen(path) {
+            Seen::Gone => false,
+            Seen::At(at) => self.fs.admin_owned(&at),
+        }
+    }
+
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
         let moved_back = self
             .shown

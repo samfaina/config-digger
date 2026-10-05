@@ -1299,7 +1299,8 @@ fn validate_registry_anchor(anchor: &Anchor) -> Result<(), String> {
 pub(crate) struct JsonKeys {
     /// Where the file is. It must not lie in a Project.
     pub anchor: Anchor,
-    /// The key path of the object whose keys are Projects.
+    /// The key path of the object whose keys are Projects. Empty for the
+    /// file's own keys, as Gemini CLI's `trustedFolders.json` holds them.
     pub root: Vec<String>,
     /// How the keys spell a Project. Omitted for paths.
     #[serde(default)]
@@ -1309,8 +1310,8 @@ pub(crate) struct JsonKeys {
 impl Validate for JsonKeys {
     fn validate(&self) -> Result<(), String> {
         validate_registry_anchor(&self.anchor)?;
-        if self.root.is_empty() {
-            return Err("a project registry needs a root key path".into());
+        if self.root.iter().any(String::is_empty) {
+            return Err("a project registry root must have no empty key".into());
         }
         Ok(())
     }
@@ -1851,6 +1852,39 @@ pub(crate) struct PluginFolders {
     pub marker: Option<RelativePaths>,
     /// What the Agent records of each plugin it installed, when it does.
     pub records: Option<InstallRecords>,
+    /// A file in a plugin's folder that can say the plugin's files are in
+    /// another folder, as for an extension Gemini CLI links.
+    pub linked: Option<LinkedFolder>,
+}
+
+/// A strict JSON file in a plugin's folder, such as the
+/// `.gemini-extension-install.json` Gemini CLI writes for each extension:
+/// while its `kind_field` holds `kind`, such as `type` holding `link`, the
+/// plugin's files are in the absolute folder its `folder` field names, which
+/// the user owns.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LinkedFolder {
+    /// A `/`-separated path relative to the plugin's folder.
+    pub file: String,
+    /// The field that names the folder.
+    pub folder: String,
+    /// The field that says how the plugin was installed.
+    pub kind_field: String,
+    /// What that field holds for a linked plugin.
+    pub kind: String,
+}
+
+impl LinkedFolder {
+    /// The folder the file's text `text` links the plugin to, if it links it.
+    pub fn target(&self, text: &str) -> Option<PathBuf> {
+        let document = JsonFormat::STRICT.parse(text).ok()?;
+        if document.get(&self.kind_field)?.as_str()? != self.kind {
+            return None;
+        }
+        let folder = paths::lexical(Path::new(document.get(&self.folder)?.as_str()?));
+        paths::is_absolute(&folder).then_some(folder)
+    }
 }
 
 /// An object in a strict JSON file of the Agent home whose keys are plugin
@@ -1890,6 +1924,15 @@ impl Validate for PluginFolders {
             validate_key_path(&records.root)?;
             if records.version.is_empty() {
                 return Err("a records field must not be empty".into());
+            }
+        }
+        if let Some(linked) = &self.linked {
+            validate_relative(&linked.file)?;
+            if [&linked.folder, &linked.kind_field, &linked.kind]
+                .iter()
+                .any(|text| text.is_empty())
+            {
+                return Err("a linked folder needs its fields and kind named".into());
             }
         }
         Ok(())
@@ -2464,6 +2507,9 @@ pub(crate) enum Sanitize {
     /// Lower case, each run of characters other than `a`-`z` and `0`-`9`
     /// replaced by one `-`, with no `-` at either end.
     LowercaseHyphens,
+    /// Each character a Windows file name cannot hold, `: \ / < > * ? " |`,
+    /// replaced by `-`, as Gemini CLI names a skill.
+    PathChars,
 }
 
 /// What an Agent does with a skill whose `SKILL.md` it cannot fully read.
@@ -2535,6 +2581,9 @@ impl SkillFolder {
                     }
                 }
                 sanitized.trim_end_matches('-').to_owned()
+            }
+            Some(Sanitize::PathChars) => {
+                name.replace([':', '\\', '/', '<', '>', '*', '?', '"', '|'], "-")
             }
         }
     }
@@ -2784,7 +2833,7 @@ impl Interpolate for Interpolation {
 /// and `_`, or one of `names` when they are set, plus
 /// `${namespace:argument}` for each listed namespace, and
 /// `${NAME<separator>default}` when a default separator is set, whose
-/// default is literal text.
+/// default is literal text, and with `bare`, `$NAME`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Braces {
@@ -2800,6 +2849,10 @@ pub(crate) struct Braces {
     /// `workspaceFolder` and `userHome`, or Cursor's `/`. Omitted for any
     /// name.
     pub names: Option<Vec<String>>,
+    /// Whether `$NAME` without braces is a reference too, `NAME` being the
+    /// letters, digits and `_` that follow, as Gemini CLI reads it.
+    #[serde(default)]
+    pub bare: bool,
 }
 
 impl Validate for Braces {
@@ -2830,10 +2883,24 @@ impl Interpolate for Braces {
         let mut runs = Vec::new();
         let mut literal = 0;
         let mut at = 0;
-        while let Some(found) = text[at..].find("${") {
+        while let Some(found) = text[at..].find('$') {
             let start = at + found;
+            if !text[start + 1..].starts_with('{') {
+                let name = text[start + 1..]
+                    .bytes()
+                    .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+                    .count();
+                if self.bare && name > 0 {
+                    push_run(&mut runs, &text[literal..start], false);
+                    push_run(&mut runs, &text[start..start + 1 + name], true);
+                    literal = start + 1 + name;
+                }
+                at = start + 1 + name;
+                continue;
+            }
             let Some(close) = text[start..].find('}').map(|close| start + close) else {
-                break;
+                at = start + 2;
+                continue;
             };
             let inner = &text[start + 2..close];
             let reference = match self.default_separator.as_deref() {
@@ -3073,6 +3140,38 @@ impl Holds for SettingIs {
     }
 }
 
+/// Whether a setting the Agent reads in layers holds one of some values:
+/// the first of its sources that holds it decides, and while none does, it
+/// does not hold.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingOneOf {
+    /// Where the setting is, highest first.
+    pub sources: Vec<SettingPlace>,
+    /// The values it may hold, such as the ways of signing in that fetch
+    /// an organisation's controls.
+    pub one_of: Vec<Value>,
+}
+
+impl Validate for SettingOneOf {
+    fn validate(&self) -> Result<(), String> {
+        if self.one_of.is_empty() {
+            return Err("one_of needs a value".into());
+        }
+        validate_sources(&self.sources)
+    }
+}
+
+impl SettingOneOf {
+    /// Of the values each source holds, highest first, with the place each
+    /// is read at, the place of the one that makes it hold, if it holds.
+    pub fn met_at<P>(&self, values: impl Iterator<Item = (Option<Value>, P)>) -> Option<P> {
+        let mut values = values.filter_map(|(value, place)| Some((value?, place)));
+        let (value, place) = values.next()?;
+        self.one_of.contains(&value).then_some(place)
+    }
+}
+
 /// Entries compete when their names are exactly equal. An Entry of a
 /// `by_endpoint` location competes instead with the Entries of other
 /// locations that have its endpoint, joining the Item of the one the Agent
@@ -3164,12 +3263,14 @@ impl Compete for PathKey {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Merge {
     DeepMerge(DeepMerge),
+    OverlayFields(OverlayFields),
 }
 
 impl Validate for Merge {
     fn validate(&self) -> Result<(), String> {
         match self {
             Merge::DeepMerge(block) => block.validate(),
+            Merge::OverlayFields(block) => block.validate(),
         }
     }
 }
@@ -3180,7 +3281,8 @@ pub(crate) struct Built {
     pub config: Value,
     /// Each value that is not an object, and each empty object, by key path
     /// in `config` and in its order, with the index of its Entry among
-    /// those the server is built from.
+    /// those the server is built from. A list built from several Entries'
+    /// has an origin per item instead, keyed by its index.
     pub origins: Vec<(Vec<String>, usize)>,
 }
 
@@ -3189,13 +3291,26 @@ impl Merge {
     pub fn build(&self, entries: &[&Value]) -> Built {
         match self {
             Merge::DeepMerge(block) => block.build(entries),
+            Merge::OverlayFields(block) => block.build(entries),
+        }
+    }
+
+    /// Which of the Entries the Agent would let win, highest first, each
+    /// given by the id of its location, take part in the server it builds,
+    /// by their indexes among them.
+    pub fn taking_part(&self, locations: &[&str]) -> Vec<usize> {
+        match self {
+            Merge::DeepMerge(_) => (0..locations.len()).collect(),
+            Merge::OverlayFields(block) => block.taking_part(locations),
         }
     }
 
     /// The fields of the built server `config` that exclude each other,
     /// when it holds more than one of them: the Agent rejects it.
     pub fn conflict<'d>(&'d self, config: &Value) -> Vec<&'d str> {
-        let Merge::DeepMerge(block) = self;
+        let Merge::DeepMerge(block) = self else {
+            return Vec::new();
+        };
         let held: Vec<&str> = block
             .exclusive
             .iter()
@@ -3205,23 +3320,217 @@ impl Merge {
         if held.len() > 1 { held } else { Vec::new() }
     }
 
+    /// Whether the built server may hold one at most of some fields.
+    pub fn excludes(&self) -> bool {
+        match self {
+            Merge::DeepMerge(block) => !block.exclusive.is_empty(),
+            Merge::OverlayFields(_) => false,
+        }
+    }
+
     /// The field whose `false` in a built server turns it off, if any.
     pub fn enabled(&self) -> Option<&str> {
-        let Merge::DeepMerge(block) = self;
-        block.enabled.as_deref()
+        match self {
+            Merge::DeepMerge(block) => block.enabled.as_deref(),
+            Merge::OverlayFields(_) => None,
+        }
     }
 
     /// The ids of the locations whose Entries merge, empty for every
     /// location of the Item kind.
     pub fn locations(&self) -> &[String] {
-        let Merge::DeepMerge(block) = self;
-        &block.locations
+        match self {
+            Merge::DeepMerge(block) => &block.locations,
+            Merge::OverlayFields(_) => &[],
+        }
     }
 
     /// Whether the Entries of the location `id` merge.
     pub fn covers(&self, id: &str) -> bool {
         let locations = self.locations();
         locations.is_empty() || locations.iter().any(|location| location == id)
+    }
+
+    /// The Agent's own command that lists the server built as its
+    /// overlaying Entry alone, if it has one.
+    pub fn cli_lists_overlay(&self) -> Option<&str> {
+        match self {
+            Merge::DeepMerge(_) => None,
+            Merge::OverlayFields(block) => block.cli_lists_overlay.as_deref(),
+        }
+    }
+
+    /// Whether an Entry of the location `id` lies underneath the Entry that
+    /// overlays it.
+    pub fn underneath(&self, id: &str) -> bool {
+        match self {
+            Merge::DeepMerge(_) => false,
+            Merge::OverlayFields(block) => block.covers_under(id),
+        }
+    }
+}
+
+/// The highest Entry of the locations outside `under` lies over the highest
+/// of `under`, as Gemini CLI lays a settings server over an extension's
+/// server of the same name: each wins whole among its own, and the two make
+/// one server, field by field. A field of the Entry on top replaces the one
+/// underneath, except the objects of `merged`, which merge key by key, the
+/// lists of `union`, which keep the items of both, and those of
+/// `intersection`, which keep, once both hold one, the items both hold.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OverlayFields {
+    /// The ids of the locations whose Entries lie underneath, such as
+    /// Gemini CLI's extension servers.
+    pub under: Vec<String>,
+    /// Objects merged key by key, such as `env`.
+    #[serde(default)]
+    pub merged: Vec<String>,
+    /// Lists holding the items of both Entries, such as `excludeTools`.
+    #[serde(default)]
+    pub union: Vec<String>,
+    /// Lists holding the items both Entries list, such as `includeTools`.
+    #[serde(default)]
+    pub intersection: Vec<String>,
+    /// The Agent's own command that lists the server built as the Entry on
+    /// top alone, such as `gemini mcp list`: the Entry underneath notes
+    /// `cli_view_differs`.
+    pub cli_lists_overlay: Option<String>,
+}
+
+impl Validate for OverlayFields {
+    fn validate(&self) -> Result<(), String> {
+        if self.under.is_empty() {
+            return Err("an overlay-fields merge needs locations underneath".into());
+        }
+        let fields: Vec<&String> = self
+            .merged
+            .iter()
+            .chain(&self.union)
+            .chain(&self.intersection)
+            .collect();
+        if fields.iter().any(|field| field.is_empty()) {
+            return Err("an overlay-fields field must not be empty".into());
+        }
+        if let Some(field) = fields
+            .iter()
+            .enumerate()
+            .find_map(|(at, field)| fields[..at].contains(field).then_some(field))
+        {
+            return Err(format!("field `{field}` is merged two ways"));
+        }
+        if self.cli_lists_overlay.as_deref() == Some("") {
+            return Err("cli_lists_overlay must not be empty".into());
+        }
+        Ok(())
+    }
+}
+
+impl OverlayFields {
+    fn covers_under(&self, id: &str) -> bool {
+        self.under.iter().any(|under| under == id)
+    }
+
+    /// The first of the Entries on top and the first underneath.
+    fn taking_part(&self, locations: &[&str]) -> Vec<usize> {
+        let over = locations.iter().position(|id| !self.covers_under(id));
+        let under = locations.iter().position(|id| self.covers_under(id));
+        over.into_iter().chain(under).collect()
+    }
+
+    /// `entries` are the Entry on top, then the one underneath, or either
+    /// alone.
+    fn build(&self, entries: &[&Value]) -> Built {
+        let [over, under] = entries else {
+            let config = entries.first().map_or(Value::Null, |&entry| entry.clone());
+            let origins = leaves(&config, &mut Vec::new())
+                .into_iter()
+                .map(|(path, _)| (path, 0))
+                .collect();
+            return Built { config, origins };
+        };
+        let mut config = (*under).clone();
+        let mut origins: Vec<(Vec<String>, usize)> = leaves(&config, &mut Vec::new())
+            .into_iter()
+            .map(|(path, _)| (path, 1))
+            .collect();
+        let (Some(object), Some(on_top)) = (config.as_object_mut(), over.as_object()) else {
+            return Built {
+                config: (*over).clone(),
+                origins: vec![(Vec::new(), 0)],
+            };
+        };
+        let named = |fields: &[String], key: &str| fields.iter().any(|field| field == key);
+        for (key, value) in on_top {
+            let below = object.get(key).cloned();
+            let path = vec![key.clone()];
+            match (below, value) {
+                (Some(Value::Object(mut below)), Value::Object(above))
+                    if named(&self.merged, key) =>
+                {
+                    for (name, value) in above {
+                        below.insert(name.clone(), value.clone());
+                        let mut path = path.clone();
+                        path.push(name.clone());
+                        replace(&mut origins, &path, value, 0);
+                    }
+                    object.insert(key.clone(), Value::Object(below));
+                }
+                (Some(Value::Array(below)), Value::Array(above)) if named(&self.union, key) => {
+                    let mut items = below;
+                    for item in above {
+                        if !items.contains(item) {
+                            items.push(item.clone());
+                            let path = vec![key.clone(), (items.len() - 1).to_string()];
+                            origins.push((path, 0));
+                        }
+                    }
+                    // Each item of the list underneath comes from it.
+                    origins.retain(|(known, _)| *known != path);
+                    for at in 0..items.len() {
+                        let item = vec![key.clone(), at.to_string()];
+                        if !origins.iter().any(|(known, _)| *known == item) {
+                            origins.push((item, 1));
+                        }
+                    }
+                    object.insert(key.clone(), Value::Array(items));
+                }
+                (Some(Value::Array(below)), Value::Array(above))
+                    if named(&self.intersection, key) =>
+                {
+                    let items: Vec<Value> = below
+                        .into_iter()
+                        .filter(|item| above.contains(item))
+                        .collect();
+                    let items = Value::Array(items);
+                    replace(&mut origins, &path, &items, 0);
+                    object.insert(key.clone(), items);
+                }
+                (_, value) => {
+                    object.insert(key.clone(), value.clone());
+                    replace(&mut origins, &path, value, 0);
+                }
+            }
+        }
+        // In the order of the server's fields, each list's items by index.
+        let mut ordered = Vec::new();
+        for (path, _) in leaves(&config, &mut Vec::new()) {
+            let mut found: Vec<(Vec<String>, usize)> = origins
+                .iter()
+                .filter(|(known, _)| known.starts_with(&path))
+                .cloned()
+                .collect();
+            found.sort_by_key(|(known, _)| {
+                known
+                    .get(path.len())
+                    .and_then(|index| index.parse::<usize>().ok())
+            });
+            ordered.extend(found);
+        }
+        Built {
+            config,
+            origins: ordered,
+        }
     }
 }
 
@@ -4823,7 +5132,10 @@ impl Validate for SettingPlace {
             }
             fragments.validate()?;
         }
-        validate_key_path(&self.key_path)?;
+        // Empty, the value is the whole file, which a SQLite store is not.
+        if !self.key_path.is_empty() || self.sqlite || self.fragments.is_some() {
+            validate_key_path(&self.key_path)?;
+        }
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a setting cannot walk up from the Project folder".into());
         }
@@ -5245,6 +5557,7 @@ pub(crate) enum Gate {
     NonceTrust(NonceTrust),
     ApprovalHash(ApprovalHash),
     ProjectTrust(ProjectTrust),
+    FolderTrust(FolderTrust),
 }
 
 impl Validate for Gate {
@@ -5257,6 +5570,7 @@ impl Validate for Gate {
             Gate::NonceTrust(block) => block.validate(),
             Gate::ApprovalHash(block) => block.validate(),
             Gate::ProjectTrust(block) => block.validate(),
+            Gate::FolderTrust(block) => block.validate(),
         }
     }
 }
@@ -5271,7 +5585,8 @@ impl Gate {
             | Gate::TrustedFolders(_)
             | Gate::NonceTrust(_)
             | Gate::ApprovalHash(_)
-            | Gate::ProjectTrust(_) => self.locations().contains(&id),
+            | Gate::ProjectTrust(_)
+            | Gate::FolderTrust(_) => self.locations().contains(&id),
         }
     }
 
@@ -5285,6 +5600,7 @@ impl Gate {
             Gate::NonceTrust(block) => &block.sources,
             Gate::ApprovalHash(block) => &block.sources,
             Gate::ProjectTrust(block) => &block.sources,
+            Gate::FolderTrust(block) => &block.sources,
         }
     }
 
@@ -5293,6 +5609,7 @@ impl Gate {
     pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
         let lifted_by = match self {
             Gate::TrustedFolders(block) => block.trust_all.as_ref(),
+            Gate::FolderTrust(block) => block.trust_all.as_ref(),
             _ => None,
         };
         self.sources()
@@ -5312,6 +5629,7 @@ impl Gate {
             Gate::NonceTrust(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::ApprovalHash(block) => block.locations.iter().map(String::as_str).collect(),
             Gate::ProjectTrust(block) => block.locations.iter().map(String::as_str).collect(),
+            Gate::FolderTrust(block) => block.locations.iter().map(String::as_str).collect(),
         }
     }
 }
@@ -5369,6 +5687,84 @@ impl TrustedFolders {
             })
             .filter_map(|item| paths::from_uri_value(item.get(&self.uri)?))
             .collect()
+    }
+}
+
+/// Locations whose Entries the Agent uses only when it starts in a folder
+/// the user trusts, user Entries included, as Gemini CLI starts no server at
+/// all in a folder it does not trust: in the context of a Project no rule
+/// trusts, each is Blocked, with `untrusted_folder`, and with no Project,
+/// each notes that such a folder Blocks it. A source holds an object of
+/// rules, each a folder's path and its level; of the rules for the
+/// Project's folder or a folder above it, the one whose path is written
+/// longest decides. config-digger never trusts a folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FolderTrust {
+    /// The ids of the locations whose Entries need trust.
+    pub locations: Vec<String>,
+    /// Where the objects of rules are, the first that holds one read.
+    pub sources: Vec<SettingPlace>,
+    /// The levels that trust their rule's folder, such as `TRUST_FOLDER`.
+    pub trusted: Vec<String>,
+    /// The levels that trust the folder above their rule's, such as
+    /// `TRUST_PARENT`.
+    #[serde(default)]
+    pub parent: Vec<String>,
+    /// A setting that, while it is met, trusts every folder, such as Gemini
+    /// CLI's `security.folderTrust.enabled: false`.
+    pub trust_all: Option<SettingIs>,
+}
+
+impl Validate for FolderTrust {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("a folder-trust gate needs locations".into());
+        }
+        if self.trusted.is_empty()
+            || self
+                .trusted
+                .iter()
+                .chain(&self.parent)
+                .any(String::is_empty)
+        {
+            return Err("a folder-trust gate needs its levels named, none of them empty".into());
+        }
+        validate_sources(&self.sources)?;
+        if let Some(setting) = &self.trust_all {
+            setting.validate().map_err(|e| format!("trust_all: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl FolderTrust {
+    /// Whether the rules `value` trust the folder `folder`.
+    pub fn trusts(&self, value: &Value, folder: &Path) -> bool {
+        let Some(rules) = value.as_object() else {
+            return false;
+        };
+        let deciding = rules
+            .iter()
+            .filter_map(|(spelling, level)| {
+                let level = level.as_str()?;
+                let path = paths::lexical(Path::new(spelling));
+                let parent = self.parent.iter().any(|known| known == level);
+                let applies_to = if parent {
+                    path.parent().map(Path::to_path_buf).unwrap_or(path)
+                } else {
+                    path
+                };
+                crate::folders::below(folder, &applies_to)?;
+                Some((
+                    spelling.len(),
+                    parent || self.trusted.iter().any(|known| known == level),
+                ))
+            })
+            // The first of equally long rules, as the Agent keeps it.
+            .rev()
+            .max_by_key(|(length, _)| *length);
+        deciding.is_some_and(|(_, trusted)| trusted)
     }
 }
 
