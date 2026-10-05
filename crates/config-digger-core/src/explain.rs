@@ -725,6 +725,30 @@ pub(crate) fn not_allowed(policy: bool, key: &str, paths: &[&Path], agent_name: 
     kept_out(policy, ReasonCode::DisabledByRule, &why, agent_name)
 }
 
+/// The reason of a server named `name` that the allowlists `key` in
+/// `places` do not allow, each place as of when the Agent cached it, if it
+/// did.
+pub(crate) fn not_required(
+    policy: bool,
+    key: &str,
+    name: &str,
+    places: &[(&Path, Option<SystemTime>)],
+    agent_name: &str,
+) -> Reason {
+    let places: Vec<String> = places
+        .iter()
+        .map(|(path, cached_at)| match cached_at {
+            Some(at) => format!("{} as of {}", path.display(), as_of(*at)),
+            None => path.display().to_string(),
+        })
+        .collect();
+    let why = format!(
+        "`{key}` in {} allows no `{name}` with this command or URL",
+        places.join(", ")
+    );
+    kept_out(policy, ReasonCode::DisabledByRule, &why, agent_name)
+}
+
 /// The reason of an Entry the switch `key` in `path` turns off, holding
 /// `value`, as of `cached_at` when the Agent cached it then.
 pub(crate) fn switched_off(
@@ -1134,6 +1158,15 @@ pub(crate) fn gate_cached(
             "Depends on {agent_name} gate `{gate}`: {value} as {agent_name} last cached it, at a time it does not record."
         ),
     }
+}
+
+/// The caveat of an Entry read from the copy of configuration held elsewhere
+/// that `agent_name` cached at `at`.
+pub(crate) fn cached_copy(agent_name: &str, at: SystemTime) -> String {
+    format!(
+        "Read from the copy {agent_name} cached as of {}: what it copies may have changed since.",
+        as_of(at)
+    )
 }
 
 /// The caveat of an Entry that depends on `agent_name`'s gate `gate`,

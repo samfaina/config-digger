@@ -1605,6 +1605,10 @@ pub enum Provenance {
     /// Shipped with the Agent, which restores it as it ships it, such as
     /// Cursor's built-in skills. config-digger only reads it.
     BuiltIn,
+    /// Installed and switched on or off through the user's account, such
+    /// as the plugins Codex installs from the account's catalog.
+    /// config-digger only reads it.
+    AccountManaged,
 }
 
 /// A skill manager, such as `npx skills`, as its definition names it.
@@ -1638,6 +1642,7 @@ impl From<DefinitionProvenance> for Provenance {
             DefinitionProvenance::Plugin => Provenance::Plugin,
             DefinitionProvenance::Extension => Provenance::Extension,
             DefinitionProvenance::BuiltIn => Provenance::BuiltIn,
+            DefinitionProvenance::AccountManaged => Provenance::AccountManaged,
         }
     }
 }
@@ -1875,6 +1880,9 @@ pub enum CaveatCode {
     /// The Entry competes with others by URL, and servers config-digger
     /// cannot see take part too, so one of them may win instead.
     UnseenServers,
+    /// The Entry is read from a copy of configuration held elsewhere, such as
+    /// in the user's account, as of when the Agent cached it.
+    CachedCopy,
 }
 
 /// A place in a file's text.

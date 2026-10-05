@@ -6,7 +6,7 @@ use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, FindsBy, Format, Gate,
     GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp,
-    ManifestSkills, NameFrom, Parse, PluginFolders, PluginRecord, PluginRegistry,
+    ManifestSkills, NameFrom, Parse, PluginCache, PluginFolders, PluginRecord, PluginRegistry,
     ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingsSource, SkillDefect,
     SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
@@ -20,7 +20,7 @@ use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
 use crate::store::Written;
 use crate::user_list::{self, UserList};
-use crate::{mask, park, paths, skill};
+use crate::{mask, park, paths, skill, version};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -68,6 +68,8 @@ pub(crate) struct Snapshot {
     pub parked: Vec<ScannedParked>,
     /// The folder each Agent home keeps for each Project.
     pub storage: Vec<StorageFolder>,
+    /// When the Agent cached each file of a location that says so.
+    pub cached: BTreeMap<PathBuf, SystemTime>,
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -757,6 +759,7 @@ pub(crate) fn scan_as_if(
         entries: Vec::new(),
         readers: Vec::new(),
         storage: Vec::new(),
+        cached: BTreeMap::new(),
     };
 
     let settings = read_settings(definitions, ports, &mut scanner.reader);
@@ -1043,6 +1046,7 @@ pub(crate) fn scan_as_if(
         parked_store,
         parked,
         storage: scanner.storage,
+        cached: scanner.cached,
     })
 }
 
@@ -2173,6 +2177,8 @@ struct Scanner<'p> {
     /// The folder an Agent home keeps for each Project, as its registry
     /// of such folders records it.
     storage: Vec<StorageFolder>,
+    /// When the Agent cached each file of a location that says so.
+    cached: BTreeMap<PathBuf, SystemTime>,
 }
 
 /// The path `relative` names in each folder the Agent home `home` of the
@@ -2370,6 +2376,7 @@ impl Scanner<'_> {
         let records = match &plugins.registry {
             PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
             PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
+            PluginRegistry::PluginCache(block) => self.plugin_cache(home, block),
             PluginRegistry::ProjectPluginKeys(block) => match folder {
                 Some((folder, key)) => self.project_plugin_keys(home, block, folder, key),
                 None => Vec::new(),
@@ -2576,6 +2583,68 @@ impl Scanner<'_> {
             .collect()
     }
 
+    /// A record for the highest version of each plugin of the cache that
+    /// holds what the cache requires and not what it excludes, sorted by id.
+    fn plugin_cache(&mut self, home: &FoundHome, block: &PluginCache) -> Vec<PluginRecord> {
+        let Some(cache) = block.anchor.path(&home.roots, None) else {
+            return Vec::new();
+        };
+        let fs = self.reader.fs;
+        // The folders of `folder`, sorted by name, leaving out dot-folders.
+        let folders = |folder: &Path| {
+            let mut children: Vec<(String, PathBuf)> = fs
+                .read_dir(folder)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|child| fs.read_dir(child).is_ok())
+                .filter_map(|child| {
+                    let name = child.file_name()?.to_str()?.to_owned();
+                    (!name.starts_with('.')).then_some((name, child))
+                })
+                .collect();
+            children.sort_by_key(|(name, _)| name.to_lowercase());
+            children
+        };
+        let holds = |plugin: &Path, marker: &str| fs.exists(&blocks::join_relative(plugin, marker));
+        let mut records = Vec::new();
+        for (marketplace, marketplace_folder) in folders(&cache) {
+            for (name, plugin) in folders(&marketplace_folder) {
+                if block
+                    .requires
+                    .as_ref()
+                    .is_some_and(|marker| !holds(&plugin, marker))
+                    || block
+                        .excludes
+                        .as_ref()
+                        .is_some_and(|marker| holds(&plugin, marker))
+                {
+                    continue;
+                }
+                let highest = folders(&plugin).into_iter().max_by(|(a, _), (b, _)| {
+                    match (version::Version::parse(a), version::Version::parse(b)) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        _ => a.cmp(b),
+                    }
+                });
+                let Some((version, folder)) = highest else {
+                    tracing::debug!(plugin = %name, "plugin without a version folder");
+                    continue;
+                };
+                records.push(PluginRecord {
+                    id: format!("{name}{}{marketplace}", block.separator),
+                    name: Some(name),
+                    folder: folder.display().to_string(),
+                    scope: None,
+                    project: None,
+                    version: Some(version),
+                });
+            }
+        }
+        // Of plugins whose Entries tie, the first by id wins, as in Codex.
+        records.sort_by(|a, b| a.id.cmp(&b.id));
+        records
+    }
+
     /// Adds the Entries of config-digger's parked-Entry store, each one of
     /// the location it was parked from, in its Agent home, at its key path
     /// in the store. A parked Entry of an Agent, home or location not found
@@ -2669,11 +2738,22 @@ impl Scanner<'_> {
             }
             // Read in the folder of each plugin alone.
             Format::ManifestSkills(_) => return,
-            Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => {}
+            Format::Json(_)
+            | Format::Toml(_)
+            | Format::TomlFragments(_)
+            | Format::SqliteJson(_) => {}
         }
         let Some(document) = self.document(home, location, &path, project.as_deref()) else {
             return;
         };
+        if let Some(at) = location
+            .cached_at
+            .as_ref()
+            .and_then(|key_path| lookup(&document, key_path))
+            .and_then(blocks::time_of)
+        {
+            self.cached.insert(path.clone(), at);
+        }
         if location.one_entry {
             // Named by its plugin, once read.
             if let Some(value) = lookup(&document, &location.root) {

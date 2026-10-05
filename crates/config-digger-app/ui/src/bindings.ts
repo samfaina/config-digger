@@ -173,7 +173,12 @@ export type CaveatCode =
  *  The Entry competes with others by URL, and servers config-digger
  *  cannot see take part too, so one of them may win instead.
  */
-"unseen_servers";
+"unseen_servers" | 
+/**
+ *  The Entry is read from a copy of configuration held elsewhere, such as
+ *  in the user's account, as of when the Agent cached it.
+ */
+"cached_copy";
 
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
@@ -712,7 +717,13 @@ export type Provenance =
  *  Shipped with the Agent, which restores it as it ships it, such as
  *  Cursor's built-in skills. config-digger only reads it.
  */
-"built_in";
+"built_in" | 
+/**
+ *  Installed and switched on or off through the user's account, such
+ *  as the plugins Codex installs from the account's catalog.
+ *  config-digger only reads it.
+ */
+"account_managed";
 
 /**  A location config-digger could not turn into Entries for one Agent. */
 export type ReadFailure = {

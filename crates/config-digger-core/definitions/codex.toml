@@ -32,6 +32,8 @@ folder = { block = "path", path = "~/.codex" }
 [homes.roots]
 config = "config.toml"
 skills = "skills"
+plugins = "plugins"
+cloud_bundle = "cloud-config-bundle-cache.json"
 sessions = "sessions"
 archived_sessions = "archived_sessions"
 state = "state_5.sqlite"
@@ -46,6 +48,8 @@ folder = { block = "env", variable = "CODEX_HOME" }
 [homes.roots]
 config = "config.toml"
 skills = "skills"
+plugins = "plugins"
+cloud_bundle = "cloud-config-bundle-cache.json"
 sessions = "sessions"
 archived_sessions = "archived_sessions"
 state = "state_5.sqlite"
@@ -70,6 +74,14 @@ id = "user"
 [[scopes]]
 id = "project"
 
+# The skills Codex ships [source].
+[[scopes]]
+id = "system"
+
+# The Scope of a plugin's servers and skills.
+[[scopes]]
+id = "plugin"
+
 # Codex records the Projects it opened in each home [source, disk]: the
 # folders its trust prompt answered for, lower-cased keys of `projects` in
 # `config.toml`; the folder each session started in, `cwd` in the
@@ -88,13 +100,31 @@ registries = [
   { block = "sqlite-column", anchor = { block = "home", root = "state" }, table = "project_roots", column = "path" },
 ]
 
+# Plugins Codex installed, each in
+# `%CODEX_HOME%\plugins\cache\<marketplace>\<plugin>\<version>`, its
+# highest version being the one it loads [source]. Codex knows each by
+# `<plugin>@<marketplace>`, and names it by its folder [source]. Its own
+# switch, `[plugins."<id>"] enabled`, is not read yet. Codex has no command
+# that uninstalls a plugin: `/plugins` in its TUI does [docs].
+[[plugins]]
+id = "installed"
+registry = { block = "plugin-cache", anchor = { block = "home", root = "plugins", path = "cache" }, separator = "@", excludes = ".codex-remote-plugin-install.json" }
+
+# Plugins the account installed from its catalog, marked by
+# `.codex-remote-plugin-install.json` beside their versions [source, disk].
+# Codex takes whether they are on from the account, not from a file
+# [source], so config-digger only reads them.
+[[plugins]]
+id = "remote"
+registry = { block = "plugin-cache", anchor = { block = "home", root = "plugins", path = "cache" }, separator = "@", requires = ".codex-remote-plugin-install.json" }
+
 # Servers are the tables of `mcp_servers` in each layer of `config.toml`
 # files Codex folds, from the lowest up [source]:
 #
 # - the machine's, `%ProgramData%\OpenAI\Codex\config.toml`, the folder
 #   Windows names for `FOLDERID_ProgramData`, an organisation's defaults;
-# - the enterprise cloud bundle the account delivers on sign-in, which is
-#   not on disk here;
+# - the enterprise cloud bundle the account delivers on sign-in, as Codex
+#   caches it;
 # - the user's, `%CODEX_HOME%\config.toml`;
 # - with `--profile <name>`, `%CODEX_HOME%\<name>.config.toml`, which a
 #   launch picks and is not read here;
@@ -130,6 +160,27 @@ store_class = "plain"
 secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
 on_read_failure = "stops_agent"
 
+# The enterprise cloud bundle, a layer between the machine's and the
+# user's that the account delivers to Codex on sign-in [source]. Codex
+# caches it in `%CODEX_HOME%\cloud-config-bundle-cache.json` for an hour:
+# `signed_payload.bundle.config_toml.enterprise_managed` lists TOML
+# fragments, highest first, each holding its text in `contents` [source].
+# The cache is read even once it has expired, as of `cached_at`: whether
+# Codex still uses it then is not known, but it shows the account has a
+# cloud layer. Without the file there is no cloud layer to show.
+[[locations]]
+id = "cloud-mcp"
+anchor = { block = "home", root = "cloud_bundle" }
+format = { block = "toml-fragments", lists = [["signed_payload", "bundle", "config_toml", "enterprise_managed"], ["signed_payload", "bundle", "requirements_toml", "enterprise_managed"]], contents = "contents", highest_first = true }
+root = ["signed_payload", "bundle", "config_toml", "enterprise_managed", "mcp_servers"]
+kind = "mcp"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+cached_at = ["signed_payload", "cached_at"]
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "unknown"
+
 [[locations]]
 id = "user-mcp"
 anchor = { block = "home", root = "config" }
@@ -154,17 +205,49 @@ store_class = "plain"
 secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
 on_read_failure = "stops_agent"
 
+# A plugin's servers, from its `.mcp.json` [source]. The servers its
+# manifest declares in `mcpServers`, which Codex reads instead when there
+# are any, are not read yet. The plugin owns their transport: `config.toml`
+# can only switch them [source]. What Codex does with a `.mcp.json` it
+# cannot parse is not known.
+[[locations]]
+id = "plugin-mcp"
+anchor = { block = "plugin", plugins = "installed", path = ".mcp.json" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "unknown"
+
+[[locations]]
+id = "remote-plugin-mcp"
+anchor = { block = "plugin", plugins = "remote", path = ".mcp.json" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "account-managed"
+store_class = "plain"
+secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
+on_read_failure = "unknown"
+
 # Same-named servers of every layer make one server, table by table [source,
 # sandbox]: a Project's `[mcp_servers.docs] args = [...]` replaces only the
 # `args` of the user's `docs`, and `enabled = false` alone turns it off.
 # Codex refuses to start on a server with both `command` and `url`
 # [sandbox]. That a higher layer's `enabled = true` turns on again a server
 # a lower one turned off follows from the merge [source], not observed.
+# The server built from the layers beats a plugin's server of the same name
+# whole, even when it is off, and of two plugins with such a server the
+# first by id wins [source].
 [items.mcp]
-precedence = ["project-mcp", "user-mcp", "system-mcp"]
+precedence = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp", "plugin-mcp", "remote-plugin-mcp"]
 competition = { block = "exact-name" }
-merge = { block = "deep-merge", exclusive = ["command", "url"], enabled = "enabled" }
-checks = ["trust", "merge", "disable", "precedence"]
+merge = { block = "deep-merge", exclusive = ["command", "url"], enabled = "enabled", locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"] }
+checks = ["trust", "rules", "merge", "disable", "precedence"]
 
 # A Project's layer counts only once the user trusts its folder, written by
 # Codex's trust prompt as `[projects.'<path>'] trust_level = "trusted"` in
@@ -183,12 +266,73 @@ sources = [
 field = "trust_level"
 trusted = "trusted"
 
-# The skills of `%CODEX_HOME%\skills`, which Codex still reads although it
-# deprecates the folder [source]. A skill is a folder holding a `SKILL.md`
-# whose frontmatter has a `name` and a `description` [docs]; `.system`,
-# Codex's own, is read apart [source]. How deep Codex looks for skills, and
-# what it does with a `SKILL.md` it cannot read, is not known: skills are
-# taken to be found at any depth, and such a `SKILL.md` to be skipped.
+# An organisation allows MCP servers in `requirements.toml`, which adds no
+# server of its own [source]: `[mcp_servers.<name>] identity = { command =
+# "…" }` or `{ url = "…" }` allows the server of that name with that
+# command or URL. Once it lists any, Codex turns off every other server,
+# checking the server it built from its layers [source]. The machine's
+# `%ProgramData%\OpenAI\Codex\requirements.toml` is the lowest source and
+# the cloud bundle's `requirements_toml` fragments rank above it, merged
+# name by name [source]. A requirement that matches a command's args, or a
+# URL by prefix or pattern, is not read: its server is taken to meet it.
+# Whether the server Codex built still beats a plugin's server of the same
+# name once a requirement turns it off is not known: it is taken not to.
+[[items.mcp.rules]]
+block = "identity-allowlist"
+identity = "identity"
+locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"]
+sources = [
+  { anchor = { block = "home", root = "cloud_bundle" }, key_path = ["signed_payload", "bundle", "requirements_toml", "enterprise_managed", "mcp_servers"], fragments = { lists = [["signed_payload", "bundle", "requirements_toml", "enterprise_managed"]], contents = "contents", highest_first = true }, cached_at = ["signed_payload", "cached_at"], policy = true },
+  { anchor = { block = "machine", path = "%ProgramData%/OpenAI/Codex/requirements.toml" }, key_path = ["mcp_servers"], toml = true, policy = true },
+]
+
+# A plugin's servers answer to `[plugins."<id>".mcp_servers]` alone, and
+# only once some plugin has one [source].
+[[items.mcp.rules]]
+block = "identity-allowlist"
+identity = "identity"
+per_plugin = ["mcp_servers"]
+locations = ["plugin-mcp", "remote-plugin-mcp"]
+sources = [
+  { anchor = { block = "home", root = "cloud_bundle" }, key_path = ["signed_payload", "bundle", "requirements_toml", "enterprise_managed", "plugins"], fragments = { lists = [["signed_payload", "bundle", "requirements_toml", "enterprise_managed"]], contents = "contents", highest_first = true }, cached_at = ["signed_payload", "cached_at"], policy = true },
+  { anchor = { block = "machine", path = "%ProgramData%/OpenAI/Codex/requirements.toml" }, key_path = ["plugins"], toml = true, policy = true },
+]
+
+# Skills come from these roots, Repo first [source]. A skill is a folder
+# holding a `SKILL.md` whose frontmatter has a `name` and a `description`
+# [docs]. How deep Codex looks for skills, and what it does with a
+# `SKILL.md` it cannot read, is not known: skills are taken to be found at
+# any depth, and such a `SKILL.md` to be skipped. A folder whose name starts
+# with `.` is not read, so `.system` is read apart.
+#
+# `.codex\skills` in each folder whose `.codex\config.toml` is a Project
+# layer, from the repo root down to the Project, read even when the layer
+# is untrusted [source, sandbox], against the docs.
+[[locations]]
+id = "project-skills"
+anchor = { block = "project", path = ".codex/skills", walk = "up-to-repo-root" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# `.agents\skills` in each folder from the repo root down to the Project
+# [source, docs]. Whether trust applies to it is not known: it is taken not
+# to, as for `.codex\skills`.
+[[locations]]
+id = "project-agents-skills"
+anchor = { block = "project", path = ".agents/skills", walk = "up-to-repo-root" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# `%CODEX_HOME%\skills`, which Codex still reads although it deprecates the
+# folder [source].
 [[locations]]
 id = "user-skills"
 anchor = { block = "home", root = "skills" }
@@ -199,9 +343,70 @@ provenance = "file"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+# `~\.agents\skills`, found from the user's home folder, not `CODEX_HOME`,
+# so every Codex home reads it [source]. VS Code reads it too.
+[[locations]]
+id = "agents-skills"
+anchor = { block = "machine", path = "~/.agents/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# The skills Codex ships, which it deletes and extracts again into
+# `%CODEX_HOME%\skills\.system` whenever its own differ [source].
+[[locations]]
+id = "system-skills"
+anchor = { block = "home", root = "skills", path = ".system" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "system"
+provenance = "built-in"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# An organisation's skills, next to the machine's `config.toml` [source, docs].
+[[locations]]
+id = "admin-skills"
+anchor = { block = "machine", path = "%ProgramData%/OpenAI/Codex/skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "managed"
+provenance = "managed"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# A plugin's skills, in its `skills` folder [source]. The folder its
+# manifest names in `skills`, which Codex reads instead, is not read yet.
+# Codex names them `<plugin>:<skill>` [source].
+[[locations]]
+id = "plugin-skills"
+anchor = { block = "plugin", plugins = "installed", path = "skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+name_template = "{plugin}:{name}"
+kind = "skill"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "remote-plugin-skills"
+anchor = { block = "plugin", plugins = "remote", path = "skills" }
+format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+name_template = "{plugin}:{name}"
+kind = "skill"
+scope = "plugin"
+provenance = "account-managed"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
 # Codex lists every skill it finds, by the path of its `SKILL.md`, so two
-# skills with one name are both used [source, docs].
+# skills with one name are both used [source, docs]. Trust keeps out no
+# skill.
 [items.skill]
-precedence = ["user-skills"]
+precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
 checks = ["frontmatter", "disable", "precedence"]

@@ -1653,6 +1653,7 @@ pub(crate) enum PluginRegistry {
     JsonPluginRecords(JsonPluginRecords),
     PluginFolders(PluginFolders),
     ProjectPluginKeys(ProjectPluginKeys),
+    PluginCache(PluginCache),
 }
 
 impl Validate for PluginRegistry {
@@ -1661,6 +1662,7 @@ impl Validate for PluginRegistry {
             PluginRegistry::JsonPluginRecords(block) => block.validate(),
             PluginRegistry::PluginFolders(block) => block.validate(),
             PluginRegistry::ProjectPluginKeys(block) => block.validate(),
+            PluginRegistry::PluginCache(block) => block.validate(),
         }
     }
 }
@@ -1671,7 +1673,54 @@ impl ListPlugins for PluginRegistry {
             PluginRegistry::JsonPluginRecords(block) => block.anchors(),
             PluginRegistry::PluginFolders(block) => block.anchors(),
             PluginRegistry::ProjectPluginKeys(block) => block.anchors(),
+            PluginRegistry::PluginCache(block) => block.anchors(),
         }
+    }
+}
+
+/// A cache of the Agent home holding each plugin it installed in
+/// `<marketplace>/<plugin>/<version>`, such as Codex's `plugins\cache`. A
+/// plugin is named by its folder, its id is that name and its marketplace's
+/// joined by `separator`, and its files are in its highest version, compared
+/// number by number, or by text where either is no version. A folder whose
+/// name starts with `.` is neither a marketplace, a plugin nor a version.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginCache {
+    /// The cache's folder.
+    pub anchor: Anchor,
+    /// The text between a plugin's name and its marketplace's in its id,
+    /// such as `@`.
+    pub separator: String,
+    /// A `/`-separated path relative to a plugin's folder, above its
+    /// versions, that a plugin must hold to be listed here.
+    pub requires: Option<String>,
+    /// A `/`-separated path relative to a plugin's folder, above its
+    /// versions, that a plugin must not hold to be listed here, such as the
+    /// file Codex writes beside a plugin the account installed.
+    pub excludes: Option<String>,
+}
+
+impl Validate for PluginCache {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        self.anchor.one_file()?;
+        if self.anchor.home_root().is_none() && self.anchor.machine().is_none() {
+            return Err("a plugin cache must lie in the Agent home or the machine".into());
+        }
+        if self.separator.is_empty() {
+            return Err("a plugin cache needs a separator".into());
+        }
+        self.requires
+            .iter()
+            .chain(&self.excludes)
+            .try_for_each(|marker| validate_relative(marker))
+    }
+}
+
+impl ListPlugins for PluginCache {
+    fn anchors(&self) -> Vec<&Anchor> {
+        vec![&self.anchor]
     }
 }
 
@@ -2035,6 +2084,11 @@ pub(crate) enum Provenance {
     /// Shipped with the Agent, which restores it as it ships it, such as
     /// Cursor's built-in skills. config-digger only reads it.
     BuiltIn,
+    /// Installed and switched on or off through the user's account, such
+    /// as the plugins Codex installs from the account's catalog: the Agent
+    /// takes their State from the account, not from a file. config-digger
+    /// only reads it.
+    AccountManaged,
 }
 
 impl Provenance {
@@ -2043,7 +2097,10 @@ impl Provenance {
     pub fn read_only(self) -> bool {
         match self {
             Provenance::File | Provenance::Plugin | Provenance::Extension => false,
-            Provenance::Managed | Provenance::CloudMirror | Provenance::BuiltIn => true,
+            Provenance::Managed
+            | Provenance::CloudMirror
+            | Provenance::BuiltIn
+            | Provenance::AccountManaged => true,
         }
     }
 }
@@ -2177,6 +2234,7 @@ pub(crate) enum Format {
     SkillList(SkillList),
     ManifestSkills(ManifestSkills),
     SqliteJson(SqliteJson),
+    TomlFragments(TomlFragments),
 }
 
 impl Validate for Format {
@@ -2188,6 +2246,7 @@ impl Validate for Format {
             Format::SkillList(block) => block.validate(),
             Format::ManifestSkills(block) => block.validate(),
             Format::SqliteJson(block) => block.validate(),
+            Format::TomlFragments(block) => block.validate(),
         }
     }
 }
@@ -2199,6 +2258,7 @@ impl Format {
         match self {
             Format::Json(block) => Some(block),
             Format::Toml(block) => Some(block),
+            Format::TomlFragments(block) => Some(block),
             Format::SkillFolder(_)
             | Format::SkillList(_)
             | Format::ManifestSkills(_)
@@ -2212,6 +2272,7 @@ impl Format {
             Format::SqliteJson(block) => Some(block),
             Format::Json(_)
             | Format::Toml(_)
+            | Format::TomlFragments(_)
             | Format::SkillFolder(_)
             | Format::SkillList(_)
             | Format::ManifestSkills(_) => None,
@@ -2225,7 +2286,10 @@ impl Format {
             Format::SkillFolder(block) => Some(block),
             Format::SkillList(block) => Some(&block.skills),
             Format::ManifestSkills(block) => Some(&block.skills),
-            Format::Json(_) | Format::Toml(_) | Format::SqliteJson(_) => None,
+            Format::Json(_)
+            | Format::Toml(_)
+            | Format::TomlFragments(_)
+            | Format::SqliteJson(_) => None,
         }
     }
 }
@@ -2587,6 +2651,82 @@ impl Parse for TomlFormat {
 
     fn syntax(&self) -> Syntax {
         Syntax::Toml
+    }
+}
+
+/// A strict JSON file holding lists of TOML texts, such as the bundle of
+/// configuration Codex caches from the account in
+/// `cloud-config-bundle-cache.json`. Each list is read as the one table its
+/// texts fold into: tables merge key by key, and any other value of a
+/// higher text replaces the lower one's whole. A text that is not TOML
+/// makes the file fail to parse.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TomlFragments {
+    /// The key path of each list. An item is an object whose `contents`
+    /// holds its text.
+    pub lists: Vec<Vec<String>>,
+    /// The field of an item that holds its text.
+    pub contents: String,
+    /// Whether a list holds its highest text first, rather than last.
+    #[serde(default)]
+    pub highest_first: bool,
+}
+
+impl Validate for TomlFragments {
+    fn validate(&self) -> Result<(), String> {
+        if self.lists.is_empty() {
+            return Err("toml-fragments needs at least one list".into());
+        }
+        self.lists
+            .iter()
+            .try_for_each(|list| validate_key_path(list))?;
+        if self.contents.is_empty() {
+            return Err("a toml-fragments contents field must not be empty".into());
+        }
+        Ok(())
+    }
+}
+
+impl Parse for TomlFragments {
+    /// The file, each list replaced by the table its texts fold into.
+    fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError> {
+        let mut document = JsonFormat::STRICT.parse(text)?;
+        for list in &self.lists {
+            let Some(items) = list
+                .iter()
+                .try_fold(&mut document, |value, key| value.get_mut(key))
+            else {
+                continue;
+            };
+            let mut texts: Vec<String> = items
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|item| item.get(&self.contents)?.as_str().map(str::to_owned))
+                .collect();
+            if self.highest_first {
+                texts.reverse();
+            }
+            let mut table = Value::Object(serde_json::Map::new());
+            for text in &texts {
+                let fragment = TomlFormat {}
+                    .parse(text)
+                    .map_err(|_| ParseError { position: None })?;
+                fold(&mut table, &fragment, &mut Vec::new(), 0, &mut Vec::new());
+            }
+            *items = table;
+        }
+        Ok(document)
+    }
+
+    fn dialect(&self) -> &'static str {
+        "strict JSON holding TOML"
+    }
+
+    fn syntax(&self) -> Syntax {
+        // Never edited: what it holds is read only, as managed configuration.
+        Syntax::Jsonc
     }
 }
 
@@ -3070,6 +3210,19 @@ impl Merge {
         let Merge::DeepMerge(block) = self;
         block.enabled.as_deref()
     }
+
+    /// The ids of the locations whose Entries merge, empty for every
+    /// location of the Item kind.
+    pub fn locations(&self) -> &[String] {
+        let Merge::DeepMerge(block) = self;
+        &block.locations
+    }
+
+    /// Whether the Entries of the location `id` merge.
+    pub fn covers(&self, id: &str) -> bool {
+        let locations = self.locations();
+        locations.is_empty() || locations.iter().any(|location| location == id)
+    }
 }
 
 /// Tables merge key by key at any depth, from the lowest Entry up, and any
@@ -3089,6 +3242,13 @@ pub(crate) struct DeepMerge {
     /// Codex's `enabled`: every Entry of the Item is then Disabled, by the
     /// Entry the field comes from.
     pub enabled: Option<String>,
+    /// The ids of the locations whose Entries merge, such as Codex's
+    /// `config.toml` layers. Omitted, every location of the Item kind
+    /// merges. The server built from them competes whole with the Entries
+    /// of the others, which rank below them, such as a plugin's server of
+    /// the same name.
+    #[serde(default)]
+    pub locations: Vec<String>,
 }
 
 impl Validate for DeepMerge {
@@ -4487,6 +4647,9 @@ pub(crate) struct SettingPlace {
     /// Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.
     #[serde(default)]
     pub toml: bool,
+    /// How a strict JSON file holding lists of TOML texts is read, such as
+    /// the bundle Codex caches from the account, rather than as JSON.
+    pub fragments: Option<TomlFragments>,
     /// The key path, in the same file, of when the Agent cached the value:
     /// milliseconds since 1970, or an RFC 3339 time, such as when VS Code
     /// fetched the account's policy. Omitted for a value the user writes.
@@ -4513,6 +4676,9 @@ impl SettingPlace {
 
     /// How the file is parsed.
     pub fn format(&self) -> Box<dyn Parse> {
+        if let Some(fragments) = &self.fragments {
+            return Box::new(fragments.clone());
+        }
         if self.toml {
             Box::new(TomlFormat {})
         } else {
@@ -4526,6 +4692,15 @@ impl Validate for SettingPlace {
         self.anchor.validate()?;
         if self.toml && (self.sqlite || self.dialect.is_some()) {
             return Err("a TOML setting takes no dialect and is no SQLite store".into());
+        }
+        if let Some(fragments) = &self.fragments {
+            if self.toml || self.sqlite || self.dialect.is_some() {
+                return Err(
+                    "a setting of TOML fragments is no TOML file or SQLite store, and takes no dialect"
+                        .into(),
+                );
+            }
+            fragments.validate()?;
         }
         validate_key_path(&self.key_path)?;
         if self.anchor.walk() != ProjectWalk::None {
@@ -4583,6 +4758,7 @@ impl Validate for SettingPlace {
 pub(crate) enum Rule {
     AllowDenyList(AllowDenyList),
     GlobalSwitch(GlobalSwitch),
+    IdentityAllowlist(IdentityAllowlist),
 }
 
 impl Validate for Rule {
@@ -4590,6 +4766,7 @@ impl Validate for Rule {
         match self {
             Rule::AllowDenyList(block) => block.validate(),
             Rule::GlobalSwitch(block) => block.validate(),
+            Rule::IdentityAllowlist(block) => block.validate(),
         }
     }
 }
@@ -4600,6 +4777,7 @@ impl Rule {
         match self {
             Rule::AllowDenyList(block) => &block.sources,
             Rule::GlobalSwitch(block) => &block.sources,
+            Rule::IdentityAllowlist(block) => &block.sources,
         }
     }
 
@@ -4608,7 +4786,7 @@ impl Rule {
     pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
         let policy_only = match self {
             Rule::AllowDenyList(block) => block.policy_only.as_ref(),
-            Rule::GlobalSwitch(_) => None,
+            Rule::GlobalSwitch(_) | Rule::IdentityAllowlist(_) => None,
         };
         self.sources().iter().chain(policy_only)
     }
@@ -4619,6 +4797,7 @@ impl Rule {
         match self {
             Rule::AllowDenyList(block) => &block.locations,
             Rule::GlobalSwitch(block) => &block.locations,
+            Rule::IdentityAllowlist(block) => &block.locations,
         }
     }
 
@@ -4789,6 +4968,104 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
         }
     }
     rest.len() >= last.len() && rest.ends_with(last)
+}
+
+/// Tables of the servers an organisation allows, each keyed by a server's
+/// name and holding what that server must be, such as the `mcp_servers` of
+/// Codex's `requirements.toml`: `identity = { command = "…" }` or
+/// `identity = { url = "…" }`. The tables of every source merge name by
+/// name, a higher source's winning. Once any source holds a table, a server
+/// whose name it lacks, or whose command or URL is not the one its name
+/// requires, is kept out. A requirement held some other way, such as a
+/// table matching a command's args, is not read: its server is taken to
+/// meet it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct IdentityAllowlist {
+    /// Highest first. A server they keep out is Blocked when any source
+    /// holding a table is policy.
+    pub sources: Vec<SettingPlace>,
+    /// The field of a server's requirement holding what it must be.
+    pub identity: String,
+    /// For sources whose value is keyed by plugin id, the key path in each
+    /// plugin's value of its table, such as the `mcp_servers` of Codex's
+    /// `[plugins."<id>"]`: a plugin's server meets only its own plugin's
+    /// table, and once any plugin has one, the servers of a plugin with
+    /// none are kept out. Omitted, a source's value is the table.
+    #[serde(default)]
+    pub per_plugin: Vec<String>,
+    /// The ids of the locations whose Entries it covers. Omitted, it covers
+    /// every location of the Item kind.
+    #[serde(default)]
+    pub locations: Vec<String>,
+}
+
+impl Validate for IdentityAllowlist {
+    fn validate(&self) -> Result<(), String> {
+        validate_sources(&self.sources)?;
+        if self.identity.is_empty() {
+            return Err("an identity-allowlist identity field must not be empty".into());
+        }
+        if !self.per_plugin.is_empty() {
+            validate_key_path(&self.per_plugin).map_err(|e| format!("per_plugin: {e}"))?;
+        }
+        Ok(())
+    }
+}
+
+impl IdentityAllowlist {
+    /// The table `value`, a source's value, holds for the servers of the
+    /// plugin with the id `plugin`, or of no plugin; `None` when it holds
+    /// none for them.
+    pub fn table<'v>(&self, value: &'v Value, plugin: Option<&str>) -> Option<&'v Value> {
+        let table = if self.per_plugin.is_empty() {
+            value
+        } else {
+            self.per_plugin
+                .iter()
+                .try_fold(value.get(plugin?)?, |value, key| value.get(key))?
+        };
+        table.is_object().then_some(table)
+    }
+
+    /// Whether `value`, a source's value, holds a table: for any plugin,
+    /// when it is keyed by plugin id.
+    pub fn holds_table(&self, value: &Value) -> bool {
+        if self.per_plugin.is_empty() {
+            return value.is_object();
+        }
+        value.as_object().is_some_and(|plugins| {
+            plugins
+                .keys()
+                .any(|id| self.table(value, Some(id)).is_some())
+        })
+    }
+
+    /// Whether a server whose command and URL are `command` and `url` meets
+    /// `requirement`, its name's entry in a table. `shown_command` and
+    /// `shown_url` give a required command or URL as the server's would be
+    /// shown, so that masked values compare alike.
+    pub fn meets(
+        &self,
+        requirement: &Value,
+        command: Option<&str>,
+        url: Option<&str>,
+        shown_command: &dyn Fn(&str) -> String,
+        shown_url: &dyn Fn(&str) -> String,
+    ) -> bool {
+        let Some(identity) = requirement.get(&self.identity) else {
+            return true;
+        };
+        match (identity.get("command"), identity.get("url")) {
+            (Some(Value::String(required)), None) => {
+                command.is_some_and(|command| shown_command(required) == command)
+            }
+            (None, Some(Value::String(required))) => {
+                url.is_some_and(|url| shown_url(required) == url)
+            }
+            _ => true,
+        }
+    }
 }
 
 /// A setting that turns off every Entry it covers while it holds `off`,

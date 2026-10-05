@@ -481,7 +481,7 @@ impl Targeted<'_> {
                         )));
                     }
                     let project = project.as_ref().map(|(_, key)| key.as_str());
-                    let ruled = rules::hits(definition, self.snapshot, scanned, project);
+                    let ruled = rules::hits(definition, self.snapshot, scanned, project, None);
                     let by_rule: Vec<&rules::RuleHit> = ruled
                         .iter()
                         .filter(|hit| hit.state == State::Disabled)

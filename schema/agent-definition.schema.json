@@ -1410,6 +1410,44 @@
             "cache",
             "marker"
           ]
+        },
+        {
+          "description": "A cache of the Agent home holding each plugin it installed in\n`<marketplace>/<plugin>/<version>`, such as Codex's `plugins\\cache`. A\nplugin is named by its folder, its id is that name and its marketplace's\njoined by `separator`, and its files are in its highest version, compared\nnumber by number, or by text where either is no version. A folder whose\nname starts with `.` is neither a marketplace, a plugin nor a version.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "The cache's folder.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "separator": {
+              "description": "The text between a plugin's name and its marketplace's in its id,\nsuch as `@`.",
+              "type": "string"
+            },
+            "requires": {
+              "description": "A `/`-separated path relative to a plugin's folder, above its\nversions, that a plugin must hold to be listed here.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "excludes": {
+              "description": "A `/`-separated path relative to a plugin's folder, above its\nversions, that a plugin must not hold to be listed here, such as the\nfile Codex writes beside a plugin the account installed.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "plugin-cache"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "separator"
+          ]
         }
       ]
     },
@@ -1620,6 +1658,16 @@
               "type": "null"
             }
           ]
+        },
+        "cached_at": {
+          "description": "The key path, in the file as its format reads it, of when the Agent\ncached the file's copy of configuration held elsewhere, such as the\nbundle Codex caches from the account: milliseconds since 1970, or an\nRFC 3339 time. Each Entry then carries a caveat that it is as of\nthen. Omitted for a file the Agent reads as it is.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false,
@@ -1809,6 +1857,41 @@
             "block",
             "key"
           ]
+        },
+        {
+          "description": "A strict JSON file holding lists of TOML texts, such as the bundle of\nconfiguration Codex caches from the account in\n`cloud-config-bundle-cache.json`. Each list is read as the one table its\ntexts fold into: tables merge key by key, and any other value of a\nhigher text replaces the lower one's whole. A text that is not TOML\nmakes the file fail to parse.",
+          "type": "object",
+          "properties": {
+            "lists": {
+              "description": "The key path of each list. An item is an object whose `contents`\nholds its text.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "contents": {
+              "description": "The field of an item that holds its text.",
+              "type": "string"
+            },
+            "highest_first": {
+              "description": "Whether a list holds its highest text first, rather than last.",
+              "type": "boolean",
+              "default": false
+            },
+            "block": {
+              "type": "string",
+              "const": "toml-fragments"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "lists",
+            "contents"
+          ]
         }
       ]
     },
@@ -1944,6 +2027,11 @@
           "description": "Shipped with the Agent, which restores it as it ships it, such as\nCursor's built-in skills. config-digger only reads it.",
           "type": "string",
           "const": "built-in"
+        },
+        {
+          "description": "Installed and switched on or off through the user's account, such\nas the plugins Codex installs from the account's catalog: the Agent\ntakes their State from the account, not from a file. config-digger\nonly reads it.",
+          "type": "string",
+          "const": "account-managed"
         }
       ]
     },
@@ -2274,6 +2362,17 @@
           "type": "boolean",
           "default": false
         },
+        "fragments": {
+          "description": "How a strict JSON file holding lists of TOML texts is read, such as\nthe bundle Codex caches from the account, rather than as JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TomlFragments"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cached_at": {
           "description": "The key path, in the same file, of when the Agent cached the value:\nmilliseconds since 1970, or an RFC 3339 time, such as when VS Code\nfetched the account's policy. Omitted for a value the user writes.",
           "type": [
@@ -2303,6 +2402,36 @@
       "required": [
         "anchor",
         "key_path"
+      ]
+    },
+    "TomlFragments": {
+      "description": "A strict JSON file holding lists of TOML texts, such as the bundle of\nconfiguration Codex caches from the account in\n`cloud-config-bundle-cache.json`. Each list is read as the one table its\ntexts fold into: tables merge key by key, and any other value of a\nhigher text replaces the lower one's whole. A text that is not TOML\nmakes the file fail to parse.",
+      "type": "object",
+      "properties": {
+        "lists": {
+          "description": "The key path of each list. An item is an object whose `contents`\nholds its text.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "contents": {
+          "description": "The field of an item that holds its text.",
+          "type": "string"
+        },
+        "highest_first": {
+          "description": "Whether a list holds its highest text first, rather than last.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "lists",
+        "contents"
       ]
     },
     "References": {
@@ -2575,6 +2704,14 @@
                 "string",
                 "null"
               ]
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries merge, such as Codex's\n`config.toml` layers. Omitted, every location of the Item kind\nmerges. The server built from them competes whole with the Entries\nof the others, which rank below them, such as a plugin's server of\nthe same name.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
             },
             "block": {
               "type": "string",
@@ -3391,6 +3528,49 @@
             "block",
             "sources",
             "off"
+          ]
+        },
+        {
+          "description": "Tables of the servers an organisation allows, each keyed by a server's\nname and holding what that server must be, such as the `mcp_servers` of\nCodex's `requirements.toml`: `identity = { command = \"…\" }` or\n`identity = { url = \"…\" }`. The tables of every source merge name by\nname, a higher source's winning. Once any source holds a table, a server\nwhose name it lacks, or whose command or URL is not the one its name\nrequires, is kept out. A requirement held some other way, such as a\ntable matching a command's args, is not read: its server is taken to\nmeet it.",
+          "type": "object",
+          "properties": {
+            "sources": {
+              "description": "Highest first. A server they keep out is Blocked when any source\nholding a table is policy.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SettingPlace"
+              }
+            },
+            "identity": {
+              "description": "The field of a server's requirement holding what it must be.",
+              "type": "string"
+            },
+            "per_plugin": {
+              "description": "For sources whose value is keyed by plugin id, the key path in each\nplugin's value of its table, such as the `mcp_servers` of Codex's\n`[plugins.\"<id>\"]`: a plugin's server meets only its own plugin's\ntable, and once any plugin has one, the servers of a plugin with\nnone are kept out. Omitted, a source's value is the table.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "locations": {
+              "description": "The ids of the locations whose Entries it covers. Omitted, it covers\nevery location of the Item kind.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "block": {
+              "type": "string",
+              "const": "identity-allowlist"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "sources",
+            "identity"
           ]
         }
       ]
