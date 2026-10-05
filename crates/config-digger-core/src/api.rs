@@ -676,6 +676,8 @@ pub struct FileChange {
     /// The file is in the index of its git repo, so the edits show in the
     /// git diff.
     pub git_versioned: bool,
+    /// How the file behaves while an Agent that reads it runs.
+    pub store_class: StoreClass,
     pub edits: Vec<EditSummary>,
     /// A unified diff of the whole file, before and after every edit, as
     /// [`FileDiff::diff`] has it.
@@ -686,15 +688,47 @@ pub struct FileChange {
 }
 
 impl FileChange {
-    pub(crate) fn new(edits: Vec<EditSummary>, diff: FileDiff, git_versioned: bool) -> Self {
+    pub(crate) fn new(
+        edits: Vec<EditSummary>,
+        diff: FileDiff,
+        git_versioned: bool,
+        store_class: StoreClass,
+    ) -> Self {
         Self {
             path: diff.path,
             git_versioned,
+            store_class,
             edits,
             diff: diff.diff,
             diff_unavailable: diff.diff_unavailable,
             diff_note: diff.diff_note,
             changed_lines: diff.changed_lines,
+        }
+    }
+}
+
+/// How a file an Operation writes behaves while an Agent that reads it
+/// runs, which decides whether that write warns or is blocked then.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub enum StoreClass {
+    /// A SQLite database the Agent holds open.
+    Sqlite,
+    /// A file the Agent rewrites from memory while it runs, such as
+    /// `~/.claude.json`.
+    RewrittenWhileRunning,
+    /// A file the Agent reads and leaves alone.
+    Plain,
+}
+
+impl From<definitions::blocks::StoreClass> for StoreClass {
+    fn from(class: definitions::blocks::StoreClass) -> Self {
+        match class {
+            definitions::blocks::StoreClass::Sqlite => StoreClass::Sqlite,
+            definitions::blocks::StoreClass::RewrittenWhileRunning => {
+                StoreClass::RewrittenWhileRunning
+            }
+            definitions::blocks::StoreClass::Plain => StoreClass::Plain,
         }
     }
 }
@@ -813,7 +847,7 @@ pub struct Warning {
 }
 
 /// Each class of warning is acknowledged on its own.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum WarningClass {
     /// The write lands in a git-versioned file.

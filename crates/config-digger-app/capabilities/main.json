@@ -8,6 +8,9 @@
     "allow-switch-project",
     "allow-backups-of",
     "allow-open-location",
-    "allow-reveal-location"
+    "allow-reveal-location",
+    "allow-plan-action",
+    "allow-execute-plan",
+    "allow-cancel-plan"
   ]
 }

@@ -27,13 +27,70 @@ export const commands = {
 	 */
 	openLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("open_location", { path })),
 	/**
-	 *  Shows `path`, a location the inventory shows or a backup copy of one,
-	 *  selected in Explorer.
+	 *  Shows `path`, a location the inventory shows, a backup copy of one, or
+	 *  the backup folder of an Operation the dialog executed, selected in
+	 *  Explorer.
 	 */
 	revealLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("reveal_location", { path })),
+	/**
+	 *  Plans `request` against what the disk holds now, without writing
+	 *  anything, and holds the plan under the id the preview carries.
+	 */
+	planAction: (request: ActionRequest) => typedError<ActionPreview, Error>(__TAURI_INVOKE("plan_action", { request })),
+	/**
+	 *  Executes the plan held under `plan_id` with the warnings the user
+	 *  acknowledged, and drops it.
+	 */
+	executePlan: (planId: string, acknowledged: WarningClass[]) => typedError<Executed, Error>(__TAURI_INVOKE("execute_plan", { planId, acknowledged })),
+	/**  Drops the plan held under `plan_id`, as when the dialog is cancelled. */
+	cancelPlan: (planId: string) => typedError<null, Error>(__TAURI_INVOKE("cancel_plan", { planId })),
 };
 
 /* Types */
+/**  What an Operation does to the Entries it targets. */
+export type Action = 
+/**
+ *  Makes each Entry stop taking effect for one Agent while keeping it,
+ *  through the Agent's own machine-local switch.
+ */
+"disable" | 
+/**
+ *  Makes each Disabled Entry take effect again, lifting every switch
+ *  that Disables it, whoever set it.
+ */
+"enable" | 
+/**  Deletes each Entry from where it lives, for every Agent that reads it. */
+"remove" | 
+/**
+ *  Applies the inverse of every edit of an earlier Operation to the files
+ *  as they are now.
+ */
+"undo" | 
+/**
+ *  Deletes the backup of an earlier Operation, which can no longer be
+ *  undone afterwards.
+ */
+"delete_backup";
+
+/**  A plan held under `plan_id`, as the dialog shows it. */
+export type ActionPreview = {
+	plan_id: string,
+	preview: Preview,
+	/**  What the user must acknowledge, each on its own. */
+	warnings: Warning[],
+	/**  Why it cannot execute, whatever is acknowledged. */
+	blocks: Block[],
+};
+
+/**  What the webview asks to plan. */
+export type ActionRequest = 
+/**  One action on one Entry, in the context of `project`, or of no Project. */
+{ kind: "entry"; verb: Verb; 
+/**  The Entry's `<path>#<key path>` locator. */
+locator: string; project: string | null } | 
+/**  The Undo of the Operation `operation` in History. */
+{ kind: "undo"; operation: string };
+
 /**  A problem of an Agent home in the context, shown above its Items. */
 export type AgentFlag = {
 	agent: string,
@@ -118,6 +175,25 @@ export type Backup = {
 };
 
 /**
+ *  Why a plan cannot execute, whatever is acknowledged. The user removes
+ *  the cause, such as by closing an Agent, and plans again.
+ */
+export type Block = {
+	code: BlockCode,
+	/**  The cause and what to do about it, as a sentence rendered by the core. */
+	sentence: string,
+};
+
+export type BlockCode = 
+/**  The plan writes a SQLite store while the Agent holding it open runs. */
+"running_agent_sqlite" | 
+/**
+ *  The plan parks an Entry out of, or puts one back into, a file the
+ *  running Agent rewrites from memory, which would undo it.
+ */
+"running_agent_parking";
+
+/**
  *  The server an Agent builds by merging same-named Entries field by field,
  *  as Codex does across its layers.
  */
@@ -186,6 +262,20 @@ export type CaveatCode =
  */
 "cached_copy";
 
+/**  An Entry's State in one Agent and context, before and after an Operation. */
+export type Change = {
+	agent: string,
+	agent_name: string,
+	home: string,
+	/**  The Item's name. */
+	item: string,
+	path: string,
+	locator: string,
+	project: string | null,
+	before: StateAfter,
+	after: StateAfter,
+};
+
 /**  Why a diff cannot be shown with its Secrets masked. */
 export type DiffUnavailable = 
 /**  One side does not parse in the dialect of an Agent that reads the file. */
@@ -200,6 +290,15 @@ export type DiffUnavailable =
  *  Secrets are.
  */
 "no_reader";
+
+/**  An Entry whose State after an Operation is not the one predicted. */
+export type Difference = {
+	agent: string,
+	home: string,
+	locator: string,
+	predicted: StateAfter,
+	actual: StateAfter,
+};
 
 /**  Why Disable is not offered for an Entry. */
 export type DisableNotOffered = 
@@ -254,6 +353,37 @@ sentence: string } |
 { status: "not_offered"; code: DisableNotOffered; 
 /**  The reason as a sentence, rendered by the core. */
 sentence: string };
+
+export type EditOp = "remove" | "set" | "insert" | "append" | "remove_item";
+
+export type EditSummary = {
+	op: EditOp,
+	key_path: string[],
+};
+
+/**
+ *  Which Entry of an Item is Effective after an Operation that leaves some of
+ *  its Entries in place.
+ */
+export type EffectiveChange = {
+	agent: string,
+	home: string,
+	item: string,
+	/**  The locator of the Effective Entry before, `None` when none was. */
+	before: string | null,
+	/**  The locator of the Effective Entry after, `None` when none is. */
+	after: string | null,
+	/**  The change as a sentence, rendered by the core. */
+	sentence: string,
+	/**
+	 *  For an Item whose Agent builds a server from several same-named
+	 *  Entries on either side, the server it builds before: the one built
+	 *  from them, or the Effective Entry's alone. `None` when it uses none.
+	 */
+	built_before: BuiltServer | null,
+	/**  The same, after. */
+	built_after: BuiltServer | null,
+};
 
 /**
  *  What Enable would do to a Disabled Entry: lift what Disables it, or
@@ -410,6 +540,16 @@ export type ErrorCode = "unexpected" |
  */
 "invalid_path";
 
+/**  What executing a plan did. */
+export type Executed = { kind: "applied"; outcome: Outcome } | 
+/**
+ *  Something the plan touched changed after its preview, so nothing was
+ *  written: this is a fresh preview of the same action, under a new id.
+ */
+{ kind: "replanned"; preview: ActionPreview; 
+/**  What changed, as a sentence rendered by the core. */
+cause: string };
+
 /**  An Operation that failed after it was recorded in History. */
 export type FailedOperation = {
 	/**  Its id in History. */
@@ -434,6 +574,27 @@ export type FieldOrigin = {
 	entry: string,
 };
 
+/**  The edits to one file and their diff. */
+export type FileChange = {
+	path: string,
+	/**
+	 *  The file is in the index of its git repo, so the edits show in the
+	 *  git diff.
+	 */
+	git_versioned: boolean,
+	/**  How the file behaves while an Agent that reads it runs. */
+	store_class: StoreClass,
+	edits: EditSummary[],
+	/**
+	 *  A unified diff of the whole file, before and after every edit, as
+	 *  [`FileDiff::diff`] has it.
+	 */
+	diff: string | null,
+	diff_unavailable: DiffUnavailable | null,
+	diff_note: string | null,
+	changed_lines: number,
+};
+
 /**
  *  A diff of two versions of one file, with every Secret masked in both,
  *  or why it cannot be shown.
@@ -454,6 +615,45 @@ export type FileDiff = {
 	/**  How many lines differ, whether or not the diff can be shown. */
 	changed_lines: number,
 };
+
+/**
+ *  What an Operation does at one skill folder's location. A folder is
+ *  moved whole, never copied, so the file count and size say what moves.
+ */
+export type FolderChange = {
+	path: string,
+	change: FolderChangeKind,
+	/**  Where the link points, for a link removed or created. */
+	target: string | null,
+	/**  How many files the folder moved holds, or the link's target. */
+	files: number | null,
+	/**  Their total size in bytes. */
+	size: number | null,
+	/**
+	 *  The folder is in the index of its git repo, so the change shows in
+	 *  the git diff.
+	 */
+	git_versioned: boolean,
+	/**  The change as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+export type FolderChangeKind = 
+/**  The skill folder is moved into the Operation's backup. */
+"moved_to_backup" | 
+/**  The link is removed, and its target left as it is. */
+"link_removed" | 
+/**  The skill folder is moved back from an earlier Operation's backup. */
+"moved_back" | 
+/**  The link is created again. */
+"link_created" | 
+/**  The skill folder is moved into config-digger's parked-Entry store. */
+"parked" | 
+/**
+ *  The skill folder is moved back from config-digger's parked-Entry
+ *  store.
+ */
+"put_back";
 
 /**  An Agent home found on this machine, or added by the user. */
 export type Home = {
@@ -526,6 +726,55 @@ export type HowToRemove = {
 	/**  What to do, as a sentence rendered by the core. */
 	sentence: string,
 };
+
+/**
+ *  Something a preview says before an Operation is applied, which needs no
+ *  acknowledgement.
+ */
+export type Info = {
+	code: InfoCode,
+	/**
+	 *  The location it is about: for a note about an Agent's versions, the
+	 *  Installation's executable, or else the Agent home's folder.
+	 */
+	path: string,
+	/**  What to know, as a sentence rendered by the core. */
+	sentence: string,
+};
+
+export type InfoCode = 
+/**
+ *  A location that could change the States after the Operation is a
+ *  Read failure, so they may differ from the prediction.
+ */
+"read_failure" | 
+/**
+ *  A file the Operation writes is a Read failure for an Agent, which
+ *  still rejects it afterwards.
+ */
+"still_rejected" | 
+/**
+ *  An Installation of an Agent it touches is outside the definition's
+ *  tested range, as [`AgentNoteCode::VersionOutsideTestedRange`] notes.
+ */
+"version_outside_tested_range" | 
+/**  The version of an Installation of an Agent it touches cannot be read. */
+"version_unreadable" | 
+/**  No Installation of an Agent it touches was found. */
+"no_installation_found" | 
+/**  The definition of an Agent it touches has no tested range. */
+"definition_untested" | 
+/**
+ *  The Agent's approval of an Entry it Removes is left as it is:
+ *  config-digger never edits approvals.
+ */
+"approval_kept" | 
+/**
+ *  It targets Entries of a Mirrored home, and changes the Entries they
+ *  were copied from instead: the change reaches the Mirrored home through
+ *  the tool that copies it. Its path is the Mirrored home's folder.
+ */
+"reaches_mirrored_home";
 
 /**  A launchable copy of an Agent, with its own version. */
 export type Installation = {
@@ -652,6 +901,24 @@ export type NoteCode =
  */
 "cli_view_differs";
 
+/**  An executed Operation. */
+export type Outcome = {
+	/**  The Operation's id in History, such as `20261001-143012-a3f`. */
+	operation: string,
+	verify: Verify,
+	/**  Where the States after differ from the preview's prediction. */
+	differences: Difference[],
+	/**  The folder holding the Operation's backup and manifest. */
+	backup: string,
+	/**  What the Operation did, as a sentence rendered by the core. */
+	sentence: string,
+	/**
+	 *  What to do next, such as restarting a running Agent that reads a
+	 *  written file, as sentences rendered by the core.
+	 */
+	hints: string[],
+};
+
 /**  Where a parked Entry came from. */
 export type Parked = {
 	/**  The file it was in, and its key path there: where Enable puts it back. */
@@ -683,6 +950,40 @@ export type Position = {
 	line: number,
 	/**  1-based, in characters. */
 	column: number,
+};
+
+/**  What a plan will change, shown before it is confirmed. */
+export type Preview = {
+	action: Action,
+	/**  What the Operation does, as a title such as "Remove 2 Entries". */
+	title: string,
+	/**  The Operation this one undoes, when it is an Undo. */
+	undo_of: string | null,
+	/**  The Operation whose backup it deletes, when it is a Delete backup. */
+	backup_of: string | null,
+	/**  The context's Project, as in [`Inventory::project`]. */
+	project: string | null,
+	/**  One row per (Agent, Entry, Project) whose State the Operation changes. */
+	changes: Change[],
+	/**  For each Item that keeps Entries, which one is Effective afterwards. */
+	effective: EffectiveChange[],
+	/**
+	 *  What to know before applying it, with nothing to acknowledge, such
+	 *  as a location that could change the outcome and cannot be read.
+	 */
+	info: Info[],
+	files: FileChange[],
+	/**  The skill folders and links it moves, removes or puts back. */
+	folders: FolderChange[],
+	/**  The backed-up copies a Delete backup deletes for good. */
+	deleted: string[],
+	/**
+	 *  Where each touched file is copied before anything is written, or for
+	 *  a Delete backup, the folder it deletes the copies from.
+	 */
+	backup_folder: string,
+	/**  The same, as a sentence. */
+	backup_note: string,
 };
 
 /**  What an Agent can be started on. */
@@ -1030,6 +1331,60 @@ export type State = "effective" | "shadowed" |
  *  a missing Project. It competes with nothing and can only be Removed.
  */
 "unread";
+
+/**  An Entry's State before or after an Operation, or that it does not exist. */
+export type StateAfter = "effective" | "shadowed" | "merged" | "disabled" | "blocked" | "invalid" | "unread" | "removed";
+
+/**
+ *  How a file an Operation writes behaves while an Agent that reads it
+ *  runs, which decides whether that write warns or is blocked then.
+ */
+export type StoreClass = 
+/**  A SQLite database the Agent holds open. */
+"sqlite" | 
+/**
+ *  A file the Agent rewrites from memory while it runs, such as
+ *  `~/.claude.json`.
+ */
+"rewritten-while-running" | 
+/**  A file the Agent reads and leaves alone. */
+"plain";
+
+/**  What the dialog does to one Entry. */
+export type Verb = "disable" | "enable" | "remove";
+
+/**  What Verify found once every edit had landed. */
+export type Verify = 
+/**  Every State after is the one the preview predicted. */
+"verified" | 
+/**  Some States after differ from the prediction, as listed. */
+"verified_with_differences";
+
+/**  A risk the user must acknowledge before a plan executes. */
+export type Warning = {
+	class: WarningClass,
+	/**  The risk as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+/**  Each class of warning is acknowledged on its own. */
+export type WarningClass = 
+/**  The write lands in a git-versioned file. */
+"git-versioned" | 
+/**  The write reaches more than the targeted Entries. */
+"wide-reach" | 
+/**  An Agent that reads or rewrites the file is running. */
+"running-agent" | 
+/**
+ *  The backup a Delete backup deletes is the only copy for the manual
+ *  recovery of an Operation that needs attention.
+ */
+"needs-attention" | 
+/**
+ *  A skill folder moved into the backup is the target of Linked Entries
+ *  the Operation leaves broken.
+ */
+"breaks-links";
 
 /**  The State a Disabled Entry would have once Enabled. */
 export type WhatIf = {

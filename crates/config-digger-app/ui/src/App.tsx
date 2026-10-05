@@ -8,7 +8,11 @@ export function App() {
     <div className="app">
       <Rail current={screen} onSelect={setScreen} />
       <main className="main">
-        {screen === "inventory" ? <InventoryScreen /> : <ComingLater title={SCREEN_TITLES[screen]} />}
+        {screen === "inventory" ? (
+          <InventoryScreen onOpenHistory={() => setScreen("history")} />
+        ) : (
+          <ComingLater title={SCREEN_TITLES[screen]} />
+        )}
       </main>
     </div>
   );

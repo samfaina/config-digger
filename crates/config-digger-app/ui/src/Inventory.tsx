@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AgentFlag, AlsoReadBy, BuiltServer, Home, Inventory, Item, State } from "./bindings";
+import { ActionDialog } from "./ActionDialog";
+import type { ActionRequest, AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State } from "./bindings";
 import type { Notify } from "./desktop";
 import { EntryCard } from "./EntryCard";
 import { Icon } from "./icons";
@@ -41,7 +42,7 @@ const NOTICE_MS = 2500;
 const FLASH_MS = 1600;
 
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */
-export function InventoryScreen() {
+export function InventoryScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
   const { inventory, project, error, reading, refresh, selectProject } = useInventory();
   const [agent, setAgent] = useState("all");
   const [homeChoice, setHomeChoice] = useState<HomeChoice>({});
@@ -49,6 +50,18 @@ export function InventoryScreen() {
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  // The action open in the dialog, numbered so that each one opens afresh.
+  const [dialog, setDialog] = useState<{ request: ActionRequest; key: number } | null>(null);
+  const [snackbar, setSnackbar] = useTransient<{ operation: string; sentence: string }>(SNACKBAR_MS);
+  const openDialog = (request: ActionRequest) => {
+    setSnackbar(null);
+    setDialog((current) => ({ request, key: (current?.key ?? 0) + 1 }));
+  };
+  /** Closes the dialog. Whatever it did, the inventory is read again. */
+  const closeDialog = () => {
+    setDialog(null);
+    refresh();
+  };
 
   const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice), [inventory, homeChoice]);
   const selection: Selection = { agent, homes };
@@ -79,7 +92,8 @@ export function InventoryScreen() {
     setFlash(locator);
   };
   // The action dialog that previews each action comes later.
-  const onAction = (verb: ActionVerb) => setNotice(`The ${VERB_LABELS[verb]} preview is not built yet.`);
+  const onAction = (verb: ActionVerb, entry: Entry) =>
+    openDialog({ kind: "entry", verb, locator: entry.locator, project: inventory?.project ?? null });
 
   return (
     <div className="inventory">
@@ -206,11 +220,44 @@ export function InventoryScreen() {
           {notice}
         </div>
       )}
+
+      {snackbar && !dialog && (
+        <div className="snackbar" role="status">
+          {snackbar.sentence}
+          <button type="button" className="snackbar-action" onClick={() => openDialog({ kind: "undo", operation: snackbar.operation })}>
+            Undo
+          </button>
+          <button type="button" className="icon-button" aria-label="Dismiss" title="Dismiss" onClick={() => setSnackbar(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {dialog && (
+        <ActionDialog
+          key={dialog.key}
+          request={dialog.request}
+          onClose={(applied) => {
+            closeDialog();
+            setSnackbar(applied);
+          }}
+          onUndo={(operation) => {
+            refresh();
+            openDialog({ kind: "undo", operation });
+          }}
+          onOpenHistory={() => {
+            closeDialog();
+            onOpenHistory();
+          }}
+          notify={setNotice}
+        />
+      )}
     </div>
   );
 }
 
-const VERB_LABELS: Record<ActionVerb, string> = { disable: "Disable", enable: "Enable", remove: "Remove" };
+/** How long the Undo snackbar stays after an Operation. */
+const SNACKBAR_MS = 10_000;
 
 /** A value that clears itself `ms` after it is set. */
 function useTransient<T>(ms: number): [T | null, (value: T | null) => void] {
@@ -574,7 +621,7 @@ type ItemDetailProps = {
   flash: string | null;
   onShowWinner: (locator: string) => void;
   onReader: (reader: AlsoReadBy, locator: string) => void;
-  onAction: (verb: ActionVerb) => void;
+  onAction: (verb: ActionVerb, entry: Entry) => void;
   notify: Notify;
 };
 

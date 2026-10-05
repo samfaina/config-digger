@@ -8,7 +8,7 @@ use crate::api::{
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::AgentDefinition;
-use crate::definitions::blocks::{Disables, Gate};
+use crate::definitions::blocks::{Disables, Gate, StoreClass};
 use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
@@ -88,6 +88,18 @@ impl PlannedFile {
     pub fn diff(&self, definitions: &[AgentDefinition], before: Side, after: Side) -> FileDiff {
         let store = self.parked_store.then_some(self.path.as_path());
         file_diff(definitions, &self.readers, &self.path, store, before, after)
+    }
+
+    /// How the file behaves while an Agent that reads it or keeps switches
+    /// in it runs: the strongest class of those locations and switches.
+    pub fn store_class(&self, definitions: &[AgentDefinition]) -> StoreClass {
+        let locations = self.readers.iter().map(|reader| {
+            definitions[reader.agent_index]
+                .location(&reader.location)
+                .store_class
+        });
+        let switches = self.switches.iter().map(|store| store.store_class);
+        locations.chain(switches).max().unwrap_or(StoreClass::Plain)
     }
 }
 
@@ -1752,7 +1764,12 @@ fn preview(
                         name: "after the Operation",
                     },
                 );
-                FileChange::new(edits, diff, file.git_versioned)
+                FileChange::new(
+                    edits,
+                    diff,
+                    file.git_versioned,
+                    file.store_class(definitions).into(),
+                )
             })
             .collect(),
         folders: folders.iter().map(PlannedFolder::change).collect(),
