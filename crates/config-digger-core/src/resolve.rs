@@ -241,32 +241,33 @@ pub(crate) fn resolve(
                 .iter()
                 .map(|entry| gates(definition, snapshot, entry, project_key.map(String::as_str)))
                 .collect();
+            // Whether the Agent keeps the Entry at `index` as far as its
+            // switches, its gates and its shape go.
+            let clear = |index: usize| {
+                hits[index].0.is_empty()
+                    && parked[index].is_none()
+                    && !gated[index]
+                        .iter()
+                        .any(|(check, _)| before_precedence(*check))
+                    && competes(index)
+            };
             // Where the Agent merges same-named Entries, those it would let
             // win take part in the server it builds, highest first.
             let merge = definition.rules(kind).merge.as_ref();
             // Whether the Entry at `index` is of a location that merges.
             let merges =
                 |index: usize| merge.is_some_and(|merge| merge.covers(&entries[index].location));
-            // The rules see the server the Agent builds, as it would build it
-            // were no rule to keep an Entry out.
-            let unruled: Vec<usize> = (0..entries.len())
-                .filter(|&index| {
-                    merges(index)
-                        && hits[index].0.is_empty()
-                        && parked[index].is_none()
-                        && !gated[index]
-                            .iter()
-                            .any(|(check, _)| before_precedence(*check))
-                        && competes(index)
-                })
+            let merging: Vec<usize> = (0..entries.len())
+                .filter(|&index| merges(index) && clear(index))
                 .collect();
-            let unruled = Merged::of(merge, &entries, &unruled);
-            // The rules that keep each Entry out.
+            let merged = Merged::of(merge, &entries, &merging);
+            // The rules that keep each Entry out, which see the server the
+            // Agent builds in place of an Entry that takes part in it.
             let ruled: Vec<Vec<rules::RuleHit>> = entries
                 .iter()
                 .enumerate()
                 .map(|(index, entry)| {
-                    let built = unruled
+                    let built = merged
                         .as_ref()
                         .filter(|merged| merged.takes_part(index))
                         .map(|merged| &merged.built.config);
@@ -277,12 +278,12 @@ pub(crate) fn resolve(
             // The gates and rules that keep each Entry out, each with the
             // check it belongs to.
             let kept: Vec<Vec<(Check, api::State, api::Reason)>> = gated
-                .into_iter()
+                .iter()
                 .zip(&ruled)
                 .map(|(gated, ruled)| {
                     gated
-                        .into_iter()
-                        .map(|(check, reason)| (check, api::State::Blocked, reason))
+                        .iter()
+                        .map(|(check, reason)| (*check, api::State::Blocked, reason.clone()))
                         .chain(
                             ruled
                                 .iter()
@@ -292,20 +293,16 @@ pub(crate) fn resolve(
                 })
                 .collect();
             // The Agent skips a Disabled or Blocked Entry, and an Invalid one
-            // that does not compete, so the highest of the others wins.
+            // that does not compete, so the highest of the others wins. A rule
+            // keeps out a server the Agent builds whole, which still holds
+            // its name.
             let free = |index: usize| {
-                hits[index].0.is_empty()
-                    && parked[index].is_none()
-                    && !kept[index]
-                        .iter()
-                        .any(|(check, _, _)| before_precedence(*check))
-                    && competes(index)
+                clear(index)
+                    && (merges(index)
+                        || ruled[index].is_empty()
+                        || !before_precedence(Check::Rules))
             };
             let winner = (0..entries.len()).find(|&index| free(index));
-            let merging: Vec<usize> = (0..entries.len())
-                .filter(|&index| merges(index) && free(index))
-                .collect();
-            let merged = Merged::of(merge, &entries, &merging);
             // The URL each remote Entry competes by, while it does.
             let urls: Vec<Option<String>> = entries
                 .iter()

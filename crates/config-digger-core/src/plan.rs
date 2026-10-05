@@ -481,6 +481,8 @@ impl Targeted<'_> {
                         )));
                     }
                     let project = project.as_ref().map(|(_, key)| key.as_str());
+                    // Only rules outside policy matter here, and none of those
+                    // checks a server its Agent builds.
                     let ruled = rules::hits(definition, self.snapshot, scanned, project, None);
                     let by_rule: Vec<&rules::RuleHit> = ruled
                         .iter()

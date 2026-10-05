@@ -68,8 +68,9 @@ pub(crate) struct Snapshot {
     pub parked: Vec<ScannedParked>,
     /// The folder each Agent home keeps for each Project.
     pub storage: Vec<StorageFolder>,
-    /// When the Agent cached each file of a location that says so.
-    pub cached: BTreeMap<PathBuf, SystemTime>,
+    /// Each file read for a location that is a copy the Agent caches, with
+    /// when it cached it, when the file says.
+    pub cached: BTreeMap<PathBuf, Option<SystemTime>>,
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -2177,8 +2178,9 @@ struct Scanner<'p> {
     /// The folder an Agent home keeps for each Project, as its registry
     /// of such folders records it.
     storage: Vec<StorageFolder>,
-    /// When the Agent cached each file of a location that says so.
-    cached: BTreeMap<PathBuf, SystemTime>,
+    /// Each file read for a location that is a copy the Agent caches, with
+    /// when it cached it, when the file says.
+    cached: BTreeMap<PathBuf, Option<SystemTime>>,
 }
 
 /// The path `relative` names in each folder the Agent home `home` of the
@@ -2746,12 +2748,8 @@ impl Scanner<'_> {
         let Some(document) = self.document(home, location, &path, project.as_deref()) else {
             return;
         };
-        if let Some(at) = location
-            .cached_at
-            .as_ref()
-            .and_then(|key_path| lookup(&document, key_path))
-            .and_then(blocks::time_of)
-        {
+        if let Some(key_path) = &location.cached_at {
+            let at = lookup(&document, key_path).and_then(blocks::time_of);
             self.cached.insert(path.clone(), at);
         }
         if location.one_entry {

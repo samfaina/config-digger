@@ -567,7 +567,8 @@ pub(crate) struct LocationDefinition {
     /// cached the file's copy of configuration held elsewhere, such as the
     /// bundle Codex caches from the account: milliseconds since 1970, or an
     /// RFC 3339 time. Each Entry then carries a caveat that it is as of
-    /// then. Omitted for a file the Agent reads as it is.
+    /// then, or that the Agent does not record when, if the file does not
+    /// say. Omitted for a file the Agent reads as it is.
     pub cached_at: Option<Vec<String>>,
 }
 

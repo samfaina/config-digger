@@ -85,7 +85,7 @@ pub(crate) fn hits(
             },
             Rule::GlobalSwitch(block) => hits.extend(global(block, values, agent_name)),
             Rule::IdentityAllowlist(block) => {
-                hits.extend(identities(
+                hits.extend(unmet_requirement(
                     block, location, entry, config, values, agent_name,
                 ));
             }
@@ -261,7 +261,7 @@ fn global(
 /// server's plugin, or for servers of no plugin, and the requirement of the
 /// highest that names the server is not met. It is policy when any source
 /// holding a list is.
-fn identities(
+fn unmet_requirement(
     block: &IdentityAllowlist,
     location: &LocationDefinition,
     entry: &ScannedEntry,
@@ -315,7 +315,7 @@ fn identities(
         .map(|value| (value.path.as_path(), value.cached_at))
         .collect();
     Some(hit(policy, holding[0], |policy| {
-        explain::not_required(policy, key(holding[0]), &entry.name, &places, agent_name)
+        explain::not_in_allowlist(policy, key(holding[0]), &entry.name, &places, agent_name)
     }))
 }
 

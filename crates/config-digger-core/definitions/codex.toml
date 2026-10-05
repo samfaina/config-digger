@@ -222,6 +222,7 @@ store_class = "plain"
 secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
 on_read_failure = "unknown"
 
+# The servers of a plugin the account installed, read only.
 [[locations]]
 id = "remote-plugin-mcp"
 anchor = { block = "plugin", plugins = "remote", path = ".mcp.json" }
@@ -275,8 +276,8 @@ trusted = "trusted"
 # the cloud bundle's `requirements_toml` fragments rank above it, merged
 # name by name [source]. A requirement that matches a command's args, or a
 # URL by prefix or pattern, is not read: its server is taken to meet it.
-# Whether the server Codex built still beats a plugin's server of the same
-# name once a requirement turns it off is not known: it is taken not to.
+# A requirement turns the server off by `enabled = false`, so the server
+# Codex built still beats a plugin's server of the same name [source].
 [[items.mcp.rules]]
 block = "identity-allowlist"
 identity = "identity"
@@ -344,7 +345,7 @@ store_class = "plain"
 on_read_failure = "ignores_file"
 
 # `~\.agents\skills`, found from the user's home folder, not `CODEX_HOME`,
-# so every Codex home reads it [source]. VS Code reads it too.
+# so every Codex home reads it [source]. VS Code reads it too [disk].
 [[locations]]
 id = "agents-skills"
 anchor = { block = "machine", path = "~/.agents/skills" }
@@ -392,6 +393,7 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+# The skills of a plugin the account installed, read only.
 [[locations]]
 id = "remote-plugin-skills"
 anchor = { block = "plugin", plugins = "remote", path = "skills" }

@@ -728,7 +728,7 @@ pub(crate) fn not_allowed(policy: bool, key: &str, paths: &[&Path], agent_name: 
 /// The reason of a server named `name` that the allowlists `key` in
 /// `places` do not allow, each place as of when the Agent cached it, if it
 /// did.
-pub(crate) fn not_required(
+pub(crate) fn not_in_allowlist(
     policy: bool,
     key: &str,
     name: &str,
@@ -1161,12 +1161,17 @@ pub(crate) fn gate_cached(
 }
 
 /// The caveat of an Entry read from the copy of configuration held elsewhere
-/// that `agent_name` cached at `at`.
-pub(crate) fn cached_copy(agent_name: &str, at: SystemTime) -> String {
-    format!(
-        "Read from the copy {agent_name} cached as of {}: what it copies may have changed since.",
-        as_of(at)
-    )
+/// that `agent_name` cached at `at`, when it recorded when.
+pub(crate) fn cached_copy(agent_name: &str, at: Option<SystemTime>) -> String {
+    match at {
+        Some(at) => format!(
+            "Read from the copy {agent_name} cached as of {}: what it copies may have changed since.",
+            as_of(at)
+        ),
+        None => format!(
+            "Read from the copy {agent_name} cached, at a time it does not record: what it copies may have changed since."
+        ),
+    }
 }
 
 /// The caveat of an Entry that depends on `agent_name`'s gate `gate`,

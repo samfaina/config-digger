@@ -546,3 +546,52 @@ fn plugin_servers_are_left_alone_while_no_plugin_has_requirements() {
 
     assert_eq!(states(item(&inventory, "wiki")), ["effective"]);
 }
+
+#[test]
+fn a_server_a_requirement_turns_off_still_shadows_a_same_named_plugin_server() {
+    let fs = FakeFileSystem::new()
+        .with_file(
+            requirements(),
+            "[mcp_servers.docs.identity]\ncommand = \"docs-mcp\"\n",
+        )
+        .with_file(
+            user_config(),
+            "[mcp_servers.linear]\ncommand = \"linear-local\"\n",
+        )
+        .with_file(
+            plugin("openai-curated", "linear", "1.0.0").join(".mcp.json"),
+            mcp_json("linear", "https://linear.example/mcp"),
+        );
+
+    let inventory = inventory(&fs);
+
+    let linear = item(&inventory, "linear");
+    assert_eq!(states(linear), ["blocked", "shadowed"]);
+    assert_eq!(code(linear.state), "blocked");
+}
+
+#[test]
+fn a_cached_bundle_that_does_not_say_when_still_carries_its_caveat() {
+    let mut cache: Value = serde_json::from_str(&bundle(
+        &["[mcp_servers.docs]\ncommand = \"docs-mcp\"\n"],
+        &[],
+    ))
+    .unwrap();
+    cache["signed_payload"]
+        .as_object_mut()
+        .unwrap()
+        .remove("cached_at");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), "")
+        .with_file(cloud_cache(), cache.to_string());
+
+    let inventory = inventory(&fs);
+
+    let caveat = &item(&inventory, "docs").entries[0].caveats[0];
+    assert_eq!(code(caveat.code), "cached_copy");
+    assert!(
+        caveat.sentence.contains("does not record"),
+        "{}",
+        caveat.sentence
+    );
+}
