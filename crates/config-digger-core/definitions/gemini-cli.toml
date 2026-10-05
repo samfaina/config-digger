@@ -31,6 +31,8 @@ trusted_folders = ".gemini/trustedFolders.json"
 skills = ".gemini/skills"
 agents_skills = ".agents/skills"
 projects = ".gemini/projects.json"
+mcp_enablement = ".gemini/mcp-server-enablement.json"
+extension_enablement = ".gemini/extensions/extension-enablement.json"
 
 # Another folder `GEMINI_CLI_HOME` names, which Gemini CLI uses in place of
 # the user's home folder for everything it keeps there, `.gemini` and
@@ -47,6 +49,8 @@ trusted_folders = ".gemini/trustedFolders.json"
 skills = ".gemini/skills"
 agents_skills = ".agents/skills"
 projects = ".gemini/projects.json"
+mcp_enablement = ".gemini/mcp-server-enablement.json"
+extension_enablement = ".gemini/extensions/extension-enablement.json"
 
 [[scopes]]
 id = "managed"
@@ -237,6 +241,44 @@ trust_all = { sources = [
   { anchor = { block = "machine", path = "%ProgramData%/gemini-cli/system-defaults.json" }, key_path = ["security", "folderTrust", "enabled"], dialect = "with-comments" },
 ], equals = false, default = true }
 
+# `gemini mcp disable <name>` and `/mcp disable` turn a server off in
+# `~\.gemini\mcp-server-enablement.json` as `{ "<name>": { "enabled": false } }`,
+# the name trimmed and in lower case, and `enable` takes the name away
+# [source]. The file is the user's alone and applies in every folder, to
+# every server of that name in every settings file and extension, so
+# `My-Server` and `my-server` share one switch [source]. Gemini CLI writes
+# the file only when told to [source].
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "mcp_enablement" }, key_path = ["{name}", "enabled"], lower_names = true, store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "delete-key"
+disabled_value = false
+reason = "disabled_by_name"
+
+# An extension is on or off with every server and skill it carries by the
+# path rules of `~\.gemini\extensions\extension-enablement.json`,
+# `{ "<name>": { "overrides": ["/C:/Users/me/*", "!/E:/proj/*"] } }`, read
+# for the folder Gemini CLI starts in: of the rules that reach it, the last
+# decides, `!` turning the extension off and `*` reaching the folders below
+# too, and with none the extension is on [source]. `gemini extensions
+# disable --scope user` writes a rule for the user's home folder, which
+# reaches no Project on another drive [source]. Disable writes a rule for
+# the Project instead, spelled `/E:/proj/*`, and Enable takes the Project's
+# own rules out, adding one that turns the extension on when another still
+# turns it off there; a rule for a Project or a drive's root reaches every
+# Project below it. With no Project there is no folder to read the rules
+# for. Gemini CLI compares the folders as written, with regard to case
+# [source], and config-digger does too but for the drive letter, which it
+# takes in upper case: that, and rules for a drive other than the home
+# folder's, are unverified until the release gate.
+[[items.mcp.disable]]
+block = "json-path-rules"
+switch = { anchor = { block = "home", root = "extension_enablement" }, key_path = ["{plugin_id}", "overrides"], store_class = "plain" }
+reason = "plugin_disabled"
+locations = ["extension-mcp"]
+
 # Skills are folders holding a `SKILL.md`, read one level deep in each root
 # [source]; a `SKILL.md` directly in a root, which Gemini CLI reads too, is
 # not read. A skill is named by the `name` of its frontmatter, each
@@ -333,6 +375,39 @@ on_read_failure = "ignores_file"
 precedence = ["project-agents-skills", "project-skills", "agents-skills", "user-skills", "extension-skills", "npm-builtin-skills", "volta-builtin-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "plugin-name", "disable", "trust", "precedence"]
+
+# `gemini skills disable <name>` and `/skills disable` add the name to
+# `skills.disabled` in the user's or the Project's settings, and every
+# settings file's list counts, each name compared without regard to case
+# [source]. A Project's settings count only in a folder the user trusts
+# [source]. Disable writes the most specific of these files that is not
+# git-versioned: the Project's, when there is one and its folder is
+# trusted, or the user's. System settings, which can hold the list too,
+# are left out.
+[[items.skill.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "project", path = ".gemini/settings.json" }, key_path = ["skills", "disabled"], dialect = "with-comments", trusted_only = true, store_class = "rewritten-while-running" }
+target = "name"
+context = "project"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+ignore_case = true
+
+[[items.skill.disable]]
+block = "json-name-list"
+switch = { anchor = { block = "home", root = "settings" }, key_path = ["skills", "disabled"], dialect = "with-comments", store_class = "rewritten-while-running" }
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+ignore_case = true
+
+# An extension's skills go with it, as its servers do.
+[[items.skill.disable]]
+block = "json-path-rules"
+switch = { anchor = { block = "home", root = "extension_enablement" }, key_path = ["{plugin_id}", "overrides"], store_class = "plain" }
+reason = "plugin_disabled"
+locations = ["extension-skills"]
 
 # A Project's skills need the folder trusted, as its servers do [source].
 [[items.skill.gates]]

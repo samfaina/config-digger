@@ -5,8 +5,8 @@
 
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
 use crate::definitions::blocks::{
-    DisableMechanism, DisableReason, Disables, Holds, MechanismContext, MechanismTarget,
-    MergedField, Switched,
+    DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
+    MechanismTarget, MergedField, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
@@ -15,6 +15,7 @@ use crate::locator;
 use crate::resolve;
 use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 /// The context's Project as Disable needs it.
@@ -33,7 +34,9 @@ pub(crate) struct Hit<'a> {
     /// What the switch holds for the Entry.
     pub value: Option<&'a Value>,
     /// What the switch holds the Entry by: its name, or its plugin's id.
-    pub key: &'a str,
+    pub key: Cow<'a, str>,
+    /// The folder of the context's Project, which path rules are read for.
+    pub folder: Option<&'a Path>,
 }
 
 impl Hit<'_> {
@@ -64,7 +67,7 @@ impl Hit<'_> {
             ),
             DisableReason::PluginDisabled => (
                 ReasonCode::PluginDisabled,
-                explain::plugin_disabled(self.key, &holds, agent_name),
+                explain::plugin_disabled(&self.key, &holds, agent_name),
             ),
         };
         Reason {
@@ -80,7 +83,7 @@ impl Hit<'_> {
         let per_project = self.per_project();
         match self.mechanism {
             Switched::NameList(_) => explain::in_list(
-                self.key,
+                &self.key,
                 self.key_path.last().expect("validation requires a key"),
                 &self.switch.path,
                 per_project,
@@ -93,11 +96,19 @@ impl Hit<'_> {
                 per_project,
             ),
             Switched::ItemList(_) => explain::item_in_list(
-                self.key,
+                &self.key,
                 self.value.unwrap_or(&Value::Null),
                 &self.key_path[self.key_path.len().saturating_sub(2)],
                 &self.switch.path,
                 per_project,
+            ),
+            Switched::PathRules(_) => explain::path_rule_holds(
+                self.folder
+                    .and_then(|folder| JsonPathRules::deciding(self.value, folder))
+                    .unwrap_or_default(),
+                &self.key_path,
+                &self.switch.path,
+                self.folder,
             ),
         }
     }
@@ -110,15 +121,18 @@ impl Hit<'_> {
     /// The edits that lift the switch.
     pub fn enable_edits(&self) -> Vec<Edit> {
         self.mechanism
-            .enable_edits(self.key_path.clone(), self.value, self.key)
+            .enable_edits(self.key_path.clone(), self.value, &self.key, self.folder)
     }
 
     /// What Enable writes to lift the switch, as a sentence.
     pub fn enable_sentence(&self) -> String {
+        if let Switched::PathRules(_) = self.mechanism {
+            return explain::enable_path_rules(&self.enable_edits(), &self.switch.path);
+        }
         let per_project = self.per_project();
         explain::enable_switch(
             &self.enable_edits(),
-            self.key,
+            &self.key,
             &self.switch.path,
             per_project,
         )
@@ -171,6 +185,10 @@ fn set_for<'a>(
     // The last layered switch that holds nothing for the Entry, whose
     // default the Agent takes when no layer holds a value.
     let mut by_default: Option<Hit> = None;
+    // The folder of the context's Project, which path rules are read for.
+    let folder = project
+        .and_then(|key| snapshot.project(key))
+        .map(|project| project.path.as_path());
     let switched = definition
         .rules(location.kind)
         .disable
@@ -180,7 +198,7 @@ fn set_for<'a>(
     for (index, mechanism) in switched {
         if !mechanism.covers(&location.id)
             || !mechanism.covers_plugin(plugin_scope(entry))
-            || !switch_read(definition, snapshot, entry, mechanism)
+            || !switch_read(definition, snapshot, entry, mechanism, project)
             || (mechanism.layered() && layer_decided)
         {
             continue;
@@ -192,23 +210,25 @@ fn set_for<'a>(
             continue;
         };
         for switch in switches {
-            let value = switch.value_for(key);
+            let value = switch.value_for(&key);
             // Enable taking a switch away leaves the next layer to decide.
-            let unset = every_layer && mechanism.enable_unsets() && mechanism.disables(value, key);
+            let unset =
+                every_layer && mechanism.enable_unsets() && mechanism.disables(value, &key, folder);
             layer_decided |= mechanism.layered() && value.is_some() && !unset;
             let hit = Hit {
                 mechanism,
                 switch,
-                key_path: switch.key_path_for(key),
+                key_path: switch.key_path_for(&key),
                 value,
-                key,
+                key: key.clone(),
+                folder,
             };
             // A layer that holds nothing leaves the next one to decide.
             if mechanism.layered() && value.is_none() {
                 by_default = Some(hit);
                 continue;
             }
-            if mechanism.disables(value, key) {
+            if mechanism.disables(value, &key, folder) {
                 disabling.push(hit);
             } else if mechanism.partial(value) {
                 partial.push(hit);
@@ -216,7 +236,7 @@ fn set_for<'a>(
         }
     }
     if let Some(hit) = by_default.filter(|_| !layer_decided) {
-        if hit.mechanism.disables(None, hit.key) {
+        if hit.mechanism.disables(None, &hit.key, folder) {
             disabling.push(hit);
         } else if hit.mechanism.partial(None) {
             partial.push(hit);
@@ -229,16 +249,22 @@ fn set_for<'a>(
 /// it is part of, for a switch keyed by plugin alone, the id its location's
 /// `switch_id` makes, for a switch per Entry of a location that has one, and
 /// its name otherwise. `None` for an Entry of no plugin under a switch keyed by
-/// plugin, or one whose id cannot be made.
-fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<&'e str> {
+/// plugin, or one whose id cannot be made. A switch of names in lower case
+/// holds the name trimmed and in lower case.
+fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<Cow<'e, str>> {
     if mechanism.switch().per_plugin() {
-        entry.plugin.as_ref().map(|plugin| plugin.id.as_str())
+        entry
+            .plugin
+            .as_ref()
+            .map(|plugin| plugin.id.as_str().into())
     } else if mechanism.target() == MechanismTarget::Entry
         && (entry.switch_id.is_some() || mechanism.by_id())
     {
-        entry.switch_id.as_deref()
+        entry.switch_id.as_deref().map(Cow::from)
+    } else if mechanism.switch().lower_names {
+        Some(entry.name.trim().to_lowercase().into())
     } else {
-        Some(&entry.name)
+        Some(entry.name.as_str().into())
     }
 }
 
@@ -266,6 +292,9 @@ pub(crate) enum Choice {
         edits: Vec<Edit>,
         syntax: Syntax,
         sqlite: bool,
+        /// The switch holds the Entry by its name in every context, so that
+        /// it reaches every Entry of that name wherever it is.
+        by_name_everywhere: bool,
         /// What Disable writes, as a sentence.
         sentence: String,
     },
@@ -336,7 +365,13 @@ pub(crate) fn choose(
         .filter(|(_, mechanism)| {
             mechanism.covers(&location.id)
                 && mechanism.covers_plugin(plugin_scope(entry))
-                && switch_read(definition, snapshot, entry, *mechanism)
+                && switch_read(
+                    definition,
+                    snapshot,
+                    entry,
+                    *mechanism,
+                    project.map(|project| project.key),
+                )
                 && mechanism.enable_offered()
                 && mechanism.switch().plugins() == in_plugin
         })
@@ -346,16 +381,20 @@ pub(crate) fn choose(
     let mut versioned: Vec<PathBuf> = Vec::new();
     let mut unreadable: Vec<PathBuf> = Vec::new();
     let mut needs_project = false;
+    // A switch of path rules needs a Project's folder to write a rule for.
+    let mut needs_folder = false;
     let mut unrecorded = false;
     for (index, mechanism) in switched {
         let switch = mechanism.switch();
         let project_key = match (mechanism.context(), project) {
             (MechanismContext::Project, None) => {
                 needs_project = true;
+                needs_folder |= matches!(mechanism, Switched::PathRules(_));
                 continue;
             }
-            (MechanismContext::Project, Some(project)) => Some(project.key),
-            (MechanismContext::All, _) => None,
+            (MechanismContext::Project, Some(project)) if switch.per_project() => Some(project.key),
+            // Path rules in a file for every Project are read for this one.
+            (MechanismContext::Project, Some(_)) | (MechanismContext::All, _) => None,
         };
         let context = project.map(|project| (project.key, project.path));
         let Some(path) = snapshot.file_for(entry, &switch.anchor, context) else {
@@ -386,20 +425,25 @@ pub(crate) fn choose(
         let Some(key) = switch_key(mechanism, entry) else {
             continue;
         };
-        let key_path = place.key_path_for(key);
-        let value = place.value_for(key);
-        let edits = mechanism.disable_edits(key_path, value, key);
+        let key_path = place.key_path_for(&key);
+        let value = place.value_for(&key);
+        let folder = project.map(|project| project.path);
+        let edits = mechanism.disable_edits(key_path, value, &key, folder);
         let per_project = mechanism.context() == MechanismContext::Project;
-        let mut sentence = explain::disable_switch(&edits, key, &path, per_project);
+        let mut sentence = match mechanism {
+            Switched::PathRules(_) => explain::disable_path_rule(&edits, &path),
+            _ => explain::disable_switch(&edits, &key, &path, per_project),
+        };
         if mechanism.target() == MechanismTarget::Plugin {
             sentence.push(' ');
-            sentence.push_str(&explain::takes_whole_plugin(key));
+            sentence.push_str(&explain::takes_whole_plugin(&key));
         }
         return Ok(Choice::Switch {
             path,
             edits,
             syntax: switch.syntax(),
             sqlite: switch.sqlite(),
+            by_name_everywhere: by_name_everywhere(mechanism),
             sentence,
         });
     }
@@ -434,6 +478,11 @@ pub(crate) fn choose(
         (
             DisableNotOffered::GitVersioned,
             explain::disable_only_in_versioned(agent, &versioned, needs_project),
+        )
+    } else if needs_folder {
+        (
+            DisableNotOffered::NoMechanism,
+            explain::disable_needs_folder(agent),
         )
     } else {
         (
@@ -562,6 +611,7 @@ fn through_merged_field(
             edits,
             syntax,
             sqlite: false,
+            by_name_everywhere: false,
             sentence,
         });
     }
@@ -608,7 +658,13 @@ pub(crate) fn failed_switch_files(
         let Some(mechanism) = mechanism.switched().filter(|mechanism| {
             mechanism.covers(&location.id)
                 && mechanism.covers_plugin(plugin_scope(entry))
-                && switch_read(definition, snapshot, entry, *mechanism)
+                && switch_read(
+                    definition,
+                    snapshot,
+                    entry,
+                    *mechanism,
+                    project.map(|project| project.key),
+                )
         }) else {
             continue;
         };
@@ -627,22 +683,34 @@ pub(crate) fn failed_switch_files(
     files
 }
 
+/// Whether the switch of `mechanism` holds Entries by their names in every
+/// context, so that a write reaches every Entry of a name wherever it is.
+pub(crate) fn by_name_everywhere(mechanism: Switched) -> bool {
+    mechanism.target() == MechanismTarget::Name && mechanism.context() == MechanismContext::All
+}
+
 /// The Scope the plugin of `entry` is installed at, as the Agent records it.
 fn plugin_scope(entry: &ScannedEntry) -> Option<&str> {
     entry.plugin.as_ref()?.scope.as_deref()
 }
 
-/// Whether the Agent home of `entry` reads the switch of `mechanism`: each
-/// Feature gate its `when` names has the value it needs.
+/// Whether the Agent home of `entry` reads the switch of `mechanism` in the
+/// context of the Project with the key `project`: each Feature gate its
+/// `when` names has the value it needs, and a switch read only in a trusted
+/// folder is in one.
 fn switch_read(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     mechanism: Switched,
+    project: Option<&str>,
 ) -> bool {
     let gate_on = |name: &str| resolve::gate_on(definition, snapshot, entry, name);
+    let kind = definition.location(&entry.location).kind;
     mechanism
         .when()
         .iter()
         .all(|condition| condition.holds(&gate_on, &|_| None))
+        && (!mechanism.switch().trusted_only
+            || resolve::project_trusted(definition, snapshot, entry, kind, project))
 }

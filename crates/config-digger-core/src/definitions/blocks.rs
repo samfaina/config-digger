@@ -4018,16 +4018,24 @@ pub(crate) trait Disables {
     }
 
     /// Whether `value`, what the switch holds for the Entry named `name`,
-    /// Disables it. `None` when the switch holds nothing for it.
-    fn disables(&self, value: Option<&Value>, name: &str) -> bool;
+    /// Disables it in the context whose Project is in `folder`, `None` with
+    /// no Project. `value` is `None` when the switch holds nothing for it.
+    fn disables(&self, value: Option<&Value>, name: &str, folder: Option<&Path>) -> bool;
 
     /// Whether `value` is a partial switch: it limits part of the Entry,
     /// leaving it Effective.
     fn partial(&self, value: Option<&Value>) -> bool;
 
     /// The edits that Disable the Entry held by `name` through the switch
-    /// at `key_path`, which holds `value` for it now.
-    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit>;
+    /// at `key_path`, which holds `value` for it now, in the context whose
+    /// Project is in `folder`.
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit>;
 
     /// When the value where `{name}` stands is a list rather than an object
     /// keyed by name, what of each item holds its name: a field, or an
@@ -4053,8 +4061,14 @@ pub(crate) trait Disables {
     }
 
     /// The edits that lift the switch at `key_path`, which holds `value`
-    /// for the Entry named `name`.
-    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit>;
+    /// for the Entry named `name`, in the context whose Project is in `folder`.
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit>;
 }
 
 /// How an Agent Disables an Entry. An Item kind lists its mechanisms in
@@ -4065,6 +4079,7 @@ pub(crate) enum DisableMechanism {
     JsonNameList(JsonNameList),
     JsonField(Box<JsonField>),
     JsonItemList(JsonItemList),
+    JsonPathRules(JsonPathRules),
     MergedField(MergedField),
     Park(Park),
 }
@@ -4075,6 +4090,7 @@ impl Validate for DisableMechanism {
             DisableMechanism::JsonNameList(block) => block.validate(),
             DisableMechanism::JsonField(block) => block.validate(),
             DisableMechanism::JsonItemList(block) => block.validate(),
+            DisableMechanism::JsonPathRules(block) => block.validate(),
             DisableMechanism::MergedField(block) => block.validate(),
             DisableMechanism::Park(block) => block.validate(),
         }
@@ -4089,6 +4105,7 @@ impl DisableMechanism {
             DisableMechanism::JsonNameList(block) => Some(Switched::NameList(block)),
             DisableMechanism::JsonField(block) => Some(Switched::Field(block)),
             DisableMechanism::JsonItemList(block) => Some(Switched::ItemList(block)),
+            DisableMechanism::JsonPathRules(block) => Some(Switched::PathRules(block)),
             DisableMechanism::MergedField(_) | DisableMechanism::Park(_) => None,
         }
     }
@@ -4099,6 +4116,7 @@ impl DisableMechanism {
             DisableMechanism::JsonNameList(block) => Some(&block.switch),
             DisableMechanism::JsonField(block) => Some(&block.switch),
             DisableMechanism::JsonItemList(block) => Some(&block.switch),
+            DisableMechanism::JsonPathRules(block) => Some(&block.switch),
             DisableMechanism::MergedField(_) | DisableMechanism::Park(_) => None,
         }
     }
@@ -4123,6 +4141,7 @@ impl DisableMechanism {
             DisableMechanism::JsonNameList(block) => block.locations(),
             DisableMechanism::JsonField(block) => block.locations(),
             DisableMechanism::JsonItemList(block) => block.locations(),
+            DisableMechanism::JsonPathRules(block) => &block.locations,
             DisableMechanism::MergedField(block) => &block.locations,
             DisableMechanism::Park(block) => &block.locations,
         }
@@ -4141,6 +4160,7 @@ pub(crate) enum Switched<'m> {
     NameList(&'m JsonNameList),
     Field(&'m JsonField),
     ItemList(&'m JsonItemList),
+    PathRules(&'m JsonPathRules),
 }
 
 impl<'m> Switched<'m> {
@@ -4150,6 +4170,7 @@ impl<'m> Switched<'m> {
             Switched::NameList(block) => block,
             Switched::Field(block) => block,
             Switched::ItemList(block) => block,
+            Switched::PathRules(block) => block,
         }
     }
 }
@@ -4187,20 +4208,32 @@ impl Disables for Switched<'_> {
         self.block().layered()
     }
 
-    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
-        self.block().disables(value, name)
+    fn disables(&self, value: Option<&Value>, name: &str, folder: Option<&Path>) -> bool {
+        self.block().disables(value, name, folder)
     }
 
     fn partial(&self, value: Option<&Value>) -> bool {
         self.block().partial(value)
     }
 
-    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
-        self.block().disable_edits(key_path, value, name)
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit> {
+        self.block().disable_edits(key_path, value, name, folder)
     }
 
-    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
-        self.block().enable_edits(key_path, value, name)
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit> {
+        self.block().enable_edits(key_path, value, name, folder)
     }
 
     fn named_by(&self) -> Option<&str> {
@@ -4362,6 +4395,10 @@ pub(crate) struct JsonNameList {
     /// hold, the switch Disables nothing and Disable skips it.
     #[serde(default)]
     pub when: Vec<Condition>,
+    /// Whether the Agent compares the names in the list without regard to
+    /// case, such as Gemini CLI's `skills.disabled`.
+    #[serde(default)]
+    pub ignore_case: bool,
 }
 
 impl Validate for JsonNameList {
@@ -4423,8 +4460,8 @@ impl Disables for JsonNameList {
         false
     }
 
-    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
-        occurrences(value, name) > 0
+    fn disables(&self, value: Option<&Value>, name: &str, _folder: Option<&Path>) -> bool {
+        self.held(value, name).next().is_some()
     }
 
     fn partial(&self, _value: Option<&Value>) -> bool {
@@ -4437,6 +4474,7 @@ impl Disables for JsonNameList {
         key_path: Vec<String>,
         _value: Option<&Value>,
         name: &str,
+        _folder: Option<&Path>,
     ) -> Vec<Edit> {
         vec![Edit::Append {
             key_path,
@@ -4444,11 +4482,17 @@ impl Disables for JsonNameList {
         }]
     }
 
-    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
-        (0..occurrences(value, name))
-            .map(|_| Edit::RemoveItem {
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        _folder: Option<&Path>,
+    ) -> Vec<Edit> {
+        self.held(value, name)
+            .map(|held| Edit::RemoveItem {
                 key_path: key_path.clone(),
-                value: Value::from(name),
+                value: held.clone(),
             })
             .collect()
     }
@@ -4459,14 +4503,21 @@ fn offered() -> bool {
     true
 }
 
-/// How many times the list `value` holds `name`.
-fn occurrences(value: Option<&Value>, name: &str) -> usize {
-    value.and_then(Value::as_array).map_or(0, |names| {
-        names
-            .iter()
-            .filter(|item| item.as_str() == Some(name))
-            .count()
-    })
+impl JsonNameList {
+    /// The items of the list `value` that hold `name`, as the Agent
+    /// compares names.
+    fn held<'v>(&self, value: Option<&'v Value>, name: &str) -> impl Iterator<Item = &'v Value> {
+        let names = value.and_then(Value::as_array).into_iter().flatten();
+        names.filter(move |item| {
+            item.as_str().is_some_and(|held| {
+                if self.ignore_case {
+                    held.to_lowercase() == name.to_lowercase()
+                } else {
+                    held == name
+                }
+            })
+        })
+    }
 }
 
 /// A field in a JSON file whose value says whether the Agent skips an
@@ -4598,7 +4649,7 @@ impl Disables for JsonField {
         self.layered
     }
 
-    fn disables(&self, value: Option<&Value>, _name: &str) -> bool {
+    fn disables(&self, value: Option<&Value>, _name: &str, _folder: Option<&Path>) -> bool {
         value.or(self.default_value.as_ref()) == Some(&self.disabled_value)
     }
 
@@ -4613,6 +4664,7 @@ impl Disables for JsonField {
         key_path: Vec<String>,
         _value: Option<&Value>,
         _name: &str,
+        _folder: Option<&Path>,
     ) -> Vec<Edit> {
         vec![Edit::Set {
             key_path,
@@ -4625,6 +4677,7 @@ impl Disables for JsonField {
         key_path: Vec<String>,
         _value: Option<&Value>,
         _name: &str,
+        _folder: Option<&Path>,
     ) -> Vec<Edit> {
         vec![match (&self.enabled_value, self.enable_action) {
             (Some(value), EnableAction::Set) => Edit::Set {
@@ -4807,7 +4860,7 @@ impl Disables for JsonItemList {
     /// An item Disables unless it holds what `enabled_item` holds: each of
     /// its fields or values, the id compared as the Agent compares ids, and
     /// any other field left aside.
-    fn disables(&self, value: Option<&Value>, name: &str) -> bool {
+    fn disables(&self, value: Option<&Value>, name: &str, _folder: Option<&Path>) -> bool {
         let Some(item) = value else {
             return false;
         };
@@ -4821,12 +4874,24 @@ impl Disables for JsonItemList {
         false
     }
 
-    fn disable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        _folder: Option<&Path>,
+    ) -> Vec<Edit> {
         let disabled = Self::item(&self.disabled_item, name);
         Self::replace(&key_path, value, Some(disabled))
     }
 
-    fn enable_edits(&self, key_path: Vec<String>, value: Option<&Value>, name: &str) -> Vec<Edit> {
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        name: &str,
+        _folder: Option<&Path>,
+    ) -> Vec<Edit> {
         let enabled = (self.enable_action == EnableAction::Set)
             .then_some(self.enabled_item.as_ref())
             .flatten()
@@ -4844,6 +4909,246 @@ impl Disables for JsonItemList {
 
     fn by_id(&self) -> bool {
         true
+    }
+}
+
+/// A list of path rules per plugin, such as the `overrides` of each
+/// extension in Gemini CLI's `extension-enablement.json`, which the Agent
+/// reads for the folder it starts in. Each rule is a folder spelled
+/// `/E:/proj/`, `!` before it turning the plugin off rather than on, and
+/// `*` after it reaching the folders below too; of the rules that reach
+/// the folder, the last decides, and with none the plugin is on. Folders
+/// compare as written, but for the drive letter. Disable takes the Project's own rules
+/// out and appends one turning the plugin off in the Project and the
+/// folders below; Enable takes them out, and appends one turning it on
+/// when another rule still turns it off there. With no Project there is
+/// no folder to read the rules for: the plugin is on, and Disable is not
+/// offered.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonPathRules {
+    /// The list, its key path naming the plugin with `{plugin_id}`.
+    pub switch: Switch,
+    /// Must be `plugin_disabled`.
+    pub reason: DisableReason,
+    /// The ids of the locations whose Entries it Disables, each in plugins.
+    pub locations: Vec<String>,
+}
+
+impl Validate for JsonPathRules {
+    fn validate(&self) -> Result<(), String> {
+        self.switch.validate()?;
+        if !self.switch.per_plugin() || self.switch.per_project() {
+            return Err(format!(
+                "path rules are held by `{PLUGIN_KEY}` in a file outside any Project"
+            ));
+        }
+        if self.switch.named_by.is_some() || self.switch.lower_names {
+            return Err("path rules take no named_by and no lower_names".into());
+        }
+        if self.reason != DisableReason::PluginDisabled {
+            return Err("path rules' reason must be `plugin_disabled`".into());
+        }
+        if self.locations.is_empty() {
+            return Err("path rules need their locations listed".into());
+        }
+        Ok(())
+    }
+}
+
+/// One path rule of a [`JsonPathRules`] list.
+struct PathRule {
+    /// The rule turns the plugin off.
+    off: bool,
+    /// Its folder, as [`JsonPathRules::spelled`] spells it.
+    folder: String,
+    /// It reaches the folders below too.
+    below: bool,
+}
+
+impl PathRule {
+    /// The rule `rule` as the list holds it, such as `!/E:/proj/*`.
+    fn parse(rule: &str) -> PathRule {
+        let (off, rule) = match rule.strip_prefix('!') {
+            Some(rule) => (true, rule),
+            None => (false, rule),
+        };
+        let (below, rule) = match rule.strip_suffix('*') {
+            Some(rule) => (true, rule),
+            None => (false, rule),
+        };
+        PathRule {
+            off,
+            folder: JsonPathRules::spelled(rule),
+            below,
+        }
+    }
+
+    /// Whether it reaches the folder `spelled`, as [`JsonPathRules::spelled`]
+    /// spells it.
+    fn reaches(&self, spelled: &str) -> bool {
+        if self.below {
+            spelled.starts_with(&self.folder)
+        } else {
+            spelled == self.folder
+        }
+    }
+}
+
+impl JsonPathRules {
+    /// `folder` as a rule spells it: `/` before and after, forward slashes,
+    /// and a drive letter in upper case, such as `/E:/proj/`.
+    fn spelled(folder: &str) -> String {
+        let mut spelled = folder.replace('\\', "/");
+        if !spelled.starts_with('/') {
+            spelled.insert(0, '/');
+        }
+        if !spelled.ends_with('/') {
+            spelled.push('/');
+        }
+        if spelled.as_bytes().get(2) == Some(&b':') {
+            spelled[1..2].make_ascii_uppercase();
+        }
+        spelled
+    }
+
+    /// The folder `folder` as a rule spells it.
+    fn spelled_folder(folder: &Path) -> String {
+        Self::spelled(&folder.display().to_string())
+    }
+
+    /// The rules of `value`, each with the item that holds it.
+    fn rules(value: Option<&Value>) -> impl Iterator<Item = (&Value, PathRule)> {
+        let items = value.and_then(Value::as_array).into_iter().flatten();
+        items.filter_map(|item| Some((item, PathRule::parse(item.as_str()?))))
+    }
+
+    /// The rule of the list `value` that decides for `folder`: the last that
+    /// reaches it.
+    pub fn deciding<'v>(value: Option<&'v Value>, folder: &Path) -> Option<&'v str> {
+        let spelled = Self::spelled_folder(folder);
+        Self::rules(value)
+            .filter(|(_, rule)| rule.reaches(&spelled))
+            .last()
+            .and_then(|(item, _)| item.as_str())
+    }
+
+    /// Whether the rules `rules` turn the plugin off in `folder`.
+    fn off_in<'v>(rules: impl Iterator<Item = (&'v Value, PathRule)>, folder: &Path) -> bool {
+        let spelled = Self::spelled_folder(folder);
+        rules
+            .filter(|(_, rule)| rule.reaches(&spelled))
+            .last()
+            .is_some_and(|(_, rule)| rule.off)
+    }
+
+    /// The edits that take the rules of `folder` out of the list at
+    /// `key_path`, which holds `value`, and append `rule`, if any.
+    fn replace(
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        folder: &Path,
+        rule: Option<String>,
+    ) -> Vec<Edit> {
+        let own = Self::spelled_folder(folder);
+        let removed = Self::rules(value)
+            .filter(|(_, rule)| rule.folder == own)
+            .map(|(item, _)| Edit::RemoveItem {
+                key_path: key_path.clone(),
+                value: item.clone(),
+            });
+        let added = rule.map(|rule| Edit::Append {
+            key_path: key_path.clone(),
+            value: Value::from(rule),
+        });
+        removed
+            .collect::<Vec<_>>()
+            .into_iter()
+            .chain(added)
+            .collect()
+    }
+
+    /// The rule reaching `folder` and the folders below, turning the plugin
+    /// off with `off`.
+    fn rule_for(folder: &Path, off: bool) -> String {
+        let bang = if off { "!" } else { "" };
+        format!("{bang}{}*", Self::spelled_folder(folder))
+    }
+}
+
+impl Disables for JsonPathRules {
+    fn switch(&self) -> &Switch {
+        &self.switch
+    }
+
+    fn target(&self) -> MechanismTarget {
+        MechanismTarget::Plugin
+    }
+
+    fn context(&self) -> MechanismContext {
+        MechanismContext::Project
+    }
+
+    fn reason(&self) -> DisableReason {
+        self.reason
+    }
+
+    fn locations(&self) -> &[String] {
+        &self.locations
+    }
+
+    fn when(&self) -> &[Condition] {
+        &[]
+    }
+
+    fn enable_offered(&self) -> bool {
+        true
+    }
+
+    fn layered(&self) -> bool {
+        false
+    }
+
+    fn disables(&self, value: Option<&Value>, _name: &str, folder: Option<&Path>) -> bool {
+        folder.is_some_and(|folder| Self::off_in(Self::rules(value), folder))
+    }
+
+    fn partial(&self, _value: Option<&Value>) -> bool {
+        false
+    }
+
+    fn disable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        _name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit> {
+        let Some(folder) = folder else {
+            return Vec::new();
+        };
+        Self::replace(key_path, value, folder, Some(Self::rule_for(folder, true)))
+    }
+
+    fn enable_unsets(&self) -> bool {
+        true
+    }
+
+    fn enable_edits(
+        &self,
+        key_path: Vec<String>,
+        value: Option<&Value>,
+        _name: &str,
+        folder: Option<&Path>,
+    ) -> Vec<Edit> {
+        let Some(folder) = folder else {
+            return Vec::new();
+        };
+        let own = Self::spelled_folder(folder);
+        let others = Self::rules(value).filter(|(_, rule)| rule.folder != own);
+        let still_off = Self::off_in(others, folder);
+        let rule = still_off.then(|| Self::rule_for(folder, false));
+        Self::replace(key_path, value, folder, rule)
     }
 }
 
@@ -4920,6 +5225,17 @@ pub(crate) struct Switch {
     /// Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.
     #[serde(default)]
     pub toml: bool,
+    /// Whether `{name}` stands for the Entry's name trimmed and in lower
+    /// case, such as in Gemini CLI's `mcp-server-enablement.json`, so that
+    /// names that differ in case alone share one switch.
+    #[serde(default)]
+    pub lower_names: bool,
+    /// Whether the Agent reads the switch, in a Project's file, only when it
+    /// starts in a folder its Item kind's folder-trust gates trust, such as
+    /// Gemini CLI, which ignores a Project's settings in a folder the user
+    /// has not trusted. Elsewhere it Disables nothing and Disable skips it.
+    #[serde(default)]
+    pub trusted_only: bool,
 }
 
 /// The switch `key_path` segment that stands for the Entry's name.
@@ -4965,6 +5281,14 @@ impl Validate for Switch {
             }
         } else if self.later_wins {
             return Err("later_wins needs named_by".into());
+        }
+        if self.trusted_only && !self.anchor.in_project() {
+            return Err("trusted_only needs a switch in a Project".into());
+        }
+        if self.lower_names && (!self.names() || self.named_by.is_some()) {
+            return Err(format!(
+                "lower_names needs `{NAME_KEY}` in the key path, keying an object"
+            ));
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();

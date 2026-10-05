@@ -1749,6 +1749,38 @@ impl TrustRules<'_> {
     }
 }
 
+/// Whether the Agent home of `entry` trusts the folder of the Project with
+/// the key `project`, as every folder-trust gate of the Item kind `kind`
+/// reads it. With no Project, or no such gate, it does.
+pub(crate) fn project_trusted(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    kind: ItemKind,
+    project: Option<&str>,
+) -> bool {
+    let Some(scanned) = project.and_then(|key| snapshot.project(key)) else {
+        return true;
+    };
+    definition
+        .rules(kind)
+        .gates
+        .iter()
+        .enumerate()
+        .all(|(gate, block)| match block {
+            Gate::FolderTrust(block) => TrustRules {
+                snapshot,
+                entry,
+                kind,
+                gate,
+                block,
+                project,
+            }
+            .trusts(&scanned.path),
+            _ => true,
+        })
+}
+
 /// The note on an Entry, in the context of no Project, that a folder-trust
 /// gate of its Item kind Blocks it wherever the Agent starts in a folder
 /// the user has not trusted, unless the gate trusts every folder.

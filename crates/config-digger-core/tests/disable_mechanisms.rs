@@ -312,7 +312,14 @@ fn an_enable_through_a_global_switch_lists_every_project_it_reaches() {
     );
     let warning = &enable.warnings()[0];
     assert_eq!(code(warning.class), "wide-reach");
-    assert!(warning.sentence.contains(TWO), "{}", warning.sentence);
+    // The rows list each Project; the warning names the Entry once.
+    assert!(
+        warning
+            .sentence
+            .contains(&format!("{} in all projects", user("alpha"))),
+        "{}",
+        warning.sentence
+    );
     let outcome = core.execute(enable, &[WarningClass::WideReach]).unwrap();
     assert_eq!(
         code(outcome.verify),

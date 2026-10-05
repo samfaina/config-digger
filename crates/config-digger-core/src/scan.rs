@@ -520,6 +520,11 @@ impl Snapshot {
             .map(|(path, _)| path)
     }
 
+    /// The Project with the key `key`.
+    pub fn project(&self, key: &str) -> Option<&ScannedProject> {
+        self.projects.iter().find(|project| project.key == key)
+    }
+
     /// The places of the switch of the mechanism at `mechanism` among those
     /// of `kind`, in the Agent home of `entry`.
     pub fn switches_of<'s>(
