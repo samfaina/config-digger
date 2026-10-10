@@ -132,6 +132,64 @@ pub fn winget_manifest(version: &str, installer_sha256: &str) -> Vec<(String, St
     ]
 }
 
+/// The name of the installer of `version`, as Tauri's NSIS bundler names it.
+pub fn installer_name(version: &str) -> String {
+    format!("config-digger_{version}_x64-setup.exe")
+}
+
+/// The name of the updater signature of the installer of `version`.
+pub fn signature_name(version: &str) -> String {
+    format!("{}.sig", installer_name(version))
+}
+
+/// The name of the updater manifest, which the app fetches from
+/// `releases/latest/download/`, so prereleases never reach it.
+pub const UPDATER_MANIFEST: &str = "latest.json";
+
+/// The updater manifest `latest.json` of `version`, whose installer on
+/// GitHub Releases has the minisign `signature`, the contents of its `.sig`.
+/// It is refused when the signature is empty.
+pub fn updater_manifest(version: &str, signature: &str) -> Result<String, String> {
+    let signature = signature.trim();
+    if signature.is_empty() {
+        return Err(
+            "the installer's updater signature is empty: is TAURI_SIGNING_PRIVATE_KEY set?"
+                .to_owned(),
+        );
+    }
+    let manifest = serde_json::json!({
+        "version": version,
+        "notes": format!("{REPOSITORY}/releases/tag/v{version}"),
+        "platforms": {
+            "windows-x86_64": {
+                "signature": signature,
+                "url": format!(
+                    "{REPOSITORY}/releases/download/v{version}/{}",
+                    installer_name(version)
+                ),
+            },
+        },
+    });
+    let mut text = serde_json::to_string_pretty(&manifest).expect("the manifest serialises");
+    text.push('\n');
+    Ok(text)
+}
+
+/// The assets the release of `version` must have that `names` lacks, in the
+/// order they are listed here: no release ships without the updater's.
+pub fn missing_assets(version: &str, names: &[&str]) -> Vec<String> {
+    [
+        installer_name(version),
+        signature_name(version),
+        format!("config-digger_{version}_x64-cli.zip"),
+        UPDATER_MANIFEST.to_owned(),
+        "SHA256SUMS".to_owned(),
+    ]
+    .into_iter()
+    .filter(|asset| !names.contains(&asset.as_str()))
+    .collect()
+}
+
 const WINGET_ID: &str = "samfaina.config-digger";
 const WINGET_SCHEMA: &str = "1.10.0";
 const REPOSITORY: &str = "https://github.com/samfaina/config-digger";
@@ -183,6 +241,65 @@ mod tests {
             let version = tag.trim_start_matches('v');
             assert!(from_tag(tag, version).is_err(), "{tag}");
         }
+    }
+
+    #[test]
+    fn the_updater_manifest_points_at_the_signed_installer_of_the_release() {
+        let manifest = updater_manifest("0.1.0", "dW50cnVzdGVkIGNvbW1lbnQ=\n").unwrap();
+
+        assert_eq!(
+            manifest,
+            r#"{
+  "version": "0.1.0",
+  "notes": "https://github.com/samfaina/config-digger/releases/tag/v0.1.0",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ=",
+      "url": "https://github.com/samfaina/config-digger/releases/download/v0.1.0/config-digger_0.1.0_x64-setup.exe"
+    }
+  }
+}
+"#
+        );
+    }
+
+    #[test]
+    fn an_updater_manifest_without_a_signature_is_refused() {
+        assert_eq!(
+            updater_manifest("0.1.0", " \n"),
+            Err(
+                "the installer's updater signature is empty: is TAURI_SIGNING_PRIVATE_KEY set?"
+                    .to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn a_release_has_every_asset_the_installers_and_the_updater_need() {
+        let names = [
+            "config-digger_0.1.0_x64-setup.exe",
+            "config-digger_0.1.0_x64-setup.exe.sig",
+            "config-digger_0.1.0_x64-cli.zip",
+            "latest.json",
+            "SHA256SUMS",
+        ];
+
+        assert_eq!(missing_assets("0.1.0", &names), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_release_without_the_updater_signature_or_manifest_is_missing_them() {
+        let names = [
+            "config-digger_0.1.0_x64-setup.exe",
+            "config-digger_0.1.0_x64-cli.zip",
+            "SHA256SUMS",
+            "config-digger_0.0.9_x64-setup.exe.sig",
+        ];
+
+        assert_eq!(
+            missing_assets("0.1.0", &names),
+            ["config-digger_0.1.0_x64-setup.exe.sig", "latest.json"]
+        );
     }
 
     #[test]

@@ -1,0 +1,156 @@
+//! The opt-in updater: Tauri's updater, called from Rust only, so the
+//! webview gets no `updater:*` permission. It reaches the network only when
+//! the user asks, with Check now, or once at startup when "Check for updates
+//! on startup" is on, and installs only on Install and restart.
+
+use crate::about::Page;
+use crate::commands::blocking;
+use config_digger_core::api::{self, Core};
+use config_digger_core::ports::Ports;
+use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
+use tauri::AppHandle;
+use tauri_plugin_updater::{Update, UpdaterExt};
+
+/// An update a check found, as its notice shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct UpdateNotice {
+    /// The version it installs.
+    pub version: String,
+    /// Its release notes on GitHub.
+    pub release_notes: String,
+}
+
+impl UpdateNotice {
+    /// The notice of an update to `version`.
+    pub fn of(version: &str) -> Self {
+        UpdateNotice {
+            version: version.to_owned(),
+            release_notes: Page::ReleaseNotes.url(env!("CARGO_PKG_REPOSITORY"), version),
+        }
+    }
+}
+
+/// What the app knows of updates, without checking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct UpdateStatus {
+    /// When the app last checked, in RFC 3339, `None` when it never did.
+    pub last_checked: Option<String>,
+    /// The update the last check since the app started found, `None` when
+    /// it found none or there was no check.
+    pub update: Option<UpdateNotice>,
+}
+
+/// The update found since the app started, and whether the startup check
+/// already ran.
+#[derive(Default)]
+pub struct UpdatesState {
+    startup_check_ran: AtomicBool,
+    found: Mutex<Option<Update>>,
+}
+
+impl UpdatesState {
+    fn found(&self) -> MutexGuard<'_, Option<Update>> {
+        // A panic in another command leaves the update as it was.
+        self.found
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// What the app knows of updates, read without a network call.
+    pub fn status(&self) -> Result<UpdateStatus, api::Error> {
+        Ok(UpdateStatus {
+            last_checked: Core::new(Ports::real())?.last_update_check()?,
+            update: self.notice(),
+        })
+    }
+
+    fn notice(&self) -> Option<UpdateNotice> {
+        self.found()
+            .as_ref()
+            .map(|update| UpdateNotice::of(&update.version))
+    }
+
+    /// Whether the startup check should run now: only on its first call
+    /// since the app started, and only when the user turned it on.
+    pub fn startup_check_due(&self) -> Result<bool, api::Error> {
+        if self.startup_check_ran.swap(true, Ordering::SeqCst) {
+            return Ok(false);
+        }
+        Ok(Core::new(Ports::real())?
+            .settings()?
+            .check_updates_on_startup)
+    }
+
+    /// The release notes of the update found, `None` when none was.
+    pub fn release_notes(&self) -> Option<String> {
+        self.notice().map(|notice| notice.release_notes)
+    }
+
+    /// Checks GitHub Releases for an update: the one network call, made only
+    /// when the user asks or turned the startup check on. The time is
+    /// recorded once the check succeeds, whatever it finds.
+    pub async fn check(&self, app: &AppHandle) -> Result<UpdateStatus, api::Error> {
+        let update = app
+            .updater()
+            .map_err(failed_check)?
+            .check()
+            .await
+            .map_err(failed_check)?;
+        let checked_at = blocking(|| Core::new(Ports::real())?.record_update_check()).await?;
+        tracing::info!(
+            found = update.as_ref().map(|update| update.version.as_str()),
+            "updates checked"
+        );
+        *self.found() = update;
+        Ok(UpdateStatus {
+            last_checked: Some(checked_at),
+            update: self.notice(),
+        })
+    }
+
+    /// Downloads the update found, checks its signature, and runs its
+    /// installer in passive mode, which replaces both executables and
+    /// restarts the app. It holds the global write lock throughout, so it
+    /// fails at once while an Operation writes, and no Operation starts
+    /// until the installer took over. On Windows the app exits once the
+    /// installer started, which releases the lock.
+    pub async fn install(&self) -> Result<(), api::Error> {
+        let Some(update) = self.found().clone() else {
+            return Err(api::Error::unexpected(
+                "no update was found: check for updates first",
+            ));
+        };
+        let lock = blocking(|| Core::new(Ports::real())?.lock_for_update()).await?;
+        tracing::info!(version = %update.version, "update installing");
+        let installed = update.download_and_install(|_, _| {}, || {}).await;
+        drop(lock);
+        installed.map_err(|error| {
+            api::Error::unexpected(format!("the update could not be installed: {error}"))
+        })
+    }
+}
+
+fn failed_check(error: tauri_plugin_updater::Error) -> api::Error {
+    api::Error::unexpected(format!("the update check failed: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_found_update_links_to_its_own_release_notes() {
+        let notice = UpdateNotice::of("0.2.0");
+
+        assert_eq!(
+            notice,
+            UpdateNotice {
+                version: "0.2.0".to_owned(),
+                release_notes: "https://github.com/samfaina/config-digger/releases/tag/v0.2.0"
+                    .to_owned(),
+            }
+        );
+    }
+}

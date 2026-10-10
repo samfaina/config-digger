@@ -7,7 +7,8 @@ use crate::definitions::{self, Definitions, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::{Environment, Ports};
 use crate::{
-    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, user_list,
+    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, updates,
+    user_list,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -469,6 +470,31 @@ impl Core {
     /// Saves the app's settings. It writes no Agent configuration.
     pub fn save_settings(&self, settings: &Settings) -> Result<(), Error> {
         settings::save(&self.ports, settings)
+    }
+
+    /// When the app last checked for updates, in RFC 3339, `None` when it
+    /// never did.
+    pub fn last_update_check(&self) -> Result<Option<String>, Error> {
+        updates::last(&self.ports)
+    }
+
+    /// Records that the app checks for updates now, whatever the check
+    /// finds, and returns the time in RFC 3339. The check itself is the
+    /// app's: the core makes no network call.
+    pub fn record_update_check(&self) -> Result<String, Error> {
+        updates::record(&self.ports)
+    }
+
+    /// Takes the global write lock for an update install, so that it never
+    /// replaces config-digger while an Operation writes, and no Operation
+    /// starts until the installer took over or the install failed. It fails
+    /// with `Locked` at once while another Operation holds it.
+    pub fn lock_for_update(&self) -> Result<UpdateLock, Error> {
+        let data = history::data_folder(self.ports.env.as_ref())?;
+        self.ports.fs.create_dir_all(&data).map_err(|error| {
+            Error::unexpected(format!("cannot create {}: {error}", data.display()))
+        })?;
+        history::lock(&self.ports, &data).map(UpdateLock)
     }
 
     /// The folders config-digger keeps its own data in. None of them has to
@@ -1219,6 +1245,10 @@ pub struct Backup {
     /// The copy, as the file was before the Operation.
     pub copy: PathBuf,
 }
+
+/// The global write lock, held while an update installs, released when
+/// dropped.
+pub struct UpdateLock(#[allow(dead_code)] crate::ports::HeldLock);
 
 /// The app's settings. The CLI never reads them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]

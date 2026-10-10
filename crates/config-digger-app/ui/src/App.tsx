@@ -6,6 +6,8 @@ import { inventoryStart, type InventoryStart } from "./places";
 import { ProjectsScreen, type Tab } from "./ProjectsScreen";
 import { Rail, type Screen } from "./Rail";
 import { SettingsScreen } from "./SettingsScreen";
+import { UpdateNotice } from "./UpdateNotice";
+import { useUpdates } from "./useUpdates";
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("inventory");
@@ -13,6 +15,7 @@ export function App() {
   const [start, setStart] = useState<InventoryStart | undefined>(undefined);
   // Where Projects & homes opens when the empty inventory opens it.
   const [placesStart, setPlacesStart] = useState<{ tab: Tab; adding: boolean } | undefined>(undefined);
+  const updates = useUpdates();
   const select = (next: Screen) => {
     setStart(undefined);
     setPlacesStart(undefined);
@@ -48,9 +51,12 @@ export function App() {
         ) : screen === "settings" ? (
           <SettingsScreen onShow={showInInventory} onOpenAbout={() => select("about")} />
         ) : (
-          <AboutScreen />
+          <AboutScreen updates={updates} />
         )}
       </main>
+      {updates.status?.update && !updates.later && screen !== "about" && (
+        <UpdateNotice update={updates.status.update} updates={updates} />
+      )}
     </div>
   );
 }

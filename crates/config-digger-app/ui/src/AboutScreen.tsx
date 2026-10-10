@@ -3,6 +3,9 @@ import type { ThirdPartyLicenses } from "../build/licenses";
 import { commands, type About, type Page } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
+import { UpdateNotice } from "./UpdateNotice";
+import { lastCheckedText } from "./updates";
+import type { UpdatesState } from "./useUpdates";
 import { useTransient } from "./useTransient";
 
 /** What each page About links to is called. */
@@ -13,9 +16,8 @@ const PAGE_TITLES: Record<Page, string> = {
 };
 
 /** The About screen: this build, updates, privacy, licenses and links. */
-export function AboutScreen() {
+export function AboutScreen({ updates }: { updates: UpdatesState }) {
   const [about, setAbout] = useState<About | null>(null);
-  const [checked, setChecked] = useState(false);
   const [licensesOpen, setLicensesOpen] = useState(false);
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);
 
@@ -32,6 +34,7 @@ export function AboutScreen() {
   };
 
   const version = about?.version ?? "";
+  const update = updates.status?.update ?? null;
   return (
     <div className="about">
       <header className="panel banner">
@@ -50,9 +53,9 @@ export function AboutScreen() {
           )}
         </div>
         <span className="grow" />
-        <button type="button" className="cta" onClick={() => setChecked(true)}>
+        <button type="button" className="cta" disabled={updates.checking} onClick={() => void updates.checkNow()}>
           <Icon name="refresh" small />
-          Check now
+          {updates.checking ? "Checking…" : "Check now"}
         </button>
       </header>
 
@@ -63,13 +66,23 @@ export function AboutScreen() {
               Updates
               <span className="place-group-line" />
             </h3>
-            {checked && (
+            {update ? (
+              <UpdateNotice update={update} updates={updates} inline />
+            ) : (
+              updates.error && (
+                <div className="about-update" role="alert">
+                  {updates.error}
+                </div>
+              )
+            )}
+            {!update && updates.checkedNow && !updates.error && (
               <div className="about-update" role="status">
-                This build cannot check for updates yet: the updater comes in a later version. Nothing was sent.
+                config-digger {version} is the latest version.
               </div>
             )}
             <p className="side-note">
-              Last checked: never. Checks only when you click Check now, or on startup once you turn that on in Settings.
+              {updates.status ? lastCheckedText(updates.status.last_checked, new Date()) : "Last checked: …"} Checks
+              only when you click Check now, or on startup once you turn that on in Settings.
             </p>
 
             <h3 className="place-group">

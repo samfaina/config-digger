@@ -1,9 +1,14 @@
 name: Release
 
 # Each `vX.Y.Z` tag publishes a GitHub release with the per-user NSIS
-# installer, the CLI-only zip, `SHA256SUMS` and GitHub artifact attestations.
-# `vX.Y.Z-rc.N` tags are published as prereleases. The tag must be the
-# workspace version, which is the one version of every crate.
+# installer, its updater signature (`.sig`) and the updater manifest
+# `latest.json`, the CLI-only zip, `SHA256SUMS` and GitHub artifact
+# attestations. No release ships without the updater's signature and
+# manifest: the run fails before the release is created. The installer is
+# signed with the minisign key in the `TAURI_SIGNING_PRIVATE_KEY` secret.
+# `vX.Y.Z-rc.N` tags are published as prereleases, never marked latest, so
+# the app's updater, which reads `releases/latest`, never sees them. The tag
+# must be the workspace version, which is the one version of every crate.
 on:
   push:
     tags: ["v*"]
@@ -32,21 +37,40 @@ jobs:
         id: release
         shell: bash
         run: cargo xtask release "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+      - name: The updater signing key is set
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::the TAURI_SIGNING_PRIVATE_KEY secret is not set: no release ships without the updater signature"
+            exit 1
+          fi
       - name: Build the installer and the CLI
         working-directory: crates/config-digger-app/ui
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           npm ci
           npm run tauri -- build --config tauri.bundle.conf.json
-      - name: Collect the installer and the CLI zip
+      - name: Collect the installer, its updater signature and the CLI zip
         shell: pwsh
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item "target/release/bundle/nsis/config-digger_${env:VERSION}_x64-setup.exe" dist/
+          Copy-Item "target/release/bundle/nsis/config-digger_${env:VERSION}_x64-setup.exe.sig" dist/
           Compress-Archive -Path target/release/config-digger.exe -DestinationPath "dist/config-digger_${env:VERSION}_x64-cli.zip"
+      - name: Updater manifest
+        shell: bash
+        run: cargo xtask updater "$GITHUB_REF_NAME" dist
       - name: Checksums
         run: cargo xtask checksums dist
+      - name: Every asset is there
+        shell: bash
+        run: cargo xtask assets "$GITHUB_REF_NAME" dist
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
         with:
@@ -70,7 +94,7 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          flags=()
-          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          flags=(--latest)
+          if [ "$PRERELEASE" = "true" ]; then flags=(--prerelease --latest=false); fi
           gh release create "$GITHUB_REF_NAME" dist/* \
             --verify-tag --title "config-digger $VERSION" --generate-notes "${flags[@]}"
