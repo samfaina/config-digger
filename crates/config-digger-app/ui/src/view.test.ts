@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, Home, Inventory, Item, ReadFailure } from "./bindings";
+import type { Agent, Entry, Home, Inventory, Item, ReadFailure } from "./bindings";
 import {
   agentStats,
   chosenHomes,
+  emptyInventory,
   entryActions,
   failuresInContext,
   filterItems,
@@ -401,5 +402,47 @@ describe("the Item another screen names", () => {
 
     expect(findItem(items, { agent: "claude-code", home: "default", kind: "skill", name: "notes" })).toBe(skill);
     expect(findItem(items, { agent: "claude-code", home: "default", kind: "mcp", name: "gone" })).toBeNull();
+  });
+});
+
+describe("the empty inventory", () => {
+  function agent(overrides: Partial<Agent> = {}): Agent {
+    return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, home_variables: [], homes: [], ...overrides };
+  }
+
+  test("says what was looked for when no Agent home was found", () => {
+    const empty = emptyInventory([
+      agent(),
+      agent({ id: "codex", name: "Codex", home_variables: ["CODEX_HOME"] }),
+      agent({ id: "gemini-cli", name: "Gemini CLI", home_variables: ["GEMINI_CLI_HOME"] }),
+    ]);
+
+    expect(empty).toEqual({
+      kind: "none_found",
+      lookedFor:
+        "config-digger looked for Claude Code, Codex and Gemini CLI in their default and known locations " +
+        "and through CODEX_HOME and GEMINI_CLI_HOME. It does not scan the disk. If an Agent keeps its " +
+        "configuration somewhere else, add that folder as an Agent home.",
+    });
+  });
+
+  test("names one variable and one Agent without a list", () => {
+    const empty = emptyInventory([agent({ id: "codex", name: "Codex", home_variables: ["CODEX_HOME"] })]);
+
+    expect(empty.kind === "none_found" && empty.lookedFor).toMatch(
+      /^config-digger looked for Codex in its default and known locations and through CODEX_HOME\. /,
+    );
+  });
+
+  test("counts only the homes the user hid", () => {
+    const listed = { agent: "claude-code", home: "default", hidden: false } as Agent["homes"][number];
+
+    expect(emptyInventory([agent({ homes: [listed] })]).kind).toBe("none_found");
+  });
+
+  test("says every home is hidden when the user hid all of those found", () => {
+    const hidden = { agent: "claude-code", home: "default", hidden: true } as Agent["homes"][number];
+
+    expect(emptyInventory([agent({ homes: [hidden, { ...hidden, home: "other" }] })])).toEqual({ kind: "all_hidden", hidden: 2 });
   });
 });

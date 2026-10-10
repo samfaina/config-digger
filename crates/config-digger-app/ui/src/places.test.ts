@@ -40,7 +40,7 @@ function home(overrides: Partial<Home> = {}): Home {
 }
 
 function agent(overrides: Partial<Agent> = {}): Agent {
-  return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, variables: [], homes: [home()], ...overrides };
+  return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, home_variables: [], homes: [home()], ...overrides };
 }
 
 function places(overrides: Partial<Places> = {}): Places {

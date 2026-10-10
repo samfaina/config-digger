@@ -6,34 +6,53 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 pub struct About {
     pub version: String,
-    /// The short id of the commit it was built from, `unknown` without git.
-    pub commit: String,
-    /// The date of that commit, as `YYYY-MM-DD`, `unknown` without git.
-    pub date: String,
+    /// The short id of the commit it was built from, `None` when it was
+    /// built without git, such as from a source archive.
+    pub commit: Option<String>,
+    /// The date of that commit, as `YYYY-MM-DD`.
+    pub date: Option<String>,
     /// Such as `Windows x64`.
     pub platform: String,
+    /// The pages About links to, in the order it shows them.
+    pub pages: Vec<PageLink>,
 }
 
 impl About {
     /// This build, as `build.rs` recorded it.
     pub fn this_build() -> Self {
+        let version = env!("CARGO_PKG_VERSION");
+        let pages = [Page::Repository, Page::Issues, Page::ReleaseNotes]
+            .into_iter()
+            .map(|page| PageLink {
+                page,
+                url: page.url(env!("CARGO_PKG_REPOSITORY"), version),
+            })
+            .collect();
         About {
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            commit: env!("CONFIG_DIGGER_COMMIT").to_owned(),
-            date: env!("CONFIG_DIGGER_COMMIT_DATE").to_owned(),
+            version: version.to_owned(),
+            commit: option_env!("CONFIG_DIGGER_COMMIT").map(str::to_owned),
+            date: option_env!("CONFIG_DIGGER_COMMIT_DATE").map(str::to_owned),
             platform: platform(std::env::consts::OS, std::env::consts::ARCH),
+            pages,
         }
     }
 }
 
 /// A page About links to. The webview opens no other.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Page {
     Repository,
     Issues,
     /// The release notes of this version.
     ReleaseNotes,
+}
+
+/// A page and where it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct PageLink {
+    pub page: Page,
+    pub url: String,
 }
 
 impl Page {
@@ -91,10 +110,29 @@ mod tests {
     }
 
     #[test]
-    fn this_build_names_its_version_and_platform() {
+    fn this_build_names_its_version_and_links_to_its_pages() {
         let about = About::this_build();
 
         assert_eq!(about.version, env!("CARGO_PKG_VERSION"));
-        assert!(!about.commit.is_empty() && !about.date.is_empty());
+        let pages: Vec<(Page, &str)> = about
+            .pages
+            .iter()
+            .map(|link| (link.page, link.url.as_str()))
+            .collect();
+        let release_notes = format!(
+            "https://github.com/samfaina/config-digger/releases/tag/v{}",
+            env!("CARGO_PKG_VERSION")
+        );
+        assert_eq!(
+            pages,
+            [
+                (Page::Repository, REPOSITORY),
+                (
+                    Page::Issues,
+                    "https://github.com/samfaina/config-digger/issues"
+                ),
+                (Page::ReleaseNotes, release_notes.as_str()),
+            ]
+        );
     }
 }

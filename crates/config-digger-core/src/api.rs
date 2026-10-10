@@ -5,7 +5,7 @@
 use crate::definitions::blocks::{FindsBy, Locate, Provenance as DefinitionProvenance};
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
-use crate::ports::Ports;
+use crate::ports::{Environment, Ports};
 use crate::{
     execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, user_list,
 };
@@ -222,7 +222,7 @@ impl Core {
                     min: verified.min.clone(),
                     max: verified.max.clone(),
                 }),
-                variables: definition
+                home_variables: definition
                     .homes
                     .iter()
                     .filter_map(|home| match home.folder.finds_by() {
@@ -363,18 +363,15 @@ impl Core {
     /// The folders config-digger keeps its own data in. None of them has to
     /// exist yet.
     pub fn data_folders(&self) -> Result<DataFolders, Error> {
-        let env = self.ports.env.as_ref();
-        let data = history::data_folder(env)?;
-        let parked = park::store_path(env)?;
-        Ok(DataFolders {
-            backups: history::backups_folder(&data),
-            parked: parked
-                .parent()
-                .expect("the manifest is in the store's folder")
-                .to_path_buf(),
-            logs: data.join("logs"),
-            lists: user_list::data_folder(env)?,
-        })
+        DataFolders::locate(self.ports.env.as_ref())
+    }
+
+    /// How long History keeps Operations. It is fixed.
+    pub fn retention(&self) -> Retention {
+        Retention {
+            operations: u32::try_from(history::KEEP_OPERATIONS).expect("a small count"),
+            days: u32::try_from(history::KEEP_FOR.as_secs() / (24 * 60 * 60)).expect("a few days"),
+        }
     }
 
     /// Every Agent home and Project, hidden ones included, with no Project
@@ -1099,6 +1096,33 @@ pub struct DataFolders {
     pub lists: PathBuf,
 }
 
+impl DataFolders {
+    /// Where the folders are in `env`, as [`Core::data_folders`] finds them,
+    /// without loading any Agent definition.
+    pub fn locate(env: &dyn Environment) -> Result<Self, Error> {
+        let data = history::data_folder(env)?;
+        let parked = park::store_path(env)?;
+        Ok(DataFolders {
+            backups: history::backups_folder(&data),
+            parked: parked
+                .parent()
+                .expect("the manifest is in the store's folder")
+                .to_path_buf(),
+            logs: data.join("logs"),
+            lists: user_list::data_folder(env)?,
+        })
+    }
+}
+
+/// How long History keeps Operations: at least the last `operations`, and
+/// every one from the last `days`. Operations that need attention are
+/// never pruned, and neither is the parked-Entry store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+pub struct Retention {
+    pub operations: u32,
+    pub days: u32,
+}
+
 /// Every Item found, with the Agent homes they belong to.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Inventory {
@@ -1233,7 +1257,7 @@ pub struct Agent {
     pub tested: Option<VersionRange>,
     /// The environment variables the definition finds Agent homes through,
     /// such as `CODEX_HOME`, in definition order.
-    pub variables: Vec<String>,
+    pub home_variables: Vec<String>,
     pub homes: Vec<Home>,
 }
 

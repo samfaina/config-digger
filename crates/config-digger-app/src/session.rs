@@ -36,6 +36,8 @@ pub struct ParkedEntry {
     /// The Project whose context lists it, `None` when it is listed with no
     /// Project.
     pub project: Option<PathBuf>,
+    /// The user hid its Agent home, so the Inventory does not list it.
+    pub hidden: bool,
     /// Where it came from, and when it was parked.
     pub parked: Parked,
 }
@@ -117,18 +119,19 @@ impl Session {
                     {
                         continue;
                     }
-                    let agent_name = inventory
+                    let home = inventory
                         .homes
                         .iter()
-                        .find(|home| home.agent == item.agent)
-                        .map_or_else(|| item.agent.clone(), |home| home.agent_name.clone());
+                        .find(|home| home.agent == item.agent && home.home == item.home);
                     listed.push(ParkedEntry {
                         agent: item.agent.clone(),
-                        agent_name,
+                        agent_name: home
+                            .map_or_else(|| item.agent.clone(), |home| home.agent_name.clone()),
                         home: item.home.clone(),
                         kind: item.kind,
                         name: item.name.clone(),
                         project: inventory.project.clone(),
+                        hidden: home.is_some_and(|home| home.hidden),
                         parked: parked.clone(),
                     });
                 }
@@ -354,6 +357,13 @@ mod tests {
                 ),
             ]
         );
+        assert!(parked.iter().all(|entry| !entry.hidden));
+
+        core(&fs).hide_home("default", Some("claude-code")).unwrap();
+        let hidden = session(&fs).parked();
+
+        assert_eq!(hidden.len(), 2);
+        assert!(hidden.iter().all(|entry| entry.hidden));
     }
 
     #[test]

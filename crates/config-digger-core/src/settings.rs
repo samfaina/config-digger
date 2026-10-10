@@ -7,7 +7,6 @@ use crate::api::{Error, Settings};
 use crate::ports::{Environment, Ports};
 use crate::user_list;
 use serde::{Deserialize, Serialize};
-use std::io;
 use std::path::PathBuf;
 
 /// The version of the file's format.
@@ -38,49 +37,21 @@ pub(crate) fn file(env: &dyn Environment) -> Result<PathBuf, Error> {
 /// The settings as they are on disk: the defaults when the file is missing.
 pub(crate) fn load(ports: &Ports) -> Result<Settings, Error> {
     let file = file(ports.env.as_ref())?;
-    let bytes = match ports.fs.read(&file) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            return Ok(Settings::from(SettingsFile::default()));
-        }
-        Err(error) => {
-            return Err(Error::unexpected(format!(
-                "cannot read {}: {error}",
-                file.display()
-            )));
-        }
+    let Some(saved) = user_list::read_json::<SettingsFile>(ports, &file, "a settings file")? else {
+        return Ok(Settings::from(SettingsFile::default()));
     };
-    let saved: SettingsFile = serde_json::from_slice(&bytes).map_err(|error| {
-        Error::unexpected(format!(
-            "{} is not a settings file config-digger can read ({error}); fix or delete it",
-            file.display()
-        ))
-    })?;
-    if saved.version != VERSION {
-        return Err(Error::unexpected(format!(
-            "{} has version {}, which this config-digger cannot read",
-            file.display(),
-            saved.version
-        )));
-    }
+    user_list::check_version(&file, saved.version, VERSION)?;
     Ok(Settings::from(saved))
 }
 
 /// Replaces the file with `settings`, through a temporary file and a rename.
 pub(crate) fn save(ports: &Ports, settings: &Settings) -> Result<(), Error> {
     let file = file(ports.env.as_ref())?;
-    let cannot =
-        |error: io::Error| Error::unexpected(format!("cannot write {}: {error}", file.display()));
-    if let Some(folder) = file.parent() {
-        ports.fs.create_dir_all(folder).map_err(cannot)?;
-    }
-    let mut json = serde_json::to_vec_pretty(&SettingsFile {
+    let saved = SettingsFile {
         version: VERSION,
         check_updates_on_startup: settings.check_updates_on_startup,
-    })
-    .expect("the settings serialise");
-    json.push(b'\n');
-    ports.fs.write_atomic(&file, &json).map_err(cannot)
+    };
+    user_list::write_json(ports, &file, &saved)
 }
 
 impl From<SettingsFile> for Settings {

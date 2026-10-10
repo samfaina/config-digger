@@ -47,18 +47,14 @@ fn main() {
 }
 
 /// Records the commit the app is built from, and its date, for About. Built
-/// without git, such as from a source archive, both are `unknown`.
+/// without git, such as from a source archive, neither is recorded.
 fn record_commit() {
-    let commit = git(&["rev-parse", "--short=7", "HEAD"]);
-    let date = git(&["log", "-1", "--format=%cs"]);
-    println!(
-        "cargo:rustc-env=CONFIG_DIGGER_COMMIT={}",
-        commit.as_deref().unwrap_or("unknown")
-    );
-    println!(
-        "cargo:rustc-env=CONFIG_DIGGER_COMMIT_DATE={}",
-        date.as_deref().unwrap_or("unknown")
-    );
+    if let Some(commit) = git(&["rev-parse", "--short=7", "HEAD"]) {
+        println!("cargo:rustc-env=CONFIG_DIGGER_COMMIT={commit}");
+    }
+    if let Some(date) = git(&["log", "-1", "--format=%cs"]) {
+        println!("cargo:rustc-env=CONFIG_DIGGER_COMMIT_DATE={date}");
+    }
 
     // Built again when HEAD moves: to another branch, or along its own.
     let mut watched = vec![git(&["rev-parse", "--git-path", "HEAD"])];

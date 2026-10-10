@@ -1,8 +1,10 @@
 // What the Inventory screen shows, worked out from the inventory the core
 // resolved: which Items are shown, how they are filtered and grouped, and
-// what each Entry card offers. Nothing here reads the disk or renders.
+// what each Entry card offers, and why it is empty when it lists no Agent
+// home. Nothing here reads the disk or renders.
 
 import type {
+  Agent,
   AgentFlag,
   AlsoReadBy,
   Entry,
@@ -229,4 +231,33 @@ export function findItem(items: Item[], ref: ItemRef): Item | null {
  */
 export function itemKey(item: Item): string {
   return [item.agent, item.home, item.kind, item.name, item.entries[0]?.locator ?? ""].join("|");
+}
+
+/** Why the inventory lists no Agent home. */
+export type EmptyReason =
+  /** None was found: what was looked for. */
+  | { kind: "none_found"; lookedFor: string }
+  /** The user hid every one found. */
+  | { kind: "all_hidden"; hidden: number };
+
+/** Why an inventory with no Agent home is empty, from every Agent with its homes, hidden ones included. */
+export function emptyInventory(agents: Agent[]): EmptyReason {
+  const hidden = agents.flatMap((agent) => agent.homes).filter((home) => home.hidden).length;
+  if (hidden > 0) return { kind: "all_hidden", hidden };
+  const names = agents.map((agent) => agent.name);
+  const variables = agents.flatMap((agent) => agent.home_variables);
+  const their = names.length === 1 ? "its" : "their";
+  const through = variables.length > 0 ? ` and through ${listed(variables)}` : "";
+  return {
+    kind: "none_found",
+    lookedFor:
+      `config-digger looked for ${listed(names)} in ${their} default and known locations${through}. ` +
+      "It does not scan the disk. If an Agent keeps its configuration somewhere else, add that folder as an Agent home.",
+  };
+}
+
+/** "A", "A and B", "A, B and C". */
+function listed(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

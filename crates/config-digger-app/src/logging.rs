@@ -2,8 +2,8 @@
 //! config-digger log it carries only paths, key paths, block ids, reason codes
 //! and errors, never configuration values.
 
-use config_digger_core::api::Core;
-use config_digger_core::ports::Ports;
+use config_digger_core::api::DataFolders;
+use config_digger_core::ports::real::RealEnvironment;
 use std::path::PathBuf;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -38,6 +38,5 @@ pub(crate) fn init() -> Option<WorkerGuard> {
 
 /// The logs folder Settings shows.
 fn logs_dir() -> Option<PathBuf> {
-    let folders = Core::new(Ports::real()).ok()?.data_folders().ok()?;
-    Some(folders.logs)
+    Some(DataFolders::locate(&RealEnvironment).ok()?.logs)
 }

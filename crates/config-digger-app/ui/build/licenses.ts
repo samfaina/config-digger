@@ -17,14 +17,14 @@ export type ThirdPartyLicense = {
   /** What it is, when its name does not say, such as the bundled font. */
   note: string | null;
   /** The index of its license text in `texts`, `null` when it ships none. */
-  text: number | null;
+  textIndex: number | null;
 };
 
 /** Every component shipped, with each license text kept once. */
 export type ThirdPartyLicenses = { components: ThirdPartyLicense[]; texts: string[] };
 
 /** A component with its license text, before the texts are shared. */
-export type Component = Omit<ThirdPartyLicense, "text"> & { text: string | null };
+export type Component = Omit<ThirdPartyLicense, "textIndex"> & { text: string | null };
 
 /** What `cargo metadata --format-version 1` prints, as far as it is read here. */
 export type CargoMetadata = {
@@ -150,13 +150,13 @@ export function licenseFiles(files: string[], named: string | null): string[] {
 export function thirdPartyLicenses(components: Component[]): ThirdPartyLicenses {
   const texts: string[] = [];
   const indexes = new Map<string, number>();
-  const shared = [...components].sort(byNameAndVersion).map((component) => {
-    let text: number | null = null;
-    if (component.text !== null) {
-      text = indexes.get(component.text) ?? texts.push(component.text) - 1;
-      indexes.set(component.text, text);
+  const shared = [...components].sort(byNameAndVersion).map(({ text, ...component }) => {
+    let textIndex: number | null = null;
+    if (text !== null) {
+      textIndex = indexes.get(text) ?? texts.push(text) - 1;
+      indexes.set(text, textIndex);
     }
-    return { ...component, text };
+    return { ...component, textIndex };
   });
   return { components: shared, texts };
 }

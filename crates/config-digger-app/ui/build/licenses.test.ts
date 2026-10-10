@@ -134,7 +134,7 @@ describe("thirdPartyLicenses", () => {
     ]);
 
     expect(licenses.texts).toEqual(["MIT text", "React MIT text"]);
-    expect(licenses.components.map((component) => [component.name, component.text])).toEqual([
+    expect(licenses.components.map((component) => [component.name, component.textIndex])).toEqual([
       ["clap", 0],
       ["nameless", null],
       ["react", 1],

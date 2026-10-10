@@ -6,6 +6,7 @@ use crate::api::Error;
 use crate::definitions::AgentDefinition;
 use crate::ports::{Environment, FileSystem, Ports};
 use crate::{explain, paths, scan};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -76,9 +77,34 @@ pub(crate) fn file(env: &dyn Environment) -> Result<PathBuf, Error> {
 /// The list as it is on disk: empty when the file is missing.
 pub(crate) fn load(ports: &Ports) -> Result<UserList, Error> {
     let file = file(ports.env.as_ref())?;
-    let bytes = match ports.fs.read(&file) {
+    let Some(list) = read_json::<UserList>(ports, &file, "a list of Agent homes and Projects")?
+    else {
+        return Ok(UserList::default());
+    };
+    check_version(&file, list.version, VERSION)?;
+    Ok(list)
+}
+
+/// Replaces the file with `list`, through a temporary file and a rename.
+pub(crate) fn save(ports: &Ports, list: &UserList) -> Result<(), Error> {
+    let file = file(ports.env.as_ref())?;
+    let list = UserList {
+        version: VERSION,
+        ..list.clone()
+    };
+    write_json(ports, &file, &list)
+}
+
+/// What the JSON file `file` in the roaming data folder holds, `None` when
+/// it is missing. `what` says what it should hold, when it does not.
+pub(crate) fn read_json<T: DeserializeOwned>(
+    ports: &Ports,
+    file: &Path,
+    what: &str,
+) -> Result<Option<T>, Error> {
+    let bytes = match ports.fs.read(file) {
         Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(UserList::default()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(error) => {
             return Err(Error::unexpected(format!(
                 "cannot read {}: {error}",
@@ -86,37 +112,36 @@ pub(crate) fn load(ports: &Ports) -> Result<UserList, Error> {
             )));
         }
     };
-    let list: UserList = serde_json::from_slice(&bytes).map_err(|error| {
+    serde_json::from_slice(&bytes).map(Some).map_err(|error| {
         Error::unexpected(format!(
-            "{} is not a list of Agent homes and Projects config-digger can read ({error}); fix or delete it",
+            "{} is not {what} config-digger can read ({error}); fix or delete it",
             file.display()
         ))
-    })?;
-    if list.version != VERSION {
-        return Err(Error::unexpected(format!(
-            "{} has version {}, which this config-digger cannot read",
-            file.display(),
-            list.version
-        )));
-    }
-    Ok(list)
+    })
 }
 
-/// Replaces the file with `list`, through a temporary file and a rename.
-pub(crate) fn save(ports: &Ports, list: &UserList) -> Result<(), Error> {
-    let file = file(ports.env.as_ref())?;
+/// Refuses a file of a format version this config-digger does not know.
+pub(crate) fn check_version(file: &Path, found: u32, known: u32) -> Result<(), Error> {
+    if found == known {
+        return Ok(());
+    }
+    Err(Error::unexpected(format!(
+        "{} has version {found}, which this config-digger cannot read",
+        file.display()
+    )))
+}
+
+/// Replaces the JSON file `file` in the roaming data folder with `value`,
+/// through a temporary file and a rename.
+pub(crate) fn write_json<T: Serialize>(ports: &Ports, file: &Path, value: &T) -> Result<(), Error> {
     let cannot =
         |error: io::Error| Error::unexpected(format!("cannot write {}: {error}", file.display()));
     if let Some(folder) = file.parent() {
         ports.fs.create_dir_all(folder).map_err(cannot)?;
     }
-    let mut json = serde_json::to_vec_pretty(&UserList {
-        version: VERSION,
-        ..list.clone()
-    })
-    .expect("the list serialises");
+    let mut json = serde_json::to_vec_pretty(value).expect("the file serialises");
     json.push(b'\n');
-    ports.fs.write_atomic(&file, &json).map_err(cannot)
+    ports.fs.write_atomic(file, &json).map_err(cannot)
 }
 
 impl UserList {

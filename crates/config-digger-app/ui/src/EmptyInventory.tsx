@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { commands } from "./bindings";
 import { call } from "./desktop";
 import { Icon } from "./icons";
-import { emptyInventory, type EmptyInventory as Why } from "./settings";
+import { emptyInventory, type EmptyReason } from "./view";
 
 type Props = {
   /** When the inventory was read, so that a Refresh asks again why it is empty. */
@@ -17,13 +17,20 @@ type Props = {
 
 /** What the Inventory shows instead of its panes when it lists no Agent home. There is no onboarding. */
 export function EmptyInventory({ readAt, reading, refresh, onAddHome, onOpenHomes }: Props) {
-  const [why, setWhy] = useState<Why | null>(null);
+  const [why, setWhy] = useState<EmptyReason | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // The Agents, with any home the user hid, say what was looked for.
     let current = true;
     void call(commands.readPlaces).then((result) => {
-      if (current && result.status === "ok") setWhy(emptyInventory(result.data.agents));
+      if (!current) return;
+      if (result.status === "ok") {
+        setWhy(emptyInventory(result.data.agents));
+        setError(null);
+      } else {
+        setError(result.error.message);
+      }
     });
     return () => {
       current = false;
@@ -64,6 +71,12 @@ export function EmptyInventory({ readAt, reading, refresh, onAddHome, onOpenHome
       </span>
       <h1 className="empty-title">No Agent found on this computer</h1>
       {why && <p className="empty-text dim">{why.lookedFor}</p>}
+      {error && (
+        <p className="empty-text dim">
+          config-digger looked in each Agent's default and known locations and through its environment variables, and
+          does not scan the disk. Which Agents it looked for couldn't be read: {error}
+        </p>
+      )}
       <div className="empty-actions">
         <button type="button" className="cta" onClick={onAddHome}>
           <Icon name="folder" small />

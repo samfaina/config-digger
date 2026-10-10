@@ -32,6 +32,7 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
   const openFolder = async (folder: DataFolder) => {
     const result = await call(() => commands.openDataFolder(folder));
     if (result.status === "error") setNotice(`It couldn't be opened: ${result.error.message}`);
+    else if (!result.data) setNotice("config-digger has kept nothing there yet.");
   };
 
   const onStartup = read?.settings.check_updates_on_startup ?? false;
@@ -143,9 +144,13 @@ function ParkedList({ rows, onShow }: { rows: ParkedRow[]; onShow: (start: Inven
         <li key={row.key}>
           <span className="parked-name">{row.title}</span>
           <span className="place-sub">{row.meta}</span>
-          <button type="button" className="link" onClick={() => onShow(row.start)}>
-            Show in Inventory
-          </button>
+          {row.start ? (
+            <button type="button" className="link" onClick={() => row.start && onShow(row.start)}>
+              Show in Inventory
+            </button>
+          ) : (
+            <span className="place-sub">Unhide its Agent home in Projects &amp; homes to see it in the Inventory.</span>
+          )}
         </li>
       ))}
     </ul>

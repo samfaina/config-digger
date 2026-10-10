@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { Agent, ParkedEntry, SettingsRead } from "./bindings";
-import { dataFolderRows, emptyInventory, parkedRows } from "./settings";
+import type { ParkedEntry, SettingsRead } from "./bindings";
+import { dataFolderRows, parkedRows } from "./settings";
 
 const LOCAL = String.raw`C:\Users\me\AppData\Local\config-digger`;
 
@@ -12,6 +12,7 @@ function parked(overrides: Partial<ParkedEntry> = {}): ParkedEntry {
     kind: "mcp",
     name: "notes",
     project: null,
+    hidden: false,
     parked: {
       path: String.raw`C:\Users\me\AppData\Roaming\Claude\claude_desktop_config.json`,
       key_path: ["mcpServers", "notes"],
@@ -32,6 +33,7 @@ function read(overrides: Partial<SettingsRead> = {}): SettingsRead {
       lists: String.raw`C:\Users\me\AppData\Roaming\config-digger`,
     },
     operations: 3,
+    retention: { operations: 50, days: 30 },
     parked: [],
     ...overrides,
   };
@@ -58,8 +60,10 @@ describe("Data on this computer", () => {
     expect(rows[3].description).toBe("The Agent homes and Projects you added or hid, and these settings.");
   });
 
-  test("counts one Operation", () => {
-    expect(dataFolderRows(read({ operations: 1 }))[0].description).toMatch(/^1 Operation kept\. /);
+  test("counts one Operation, and says how long History keeps them as the core does", () => {
+    const description = dataFolderRows(read({ operations: 1, retention: { operations: 20, days: 7 } }))[0].description;
+
+    expect(description).toMatch(/^1 Operation kept\. History keeps the last 20 Operations and everything from the last 7 days, /);
   });
 });
 
@@ -85,42 +89,13 @@ describe("the parked Entries", () => {
       state: null,
       item: { agent: "claude-desktop", home: "msix", kind: "mcp", name: "notes" },
     });
-    expect(rows[1].start.project).toBe(project);
-  });
-});
-
-describe("the empty inventory", () => {
-  function agent(overrides: Partial<Agent> = {}): Agent {
-    return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, variables: [], homes: [], ...overrides };
-  }
-
-  test("says what was looked for when no Agent home was found", () => {
-    const empty = emptyInventory([
-      agent(),
-      agent({ id: "codex", name: "Codex", variables: ["CODEX_HOME"] }),
-      agent({ id: "gemini-cli", name: "Gemini CLI", variables: ["GEMINI_CLI_HOME"] }),
-    ]);
-
-    expect(empty).toEqual({
-      kind: "none_found",
-      lookedFor:
-        "config-digger looked for Claude Code, Codex and Gemini CLI in their default and known locations " +
-        "and through CODEX_HOME and GEMINI_CLI_HOME. It does not scan the disk. If an Agent keeps its " +
-        "configuration somewhere else, add that folder as an Agent home.",
-    });
+    expect(rows[1].start?.project).toBe(project);
   });
 
-  test("names one variable and one Agent without a list", () => {
-    const empty = emptyInventory([agent({ id: "codex", name: "Codex", variables: ["CODEX_HOME"] })]);
+  test("say when an Entry's Agent home is hidden, which the Inventory does not list", () => {
+    const [row] = parkedRows([parked({ hidden: true })]);
 
-    expect(empty.kind === "none_found" && empty.lookedFor).toMatch(
-      /^config-digger looked for Codex in its default and known locations and through CODEX_HOME\. /,
-    );
-  });
-
-  test("says every home is hidden when the user hid all of those found", () => {
-    const hidden = { agent: "claude-code", home: "default", hidden: true } as Agent["homes"][number];
-
-    expect(emptyInventory([agent({ homes: [hidden, { ...hidden, home: "other" }] })])).toEqual({ kind: "all_hidden", hidden: 2 });
+    expect(row.meta).toMatch(/ · in a hidden Agent home$/);
+    expect(row.start).toBeNull();
   });
 });

@@ -5,12 +5,12 @@ import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
 import { useTransient } from "./useTransient";
 
-/** The pages About links to, with what each shows. */
-const LINKS: { page: Page; title: string; text: (version: string) => string }[] = [
-  { page: "repository", title: "Repository", text: () => "github.com/samfaina/config-digger" },
-  { page: "issues", title: "Report an issue", text: () => "github.com/samfaina/config-digger/issues" },
-  { page: "release_notes", title: "Release notes", text: (version) => `github.com/samfaina/config-digger/releases/tag/v${version}` },
-];
+/** What each page About links to is called. */
+const PAGE_TITLES: Record<Page, string> = {
+  repository: "Repository",
+  issues: "Report an issue",
+  release_notes: "Release notes",
+};
 
 /** The About screen: this build, updates, privacy, licenses and links. */
 export function AboutScreen() {
@@ -43,7 +43,9 @@ export function AboutScreen() {
           <div className="banner-title">config-digger {version}</div>
           {about && (
             <div className="caption">
-              build {about.commit} · {about.date} · {about.platform}
+              {[about.commit ? `build ${about.commit}` : "built without git", about.date, about.platform]
+                .filter((part) => part !== null)
+                .join(" · ")}
             </div>
           )}
         </div>
@@ -111,10 +113,10 @@ export function AboutScreen() {
         <aside className="panel places-side">
           <h2 className="panel-title">Links</h2>
           <div className="scroll">
-            {LINKS.map((link) => (
+            {(about?.pages ?? []).map((link) => (
               <button key={link.page} type="button" className="side-row about-link" onClick={() => void open(link.page)}>
-                <b>{link.title}</b>
-                <span className="dim mono">{link.text(version)}</span>
+                <b>{PAGE_TITLES[link.page]}</b>
+                <span className="dim mono">{link.url.replace(/^https:\/\//, "")}</span>
                 <span className="side-count">
                   <Icon name="open" small />
                 </span>
@@ -178,10 +180,10 @@ function LicensesDialog({ onClose }: { onClose: () => void }) {
                   <span className="grow" />
                   <span className="dim">{component.license}</span>
                 </summary>
-                {component.text === null ? (
+                {component.textIndex === null ? (
                   <p className="side-note">Its package ships no license text.</p>
                 ) : (
-                  <pre className="license-text">{licenses.texts[component.text]}</pre>
+                  <pre className="license-text">{licenses.texts[component.textIndex]}</pre>
                 )}
               </details>
             ))}

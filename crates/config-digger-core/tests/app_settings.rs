@@ -1,7 +1,7 @@
 //! The app's settings and the folders config-digger keeps its data in,
 //! through the core `api` with fake ports.
 
-use config_digger_core::api::{Core, DataFolders, Settings};
+use config_digger_core::api::{Core, DataFolders, Retention, Settings};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use std::path::PathBuf;
 
@@ -71,6 +71,11 @@ fn a_settings_file_that_cannot_be_read_is_an_error_that_names_it() {
 #[test]
 fn data_folders_are_in_the_local_and_roaming_app_data_folders() {
     let folders = core(&FakeFileSystem::new()).data_folders().unwrap();
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("APPDATA", APPDATA)
+        .with_var("LOCALAPPDATA", LOCALAPPDATA);
+
+    assert_eq!(DataFolders::locate(&env).unwrap(), folders);
 
     assert_eq!(
         folders,
@@ -79,6 +84,17 @@ fn data_folders_are_in_the_local_and_roaming_app_data_folders() {
             parked: PathBuf::from(r"C:\Users\fixture\AppData\Local\config-digger\parked"),
             logs: PathBuf::from(r"C:\Users\fixture\AppData\Local\config-digger\logs"),
             lists: PathBuf::from(r"C:\Users\fixture\AppData\Roaming\config-digger"),
+        }
+    );
+}
+
+#[test]
+fn history_keeps_the_last_50_operations_and_the_last_30_days() {
+    assert_eq!(
+        core(&FakeFileSystem::new()).retention(),
+        Retention {
+            operations: 50,
+            days: 30
         }
     );
 }

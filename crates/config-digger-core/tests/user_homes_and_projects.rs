@@ -532,7 +532,7 @@ fn each_agent_names_the_environment_variables_its_homes_are_found_through() {
     let variables: Vec<(&str, Vec<&str>)> = agents
         .iter()
         .map(|agent| {
-            let variables = agent.variables.iter().map(String::as_str).collect();
+            let variables = agent.home_variables.iter().map(String::as_str).collect();
             (agent.id.as_str(), variables)
         })
         .collect();
