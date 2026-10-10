@@ -383,6 +383,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         undo_of: manifest.undo_of.clone(),
         undone_by,
         backup_deleted: manifest.backup_deleted_at.is_some(),
+        backup_deletable: backup_deletable(ports, manifest),
         agents,
         locations: manifest
             .locations
@@ -393,6 +394,18 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         undoable: not_undoable.is_none(),
         not_undoable,
     }
+}
+
+/// Whether the backup of `manifest` can be deleted, as
+/// [`plan::plan_delete_backup`] checks it.
+fn backup_deletable(ports: &Ports, manifest: &Manifest) -> bool {
+    if manifest.backup_deleted_at.is_none() {
+        return true;
+    }
+    operation_folder(ports, &manifest.id).is_ok_and(|folder| {
+        let copies = backup_copies(ports, &folder, manifest);
+        !backup_already_deleted(manifest, &copies)
+    })
 }
 
 /// The Operation `id` among `manifests`.

@@ -1713,13 +1713,8 @@ pub(crate) fn operation_diff(
 ) -> FileDiff {
     let path = &location.path;
     if manifest.backup_deleted_at.is_some() {
-        return FileDiff {
-            path: path.clone(),
-            diff: None,
-            diff_unavailable: Some(DiffUnavailable::BackupDeleted),
-            diff_note: Some(explain::diff_of_deleted_backup(&manifest.id)),
-            changed_lines: 0,
-        };
+        let note = explain::diff_of_deleted_backup(&manifest.id);
+        return no_diff(path, DiffUnavailable::BackupDeleted, note);
     }
     let backed_up = match &location.backup {
         Some(backup) => {
@@ -1740,13 +1735,8 @@ pub(crate) fn operation_diff(
     let written = match apply_edits(base, location.syntax, &edits, &location.medium) {
         Ok(edited) => edited.bytes,
         Err(_) => {
-            return FileDiff {
-                path: path.clone(),
-                diff: None,
-                diff_unavailable: Some(DiffUnavailable::Parse),
-                diff_note: Some(explain::edits_do_not_apply(path)),
-                changed_lines: 0,
-            };
+            let note = explain::edits_do_not_apply(path);
+            return no_diff(path, DiffUnavailable::EditsDoNotApply, note);
         }
     };
     let before = Side {
@@ -1764,15 +1754,21 @@ pub(crate) fn operation_diff(
 
 /// No diff of a file whose backup cannot be read.
 fn unreadable_backup(path: &Path, backup: &Path, error: &io::Error) -> FileDiff {
+    let note = format!(
+        "Can't show a diff: the backup {} cannot be read: {error}.",
+        backup.display()
+    );
+    no_diff(path, DiffUnavailable::Io, note)
+}
+
+/// No diff of the file at `path`, for `reason`, said by `note`.
+fn no_diff(path: &Path, reason: DiffUnavailable, note: String) -> FileDiff {
     FileDiff {
         path: path.to_path_buf(),
         diff: None,
-        diff_unavailable: Some(DiffUnavailable::Io),
-        diff_note: Some(format!(
-            "Can't show a diff: the backup {} cannot be read: {error}.",
-            backup.display()
-        )),
-        // Nothing says how many lines differ without the backup.
+        diff_unavailable: Some(reason),
+        diff_note: Some(note),
+        // Nothing says how many lines differ without both sides.
         changed_lines: 0,
     }
 }

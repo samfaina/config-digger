@@ -9,7 +9,7 @@ import {
   type StateAfter,
   type WarningClass,
 } from "./bindings";
-import { copy, revealLocation, type Notify } from "./desktop";
+import { call, copy, revealLocation, type Notify } from "./desktop";
 import {
   appliedResult,
   applyButton,
@@ -260,21 +260,6 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
   );
 }
 
-/** What a command returns. */
-type CommandResult<T> = { status: "ok"; data: T } | { status: "error"; error: ApiError };
-
-/** Runs a command, turning a thrown failure into an error result. */
-async function call<T>(command: () => Promise<CommandResult<T>>): Promise<CommandResult<T>> {
-  try {
-    return await command();
-  } catch (thrown) {
-    return {
-      status: "error",
-      error: { code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null },
-    };
-  }
-}
-
 type PreviewBodyProps = {
   planned: ActionPreview;
   acknowledged: ReadonlySet<WarningClass>;
@@ -500,6 +485,18 @@ export function CopyPathButton({ path, what, notify }: { path: string; what: str
   );
 }
 
+/** A backup folder's path, with Open backup folder and Copy path to recover from it by hand. */
+export function BackupPath({ backup, notify }: { backup: string; notify: Notify }) {
+  return (
+    <div className="backup-path">
+      <span className="mono">{backup}</span>
+      <span className="grow" />
+      <BackupFolderButton backup={backup} notify={notify} />
+      <CopyPathButton path={backup} what="backup folder path" notify={notify} />
+    </div>
+  );
+}
+
 /** Shows the backup folder an error points at in Explorer. */
 export function BackupFolderButton({ backup, notify }: { backup: string | null; notify: Notify }) {
   if (backup === null) return null;
@@ -692,7 +689,8 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
   );
 }
 
-const ROLLBACK_LABELS = {
+/** Where a Rollback left each location, as a label. */
+export const ROLLBACK_LABELS = {
   restored: "restored",
   not_written: "never written",
   left_alone: "left alone",

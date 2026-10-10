@@ -15,14 +15,23 @@ export type OperationRow = {
   status: { label: string; tone: StatusTone };
 };
 
+/** The Agents whose States an Operation changed, or "No Agent". */
+export function agentNames(summary: OperationSummary): string {
+  return summary.agents.length > 0 ? summary.agents.join(", ") : "No Agent";
+}
+
+/** "1 Operation", "3 Operations". */
+export function operationCount(count: number): string {
+  return `${count} ${count === 1 ? "Operation" : "Operations"}`;
+}
+
 /** An Operation's row in the list. */
 export function operationRow(summary: OperationSummary): OperationRow {
-  const agents = summary.agents.length > 0 ? summary.agents.join(", ") : "No Agent";
   const count = summary.locations.length;
   const locations = `${count} ${count === 1 ? "location" : "locations"}`;
   return {
     title: summary.title,
-    meta: `${agents} · ${locations} · Operation ${summary.id}`,
+    meta: `${agentNames(summary)} · ${locations} · Operation ${summary.id}`,
     status: { label: summary.status_text, tone: statusTone(summary) },
   };
 }
@@ -67,11 +76,16 @@ export type OperationActions = {
  * shows what changed. Any other says why it cannot be undone.
  */
 export function operationActions(summary: OperationSummary): OperationActions {
-  const history = summary.status === "applied" && !summary.backup_deleted && summary.undone_by === null;
-  const undo: UndoAction = history
+  const offered = summary.status === "applied" && !summary.backup_deleted && summary.undone_by === null;
+  const undo: UndoAction = offered
     ? { offered: true, refusal: summary.undoable ? null : summary.not_undoable }
     : { offered: false, why: summary.not_undoable ?? "It cannot be undone." };
-  return { undo, deleteBackup: !summary.backup_deleted, dismiss: summary.needs_attention };
+  return { undo, deleteBackup: summary.backup_deletable, dismiss: summary.needs_attention };
+}
+
+/** The Operation the detail pane shows: the one selected while History lists it, else the newest. */
+export function selectedOperation(history: OperationSummary[], selected: string | null): OperationSummary | null {
+  return history.find((operation) => operation.id === selected) ?? history[0] ?? null;
 }
 
 /** What the persistent banner says while any Operation needs attention, or `null` once none does. */

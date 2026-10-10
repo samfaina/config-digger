@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { Error as ApiError, FileDiff, OperationSummary } from "./bindings";
-import { operationActions, operationRow, operationTime, recoveryBanner, undoRefusal } from "./history";
+import {
+  operationActions,
+  operationRow,
+  operationTime,
+  recoveryBanner,
+  selectedOperation,
+  undoRefusal,
+} from "./history";
 
 function summary(overrides: Partial<OperationSummary> = {}): OperationSummary {
   return {
@@ -15,6 +22,7 @@ function summary(overrides: Partial<OperationSummary> = {}): OperationSummary {
     undo_of: null,
     undone_by: null,
     backup_deleted: false,
+    backup_deletable: true,
     agents: ["Claude Code"],
     locations: [String.raw`C:\Users\me\.claude.json`],
     undoable: true,
@@ -87,7 +95,7 @@ describe("what can be done to an Operation", () => {
   });
 
   test("Undo stays offered when its files changed since, saying it would be refused", () => {
-    const refused = "`mcpServers.notes` in C:\Users\me\.claude.json changed since the Operation";
+    const refused = String.raw`\`mcpServers.notes\` in C:\Users\me\.claude.json changed since the Operation`;
 
     expect(operationActions(summary({ undoable: false, not_undoable: refused })).undo).toEqual({
       offered: true,
@@ -112,6 +120,7 @@ describe("what can be done to an Operation", () => {
     });
     const deleted = summary({
       backup_deleted: true,
+      backup_deletable: false,
       undoable: false,
       not_undoable: "Its backup was deleted, with the values its Undo would put back.",
     });
@@ -121,6 +130,17 @@ describe("what can be done to an Operation", () => {
       undo: { offered: false, why: "Its backup was deleted, with the values its Undo would put back." },
       deleteBackup: false,
     });
+  });
+
+  test("one whose backup deletion left copies behind offers Delete backup again", () => {
+    const left = summary({
+      backup_deleted: true,
+      backup_deletable: true,
+      undoable: false,
+      not_undoable: "Its backup was deleted, with the values its Undo would put back.",
+    });
+
+    expect(operationActions(left)).toMatchObject({ undo: { offered: false }, deleteBackup: true });
   });
 
   test("one that needs attention offers Dismiss and Delete backup, but no Undo", () => {
@@ -184,13 +204,13 @@ describe("a refused Undo", () => {
   test("shows the reason, the diffs from the backup and the backup folder", () => {
     const refused = error({
       code: "undo_refused",
-      message: "Undo refused: `mcpServers.notes` in C:\Users\me\.claude.json changed since the Operation.",
+      message: String.raw`Undo refused: \`mcpServers.notes\` in C:\Users\me\.claude.json changed since the Operation.`,
       backup,
       diffs: [diff],
     });
 
     expect(undoRefusal(refused)).toEqual({
-      reason: "Undo refused: `mcpServers.notes` in C:\Users\me\.claude.json changed since the Operation.",
+      reason: String.raw`Undo refused: \`mcpServers.notes\` in C:\Users\me\.claude.json changed since the Operation.`,
       backup,
       diffs: [diff],
     });
@@ -199,5 +219,20 @@ describe("a refused Undo", () => {
   test("is only an Undo the core refused for what changed, not another failure to plan", () => {
     expect(undoRefusal(error({ code: "blocked", message: "Operation x cannot be undone" }))).toBeNull();
     expect(undoRefusal(error({ code: "undo_refused", message: "refused", backup: null }))).toBeNull();
+  });
+});
+
+describe("the Operation the detail pane shows", () => {
+  const newest = summary({ id: "20261002-101500-b10" });
+  const older = summary({ id: "20261001-080000-c20" });
+
+  test("is the one selected while History lists it", () => {
+    expect(selectedOperation([newest, older], "20261001-080000-c20")).toBe(older);
+  });
+
+  test("is the newest when none is selected, or the one selected is gone", () => {
+    expect(selectedOperation([newest, older], null)).toBe(newest);
+    expect(selectedOperation([newest, older], "20260901-000000-0aa")).toBe(newest);
+    expect(selectedOperation([], null)).toBeNull();
   });
 });

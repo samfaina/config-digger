@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type OperationSummary } from "./bindings";
+import { call } from "./desktop";
 
 export type HistoryRead = {
   /** Every Operation, newest first, kept while a new read runs or after one fails. */
@@ -19,15 +20,13 @@ export function useHistory(): HistoryRead {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      const result = await commands.readHistory();
+      const result = await call(commands.readHistory);
       if (result.status === "ok") {
         setHistory(result.data);
         setError(null);
       } else {
         setError(result.error);
       }
-    } catch (thrown) {
-      setError({ code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null });
     } finally {
       inFlight.current = false;
     }

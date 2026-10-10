@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
-import type { Notify } from "./desktop";
+import { NOTICE_MS, type Notify } from "./desktop";
 import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
@@ -39,8 +39,7 @@ import {
 /** What the detail panel shows: an Item's Entries, or the Read failures in the context. */
 type Detail = { kind: "item"; key: string } | { kind: "failures" } | null;
 
-/** How long a notice and a "show winner" mark stay. */
-const NOTICE_MS = 2500;
+/** How long a "show winner" mark stays. */
 const FLASH_MS = 1600;
 
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */

@@ -196,10 +196,13 @@ impl Actions {
         self.core.history()
     }
 
-    /// The Operation `id` in History, whose backup folder can then be revealed.
+    /// The Operation `id` in History, whose backup folder can then be
+    /// revealed, unless its backup was deleted.
     pub fn detail(&mut self, id: &str) -> Result<OperationDetail, Error> {
         let detail = self.core.history_show(id)?;
-        self.report(Some(&detail.backup));
+        if !detail.summary.backup_deleted {
+            self.report(Some(&detail.backup));
+        }
         Ok(detail)
     }
 
@@ -450,6 +453,10 @@ mod tests {
         let history = actions.history().unwrap();
         assert!(history[0].backup_deleted);
         assert!(!history[0].undoable);
+        // Its folder holds only its record now, so the detail offers nothing to reveal.
+        let mut restarted = self::actions(&fs);
+        let detail = restarted.detail(&operation).unwrap();
+        assert!(!restarted.can_reveal(&detail.backup));
     }
 
     #[test]

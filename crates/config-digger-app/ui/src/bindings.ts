@@ -307,7 +307,12 @@ export type DiffUnavailable =
  */
 "no_reader" | 
 /**  The backup of the Operation was deleted, with the values of its edits. */
-"backup_deleted";
+"backup_deleted" | 
+/**
+ *  The edits History holds no longer apply to the backup, so what the
+ *  Operation wrote cannot be rebuilt from it.
+ */
+"edits_do_not_apply";
 
 /**  An Entry whose State after an Operation is not the one predicted. */
 export type Difference = {
@@ -991,6 +996,11 @@ export type OperationSummary = {
 	undone_by: string | null,
 	/**  Its backup was deleted, and with it the values of its edits. */
 	backup_deleted: boolean,
+	/**
+	 *  Its backup can be deleted: it was not yet, or a deletion left copies
+	 *  of it behind.
+	 */
+	backup_deletable: boolean,
 	/**  The names of the Agents whose States it changed. */
 	agents: string[],
 	/**  The files it touched. */

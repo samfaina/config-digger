@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { BackupDiffs, BackupFolderButton, ChangeRow, CopyPathButton, DialogSection, Diff } from "./ActionDialog";
+import { BackupDiffs, BackupPath, ChangeRow, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
 import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
-import type { Notify } from "./desktop";
+import { call, NOTICE_MS, type Notify } from "./desktop";
 import {
+  agentNames,
   operationActions,
+  operationCount,
   operationRow,
   operationTime,
+  selectedOperation,
   type OperationRow,
   type UndoAction,
   type UndoRefusal,
@@ -14,16 +17,6 @@ import { Icon } from "./icons";
 import { useActionDialog } from "./useActionDialog";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
-
-/** How long a notice stays. */
-const NOTICE_MS = 2500;
-
-const ROLLBACK_LABELS = {
-  restored: "restored",
-  not_written: "never written",
-  left_alone: "left alone",
-  not_restored: "not restored",
-} as const;
 
 /** The History · Undo screen: every Operation, newest first, and the detail of the one selected. */
 export function HistoryScreen() {
@@ -38,10 +31,14 @@ export function HistoryScreen() {
     // History is the screen already open.
     onOpenHistory: () => {},
     notify: setNotice,
-    onRefused: (operation, refusal) => setRefused({ operation, refusal }),
+    // A refused Undo shows in the detail of its Operation, even one started from the snackbar.
+    onRefused: (operation, refusal) => {
+      setSelected(operation);
+      setRefused({ operation, refusal });
+    },
   });
 
-  const summary = history?.find((operation) => operation.id === selected) ?? history?.[0] ?? null;
+  const summary = history ? selectedOperation(history, selected) : null;
   const id = summary?.id ?? null;
 
   // The detail is read again whenever History is, since an Undo or a Dismiss changes it.
@@ -51,14 +48,9 @@ export function HistoryScreen() {
       return;
     }
     let current = true;
-    void commands.historyDetail(id).then(
-      (result) => {
-        if (current) setDetail(result.status === "ok" ? { detail: result.data } : { error: result.error });
-      },
-      (thrown) => {
-        if (current) setDetail({ error: { code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null } });
-      },
-    );
+    void call(() => commands.historyDetail(id)).then((result) => {
+      if (current) setDetail(result.status === "ok" ? { detail: result.data } : { error: result.error });
+    });
     return () => {
       current = false;
     };
@@ -82,11 +74,11 @@ export function HistoryScreen() {
       <header className="panel banner">
         <div>
           <div className="caption">History · Undo</div>
-          <div className="banner-title">{count(history?.length ?? 0)}</div>
+          <div className="banner-title">{operationCount(history?.length ?? 0)}</div>
         </div>
         <p className="history-about dim">
           Any Operation can be undone on its own, across restarts. Undo is refused when something it touched changed
-          since. Kept: the last 50 Operations and everything from the last 30 days.
+          since.
         </p>
       </header>
 
@@ -154,10 +146,6 @@ export function HistoryScreen() {
   );
 }
 
-function count(operations: number): string {
-  return `${operations} ${operations === 1 ? "Operation" : "Operations"}`;
-}
-
 type RowProps = { row: OperationRow; time: string; selected: boolean; onSelect: () => void };
 
 /** One Operation in the list: time, title, Agents, locations, number and status. */
@@ -208,7 +196,7 @@ function OperationPane({ summary, detail, detailError, time, refusal, onUndo, on
         <StatusChip status={row.status} />
       </h2>
       <p className="caption">
-        Operation {summary.id} · {time} · {summary.agents.length > 0 ? summary.agents.join(", ") : "No Agent"}
+        Operation {summary.id} · {time} · {agentNames(summary)}
       </p>
 
       <div className="scroll history-body">
@@ -295,12 +283,7 @@ function RefusalBlock({ refusal, notify }: { refusal: UndoRefusal; notify: Notif
         </div>
       </div>
       <BackupDiffs diffs={refusal.diffs} />
-      <div className="backup-path">
-        <span className="mono">{refusal.backup}</span>
-        <span className="grow" />
-        <BackupFolderButton backup={refusal.backup} notify={notify} />
-        <CopyPathButton path={refusal.backup} what="backup folder path" notify={notify} />
-      </div>
+      <BackupPath backup={refusal.backup} notify={notify} />
     </>
   );
 }
@@ -340,13 +323,13 @@ function DetailSections({ detail, notify }: { detail: OperationDetail; notify: N
       </DialogSection>
 
       <DialogSection title="Backup">
-        <div className="backup-path">
-          <span className="mono">{detail.backup}</span>
-          <span className="grow" />
-          <BackupFolderButton backup={detail.backup} notify={notify} />
-          <CopyPathButton path={detail.backup} what="backup folder path" notify={notify} />
-        </div>
-        {detail.summary.backup_deleted && <p className="file-note">Its backup was deleted; only its record is kept.</p>}
+        {detail.summary.backup_deleted ? (
+          <p className="file-note">
+            Its backup was deleted; only its record is kept in <span className="mono">{detail.backup}</span>.
+          </p>
+        ) : (
+          <BackupPath backup={detail.backup} notify={notify} />
+        )}
       </DialogSection>
     </>
   );
