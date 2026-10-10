@@ -200,10 +200,6 @@ p {
   font-size: 14.5px;
 }
 
-.later {
-  flex: 1;
-}
-
 .scroll {
   flex: 1;
   min-height: 0;
@@ -1889,4 +1885,208 @@ p {
 select.add-input {
   flex: none;
   width: 170px;
+}
+
+/* Settings */
+
+.settings,
+.about {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-about {
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+.settings-updates {
+  width: 440px;
+  flex: none;
+}
+
+.settings-data {
+  flex: 1;
+}
+
+.setting-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--tile);
+}
+
+.switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #34353f;
+  cursor: pointer;
+}
+
+.switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--grey);
+  transition: left 0.15s;
+}
+
+.switch.on {
+  background: var(--primary);
+}
+
+.switch.on i {
+  left: 21px;
+  background: var(--white);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+.parked-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.parked-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.parked-name {
+  font-weight: 500;
+}
+
+.parked-none {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* About */
+
+.about-logo {
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 40px;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.about-main {
+  flex: 1;
+}
+
+.about-update {
+  margin-bottom: 6px;
+  padding: 10px 12px;
+  border: 1px solid #7d67cb66;
+  border-radius: 12px;
+  background: #7d67cb22;
+}
+
+.about-link {
+  width: 100%;
+  border-width: 0 0 1px;
+  border-color: var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.about-link:hover b {
+  color: var(--primary-hover);
+}
+
+.about-link:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+.dialog.licenses {
+  width: min(820px, 92vw);
+  display: flex;
+  flex-direction: column;
+}
+
+.licenses-list {
+  min-height: 0;
+  margin-top: 14px;
+  overflow: auto;
+}
+
+.license {
+  border-bottom: 1px solid var(--line);
+}
+
+.license summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+
+.license-text {
+  max-height: 320px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--tile);
+  color: var(--grey);
+  font: 11.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+}
+
+/* The empty inventory: no Agent home found, and no onboarding */
+
+.empty-inventory {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.empty-text {
+  max-width: 560px;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
 }

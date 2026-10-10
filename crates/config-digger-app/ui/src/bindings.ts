@@ -69,9 +69,43 @@ export const commands = {
 	changeList: (change: ListChange) => typedError<ListChanged, Error>(__TAURI_INVOKE("change_list", { change })),
 	/**  Opens the Windows picker over the window, `None` when it is cancelled. */
 	pickLocation: (pick: Pick) => typedError<string | null, Error>(__TAURI_INVOKE("pick_location", { pick })),
+	/**
+	 *  Reads the app's settings, where config-digger keeps its data, and every
+	 *  Agent home and Project again to list the parked Entries. The Inventory's
+	 *  last scan stays as it was.
+	 */
+	readSettings: () => typedError<SettingsRead, Error>(__TAURI_INVOKE("read_settings")),
+	/**  Saves the app's settings, and returns them as saved. */
+	saveSettings: (settings: Settings) => typedError<Settings, Error>(__TAURI_INVOKE("save_settings", { settings })),
+	/**
+	 *  Opens one of config-digger's data folders in Explorer, and says whether
+	 *  it did. A folder that does not exist yet is not created: nothing was
+	 *  kept there.
+	 */
+	openDataFolder: (folder: DataFolder) => typedError<boolean, Error>(__TAURI_INVOKE("open_data_folder", { folder })),
+	/**  This build of the app, as About shows it. */
+	readAbout: () => typedError<About, Error>(__TAURI_INVOKE("read_about")),
+	/**  Opens one of the pages About links to in the default browser. */
+	openPage: (page: Page) => typedError<null, Error>(__TAURI_INVOKE("open_page", { page })),
 };
 
 /* Types */
+/**  This build of the app. */
+export type About = {
+	version: string,
+	/**
+	 *  The short id of the commit it was built from, `None` when it was
+	 *  built without git, such as from a source archive.
+	 */
+	commit: string | null,
+	/**  The date of that commit, as `YYYY-MM-DD`. */
+	date: string | null,
+	/**  Such as `Windows x64`. */
+	platform: string,
+	/**  The pages About links to, in the order it shows them. */
+	pages: PageLink[],
+};
+
 /**  What an Operation does to the Entries it targets. */
 export type Action = 
 /**
@@ -133,6 +167,11 @@ export type Agent = {
 	built_in: boolean,
 	/**  The versions the definition was tested with, `None` when it is untested. */
 	tested: VersionRange | null,
+	/**
+	 *  The environment variables the definition finds Agent homes through,
+	 *  such as `CODEX_HOME`, in definition order.
+	 */
+	home_variables: string[],
 	homes: Home[],
 };
 
@@ -319,6 +358,24 @@ export type Change = {
 	project: string | null,
 	before: StateAfter,
 	after: StateAfter,
+};
+
+/**  A folder config-digger keeps its own data in. */
+export type DataFolder = "backups" | "parked" | "logs" | "lists";
+
+/**  The folders config-digger keeps its own data in. */
+export type DataFolders = {
+	/**  Each Operation's backup and manifest, which History lists. */
+	backups: string,
+	/**  The parked-Entry store, which is never pruned. */
+	parked: string,
+	/**  The app's rotating logs. */
+	logs: string,
+	/**
+	 *  The Agent homes and Projects the user added or hid, and the app's
+	 *  settings.
+	 */
+	lists: string,
 };
 
 /**  Why a diff cannot be shown with its Secrets masked. */
@@ -1101,6 +1158,17 @@ export type Outcome = {
 	hints: string[],
 };
 
+/**  A page About links to. The webview opens no other. */
+export type Page = "repository" | "issues" | 
+/**  The release notes of this version. */
+"release_notes";
+
+/**  A page and where it is. */
+export type PageLink = {
+	page: Page,
+	url: string,
+};
+
 /**  Where a parked Entry came from. */
 export type Parked = {
 	/**  The file it was in, and its key path there: where Enable puts it back. */
@@ -1110,6 +1178,24 @@ export type Parked = {
 	locator: string,
 	/**  When it was parked, in RFC 3339. */
 	parked_at: string,
+};
+
+/**  A parked Entry, as Settings lists it, with where its Item is listed. */
+export type ParkedEntry = {
+	agent: string,
+	agent_name: string,
+	home: string,
+	kind: ItemKind,
+	name: string,
+	/**
+	 *  The Project whose context lists it, `None` when it is listed with no
+	 *  Project.
+	 */
+	project: string | null,
+	/**  The user hid its Agent home, so the Inventory does not list it. */
+	hidden: boolean,
+	/**  Where it came from, and when it was parked. */
+	parked: Parked,
 };
 
 /**  What the Windows picker picks. */
@@ -1467,6 +1553,16 @@ sentence: string;
 /**  How to remove it some other way, such as through the Agent. */
 how_to_remove: HowToRemove | null };
 
+/**
+ *  How long History keeps Operations: at least the last `operations`, and
+ *  every one from the last `days`. Operations that need attention are
+ *  never pruned, and neither is the parked-Entry store.
+ */
+export type Retention = {
+	operations: number,
+	days: number,
+};
+
 export type RiskCode = 
 /**  The Agent may offer to reset the file, losing what it holds. */
 "agent_may_reset_file" | 
@@ -1508,6 +1604,27 @@ export type RollbackOutcome =
  *  restored. It needs manual recovery from the backup.
  */
 "not_restored";
+
+/**  The app's settings. The CLI never reads them. */
+export type Settings = {
+	/**
+	 *  The app checks for updates when it starts. Off by default: until
+	 *  then, it makes no network call unless asked to.
+	 */
+	check_updates_on_startup: boolean,
+};
+
+/**  What the Settings screen shows. */
+export type SettingsRead = {
+	settings: Settings,
+	folders: DataFolders,
+	/**  How many Operations History holds now. */
+	operations: number,
+	/**  How long History keeps them. */
+	retention: Retention,
+	/**  Every parked Entry, with where its Item is listed. */
+	parked: ParkedEntry[],
+};
 
 /**  A skill manager, such as `npx skills`, as its definition names it. */
 export type SkillManager = {

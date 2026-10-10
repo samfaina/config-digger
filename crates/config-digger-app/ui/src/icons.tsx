@@ -132,6 +132,16 @@ const ICONS = {
       <path d="M11 5H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
     </>
   ),
+  lock: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <rect x="10.8" y="13.5" width="2.4" height="4" rx="1.2" fill="#000" />
+      </mask>
+      <path d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="4.5" y="10" width="15" height="11" rx="3" mask={`url(#${mask})`} />
+    </>
+  ),
 } satisfies Record<string, (mask: string) => ReactNode>;
 
 export type IconName = keyof typeof ICONS;

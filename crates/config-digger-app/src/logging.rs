@@ -2,6 +2,8 @@
 //! config-digger log it carries only paths, key paths, block ids, reason codes
 //! and errors, never configuration values.
 
+use config_digger_core::api::DataFolders;
+use config_digger_core::ports::real::RealEnvironment;
 use std::path::PathBuf;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -14,8 +16,8 @@ const KEPT_LOG_FILES: usize = 14;
 /// stack logs URLs and page content we have no control over.
 const FILTER: &str = "warn,config_digger_app=info,config_digger_core=info";
 
-/// Starts logging to the rotating file. Without `LOCALAPPDATA`, or when the
-/// folder cannot be created, the app runs without a log.
+/// Starts logging to the rotating file. When there is no data folder, or
+/// the logs folder cannot be created, the app runs without a log.
 pub(crate) fn init() -> Option<WorkerGuard> {
     let appender = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
@@ -34,11 +36,7 @@ pub(crate) fn init() -> Option<WorkerGuard> {
     Some(guard)
 }
 
+/// The logs folder Settings shows.
 fn logs_dir() -> Option<PathBuf> {
-    let local_app_data = std::env::var_os("LOCALAPPDATA").filter(|value| !value.is_empty())?;
-    Some(
-        PathBuf::from(local_app_data)
-            .join("config-digger")
-            .join("logs"),
-    )
+    Some(DataFolders::locate(&RealEnvironment).ok()?.logs)
 }

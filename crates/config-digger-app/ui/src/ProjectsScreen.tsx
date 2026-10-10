@@ -17,22 +17,24 @@ import { useActionDialog } from "./useActionDialog";
 import { usePlaces } from "./usePlaces";
 import { useTransient } from "./useTransient";
 
-type Tab = "projects" | "homes";
+export type Tab = "projects" | "homes";
 
 type Props = {
   /** Opens the Inventory on a Project, a missing Project's leftovers or an Agent home. */
   onShow: (show: ShowInInventory) => void;
   onOpenHistory: () => void;
+  /** Opens on the Agent homes tab, with its add dialog when `adding`. */
+  start?: { tab: Tab; adding: boolean };
 };
 
 /**
  * The Projects & homes screen: the Projects and the Agent homes config-digger
  * reads, in two tabs that mirror `projects` and `homes` in the CLI.
  */
-export function ProjectsScreen({ onShow, onOpenHistory }: Props) {
+export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const { places, error, reload, change } = usePlaces();
-  const [tab, setTab] = useState<Tab>("projects");
-  const [adding, setAdding] = useState<Tab | null>(null);
+  const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
+  const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);
   // Remove leftovers is an Operation, previewed like any other.
   const dialog = useActionDialog({ onClosed: reload, onOpenHistory, notify: setNotice });

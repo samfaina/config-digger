@@ -660,9 +660,9 @@ fn remove_copy(ports: &Ports, copy: &Path, folder: &Path, manifest: &Manifest) -
 }
 
 /// History keeps at least this many Operations…
-const KEEP_OPERATIONS: usize = 50;
+pub(crate) const KEEP_OPERATIONS: usize = 50;
 /// …and every Operation younger than this.
-const KEEP_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+pub(crate) const KEEP_FOR: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 /// Prunes History under the global lock: every Operation beyond the last
 /// [`KEEP_OPERATIONS`] that is older than [`KEEP_FOR`] goes, with its

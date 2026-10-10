@@ -22,6 +22,7 @@ mod rules;
 mod running;
 mod scan;
 mod select;
+mod settings;
 mod skill;
 mod store;
 mod user_list;

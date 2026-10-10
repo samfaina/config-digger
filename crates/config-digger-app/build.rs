@@ -16,7 +16,14 @@ fn main() {
         "read_places",
         "change_list",
         "pick_location",
+        "read_settings",
+        "save_settings",
+        "open_data_folder",
+        "read_about",
+        "open_page",
     ]);
+
+    record_commit();
 
     // Tauri embeds its Windows application manifest (Common Controls v6) in
     // `[[bin]]` targets only. Without it, any other executable linking Tauri,
@@ -37,4 +44,38 @@ fn main() {
             .windows_attributes(windows),
     )
     .expect("the Tauri build script runs");
+}
+
+/// Records the commit the app is built from, and its date, for About. Built
+/// without git, such as from a source archive, neither is recorded.
+fn record_commit() {
+    if let Some(commit) = git(&["rev-parse", "--short=7", "HEAD"]) {
+        println!("cargo:rustc-env=CONFIG_DIGGER_COMMIT={commit}");
+    }
+    if let Some(date) = git(&["log", "-1", "--format=%cs"]) {
+        println!("cargo:rustc-env=CONFIG_DIGGER_COMMIT_DATE={date}");
+    }
+
+    // Built again when HEAD moves: to another branch, or along its own.
+    let mut watched = vec![git(&["rev-parse", "--git-path", "HEAD"])];
+    if let Some(branch) = git(&["symbolic-ref", "-q", "HEAD"]) {
+        watched.push(git(&["rev-parse", "--git-path", &branch]));
+        watched.push(git(&["rev-parse", "--git-path", "packed-refs"]));
+    }
+    let manifest = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    for path in watched.into_iter().flatten() {
+        let path = manifest.join(path);
+        // A path that does not exist would build it again every time.
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+}
+
+/// What `git` prints for `args`, `None` when it fails or prints nothing.
+fn git(args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git").args(args).output().ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    let text = text.trim();
+    (output.status.success() && !text.is_empty()).then(|| text.to_owned())
 }

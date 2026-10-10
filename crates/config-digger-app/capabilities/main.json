@@ -17,6 +17,11 @@
     "allow-dismiss-operation",
     "allow-read-places",
     "allow-change-list",
-    "allow-pick-location"
+    "allow-pick-location",
+    "allow-read-settings",
+    "allow-save-settings",
+    "allow-open-data-folder",
+    "allow-read-about",
+    "allow-open-page"
   ]
 }

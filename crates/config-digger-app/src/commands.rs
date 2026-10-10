@@ -1,14 +1,17 @@
 //! Task-level commands: each one is a thin async wrapper that runs the
 //! synchronous core on a blocking thread.
 
+use crate::about::{About, Page};
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
 use crate::lists::{ListChange, Listed};
-use crate::session::{self, Places, Session};
+use crate::session::{self, ParkedEntry, Places, Session};
 use config_digger_core::api::{
-    self, Backup, Core, Inventory, OperationDetail, OperationSummary, WarningClass,
+    self, Backup, Core, DataFolders, Inventory, OperationDetail, OperationSummary, Retention,
+    Settings, WarningClass,
 };
 use config_digger_core::ports::Ports;
 use serde::{Deserialize, Serialize};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
@@ -103,7 +106,7 @@ pub async fn open_location(app: AppHandle, path: PathBuf) -> Result<(), api::Err
         if link || path.is_dir() {
             select_in_explorer(&path)
         } else {
-            open_file(&path)
+            open_in_windows(&path)
         }
     })
     .await
@@ -312,6 +315,110 @@ pub async fn pick_location(
     .await
 }
 
+/// What the Settings screen shows.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct SettingsRead {
+    pub settings: Settings,
+    pub folders: DataFolders,
+    /// How many Operations History holds now.
+    pub operations: u32,
+    /// How long History keeps them.
+    pub retention: Retention,
+    /// Every parked Entry, with where its Item is listed.
+    pub parked: Vec<ParkedEntry>,
+}
+
+/// Reads the app's settings, where config-digger keeps its data, and every
+/// Agent home and Project again to list the parked Entries. The Inventory's
+/// last scan stays as it was.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_settings() -> Result<SettingsRead, api::Error> {
+    blocking(move || {
+        let core = Core::new(Ports::real())?;
+        let settings = core.settings()?;
+        let folders = core.data_folders()?;
+        let operations = u32::try_from(core.history()?.len()).unwrap_or(u32::MAX);
+        let retention = core.retention();
+        let parked = Session::scan(core)?.parked();
+        Ok(SettingsRead {
+            settings,
+            folders,
+            operations,
+            retention,
+            parked,
+        })
+    })
+    .await
+}
+
+/// Saves the app's settings, and returns them as saved.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_settings(settings: Settings) -> Result<Settings, api::Error> {
+    let result = blocking(move || {
+        let core = Core::new(Ports::real())?;
+        core.save_settings(&settings)?;
+        core.settings()
+    })
+    .await;
+    match &result {
+        Ok(settings) => tracing::info!(
+            check_updates_on_startup = settings.check_updates_on_startup,
+            "settings saved"
+        ),
+        Err(error) => tracing::warn!(code = error.code.code(), "settings not saved"),
+    }
+    result
+}
+
+/// A folder config-digger keeps its own data in.
+#[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DataFolder {
+    Backups,
+    Parked,
+    Logs,
+    Lists,
+}
+
+/// Opens one of config-digger's data folders in Explorer, and says whether
+/// it did. A folder that does not exist yet is not created: nothing was
+/// kept there.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_data_folder(folder: DataFolder) -> Result<bool, api::Error> {
+    blocking(move || {
+        let folders = Core::new(Ports::real())?.data_folders()?;
+        let path = match folder {
+            DataFolder::Backups => folders.backups,
+            DataFolder::Parked => folders.parked,
+            DataFolder::Logs => folders.logs,
+            DataFolder::Lists => folders.lists,
+        };
+        if !path.is_dir() {
+            return Ok(false);
+        }
+        open_in_windows(&path).map(|()| true)
+    })
+    .await
+}
+
+/// This build of the app, as About shows it.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_about() -> Result<About, api::Error> {
+    Ok(About::this_build())
+}
+
+/// Opens one of the pages About links to in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_page(page: Page) -> Result<(), api::Error> {
+    let url = page.url(env!("CARGO_PKG_REPOSITORY"), env!("CARGO_PKG_VERSION"));
+    blocking(move || open_in_windows(&url)).await
+}
+
 /// Keeps `session` as the app's last scan, and lists its Projects and
 /// Agent homes.
 fn keep_places(app: &AppHandle, session: Session) -> Places {
@@ -343,10 +450,11 @@ fn ensure_shown(app: &AppHandle, path: &Path) -> Result<(), api::Error> {
     }
 }
 
-/// Opens `path` in the app Windows associates with it.
-fn open_file(path: &Path) -> Result<(), api::Error> {
+/// Opens `target`, a path or a URL, in the app Windows associates with it:
+/// Explorer for a folder, the default browser for a URL.
+fn open_in_windows(target: impl AsRef<OsStr>) -> Result<(), api::Error> {
     let mut explorer = Command::new("explorer.exe");
-    explorer.arg(path);
+    explorer.arg(target);
     start(explorer)
 }
 

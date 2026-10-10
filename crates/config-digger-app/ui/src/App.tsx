@@ -1,48 +1,56 @@
 import { useState } from "react";
+import { AboutScreen } from "./AboutScreen";
 import { HistoryScreen } from "./HistoryScreen";
 import { InventoryScreen } from "./Inventory";
 import { inventoryStart, type InventoryStart } from "./places";
-import { ProjectsScreen } from "./ProjectsScreen";
-import { Rail, SCREEN_TITLES, type Screen } from "./Rail";
+import { ProjectsScreen, type Tab } from "./ProjectsScreen";
+import { Rail, type Screen } from "./Rail";
+import { SettingsScreen } from "./SettingsScreen";
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("inventory");
   // Where the Inventory opens when another screen opens it on something.
   const [start, setStart] = useState<InventoryStart | undefined>(undefined);
+  // Where Projects & homes opens when the empty inventory opens it.
+  const [placesStart, setPlacesStart] = useState<{ tab: Tab; adding: boolean } | undefined>(undefined);
   const select = (next: Screen) => {
     setStart(undefined);
+    setPlacesStart(undefined);
     setScreen(next);
+  };
+  const showInInventory = (at: InventoryStart) => {
+    setStart(at);
+    setScreen("inventory");
+  };
+  const openHomes = (adding: boolean) => {
+    setPlacesStart({ tab: "homes", adding });
+    setScreen("projects");
   };
   return (
     <div className="app">
       <Rail current={screen} onSelect={select} />
       <main className="main">
         {screen === "inventory" ? (
-          <InventoryScreen start={start} onOpenHistory={() => select("history")} />
+          <InventoryScreen
+            start={start}
+            onOpenHistory={() => select("history")}
+            onAddHome={() => openHomes(true)}
+            onOpenHomes={() => openHomes(false)}
+          />
         ) : screen === "history" ? (
           <HistoryScreen />
         ) : screen === "projects" ? (
           <ProjectsScreen
-            onShow={(show) => {
-              setStart(inventoryStart(show));
-              setScreen("inventory");
-            }}
+            start={placesStart}
+            onShow={(show) => showInInventory(inventoryStart(show))}
             onOpenHistory={() => select("history")}
           />
+        ) : screen === "settings" ? (
+          <SettingsScreen onShow={showInInventory} onOpenAbout={() => select("about")} />
         ) : (
-          <ComingLater title={SCREEN_TITLES[screen]} />
+          <AboutScreen />
         )}
       </main>
     </div>
-  );
-}
-
-/** The screens later versions of the app fill in. */
-function ComingLater({ title }: { title: string }) {
-  return (
-    <section className="panel later">
-      <h1 className="panel-title">{title}</h1>
-      <p className="empty">This screen is not built yet.</p>
-    </section>
   );
 }

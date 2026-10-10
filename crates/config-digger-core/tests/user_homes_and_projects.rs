@@ -522,3 +522,29 @@ fn a_workspace_file_project_lists_the_folders_it_opens() {
     );
     assert_eq!(members(PETME), Vec::<PathBuf>::new());
 }
+
+#[test]
+fn each_agent_names_the_environment_variables_its_homes_are_found_through() {
+    let core = core(&FakeFileSystem::new());
+
+    let agents = core.agents(&inventory(&core, true));
+
+    let variables: Vec<(&str, Vec<&str>)> = agents
+        .iter()
+        .map(|agent| {
+            let variables = agent.home_variables.iter().map(String::as_str).collect();
+            (agent.id.as_str(), variables)
+        })
+        .collect();
+    assert_eq!(
+        variables,
+        [
+            ("claude-code", vec![]),
+            ("claude-desktop", vec!["CLAUDE_USER_DATA_DIR"]),
+            ("vscode", vec![]),
+            ("cursor", vec![]),
+            ("codex", vec!["CODEX_HOME"]),
+            ("gemini-cli", vec!["GEMINI_CLI_HOME"]),
+        ]
+    );
+}
