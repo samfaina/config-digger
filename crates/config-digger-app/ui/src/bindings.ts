@@ -87,6 +87,26 @@ export const commands = {
 	readAbout: () => typedError<About, Error>(__TAURI_INVOKE("read_about")),
 	/**  Opens one of the pages About links to in the default browser. */
 	openPage: (page: Page) => typedError<null, Error>(__TAURI_INVOKE("open_page", { page })),
+	/**
+	 *  When the app last checked for updates, and the update found since it
+	 *  started. It makes no network call.
+	 */
+	updateStatus: () => typedError<UpdateStatus, Error>(__TAURI_INVOKE("update_status")),
+	/**
+	 *  Checks for updates on the first call since the app started, when "Check
+	 *  for updates on startup" is on. Otherwise it makes no network call and
+	 *  only says what the app knows, as [`update_status`] does.
+	 */
+	startupUpdateCheck: () => typedError<UpdateStatus, Error>(__TAURI_INVOKE("startup_update_check")),
+	/**  Checks for updates now, as Check now in About asks. */
+	checkForUpdates: () => typedError<UpdateStatus, Error>(__TAURI_INVOKE("check_for_updates")),
+	/**
+	 *  Installs the update found and restarts the app, as Install and restart
+	 *  asks. It fails at once while an Operation holds the global lock.
+	 */
+	installUpdate: () => typedError<null, Error>(__TAURI_INVOKE("install_update")),
+	/**  Opens the release notes of the update found in the default browser. */
+	openUpdateNotes: () => typedError<null, Error>(__TAURI_INVOKE("open_update_notes")),
 };
 
 /* Types */
@@ -1678,6 +1698,25 @@ export type StoreClass =
 "rewritten-while-running" | 
 /**  A SQLite database the Agent holds open. */
 "sqlite";
+
+/**  An update a check found, as its notice shows it. */
+export type UpdateNotice = {
+	/**  The version it installs. */
+	version: string,
+	/**  Its release notes on GitHub. */
+	release_notes: string,
+};
+
+/**  What the app knows of updates, without checking. */
+export type UpdateStatus = {
+	/**  When the app last checked, in RFC 3339, `None` when it never did. */
+	last_checked: string | null,
+	/**
+	 *  The update the last check since the app started found, `None` when
+	 *  it found none or there was no check.
+	 */
+	update: UpdateNotice | null,
+};
 
 /**  What the dialog does to one Entry. */
 export type Verb = 

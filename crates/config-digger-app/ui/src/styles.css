@@ -2011,6 +2011,50 @@ select.add-input {
   background: #7d67cb22;
 }
 
+.update-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 12.5px;
+}
+
+.update-notice.floating {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 5;
+  max-width: 420px;
+  padding: 12px 16px;
+  border: 1px solid #7d67cb66;
+  border-radius: 16px;
+  background: #23242b;
+  box-shadow: 0 8px 24px #00000066;
+}
+
+.update-text {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.update-text .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.update-error {
+  flex-basis: 100%;
+  color: #fecaca;
+}
+
+.update-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .about-link {
   width: 100%;
   border-width: 0 0 1px;

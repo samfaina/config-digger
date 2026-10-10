@@ -21,6 +21,11 @@ fn main() {
         "open_data_folder",
         "read_about",
         "open_page",
+        "update_status",
+        "startup_update_check",
+        "check_for_updates",
+        "install_update",
+        "open_update_notes",
     ]);
 
     record_commit();

@@ -11,6 +11,11 @@
 //! - `checksums <dir>`: writes `<dir>/SHA256SUMS` for every other file in it.
 //! - `winget <tag> <installer> <dir>`: writes the winget manifest of the
 //!   tag's release, with the installer's SHA-256, into `<dir>`.
+//! - `updater <tag> <dir>`: writes the updater manifest `<dir>/latest.json`
+//!   from the signature of the tag's installer, `<dir>/<installer>.sig`, and
+//!   fails when the signature is missing or empty.
+//! - `assets <tag> <dir>`: fails unless `<dir>` holds every asset the tag's
+//!   release publishes, the updater's signature and manifest included.
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
@@ -60,10 +65,13 @@ fn main() -> ExitCode {
         ["winget", tag, installer, dir] => {
             return write_winget(tag, Path::new(installer), Path::new(dir));
         }
+        ["updater", tag, dir] => return write_updater_manifest(tag, Path::new(dir)),
+        ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         _ => {
             eprintln!(
                 "usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions\n       \
-                 cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>"
+                 cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
+                        cargo xtask updater <tag> <dir> | assets <tag> <dir>"
             );
             return ExitCode::from(2);
         }
@@ -173,6 +181,60 @@ fn write_winget(tag: &str, installer: &Path, dir: &Path) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn write_updater_manifest(tag: &str, dir: &Path) -> ExitCode {
+    let release = match checked_release(tag) {
+        Ok(release) => release,
+        Err(code) => return code,
+    };
+    let signature = dir.join(release::signature_name(&release.version));
+    let manifest = std::fs::read_to_string(&signature)
+        .map_err(|error| format!("cannot read {}: {error}", signature.display()))
+        .and_then(|signature| release::updater_manifest(&release.version, &signature));
+    let file = dir.join(release::UPDATER_MANIFEST);
+    let written = manifest.and_then(|manifest| {
+        std::fs::write(&file, manifest)
+            .map_err(|error| format!("cannot write {}: {error}", file.display()))
+    });
+    match written {
+        Ok(()) => {
+            println!("wrote {}", file.display());
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn check_assets(tag: &str, dir: &Path) -> ExitCode {
+    let release = match checked_release(tag) {
+        Ok(release) => release,
+        Err(code) => return code,
+    };
+    let names: Vec<String> = match std::fs::read_dir(dir) {
+        Ok(entries) => entries
+            .flatten()
+            .filter(|entry| entry.path().is_file())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect(),
+        Err(error) => {
+            eprintln!("cannot read {}: {error}", dir.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let missing = release::missing_assets(&release.version, &names);
+    if missing.is_empty() {
+        println!("{} holds every asset of {tag}", dir.display());
+        return ExitCode::SUCCESS;
+    }
+    for asset in missing {
+        eprintln!("the release of {tag} lacks {asset} in {}", dir.display());
+    }
+    ExitCode::FAILURE
 }
 
 fn repo_file(path: &str) -> PathBuf {

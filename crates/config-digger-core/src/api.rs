@@ -7,7 +7,8 @@ use crate::definitions::{self, Definitions, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::{Environment, Ports};
 use crate::{
-    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, user_list,
+    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, updates,
+    user_list,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -469,6 +470,40 @@ impl Core {
     /// Saves the app's settings. It writes no Agent configuration.
     pub fn save_settings(&self, settings: &Settings) -> Result<(), Error> {
         settings::save(&self.ports, settings)
+    }
+
+    /// When the app last checked for updates, in RFC 3339, `None` when it
+    /// never did.
+    pub fn last_update_check(&self) -> Result<Option<String>, Error> {
+        updates::last(&self.ports)
+    }
+
+    /// Records that the app checks for updates now, whatever the check
+    /// finds, and returns the time in RFC 3339. The check itself is the
+    /// app's: the core makes no network call.
+    pub fn record_update_check(&self) -> Result<String, Error> {
+        updates::record(&self.ports)
+    }
+
+    /// Takes the global write lock for an update install, so that the
+    /// install never starts while an Operation writes, and no Operation
+    /// starts while the update downloads. It fails with `Locked` at once
+    /// while another Operation holds it, and is `Blocked` while the CLI the
+    /// installer replaces, `cli`, runs, since Windows would not let it
+    /// replace a running executable.
+    pub fn lock_for_update(&self, cli: &Path) -> Result<UpdateLock, Error> {
+        let (_, lock) = history::create_and_lock(&self.ports)?;
+        let key = paths::lexical_key(cli);
+        let cli_runs = self.ports.processes.running().iter().any(|process| {
+            process
+                .path
+                .as_ref()
+                .is_some_and(|path| paths::lexical_key(path) == key)
+        });
+        if cli_runs {
+            return Err(Error::blocked(explain::cli_running(cli)));
+        }
+        Ok(UpdateLock(lock))
     }
 
     /// The folders config-digger keeps its own data in. None of them has to
@@ -1219,6 +1254,10 @@ pub struct Backup {
     /// The copy, as the file was before the Operation.
     pub copy: PathBuf,
 }
+
+/// The global write lock, held while an update installs, released when
+/// dropped.
+pub struct UpdateLock(#[allow(dead_code)] crate::ports::HeldLock);
 
 /// The app's settings. The CLI never reads them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]

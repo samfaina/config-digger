@@ -25,5 +25,6 @@ mod select;
 mod settings;
 mod skill;
 mod store;
+mod updates;
 mod user_list;
 mod version;

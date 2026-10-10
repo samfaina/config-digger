@@ -22,6 +22,11 @@
     "allow-save-settings",
     "allow-open-data-folder",
     "allow-read-about",
-    "allow-open-page"
+    "allow-open-page",
+    "allow-update-status",
+    "allow-startup-update-check",
+    "allow-check-for-updates",
+    "allow-install-update",
+    "allow-open-update-notes"
   ]
 }
