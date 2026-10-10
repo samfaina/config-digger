@@ -494,6 +494,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "unicode-width",
+ "winreg 0.56.0",
 ]
 
 [[package]]
@@ -5052,6 +5053,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "config-digger-core",
+ "sha2",
 ]
 
 [[package]]
