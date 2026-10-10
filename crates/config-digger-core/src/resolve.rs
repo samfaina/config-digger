@@ -973,8 +973,6 @@ pub(crate) fn resolve(
     }
 }
 
-/// The Unread Entries of each missing Project that has any, sorted by its
-/// path, each resolved in its Project's context.
 /// How many distinct Entries `counted` keeps: one an Agent home of each of
 /// several Agents reads counts once.
 fn count_entries(snapshot: &Snapshot, counted: impl Fn(&ScannedEntry) -> bool) -> u32 {
@@ -987,6 +985,8 @@ fn count_entries(snapshot: &Snapshot, counted: impl Fn(&ScannedEntry) -> bool) -
     u32::try_from(entries.len()).unwrap_or(u32::MAX)
 }
 
+/// The Unread Entries of each missing Project that has any, sorted by its
+/// path, each resolved in its Project's context.
 pub(crate) fn leftovers(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,

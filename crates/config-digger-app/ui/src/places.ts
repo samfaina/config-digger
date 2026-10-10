@@ -47,6 +47,7 @@ export type MissingRow = {
 /** A hidden Project, missing or not: Unhide, and Remove from list for the user's own. */
 export type HiddenRow = { project: Project; path: string; source: string; removable: boolean };
 
+/** The Projects tab's sections, in the order it shows them. */
 export type ProjectSections = { present: ProjectRow[]; missing: MissingRow[]; hidden: HiddenRow[] };
 
 /** `count` of a noun, such as "1 leftover" or "2 leftovers", or "No leftovers" for none. */
@@ -102,6 +103,7 @@ function leftoversOf(places: Places, path: string): string[] {
   return [...new Set(locations)];
 }
 
+/** `text` starting in lower case, to follow a separator. */
 function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1);
 }
@@ -124,9 +126,10 @@ export type HomeAction = "show" | "hide" | "unhide" | "remove_from_list";
 /** A tag on a home row; a Mirrored home's says it is read-only. */
 export type HomeTag = { text: string; tone: "plain" | "read_only" };
 
+/** One Agent home, as the Agent homes tab shows it. */
 export type HomeRow = {
   home: Home;
-  /** Its id, or its folder when the user added it. */
+  /** Its id, which is its folder when the user added it. */
   label: string;
   path: string;
   tags: HomeTag[];
@@ -174,15 +177,16 @@ function installed(installations: Installation[]): string[] {
   const each = new Map<string, Installation>();
   for (const installation of installations) if (!each.has(installation.path)) each.set(installation.path, installation);
   return [...each.values()].map((installation) => {
-    const version = installation.version ?? "version unknown";
+    const version = `${installation.id} ${installation.version ?? "version unknown"}`;
     return installation.version_from ? `${version} · read from ${installation.version_from}` : version;
   });
 }
 
+/** A home's row: its tags and notes, and Show in Inventory, Hide, Unhide or Remove from list. */
 function homeRow(home: Home): HomeRow {
   const removable = home.source.kind === "added";
   const tags: HomeTag[] = [{ text: sourceTag(home.source), tone: "plain" }];
-  if (home.mirror) tags.push({ text: `${home.mirror.label}, read-only`, tone: "read_only" });
+  if (home.mirror) tags.push({ text: `${home.mirror.label}, read-only · from ${home.mirror.source}`, tone: "read_only" });
   if (home.not_read) tags.push({ text: "not read", tone: "plain" });
   const notes = [
     ...(home.mirror ? [home.mirror.sentence] : []),
@@ -218,6 +222,7 @@ function sourceTag(source: HomeSource): string {
   }
 }
 
+/** Each value once, in the order first seen. */
 function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
@@ -232,6 +237,7 @@ export type ShowInInventory =
   | { kind: "leftovers"; path: string }
   | { kind: "home"; home: Home };
 
+/** Where the Inventory opens to show `show`. */
 export function inventoryStart(show: ShowInInventory): InventoryStart {
   switch (show.kind) {
     case "project":

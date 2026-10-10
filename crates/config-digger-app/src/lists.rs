@@ -11,44 +11,30 @@ use std::path::PathBuf;
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ListChange {
     /// Adds an existing folder or `.code-workspace` file as a Project.
-    AddProject {
-        path: PathBuf,
-    },
-    HideProject {
-        path: PathBuf,
-    },
-    UnhideProject {
-        path: PathBuf,
-    },
+    AddProject { path: PathBuf },
+    /// Hides a Project, discovered or added, from the Inventory's selector.
+    HideProject { path: PathBuf },
+    /// Lists a hidden Project again.
+    UnhideProject { path: PathBuf },
     /// Forgets a Project the user added and no registry records.
-    ForgetProject {
-        path: PathBuf,
-    },
+    ForgetProject { path: PathBuf },
     /// Adds an existing folder as an Agent home of `agent`, with no other check.
-    AddHome {
-        folder: PathBuf,
-        agent: String,
-    },
-    HideHome {
-        agent: String,
-        home: String,
-    },
-    UnhideHome {
-        agent: String,
-        home: String,
-    },
+    AddHome { folder: PathBuf, agent: String },
+    /// Hides an Agent home, discovered or added, and its Items.
+    HideHome { agent: String, home: String },
+    /// Lists a hidden Agent home again.
+    UnhideHome { agent: String, home: String },
     /// Forgets an Agent home the user added and no definition finds.
-    ForgetHome {
-        agent: String,
-        home: String,
-    },
+    ForgetHome { agent: String, home: String },
 }
 
 /// The Project or Agent home a change applied to, as it is listed now.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Listed {
+    /// A Project.
     Project { project: Project },
+    /// An Agent home, boxed since it is much larger than a Project.
     Home { home: Box<Home> },
 }
 
@@ -158,39 +144,18 @@ mod tests {
             .unwrap(),
         );
         assert!(added.no_configuration.is_some());
-        let id = added.home;
-        let named = |id: &str| (agent.clone(), id.to_owned());
-        let (a, h) = named(&id);
-        assert!(
-            home(
-                ListChange::HideHome { agent: a, home: h }
-                    .apply(&core)
-                    .unwrap()
-            )
-            .hidden
-        );
-        let (a, h) = named(&id);
-        assert!(
-            !home(
-                ListChange::UnhideHome { agent: a, home: h }
-                    .apply(&core)
-                    .unwrap()
-            )
-            .hidden
-        );
-        let (a, h) = named(&id);
-        home(
-            ListChange::ForgetHome { agent: a, home: h }
-                .apply(&core)
-                .unwrap(),
-        );
+        // Applies a change to the added home, as its Agent and id name it.
+        let on_added = |change: fn(String, String) -> ListChange| {
+            change(agent.clone(), added.home.clone()).apply(&core)
+        };
+        let hide = |agent, home| ListChange::HideHome { agent, home };
 
-        let (a, h) = named(&id);
-        assert!(
-            ListChange::HideHome { agent: a, home: h }
-                .apply(&core)
-                .is_err()
-        );
+        assert!(home(on_added(hide).unwrap()).hidden);
+        let unhide = |agent, home| ListChange::UnhideHome { agent, home };
+        assert!(!home(on_added(unhide).unwrap()).hidden);
+        home(on_added(|agent, home| ListChange::ForgetHome { agent, home }).unwrap());
+
+        assert!(on_added(hide).is_err());
     }
 
     #[test]

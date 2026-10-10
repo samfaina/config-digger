@@ -1133,7 +1133,7 @@ pub struct Project {
     pub missing: bool,
     /// It is a `.code-workspace` file rather than a folder.
     pub workspace_file: bool,
-    /// For a workspace file, the folders it opens, first first.
+    /// For a workspace file, the folders it opens, in the order it lists them.
     pub members: Vec<PathBuf>,
     /// The Agents whose registries record it. Empty when it was only added
     /// or asked for.

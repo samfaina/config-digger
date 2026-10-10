@@ -17,12 +17,16 @@ export function usePlaces(): PlacesRead {
   const [error, setError] = useState<ApiError | null>(null);
   // A focus event during a read does not start a second one.
   const inFlight = useRef(false);
+  // Counts the changes, so that a read started before one is dropped.
+  const changes = useRef(0);
 
   const reload = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
+    const before = changes.current;
     try {
       const result = await call(commands.readPlaces);
+      if (changes.current !== before) return;
       if (result.status === "ok") {
         setPlaces(result.data);
         setError(null);
@@ -35,6 +39,7 @@ export function usePlaces(): PlacesRead {
   }, []);
 
   const change = useCallback(async (change: ListChange) => {
+    changes.current += 1;
     const result = await call(() => commands.changeList(change));
     if (result.status === "ok") {
       setPlaces(result.data.places);

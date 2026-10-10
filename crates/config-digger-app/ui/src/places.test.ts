@@ -185,13 +185,13 @@ describe("the Agent homes tab", () => {
 
     expect(group).toMatchObject({
       name: "Claude Code",
-      installed: ["2.1.40 · read from claude.exe version resource", "version unknown"],
+      installed: ["native 2.1.40 · read from claude.exe version resource", "desktop version unknown"],
       notes: [],
       definition: "built-in definition",
     });
 
     const [outOfRange] = homeGroups(places({ agents: [agent({ homes: [home({ installations: [newer], notes: [note] })] })] }));
-    expect(outOfRange).toMatchObject({ installed: ["2.9.0 · read from claude.exe version resource"], notes: [note.sentence] });
+    expect(outOfRange).toMatchObject({ installed: ["native 2.9.0 · read from claude.exe version resource"], notes: [note.sentence] });
 
     const [none] = homeGroups(places({ agents: [agent()] }));
     expect(none.installed).toEqual(["no Installation found"]);
@@ -248,7 +248,7 @@ describe("the Agent homes tab", () => {
 
     const [orca, old, hidden] = group.homes;
     expect(orca).toMatchObject({
-      tags: [{ text: "known location", tone: "plain" }, { text: "Mirrored by Orca, read-only", tone: "read_only" }],
+      tags: [{ text: "known location", tone: "plain" }, { text: "Mirrored by Orca, read-only · from default", tone: "read_only" }],
       notes: [mirror.sentence],
     });
     expect(old).toMatchObject({ tags: [{ text: "default location", tone: "plain" }, { text: "not read", tone: "plain" }], notes: [notRead.sentence] });

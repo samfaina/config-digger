@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { commands, type Agent, type ListChange, type Pick, type Places } from "./bindings";
-import { call, NOTICE_MS } from "./desktop";
+import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
+import { call, NOTICE_MS, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import {
   changedSentence,
@@ -37,16 +37,18 @@ export function ProjectsScreen({ onShow, onOpenHistory }: Props) {
   // Remove leftovers is an Operation, previewed like any other.
   const dialog = useActionDialog({ onClosed: reload, onOpenHistory, notify: setNotice });
 
-  /** Applies a change to config-digger's lists and says what it did; returns the error message, if any. */
+  /** Applies a change to config-digger's lists and says what it did; returns why it was refused, if it was. */
   const apply = async (request: ListChange): Promise<string | null> => {
     const result = await change(request);
-    if (result.status === "error") {
-      setNotice(result.error.message);
-      return result.error.message;
-    }
+    if (result.status === "error") return result.error.message;
     setNotice(changedSentence(request, result.data.listed));
     return null;
   };
+  /** Applies a change from a row, whose refusal shows as a notice. */
+  const act = (request: ListChange) =>
+    void apply(request).then((refused) => {
+      if (refused !== null) setNotice(refused);
+    });
 
   const projectCount = places?.projects.length ?? 0;
   const homeCount = places?.agents.reduce((sum, agent) => sum + agent.homes.length, 0) ?? 0;
@@ -98,19 +100,21 @@ export function ProjectsScreen({ onShow, onOpenHistory }: Props) {
               <ProjectsTab
                 places={places}
                 onShow={onShow}
-                onChange={(request) => void apply(request)}
+                onChange={act}
                 onRemoveLeftovers={(path) => dialog.open({ kind: "leftovers", project: path })}
               />
             ) : (
-              <HomesTab places={places} onShow={onShow} onChange={(request) => void apply(request)} />
+              <HomesTab places={places} onShow={onShow} onChange={act} />
             )}
           </div>
         </section>
         {tab === "projects" ? <ProjectsSide places={places} /> : <HomesSide />}
       </div>
 
-      {adding === "projects" && <AddProjectDialog onAdd={apply} onClose={() => setAdding(null)} />}
-      {adding === "homes" && <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} />}
+      {adding === "projects" && <AddProjectDialog onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />}
+      {adding === "homes" && (
+        <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
+      )}
 
       {notice && (
         <div className="notice" role="status">
@@ -229,6 +233,7 @@ function PlaceRow({
   );
 }
 
+/** A small button on a row: secondary, or red for Remove leftovers. */
 function SmallButton({ label, danger = false, onClick }: { label: ReactNode; danger?: boolean; onClick: () => void }) {
   return (
     <button type="button" className={`cta small ${danger ? "danger" : "secondary"}`} onClick={onClick}>
@@ -244,10 +249,16 @@ type ProjectLineProps = {
   onForget: (path: string) => void;
 };
 
+/** A Project's icon: a document for a workspace file, a folder otherwise. */
+function projectIcon(project: Project): "doc" | "folder" {
+  return project.workspace_file ? "doc" : "folder";
+}
+
+/** A Project that exists: Open in Inventory, and Hide or Remove from list. */
 function ProjectLine({ row, onShow, onHide, onForget }: ProjectLineProps) {
   return (
     <PlaceRow
-      icon={row.project.workspace_file ? "doc" : "folder"}
+      icon={projectIcon(row.project)}
       count={row.entries}
       actions={
         <>
@@ -275,6 +286,7 @@ type MissingLineProps = {
   onRemoveLeftovers: (path: string) => void;
 };
 
+/** A missing Project with its leftovers: Show leftovers and Remove leftovers, or Hide when it has none. */
 function MissingLine({ row, onShow, onHide, onRemoveLeftovers }: MissingLineProps) {
   return (
     <PlaceRow
@@ -314,10 +326,11 @@ function MissingLine({ row, onShow, onHide, onRemoveLeftovers }: MissingLineProp
   );
 }
 
+/** A hidden Project, dimmed: Unhide, and Remove from list for the user's own. */
 function HiddenLine({ row, onUnhide, onForget }: { row: HiddenRow; onUnhide: (path: string) => void; onForget: (path: string) => void }) {
   return (
     <PlaceRow
-      icon={row.project.workspace_file ? "doc" : "folder"}
+      icon={projectIcon(row.project)}
       dim
       actions={
         <>
@@ -343,6 +356,7 @@ function HomesTab({ places, onShow, onChange }: { places: Places; onShow: (show:
   );
 }
 
+/** One Agent's header, version notes and homes. */
 function HomeGroupView({
   group,
   onShow,
@@ -375,6 +389,7 @@ function HomeGroupView({
   );
 }
 
+/** One Agent home with its tags, notes and Entry count, and the actions it offers. */
 function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: ShowInInventory) => void; onChange: (change: ListChange) => void }) {
   const named = { agent: row.home.agent, home: row.home.home };
   const buttons = {
@@ -441,6 +456,7 @@ function ProjectsSide({ places }: { places: Places | null }) {
   );
 }
 
+/** Where Agent homes come from, as their source tags name it. */
 const HOME_SOURCES: [string, string][] = [
   ["Default location", "Where each Agent definition says the Agent keeps its user configuration."],
   ["Environment variable", "CODEX_HOME, GEMINI_CLI_HOME and CLAUDE_USER_DATA_DIR, as config-digger sees them."],
@@ -467,6 +483,7 @@ function HomesSide() {
   );
 }
 
+/** A row of a side panel: a title, what it means and how many Projects it accounts for. */
 function SideRow({ title, text, count }: { title: string; text: string; count?: number }) {
   return (
     <div className="side-row">
@@ -529,8 +546,12 @@ function useAdd(onAdd: (change: ListChange) => Promise<string | null>, onClose: 
   const [busy, setBusy] = useState(false);
   const add = async (change: ListChange) => {
     setBusy(true);
-    const refused = await onAdd(change);
-    setBusy(false);
+    let refused: string | null;
+    try {
+      refused = await onAdd(change);
+    } finally {
+      setBusy(false);
+    }
     if (refused === null) onClose();
     else setError(refused);
   };
@@ -538,14 +559,16 @@ function useAdd(onAdd: (change: ListChange) => Promise<string | null>, onClose: 
 }
 
 /** Opens the Windows picker, filling `set` with what was picked. */
-async function pick(what: Pick, set: (path: string) => void) {
+async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
   const result = await call(() => commands.pickLocation(what));
-  if (result.status === "ok" && result.data !== null) set(result.data);
+  if (result.status === "error") notify(`The Windows picker couldn't open: ${result.error.message}`);
+  else if (result.data !== null) set(result.data);
 }
 
-type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void };
+type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void; notify: Notify };
 
-function AddProjectDialog({ onAdd, onClose }: AddProps) {
+/** Add Project: a folder or `.code-workspace` file, typed or picked. */
+function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
   const [path, setPath] = useState("");
   const { error, busy, add } = useAdd(onAdd, onClose);
   return (
@@ -559,10 +582,10 @@ function AddProjectDialog({ onAdd, onClose }: AddProps) {
     >
       <div className="add-field">
         <input className="add-input mono" aria-label="Path" value={path} onChange={(event) => setPath(event.target.value)} />
-        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setPath)}>
+        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setPath, notify)}>
           Choose folder…
         </button>
-        <button type="button" className="cta small secondary" onClick={() => void pick("workspace_file", setPath)}>
+        <button type="button" className="cta small secondary" onClick={() => void pick("workspace_file", setPath, notify)}>
           Choose .code-workspace…
         </button>
       </div>
@@ -571,14 +594,17 @@ function AddProjectDialog({ onAdd, onClose }: AddProps) {
   );
 }
 
-function AddHomeDialog({ agents, onAdd, onClose }: AddProps & { agents: Agent[] }) {
-  const [agent, setAgent] = useState(agents[0]?.id ?? "");
+/** Add Agent home: an Agent and an existing folder, typed or picked. */
+function AddHomeDialog({ agents, onAdd, onClose, notify }: AddProps & { agents: Agent[] }) {
+  // The first Agent until one is picked, even when the Agents are read after the dialog opens.
+  const [picked, setAgent] = useState<string | null>(null);
+  const agent = picked ?? agents[0]?.id ?? "";
   const [folder, setFolder] = useState("");
   const { error, busy, add } = useAdd(onAdd, onClose);
   return (
     <AddDialog
       title="Add Agent home"
-      sub="A folder an instance of an Agent reads its user configuration from, such as another CODEX_HOME or a portable install."
+      sub="A folder an Agent reads its user configuration from, such as another CODEX_HOME."
       error={error}
       busy={busy || folder.trim() === "" || agent === ""}
       onAdd={() => void add({ kind: "add_home", folder: folder.trim(), agent })}
@@ -593,7 +619,7 @@ function AddHomeDialog({ agents, onAdd, onClose }: AddProps & { agents: Agent[] 
           ))}
         </select>
         <input className="add-input mono" aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)} />
-        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setFolder)}>
+        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setFolder, notify)}>
           Choose…
         </button>
       </div>

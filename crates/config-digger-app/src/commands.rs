@@ -252,13 +252,7 @@ pub async fn dismiss_operation(app: AppHandle, id: String) -> Result<OperationSu
 #[tauri::command]
 #[specta::specta]
 pub async fn read_places(app: AppHandle) -> Result<Places, api::Error> {
-    blocking(move || {
-        let session = scan()?;
-        let places = session.places();
-        *app.state::<SessionState>().lock() = Some(session);
-        Ok(places)
-    })
-    .await
+    blocking(move || Ok(keep_places(&app, scan()?))).await
 }
 
 /// What a change to config-digger's lists did, read again at once.
@@ -266,6 +260,7 @@ pub async fn read_places(app: AppHandle) -> Result<Places, api::Error> {
 pub struct ListChanged {
     /// The Project or Agent home it changed, as it is listed now.
     pub listed: Listed,
+    /// Every Project and Agent home, read again after the change.
     pub places: Places,
 }
 
@@ -278,9 +273,7 @@ pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChang
     let result = blocking(move || {
         let core = Core::new(Ports::real())?;
         let listed = change.apply(&core)?;
-        let session = Session::scan(core)?;
-        let places = session.places();
-        *app.state::<SessionState>().lock() = Some(session);
+        let places = keep_places(&app, Session::scan(core)?);
         Ok(ListChanged { listed, places })
     })
     .await;
@@ -294,6 +287,7 @@ pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChang
 #[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Pick {
+    /// A folder, such as a Project or an Agent home.
     Folder,
     /// A `.code-workspace` file.
     WorkspaceFile,
@@ -316,6 +310,14 @@ pub async fn pick_location(
         })
     })
     .await
+}
+
+/// Keeps `session` as the app's last scan, and lists its Projects and
+/// Agent homes.
+fn keep_places(app: &AppHandle, session: Session) -> Places {
+    let places = session.places();
+    *app.state::<SessionState>().lock() = Some(session);
+    places
 }
 
 /// Reads every Agent home and Project on this machine.

@@ -913,11 +913,19 @@ export type Link = {
 /**  What the webview asks to change in config-digger's lists. */
 export type ListChange = 
 /**  Adds an existing folder or `.code-workspace` file as a Project. */
-{ kind: "add_project"; path: string } | { kind: "hide_project"; path: string } | { kind: "unhide_project"; path: string } | 
+{ kind: "add_project"; path: string } | 
+/**  Hides a Project, discovered or added, from the Inventory's selector. */
+{ kind: "hide_project"; path: string } | 
+/**  Lists a hidden Project again. */
+{ kind: "unhide_project"; path: string } | 
 /**  Forgets a Project the user added and no registry records. */
 { kind: "forget_project"; path: string } | 
 /**  Adds an existing folder as an Agent home of `agent`, with no other check. */
-{ kind: "add_home"; folder: string; agent: string } | { kind: "hide_home"; agent: string; home: string } | { kind: "unhide_home"; agent: string; home: string } | 
+{ kind: "add_home"; folder: string; agent: string } | 
+/**  Hides an Agent home, discovered or added, and its Items. */
+{ kind: "hide_home"; agent: string; home: string } | 
+/**  Lists a hidden Agent home again. */
+{ kind: "unhide_home"; agent: string; home: string } | 
 /**  Forgets an Agent home the user added and no definition finds. */
 { kind: "forget_home"; agent: string; home: string };
 
@@ -925,11 +933,16 @@ export type ListChange =
 export type ListChanged = {
 	/**  The Project or Agent home it changed, as it is listed now. */
 	listed: Listed,
+	/**  Every Project and Agent home, read again after the change. */
 	places: Places,
 };
 
 /**  The Project or Agent home a change applied to, as it is listed now. */
-export type Listed = { kind: "project"; project: Project } | { kind: "home"; home: Home };
+export type Listed = 
+/**  A Project. */
+{ kind: "project"; project: Project } | 
+/**  An Agent home, boxed since it is much larger than a Project. */
+{ kind: "home"; home: Home };
 
 /**
  *  An Agent home another tool copies from a source Agent home, such as the
@@ -1100,7 +1113,9 @@ export type Parked = {
 };
 
 /**  What the Windows picker picks. */
-export type Pick = "folder" | 
+export type Pick = 
+/**  A folder, such as a Project or an Agent home. */
+"folder" | 
 /**  A `.code-workspace` file. */
 "workspace_file";
 
@@ -1186,7 +1201,7 @@ export type Project = {
 	missing: boolean,
 	/**  It is a `.code-workspace` file rather than a folder. */
 	workspace_file: boolean,
-	/**  For a workspace file, the folders it opens, first first. */
+	/**  For a workspace file, the folders it opens, in the order it lists them. */
 	members: string[],
 	/**
 	 *  The Agents whose registries record it. Empty when it was only added
