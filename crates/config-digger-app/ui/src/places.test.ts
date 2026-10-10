@@ -40,7 +40,7 @@ function home(overrides: Partial<Home> = {}): Home {
 }
 
 function agent(overrides: Partial<Agent> = {}): Agent {
-  return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, homes: [home()], ...overrides };
+  return { id: "claude-code", name: "Claude Code", built_in: true, tested: null, variables: [], homes: [home()], ...overrides };
 }
 
 function places(overrides: Partial<Places> = {}): Places {
@@ -283,13 +283,14 @@ describe("what the Inventory opens on", () => {
   test("Open in Inventory picks the Project, Show leftovers also filters to Unread, Show in Inventory picks the home", () => {
     const path = String.raw`E:\code\shop`;
 
-    expect(inventoryStart({ kind: "project", path })).toEqual({ project: path, agent: "all", homes: {}, state: null });
-    expect(inventoryStart({ kind: "leftovers", path })).toEqual({ project: path, agent: "all", homes: {}, state: "unread" });
+    expect(inventoryStart({ kind: "project", path })).toEqual({ project: path, agent: "all", homes: {}, state: null, item: null });
+    expect(inventoryStart({ kind: "leftovers", path })).toEqual({ project: path, agent: "all", homes: {}, state: "unread", item: null });
     expect(inventoryStart({ kind: "home", home: home({ agent: "codex", home: "orca" }) })).toEqual({
       project: null,
       agent: "codex",
       homes: { codex: "orca" },
       state: null,
+      item: null,
     });
   });
 });

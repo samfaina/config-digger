@@ -6,6 +6,7 @@ import {
   entryActions,
   failuresInContext,
   filterItems,
+  findItem,
   groupItems,
   flagsShown,
   homeFailures,
@@ -390,5 +391,15 @@ describe("the Item of another Agent that reads an Entry", () => {
     const reader = { agent: "vscode", agent_name: "VS Code", home: "insiders", state: "shadowed" as const, sentence: "" };
 
     expect(readerItem(inventory({ items: [vscodeItem] }), reader, shared.locator)).toBeNull();
+  });
+});
+
+describe("the Item another screen names", () => {
+  test("is found by its Agent, home, kind and name", () => {
+    const skill = item({ kind: "skill", name: "notes" });
+    const items = [item(), item({ home: "other" }), skill];
+
+    expect(findItem(items, { agent: "claude-code", home: "default", kind: "skill", name: "notes" })).toBe(skill);
+    expect(findItem(items, { agent: "claude-code", home: "default", kind: "mcp", name: "gone" })).toBeNull();
   });
 });

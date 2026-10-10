@@ -2,11 +2,13 @@
 //! DTOs it returns. Domain types stay internal. The DTOs also derive
 //! `specta::Type`, from which the app's TypeScript bindings are generated.
 
-use crate::definitions::blocks::Provenance as DefinitionProvenance;
+use crate::definitions::blocks::{FindsBy, Locate, Provenance as DefinitionProvenance};
 use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::Ports;
-use crate::{execute, explain, history, paths, plan, resolve, scan, select, skill, user_list};
+use crate::{
+    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, user_list,
+};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -220,6 +222,14 @@ impl Core {
                     min: verified.min.clone(),
                     max: verified.max.clone(),
                 }),
+                variables: definition
+                    .homes
+                    .iter()
+                    .filter_map(|home| match home.folder.finds_by() {
+                        FindsBy::Variable(variable) => Some(variable.to_owned()),
+                        FindsBy::FixedPath | FindsBy::Search => None,
+                    })
+                    .collect(),
                 homes: inventory
                     .homes
                     .iter()
@@ -338,6 +348,33 @@ impl Core {
         }
         user_list::forget_project(&self.ports, &found.path)?;
         Ok(found)
+    }
+
+    /// The app's settings, with their defaults when none were saved.
+    pub fn settings(&self) -> Result<Settings, Error> {
+        settings::load(&self.ports)
+    }
+
+    /// Saves the app's settings. It writes no Agent configuration.
+    pub fn save_settings(&self, settings: &Settings) -> Result<(), Error> {
+        settings::save(&self.ports, settings)
+    }
+
+    /// The folders config-digger keeps its own data in. None of them has to
+    /// exist yet.
+    pub fn data_folders(&self) -> Result<DataFolders, Error> {
+        let env = self.ports.env.as_ref();
+        let data = history::data_folder(env)?;
+        let parked = park::store_path(env)?;
+        Ok(DataFolders {
+            backups: history::backups_folder(&data),
+            parked: parked
+                .parent()
+                .expect("the manifest is in the store's folder")
+                .to_path_buf(),
+            logs: data.join("logs"),
+            lists: user_list::data_folder(env)?,
+        })
     }
 
     /// Every Agent home and Project, hidden ones included, with no Project
@@ -1040,6 +1077,28 @@ pub struct Backup {
     pub copy: PathBuf,
 }
 
+/// The app's settings. The CLI never reads them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+pub struct Settings {
+    /// The app checks for updates when it starts. Off by default: until
+    /// then, it makes no network call unless asked to.
+    pub check_updates_on_startup: bool,
+}
+
+/// The folders config-digger keeps its own data in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct DataFolders {
+    /// Each Operation's backup and manifest, which History lists.
+    pub backups: PathBuf,
+    /// The parked-Entry store, which is never pruned.
+    pub parked: PathBuf,
+    /// The app's rotating logs.
+    pub logs: PathBuf,
+    /// The Agent homes and Projects the user added or hid, and the app's
+    /// settings.
+    pub lists: PathBuf,
+}
+
 /// Every Item found, with the Agent homes they belong to.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 pub struct Inventory {
@@ -1172,6 +1231,9 @@ pub struct Agent {
     pub built_in: bool,
     /// The versions the definition was tested with, `None` when it is untested.
     pub tested: Option<VersionRange>,
+    /// The environment variables the definition finds Agent homes through,
+    /// such as `CODEX_HOME`, in definition order.
+    pub variables: Vec<String>,
     pub homes: Vec<Home>,
 }
 

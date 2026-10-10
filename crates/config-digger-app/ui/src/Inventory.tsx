@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
 import { NOTICE_MS, type Notify } from "./desktop";
+import { EmptyInventory } from "./EmptyInventory";
 import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
@@ -20,6 +21,7 @@ import {
   couldNotBeRead,
   failuresInContext,
   filterItems,
+  findItem,
   flagsShown,
   groupItems,
   homeFailures,
@@ -47,10 +49,14 @@ type InventoryProps = {
   /** Where it opens, when another screen opens it on something. */
   start?: InventoryStart;
   onOpenHistory: () => void;
+  /** Opens the Agent homes tab with its add dialog, from the empty inventory. */
+  onAddHome: () => void;
+  /** Opens the Agent homes tab, from the empty inventory. */
+  onOpenHomes: () => void;
 };
 
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */
-export function InventoryScreen({ start, onOpenHistory }: InventoryProps) {
+export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }: InventoryProps) {
   const { inventory, project, error, reading, refresh, selectProject } = useInventory(start?.project ?? null);
   const { history, reload: reloadHistory } = useHistory();
   const [agent, setAgent] = useState(start?.agent ?? "all");
@@ -69,12 +75,20 @@ export function InventoryScreen({ start, onOpenHistory }: InventoryProps) {
     notify: setNotice,
   });
   const recovery = recoveryBanner(history ?? []);
+  // The Item another screen opened it on, selected once the inventory is read.
+  const startItem = useRef(start?.item ?? null);
 
   const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice), [inventory, homeChoice]);
   const selection: Selection = { agent, homes };
   const shown = useMemo(() => itemsShown(inventory?.items ?? [], { agent, homes }), [inventory, agent, homes]);
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
   const flags = flagsShown(inventory?.agent_flags ?? [], selection);
+  useEffect(() => {
+    if (!inventory || !startItem.current) return;
+    const item = findItem(inventory.items, startItem.current);
+    startItem.current = null;
+    if (item) setDetail({ kind: "item", key: itemKey(item) });
+  }, [inventory]);
   const selected = detail?.kind === "item" ? (shown.find((item) => itemKey(item) === detail.key) ?? null) : null;
   const agentName = agent === "all" ? "All Agents" : (inventory?.homes.find((home) => home.agent === agent)?.agent_name ?? agent);
 
@@ -127,110 +141,120 @@ export function InventoryScreen({ start, onOpenHistory }: InventoryProps) {
         </div>
       )}
 
-      <div className="panes">
-        <div className="column">
-          <AgentsPane inventory={inventory} selection={selection} onAgent={chooseAgent} />
-          <StateBars
-            items={shown}
-            state={filter.state}
-            onState={(state) => setFilter((current) => ({ ...current, state }))}
-          />
-          <HomesPane inventory={inventory} selection={selection} onHome={chooseHome} />
-        </div>
-
-        <section className="panel items">
-          <h2 className="panel-title">
-            Items
-            <span className="grow" />
-            <span className="segmented" role="group" aria-label="Item kind">
-              {(["all", "mcp", "skill"] as const).map((kind) => (
-                <button
-                  type="button"
-                  key={kind}
-                  className={filter.kind === kind ? "on" : ""}
-                  aria-pressed={filter.kind === kind}
-                  onClick={() => setFilter((current) => ({ ...current, kind }))}
-                >
-                  {kind === "all" ? "All" : KIND_TITLES[kind]}
-                </button>
-              ))}
-            </span>
-          </h2>
-          <label className="search">
-            <Icon name="search" small />
-            <input
-              placeholder="Search Items…"
-              value={filter.text}
-              onChange={(event) => setFilter((current) => ({ ...current, text: event.target.value }))}
+      {inventory && inventory.homes.length === 0 ? (
+        <EmptyInventory
+          readAt={inventory.read_at}
+          reading={reading}
+          refresh={refresh}
+          onAddHome={onAddHome}
+          onOpenHomes={onOpenHomes}
+        />
+      ) : (
+        <div className="panes">
+          <div className="column">
+            <AgentsPane inventory={inventory} selection={selection} onAgent={chooseAgent} />
+            <StateBars
+              items={shown}
+              state={filter.state}
+              onState={(state) => setFilter((current) => ({ ...current, state }))}
             />
-          </label>
-          {error && (
-            <div className="alert" role="alert">
-              <Icon name="flag" small />
-              The inventory couldn't be read: {error.message}
-            </div>
-          )}
-          {failures.length > 0 && (
-            <div className="alert" role="status">
-              <Icon name="flag" small />
-              {couldNotBeRead(failures.length)}.
+            <HomesPane inventory={inventory} selection={selection} onHome={chooseHome} />
+          </div>
+
+          <section className="panel items">
+            <h2 className="panel-title">
+              Items
               <span className="grow" />
-              <button type="button" className="link" onClick={() => setDetail({ kind: "failures" })}>
-                View
-              </button>
+              <span className="segmented" role="group" aria-label="Item kind">
+                {(["all", "mcp", "skill"] as const).map((kind) => (
+                  <button
+                    type="button"
+                    key={kind}
+                    className={filter.kind === kind ? "on" : ""}
+                    aria-pressed={filter.kind === kind}
+                    onClick={() => setFilter((current) => ({ ...current, kind }))}
+                  >
+                    {kind === "all" ? "All" : KIND_TITLES[kind]}
+                  </button>
+                ))}
+              </span>
+            </h2>
+            <label className="search">
+              <Icon name="search" small />
+              <input
+                placeholder="Search Items…"
+                value={filter.text}
+                onChange={(event) => setFilter((current) => ({ ...current, text: event.target.value }))}
+              />
+            </label>
+            {error && (
+              <div className="alert" role="alert">
+                <Icon name="flag" small />
+                The inventory couldn't be read: {error.message}
+              </div>
+            )}
+            {failures.length > 0 && (
+              <div className="alert" role="status">
+                <Icon name="flag" small />
+                {couldNotBeRead(failures.length)}.
+                <span className="grow" />
+                <button type="button" className="link" onClick={() => setDetail({ kind: "failures" })}>
+                  View
+                </button>
+              </div>
+            )}
+            {flags.map((flag) => (
+              <div key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} className="alert" role="status" title={flag.path}>
+                <Icon name="flag" small />
+                {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
+              </div>
+            ))}
+            <div className="scroll">
+              {inventory ? (
+                <ItemList
+                  inventory={inventory}
+                  items={filterItems(shown, filter)}
+                  agent={agent}
+                  flags={flags}
+                  selected={selected}
+                  onSelect={(item) => setDetail({ kind: "item", key: itemKey(item) })}
+                />
+              ) : (
+                !error && <p className="empty">Reading the inventory…</p>
+              )}
             </div>
-          )}
-          {flags.map((flag) => (
-            <div key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} className="alert" role="status" title={flag.path}>
-              <Icon name="flag" small />
-              {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
-            </div>
-          ))}
-          <div className="scroll">
-            {inventory ? (
-              <ItemList
+          </section>
+
+          <section className="panel detail">
+            {detail?.kind === "failures" ? (
+              <>
+                <h2 className="panel-title">Read failures</h2>
+                <div className="scroll cards">
+                  {failures.map((failure) => (
+                    <ReadFailureCard key={`${failure.agent}|${failure.home}|${failure.path}`} failure={failure} notify={setNotice} />
+                  ))}
+                  {failures.length === 0 && <p className="empty">Every location in this context was read.</p>}
+                </div>
+              </>
+            ) : selected && inventory ? (
+              <ItemDetail
                 inventory={inventory}
-                items={filterItems(shown, filter)}
-                agent={agent}
-                flags={flags}
-                selected={selected}
-                onSelect={(item) => setDetail({ kind: "item", key: itemKey(item) })}
+                item={selected}
+                flash={flash}
+                onShowWinner={showWinner}
+                onReader={openReader}
+                onAction={onAction}
+                notify={setNotice}
               />
             ) : (
-              !error && <p className="empty">Reading the inventory…</p>
+              <>
+                <h2 className="panel-title">Details</h2>
+                <p className="empty">Select an Item to see which Entry is Effective and why.</p>
+              </>
             )}
-          </div>
-        </section>
-
-        <section className="panel detail">
-          {detail?.kind === "failures" ? (
-            <>
-              <h2 className="panel-title">Read failures</h2>
-              <div className="scroll cards">
-                {failures.map((failure) => (
-                  <ReadFailureCard key={`${failure.agent}|${failure.home}|${failure.path}`} failure={failure} notify={setNotice} />
-                ))}
-                {failures.length === 0 && <p className="empty">Every location in this context was read.</p>}
-              </div>
-            </>
-          ) : selected && inventory ? (
-            <ItemDetail
-              inventory={inventory}
-              item={selected}
-              flash={flash}
-              onShowWinner={showWinner}
-              onReader={openReader}
-              onAction={onAction}
-              notify={setNotice}
-            />
-          ) : (
-            <>
-              <h2 className="panel-title">Details</h2>
-              <p className="empty">Select an Item to see which Entry is Effective and why.</p>
-            </>
-          )}
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
 
       {notice && (
         <div className="notice" role="status">

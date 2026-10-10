@@ -210,6 +210,18 @@ export function readerItem(inventory: Inventory, reader: AlsoReadBy, locator: st
   );
 }
 
+/** An Item as another screen names it. */
+export type ItemRef = Pick<Item, "agent" | "home" | "kind" | "name">;
+
+/** The Item `ref` names among `items`, `null` when none is listed. */
+export function findItem(items: Item[], ref: ItemRef): Item | null {
+  return (
+    items.find(
+      (item) => item.agent === ref.agent && item.home === ref.home && item.kind === ref.kind && item.name === ref.name,
+    ) ?? null
+  );
+}
+
 /**
  * An Item's identity in the inventory. Its name is not enough: an Agent
  * whose Entries never compete, such as Cursor, has an Item per Entry, so

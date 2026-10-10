@@ -57,7 +57,7 @@ pub(crate) struct HiddenHome {
 
 /// config-digger's roaming data folder: `%APPDATA%\config-digger`, or
 /// `~/.config/config-digger` where there is no `APPDATA`.
-fn data_folder(env: &dyn Environment) -> Result<PathBuf, Error> {
+pub(crate) fn data_folder(env: &dyn Environment) -> Result<PathBuf, Error> {
     let base = match env.var("APPDATA").filter(|value| !value.is_empty()) {
         Some(roaming) => PathBuf::from(roaming),
         None => env

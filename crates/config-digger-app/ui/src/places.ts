@@ -13,7 +13,7 @@ import type {
   Project,
   State,
 } from "./bindings";
-import type { HomeChoice } from "./view";
+import type { HomeChoice, ItemRef } from "./view";
 
 /** Hide, or Remove from list for what the user added and nothing discovers. */
 export type ListOffer = "hide" | "remove_from_list";
@@ -228,7 +228,14 @@ function unique(values: string[]): string[] {
 }
 
 /** Where the Inventory opens: its Project, the Agent selected, each Agent's home and the State filter. */
-export type InventoryStart = { project: string | null; agent: string; homes: HomeChoice; state: State | null };
+export type InventoryStart = {
+  project: string | null;
+  agent: string;
+  homes: HomeChoice;
+  state: State | null;
+  /** The Item whose Entries the detail panel opens on, when one is named. */
+  item: ItemRef | null;
+};
 
 /** What the Projects & homes screen opens the Inventory on. */
 export type ShowInInventory =
@@ -241,11 +248,11 @@ export type ShowInInventory =
 export function inventoryStart(show: ShowInInventory): InventoryStart {
   switch (show.kind) {
     case "project":
-      return { project: show.path, agent: "all", homes: {}, state: null };
+      return { project: show.path, agent: "all", homes: {}, state: null, item: null };
     case "leftovers":
-      return { project: show.path, agent: "all", homes: {}, state: "unread" };
+      return { project: show.path, agent: "all", homes: {}, state: "unread", item: null };
     case "home":
-      return { project: null, agent: show.home.agent, homes: { [show.home.agent]: show.home.home }, state: null };
+      return { project: null, agent: show.home.agent, homes: { [show.home.agent]: show.home.home }, state: null, item: null };
   }
 }
 

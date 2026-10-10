@@ -3,7 +3,8 @@
 //! the webview may ask to open.
 
 use config_digger_core::api::{
-    Agent, Backup, Context, Core, Error, Inventory, Leftovers, Project, ScanOptions, Snapshot,
+    Agent, Backup, Context, Core, Error, Inventory, ItemKind, Leftovers, Parked, Project,
+    ScanOptions, Snapshot,
 };
 use serde::Serialize;
 use std::collections::HashSet;
@@ -22,6 +23,21 @@ pub struct Places {
     pub leftovers: Vec<Leftovers>,
     /// Every loaded Agent definition, with each of its Agent homes.
     pub agents: Vec<Agent>,
+}
+
+/// A parked Entry, as Settings lists it, with where its Item is listed.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct ParkedEntry {
+    pub agent: String,
+    pub agent_name: String,
+    pub home: String,
+    pub kind: ItemKind,
+    pub name: String,
+    /// The Project whose context lists it, `None` when it is listed with no
+    /// Project.
+    pub project: Option<PathBuf>,
+    /// Where it came from, and when it was parked.
+    pub parked: Parked,
 }
 
 /// The last scan and what was resolved from it.
@@ -74,6 +90,51 @@ impl Session {
             read_at: inventory.read_at,
             projects: inventory.projects,
         }
+    }
+
+    /// Every parked Entry, hidden homes included, each with the first
+    /// context that lists it: no Project, then each Project. It never reads
+    /// the disk.
+    pub fn parked(&self) -> Vec<ParkedEntry> {
+        let resolve = |project| self.core.resolve(&self.snapshot, &Context { project });
+        let none = resolve(None);
+        let projects: Vec<PathBuf> = none
+            .projects
+            .iter()
+            .map(|project| project.path.clone())
+            .collect();
+        let contexts = projects.into_iter().map(|project| resolve(Some(project)));
+        let mut listed: Vec<ParkedEntry> = Vec::new();
+        for inventory in std::iter::once(none).chain(contexts) {
+            for item in &inventory.items {
+                for entry in &item.entries {
+                    let Some(parked) = &entry.parked else {
+                        continue;
+                    };
+                    if listed
+                        .iter()
+                        .any(|known| known.parked.locator == parked.locator)
+                    {
+                        continue;
+                    }
+                    let agent_name = inventory
+                        .homes
+                        .iter()
+                        .find(|home| home.agent == item.agent)
+                        .map_or_else(|| item.agent.clone(), |home| home.agent_name.clone());
+                    listed.push(ParkedEntry {
+                        agent: item.agent.clone(),
+                        agent_name,
+                        home: item.home.clone(),
+                        kind: item.kind,
+                        name: item.name.clone(),
+                        project: inventory.project.clone(),
+                        parked: parked.clone(),
+                    });
+                }
+            }
+        }
+        listed
     }
 
     /// The backups History holds of `path`, a location shown, whose copies
@@ -223,6 +284,76 @@ mod tests {
 
         session.resolve(None);
         assert_eq!(session.backups_of(&claude_json()).unwrap(), []);
+    }
+
+    /// config-digger's parked-Entry store, holding a user server and a
+    /// server of the Project.
+    fn parked_store() -> (PathBuf, String) {
+        let store =
+            PathBuf::from(r"C:\Users\fixture\AppData\Local\config-digger\parked\manifest.json");
+        let manifest = serde_json::json!({
+            "entries": {
+                "notes": {
+                    "agent": "claude-code", "home": "default", "location": "user-mcp",
+                    "name": "notes", "path": claude_json(), "key_path": ["mcpServers", "notes"],
+                    "parked_at": "2026-10-01T14:30:12Z", "entry": { "command": "notes-mcp" }
+                },
+                "linear": {
+                    "agent": "claude-code", "home": "default", "location": "project-mcp",
+                    "name": "linear", "path": mcp_json(), "key_path": ["mcpServers", "linear"],
+                    "project": r"e:\projects\app",
+                    "parked_at": "2026-10-02T09:00:00Z", "entry": { "url": "https://x" }
+                }
+            }
+        });
+        (store, manifest.to_string())
+    }
+
+    #[test]
+    fn parked_lists_every_parked_entry_with_the_project_it_is_listed_in() {
+        let (store, manifest) = parked_store();
+        let fs = FakeFileSystem::new()
+            .with_file(
+                claude_json(),
+                r#"{ "projects": { "E:/projects/app": {} } }"#,
+            )
+            .with_file(mcp_json(), "{}")
+            .with_folder(PROJECT)
+            .with_file(store, manifest);
+
+        let parked = session(&fs).parked();
+
+        let listed: Vec<(&str, &str, &str, Option<&Path>, &str)> = parked
+            .iter()
+            .map(|entry| {
+                (
+                    entry.agent_name.as_str(),
+                    entry.home.as_str(),
+                    entry.name.as_str(),
+                    entry.project.as_deref(),
+                    entry.parked.locator.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                (
+                    "Claude Code",
+                    "default",
+                    "notes",
+                    None,
+                    r"C:\Users\fixture\.claude.json#mcpServers.notes"
+                ),
+                (
+                    "Claude Code",
+                    "default",
+                    "linear",
+                    Some(Path::new(PROJECT)),
+                    r"E:\projects\app\.mcp.json#mcpServers.linear"
+                ),
+            ]
+        );
     }
 
     #[test]

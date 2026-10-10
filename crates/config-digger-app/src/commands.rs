@@ -1,11 +1,13 @@
 //! Task-level commands: each one is a thin async wrapper that runs the
 //! synchronous core on a blocking thread.
 
+use crate::about::{About, Page};
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
 use crate::lists::{ListChange, Listed};
-use crate::session::{self, Places, Session};
+use crate::session::{self, ParkedEntry, Places, Session};
 use config_digger_core::api::{
-    self, Backup, Core, Inventory, OperationDetail, OperationSummary, WarningClass,
+    self, Backup, Core, DataFolders, Inventory, OperationDetail, OperationSummary, Settings,
+    WarningClass,
 };
 use config_digger_core::ports::Ports;
 use serde::{Deserialize, Serialize};
@@ -308,6 +310,114 @@ pub async fn pick_location(
                 .add_filter("VS Code workspace", &["code-workspace"])
                 .pick_file(),
         })
+    })
+    .await
+}
+
+/// What the Settings screen shows.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct SettingsRead {
+    pub settings: Settings,
+    pub folders: DataFolders,
+    /// How many Operations History keeps.
+    pub operations: u32,
+    /// Every parked Entry, with where its Item is listed.
+    pub parked: Vec<ParkedEntry>,
+}
+
+/// Reads the app's settings, where config-digger keeps its data, and every
+/// Agent home and Project again to list the parked Entries.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_settings(app: AppHandle) -> Result<SettingsRead, api::Error> {
+    blocking(move || {
+        let core = Core::new(Ports::real())?;
+        let settings = core.settings()?;
+        let folders = core.data_folders()?;
+        let operations = u32::try_from(core.history()?.len()).unwrap_or(u32::MAX);
+        let session = Session::scan(core)?;
+        let parked = session.parked();
+        *app.state::<SessionState>().lock() = Some(session);
+        Ok(SettingsRead {
+            settings,
+            folders,
+            operations,
+            parked,
+        })
+    })
+    .await
+}
+
+/// Saves the app's settings, and returns them as saved.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_settings(settings: Settings) -> Result<Settings, api::Error> {
+    let result = blocking(move || {
+        let core = Core::new(Ports::real())?;
+        core.save_settings(&settings)?;
+        core.settings()
+    })
+    .await;
+    match &result {
+        Ok(settings) => tracing::info!(
+            check_updates_on_startup = settings.check_updates_on_startup,
+            "settings saved"
+        ),
+        Err(error) => tracing::warn!(code = error.code.code(), "settings not saved"),
+    }
+    result
+}
+
+/// A folder config-digger keeps its own data in.
+#[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DataFolder {
+    Backups,
+    Parked,
+    Logs,
+    Lists,
+}
+
+/// Opens one of config-digger's data folders in Explorer. A folder that
+/// does not exist yet is not created: nothing was kept there.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_data_folder(folder: DataFolder) -> Result<(), api::Error> {
+    blocking(move || {
+        let folders = Core::new(Ports::real())?.data_folders()?;
+        let path = match folder {
+            DataFolder::Backups => folders.backups,
+            DataFolder::Parked => folders.parked,
+            DataFolder::Logs => folders.logs,
+            DataFolder::Lists => folders.lists,
+        };
+        if !path.is_dir() {
+            return Err(api::Error::unexpected(format!(
+                "config-digger has kept nothing in {} yet",
+                path.display()
+            )));
+        }
+        open_file(&path)
+    })
+    .await
+}
+
+/// This build of the app, as About shows it.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_about() -> Result<About, api::Error> {
+    Ok(About::this_build())
+}
+
+/// Opens one of the pages About links to in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_page(page: Page) -> Result<(), api::Error> {
+    let url = page.url(env!("CARGO_PKG_REPOSITORY"), env!("CARGO_PKG_VERSION"));
+    blocking(move || {
+        let mut explorer = Command::new("explorer.exe");
+        explorer.arg(url);
+        start(explorer)
     })
     .await
 }

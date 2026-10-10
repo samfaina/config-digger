@@ -5,6 +5,7 @@
 //! The React/TypeScript UI lives in `ui/`. Run the app with `npm run tauri dev`
 //! from there; after changing a command or an api DTO, run `cargo xtask bindings`.
 
+mod about;
 mod actions;
 mod commands;
 mod lists;
@@ -37,6 +38,11 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::read_places,
         commands::change_list,
         commands::pick_location,
+        commands::read_settings,
+        commands::save_settings,
+        commands::open_data_folder,
+        commands::read_about,
+        commands::open_page,
     ])
 }
 
