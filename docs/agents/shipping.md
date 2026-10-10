@@ -1,11 +1,14 @@
 # Shipping
 
-Read by `/ship-tickets` and `/ship-tickets-reviewed` (samfaina/agent-skills).
+Read by the `ship-tickets` skill (samfaina/agent-skills).
 
 - **Base branch:** `main`
 - **Merge method:** `merge`
-- **Branch naming:** the worktree `--name` is the issue title in kebab-case, e.g. `stale-previews-and-rollback`. Orca adds the `samfaina/` prefix to the branch.
+- **Merge approval:** `auto` (the loop merges as soon as CI is green)
+- **Branch naming:** the worktree `--name` is the issue title in kebab-case: "Action dialog" becomes `action-dialog`. Orca adds the `samfaina/` prefix to the branch.
 - **After merge:** delete the remote branch with `git push origin --delete <branch>`.
+- **CI:** `required` (PRs get checks, and the loop waits for them to pass)
+- **Workers:** `claude` (all roles)
 
 ## PR format
 
