@@ -2,9 +2,27 @@
 //! the Project resolves again without reading the disk, and the locations
 //! the webview may ask to open.
 
-use config_digger_core::api::{Backup, Context, Core, Error, Inventory, ScanOptions, Snapshot};
+use config_digger_core::api::{
+    Agent, Backup, Context, Core, Error, Inventory, Leftovers, Project, ScanOptions, Snapshot,
+};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+
+/// What the Projects & homes screen lists: every Project and Agent home,
+/// hidden ones included, as `projects list` and `homes list` do with
+/// `--include-hidden`.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct Places {
+    /// When the snapshot was read, in RFC 3339.
+    pub read_at: String,
+    /// Every Project, missing and hidden ones included, sorted by path.
+    pub projects: Vec<Project>,
+    /// The leftovers of each missing Project that has any.
+    pub leftovers: Vec<Leftovers>,
+    /// Every loaded Agent definition, with each of its Agent homes.
+    pub agents: Vec<Agent>,
+}
 
 /// The last scan and what was resolved from it.
 pub struct Session {
@@ -44,6 +62,18 @@ impl Session {
             self.allow(location);
         }
         inventory
+    }
+
+    /// Every Project and Agent home of the last scan, hidden ones included,
+    /// with the leftovers of the missing Projects. It never reads the disk.
+    pub fn places(&self) -> Places {
+        let inventory = self.core.resolve(&self.snapshot, &Context::default());
+        Places {
+            agents: self.core.agents(&inventory),
+            leftovers: self.core.leftovers(&self.snapshot),
+            read_at: inventory.read_at,
+            projects: inventory.projects,
+        }
     }
 
     /// The backups History holds of `path`, a location shown, whose copies
@@ -110,10 +140,15 @@ mod tests {
             .with_folder(PROJECT)
     }
 
-    fn session(fs: &FakeFileSystem) -> Session {
+    fn core(fs: &FakeFileSystem) -> Core {
         let env = FakeEnvironment::with_home(HOME)
-            .with_var("LOCALAPPDATA", r"C:\Users\fixture\AppData\Local");
-        Session::scan(Core::new(fake::ports(fs.clone(), env)).unwrap()).unwrap()
+            .with_var("LOCALAPPDATA", r"C:\Users\fixture\AppData\Local")
+            .with_var("APPDATA", r"C:\Users\fixture\AppData\Roaming");
+        Core::new(fake::ports(fs.clone(), env)).unwrap()
+    }
+
+    fn session(fs: &FakeFileSystem) -> Session {
+        Session::scan(core(fs)).unwrap()
     }
 
     fn names(inventory: &Inventory) -> Vec<&str> {
@@ -188,5 +223,48 @@ mod tests {
 
         session.resolve(None);
         assert_eq!(session.backups_of(&claude_json()).unwrap(), []);
+    }
+
+    #[test]
+    fn places_lists_hidden_projects_and_homes_and_the_leftovers_of_missing_ones() {
+        let fs = FakeFileSystem::new()
+            .with_file(
+                claude_json(),
+                r#"{ "projects": { "E:/projects/app": {}, "E:/projects/gone": { "mcpServers": { "old": { "command": "old" } } } } }"#,
+            )
+            .with_folder(PROJECT);
+        core(&fs).hide_project(Path::new(PROJECT)).unwrap();
+        core(&fs).hide_home("default", Some("claude-code")).unwrap();
+
+        let places = session(&fs).places();
+
+        let projects: Vec<(String, bool)> = places
+            .projects
+            .iter()
+            .map(|project| (project.path.display().to_string(), project.hidden))
+            .collect();
+        assert_eq!(
+            projects,
+            [
+                (PROJECT.to_owned(), true),
+                (r"E:\projects\gone".to_owned(), false)
+            ]
+        );
+        let leftovers: Vec<&str> = places
+            .leftovers
+            .iter()
+            .flat_map(Leftovers::entries)
+            .map(|entry| entry.locator.as_str())
+            .collect();
+        assert_eq!(
+            leftovers,
+            [r"C:\Users\fixture\.claude.json#projects.E:/projects/gone.mcpServers.old"]
+        );
+        let claude_code = places
+            .agents
+            .iter()
+            .find(|agent| agent.id == "claude-code")
+            .unwrap();
+        assert!(claude_code.homes[0].hidden);
     }
 }

@@ -5,6 +5,7 @@ import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
 import { LinkTag } from "./Location";
+import type { InventoryStart } from "./places";
 import { ReadFailureCard } from "./ReadFailureCard";
 import { StatePill } from "./StatePill";
 import { STATE_LABELS } from "./states";
@@ -42,13 +43,19 @@ type Detail = { kind: "item"; key: string } | { kind: "failures" } | null;
 /** How long a "show winner" mark stays. */
 const FLASH_MS = 1600;
 
+type InventoryProps = {
+  /** Where it opens, when another screen opens it on something. */
+  start?: InventoryStart;
+  onOpenHistory: () => void;
+};
+
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */
-export function InventoryScreen({ onOpenHistory }: { onOpenHistory: () => void }) {
-  const { inventory, project, error, reading, refresh, selectProject } = useInventory();
+export function InventoryScreen({ start, onOpenHistory }: InventoryProps) {
+  const { inventory, project, error, reading, refresh, selectProject } = useInventory(start?.project ?? null);
   const { history, reload: reloadHistory } = useHistory();
-  const [agent, setAgent] = useState("all");
-  const [homeChoice, setHomeChoice] = useState<HomeChoice>({});
-  const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: null });
+  const [agent, setAgent] = useState(start?.agent ?? "all");
+  const [homeChoice, setHomeChoice] = useState<HomeChoice>(start?.homes ?? {});
+  const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: start?.state ?? null });
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);

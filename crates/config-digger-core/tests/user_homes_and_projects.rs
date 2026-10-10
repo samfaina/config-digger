@@ -493,3 +493,32 @@ fn a_folder_named_like_a_workspace_file_is_a_folder_project() {
 
     assert!(!project.workspace_file);
 }
+
+#[test]
+fn a_workspace_file_project_lists_the_folders_it_opens() {
+    let fs = with_projects().with_file(
+        WORKSPACE,
+        r#"{"folders": [{"path": "api"}, {"uri": "file:///e%3A/shared/lib"}]}"#,
+    );
+    let core = core(&fs);
+    core.add_project(Path::new(WORKSPACE)).unwrap();
+
+    let inventory = inventory(&core, false);
+
+    let members = |path: &str| {
+        let project = inventory
+            .projects
+            .iter()
+            .find(|project| project.path == Path::new(path))
+            .unwrap();
+        project.members.clone()
+    };
+    assert_eq!(
+        members(WORKSPACE),
+        [
+            PathBuf::from(r"E:\work\api"),
+            PathBuf::from(r"e:\shared\lib")
+        ]
+    );
+    assert_eq!(members(PETME), Vec::<PathBuf>::new());
+}

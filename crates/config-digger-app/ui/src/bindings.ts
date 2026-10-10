@@ -56,6 +56,19 @@ export const commands = {
 	 *  recovered by hand.
 	 */
 	dismissOperation: (id: string) => typedError<OperationSummary, Error>(__TAURI_INVOKE("dismiss_operation", { id })),
+	/**
+	 *  Reads every Agent home and Project, and lists them with the hidden ones
+	 *  and the leftovers of the missing Projects.
+	 */
+	readPlaces: () => typedError<Places, Error>(__TAURI_INVOKE("read_places")),
+	/**
+	 *  Adds, hides, lists again or forgets a Project or an Agent home, then
+	 *  reads every Agent home and Project again. It writes no Agent
+	 *  configuration.
+	 */
+	changeList: (change: ListChange) => typedError<ListChanged, Error>(__TAURI_INVOKE("change_list", { change })),
+	/**  Opens the Windows picker over the window, `None` when it is cancelled. */
+	pickLocation: (pick: Pick) => typedError<string | null, Error>(__TAURI_INVOKE("pick_location", { pick })),
 };
 
 /* Types */
@@ -102,10 +115,26 @@ export type ActionRequest =
 { kind: "entry"; verb: Verb; 
 /**  The Entry's `<path>#<key path>` locator. */
 locator: string; project: string | null } | 
+/**
+ *  The Remove of every leftover of the missing Project `project`, in
+ *  its context.
+ */
+{ kind: "leftovers"; project: string } | 
 /**  The Undo of the Operation `operation` in History. */
 { kind: "undo"; operation: string } | 
 /**  The deletion of the backup of the Operation `operation` in History. */
 { kind: "delete_backup"; operation: string };
+
+/**  A loaded Agent definition and the Agent homes listed for it. */
+export type Agent = {
+	id: string,
+	name: string,
+	/**  The definition ships with config-digger, rather than being loaded from a file. */
+	built_in: boolean,
+	/**  The versions the definition was tested with, `None` when it is untested. */
+	tested: VersionRange | null,
+	homes: Home[],
+};
 
 /**  A problem of an Agent home in the context, shown above its Items. */
 export type AgentFlag = {
@@ -720,6 +749,8 @@ export type Home = {
 	out_of_range: boolean,
 	/**  The version that last ran against it, as the Agent records it. */
 	last_ran: string | null,
+	/**  How many Entries it holds, in any context. */
+	entries: number,
 	/**
 	 *  What to know about the Agent's versions here, such as one outside
 	 *  the definition's tested range. None of them changes a State or
@@ -860,6 +891,14 @@ export type ItemKind = "mcp" | "skill";
  */
 export type JsonValue = null | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
+/**  The leftovers of one missing Project: its Unread Entries. */
+export type Leftovers = {
+	/**  The missing Project, as [`Project::path`] has it. */
+	project: string,
+	/**  Each Item with only its Unread Entries, sorted like [`Inventory::items`]. */
+	items: Item[],
+};
+
 /**  Where the junction or symlink of a Linked Entry points. */
 export type Link = {
 	/**  The path the link holds, made absolute. */
@@ -870,6 +909,27 @@ export type Link = {
 	 */
 	broken: boolean,
 };
+
+/**  What the webview asks to change in config-digger's lists. */
+export type ListChange = 
+/**  Adds an existing folder or `.code-workspace` file as a Project. */
+{ kind: "add_project"; path: string } | { kind: "hide_project"; path: string } | { kind: "unhide_project"; path: string } | 
+/**  Forgets a Project the user added and no registry records. */
+{ kind: "forget_project"; path: string } | 
+/**  Adds an existing folder as an Agent home of `agent`, with no other check. */
+{ kind: "add_home"; folder: string; agent: string } | { kind: "hide_home"; agent: string; home: string } | { kind: "unhide_home"; agent: string; home: string } | 
+/**  Forgets an Agent home the user added and no definition finds. */
+{ kind: "forget_home"; agent: string; home: string };
+
+/**  What a change to config-digger's lists did, read again at once. */
+export type ListChanged = {
+	/**  The Project or Agent home it changed, as it is listed now. */
+	listed: Listed,
+	places: Places,
+};
+
+/**  The Project or Agent home a change applied to, as it is listed now. */
+export type Listed = { kind: "project"; project: Project } | { kind: "home"; home: Home };
 
 /**
  *  An Agent home another tool copies from a source Agent home, such as the
@@ -1039,6 +1099,27 @@ export type Parked = {
 	parked_at: string,
 };
 
+/**  What the Windows picker picks. */
+export type Pick = "folder" | 
+/**  A `.code-workspace` file. */
+"workspace_file";
+
+/**
+ *  What the Projects & homes screen lists: every Project and Agent home,
+ *  hidden ones included, as `projects list` and `homes list` do with
+ *  `--include-hidden`.
+ */
+export type Places = {
+	/**  When the snapshot was read, in RFC 3339. */
+	read_at: string,
+	/**  Every Project, missing and hidden ones included, sorted by path. */
+	projects: Project[],
+	/**  The leftovers of each missing Project that has any. */
+	leftovers: Leftovers[],
+	/**  Every loaded Agent definition, with each of its Agent homes. */
+	agents: Agent[],
+};
+
 /**  A plugin or extension an Agent installed, which an Entry is part of. */
 export type Plugin = {
 	/**  The id the Agent knows it by, such as `supabase@claude-plugins-official`. */
@@ -1105,6 +1186,8 @@ export type Project = {
 	missing: boolean,
 	/**  It is a `.code-workspace` file rather than a folder. */
 	workspace_file: boolean,
+	/**  For a workspace file, the folders it opens, first first. */
+	members: string[],
 	/**
 	 *  The Agents whose registries record it. Empty when it was only added
 	 *  or asked for.
@@ -1114,6 +1197,11 @@ export type Project = {
 	added: boolean,
 	/**  The user hid it, so it is listed only when hidden ones are asked for. */
 	hidden: boolean,
+	/**
+	 *  How many Entries apply in it alone: in files inside it, or keyed to
+	 *  its path in user files. Each counts once, however many Agents read it.
+	 */
+	entries: number,
 };
 
 /**  How an Entry got where it is, which decides how it can be taken away. */
@@ -1474,6 +1562,14 @@ export type Verify =
 "verified" | 
 /**  Some States after differ from the prediction, as listed. */
 "verified_with_differences";
+
+/**  The versions an Agent definition was tested with, both ends included. */
+export type VersionRange = {
+	/**  The lowest version tested, as the definition spells it. */
+	min: string,
+	/**  The highest version tested, as the definition spells it. */
+	max: string,
+};
 
 /**  A risk the user must acknowledge before a plan executes. */
 export type Warning = {

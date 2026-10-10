@@ -87,6 +87,25 @@ describe("the Apply button", () => {
       why: "Blocked: see above",
     });
   });
+
+  test("names how many leftovers Remove leftovers removes, each once however many Agents read it", () => {
+    const leftover = (name: string) => String.raw`C:\Users\me\.claude.json#projects.E:/gone.mcpServers.${name}`;
+    const plan = planned({
+      preview: preview({
+        action: "remove",
+        changes: [
+          change({ locator: leftover("old"), after: "removed" }),
+          change({ locator: leftover("old"), agent: "vscode", after: "removed" }),
+          change({ locator: leftover("search"), after: "removed" }),
+        ],
+      }),
+    });
+
+    expect(applyButton(plan, new Set(), { leftovers: true })).toMatchObject({ label: "Remove 2 leftovers", danger: true });
+    expect(applyButton(planned({ preview: preview({ action: "remove", changes: [change()] }) }), new Set(), { leftovers: true })).toMatchObject({
+      label: "Remove 1 leftover",
+    });
+  });
 });
 
 function file(overrides: Partial<FileChange> = {}): FileChange {

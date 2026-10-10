@@ -17,6 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 config-digger-core.workspace = true
+rfd.workspace = true
 serde.workspace = true
 specta.workspace = true
 specta-typescript.workspace = true

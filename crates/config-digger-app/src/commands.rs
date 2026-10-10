@@ -2,16 +2,18 @@
 //! synchronous core on a blocking thread.
 
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
-use crate::session::{self, Session};
+use crate::lists::{ListChange, Listed};
+use crate::session::{self, Places, Session};
 use config_digger_core::api::{
     self, Backup, Core, Inventory, OperationDetail, OperationSummary, WarningClass,
 };
 use config_digger_core::ports::Ports;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 /// The app's [`Session`], once the inventory was read.
 #[derive(Default)]
@@ -243,6 +245,77 @@ pub async fn dismiss_operation(app: AppHandle, id: String) -> Result<OperationSu
         tracing::info!(operation = %summary.id, "operation dismissed");
     }
     result
+}
+
+/// Reads every Agent home and Project, and lists them with the hidden ones
+/// and the leftovers of the missing Projects.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_places(app: AppHandle) -> Result<Places, api::Error> {
+    blocking(move || {
+        let session = scan()?;
+        let places = session.places();
+        *app.state::<SessionState>().lock() = Some(session);
+        Ok(places)
+    })
+    .await
+}
+
+/// What a change to config-digger's lists did, read again at once.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct ListChanged {
+    /// The Project or Agent home it changed, as it is listed now.
+    pub listed: Listed,
+    pub places: Places,
+}
+
+/// Adds, hides, lists again or forgets a Project or an Agent home, then
+/// reads every Agent home and Project again. It writes no Agent
+/// configuration.
+#[tauri::command]
+#[specta::specta]
+pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChanged, api::Error> {
+    let result = blocking(move || {
+        let core = Core::new(Ports::real())?;
+        let listed = change.apply(&core)?;
+        let session = Session::scan(core)?;
+        let places = session.places();
+        *app.state::<SessionState>().lock() = Some(session);
+        Ok(ListChanged { listed, places })
+    })
+    .await;
+    if let Err(error) = &result {
+        tracing::warn!(code = error.code.code(), "list not changed");
+    }
+    result
+}
+
+/// What the Windows picker picks.
+#[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Pick {
+    Folder,
+    /// A `.code-workspace` file.
+    WorkspaceFile,
+}
+
+/// Opens the Windows picker over the window, `None` when it is cancelled.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_location(
+    window: WebviewWindow,
+    pick: Pick,
+) -> Result<Option<PathBuf>, api::Error> {
+    blocking(move || {
+        let dialog = rfd::FileDialog::new().set_parent(&window);
+        Ok(match pick {
+            Pick::Folder => dialog.pick_folder(),
+            Pick::WorkspaceFile => dialog
+                .add_filter("VS Code workspace", &["code-workspace"])
+                .pick_file(),
+        })
+    })
+    .await
 }
 
 /// Reads every Agent home and Project on this machine.

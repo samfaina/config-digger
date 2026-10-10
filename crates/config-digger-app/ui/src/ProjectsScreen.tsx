@@ -1,0 +1,606 @@
+import { useState, type ReactNode } from "react";
+import { commands, type Agent, type ListChange, type Pick, type Places } from "./bindings";
+import { call, NOTICE_MS } from "./desktop";
+import { Icon } from "./icons";
+import {
+  changedSentence,
+  homeGroups,
+  projectSections,
+  type HiddenRow,
+  type HomeGroup,
+  type HomeRow,
+  type MissingRow,
+  type ProjectRow,
+  type ShowInInventory,
+} from "./places";
+import { useActionDialog } from "./useActionDialog";
+import { usePlaces } from "./usePlaces";
+import { useTransient } from "./useTransient";
+
+type Tab = "projects" | "homes";
+
+type Props = {
+  /** Opens the Inventory on a Project, a missing Project's leftovers or an Agent home. */
+  onShow: (show: ShowInInventory) => void;
+  onOpenHistory: () => void;
+};
+
+/**
+ * The Projects & homes screen: the Projects and the Agent homes config-digger
+ * reads, in two tabs that mirror `projects` and `homes` in the CLI.
+ */
+export function ProjectsScreen({ onShow, onOpenHistory }: Props) {
+  const { places, error, reload, change } = usePlaces();
+  const [tab, setTab] = useState<Tab>("projects");
+  const [adding, setAdding] = useState<Tab | null>(null);
+  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  // Remove leftovers is an Operation, previewed like any other.
+  const dialog = useActionDialog({ onClosed: reload, onOpenHistory, notify: setNotice });
+
+  /** Applies a change to config-digger's lists and says what it did; returns the error message, if any. */
+  const apply = async (request: ListChange): Promise<string | null> => {
+    const result = await change(request);
+    if (result.status === "error") {
+      setNotice(result.error.message);
+      return result.error.message;
+    }
+    setNotice(changedSentence(request, result.data.listed));
+    return null;
+  };
+
+  const projectCount = places?.projects.length ?? 0;
+  const homeCount = places?.agents.reduce((sum, agent) => sum + agent.homes.length, 0) ?? 0;
+  return (
+    <div className="places">
+      <header className="panel banner">
+        <div>
+          <div className="caption">Where config-digger looks</div>
+          <div className="banner-title">Projects &amp; homes</div>
+        </div>
+        <span className="segmented places-tabs" role="tablist" aria-label="Projects or Agent homes">
+          {(["projects", "homes"] as const).map((each) => (
+            <button
+              type="button"
+              key={each}
+              role="tab"
+              className={tab === each ? "on" : ""}
+              aria-selected={tab === each}
+              onClick={() => setTab(each)}
+            >
+              {each === "projects" ? `Projects · ${projectCount}` : `Agent homes · ${homeCount}`}
+            </button>
+          ))}
+        </span>
+        <p className="places-about dim">
+          {tab === "projects"
+            ? "Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk."
+            : "Each Agent reads its user configuration from one or more homes. Entries in different homes never compete."}
+        </p>
+        <span className="grow" />
+        <button type="button" className="cta" onClick={() => setAdding(tab)}>
+          <Icon name="folder" small />
+          {tab === "projects" ? "Add Project" : "Add Agent home"}
+        </button>
+      </header>
+
+      <div className="panes">
+        <section className="panel places-list">
+          {error && (
+            <div className="alert" role="alert">
+              <Icon name="flag" small />
+              The Projects and Agent homes couldn't be read: {error.message}
+            </div>
+          )}
+          <div className="scroll">
+            {places === null ? (
+              !error && <p className="empty">Reading the Projects and Agent homes…</p>
+            ) : tab === "projects" ? (
+              <ProjectsTab
+                places={places}
+                onShow={onShow}
+                onChange={(request) => void apply(request)}
+                onRemoveLeftovers={(path) => dialog.open({ kind: "leftovers", project: path })}
+              />
+            ) : (
+              <HomesTab places={places} onShow={onShow} onChange={(request) => void apply(request)} />
+            )}
+          </div>
+        </section>
+        {tab === "projects" ? <ProjectsSide places={places} /> : <HomesSide />}
+      </div>
+
+      {adding === "projects" && <AddProjectDialog onAdd={apply} onClose={() => setAdding(null)} />}
+      {adding === "homes" && <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} />}
+
+      {notice && (
+        <div className="notice" role="status">
+          {notice}
+        </div>
+      )}
+
+      {dialog.view}
+    </div>
+  );
+}
+
+type ProjectsTabProps = {
+  places: Places;
+  onShow: (show: ShowInInventory) => void;
+  onChange: (change: ListChange) => void;
+  onRemoveLeftovers: (path: string) => void;
+};
+
+/** The Projects, No Project, the missing Projects (open by default) and the hidden ones (collapsed). */
+function ProjectsTab({ places, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
+  const [missingOpen, setMissingOpen] = useState(true);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+  const { present, missing, hidden } = projectSections(places);
+  const hide = (path: string) => onChange({ kind: "hide_project", path });
+  const forget = (path: string) => onChange({ kind: "forget_project", path });
+  return (
+    <>
+      <GroupTitle title="Projects" count={present.length} />
+      {present.map((row) => (
+        <ProjectLine key={row.path} row={row} onShow={onShow} onHide={hide} onForget={forget} />
+      ))}
+      <div className="place-row informational">
+        <span className="place-icon">
+          <Icon name="users" small />
+        </span>
+        <div className="place-text">
+          <div className="place-name">No Project</div>
+          <div className="place-sub">
+            Always available in the Inventory: an Agent started outside any Project, where only user, managed, plugin and
+            connector Scopes compete.
+          </div>
+        </div>
+      </div>
+
+      {missing.length > 0 && (
+        <>
+          <GroupTitle title="Missing" count={missing.length} open={missingOpen} onToggle={() => setMissingOpen(!missingOpen)} />
+          {missingOpen &&
+            missing.map((row) => (
+              <MissingLine key={row.path} row={row} onShow={onShow} onHide={hide} onRemoveLeftovers={onRemoveLeftovers} />
+            ))}
+        </>
+      )}
+
+      {hidden.length > 0 && (
+        <>
+          <GroupTitle title="Hidden" count={hidden.length} open={hiddenOpen} onToggle={() => setHiddenOpen(!hiddenOpen)} />
+          {hiddenOpen &&
+            hidden.map((row) => (
+              <HiddenLine
+                key={row.path}
+                row={row}
+                onUnhide={(path) => onChange({ kind: "unhide_project", path })}
+                onForget={forget}
+              />
+            ))}
+        </>
+      )}
+    </>
+  );
+}
+
+/** A section title, with its count; a collapsible one toggles on click. */
+function GroupTitle({ title, count, open, onToggle }: { title: string; count: number; open?: boolean; onToggle?: () => void }) {
+  const label = `${title} · ${count}`;
+  return (
+    <h3 className="place-group">
+      {onToggle ? (
+        <button type="button" className="place-group-toggle" aria-expanded={open} onClick={onToggle}>
+          {open ? "▾" : "▸"} {label}
+        </button>
+      ) : (
+        label
+      )}
+      <span className="place-group-line" />
+    </h3>
+  );
+}
+
+/** One row: an icon, its text, an optional count and its buttons. */
+function PlaceRow({
+  icon,
+  warn = false,
+  dim = false,
+  children,
+  count,
+  actions,
+}: {
+  icon: "folder" | "doc" | "flag";
+  warn?: boolean;
+  dim?: boolean;
+  children: ReactNode;
+  count?: string;
+  actions: ReactNode;
+}) {
+  return (
+    <div className={`place-row${dim ? " dimmed" : ""}`}>
+      <span className={`place-icon${warn ? " warn" : ""}`}>
+        <Icon name={icon} small />
+      </span>
+      <div className="place-text">{children}</div>
+      {count !== undefined && <span className="place-count">{count}</span>}
+      <div className="row-buttons place-actions">{actions}</div>
+    </div>
+  );
+}
+
+function SmallButton({ label, danger = false, onClick }: { label: ReactNode; danger?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className={`cta small ${danger ? "danger" : "secondary"}`} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+type ProjectLineProps = {
+  row: ProjectRow;
+  onShow: (show: ShowInInventory) => void;
+  onHide: (path: string) => void;
+  onForget: (path: string) => void;
+};
+
+function ProjectLine({ row, onShow, onHide, onForget }: ProjectLineProps) {
+  return (
+    <PlaceRow
+      icon={row.project.workspace_file ? "doc" : "folder"}
+      count={row.entries}
+      actions={
+        <>
+          <SmallButton label="Open in Inventory" onClick={() => onShow({ kind: "project", path: row.path })} />
+          {row.offer === "remove_from_list" ? (
+            <SmallButton label="Remove from list" onClick={() => onForget(row.path)} />
+          ) : (
+            <SmallButton label="Hide" onClick={() => onHide(row.path)} />
+          )}
+        </>
+      }
+    >
+      <div className="place-name mono">{row.path}</div>
+      <div className="place-sub">
+        {row.kind} · {row.source}
+      </div>
+    </PlaceRow>
+  );
+}
+
+type MissingLineProps = {
+  row: MissingRow;
+  onShow: (show: ShowInInventory) => void;
+  onHide: (path: string) => void;
+  onRemoveLeftovers: (path: string) => void;
+};
+
+function MissingLine({ row, onShow, onHide, onRemoveLeftovers }: MissingLineProps) {
+  return (
+    <PlaceRow
+      icon="flag"
+      warn
+      count={row.count}
+      actions={
+        row.hideOffered ? (
+          <SmallButton label="Hide" onClick={() => onHide(row.path)} />
+        ) : (
+          <>
+            <SmallButton label="Show leftovers" onClick={() => onShow({ kind: "leftovers", path: row.path })} />
+            <SmallButton
+              danger
+              label={
+                <>
+                  <Icon name="trash" small />
+                  Remove leftovers
+                </>
+              }
+              onClick={() => onRemoveLeftovers(row.path)}
+            />
+          </>
+        )
+      }
+    >
+      <div className="place-name mono">{row.path}</div>
+      <div className="place-sub">{row.source}</div>
+      {row.leftovers.length > 0 && (
+        <ul className="place-leftovers mono">
+          {row.leftovers.map((leftover) => (
+            <li key={leftover}>{leftover}</li>
+          ))}
+        </ul>
+      )}
+    </PlaceRow>
+  );
+}
+
+function HiddenLine({ row, onUnhide, onForget }: { row: HiddenRow; onUnhide: (path: string) => void; onForget: (path: string) => void }) {
+  return (
+    <PlaceRow
+      icon={row.project.workspace_file ? "doc" : "folder"}
+      dim
+      actions={
+        <>
+          <SmallButton label="Unhide" onClick={() => onUnhide(row.path)} />
+          {row.removable && <SmallButton label="Remove from list" onClick={() => onForget(row.path)} />}
+        </>
+      }
+    >
+      <div className="place-name mono">{row.path}</div>
+      <div className="place-sub">{row.source}</div>
+    </PlaceRow>
+  );
+}
+
+/** Every Agent's homes, each Agent headed by its Installations' versions. */
+function HomesTab({ places, onShow, onChange }: { places: Places; onShow: (show: ShowInInventory) => void; onChange: (change: ListChange) => void }) {
+  return (
+    <>
+      {homeGroups(places).map((group) => (
+        <HomeGroupView key={group.agent} group={group} onShow={onShow} onChange={onChange} />
+      ))}
+    </>
+  );
+}
+
+function HomeGroupView({
+  group,
+  onShow,
+  onChange,
+}: {
+  group: HomeGroup;
+  onShow: (show: ShowInInventory) => void;
+  onChange: (change: ListChange) => void;
+}) {
+  return (
+    <>
+      <h3 className="place-group agent-group">
+        {group.name}
+        <span className="agent-version">
+          installed {group.installed.join(", ")} · {group.definition}
+        </span>
+        <span className="place-group-line" />
+      </h3>
+      {group.notes.map((note) => (
+        <p key={note} className="agent-note">
+          <Icon name="flag" small />
+          {note}
+        </p>
+      ))}
+      {group.homes.length === 0 && <p className="empty">No Agent home found.</p>}
+      {group.homes.map((row) => (
+        <HomeLine key={row.home.home} row={row} onShow={onShow} onChange={onChange} />
+      ))}
+    </>
+  );
+}
+
+function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: ShowInInventory) => void; onChange: (change: ListChange) => void }) {
+  const named = { agent: row.home.agent, home: row.home.home };
+  const buttons = {
+    show: <SmallButton key="show" label="Show in Inventory" onClick={() => onShow({ kind: "home", home: row.home })} />,
+    hide: <SmallButton key="hide" label="Hide" onClick={() => onChange({ kind: "hide_home", ...named })} />,
+    unhide: <SmallButton key="unhide" label="Unhide" onClick={() => onChange({ kind: "unhide_home", ...named })} />,
+    remove_from_list: (
+      <SmallButton key="forget" label="Remove from list" onClick={() => onChange({ kind: "forget_home", ...named })} />
+    ),
+  };
+  return (
+    <PlaceRow icon="folder" dim={row.hidden} count={row.entries} actions={row.actions.map((action) => buttons[action])}>
+      <div className="place-name">{row.label}</div>
+      <div className="place-sub mono">{row.path}</div>
+      <div className="tags">
+        {row.tags.map((tag) => (
+          <span key={tag.text} className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>
+            {tag.text}
+          </span>
+        ))}
+        {row.hidden && <span className="tag">hidden</span>}
+      </div>
+      {row.notes.map((note) => (
+        <div key={note} className="place-sub">
+          {note}
+        </div>
+      ))}
+    </PlaceRow>
+  );
+}
+
+/** Where Projects come from: each Agent's registry, and the user. */
+function ProjectsSide({ places }: { places: Places | null }) {
+  const projects = places?.projects ?? [];
+  const agents = (places?.agents ?? []).filter((agent) => projects.some((project) => project.registered_by.includes(agent.id)));
+  return (
+    <aside className="panel places-side">
+      <h2 className="panel-title">Where Projects come from</h2>
+      <div className="scroll">
+        {agents.map((agent) => (
+          <SideRow
+            key={agent.id}
+            title={agent.name}
+            text="Its own registry of Projects"
+            count={projects.filter((project) => project.registered_by.includes(agent.id)).length}
+          />
+        ))}
+        <SideRow title="Added by you" text="Folders or .code-workspace files" count={projects.filter((project) => project.added).length} />
+        <p className="side-note">
+          A Project found in any one registry is evaluated for every Agent. Worktrees and nested folders are separate
+          Projects only when a registry lists them on their own.
+        </p>
+        <p className="side-note">
+          Hide keeps a Project out of the Inventory's selector; picking it there still evaluates it. Remove from list only
+          applies to Projects you added. Missing Projects keep their leftovers until you remove them; trust lists are never
+          touched.
+        </p>
+        <p className="side-note">
+          Your additions and hides live in %APPDATA%\config-digger\. Nothing on this screen writes Agent configuration,
+          except Remove leftovers, which is an Operation with its own preview, backup and Undo.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+const HOME_SOURCES: [string, string][] = [
+  ["Default location", "Where each Agent definition says the Agent keeps its user configuration."],
+  ["Environment variable", "CODEX_HOME, GEMINI_CLI_HOME and CLAUDE_USER_DATA_DIR, as config-digger sees them."],
+  ["Known location", "MSIX packages, VS Code profiles, and homes other tools keep, such as Orca's Mirrored Codex home."],
+  ["Added by you", "Any existing folder, read with the Agent definition you pick."],
+];
+
+/** Where Agent homes come from. */
+function HomesSide() {
+  return (
+    <aside className="panel places-side">
+      <h2 className="panel-title">Where homes come from</h2>
+      <div className="scroll">
+        {HOME_SOURCES.map(([title, text]) => (
+          <SideRow key={title} title={title} text={text} />
+        ))}
+        <p className="side-note">
+          A home is listed when its folder exists, even if the Agent is not installed. A home the Agent's lookup order
+          skips is listed as not read, with the reason.
+        </p>
+        <p className="side-note">Installed versions are read from files, never by running the Agent.</p>
+      </div>
+    </aside>
+  );
+}
+
+function SideRow({ title, text, count }: { title: string; text: string; count?: number }) {
+  return (
+    <div className="side-row">
+      <b>{title}</b>
+      <span className="dim">{text}</span>
+      {count !== undefined && <span className="side-count">{count}</span>}
+    </div>
+  );
+}
+
+/** A small dialog with a title, its body, and Cancel and Add. */
+function AddDialog({
+  title,
+  sub,
+  error,
+  busy,
+  onAdd,
+  onClose,
+  children,
+}: {
+  title: string;
+  sub: string;
+  error: string | null;
+  busy: boolean;
+  onAdd: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="dialog-backdrop" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="dialog small" role="dialog" aria-modal="true" aria-labelledby="add-title">
+        <h1 id="add-title" className="dialog-title">
+          {title}
+        </h1>
+        <p className="dialog-subtitle">{sub}</p>
+        {children}
+        {error && (
+          <div className="alert" role="alert">
+            <Icon name="flag" small />
+            {error}
+          </div>
+        )}
+        <footer className="dialog-foot">
+          <span className="grow" />
+          <button type="button" className="cta secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="cta" disabled={busy} onClick={onAdd}>
+            Add
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+/** Adds, then closes once added; keeps the dialog open with the core's reason otherwise. */
+function useAdd(onAdd: (change: ListChange) => Promise<string | null>, onClose: () => void) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const add = async (change: ListChange) => {
+    setBusy(true);
+    const refused = await onAdd(change);
+    setBusy(false);
+    if (refused === null) onClose();
+    else setError(refused);
+  };
+  return { error, busy, add };
+}
+
+/** Opens the Windows picker, filling `set` with what was picked. */
+async function pick(what: Pick, set: (path: string) => void) {
+  const result = await call(() => commands.pickLocation(what));
+  if (result.status === "ok" && result.data !== null) set(result.data);
+}
+
+type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void };
+
+function AddProjectDialog({ onAdd, onClose }: AddProps) {
+  const [path, setPath] = useState("");
+  const { error, busy, add } = useAdd(onAdd, onClose);
+  return (
+    <AddDialog
+      title="Add Project"
+      sub="A folder or a .code-workspace file. config-digger evaluates it for every Agent and writes nothing to any Agent."
+      error={error}
+      busy={busy || path.trim() === ""}
+      onAdd={() => void add({ kind: "add_project", path: path.trim() })}
+      onClose={onClose}
+    >
+      <div className="add-field">
+        <input className="add-input mono" aria-label="Path" value={path} onChange={(event) => setPath(event.target.value)} />
+        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setPath)}>
+          Choose folder…
+        </button>
+        <button type="button" className="cta small secondary" onClick={() => void pick("workspace_file", setPath)}>
+          Choose .code-workspace…
+        </button>
+      </div>
+      <p className="side-note">The folder or file must exist. config-digger reads it again at once.</p>
+    </AddDialog>
+  );
+}
+
+function AddHomeDialog({ agents, onAdd, onClose }: AddProps & { agents: Agent[] }) {
+  const [agent, setAgent] = useState(agents[0]?.id ?? "");
+  const [folder, setFolder] = useState("");
+  const { error, busy, add } = useAdd(onAdd, onClose);
+  return (
+    <AddDialog
+      title="Add Agent home"
+      sub="A folder an instance of an Agent reads its user configuration from, such as another CODEX_HOME or a portable install."
+      error={error}
+      busy={busy || folder.trim() === "" || agent === ""}
+      onAdd={() => void add({ kind: "add_home", folder: folder.trim(), agent })}
+      onClose={onClose}
+    >
+      <div className="add-field">
+        <select className="add-input" aria-label="Agent" value={agent} onChange={(event) => setAgent(event.target.value)}>
+          {agents.map((each) => (
+            <option key={each.id} value={each.id}>
+              {each.name}
+            </option>
+          ))}
+        </select>
+        <input className="add-input mono" aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)} />
+        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setFolder)}>
+          Choose…
+        </button>
+      </div>
+      <p className="side-note">
+        Any existing folder is accepted. config-digger reads it with the definition of the Agent you pick; if none of the
+        files that definition expects are there, the home is listed with "No configuration found".
+      </p>
+    </AddDialog>
+  );
+}

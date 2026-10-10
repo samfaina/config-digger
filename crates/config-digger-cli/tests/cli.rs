@@ -562,6 +562,8 @@ fn list_json_prints_one_document_with_schema_version() {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
+            // Its two user servers, and `dart`, keyed to a Project.
+            "entries": 3,
             "notes": [{
                 "code": "no_installation_found",
                 "installation": null,

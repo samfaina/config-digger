@@ -13,6 +13,9 @@ fn main() {
         "read_history",
         "history_detail",
         "dismiss_operation",
+        "read_places",
+        "change_list",
+        "pick_location",
     ]);
 
     // Tauri embeds its Windows application manifest (Common Controls v6) in

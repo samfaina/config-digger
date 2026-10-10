@@ -48,6 +48,8 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
+            // Its two user servers, and `dart`, keyed to a Project.
+            "entries": 3,
             "notes": [{
                 "code": "no_installation_found",
                 "installation": null,

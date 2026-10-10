@@ -17,6 +17,9 @@ clap_complete = "4.6"
 humantime = "2.4"
 # Pre-1.0, and its CST API changes between minor releases: upgrade deliberately.
 jsonc-parser = { version = "=0.34.0", features = ["cst", "serde", "serde_json"] }
+# The Windows picker for folders and files. Windows only, so no default
+# (Linux portal) feature is needed.
+rfd = { version = "0.16", default-features = false }
 # SQLite stores such as `state.vscdb`, read-only. Bundled, so no system
 # library is needed.
 rusqlite = { version = "0.40", features = ["bundled"] }
