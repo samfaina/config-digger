@@ -33,11 +33,42 @@ pub struct Loaded {
 }
 
 /// An extra definition file that failed to load, and why.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct RejectedDefinition {
     pub file: PathBuf,
     /// The validation error, naming the file.
     pub message: String,
+}
+
+/// Loads each definition file directly in `folder` with `parse`, after
+/// those in `loaded`, adding to `rejected` each that fails to load or whose
+/// `id` one already loaded has.
+fn load_folder<D>(
+    ports: &Ports,
+    folder: &Path,
+    loaded: &mut Vec<D>,
+    rejected: &mut Vec<RejectedDefinition>,
+    parse: fn(&str, &str) -> Result<D, definitions::DefinitionError>,
+    id: fn(&D) -> &String,
+) -> Result<(), Error> {
+    for (file, text) in definition_files(ports, folder)? {
+        let name = file.display().to_string();
+        let parsed = text.and_then(|text| {
+            let definition = parse(&name, &text).map_err(|e| e.to_string())?;
+            if loaded.iter().any(|known| id(known) == id(&definition)) {
+                return Err(format!(
+                    "definition `{name}` is invalid: id `{}` is taken by another definition",
+                    id(&definition)
+                ));
+            }
+            Ok(definition)
+        });
+        match parsed {
+            Ok(definition) => loaded.push(definition),
+            Err(message) => rejected.push(RejectedDefinition { file, message }),
+        }
+    }
+    Ok(())
 }
 
 /// A definition file, with its text or why it cannot be read.
@@ -109,29 +140,24 @@ impl Core {
     pub fn with_definitions_folder(ports: Ports, folder: &Path) -> Result<Loaded, Error> {
         let mut core = Self::new(ports)?;
         let mut rejected = Vec::new();
-        let mut reject = |file: PathBuf, message: String| {
-            rejected.push(RejectedDefinition { file, message });
-        };
-        for (file, text) in definition_files(&core.ports, folder)? {
-            let name = file.display().to_string();
-            match text.and_then(|text| definitions::parse(&name, &text).map_err(|e| e.to_string()))
-            {
-                Ok(definition) => core.definitions.agents.push(definition),
-                Err(message) => reject(file, message),
-            }
-        }
+        load_folder(
+            &core.ports,
+            folder,
+            &mut core.definitions.agents,
+            &mut rejected,
+            definitions::parse,
+            |definition| &definition.agent.id,
+        )?;
         let managers = folder.join("skill-managers");
         if core.ports.fs.exists(&managers) {
-            for (file, text) in definition_files(&core.ports, &managers)? {
-                let name = file.display().to_string();
-                let parsed = text.and_then(|text| {
-                    definitions::skill_managers::parse(&name, &text).map_err(|e| e.to_string())
-                });
-                match parsed {
-                    Ok(definition) => core.definitions.skill_managers.push(definition),
-                    Err(message) => reject(file, message),
-                }
-            }
+            load_folder(
+                &core.ports,
+                &managers,
+                &mut core.definitions.skill_managers,
+                &mut rejected,
+                definitions::skill_managers::parse,
+                |definition| &definition.manager.id,
+            )?;
         }
         rejected.sort_by_key(|rejected| paths::key(&rejected.file));
         Ok(Loaded { core, rejected })

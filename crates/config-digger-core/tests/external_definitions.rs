@@ -199,3 +199,52 @@ fn a_skill_managers_folder_adds_skill_manager_definitions() {
         serde_json::json!({ "id": "acme", "name": "Acme skills" })
     );
 }
+
+#[test]
+fn a_definition_whose_id_is_taken_is_rejected() {
+    let acme_again = ACME_MANAGER.replace("Acme skills", "Acme again");
+    let fs = FakeFileSystem::new()
+        .with_file(definition_file("alpha.toml"), agent("alpha"))
+        .with_file(definition_file("alpha-again.toml"), agent("alpha"))
+        .with_file(definition_file("codex.toml"), agent("codex"))
+        .with_file(definition_file(r"skill-managers\acme.toml"), ACME_MANAGER)
+        .with_file(
+            definition_file(r"skill-managers\acme-again.toml"),
+            acme_again,
+        )
+        .with_file(
+            definition_file(r"skill-managers\skillfish.toml"),
+            ACME_MANAGER.replace("\"acme\"", "\"skillfish\""),
+        );
+    let ports = fake::ports(fs, FakeEnvironment::with_home(HOME));
+
+    let loaded = Core::with_definitions_folder(ports, Path::new(DEFINITIONS)).unwrap();
+
+    let rejected: Vec<(PathBuf, &str)> = loaded
+        .rejected
+        .iter()
+        .map(|rejected| (rejected.file.clone(), rejected.message.as_str()))
+        .collect();
+    assert_eq!(
+        rejected
+            .iter()
+            .map(|(file, _)| file.clone())
+            .collect::<Vec<_>>(),
+        [
+            definition_file("alpha.toml"),
+            definition_file("codex.toml"),
+            definition_file(r"skill-managers\acme.toml"),
+            definition_file(r"skill-managers\skillfish.toml"),
+        ],
+        "{rejected:#?}"
+    );
+    assert!(
+        rejected
+            .iter()
+            .all(|(_, message)| message.contains("is taken")),
+        "{rejected:#?}"
+    );
+    let agents = agent_ids(&loaded.core);
+    assert_eq!(agents.iter().filter(|(id, _)| id == "alpha").count(), 1);
+    assert_eq!(agents.iter().filter(|(id, _)| id == "codex").count(), 1);
+}

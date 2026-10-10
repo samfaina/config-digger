@@ -1,17 +1,21 @@
 #:schema ../../../../../../schema/agent-definition.schema.json
 # Zed, the acceptance walk of ADR 0005: Zed is outside v0.1, and this
-# definition describes it with only the blocks the six v0.1 Agents need. It
-# is a test fixture, never shipped: `--definitions` loads it. Facts from
+# definition describes it with the blocks the six v0.1 Agents need, no new
+# block. It is a test fixture, never shipped: `--definitions` loads it.
+# Facts from
 # docs/research/agent-definition-format.md, read from Zed's source at
 # `zed-industries/zed` @ `95cd535a5fad` [source] and from its files on the
 # reference machine [disk]. No real-Agent test has run against it, so it
 # has no `verified` range.
 #
-# The walk found two gaps, each filled by a parameter of an existing block
-# rather than a new block: a setting read from a table of a SQLite store
-# (`table`), with a `trusted-folders` gate whose items are paths, for
-# Zed's trust; and a Feature gate kept nowhere on disk, for its active
-# settings profile.
+# This departs from ADR 0005's "only blocks the six v0.1 Agents already
+# need" in two places, where the walk found a gap: each is filled by a new
+# parameter of an existing block, which no v0.1 definition uses yet. One is
+# a setting read from a table of a SQLite store (`table`), with a
+# `trusted-folders` gate whose items are paths, for Zed's trust; the other a
+# Feature gate kept nowhere on disk, for its active settings profile. Zed's
+# ordered transport rules map to no block: the catalog has none for any
+# Agent, and `shape` names the fields each kind of server takes.
 
 format_version = 1
 
@@ -88,9 +92,12 @@ registry = { block = "plugin-folders", anchor = { block = "machine", path = "%LO
 
 # A worktree's `.zed/settings.json` [source]. Zed applies one in a subfolder
 # of the worktree too, to the files below it, the deeper winning [source]:
-# a Project is read from its folder up to the root of its repo, the deeper
-# first, as Codex reads its project layers. Whether a nested file
-# contributes servers at all is unverified.
+# for a Project in a subfolder of a worktree, its own file ranks above the
+# worktree's. The Project is read from its folder up to the root of its
+# repo, the deeper first, as Codex reads its project layers, with the repo's
+# root standing in for the worktree's: a worktree opened below a repo's root
+# reads no file above it, so the two differ there. Both that stand-in and
+# whether a nested file contributes servers at all are unverified.
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".zed/settings.json", walk = "up-to-repo-root" }

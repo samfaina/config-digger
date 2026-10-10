@@ -146,3 +146,25 @@ fn a_table_is_read_only_from_a_sqlite_store_and_by_one_column() {
         assert!(error.message.contains(expected), "{}", error.message);
     }
 }
+
+#[test]
+fn a_store_whose_table_cannot_be_read_is_a_caveat_naming_it() {
+    let fs = FakeFileSystem::new().with_sqlite_rows(STORE, "other", "path", &[r"E:\workpp"]);
+    let fs = with_server(fs, &project("app"));
+
+    let inventory = inventory(fs, &project("app"));
+
+    let item = inventory
+        .items
+        .iter()
+        .find(|item| item.agent == "table-agent")
+        .unwrap();
+    let entry = serde_json::to_value(&item.entries[0]).unwrap();
+    let caveats = entry["caveats"].as_array().unwrap();
+    assert!(
+        caveats
+            .iter()
+            .any(|caveat| caveat["code"] == "setting_read_failure" && caveat["path"] == STORE),
+        "{entry:#}"
+    );
+}

@@ -3836,8 +3836,10 @@ impl<'p> Reader<'p> {
 
     /// The texts of the column `column` of the table `table` in the SQLite
     /// store at `path`, as the text of a JSON list, `None` when the store
-    /// or the table is missing, without reporting a failure: for a store
-    /// that holds no Entries, such as a gate's.
+    /// is missing, without reporting a failure: for a store that holds no
+    /// Entries, such as a gate's. A store that cannot be opened or queried,
+    /// its table missing included, is unreadable: what it holds is not
+    /// known, rather than empty.
     fn peek_column(
         &mut self,
         path: &Path,
@@ -3846,11 +3848,10 @@ impl<'p> Reader<'p> {
     ) -> Result<Option<String>, ReadFailureKind> {
         match self.fs.read_sqlite_column(path, table, column) {
             Ok(values) => Ok(Some(serde_json::Value::from(values).to_string())),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(error) => {
-                // A store without the table, as in another version of the
-                // Agent, holds no value.
                 tracing::debug!(path = %path.display(), %table, %error, "cannot read the column");
-                Ok(None)
+                Err(ReadFailureKind::Sqlite)
             }
         }
     }

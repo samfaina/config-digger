@@ -660,10 +660,7 @@ fn load_core(cli: &Cli) -> Result<Core, Failure> {
         .collect();
     Err(Failure::new(
         "invalid_definition",
-        messages.join(
-            "
-",
-        ),
+        messages.join("\n"),
         Exit::Usage,
     ))
 }

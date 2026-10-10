@@ -1,8 +1,8 @@
 //! The Zed acceptance walk of ADR 0005, through the core `api` with fake
 //! ports: the fixture definition in `fixtures/zed/definitions`, written
-//! with only the blocks the six v0.1 Agents need and loaded as
-//! `--definitions` loads it, resolves a fixture Zed home and Project to the
-//! States Zed gives their servers and skills.
+//! with the blocks the six v0.1 Agents need and two new parameters of them,
+//! and loaded as `--definitions` loads it, resolves a fixture Zed home and
+//! Project to the States Zed gives their servers and skills.
 
 use config_digger_core::api::{
     Action, Context, Core, Inventory, ScanOptions, Targets, WarningClass,
@@ -429,4 +429,33 @@ fn jsonc(text: &str) -> Value {
     jsonc_parser::parse_to_serde_value::<Option<Value>>(text, &Default::default())
         .unwrap()
         .unwrap()
+}
+
+#[test]
+fn disable_inserts_enabled_false_for_a_server_the_user_s_settings_lack() {
+    let settings = Path::new(APP_DATA).join(r"Zed\settings.json");
+    let global = Path::new(APP_DATA).join(r"Zed\global_settings.json");
+    let fs = trusted();
+
+    disable(
+        &fs,
+        &format!("{}#context_servers.browser", global.display()),
+        &[WarningClass::WideReach],
+    );
+
+    let written = jsonc(&String::from_utf8(fs.contents(&settings).unwrap()).unwrap());
+    assert_eq!(
+        written["context_servers"]["browser"],
+        serde_json::json!({ "enabled": false })
+    );
+    let global_text = String::from_utf8(fs.contents(&global).unwrap()).unwrap();
+    assert_eq!(
+        jsonc(&global_text)["context_servers"]["browser"]["command"],
+        "browser-mcp"
+    );
+    let browser = entries_of(&states(&inventory(&fs)), "mcp", "browser");
+    assert!(
+        browser.iter().all(|(_, state, _)| state != "effective"),
+        "{browser:?}"
+    );
 }
