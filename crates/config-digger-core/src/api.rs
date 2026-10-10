@@ -7,8 +7,7 @@ use crate::definitions::{self, Definitions, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::{Environment, Ports};
 use crate::{
-    execute, explain, history, locator, park, paths, plan, resolve, scan, select, settings, skill,
-    user_list,
+    execute, explain, history, park, paths, plan, resolve, scan, select, settings, skill, user_list,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -483,19 +482,16 @@ impl Core {
     /// before it deletes config-digger's data. None when there is no store.
     pub fn stored_parked_entries(&self) -> Result<Vec<StoredParkedEntry>, Error> {
         let store = park::store_path(self.ports.env.as_ref())?;
+        let unreadable = |error: &dyn std::fmt::Display| {
+            Error::unexpected(format!("cannot read {}: {error}", store.display()))
+        };
         let bytes = match self.ports.fs.read(&store) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => {
-                return Err(Error::unexpected(format!(
-                    "cannot read {}: {error}",
-                    store.display()
-                )));
-            }
+            Err(error) => return Err(unreadable(&error)),
         };
-        let document: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
-            Error::unexpected(format!("cannot read {}: {error}", store.display()))
-        })?;
+        let document: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|error| unreadable(&error))?;
         let mut stored: Vec<StoredParkedEntry> = park::parked_entries(&document)
             .into_iter()
             .map(|(_, parked)| {
@@ -505,14 +501,9 @@ impl Core {
                     .agents
                     .iter()
                     .find(|definition| definition.agent.id == origin.agent)
-                    .map_or_else(
-                        || origin.agent.clone(),
-                        |definition| definition.agent.name.clone(),
-                    );
+                    .map_or(origin.agent, |definition| definition.agent.name.clone());
                 StoredParkedEntry {
-                    locator: locator::render(&origin.path, &origin.key_path),
                     name: origin.name,
-                    agent: origin.agent,
                     agent_name,
                 }
             })
@@ -1269,16 +1260,12 @@ impl DataFolders {
     }
 }
 
-/// An Entry in config-digger's parked-Entry store, as the store records it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+/// An Entry in config-digger's parked-Entry store, as the uninstaller names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredParkedEntry {
     pub name: String,
-    /// The id of its Agent, such as `claude-desktop`.
-    pub agent: String,
-    /// The Agent's name, or its id when no loaded definition has it.
+    /// Its Agent's name, or the Agent's id when no loaded definition has it.
     pub agent_name: String,
-    /// `<path>#<key path>` of where it was, which Enable puts it back to.
-    pub locator: String,
 }
 
 /// How long History keeps Operations: at least the last `operations`, and

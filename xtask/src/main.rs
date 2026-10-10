@@ -62,8 +62,8 @@ fn main() -> ExitCode {
         }
         _ => {
             eprintln!(
-                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions
-                        cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>"
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions\n       \
+                 cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>"
             );
             return ExitCode::from(2);
         }
@@ -105,7 +105,7 @@ fn check_definitions() -> ExitCode {
 
 /// The release `tag` names, checked against the workspace version.
 fn checked_release(tag: &str) -> Result<release::Release, ExitCode> {
-    release::release(tag, env!("CARGO_PKG_VERSION")).map_err(|error| {
+    release::from_tag(tag, env!("CARGO_PKG_VERSION")).map_err(|error| {
         eprintln!("{error}");
         ExitCode::FAILURE
     })

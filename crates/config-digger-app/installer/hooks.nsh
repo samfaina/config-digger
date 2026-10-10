@@ -3,6 +3,7 @@
 ;
 ; - The welcome page carries a checkbox, checked by default, that puts the
 ;   install folder on the user PATH (HKCU). The uninstaller takes it off.
+;   An unticked box is remembered for the next install, silent ones included.
 ;   `$PROFILE` is never touched. The PATH is edited by the console exe,
 ;   `config-digger installer add-to-path|remove-from-path`, because NSIS
 ;   strings stop at 1024 characters and would cut a long PATH.
@@ -23,10 +24,22 @@
 !define DATA_LOCAL "$LOCALAPPDATA\config-digger"
 !define DATA_ROAMING "$APPDATA\config-digger"
 
+; Where the PATH choice is remembered: Tauri's `${MANUPRODUCTKEY}` for the
+; publisher samfaina, not defined yet where this file is included. Tauri
+; deletes it with config-digger's data.
+!define PATH_CHOICE_KEY "Software\samfaina\config-digger"
+!define PATH_CHOICE_VALUE "KeepPathAlone"
+
 Var AddToPathCheckbox
-; 1 once the user unticks the checkbox; empty, so ticked, until then and in
-; silent and passive installs, which skip the welcome page.
+; 1 when the user unticked the checkbox, now or at the last install; 0 or
+; empty, so ticked, otherwise.
 Var KeepPathAlone
+
+Function LoadPathChoice
+  ${If} $KeepPathAlone == ""
+    ReadRegDWORD $KeepPathAlone HKCU "${PATH_CHOICE_KEY}" "${PATH_CHOICE_VALUE}"
+  ${EndIf}
+FunctionEnd
 
 ; Tauri's welcome page is the first page inserted after this file.
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW AddToPathShow
@@ -35,6 +48,7 @@ Var KeepPathAlone
 ; Below the welcome text, which ends at 175u, on the page's white: MUI's
 ; default `MUI_BGCOLOR`, not defined yet where this file is included.
 Function AddToPathShow
+  Call LoadPathChoice
   ${NSD_CreateCheckbox} 120u 177u 195u 12u "$(addToPath)"
   Pop $AddToPathCheckbox
   SetCtlColors $AddToPathCheckbox "" "FFFFFF"
@@ -65,6 +79,8 @@ FunctionEnd
 
 !macro NSIS_HOOK_POSTINSTALL
   ${If} $UpdateMode <> 1
+    Call LoadPathChoice
+    WriteRegDWORD HKCU "${PATH_CHOICE_KEY}" "${PATH_CHOICE_VALUE}" $KeepPathAlone
     ${If} $KeepPathAlone = 1
       !insertmacro EditUserPath remove-from-path
     ${Else}
@@ -73,7 +89,10 @@ FunctionEnd
   ${EndIf}
 !macroend
 
+; Tauri checks for a running app only after this hook: check first, so that
+; cancelling its "Click OK to kill it" leaves the PATH and the data alone.
 !macro NSIS_HOOK_PREUNINSTALL
+  !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
   ${If} $UpdateMode <> 1
     !insertmacro EditUserPath remove-from-path
 

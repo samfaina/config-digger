@@ -14,7 +14,7 @@ pub struct Release {
 
 /// The release `tag` names, which must be `v` followed by the workspace's
 /// `version`.
-pub fn release(tag: &str, version: &str) -> Result<Release, String> {
+pub fn from_tag(tag: &str, version: &str) -> Result<Release, String> {
     let Some((tagged, prerelease)) = tag.strip_prefix('v').and_then(parse) else {
         return Err(format!(
             "the tag {tag} is not vX.Y.Z or vX.Y.Z-rc.N with numbers without leading zeros"
@@ -61,12 +61,7 @@ pub fn sha256sums(files: &[(String, Vec<u8>)]) -> String {
     lines.sort();
     lines
         .iter()
-        .map(|(name, hash)| {
-            format!(
-                "{hash}  {name}
-"
-            )
-        })
+        .map(|(name, hash)| format!("{hash}  {name}\n"))
         .collect()
 }
 
@@ -148,7 +143,7 @@ mod tests {
     #[test]
     fn a_tag_of_the_workspace_version_is_a_release() {
         assert_eq!(
-            release("v0.1.0", "0.1.0"),
+            from_tag("v0.1.0", "0.1.0"),
             Ok(Release {
                 version: "0.1.0".to_owned(),
                 prerelease: false
@@ -159,7 +154,7 @@ mod tests {
     #[test]
     fn an_rc_tag_is_a_prerelease() {
         assert_eq!(
-            release("v0.2.0-rc.3", "0.2.0-rc.3"),
+            from_tag("v0.2.0-rc.3", "0.2.0-rc.3"),
             Ok(Release {
                 version: "0.2.0-rc.3".to_owned(),
                 prerelease: true
@@ -170,7 +165,7 @@ mod tests {
     #[test]
     fn a_tag_of_another_version_is_refused() {
         assert_eq!(
-            release("v0.1.1", "0.1.0"),
+            from_tag("v0.1.1", "0.1.0"),
             Err("the tag v0.1.1 is not the workspace version 0.1.0: tag v0.1.0".to_owned())
         );
     }
@@ -186,7 +181,7 @@ mod tests {
             "v01.1.0",
         ] {
             let version = tag.trim_start_matches('v');
-            assert!(release(tag, version).is_err(), "{tag}");
+            assert!(from_tag(tag, version).is_err(), "{tag}");
         }
     }
 

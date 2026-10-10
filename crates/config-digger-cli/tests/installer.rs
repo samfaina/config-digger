@@ -110,7 +110,7 @@ fn installer_parked_prints_nothing_without_a_parked_entry_store() {
 }
 
 #[test]
-fn installer_parked_names_the_first_ten_by_name_and_counts_the_rest() {
+fn installer_parked_names_the_first_eight_by_name_and_counts_the_rest() {
     let names: Vec<String> = (1..=12).map(|n| format!("server-{n:02}")).collect();
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
     let harness = Harness::new().with_parked("claude-desktop", &names);
@@ -119,10 +119,10 @@ fn installer_parked_names_the_first_ten_by_name_and_counts_the_rest() {
 
     assert_eq!(run.code, 0, "{}", run.stderr);
     let lines: Vec<&str> = run.stdout.lines().collect();
-    assert_eq!(lines.len(), 11, "{}", run.stdout);
+    assert_eq!(lines.len(), 9, "{}", run.stdout);
     assert_eq!(lines[0], "server-01 (Claude Desktop)");
-    assert_eq!(lines[9], "server-10 (Claude Desktop)");
-    assert_eq!(lines[10], "and 2 more");
+    assert_eq!(lines[7], "server-08 (Claude Desktop)");
+    assert_eq!(lines[8], "and 4 more");
 }
 
 /// A throwaway key under `HKCU\Software` standing in for the user's
@@ -274,4 +274,18 @@ fn remove_from_path_deletes_a_path_left_empty() {
 
     assert_eq!(run.code, 0, "{}", run.stderr);
     assert_eq!(key.path(), None);
+}
+
+#[test]
+fn installer_parked_shortens_long_lines_to_fit_the_uninstaller_message() {
+    let long = "a-server-name-far-longer-than-anyone-would-normally-give-a-server";
+    let harness = Harness::new().with_parked("claude-desktop", &[long]);
+
+    let run = harness.run(&["installer", "parked"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert_eq!(
+        run.stdout,
+        "a-server-name-far-longer-than-anyone-would-normally-give-...\n"
+    );
 }

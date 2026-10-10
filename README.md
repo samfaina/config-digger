@@ -10,13 +10,15 @@ Windows 11, x64. Windows 10 22H2 should work but is not tested.
 
 ### Installer
 
-Download `config-digger_<version>_x64-setup.exe` from [GitHub Releases](https://github.com/samfaina/config-digger/releases) and run it. It installs for your user only, without admin rights, into `%LOCALAPPDATA%\config-digger`, with the app and the `config-digger` CLI in the same folder.
+Download `config-digger_<version>_x64-setup.exe` from [GitHub Releases](https://github.com/samfaina/config-digger/releases) and run it. It installs for your user only, without admin rights, into `%LOCALAPPDATA%\config-digger`, with the app and the `config-digger` CLI in the same folder. That is also the folder where config-digger keeps its data (see [Uninstall](#uninstall)).
 
-The box "Add the config-digger command to my PATH", checked by default, adds that folder to your user PATH, so `config-digger` works in any new terminal. The uninstaller takes it off again. The installer never edits your PowerShell `$PROFILE`.
+The box "Add the config-digger command to my PATH", checked by default, adds that folder to your user PATH, so `config-digger` works in any new terminal. The uninstaller takes it off again. If you untick the box, later installs and upgrades remember that. The installer never edits your PowerShell `$PROFILE`.
 
 The app needs the WebView2 runtime. Windows 11 ships with it. If it is missing, the installer downloads it.
 
 ### winget
+
+Once a release's manifest is accepted into the winget repository:
 
 ```powershell
 winget install samfaina.config-digger
@@ -37,7 +39,7 @@ The builds are not code-signed yet.
 
 ### Checking a download
 
-Each release has a `SHA256SUMS` file and GitHub artifact attestations for the installer and the CLI zip:
+Each release has a `SHA256SUMS` file and GitHub artifact attestations for the installer and the CLI zip. Compare the hash `Get-FileHash` prints with the file's line in `SHA256SUMS`, or let `gh` check the attestation:
 
 ```powershell
 Get-FileHash .\config-digger_0.1.0_x64-setup.exe -Algorithm SHA256
@@ -62,7 +64,7 @@ With `--json`, every command prints exactly one JSON document with a `schema_ver
 
 Uninstall config-digger from Settings > Apps, or with `winget uninstall samfaina.config-digger`.
 
-By default the uninstaller keeps config-digger's data:
+By default the uninstaller removes only the app's own files and keeps config-digger's data:
 
 - `%LOCALAPPDATA%\config-digger`: backups, the History of Operations behind Undo, logs and the parked-Entry store;
 - `%APPDATA%\config-digger`: the homes and Projects you added or hid, and the app's settings.
