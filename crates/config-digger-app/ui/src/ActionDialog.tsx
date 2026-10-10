@@ -9,7 +9,7 @@ import {
   type StateAfter,
   type WarningClass,
 } from "./bindings";
-import { revealLocation, type Notify } from "./desktop";
+import { copy, revealLocation, type Notify } from "./desktop";
 import {
   appliedResult,
   applyButton,
@@ -22,6 +22,7 @@ import {
   type Result,
   type Step,
 } from "./dialog";
+import { undoRefusal, type UndoRefusal } from "./history";
 import { Icon } from "./icons";
 import { StatePill } from "./StatePill";
 
@@ -49,6 +50,8 @@ type Props = {
   /** Opens the dialog on the Undo of `operation`. */
   onUndo: (operation: string) => void;
   onOpenHistory: () => void;
+  /** Takes over a refused Undo of `operation`, to show it elsewhere; the dialog shows it otherwise. */
+  onRefused?: (operation: string, refusal: UndoRefusal) => void;
   notify: Notify;
 };
 
@@ -56,8 +59,11 @@ type Props = {
  * One modal dialog per action: its preview with everything that matters for
  * safety on one page, then the write as it happens and what it did.
  */
-export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }: Props) {
+export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefused, notify }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: "planning" });
+  // Read when planning fails, so that a new callback does not plan again.
+  const refusedRef = useRef(onRefused);
+  refusedRef.current = onRefused;
   // The plan held in Rust, dropped when the dialog goes without applying it.
   const held = useRef<string | null>(null);
   const phaseRef = useRef(phase);
@@ -87,6 +93,11 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
       }
       if (result.status === "error") {
         hold(null);
+        const refusal = undoRefusal(result.error);
+        if (request.kind === "undo" && refusal && refusedRef.current) {
+          refusedRef.current(request.operation, refusal);
+          return;
+        }
         setPhase({ kind: "plan_failed", error: result.error });
         return;
       }
@@ -140,7 +151,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
     if (result.status === "error") {
       setPhase({ kind: "done", planned, result: failedResult(result.error) });
     } else if (result.data.kind === "applied") {
-      setPhase({ kind: "done", planned, result: appliedResult(result.data.outcome) });
+      setPhase({ kind: "done", planned, result: appliedResult(result.data.outcome, planned.preview.action) });
     } else {
       // Nothing was written: every tick is cleared for the fresh preview.
       hold(result.data.preview);
@@ -154,7 +165,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
   };
 
   const applied: Applied | null =
-    phase.kind === "done" && phase.result.kind === "applied"
+    phase.kind === "done" && phase.result.kind === "applied" && phase.result.undo !== null
       ? { operation: phase.result.undo, sentence: phase.result.sentence }
       : null;
   const close = () => {
@@ -195,6 +206,9 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, notify }
             <footer className="dialog-foot">
               <span className="grow" />
               <BackupFolderButton backup={phase.error.backup} notify={notify} />
+              {phase.error.backup !== null && (
+                <CopyPathButton path={phase.error.backup} what="backup folder path" notify={notify} />
+              )}
               <button type="button" className="cta secondary" onClick={retry}>
                 <Icon name="refresh" small />
                 Check again
@@ -366,7 +380,7 @@ function PreviewBody({ planned, acknowledged, fresh, onToggle, onCheckAgain, onC
 }
 
 /** A titled section of the dialog, its title ruled to the edge. */
-function DialogSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function DialogSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="dialog-section">
       <h2 className="dialog-section-title">
@@ -379,7 +393,7 @@ function DialogSection({ title, children }: { title: string; children: React.Rea
 }
 
 /** One (Agent, Entry, Project) whose State the Operation changes, before → after. */
-function ChangeRow({ change }: { change: Change }) {
+export function ChangeRow({ change }: { change: Change }) {
   return (
     <div className="change-row">
       <div className="change-what">
@@ -408,6 +422,21 @@ function StateAfterPill({ state }: { state: StateAfter }) {
 /** One location the Operation touches, open or collapsed, with its tags and masked diff. */
 function LocationBlock({ location }: { location: Location }) {
   const [open, setOpen] = useState(location.open);
+  if (location.kind === "copy") {
+    return (
+      <div className="file-block">
+        <div className="file-head static">
+          <Icon name="doc" small />
+          <span className="mono file-path">{location.path}</span>
+          {location.tags.map((tag) => (
+            <span key={tag} className="tag">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="file-block">
       <button type="button" className="file-head" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -430,7 +459,7 @@ function LocationBlock({ location }: { location: Location }) {
 }
 
 /** A masked diff, or the core's notice of why none can be shown. */
-function Diff({ diff }: { diff: Pick<FileDiff, "diff" | "diff_note"> }) {
+export function Diff({ diff }: { diff: Pick<FileDiff, "diff" | "diff_note"> }) {
   const view = diffView(diff);
   if (view.kind === "notice") return <p className="file-note">{view.sentence}</p>;
   return (
@@ -445,7 +474,7 @@ function Diff({ diff }: { diff: Pick<FileDiff, "diff" | "diff_note"> }) {
 }
 
 /** A masked diff from each backed-up file to what it holds now, as for a refused Undo or an incomplete Rollback. */
-function BackupDiffs({ diffs }: { diffs: FileDiff[] }) {
+export function BackupDiffs({ diffs }: { diffs: FileDiff[] }) {
   if (diffs.length === 0) return null;
   return (
     <DialogSection title="Backup → now">
@@ -462,8 +491,17 @@ function BackupDiffs({ diffs }: { diffs: FileDiff[] }) {
   );
 }
 
+/** Copies a path, such as a backup folder's, to recover from by hand. */
+export function CopyPathButton({ path, what, notify }: { path: string; what: string; notify: Notify }) {
+  return (
+    <button type="button" className="cta secondary" onClick={() => void copy(path, what, notify)}>
+      Copy path
+    </button>
+  );
+}
+
 /** Shows the backup folder an error points at in Explorer. */
-function BackupFolderButton({ backup, notify }: { backup: string | null; notify: Notify }) {
+export function BackupFolderButton({ backup, notify }: { backup: string | null; notify: Notify }) {
   if (backup === null) return null;
   return (
     <button type="button" className="cta secondary" onClick={() => void revealLocation(backup, notify)}>
@@ -511,6 +549,7 @@ type ResultBodyProps = {
 
 /** The chain as far as it got, then what Apply did and what can be done next. */
 function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }: ResultBodyProps) {
+  const undo = result.kind === "applied" ? result.undo : null;
   return (
     <>
       <Steps steps={result.steps} />
@@ -560,10 +599,12 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
           )}
           <footer className="dialog-foot">
             <span className="grow" />
-            <button type="button" className="cta secondary" onClick={() => onUndo(result.undo)}>
-              <Icon name="history" small />
-              Undo
-            </button>
+            {undo !== null && (
+              <button type="button" className="cta secondary" onClick={() => onUndo(undo)}>
+                <Icon name="history" small />
+                Undo
+              </button>
+            )}
             <button type="button" className="cta secondary" onClick={onOpenHistory}>
               Open History
             </button>

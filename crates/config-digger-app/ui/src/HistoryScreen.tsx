@@ -1,0 +1,366 @@
+import { useEffect, useState } from "react";
+import { BackupDiffs, BackupFolderButton, ChangeRow, CopyPathButton, DialogSection, Diff } from "./ActionDialog";
+import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
+import type { Notify } from "./desktop";
+import {
+  operationActions,
+  operationRow,
+  operationTime,
+  type OperationRow,
+  type UndoAction,
+  type UndoRefusal,
+} from "./history";
+import { Icon } from "./icons";
+import { useActionDialog } from "./useActionDialog";
+import { useHistory } from "./useHistory";
+import { useTransient } from "./useTransient";
+
+/** How long a notice stays. */
+const NOTICE_MS = 2500;
+
+const ROLLBACK_LABELS = {
+  restored: "restored",
+  not_written: "never written",
+  left_alone: "left alone",
+  not_restored: "not restored",
+} as const;
+
+/** The History · Undo screen: every Operation, newest first, and the detail of the one selected. */
+export function HistoryScreen() {
+  const { history, error, reload } = useHistory();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
+  // An Undo of the selected Operation that the core refused, shown in its detail.
+  const [refused, setRefused] = useState<{ operation: string; refusal: UndoRefusal } | null>(null);
+  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const dialog = useActionDialog({
+    onClosed: reload,
+    // History is the screen already open.
+    onOpenHistory: () => {},
+    notify: setNotice,
+    onRefused: (operation, refusal) => setRefused({ operation, refusal }),
+  });
+
+  const summary = history?.find((operation) => operation.id === selected) ?? history?.[0] ?? null;
+  const id = summary?.id ?? null;
+
+  // The detail is read again whenever History is, since an Undo or a Dismiss changes it.
+  useEffect(() => {
+    if (id === null) {
+      setDetail(null);
+      return;
+    }
+    let current = true;
+    void commands.historyDetail(id).then(
+      (result) => {
+        if (current) setDetail(result.status === "ok" ? { detail: result.data } : { error: result.error });
+      },
+      (thrown) => {
+        if (current) setDetail({ error: { code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null } });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [id, history]);
+
+  const select = (operation: string) => {
+    setSelected(operation);
+    setRefused(null);
+  };
+
+  const dismiss = async (operation: string) => {
+    const result = await commands.dismissOperation(operation);
+    setNotice(result.status === "ok" ? `Dismissed Operation ${operation}.` : `It couldn't be dismissed: ${result.error.message}`);
+    reload();
+  };
+
+  const now = new Date();
+  const shown = detail && "detail" in detail && detail.detail.summary.id === id ? detail.detail : null;
+  return (
+    <div className="history">
+      <header className="panel banner">
+        <div>
+          <div className="caption">History · Undo</div>
+          <div className="banner-title">{count(history?.length ?? 0)}</div>
+        </div>
+        <p className="history-about dim">
+          Any Operation can be undone on its own, across restarts. Undo is refused when something it touched changed
+          since. Kept: the last 50 Operations and everything from the last 30 days.
+        </p>
+      </header>
+
+      <div className="panes">
+        <section className="panel history-list">
+          <h2 className="panel-title">Operations</h2>
+          {error && (
+            <div className="alert" role="alert">
+              <Icon name="flag" small />
+              History couldn't be read: {error.message}
+            </div>
+          )}
+          <div className="scroll">
+            {history === null ? (
+              <p className="empty">Reading History…</p>
+            ) : history.length === 0 ? (
+              <p className="empty">No Operations yet. Disable, Enable or Remove an Entry and it is listed here.</p>
+            ) : (
+              history.map((operation) => (
+                <OperationRowButton
+                  key={operation.id}
+                  row={operationRow(operation)}
+                  time={operationTime(operation.created_at, now)}
+                  selected={operation.id === id}
+                  onSelect={() => select(operation.id)}
+                />
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="panel detail history-detail">
+          {summary === null ? (
+            <>
+              <h2 className="panel-title">Details</h2>
+              <p className="empty">Select an Operation to see what it changed.</p>
+            </>
+          ) : (
+            <OperationPane
+              summary={summary}
+              detail={shown}
+              detailError={detail && "error" in detail ? detail.error : null}
+              time={operationTime(summary.created_at, now)}
+              refusal={refused?.operation === summary.id ? refused.refusal : null}
+              onUndo={() => {
+                setRefused(null);
+                dialog.open({ kind: "undo", operation: summary.id });
+              }}
+              onDeleteBackup={() => dialog.open({ kind: "delete_backup", operation: summary.id })}
+              onDismiss={() => void dismiss(summary.id)}
+              notify={setNotice}
+            />
+          )}
+        </section>
+      </div>
+
+      {notice && (
+        <div className="notice" role="status">
+          {notice}
+        </div>
+      )}
+
+      {dialog.view}
+    </div>
+  );
+}
+
+function count(operations: number): string {
+  return `${operations} ${operations === 1 ? "Operation" : "Operations"}`;
+}
+
+type RowProps = { row: OperationRow; time: string; selected: boolean; onSelect: () => void };
+
+/** One Operation in the list: time, title, Agents, locations, number and status. */
+function OperationRowButton({ row, time, selected, onSelect }: RowProps) {
+  return (
+    <button type="button" className={`operation-row${selected ? " selected" : ""}`} aria-current={selected || undefined} onClick={onSelect}>
+      <span className="operation-time">{time}</span>
+      <span className="operation-text">
+        <span className="operation-title">{row.title}</span>
+        <span className="operation-meta">{row.meta}</span>
+      </span>
+      <StatusChip status={row.status} />
+    </button>
+  );
+}
+
+/** The status the core renders, with a badge for one that needs attention. */
+function StatusChip({ status }: { status: OperationRow["status"] }) {
+  return (
+    <span className={`status-chip ${status.tone}`}>
+      {status.tone === "attention" && <Icon name="flag" small />}
+      {status.label}
+    </span>
+  );
+}
+
+type PaneProps = {
+  summary: OperationSummary;
+  /** `null` while it is read. */
+  detail: OperationDetail | null;
+  detailError: ApiError | null;
+  time: string;
+  refusal: UndoRefusal | null;
+  onUndo: () => void;
+  onDeleteBackup: () => void;
+  onDismiss: () => void;
+  notify: Notify;
+};
+
+/** What one Operation changed: its States, files with masked diffs and backup, then what can be done to it. */
+function OperationPane({ summary, detail, detailError, time, refusal, onUndo, onDeleteBackup, onDismiss, notify }: PaneProps) {
+  const row = operationRow(summary);
+  const actions = operationActions(summary);
+  return (
+    <>
+      <h2 className="panel-title">
+        {row.title}
+        <StatusChip status={row.status} />
+      </h2>
+      <p className="caption">
+        Operation {summary.id} · {time} · {summary.agents.length > 0 ? summary.agents.join(", ") : "No Agent"}
+      </p>
+
+      <div className="scroll history-body">
+        {refusal && <RefusalBlock refusal={refusal} notify={notify} />}
+
+        {summary.needs_attention && (
+          <div className="dialog-callout danger strong" role="alert">
+            <Icon name="flag" small />
+            <div>
+              <div className="callout-title">This Operation needs manual recovery</div>
+              Its Rollback could not restore every file. Recover them from the backup by hand, then dismiss it.
+            </div>
+          </div>
+        )}
+        {summary.cause && (
+          <div className="dialog-callout danger" role="status">
+            <Icon name="flag" small />
+            <div>{summary.cause}</div>
+          </div>
+        )}
+        {actions.undo.offered && actions.undo.refusal && !refusal && (
+          <div className="alert" role="status">
+            <Icon name="info" small />
+            {actions.undo.refusal}
+          </div>
+        )}
+
+        {detailError && (
+          <div className="alert" role="alert">
+            <Icon name="flag" small />
+            Its detail couldn't be read: {detailError.message}
+          </div>
+        )}
+        {detail === null && !detailError && <p className="empty">Reading what it changed…</p>}
+        {detail && <DetailSections detail={detail} notify={notify} />}
+      </div>
+
+      <footer className="dialog-foot">
+        {actions.dismiss && (
+          <button type="button" className="cta secondary" onClick={onDismiss}>
+            Dismiss
+          </button>
+        )}
+        {actions.deleteBackup && (
+          <button type="button" className="cta secondary" onClick={onDeleteBackup}>
+            <Icon name="trash" small />
+            Delete backup
+          </button>
+        )}
+        <span className="grow" />
+        <UndoButton undo={actions.undo} onUndo={onUndo} />
+      </footer>
+    </>
+  );
+}
+
+/** Undo, or in its place why the Operation cannot be undone. */
+function UndoButton({ undo, onUndo }: { undo: UndoAction; onUndo: () => void }) {
+  if (!undo.offered) {
+    return (
+      <span className="not-undoable" title={undo.why} tabIndex={0} aria-label={`Can't undo: ${undo.why}`}>
+        <Icon name="info" small />
+        Can't undo
+      </span>
+    );
+  }
+  return (
+    <button type="button" className="cta" onClick={onUndo}>
+      <Icon name="history" small />
+      Undo
+    </button>
+  );
+}
+
+/** Why the Undo was refused, the backup → now diffs, and where to recover from by hand. No "restore anyway". */
+function RefusalBlock({ refusal, notify }: { refusal: UndoRefusal; notify: Notify }) {
+  return (
+    <>
+      <div className="dialog-callout danger" role="alert">
+        <Icon name="flag" small />
+        <div>
+          <div className="callout-title">Can't undo</div>
+          {refusal.reason}
+        </div>
+      </div>
+      <BackupDiffs diffs={refusal.diffs} />
+      <div className="backup-path">
+        <span className="mono">{refusal.backup}</span>
+        <span className="grow" />
+        <BackupFolderButton backup={refusal.backup} notify={notify} />
+        <CopyPathButton path={refusal.backup} what="backup folder path" notify={notify} />
+      </div>
+    </>
+  );
+}
+
+/** The States it changed, its files with masked diffs, its Rollback and its backup. */
+function DetailSections({ detail, notify }: { detail: OperationDetail; notify: Notify }) {
+  return (
+    <>
+      <DialogSection title="States changed">
+        {detail.changes.length === 0 ? (
+          <p className="dim">No State changes in any Agent.</p>
+        ) : (
+          <div className="changes">
+            {detail.changes.map((change) => (
+              <ChangeRow key={`${change.agent}|${change.home}|${change.locator}|${change.project ?? ""}`} change={change} />
+            ))}
+          </div>
+        )}
+      </DialogSection>
+
+      {detail.rollback.length > 0 && (
+        <DialogSection title="Rollback">
+          {detail.rollback.map((location) => (
+            <div key={location.path} className={`rollback-location ${location.outcome}`}>
+              <span className="mono">{location.path}</span>
+              <span className="rollback-outcome">{ROLLBACK_LABELS[location.outcome]}</span>
+              {location.reason && <div className="dim">{location.reason}</div>}
+            </div>
+          ))}
+        </DialogSection>
+      )}
+
+      <DialogSection title={`Files · ${detail.locations.length}`}>
+        {detail.locations.map((location, index) => (
+          <LocationDiff key={`${location.path}|${index}`} location={location} />
+        ))}
+      </DialogSection>
+
+      <DialogSection title="Backup">
+        <div className="backup-path">
+          <span className="mono">{detail.backup}</span>
+          <span className="grow" />
+          <BackupFolderButton backup={detail.backup} notify={notify} />
+          <CopyPathButton path={detail.backup} what="backup folder path" notify={notify} />
+        </div>
+        {detail.summary.backup_deleted && <p className="file-note">Its backup was deleted; only its record is kept.</p>}
+      </DialogSection>
+    </>
+  );
+}
+
+/** One location the Operation touched, with the masked diff of what it changed there. */
+function LocationDiff({ location }: { location: OperationLocation }) {
+  return (
+    <div className="file-block">
+      <div className="file-head static">
+        <Icon name={location.diff ? "doc" : "folder"} small />
+        <span className="mono file-path">{location.path}</span>
+      </div>
+      {location.diff ? <Diff diff={location.diff} /> : <p className="file-note">A skill folder or link: it has no diff.</p>}
+    </div>
+  );
+}

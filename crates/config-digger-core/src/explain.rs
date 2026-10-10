@@ -1076,6 +1076,22 @@ pub(crate) fn delete_backup_note(operation: &str) -> String {
     )
 }
 
+/// Why History shows no diff of a file once its Operation's backup is deleted.
+pub(crate) fn diff_of_deleted_backup(operation: &str) -> String {
+    format!(
+        "Can't show a diff: the backup of Operation {operation} was deleted, with the values of its edits."
+    )
+}
+
+/// Why History shows no diff of a file whose recorded edits no longer apply
+/// to its backup.
+pub(crate) fn edits_do_not_apply(path: &Path) -> String {
+    format!(
+        "Can't show a diff: the edits History holds no longer apply to the backup of {}.",
+        path.display()
+    )
+}
+
 /// The check a Delete backup adds when its Operation needs attention.
 pub(crate) fn only_copy_for_recovery(operation: &str) -> String {
     format!(

@@ -3,7 +3,9 @@
 
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
 use crate::session::{self, Session};
-use config_digger_core::api::{self, Backup, Core, Inventory, WarningClass};
+use config_digger_core::api::{
+    self, Backup, Core, Inventory, OperationDetail, OperationSummary, WarningClass,
+};
 use config_digger_core::ports::Ports;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -202,6 +204,45 @@ pub async fn cancel_plan(app: AppHandle, plan_id: String) -> Result<(), api::Err
         })
     })
     .await
+}
+
+/// Every Operation in History, newest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_history(app: AppHandle) -> Result<Vec<OperationSummary>, api::Error> {
+    blocking(move || {
+        app.state::<ActionsState>()
+            .with(|actions| actions.history())
+    })
+    .await
+}
+
+/// The Operation `id` in History, with what it changed in each file, whose
+/// backup folder can then be revealed.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_detail(app: AppHandle, id: String) -> Result<OperationDetail, api::Error> {
+    blocking(move || {
+        app.state::<ActionsState>()
+            .with(|actions| actions.detail(&id))
+    })
+    .await
+}
+
+/// Dismisses the Operation `id`, which needs attention, once its files were
+/// recovered by hand.
+#[tauri::command]
+#[specta::specta]
+pub async fn dismiss_operation(app: AppHandle, id: String) -> Result<OperationSummary, api::Error> {
+    let result = blocking(move || {
+        app.state::<ActionsState>()
+            .with(|actions| actions.dismiss(&id))
+    })
+    .await;
+    if let Ok(summary) = &result {
+        tracing::info!(operation = %summary.id, "operation dismissed");
+    }
+    result
 }
 
 /// Reads every Agent home and Project on this machine.

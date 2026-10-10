@@ -29,7 +29,7 @@ const ACTION_LABELS: Record<Action, string> = {
 export type ApplyButton = {
   /** Named by the verb. */
   label: string;
-  /** Remove deletes the Entry for every Agent that reads it. */
+  /** Remove deletes the Entry for every Agent that reads it, and Delete backup deletes the copies for good. */
   danger: boolean;
   enabled: boolean;
   /** Why it is disabled. */
@@ -46,13 +46,16 @@ export function applyButton(planned: ActionPreview, acknowledged: ReadonlySet<Wa
       : left > 0
         ? `Tick ${left} ${left === 1 ? "warning" : "warnings"} to apply`
         : null;
-  return { label: ACTION_LABELS[action], danger: action === "remove", enabled: why === null, why };
+  const danger = action === "remove" || action === "delete_backup";
+  return { label: ACTION_LABELS[action], danger, enabled: why === null, why };
 }
 
 /** One location the Operation touches, as the Files section lists it. */
 export type Location =
   | { kind: "file"; path: string; tags: string[]; open: boolean; file: FileChange }
-  | { kind: "folder"; path: string; tags: string[]; open: boolean; folder: FolderChange };
+  | { kind: "folder"; path: string; tags: string[]; open: boolean; folder: FolderChange }
+  /** A backed-up copy a Delete backup deletes. */
+  | { kind: "copy"; path: string; tags: string[]; open: boolean };
 
 /** Locations are open when there are 1 or 2, and collapsed above that. */
 const OPEN_UP_TO = 2;
@@ -63,9 +66,9 @@ const STORE_TAGS: Record<StoreClass, string | null> = {
   plain: null,
 };
 
-/** Each file, then each skill folder or link, the Operation touches, with its tags. */
+/** Each file, then each skill folder or link, then each backed-up copy, the Operation touches, with its tags. */
 export function locations(preview: Preview): Location[] {
-  const open = preview.files.length + preview.folders.length <= OPEN_UP_TO;
+  const open = preview.files.length + preview.folders.length + preview.deleted.length <= OPEN_UP_TO;
   const gitTag = (versioned: boolean) => (versioned ? ["git-versioned"] : []);
   return [
     ...preview.files.map((file): Location => {
@@ -76,6 +79,7 @@ export function locations(preview: Preview): Location[] {
     ...preview.folders.map(
       (folder): Location => ({ kind: "folder", path: folder.path, tags: gitTag(folder.git_versioned), open, folder }),
     ),
+    ...preview.deleted.map((path): Location => ({ kind: "copy", path, tags: ["deleted for good"], open })),
   ];
 }
 
@@ -118,8 +122,8 @@ export type Result =
       sentence: string;
       /** Such as a restart hint for a running Agent that reads a written file. */
       hints: string[];
-      /** The Operation to undo. */
-      undo: string;
+      /** The Operation to undo, `null` for a Delete backup, after which its Operation cannot be. */
+      undo: string | null;
       /** Where the States after differ from the preview's prediction. */
       differences: Difference[];
     }
@@ -146,8 +150,8 @@ export type Result =
 const done = (name: StepName): Step => ({ name, status: "done" });
 const failed = (name: StepName): Step => ({ name, status: "failed" });
 
-/** What an applied Operation did, with Verify amber when States differ from the prediction. */
-export function appliedResult(outcome: Outcome): Result {
+/** What an applied Operation of `action` did, with Verify amber when States differ from the prediction. */
+export function appliedResult(outcome: Outcome, action: Action): Result {
   return {
     kind: "applied",
     steps: [
@@ -157,7 +161,7 @@ export function appliedResult(outcome: Outcome): Result {
     ],
     sentence: outcome.sentence,
     hints: outcome.hints,
-    undo: outcome.operation,
+    undo: action === "delete_backup" ? null : outcome.operation,
     differences: outcome.differences,
   };
 }

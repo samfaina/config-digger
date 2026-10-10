@@ -4,7 +4,8 @@
 //! recovery.
 
 use config_digger_core::api::{
-    Action, Context, Core, Error, ErrorCode, Outcome, ScanOptions, Targets, WarningClass,
+    Action, Context, Core, DiffUnavailable, Error, ErrorCode, Outcome, ScanOptions, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use std::path::PathBuf;
@@ -188,6 +189,28 @@ fn history_show_still_lists_what_the_operation_did_without_its_backup() {
     );
     assert_eq!(detail.changes.len(), 1);
     assert!(detail.summary.backup_deleted);
+}
+
+#[test]
+fn history_shows_why_there_is_no_diff_once_the_backup_is_deleted() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let operation = removed(&fs, "linear");
+    delete_backup(&fs, &operation, &[]).unwrap();
+
+    let detail = core(&fs).history_show(&operation).unwrap();
+
+    let diff = detail.locations[0].diff.as_ref().unwrap();
+    assert_eq!(diff.diff, None);
+    assert_eq!(diff.diff_unavailable, Some(DiffUnavailable::BackupDeleted));
+    assert_eq!(
+        diff.diff_note.as_deref(),
+        Some(
+            format!(
+                "Can't show a diff: the backup of Operation {operation} was deleted, with the values of its edits."
+            )
+            .as_str()
+        )
+    );
 }
 
 #[test]
