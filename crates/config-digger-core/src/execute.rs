@@ -9,7 +9,7 @@ use crate::api::{
     Block, Context, Difference, Error, ErrorCode, Inventory, OperationStatus, Outcome,
     RollbackLocation, RollbackOutcome, Verify, WarningClass,
 };
-use crate::definitions::AgentDefinition;
+use crate::definitions::{AgentDefinition, Definitions};
 use crate::edit::EditableFile;
 use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
@@ -33,7 +33,7 @@ struct PendingWrite<'p> {
 }
 
 pub(crate) fn execute(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     planned: Planned,
     acknowledged: &[WarningClass],
@@ -550,7 +550,7 @@ impl Failure {
 /// link removed or created as planned. Then it scans and resolves the context
 /// again and compares each predicted State with the actual one.
 fn verify(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     planned: &Planned,
     writes: &[PendingWrite],

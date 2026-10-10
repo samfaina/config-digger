@@ -7,11 +7,10 @@ use super::DefinitionError;
 use super::blocks::Validate;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use std::sync::OnceLock;
 
 /// The skill manager definitions that ship inside config-digger, embedded
 /// at compile time, in the order a tie between them is settled.
-const BUILT_IN: &[(&str, &str)] = &[
+pub(super) const BUILT_IN: &[(&str, &str)] = &[
     (
         "npx-skills.toml",
         include_str!("../../definitions/skill-managers/npx-skills.toml"),
@@ -37,21 +36,18 @@ pub fn json_schema() -> String {
     json
 }
 
-/// The built-in skill manager definitions, loaded once.
-pub(crate) fn built_in() -> Result<&'static [SkillManagerDefinition], &'static DefinitionError> {
-    static LOADED: OnceLock<Result<Vec<SkillManagerDefinition>, DefinitionError>> = OnceLock::new();
-    LOADED
-        .get_or_init(|| {
-            BUILT_IN
-                .iter()
-                .map(|(file, text)| parse(file, text))
-                .collect()
-        })
-        .as_deref()
+/// The built-in skill manager definitions, in the order a tie between
+/// them is settled.
+pub(crate) fn built_in() -> Result<Vec<SkillManagerDefinition>, DefinitionError> {
+    BUILT_IN
+        .iter()
+        .map(|(file, text)| parse(file, text))
+        .collect()
 }
 
 pub(crate) fn parse(file: &str, text: &str) -> Result<SkillManagerDefinition, DefinitionError> {
     let error = |message: String| DefinitionError {
+        kind: "skill manager",
         file: file.to_owned(),
         message,
     };
@@ -252,8 +248,8 @@ mod tests {
 
     #[test]
     fn built_in_skill_manager_definitions_load() {
-        let ids: Vec<&str> = built_in()
-            .unwrap()
+        let managers = built_in().unwrap();
+        let ids: Vec<&str> = managers
             .iter()
             .map(|definition| definition.manager.id.as_str())
             .collect();

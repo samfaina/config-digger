@@ -1,0 +1,357 @@
+#:schema ../../../../../../schema/agent-definition.schema.json
+# Zed, the acceptance walk of ADR 0005: Zed is outside v0.1, and this
+# definition describes it with only the blocks the six v0.1 Agents need. It
+# is a test fixture, never shipped: `--definitions` loads it. Facts from
+# docs/research/agent-definition-format.md, read from Zed's source at
+# `zed-industries/zed` @ `95cd535a5fad` [source] and from its files on the
+# reference machine [disk]. No real-Agent test has run against it, so it
+# has no `verified` range.
+#
+# The walk found two gaps, each filled by a parameter of an existing block
+# rather than a new block: a setting read from a table of a SQLite store
+# (`table`), with a `trusted-folders` gate whose items are paths, for
+# Zed's trust; and a Feature gate kept nowhere on disk, for its active
+# settings profile.
+
+format_version = 1
+
+[agent]
+id = "zed"
+name = "Zed"
+
+# Zed installs per user in `%LOCALAPPDATA%\Programs\Zed` [disk].
+[[installations]]
+id = "user"
+folder = "%LOCALAPPDATA%/Programs/Zed"
+executable = "Zed.exe"
+versions = [{ block = "exe-version" }]
+
+[process]
+images = ["Zed.exe"]
+paths = ["%LOCALAPPDATA%/Programs/Zed/Zed.exe"]
+
+# Zed keeps its configuration in `%APPDATA%\Zed` and its data in
+# `%LOCALAPPDATA%\Zed` [source, disk]. `--user-data-dir <dir>` moves the
+# configuration to `<dir>\config`, and no environment variable does on
+# Windows [source]: a home the user adds covers it. The data folder is read
+# where it is by default.
+[[homes]]
+id = "default"
+default = true
+folder = { block = "path", path = "%APPDATA%/Zed" }
+
+[homes.roots]
+settings = "settings.json"
+global_settings = "global_settings.json"
+
+[[scopes]]
+id = "project"
+
+[[scopes]]
+id = "user"
+
+[[scopes]]
+id = "global"
+
+[[scopes]]
+id = "extension"
+
+# The workspaces Zed opened, one row each in the `workspaces` table of its
+# database, whose `paths` column holds the workspace's folders [disk]. A
+# workspace of several folders holds them separated by newlines, which this
+# column registry reads as one path: such a workspace is no Project here.
+[projects]
+registries = [
+  { block = "sqlite-column", anchor = { block = "machine", path = "%LOCALAPPDATA%/Zed/db/0-stable/db.sqlite" }, table = "workspaces", column = "paths" },
+]
+
+# The extensions Zed installed, a folder each in
+# `%LOCALAPPDATA%\Zed\extensions\installed`, named by the extension's id,
+# each with its `extension.toml` [source, disk].
+[[plugins]]
+id = "extensions"
+registry = { block = "plugin-folders", anchor = { block = "machine", path = "%LOCALAPPDATA%/Zed/extensions/installed" }, marker = "extension.toml" }
+
+# Zed's settings layers, lowest first: an extension's, `global_settings.json`,
+# the user's `settings.json`, the active settings profile, remote-server
+# settings and a worktree's `.zed/settings.json` [source]. Each is JSON with
+# comments and trailing commas, servers under `context_servers` [source].
+# Every server is one of three shapes, told apart by its fields: `command`
+# for one Zed starts, `url` for a remote one, and neither for the settings
+# of an extension's server; each takes `enabled`, `true` by default
+# [source]. Zed rewrites a settings file in place through text edits, which
+# keeps the comments outside the edited range [source]; that it does so
+# while it runs, and that it keeps them, is unverified. What Zed does with a
+# settings file it cannot parse is not known. Which of an extension
+# server's `settings` hold Secrets is not known either: every value there is
+# masked, which is unverified.
+
+# A worktree's `.zed/settings.json` [source]. Zed applies one in a subfolder
+# of the worktree too, to the files below it, the deeper winning [source]:
+# a Project is read from its folder up to the root of its repo, the deeper
+# first, as Codex reads its project layers. Whether a nested file
+# contributes servers at all is unverified.
+[[locations]]
+id = "project-mcp"
+anchor = { block = "project", path = ".zed/settings.json", walk = "up-to-repo-root" }
+format = { block = "json", dialect = "jsonc" }
+root = ["context_servers"]
+kind = "mcp"
+scope = "project"
+provenance = "file"
+store_class = "rewritten-while-running"
+on_read_failure = "unknown"
+secrets = { fields = [["settings"]] }
+shape = { block = "fields", types = { command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map", enabled = "boolean", settings = "object" } }
+
+# The user's `settings.json`, whose `stable` and `windows` blocks hold
+# settings for the release channel and the OS Zed runs on [source]. That
+# the release channel's block ranks above the OS's is unverified.
+[[locations]]
+id = "user-stable-mcp"
+anchor = { block = "home", root = "settings" }
+format = { block = "json", dialect = "jsonc" }
+root = ["stable", "context_servers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+on_read_failure = "unknown"
+secrets = { fields = [["settings"]] }
+shape = { block = "fields", types = { command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map", enabled = "boolean", settings = "object" } }
+
+[[locations]]
+id = "user-windows-mcp"
+anchor = { block = "home", root = "settings" }
+format = { block = "json", dialect = "jsonc" }
+root = ["windows", "context_servers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+on_read_failure = "unknown"
+secrets = { fields = [["settings"]] }
+shape = { block = "fields", types = { command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map", enabled = "boolean", settings = "object" } }
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "settings" }
+format = { block = "json", dialect = "jsonc" }
+root = ["context_servers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+on_read_failure = "unknown"
+secrets = { fields = [["settings"]] }
+shape = { block = "fields", types = { command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map", enabled = "boolean", settings = "object" } }
+
+# `global_settings.json`, beside the user's settings [source].
+[[locations]]
+id = "global-mcp"
+anchor = { block = "home", root = "global_settings" }
+format = { block = "json", dialect = "jsonc" }
+root = ["context_servers"]
+kind = "mcp"
+scope = "global"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "unknown"
+secrets = { fields = [["settings"]] }
+shape = { block = "fields", types = { command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map", enabled = "boolean", settings = "object" } }
+
+# The servers an extension declares in the `context_servers` of its
+# `extension.toml`, each named by its key [source]. The extension starts
+# them itself, so a declaration holds no command.
+[[locations]]
+id = "extension-mcp"
+anchor = { block = "plugin", plugins = "extensions", path = "extension.toml" }
+format = { block = "toml" }
+root = ["context_servers"]
+kind = "mcp"
+scope = "extension"
+provenance = "extension"
+store_class = "plain"
+on_read_failure = "unknown"
+
+# Of same-named servers, the highest layer's wins whole: the layers merge
+# `context_servers` key by key, and each server is replaced whole [source].
+# In a workspace of several worktrees, the first that defines a name wins
+# [source], which a Project of one folder never shows. A settings server,
+# one with only `settings` and `enabled` above all, lies over the
+# extension's server of its name, field by field [source].
+[items.mcp]
+precedence = ["project-mcp", "user-stable-mcp", "user-windows-mcp", "user-mcp", "global-mcp", "extension-mcp"]
+competition = { block = "exact-name" }
+merge = { block = "overlay-fields", under = ["extension-mcp"] }
+checks = ["shape", "trust", "rules", "disable", "precedence"]
+
+# `disable_ai: true` turns off every AI feature, servers and skills
+# included [source]. It is read from the user's settings, then the global
+# ones; whether a worktree's settings can hold it is not known.
+[[items.mcp.rules]]
+block = "global-switch"
+off = true
+sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["disable_ai"], dialect = "jsonc" },
+  { anchor = { block = "home", root = "global_settings" }, key_path = ["disable_ai"], dialect = "jsonc" },
+]
+
+# Zed applies no `.zed/settings.json` of a worktree the user has not
+# trusted [source]. Its database keeps one row per trusted worktree in
+# `trusted_worktrees`, its `absolute_path` spelled natively [disk]. That a
+# trusted folder trusts the folders below it is unverified.
+# `session.trust_all_worktrees: true` trusts every worktree [source].
+[[items.mcp.gates]]
+block = "trusted-folders"
+locations = ["project-mcp"]
+sources = [
+  { anchor = { block = "machine", path = "%LOCALAPPDATA%/Zed/db/0-stable/db.sqlite" }, key_path = ["absolute_path"], sqlite = true, table = "trusted_worktrees" },
+]
+trust_all = { equals = true, default = false, sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["session", "trust_all_worktrees"], dialect = "jsonc" },
+] }
+
+# Zed's own toggle turns a server off by writing `enabled: false` into the
+# user's `settings.json` under the server's name, and on again with `true`
+# [source]. For a server the user's settings lack, it first inserts a stub
+# of an extension's server, `{"enabled": false, "remote": false,
+# "settings": {}}` [source]; config-digger writes `enabled` alone, which Zed
+# reading as the same stub is unverified. Since a higher layer replaces a
+# server whole, the switch reaches neither a worktree's server nor one of
+# the user's `stable` or `windows` blocks, and whether Zed's toggle sticks
+# for a worktree's server is unverified: Disable parks those instead. Each
+# other layer's own `enabled` is read and never written.
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "project", path = ".zed/settings.json" }, key_path = ["context_servers", "{name}", "enabled"], dialect = "jsonc", trusted_only = true, store_class = "rewritten-while-running" }
+target = "name"
+context = "project"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+enable_offered = false
+layered = true
+locations = ["project-mcp"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings" }, key_path = ["stable", "context_servers", "{name}", "enabled"], dialect = "jsonc", store_class = "rewritten-while-running" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+enable_offered = false
+layered = true
+locations = ["user-stable-mcp"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings" }, key_path = ["windows", "context_servers", "{name}", "enabled"], dialect = "jsonc", store_class = "rewritten-while-running" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+enable_offered = false
+layered = true
+locations = ["user-windows-mcp"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings" }, key_path = ["context_servers", "{name}", "enabled"], dialect = "jsonc", store_class = "rewritten-while-running" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+layered = true
+locations = ["user-mcp", "global-mcp", "extension-mcp"]
+
+[[items.mcp.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "global_settings" }, key_path = ["context_servers", "{name}", "enabled"], dialect = "jsonc", store_class = "plain" }
+target = "name"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "disabled_natively"
+enable_offered = false
+layered = true
+locations = ["global-mcp", "extension-mcp"]
+
+[[items.mcp.disable]]
+block = "park"
+locations = ["project-mcp", "user-stable-mcp", "user-windows-mcp"]
+
+# Skills are folders holding a `SKILL.md` [source]: the user's
+# `~\.agents\skills`, a worktree's `.agents\skills`, and skills built into
+# Zed, which are not on disk to read. Zed does not read `.claude\skills`
+# [source]. That a skill is named by its frontmatter's `name`, and that one
+# without it is skipped, is unverified.
+[[locations]]
+id = "project-skills"
+anchor = { block = "project", path = ".agents/skills" }
+format = { block = "skill-folder", name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "user-skills"
+anchor = { block = "machine", path = "~/.agents/skills" }
+format = { block = "skill-folder", name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# A worktree's skill beats the user's of its name, which beats a built-in
+# one [source]. No setting turns a skill off, so Disable parks it; a skill's
+# own `disable-model-invocation` keeps it from the model alone [source] and
+# is not read.
+[items.skill]
+precedence = ["project-skills", "user-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "trust", "rules", "disable", "precedence"]
+
+[[items.skill.rules]]
+block = "global-switch"
+off = true
+sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["disable_ai"], dialect = "jsonc" },
+  { anchor = { block = "home", root = "global_settings" }, key_path = ["disable_ai"], dialect = "jsonc" },
+]
+
+# A worktree's skills load only once the user trusts it [source].
+[[items.skill.gates]]
+block = "trusted-folders"
+locations = ["project-skills"]
+sources = [
+  { anchor = { block = "machine", path = "%LOCALAPPDATA%/Zed/db/0-stable/db.sqlite" }, key_path = ["absolute_path"], sqlite = true, table = "trusted_worktrees" },
+]
+trust_all = { equals = true, default = false, sources = [
+  { anchor = { block = "home", root = "settings" }, key_path = ["session", "trust_all_worktrees"], dialect = "jsonc" },
+] }
+
+[[items.skill.disable]]
+block = "park"
+locations = ["project-skills", "user-skills"]
+
+# A settings profile the user picks lies over the user's settings,
+# `context_servers` included [source]. Zed keeps which one is active in
+# memory only [source], so none is assumed active, and each Entry it could
+# change says so.
+[[feature_gates]]
+name = "active_settings_profile"
+assumed = false
+affects = ["user-stable-mcp", "user-windows-mcp", "user-mcp", "global-mcp", "extension-mcp"]

@@ -59,6 +59,13 @@ struct Cli {
     #[arg(long, global = true)]
     include_hidden: bool,
 
+    /// Also load the definitions in this folder, for development and tests:
+    /// each `*.toml` file is an Agent definition, and each one in its
+    /// `skill-managers` folder a Skill manager definition. Any that fails
+    /// validation fails the command.
+    #[arg(long, value_name = "DIR", global = true)]
+    definitions: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -471,7 +478,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     if let Command::Completions { shell } = &cli.command {
         return completions(cli, *shell);
     }
-    let core = Core::new(Ports::real())?;
+    let core = load_core(cli)?;
     // Startup pruning is best-effort: History is pruned again next time.
     if let Err(error) = core.prune_history() {
         tracing::warn!(%error, "history not pruned");
@@ -634,6 +641,31 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         Command::Projects { command } => homes_and_projects::projects(cli, &core, command),
         Command::Completions { .. } => unreachable!("completions run without a core"),
     }
+}
+
+/// The core with the built-in definitions, and those of `--definitions`,
+/// which fail the command when any of them is rejected.
+fn load_core(cli: &Cli) -> Result<Core, Failure> {
+    let Some(folder) = &cli.definitions else {
+        return Ok(Core::new(Ports::real())?);
+    };
+    let loaded = Core::with_definitions_folder(Ports::real(), folder)?;
+    if loaded.rejected.is_empty() {
+        return Ok(loaded.core);
+    }
+    let messages: Vec<&str> = loaded
+        .rejected
+        .iter()
+        .map(|rejected| rejected.message.as_str())
+        .collect();
+    Err(Failure::new(
+        "invalid_definition",
+        messages.join(
+            "
+",
+        ),
+        Exit::Usage,
+    ))
 }
 
 /// The Entries `selectors` name, or with `all`, every Entry of their Items.

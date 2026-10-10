@@ -1,0 +1,6 @@
+{
+  "context_servers": {
+    "shared": { "command": "project-shared" },
+    "docs": { "url": "https://docs.example/mcp" },
+  },
+}

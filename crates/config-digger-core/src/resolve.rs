@@ -7,7 +7,7 @@ use crate::definitions::blocks::{
     JsonFormat, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect,
     SkillFallback,
 };
-use crate::definitions::skill_managers::{self, Strength};
+use crate::definitions::skill_managers::Strength;
 use crate::definitions::{
     AgentDefinition, Check, ItemKind, LocationDefinition, ReadFailureReaction, RiskCode,
 };
@@ -1445,12 +1445,9 @@ struct Origin {
 fn origin(location: &LocationDefinition, entry: &ScannedEntry) -> Origin {
     let found = entry
         .manager
-        .filter(|_| location.provenance == Provenance::File)
-        .and_then(|found| {
-            let managers = skill_managers::built_in().ok()?;
-            Some((&managers[found.manager], found.strength))
-        });
-    let Some((definition, strength)) = found else {
+        .as_ref()
+        .filter(|_| location.provenance == Provenance::File);
+    let Some(found) = found else {
         return Origin {
             provenance: location.provenance.into(),
             skill_manager: None,
@@ -1460,13 +1457,13 @@ fn origin(location: &LocationDefinition, entry: &ScannedEntry) -> Origin {
     Origin {
         provenance: api::Provenance::SkillManager,
         skill_manager: Some(api::SkillManager {
-            id: definition.manager.id.clone(),
-            name: definition.manager.name.clone(),
+            id: found.id.clone(),
+            name: found.name.clone(),
         }),
-        by_name_only: (strength == Strength::Weak).then(|| api::Note {
+        by_name_only: (found.strength == Strength::Weak).then(|| api::Note {
             code: api::NoteCode::ProvenanceByNameOnly,
             switch: None,
-            sentence: explain::provenance_by_name_only(&definition.manager.name),
+            sentence: explain::provenance_by_name_only(&found.name),
         }),
     }
 }
@@ -1966,6 +1963,14 @@ fn gate_caveats(
                     code: api::CaveatCode::GateMayApply,
                     path,
                     sentence: explain::gate_may_apply(agent_name, &gate.name),
+                });
+            }
+            // The Agent keeps the gate nowhere on disk.
+            if gate.lookup.is_none() {
+                return Some(api::Caveat {
+                    code: api::CaveatCode::GateAssumed,
+                    path: entry.path.clone(),
+                    sentence: explain::gate_assumed(agent_name, &gate.name, gate.assumed, None),
                 });
             }
             let scanned = scanned_gate(snapshot, entry, &gate.name)?;

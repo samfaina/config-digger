@@ -1,0 +1,24 @@
+// Zed settings, as Zed's own settings editor leaves them.
+{
+  "theme": "One Dark",
+  "context_servers": {
+    // Started by Zed.
+    "github": {
+      "command": "github-mcp",
+      "args": ["stdio"],
+      "env": { "GITHUB_TOKEN": "not-a-real-secret" },
+    },
+    // A remote server the user turned off with Zed's toggle.
+    "linear": { "url": "https://mcp.linear.app/sse", "enabled": false },
+    // The settings of the Postgres extension's server.
+    "postgres-context-server": {
+      "settings": { "database_url": "postgres://app:not-a-real-secret@localhost/app" },
+    },
+    "shared": { "command": "user-shared" },
+  },
+  "windows": {
+    "context_servers": {
+      "shared": { "command": "windows-shared" },
+    },
+  },
+}

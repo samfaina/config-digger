@@ -7,8 +7,8 @@ use crate::api::{
     FileChange, FileDiff, Home, Info, InfoCode, Inventory, Leftovers, Preview, ReadFailure,
     ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
-use crate::definitions::AgentDefinition;
 use crate::definitions::blocks::{Disables, Gate, StoreClass};
+use crate::definitions::{AgentDefinition, Definitions};
 use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
@@ -140,7 +140,7 @@ pub(crate) enum EditFailure {
 }
 
 pub(crate) fn plan(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     snapshot: &Snapshot,
     scan_options: &ScanOptions,
@@ -268,7 +268,7 @@ fn redirected<'i, 's>(
 /// Plans the Remove of every leftover of the missing Project `project`, in
 /// any spelling, as one Operation in that Project's context.
 pub(crate) fn plan_remove_leftovers(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     snapshot: &Snapshot,
     scan_options: &ScanOptions,
@@ -305,7 +305,7 @@ pub(crate) fn plan_remove_leftovers(
 
 /// An action on the Entries it targets, about to be planned.
 struct Targeted<'a> {
-    definitions: &'a [AgentDefinition],
+    definitions: &'a Definitions,
     ports: &'a Ports,
     snapshot: &'a Snapshot,
     scan_options: &'a ScanOptions,
@@ -1184,7 +1184,7 @@ fn read_if_there(ports: &Ports, path: &Path, medium: &Medium) -> Result<Option<V
 /// its edits, last first, applied to each file as it is now, and resolved in
 /// the context the Operation ran in (ADR 0003).
 pub(crate) fn plan_undo(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     id: &str,
 ) -> Result<Planned, Error> {

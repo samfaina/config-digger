@@ -6,7 +6,7 @@ use crate::api::{
     Action, Backup, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
     OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
 };
-use crate::definitions::AgentDefinition;
+use crate::definitions::Definitions;
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::folders::{FolderOp, FolderSize};
 use crate::ports::{Environment, HeldLock, Ports};
@@ -441,7 +441,7 @@ fn undone_by<'m>(id: &str, manifests: &'m [Manifest]) -> Option<&'m Manifest> {
 /// The Operation `id`, with its edits, backed-up files and what it changed
 /// in each, masked for the locations that read them now.
 pub(crate) fn detail(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     id: &str,
 ) -> Result<OperationDetail, Error> {
