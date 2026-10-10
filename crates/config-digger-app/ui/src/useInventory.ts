@@ -15,17 +15,18 @@ export type InventoryRead = {
 };
 
 /**
- * Reads the inventory on start, whenever the window regains focus, and on
- * `refresh`, for the Project last selected.
+ * Reads the inventory on start, for `initialProject` or for no Project,
+ * whenever the window regains focus, and on `refresh`, for the Project last
+ * selected.
  */
-export function useInventory(): InventoryRead {
+export function useInventory(initialProject: string | null = null): InventoryRead {
   const [inventory, setInventory] = useState<Inventory | null>(null);
-  const [project, setProject] = useState<string | null>(null);
+  const [project, setProject] = useState<string | null>(initialProject);
   const [error, setError] = useState<ApiError | null>(null);
   const [reading, setReading] = useState(false);
   // A focus event during a read does not start a second one.
   const inFlight = useRef(false);
-  const projectRef = useRef<string | null>(null);
+  const projectRef = useRef<string | null>(initialProject);
 
   /** Runs `read` for `project`, dropping what it returns when another Project was selected meanwhile. */
   const load = useCallback(async (project: string | null, read: (project: string | null) => Promise<CommandResult<Inventory>>) => {

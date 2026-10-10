@@ -14,6 +14,9 @@
     "allow-cancel-plan",
     "allow-read-history",
     "allow-history-detail",
-    "allow-dismiss-operation"
+    "allow-dismiss-operation",
+    "allow-read-places",
+    "allow-change-list",
+    "allow-pick-location"
   ]
 }

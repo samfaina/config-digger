@@ -475,3 +475,28 @@ fn the_leftovers_of_a_hidden_project_are_listed_only_when_asked_for() {
     assert_eq!(projects, [Path::new(r"E:\archive\legacy")]);
     assert_eq!(core.leftovers(&snapshot).len(), 2);
 }
+
+#[test]
+fn each_project_and_home_counts_its_entries_once_in_any_context() {
+    let fs = fixture().with_file(
+        Path::new(PETME).join(".mcp.json"),
+        r#"{ "mcpServers": { "shared": { "command": "shared-mcp" } } }"#,
+    );
+
+    let inventory = inventory(&fs, None);
+
+    let count = |list: &str, field: &str, value: &str| {
+        inventory[list]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row[field] == value)
+            .unwrap()["entries"]
+            .clone()
+    };
+    // The local `dart` and `.mcp.json`'s `shared`, and the two leftovers.
+    assert_eq!(count("projects", "path", PETME), json!(2));
+    assert_eq!(count("projects", "path", GONE), json!(2));
+    // The user `linear`, and those of both Projects.
+    assert_eq!(count("homes", "agent", "claude-code"), json!(5));
+}

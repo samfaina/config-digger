@@ -74,6 +74,7 @@ function home(overrides: Partial<Home> = {}): Home {
     installations: [],
     out_of_range: false,
     last_ran: null,
+    entries: 0,
     notes: [],
     ...overrides,
   };

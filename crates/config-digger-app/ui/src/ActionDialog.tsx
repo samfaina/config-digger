@@ -225,6 +225,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
             planned={phase.planned}
             acknowledged={phase.acknowledged}
             fresh={phase.fresh}
+            leftovers={request.kind === "leftovers"}
             onToggle={(warning) => {
               const next = new Set(phase.acknowledged);
               if (!next.delete(warning)) next.add(warning);
@@ -264,6 +265,8 @@ type PreviewBodyProps = {
   planned: ActionPreview;
   acknowledged: ReadonlySet<WarningClass>;
   fresh: string | null;
+  /** It is a Remove leftovers, whose Apply names how many it removes. */
+  leftovers: boolean;
   onToggle: (warning: WarningClass) => void;
   onCheckAgain: () => void;
   onCancel: () => void;
@@ -271,9 +274,9 @@ type PreviewBodyProps = {
 };
 
 /** The preview: What changes, Before you apply, Files, and the footer with Cancel and Apply. */
-function PreviewBody({ planned, acknowledged, fresh, onToggle, onCheckAgain, onCancel, onApply }: PreviewBodyProps) {
+function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onCheckAgain, onCancel, onApply }: PreviewBodyProps) {
   const { preview, warnings, blocks } = planned;
-  const button = applyButton(planned, acknowledged);
+  const button = applyButton(planned, acknowledged, { leftovers });
   const before = blocks.length + warnings.length + preview.info.length;
   return (
     <>

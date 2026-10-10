@@ -1133,6 +1133,8 @@ pub struct Project {
     pub missing: bool,
     /// It is a `.code-workspace` file rather than a folder.
     pub workspace_file: bool,
+    /// For a workspace file, the folders it opens, in the order it lists them.
+    pub members: Vec<PathBuf>,
     /// The Agents whose registries record it. Empty when it was only added
     /// or asked for.
     pub registered_by: Vec<String>,
@@ -1140,6 +1142,9 @@ pub struct Project {
     pub added: bool,
     /// The user hid it, so it is listed only when hidden ones are asked for.
     pub hidden: bool,
+    /// How many Entries apply in it alone: in files inside it, or keyed to
+    /// its path in user files. Each counts once, however many Agents read it.
+    pub entries: u32,
 }
 
 /// The leftovers of one missing Project: its Unread Entries.
@@ -1201,6 +1206,8 @@ pub struct Home {
     pub out_of_range: bool,
     /// The version that last ran against it, as the Agent records it.
     pub last_ran: Option<String>,
+    /// How many Entries it holds, in any context.
+    pub entries: u32,
     /// What to know about the Agent's versions here, such as one outside
     /// the definition's tested range. None of them changes a State or
     /// blocks a write.

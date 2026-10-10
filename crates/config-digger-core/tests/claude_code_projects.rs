@@ -179,8 +179,8 @@ fn every_spelling_of_one_folder_is_one_project() {
     assert_eq!(
         inventory["projects"],
         json!([
-            { "path": r"E:\projects\gone", "missing": true, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false },
-            { "path": PETME, "missing": false, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false },
+            { "path": r"E:\projects\gone", "missing": true, "workspace_file": false, "members": [], "registered_by": ["claude-code"], "added": false, "hidden": false, "entries": 1 },
+            { "path": PETME, "missing": false, "workspace_file": false, "members": [], "registered_by": ["claude-code"], "added": false, "hidden": false, "entries": 6 },
         ])
     );
 }
@@ -344,7 +344,7 @@ fn registry_keys_that_are_not_absolute_paths_are_not_projects() {
 
     assert_eq!(
         inventory["projects"],
-        json!([{ "path": PETME, "missing": false, "workspace_file": false, "registered_by": ["claude-code"], "added": false, "hidden": false }])
+        json!([{ "path": PETME, "missing": false, "workspace_file": false, "members": [], "registered_by": ["claude-code"], "added": false, "hidden": false, "entries": 0 }])
     );
     assert_eq!(inventory["items"], json!([]));
 }

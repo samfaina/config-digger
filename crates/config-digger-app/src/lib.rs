@@ -7,6 +7,7 @@
 
 mod actions;
 mod commands;
+mod lists;
 mod logging;
 mod session;
 
@@ -33,6 +34,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::read_history,
         commands::history_detail,
         commands::dismiss_operation,
+        commands::read_places,
+        commands::change_list,
+        commands::pick_location,
     ])
 }
 

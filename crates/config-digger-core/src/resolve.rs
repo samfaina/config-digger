@@ -38,6 +38,9 @@ pub(crate) fn resolve(
                     .any(|installation| installation.out_of_range),
                 installations,
                 last_ran: home.last_ran.clone(),
+                entries: count_entries(snapshot, |entry| {
+                    entry.agent_index == home.agent_index && entry.home == home.home
+                }),
                 notes,
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
@@ -85,6 +88,7 @@ pub(crate) fn resolve(
             path: project.path.clone(),
             missing: !project.exists,
             workspace_file: project.workspace_file,
+            members: project.members.clone(),
             registered_by: project
                 .registered_by
                 .iter()
@@ -92,6 +96,9 @@ pub(crate) fn resolve(
                 .collect(),
             added: project.added,
             hidden: project.hidden,
+            entries: count_entries(snapshot, |entry| {
+                entry.project.as_ref() == Some(&project.key)
+            }),
         })
         .collect();
 
@@ -964,6 +971,18 @@ pub(crate) fn resolve(
         read_failures,
         agent_flags,
     }
+}
+
+/// How many distinct Entries `counted` keeps: one an Agent home of each of
+/// several Agents reads counts once.
+fn count_entries(snapshot: &Snapshot, counted: impl Fn(&ScannedEntry) -> bool) -> u32 {
+    let entries = snapshot
+        .entries
+        .iter()
+        .filter(|entry| counted(entry))
+        .map(|entry| (&entry.path, &entry.key_path))
+        .collect::<BTreeSet<_>>();
+    u32::try_from(entries.len()).unwrap_or(u32::MAX)
 }
 
 /// The Unread Entries of each missing Project that has any, sorted by its

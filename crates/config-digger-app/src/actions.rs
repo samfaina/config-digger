@@ -24,6 +24,9 @@ pub enum ActionRequest {
         locator: String,
         project: Option<PathBuf>,
     },
+    /// The Remove of every leftover of the missing Project `project`, in
+    /// its context.
+    Leftovers { project: PathBuf },
     /// The Undo of the Operation `operation` in History.
     Undo { operation: String },
     /// The deletion of the backup of the Operation `operation` in History.
@@ -146,6 +149,10 @@ impl Actions {
                 };
                 self.core
                     .plan(&snapshot, &context, (*verb).into(), &targets)
+            }
+            ActionRequest::Leftovers { project } => {
+                let snapshot = self.core.scan(&ScanOptions::default())?;
+                self.core.plan_remove_leftovers(&snapshot, project)
             }
             ActionRequest::Undo { operation } => self.core.plan_undo(operation),
             ActionRequest::DeleteBackup { operation } => self.core.plan_delete_backup(operation),
@@ -457,6 +464,25 @@ mod tests {
         let mut restarted = self::actions(&fs);
         let detail = restarted.detail(&operation).unwrap();
         assert!(!restarted.can_reveal(&detail.backup));
+    }
+
+    #[test]
+    fn the_leftovers_of_a_missing_project_are_removed_through_one_plan() {
+        let gone = r#"{ "projects": { "E:/projects/gone": { "mcpServers": { "a": { "command": "a" }, "b": { "command": "b" } } } } }"#;
+        let fs = FakeFileSystem::new().with_file(claude_json(), gone);
+        let mut actions = actions(&fs);
+
+        let planned = actions
+            .plan(&ActionRequest::Leftovers {
+                project: PathBuf::from(r"e:\projects\gone"),
+            })
+            .unwrap();
+
+        assert_eq!(planned.preview.action, Action::Remove);
+        assert_eq!(planned.preview.changes.len(), 2);
+        actions.execute(&planned.plan_id, &[]).unwrap();
+        let text = String::from_utf8(fs.contents(claude_json()).unwrap()).unwrap();
+        assert!(!text.contains("command"), "{text}");
     }
 
     #[test]

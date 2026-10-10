@@ -36,8 +36,15 @@ export type ApplyButton = {
   why: string | null;
 };
 
-/** The Apply button, given the warnings ticked so far. */
-export function applyButton(planned: ActionPreview, acknowledged: ReadonlySet<WarningClass>): ApplyButton {
+/**
+ * The Apply button, given the warnings ticked so far. For Remove leftovers,
+ * it names how many leftovers it removes.
+ */
+export function applyButton(
+  planned: ActionPreview,
+  acknowledged: ReadonlySet<WarningClass>,
+  { leftovers = false }: { leftovers?: boolean } = {},
+): ApplyButton {
   const action = planned.preview.action;
   const left = planned.warnings.filter((warning) => !acknowledged.has(warning.class)).length;
   const why =
@@ -47,7 +54,14 @@ export function applyButton(planned: ActionPreview, acknowledged: ReadonlySet<Wa
         ? `Tick ${left} ${left === 1 ? "warning" : "warnings"} to apply`
         : null;
   const danger = action === "remove" || action === "delete_backup";
-  return { label: ACTION_LABELS[action], danger, enabled: why === null, why };
+  const label = leftovers ? `Remove ${leftoverCount(planned.preview)}` : ACTION_LABELS[action];
+  return { label, danger, enabled: why === null, why };
+}
+
+/** Such as "2 leftovers": an Entry several Agents read is one leftover. */
+function leftoverCount(preview: Preview): string {
+  const count = new Set(preview.changes.map((change) => change.locator)).size;
+  return `${count} ${count === 1 ? "leftover" : "leftovers"}`;
 }
 
 /** One location the Operation touches, as the Files section lists it. */
