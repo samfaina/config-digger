@@ -505,3 +505,26 @@ fn a_preview_diff_masks_secrets_the_definition_marks_outside_any_entry() {
     );
     assert!(diff.contains(r#"     "approved": ["••••"]"#), "{diff}");
 }
+
+// History's diff of what an Operation changed.
+
+#[test]
+fn history_diffs_mask_the_removed_entry_and_the_context_around_it() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_SERVERS);
+    let core = core(&fs);
+    let removed = core.execute(plan_remove(&fs, "github"), &[]).unwrap();
+
+    let operation = core.history_show(&removed.operation).unwrap();
+
+    let diff = operation.locations[0].diff.as_ref().unwrap();
+    let text = diff.diff.as_deref().unwrap();
+    assert!(
+        text.contains(r#"-        "GITHUB_TOKEN": "ghp_••••""#),
+        "{text}"
+    );
+    assert!(
+        text.contains(r#"     "linear": {"#) && text.contains("?key=••••"),
+        "{text}"
+    );
+    assert!(!serde_json::to_string(&operation).unwrap().contains(SECRET));
+}

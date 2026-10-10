@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Inventory } from "./bindings";
+import { call, type CommandResult } from "./desktop";
 
 export type InventoryRead = {
   /** The last inventory read, kept while a new read runs or after one fails. */
@@ -12,8 +13,6 @@ export type InventoryRead = {
   /** Resolves the inventory for another Project, without reading the disk. */
   selectProject: (project: string | null) => void;
 };
-
-type Result = { status: "ok"; data: Inventory } | { status: "error"; error: ApiError };
 
 /**
  * Reads the inventory on start, whenever the window regains focus, and on
@@ -28,17 +27,9 @@ export function useInventory(): InventoryRead {
   const inFlight = useRef(false);
   const projectRef = useRef<string | null>(null);
 
-  /** Runs `call` for `project`, dropping what it returns when another Project was selected meanwhile. */
-  const load = useCallback(async (project: string | null, call: (project: string | null) => Promise<Result>) => {
-    let result: Result;
-    try {
-      result = await call(project);
-    } catch (thrown) {
-      result = {
-        status: "error",
-        error: { code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null },
-      };
-    }
+  /** Runs `read` for `project`, dropping what it returns when another Project was selected meanwhile. */
+  const load = useCallback(async (project: string | null, read: (project: string | null) => Promise<CommandResult<Inventory>>) => {
+    const result = await call(() => read(project));
     if (project !== projectRef.current) return;
     if (result.status === "ok") {
       setInventory(result.data);

@@ -1502,3 +1502,166 @@ p {
   outline: 2px solid var(--primary-hover);
   outline-offset: 2px;
 }
+
+/* The banner while an Operation needs manual recovery, until it is dismissed */
+
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 18px;
+  border: 1px solid #f85149;
+  border-radius: 16px;
+  background: #f8514926;
+  color: #fecaca;
+  font-weight: 500;
+}
+
+/* History · Undo */
+
+.history {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-about {
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.history-list {
+  flex: 1;
+}
+
+.history-detail {
+  width: 560px;
+}
+
+.history-body {
+  gap: 0;
+}
+
+.operation-row {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.operation-row:hover {
+  background: var(--tile);
+}
+
+.operation-row.selected {
+  background: var(--tile-hover);
+}
+
+.operation-row:focus-visible,
+.not-undoable:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+.operation-time {
+  width: 110px;
+  flex: none;
+  color: var(--grey);
+  font-size: 12px;
+}
+
+.operation-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.operation-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.operation-meta {
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--grey);
+  font-size: 12px;
+}
+
+.status-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-chip.applied {
+  background: #3fb9501f;
+  color: var(--state-effective);
+}
+
+.status-chip.undone {
+  background: #ffffff12;
+  color: var(--grey);
+}
+
+.status-chip.undo {
+  background: #7d67cb2e;
+  color: #c9bcf5;
+}
+
+.status-chip.failed {
+  background: #f8514914;
+  color: #fca5a5;
+}
+
+.status-chip.attention {
+  background: var(--state-invalid);
+  color: var(--white);
+}
+
+.not-undoable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #26272d;
+  color: var(--grey);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: help;
+}
+
+.backup-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.backup-path .mono {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

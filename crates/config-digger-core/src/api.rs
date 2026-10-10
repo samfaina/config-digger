@@ -187,10 +187,10 @@ impl Core {
         history::prune(&self.ports)
     }
 
-    /// One Operation in History, with the edits it made and the files it
-    /// copied to its backup.
+    /// One Operation in History, with the edits it made, the files it
+    /// copied to its backup and a masked diff of what it changed in each.
     pub fn history_show(&self, id: &str) -> Result<OperationDetail, Error> {
-        history::detail(&self.ports, id)
+        history::detail(&self.definitions, &self.ports, id)
     }
 
     /// The copies of the file at `path` that History still holds, newest
@@ -804,6 +804,11 @@ pub enum DiffUnavailable {
     /// Disable switches, or none any more, so nothing says where its
     /// Secrets are.
     NoReader,
+    /// The backup of the Operation was deleted, with the values of its edits.
+    BackupDeleted,
+    /// The edits History holds no longer apply to the backup, so what the
+    /// Operation wrote cannot be rebuilt from it.
+    EditsDoNotApply,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -976,6 +981,9 @@ pub struct OperationSummary {
     pub undone_by: Option<String>,
     /// Its backup was deleted, and with it the values of its edits.
     pub backup_deleted: bool,
+    /// Its backup can be deleted: it was not yet, or a deletion left copies
+    /// of it behind.
+    pub backup_deletable: bool,
     /// The names of the Agents whose States it changed.
     pub agents: Vec<String>,
     /// The files it touched.
@@ -1013,6 +1021,10 @@ pub struct OperationLocation {
     /// created the file or its backup was deleted.
     pub backup: Option<PathBuf>,
     pub edits: Vec<EditSummary>,
+    /// What the Operation changed in the file: a diff from its backup to
+    /// what its edits made of it, with every Secret masked. `None` for a
+    /// skill folder or link.
+    pub diff: Option<FileDiff>,
 }
 
 /// A copy of one file that an Operation in History backed up.

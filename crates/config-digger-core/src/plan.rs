@@ -1700,17 +1700,75 @@ impl Refused<'_> {
     }
 }
 
+/// What an Operation changed in one file it touched: a diff from its
+/// backup, or from nothing when it created the file, to what its edits made
+/// of that backup, masked for the locations of `snapshot` that read it now.
+pub(crate) fn operation_diff(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    snapshot: &Snapshot,
+    folder: &Path,
+    manifest: &history::Manifest,
+    location: &history::LocationRecord,
+) -> FileDiff {
+    let path = &location.path;
+    if manifest.backup_deleted_at.is_some() {
+        let note = explain::diff_of_deleted_backup(&manifest.id);
+        return no_diff(path, DiffUnavailable::BackupDeleted, note);
+    }
+    let backed_up = match &location.backup {
+        Some(backup) => {
+            let backup = folder.join(backup);
+            match ports.fs.read(&backup) {
+                Ok(bytes) => Some(bytes),
+                Err(error) => return unreadable_backup(path, &backup, &error),
+            }
+        }
+        None => None,
+    };
+    let base = backed_up.as_deref().unwrap_or(empty_file(location.syntax));
+    let edits: Vec<Edit> = location
+        .edits
+        .iter()
+        .map(|record| record.edit.clone())
+        .collect();
+    let written = match apply_edits(base, location.syntax, &edits, &location.medium) {
+        Ok(edited) => edited.bytes,
+        Err(_) => {
+            let note = explain::edits_do_not_apply(path);
+            return no_diff(path, DiffUnavailable::EditsDoNotApply, note);
+        }
+    };
+    let before = Side {
+        bytes: backed_up.as_deref(),
+        name: "in the backup",
+    };
+    let after = Side {
+        bytes: Some(&written),
+        name: "as the Operation wrote it",
+    };
+    let readers = snapshot.readers_of(path);
+    let store = snapshot.parked_store.as_deref();
+    file_diff(definitions, &readers, path, store, before, after)
+}
+
 /// No diff of a file whose backup cannot be read.
 fn unreadable_backup(path: &Path, backup: &Path, error: &io::Error) -> FileDiff {
+    let note = format!(
+        "Can't show a diff: the backup {} cannot be read: {error}.",
+        backup.display()
+    );
+    no_diff(path, DiffUnavailable::Io, note)
+}
+
+/// No diff of the file at `path`, for `reason`, said by `note`.
+fn no_diff(path: &Path, reason: DiffUnavailable, note: String) -> FileDiff {
     FileDiff {
         path: path.to_path_buf(),
         diff: None,
-        diff_unavailable: Some(DiffUnavailable::Io),
-        diff_note: Some(format!(
-            "Can't show a diff: the backup {} cannot be read: {error}.",
-            backup.display()
-        )),
-        // Nothing says how many lines differ without the backup.
+        diff_unavailable: Some(reason),
+        diff_note: Some(note),
+        // Nothing says how many lines differ without both sides.
         changed_lines: 0,
     }
 }

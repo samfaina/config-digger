@@ -1,7 +1,25 @@
-import { commands } from "./bindings";
+import { commands, type Error as ApiError } from "./bindings";
 
 /** What a desktop action did, as the screen tells the user. */
 export type Notify = (message: string) => void;
+
+/** How long a notice stays. */
+export const NOTICE_MS = 2500;
+
+/** What a command returns. */
+export type CommandResult<T> = { status: "ok"; data: T } | { status: "error"; error: ApiError };
+
+/** Runs a command, turning a thrown failure into an error result. */
+export async function call<T>(command: () => Promise<CommandResult<T>>): Promise<CommandResult<T>> {
+  try {
+    return await command();
+  } catch (thrown) {
+    return {
+      status: "error",
+      error: { code: "unexpected", message: String(thrown), candidates: [], backup: null, diffs: [], failed: null },
+    };
+  }
+}
 
 /** Copies `text` and says so. */
 export async function copy(text: string, what: string, notify: Notify): Promise<void> {

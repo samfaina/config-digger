@@ -6,11 +6,12 @@ use crate::api::{
     Action, Backup, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
     OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
 };
+use crate::definitions::AgentDefinition;
 use crate::edit::{Dependency, Edit, Syntax};
 use crate::folders::{FolderOp, FolderSize};
 use crate::ports::{Environment, HeldLock, Ports};
 use crate::store::Medium;
-use crate::{explain, paths, plan};
+use crate::{explain, paths, plan, scan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::hash::{BuildHasher, RandomState};
@@ -382,6 +383,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         undo_of: manifest.undo_of.clone(),
         undone_by,
         backup_deleted: manifest.backup_deleted_at.is_some(),
+        backup_deletable: backup_deletable(ports, manifest),
         agents,
         locations: manifest
             .locations
@@ -392,6 +394,18 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         undoable: not_undoable.is_none(),
         not_undoable,
     }
+}
+
+/// Whether the backup of `manifest` can be deleted, as
+/// [`plan::plan_delete_backup`] checks it.
+fn backup_deletable(ports: &Ports, manifest: &Manifest) -> bool {
+    if manifest.backup_deleted_at.is_none() {
+        return true;
+    }
+    operation_folder(ports, &manifest.id).is_ok_and(|folder| {
+        let copies = backup_copies(ports, &folder, manifest);
+        !backup_already_deleted(manifest, &copies)
+    })
 }
 
 /// The Operation `id` among `manifests`.
@@ -424,11 +438,18 @@ fn undone_by<'m>(id: &str, manifests: &'m [Manifest]) -> Option<&'m Manifest> {
     })
 }
 
-/// The Operation `id`, with its edits and backed-up files.
-pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> {
+/// The Operation `id`, with its edits, backed-up files and what it changed
+/// in each, masked for the locations that read them now.
+pub(crate) fn detail(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    id: &str,
+) -> Result<OperationDetail, Error> {
     let manifests = load_all(ports)?;
     let manifest = find(&manifests, id)?;
     let folder = operation_folder(ports, id)?;
+    let projects: Vec<PathBuf> = manifest.project.iter().cloned().collect();
+    let snapshot = scan::scan(definitions, ports, &projects).map_err(Error::unexpected)?;
     Ok(OperationDetail {
         summary: summary(ports, manifest, &manifests),
         project: manifest.project.clone(),
@@ -444,6 +465,14 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
                     .filter(|_| manifest.backup_deleted_at.is_none())
                     .map(|backup| folder.join(backup)),
                 edits: location.edit_summaries(),
+                diff: Some(plan::operation_diff(
+                    definitions,
+                    ports,
+                    &snapshot,
+                    &folder,
+                    manifest,
+                    location,
+                )),
             })
             .chain(manifest.folders.iter().map(|record| {
                 OperationLocation {
@@ -453,6 +482,7 @@ pub(crate) fn detail(ports: &Ports, id: &str) -> Result<OperationDetail, Error> 
                         .filter(|_| manifest.backup_deleted_at.is_none())
                         .map(|backup| folder.join(backup)),
                     edits: Vec::new(),
+                    diff: None,
                 }
             }))
             .collect(),

@@ -44,6 +44,18 @@ export const commands = {
 	executePlan: (planId: string, acknowledged: WarningClass[]) => typedError<Executed, Error>(__TAURI_INVOKE("execute_plan", { planId, acknowledged })),
 	/**  Drops the plan held under `plan_id`, as when the dialog is cancelled. */
 	cancelPlan: (planId: string) => typedError<null, Error>(__TAURI_INVOKE("cancel_plan", { planId })),
+	/**  Every Operation in History, newest first. */
+	readHistory: () => typedError<OperationSummary[], Error>(__TAURI_INVOKE("read_history")),
+	/**
+	 *  The Operation `id` in History, with what it changed in each file, whose
+	 *  backup folder can then be revealed.
+	 */
+	historyDetail: (id: string) => typedError<OperationDetail, Error>(__TAURI_INVOKE("history_detail", { id })),
+	/**
+	 *  Dismisses the Operation `id`, which needs attention, once its files were
+	 *  recovered by hand.
+	 */
+	dismissOperation: (id: string) => typedError<OperationSummary, Error>(__TAURI_INVOKE("dismiss_operation", { id })),
 };
 
 /* Types */
@@ -91,7 +103,9 @@ export type ActionRequest =
 /**  The Entry's `<path>#<key path>` locator. */
 locator: string; project: string | null } | 
 /**  The Undo of the Operation `operation` in History. */
-{ kind: "undo"; operation: string };
+{ kind: "undo"; operation: string } | 
+/**  The deletion of the backup of the Operation `operation` in History. */
+{ kind: "delete_backup"; operation: string };
 
 /**  A problem of an Agent home in the context, shown above its Items. */
 export type AgentFlag = {
@@ -291,7 +305,14 @@ export type DiffUnavailable =
  *  Disable switches, or none any more, so nothing says where its
  *  Secrets are.
  */
-"no_reader";
+"no_reader" | 
+/**  The backup of the Operation was deleted, with the values of its edits. */
+"backup_deleted" | 
+/**
+ *  The edits History holds no longer apply to the backup, so what the
+ *  Operation wrote cannot be rebuilt from it.
+ */
+"edits_do_not_apply";
 
 /**  An Entry whose State after an Operation is not the one predicted. */
 export type Difference = {
@@ -904,6 +925,90 @@ export type NoteCode =
  *  from this Entry and another as that other alone, hiding this one.
  */
 "cli_view_differs";
+
+/**  One Operation as `history show` details it. */
+export type OperationDetail = {
+	summary: OperationSummary,
+	/**  The context's Project, as in [`Preview::project`]. */
+	project: string | null,
+	/**  The States its preview predicted. */
+	changes: Change[],
+	locations: OperationLocation[],
+	/**  The folder holding its backup and manifest. */
+	backup: string,
+	/**  Why it did not complete. */
+	cause: string | null,
+	/**  Where its Rollback left each file it touched, when it failed. */
+	rollback: RollbackLocation[],
+	verify: Verify | null,
+	/**  Where the States after differed from the prediction. */
+	differences: Difference[],
+};
+
+/**  One file an Operation touched. */
+export type OperationLocation = {
+	path: string,
+	/**
+	 *  Its copy as it was before the Operation, or `None` when the Operation
+	 *  created the file or its backup was deleted.
+	 */
+	backup: string | null,
+	edits: EditSummary[],
+	/**
+	 *  What the Operation changed in the file: a diff from its backup to
+	 *  what its edits made of it, with every Secret masked. `None` for a
+	 *  skill folder or link.
+	 */
+	diff: FileDiff | null,
+};
+
+/**  Where an Operation got to. */
+export type OperationStatus = 
+/**  Backed up and being written, or interrupted while it was. */
+"in_progress" | "applied" | 
+/**  Failed, and rolled back: no file holds any of its edits. */
+"failed" | 
+/**
+ *  Failed, and its Rollback could not restore every file, so its backup
+ *  is needed to recover. Its backup is kept until it is dismissed.
+ */
+"needs_attention";
+
+/**  One Operation as History lists it. */
+export type OperationSummary = {
+	/**  Such as `20261001-143012-a3f`. */
+	id: string,
+	/**  When it started, in RFC 3339. */
+	created_at: string,
+	action: Action,
+	/**  What it does, as its preview titled it. */
+	title: string,
+	status: OperationStatus,
+	/**  The status as History shows it, such as "Applied", rendered by the core. */
+	status_text: string,
+	/**  Why it failed, as a sentence, when it did. */
+	cause: string | null,
+	/**  Its Rollback is incomplete and it was not dismissed yet. */
+	needs_attention: boolean,
+	/**  The Operation this one undoes, when it is an Undo. */
+	undo_of: string | null,
+	/**  The Undo of this Operation, while that Undo is in effect. */
+	undone_by: string | null,
+	/**  Its backup was deleted, and with it the values of its edits. */
+	backup_deleted: boolean,
+	/**
+	 *  Its backup can be deleted: it was not yet, or a deletion left copies
+	 *  of it behind.
+	 */
+	backup_deletable: boolean,
+	/**  The names of the Agents whose States it changed. */
+	agents: string[],
+	/**  The files it touched. */
+	locations: string[],
+	undoable: boolean,
+	/**  Why it cannot be undone, as a sentence, when it cannot. */
+	not_undoable: string | null,
+};
 
 /**  An executed Operation. */
 export type Outcome = {

@@ -11,6 +11,9 @@
     "allow-reveal-location",
     "allow-plan-action",
     "allow-execute-plan",
-    "allow-cancel-plan"
+    "allow-cancel-plan",
+    "allow-read-history",
+    "allow-history-detail",
+    "allow-dismiss-operation"
   ]
 }

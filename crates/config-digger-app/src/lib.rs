@@ -30,6 +30,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::plan_action,
         commands::execute_plan,
         commands::cancel_plan,
+        commands::read_history,
+        commands::history_detail,
+        commands::dismiss_operation,
     ])
 }
 

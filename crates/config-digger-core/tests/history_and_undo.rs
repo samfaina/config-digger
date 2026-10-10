@@ -348,6 +348,38 @@ fn history_show_lists_the_edits_and_the_files_copied_to_the_backup() {
 }
 
 #[test]
+fn history_show_diffs_each_file_as_the_operation_changed_it() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    // What the file holds now does not change what the Operation did.
+    fs.put_file(
+        claude_json(),
+        TWO_USER_SERVERS.replace("notes-mcp", "notes-mcp-2"),
+    );
+
+    let operation = core(&fs).history_show(&removed.operation).unwrap();
+
+    let diff = operation.locations[0].diff.as_ref().unwrap();
+    assert_eq!(diff.path, claude_json());
+    assert_eq!(
+        diff.diff.as_deref().unwrap(),
+        r#"--- a/C:\Users\fixture\.claude.json
++++ b/C:\Users\fixture\.claude.json
+@@ -1,9 +1,6 @@
+ {
+   "numStartups": 3,
+   "mcpServers": {
+-    "linear": {
+-      "url": "https://mcp.linear.app/mcp"
+-    },
+     "notes": {
+       "command": "notes-mcp"
+     }
+"#
+    );
+}
+
+#[test]
 fn backups_of_a_file_list_each_copy_history_holds_newest_first() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
     let clock = FakeClock::default();

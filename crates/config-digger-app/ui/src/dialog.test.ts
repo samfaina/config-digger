@@ -38,7 +38,7 @@ const gitWarning: Warning = { class: "git-versioned", sentence: "The edit shows 
 const runningWarning: Warning = { class: "running-agent", sentence: "Claude Code is running." };
 
 describe("the Apply button", () => {
-  test("is named by the verb, in the danger style only for Remove", () => {
+  test("is named by the verb, in the danger style for Remove", () => {
     expect(applyButton(planned(), new Set())).toMatchObject({ label: "Disable", danger: false });
     expect(applyButton(planned({ preview: preview({ action: "enable" }) }), new Set())).toMatchObject({
       label: "Enable",
@@ -51,6 +51,13 @@ describe("the Apply button", () => {
     expect(applyButton(planned({ preview: preview({ action: "undo" }) }), new Set())).toMatchObject({
       label: "Undo",
       danger: false,
+    });
+  });
+
+  test("deletes a backup in the danger style, since it is gone for good", () => {
+    expect(applyButton(planned({ preview: preview({ action: "delete_backup" }) }), new Set())).toMatchObject({
+      label: "Delete backup",
+      danger: true,
     });
   });
 
@@ -135,6 +142,14 @@ describe("the Files section", () => {
 
     expect(tags).toEqual([["git-versioned"], ["SQLite"], ["rewritten while running"], ["git-versioned"]]);
   });
+
+  test("lists each backed-up copy a Delete backup deletes", () => {
+    const copy = String.raw`C:\Users\me\AppData\Local\config-digger\backups\20261001-143012-a3f\1-.claude.json`;
+
+    expect(locations(preview({ action: "delete_backup", deleted: [copy] }))).toEqual([
+      { kind: "copy", path: copy, tags: ["deleted for good"], open: true },
+    ]);
+  });
 });
 
 describe("a diff", () => {
@@ -201,7 +216,10 @@ const steps = (result: Result) => result.steps.map(({ name, status }) => `${name
 
 describe("the result", () => {
   test("of a verified Operation completes Back up, Write and Verify, and offers Undo", () => {
-    const result = appliedResult(outcome({ hints: ["Restart Claude Code so that it reads what the Operation wrote."] }));
+    const result = appliedResult(
+      outcome({ hints: ["Restart Claude Code so that it reads what the Operation wrote."] }),
+      "disable",
+    );
 
     expect(steps(result)).toEqual(["Back up done", "Write done", "Verify done"]);
     expect(result).toMatchObject({
@@ -213,6 +231,12 @@ describe("the result", () => {
     });
   });
 
+  test("of a Delete backup offers no Undo, since its Operation can no longer be undone", () => {
+    const result = appliedResult(outcome({ sentence: "Deleted the backup of 20261001-143012-a3f." }), "delete_backup");
+
+    expect(result).toMatchObject({ kind: "applied", undo: null });
+  });
+
   test("verified with differences marks Verify amber and lists Predicted against Actual", () => {
     const difference = {
       agent: "vscode",
@@ -222,7 +246,7 @@ describe("the result", () => {
       actual: "shadowed" as const,
     };
 
-    const result = appliedResult(outcome({ verify: "verified_with_differences", differences: [difference] }));
+    const result = appliedResult(outcome({ verify: "verified_with_differences", differences: [difference] }), "disable");
 
     expect(steps(result)).toEqual(["Back up done", "Write done", "Verify warn"]);
     expect(result).toMatchObject({ kind: "applied", differences: [difference] });

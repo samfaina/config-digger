@@ -1,12 +1,13 @@
-//! The plans the action dialog previews. A plan stays here, in Rust, under
-//! an id: the webview gets its preview, warnings and blocks, then executes
-//! it by id with the warnings the user acknowledged. A plan is dropped once
-//! it is executed or cancelled, and with the app when it exits.
+//! The plans the action dialog previews, and the History of the Operations
+//! they record. A plan stays here, in Rust, under an id: the webview gets its
+//! preview, warnings and blocks, then executes it by id with the warnings the
+//! user acknowledged. A plan is dropped once it is executed or cancelled, and
+//! with the app when it exits.
 
 use crate::session;
 use config_digger_core::api::{
-    Action, Block, Context, Core, Error, ErrorCode, Outcome, Plan, Preview, ScanOptions, Targets,
-    Warning, WarningClass,
+    Action, Block, Context, Core, Error, ErrorCode, OperationDetail, OperationSummary, Outcome,
+    Plan, Preview, ScanOptions, Targets, Warning, WarningClass,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -25,6 +26,8 @@ pub enum ActionRequest {
     },
     /// The Undo of the Operation `operation` in History.
     Undo { operation: String },
+    /// The deletion of the backup of the Operation `operation` in History.
+    DeleteBackup { operation: String },
 }
 
 /// What the dialog does to one Entry.
@@ -145,6 +148,7 @@ impl Actions {
                     .plan(&snapshot, &context, (*verb).into(), &targets)
             }
             ActionRequest::Undo { operation } => self.core.plan_undo(operation),
+            ActionRequest::DeleteBackup { operation } => self.core.plan_delete_backup(operation),
         }
     }
 
@@ -187,8 +191,30 @@ impl Actions {
         self.held.remove(plan_id);
     }
 
-    /// Whether `path` is a backup folder an Operation or a refused Undo
-    /// reported here, in any letter case: the webview reveals no other.
+    /// Every Operation in History, newest first.
+    pub fn history(&self) -> Result<Vec<OperationSummary>, Error> {
+        self.core.history()
+    }
+
+    /// The Operation `id` in History, whose backup folder can then be
+    /// revealed, unless its backup was deleted.
+    pub fn detail(&mut self, id: &str) -> Result<OperationDetail, Error> {
+        let detail = self.core.history_show(id)?;
+        if !detail.summary.backup_deleted {
+            self.report(Some(&detail.backup));
+        }
+        Ok(detail)
+    }
+
+    /// Dismisses the Operation `id`, which needs attention, once its files
+    /// were recovered by hand.
+    pub fn dismiss(&self, id: &str) -> Result<OperationSummary, Error> {
+        self.core.dismiss(id)
+    }
+
+    /// Whether `path` is a backup folder an Operation, a refused Undo or a
+    /// detail in History reported here, in any letter case: the webview
+    /// reveals no other.
     pub fn can_reveal(&self, path: &Path) -> bool {
         self.reported.contains(&session::key(path))
     }
@@ -377,6 +403,60 @@ mod tests {
 
         assert_eq!(refused.code, ErrorCode::UndoRefused);
         assert!(actions.can_reveal(refused.backup.as_deref().unwrap()));
+    }
+
+    fn removed_notes(actions: &mut Actions) -> String {
+        let planned = actions.plan(&remove_notes()).unwrap();
+        let Executed::Applied { outcome } = actions.execute(&planned.plan_id, &[]).unwrap() else {
+            panic!("applied");
+        };
+        outcome.operation
+    }
+
+    #[test]
+    fn history_lists_each_operation_with_a_detail_whose_backup_folder_can_be_revealed() {
+        let fs = fixture();
+        let operation = removed_notes(&mut actions(&fs));
+        // History is read after the app restarted.
+        let mut actions = actions(&fs);
+
+        let history = actions.history().unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].id, operation);
+
+        let detail = actions.detail(&operation).unwrap();
+        assert!(actions.can_reveal(&detail.backup));
+        let diff = detail.locations[0].diff.as_ref().unwrap();
+        let text = diff.diff.as_deref().unwrap();
+        assert!(text.contains("-{ \"mcpServers\": { \"notes\""), "{text}");
+    }
+
+    #[test]
+    fn a_backup_is_deleted_through_a_plan_of_its_own() {
+        let fs = fixture();
+        let mut actions = actions(&fs);
+        let operation = removed_notes(&mut actions);
+
+        let delete = actions
+            .plan(&ActionRequest::DeleteBackup {
+                operation: operation.clone(),
+            })
+            .unwrap();
+        assert_eq!(delete.preview.action, Action::DeleteBackup);
+        assert_eq!(
+            delete.preview.backup_of.as_deref(),
+            Some(operation.as_str())
+        );
+        assert_eq!(delete.preview.deleted.len(), 1);
+        actions.execute(&delete.plan_id, &[]).unwrap();
+
+        let history = actions.history().unwrap();
+        assert!(history[0].backup_deleted);
+        assert!(!history[0].undoable);
+        // Its folder holds only its record now, so the detail offers nothing to reveal.
+        let mut restarted = self::actions(&fs);
+        let detail = restarted.detail(&operation).unwrap();
+        assert!(!restarted.can_reveal(&detail.backup));
     }
 
     #[test]

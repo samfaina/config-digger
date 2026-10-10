@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HistoryScreen } from "./HistoryScreen";
 import { InventoryScreen } from "./Inventory";
 import { Rail, SCREEN_TITLES, type Screen } from "./Rail";
 
@@ -10,6 +11,8 @@ export function App() {
       <main className="main">
         {screen === "inventory" ? (
           <InventoryScreen onOpenHistory={() => setScreen("history")} />
+        ) : screen === "history" ? (
+          <HistoryScreen />
         ) : (
           <ComingLater title={SCREEN_TITLES[screen]} />
         )}
