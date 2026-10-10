@@ -3,7 +3,7 @@
 //! `specta::Type`, from which the app's TypeScript bindings are generated.
 
 use crate::definitions::blocks::{FindsBy, Locate, Provenance as DefinitionProvenance};
-use crate::definitions::{self, AgentDefinition, ItemKind as DefinitionItemKind};
+use crate::definitions::{self, Definitions, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::{Environment, Ports};
 use crate::{
@@ -15,12 +15,90 @@ use std::path::{Path, PathBuf};
 /// The version of every JSON document config-digger emits.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// The core, holding the ports and the loaded Agent definitions.
+/// The core, holding the ports and the loaded definitions.
 pub struct Core {
     ports: Ports,
-    definitions: Vec<AgentDefinition>,
-    /// How many of `definitions`, at their start, are built in.
+    definitions: Definitions,
+    /// How many of the Agent definitions, at their start, are built in.
     built_in: usize,
+}
+
+/// A [`Core`] loaded with a folder of extra definitions, and the files of
+/// it that were rejected.
+pub struct Loaded {
+    pub core: Core,
+    /// Each file that failed to load, in the order of their names. None of
+    /// it was loaded.
+    pub rejected: Vec<RejectedDefinition>,
+}
+
+/// An extra definition file that failed to load, and why.
+#[derive(Debug, Clone)]
+pub struct RejectedDefinition {
+    pub file: PathBuf,
+    /// The validation error, naming the file.
+    pub message: String,
+}
+
+/// Loads each definition file directly in `folder` with `parse`, after
+/// those in `loaded`, adding to `rejected` each that fails to load or whose
+/// `id` one already loaded has.
+fn load_folder<D>(
+    ports: &Ports,
+    folder: &Path,
+    loaded: &mut Vec<D>,
+    rejected: &mut Vec<RejectedDefinition>,
+    parse: fn(&str, &str) -> Result<D, definitions::DefinitionError>,
+    id: fn(&D) -> &String,
+) -> Result<(), Error> {
+    for (file, text) in definition_files(ports, folder)? {
+        let name = file.display().to_string();
+        let parsed = text.and_then(|text| {
+            let definition = parse(&name, &text).map_err(|e| e.to_string())?;
+            if loaded.iter().any(|known| id(known) == id(&definition)) {
+                return Err(format!(
+                    "definition `{name}` is invalid: id `{}` is taken by another definition",
+                    id(&definition)
+                ));
+            }
+            Ok(definition)
+        });
+        match parsed {
+            Ok(definition) => loaded.push(definition),
+            Err(message) => rejected.push(RejectedDefinition { file, message }),
+        }
+    }
+    Ok(())
+}
+
+/// A definition file, with its text or why it cannot be read.
+type DefinitionFile = (PathBuf, Result<String, String>);
+
+/// The `*.toml` files directly in `folder`, in the order of their names.
+fn definition_files(ports: &Ports, folder: &Path) -> Result<Vec<DefinitionFile>, Error> {
+    let mut files = ports.fs.read_dir(folder).map_err(|error| {
+        Error::invalid_path(format!(
+            "cannot read the definitions folder {}: {error}",
+            folder.display()
+        ))
+    })?;
+    files.retain(|file| {
+        file.extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("toml"))
+    });
+    files.sort_by_key(|file| paths::key(file));
+    Ok(files
+        .into_iter()
+        .map(|file| {
+            let text = ports
+                .fs
+                .read(&file)
+                .map_err(|error| error.to_string())
+                .and_then(|bytes| String::from_utf8(bytes).map_err(|error| error.to_string()))
+                .map_err(|error| format!("cannot read {}: {error}", file.display()));
+            (file, text)
+        })
+        .collect())
 }
 
 /// What [`Core::scan`] read. Resolve it as often as needed without reading the disk again.
@@ -52,18 +130,49 @@ impl Core {
         Self::with_extra_definitions(ports, &[])
     }
 
+    /// Loads the built-in definitions plus the extra ones in `folder`, as
+    /// `--definitions <dir>` does for development, tests and contributors
+    /// (ADR 0005): each `*.toml` file in it is an Agent definition, and each
+    /// one in its `skill-managers` folder a skill manager definition, each
+    /// kind in the order of their names, after the built-in ones. A file
+    /// that fails to load is rejected whole, with the reason, and the others
+    /// load all the same.
+    pub fn with_definitions_folder(ports: Ports, folder: &Path) -> Result<Loaded, Error> {
+        let mut core = Self::new(ports)?;
+        let mut rejected = Vec::new();
+        load_folder(
+            &core.ports,
+            folder,
+            &mut core.definitions.agents,
+            &mut rejected,
+            definitions::parse,
+            |definition| &definition.agent.id,
+        )?;
+        let managers = folder.join("skill-managers");
+        if core.ports.fs.exists(&managers) {
+            load_folder(
+                &core.ports,
+                &managers,
+                &mut core.definitions.skill_managers,
+                &mut rejected,
+                definitions::skill_managers::parse,
+                |definition| &definition.manager.id,
+            )?;
+        }
+        rejected.sort_by_key(|rejected| paths::key(&rejected.file));
+        Ok(Loaded { core, rejected })
+    }
+
     /// Loads the built-in Agent definitions plus the extra ones in `files`,
     /// each a file name and its TOML text, as `--definitions` does for
-    /// development and tests (ADR 0005). A file that fails to load is
-    /// rejected whole.
+    /// development and tests (ADR 0005). A file that fails to load fails
+    /// the whole load.
     pub fn with_extra_definitions(ports: Ports, files: &[(&str, &str)]) -> Result<Self, Error> {
-        // Scans read the built-in skill manager definitions: one that fails
-        // to load fails here, rather than recognising no skill manager.
-        definitions::skill_managers::built_in().map_err(Error::unexpected)?;
-        let mut definitions = definitions::built_in().map_err(Error::unexpected)?;
+        let mut definitions = Definitions::built_in().map_err(Error::unexpected)?;
         let built_in = definitions.len();
         for (file, text) in files {
-            definitions.push(definitions::parse(file, text).map_err(Error::unexpected)?);
+            let definition = definitions::parse(file, text).map_err(Error::unexpected)?;
+            definitions.agents.push(definition);
         }
         Ok(Self {
             ports,

@@ -3076,3 +3076,136 @@ fn homes_list_labels_orca_s_codex_home_as_mirrored() {
     assert_eq!(run.code, 0, "{}", run.stderr);
     assert!(run.stdout.contains("Mirrored by Orca"), "{}", run.stdout);
 }
+
+/// An Agent whose servers are in `~/.extra.json`, for `--definitions`.
+const EXTRA_AGENT: &str = r#"
+format_version = 1
+
+[agent]
+id = "extra"
+name = "Extra"
+
+[[homes]]
+id = "default"
+folder = { block = "path", path = "~" }
+roots.config = ".extra.json"
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "config" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "unknown"
+
+[items.mcp]
+precedence = ["user-mcp"]
+competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
+"#;
+
+#[test]
+fn definitions_loads_extra_agent_definitions_from_a_folder() {
+    let harness = Harness::new()
+        .with_file("definitions/extra.toml", EXTRA_AGENT)
+        .with_file(
+            ".extra.json",
+            r#"{"mcpServers": {"notes": {"command": "n"}}}"#,
+        );
+    let definitions = harness.path("definitions").display().to_string();
+
+    let agents = harness.run(&["--definitions", &definitions, "agents", "--json"]);
+    let list = harness.run(&["list", "--json", "--definitions", &definitions]);
+
+    assert_eq!(agents.code, 0, "{}", agents.stderr);
+    let document = agents.document();
+    let extra: Vec<&Value> = document["agents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|agent| agent["built_in"] == false)
+        .collect();
+    assert_eq!(extra.len(), 1, "{}", agents.stdout);
+    assert_eq!(extra[0]["id"], "extra");
+    assert_eq!(list.code, 0, "{}", list.stderr);
+    assert_eq!(
+        entry_states(&list.document(), "notes"),
+        pairs(&[("user", "effective")])
+    );
+}
+
+#[test]
+fn an_invalid_extra_definition_fails_with_its_validation_error() {
+    let broken = EXTRA_AGENT.replace("\"exact-name\"", "\"guess-name\"");
+    let harness = Harness::new()
+        .with_file("definitions/extra.toml", EXTRA_AGENT)
+        .with_file("definitions/broken.toml", &broken);
+    let definitions = harness.path("definitions").display().to_string();
+
+    let json = harness.run(&["--definitions", &definitions, "agents", "--json"]);
+    let text = harness.run(&["--definitions", &definitions, "agents"]);
+
+    assert_eq!(json.code, 2, "{}", json.stdout);
+    let error = &json.document()["error"];
+    assert_eq!(error["code"], "invalid_definition");
+    let message = error["message"].as_str().unwrap();
+    assert!(message.contains("broken.toml"), "{message}");
+    assert!(
+        message.contains("unknown variant `guess-name`"),
+        "{message}"
+    );
+    assert_eq!(text.code, 2);
+    assert!(text.stdout.is_empty(), "{}", text.stdout);
+    assert!(text.stderr.contains("guess-name"), "{}", text.stderr);
+}
+
+#[test]
+fn a_definitions_folder_that_does_not_exist_is_a_usage_error() {
+    let harness = Harness::new();
+    let missing = harness.path("nowhere").display().to_string();
+
+    let run = harness.run(&["--definitions", &missing, "agents", "--json"]);
+
+    assert_eq!(run.code, 2, "{}", run.stdout);
+    assert!(
+        run.document()["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("nowhere")
+    );
+}
+
+#[test]
+fn definitions_loads_the_zed_acceptance_definition() {
+    let zed = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../config-digger-core/tests/fixtures/zed/definitions")
+        .display()
+        .to_string();
+    let harness = Harness::new();
+    // `%APPDATA%` points inside the temporary folder, beside the home.
+    let settings = harness.roaming_app_data().join("Zed").join("settings.json");
+    std::fs::create_dir_all(settings.parent().unwrap()).unwrap();
+    std::fs::write(
+        &settings,
+        r#"{ "context_servers": { "github": { "command": "github-mcp" } } }"#,
+    )
+    .unwrap();
+
+    let run = harness.run(&["--definitions", &zed, "list", "--json", "--no-project"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let document = run.document();
+    let github = document["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["agent"] == "zed" && item["name"] == "github")
+        .unwrap_or_else(|| panic!("{document:#}"));
+    assert_eq!(github["entries"][0]["state"], "effective");
+}

@@ -47,12 +47,117 @@ pub fn json_schema() -> String {
     json
 }
 
+/// Checks the definition files in `folder`, laid out as the built-in ones
+/// are in the source tree: each `*.toml` file an Agent definition, and each
+/// one in its `skill-managers` folder a skill manager definition, as CI
+/// checks them. Every file must load, and the files must be exactly those
+/// built in, so that none ships unchecked and none is checked but not
+/// shipped. Returns one line per problem, Agent definitions first, each
+/// kind in the order of the files' names.
+pub fn check_built_in_folder(folder: &Path) -> Vec<String> {
+    let mut problems = Vec::new();
+    check_files(folder, BUILT_IN, &mut problems, |file, text| {
+        parse(file, text).map(drop)
+    });
+    let managers = folder.join("skill-managers");
+    check_files(
+        &managers,
+        skill_managers::BUILT_IN,
+        &mut problems,
+        |file, text| skill_managers::parse(file, text).map(drop),
+    );
+    problems
+}
+
+/// Checks the `*.toml` files in `folder` against `built_in`, each loaded
+/// with `load`, adding a line to `problems` for each that fails.
+fn check_files(
+    folder: &Path,
+    built_in: &[(&str, &str)],
+    problems: &mut Vec<String>,
+    load: impl Fn(&str, &str) -> Result<(), DefinitionError>,
+) {
+    let mut files: Vec<PathBuf> = match std::fs::read_dir(folder) {
+        Ok(entries) => entries
+            .filter_map(|entry| Some(entry.ok()?.path()))
+            .filter(|path| {
+                path.is_file()
+                    && path
+                        .extension()
+                        .is_some_and(|extension| extension.eq_ignore_ascii_case("toml"))
+            })
+            .collect(),
+        Err(error) => {
+            problems.push(format!("cannot read {}: {error}", folder.display()));
+            return;
+        }
+    };
+    files.sort();
+    for file in &files {
+        let name = file.file_name().unwrap_or_default().to_string_lossy();
+        if !built_in.iter().any(|(known, _)| *known == name) {
+            problems.push(format!(
+                "{} is not built in: list it with the built-in definitions",
+                file.display()
+            ));
+            continue;
+        }
+        match std::fs::read_to_string(file) {
+            Ok(text) => {
+                if let Err(error) = load(&file.display().to_string(), &text) {
+                    problems.push(error.to_string());
+                }
+            }
+            Err(error) => problems.push(format!("cannot read {}: {error}", file.display())),
+        }
+    }
+    for (known, _) in built_in {
+        if !files
+            .iter()
+            .any(|file| file.file_name().is_some_and(|name| name == *known))
+        {
+            problems.push(format!(
+                "{} is missing: it is built in",
+                folder.join(known).display()
+            ));
+        }
+    }
+}
+
 /// A definition file that failed to load. It is rejected whole.
 #[derive(Debug, thiserror::Error)]
-#[error("Agent definition `{file}` is invalid: {message}")]
+#[error("{kind} definition `{file}` is invalid: {message}")]
 pub(crate) struct DefinitionError {
+    /// Which kind of definition it is: `Agent` or `skill manager`.
+    pub kind: &'static str,
     pub file: String,
     pub message: String,
+}
+
+/// The loaded definitions: the Agent definitions, which it derefs to, and
+/// the skill manager definitions that recognise who installed a skill
+/// folder of any of them, each in load order.
+pub(crate) struct Definitions {
+    pub agents: Vec<AgentDefinition>,
+    pub skill_managers: Vec<skill_managers::SkillManagerDefinition>,
+}
+
+impl Definitions {
+    /// The built-in definitions of both kinds.
+    pub fn built_in() -> Result<Self, DefinitionError> {
+        Ok(Self {
+            agents: built_in()?,
+            skill_managers: skill_managers::built_in()?,
+        })
+    }
+}
+
+impl std::ops::Deref for Definitions {
+    type Target = [AgentDefinition];
+
+    fn deref(&self) -> &[AgentDefinition] {
+        &self.agents
+    }
 }
 
 /// The built-in Agent definitions, in load order.
@@ -65,6 +170,7 @@ pub(crate) fn built_in() -> Result<Vec<AgentDefinition>, DefinitionError> {
 
 pub(crate) fn parse(file: &str, text: &str) -> Result<AgentDefinition, DefinitionError> {
     let error = |message: String| DefinitionError {
+        kind: "Agent",
         file: file.to_owned(),
         message,
     };
@@ -200,7 +306,10 @@ pub(crate) struct FeatureGateDefinition {
     pub affects: Vec<String>,
     /// Where the Agent caches the gate's value. Omitted when it caches it
     /// nowhere config-digger reads, such as the admin controls Gemini CLI
-    /// fetches when it signs in.
+    /// fetches when it signs in. Omitted with `when` too, the Agent keeps
+    /// it nowhere on disk, such as the settings profile Zed has active:
+    /// each Entry it affects gets the caveat `gate_assumed`, at its own
+    /// location.
     pub lookup: Option<GateLookup>,
     /// When the Agent ignores its cache and uses its own default. Only a
     /// gate with a lookup takes one.
@@ -1185,16 +1294,20 @@ impl AgentDefinition {
                     lookup.validate().map_err(context)?;
                     self.validate_home_root(lookup.anchor()).map_err(context)?;
                 }
-                (None, Some(when)) => {
-                    when.validate().map_err(context)?;
-                    for source in &when.sources {
-                        self.validate_setting(&source.anchor).map_err(context)?;
+                (None, when) => {
+                    if let Some(when) = when {
+                        when.validate().map_err(context)?;
+                        for source in &when.sources {
+                            self.validate_setting(&source.anchor).map_err(context)?;
+                        }
                     }
                     if gate.bypass.is_some() {
                         return Err(context("only a gate with a lookup takes a bypass".into()));
                     }
                 }
-                _ => return Err(context("needs a lookup or a `when`, not both".into())),
+                (Some(_), Some(_)) => {
+                    return Err(context("takes a lookup or a `when`, not both".into()));
+                }
             }
             if let Some(bypass) = &gate.bypass {
                 bypass.validate().map_err(context)?;
@@ -3697,7 +3810,7 @@ admin_owned = true
     }
 
     #[test]
-    fn a_feature_gate_has_a_lookup_or_a_when() {
+    fn a_feature_gate_takes_a_lookup_or_a_when_or_neither() {
         let gate = |lookup: &str| {
             format!(
                 "{VALID}\n[[feature_gates]]\nname = \"admin\"\nassumed = true\naffects = [\"user-mcp\"]\n{lookup}"
@@ -3707,8 +3820,11 @@ admin_owned = true
         let text = gate(when);
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
         let text = gate("");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let lookup = r#"lookup = { block = "json-value", anchor = { block = "home", root = "state" }, key_path = ["{gate}"] }"#;
+        let text = gate(&format!("{when}\n{lookup}"));
         assert!(
-            error(&text).contains("a lookup or a `when`"),
+            error(&text).contains("a lookup or a `when`, not both"),
             "{}",
             error(&text)
         );

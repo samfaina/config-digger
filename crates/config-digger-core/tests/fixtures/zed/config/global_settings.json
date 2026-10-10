@@ -1,0 +1,6 @@
+{
+  "context_servers": {
+    "shared": { "command": "global-shared" },
+    "browser": { "command": "browser-mcp" }
+  }
+}

@@ -2438,6 +2438,13 @@
           "type": "boolean",
           "default": false
         },
+        "table": {
+          "description": "In a SQLite store, a table of its own rather than its `ItemTable`,\nsuch as the `trusted_worktrees` of Zed's `db.sqlite`: the value is\nthen the list of the text values of the column the key path's one\nkey names, one per row. The store is opened read-only and closed\nstraight after, and a store without the table holds no value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "toml": {
           "description": "Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.",
           "type": "boolean",
@@ -3482,11 +3489,14 @@
               }
             },
             "uri": {
-              "description": "The field of an item that holds the folder's `file:` URI, as text\nor as VS Code's URI object.",
-              "type": "string"
+              "description": "The field of an item that holds the folder's `file:` URI, as text\nor as VS Code's URI object. Omitted, each item is the folder's path\nas text, such as a row of Zed's `trusted_worktrees`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "trusted": {
-              "description": "The field of an item that must hold `true` for it to trust the\nfolder. Omitted, every item trusts its folder.",
+              "description": "The field of an item that must hold `true` for it to trust the\nfolder. Omitted, every item trusts its folder. Only an item with a\n`uri` field has one.",
               "type": [
                 "string",
                 "null"
@@ -3512,8 +3522,7 @@
           "required": [
             "block",
             "locations",
-            "sources",
-            "uri"
+            "sources"
           ]
         },
         {
@@ -3918,7 +3927,7 @@
           }
         },
         "lookup": {
-          "description": "Where the Agent caches the gate's value. Omitted when it caches it\nnowhere config-digger reads, such as the admin controls Gemini CLI\nfetches when it signs in.",
+          "description": "Where the Agent caches the gate's value. Omitted when it caches it\nnowhere config-digger reads, such as the admin controls Gemini CLI\nfetches when it signs in. Omitted with `when` too, the Agent keeps\nit nowhere on disk, such as the settings profile Zed has active:\neach Entry it affects gets the caveat `gate_assumed`, at its own\nlocation.",
           "anyOf": [
             {
               "$ref": "#/$defs/GateLookup"

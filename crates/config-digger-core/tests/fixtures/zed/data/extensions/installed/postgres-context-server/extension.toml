@@ -1,0 +1,7 @@
+id = "postgres-context-server"
+name = "Postgres Context Server"
+version = "0.1.0"
+schema_version = 1
+authors = ["Zed Industries <support@zed.dev>"]
+
+[context_servers.postgres-context-server]

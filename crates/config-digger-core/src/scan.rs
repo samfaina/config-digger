@@ -11,9 +11,9 @@ use crate::definitions::blocks::{
     RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
     is_entry_key,
 };
-use crate::definitions::skill_managers::{self, Detector, SkillManagerDefinition, Strength};
+use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
-    ANY_KEY, AgentDefinition, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
+    ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
     LocationDefinition, NameParts, PROJECT_KEY, PluginNames, PluginsDefinition, References,
 };
 use crate::folders::{AsIf, PlannedFolder};
@@ -718,10 +718,11 @@ pub(crate) struct ScannedEntry {
 }
 
 /// The skill manager whose detectors match a skill folder most strongly.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct ManagerMatch {
-    /// Index of its definition among the built-in skill manager definitions.
-    pub manager: usize,
+    /// The id and display name of its definition.
+    pub id: String,
+    pub name: String,
     pub strength: Strength,
 }
 
@@ -806,7 +807,7 @@ struct FoundHome {
 
 /// `extra_projects` are evaluated whether or not a registry records them.
 pub(crate) fn scan(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     extra_projects: &[PathBuf],
 ) -> Result<Snapshot, ScanError> {
@@ -817,7 +818,7 @@ pub(crate) fn scan(
 /// will hold and `folders` were done, so that a plan can predict what a scan
 /// will read once it is done.
 pub(crate) fn scan_as_if(
-    definitions: &[AgentDefinition],
+    definitions: &Definitions,
     ports: &Ports,
     extra_projects: &[PathBuf],
     written: &[Written],
@@ -1035,11 +1036,15 @@ pub(crate) fn scan_as_if(
             .as_deref()
             .map(|template| switch_id(template, entry, &location.root));
     }
-    let managers = skill_managers::built_in().unwrap_or_default();
     for entry in &mut scanner.entries {
         let location = definitions[entry.agent_index].location(&entry.location);
         if location.format.skill_folder().is_some() {
-            entry.manager = manager_of(managers, &mut scanner.reader, ports, entry);
+            entry.manager = manager_of(
+                &definitions.skill_managers,
+                &mut scanner.reader,
+                ports,
+                entry,
+            );
         }
     }
     // A skill folder is git-versioned when a file below it is.
@@ -1384,6 +1389,7 @@ fn read_switches(
                     switch.format().as_ref(),
                     switch.sqlite(),
                     None,
+                    None,
                     reader,
                     &mut unreadable,
                 ) {
@@ -1505,6 +1511,7 @@ fn read_rules(
                     &setting.key_path,
                     format.as_ref(),
                     setting.sqlite,
+                    setting.table.as_deref(),
                     setting.cached_at.as_deref(),
                     reader,
                     &mut unreadable,
@@ -1599,8 +1606,10 @@ impl Places<'_> {
     /// is a Read failure for the Agent home, goes into `unreadable` and has
     /// no places. With `sqlite`, the file is a SQLite store, read as an
     /// object of the key path's first key and the JSON its `ItemTable` holds
-    /// there; a missing store has no places. With `cached_at`, each place
-    /// says when the Agent cached the value, read at that key path.
+    /// there; a missing store has no places. With `table` too, the object
+    /// holds the list of the texts of that column of that table instead.
+    /// With `cached_at`, each place says when the Agent cached the value,
+    /// read at that key path.
     #[allow(clippy::too_many_arguments)]
     fn read(
         &self,
@@ -1608,6 +1617,7 @@ impl Places<'_> {
         key_path: &[String],
         format: &dyn Parse,
         sqlite: bool,
+        table: Option<&str>,
         cached_at: Option<&[String]>,
         reader: &mut Reader,
         unreadable: &mut BTreeSet<PathBuf>,
@@ -1698,7 +1708,10 @@ impl Places<'_> {
                 if !reader.fs.exists(&path) {
                     continue;
                 }
-                reader.peek_item(&path, &key_path[0])
+                match table {
+                    Some(table) => reader.peek_column(&path, table, &key_path[0]),
+                    None => reader.peek_item(&path, &key_path[0]),
+                }
             } else {
                 reader.peek(&path).map(|text| text.map(str::to_owned))
             };
@@ -3523,14 +3536,18 @@ fn manager_of(
     entry: &ScannedEntry,
 ) -> Option<ManagerMatch> {
     let mut best: Option<ManagerMatch> = None;
-    for (manager, definition) in managers.iter().enumerate() {
+    for definition in managers {
         for detector in &definition.detectors {
             let strength = detector.strength();
-            if best.is_some_and(|best| best.strength >= strength) {
+            if best.as_ref().is_some_and(|best| best.strength >= strength) {
                 continue;
             }
             if detects(detector, reader, ports, entry) {
-                best = Some(ManagerMatch { manager, strength });
+                best = Some(ManagerMatch {
+                    id: definition.manager.id.clone(),
+                    name: definition.manager.name.clone(),
+                    strength,
+                });
             }
         }
     }
@@ -3815,6 +3832,28 @@ impl<'p> Reader<'p> {
             self.items.insert(id.clone(), read);
         }
         self.items[&id].clone()
+    }
+
+    /// The texts of the column `column` of the table `table` in the SQLite
+    /// store at `path`, as the text of a JSON list, `None` when the store
+    /// is missing, without reporting a failure: for a store that holds no
+    /// Entries, such as a gate's. A store that cannot be opened or queried,
+    /// its table missing included, is unreadable: what it holds is not
+    /// known, rather than empty.
+    fn peek_column(
+        &mut self,
+        path: &Path,
+        table: &str,
+        column: &str,
+    ) -> Result<Option<String>, ReadFailureKind> {
+        match self.fs.read_sqlite_column(path, table, column) {
+            Ok(values) => Ok(Some(serde_json::Value::from(values).to_string())),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => {
+                tracing::debug!(path = %path.display(), %table, %error, "cannot read the column");
+                Err(ReadFailureKind::Sqlite)
+            }
+        }
     }
 
     /// A file's text, `None` when it is missing, as [`text`](Self::text)

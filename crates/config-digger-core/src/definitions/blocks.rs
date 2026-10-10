@@ -5398,6 +5398,12 @@ pub(crate) struct SettingPlace {
     /// whose `ItemTable` holds JSON text under the key path's first key.
     #[serde(default)]
     pub sqlite: bool,
+    /// In a SQLite store, a table of its own rather than its `ItemTable`,
+    /// such as the `trusted_worktrees` of Zed's `db.sqlite`: the value is
+    /// then the list of the text values of the column the key path's one
+    /// key names, one per row. The store is opened read-only and closed
+    /// straight after, and a store without the table holds no value.
+    pub table: Option<String>,
     /// Whether the file is TOML, such as Codex's `config.toml`, rather than JSON.
     #[serde(default)]
     pub toml: bool,
@@ -5492,6 +5498,21 @@ impl Validate for SettingPlace {
                 super::PROJECT_KEY
             ));
         }
+        if let Some(table) = &self.table {
+            if !self.sqlite {
+                return Err(format!(
+                    "a setting read from table `{table}` is in a SQLite store"
+                ));
+            }
+            if self.key_path.len() != 1 || self.cached_at.is_some() {
+                return Err(format!(
+                    "a setting read from table `{table}` is one column, with no cached_at"
+                ));
+            }
+            if !is_name(table) || !is_name(&self.key_path[0]) {
+                return Err("a setting names its table and column by plain names".into());
+            }
+        }
         if let Some(cached_at) = &self.cached_at {
             validate_key_path(cached_at).map_err(|e| format!("cached_at: {e}"))?;
             if self.sqlite && cached_at[0] != self.key_path[0] {
@@ -5513,7 +5534,7 @@ impl Validate for SettingPlace {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum Rule {
-    AllowDenyList(AllowDenyList),
+    AllowDenyList(Box<AllowDenyList>),
     GlobalSwitch(GlobalSwitch),
     IdentityAllowlist(IdentityAllowlist),
 }
@@ -5972,10 +5993,12 @@ pub(crate) struct TrustedFolders {
     /// Where the lists of trusted folders are, every one of them read.
     pub sources: Vec<SettingPlace>,
     /// The field of an item that holds the folder's `file:` URI, as text
-    /// or as VS Code's URI object.
-    pub uri: String,
+    /// or as VS Code's URI object. Omitted, each item is the folder's path
+    /// as text, such as a row of Zed's `trusted_worktrees`.
+    pub uri: Option<String>,
     /// The field of an item that must hold `true` for it to trust the
-    /// folder. Omitted, every item trusts its folder.
+    /// folder. Omitted, every item trusts its folder. Only an item with a
+    /// `uri` field has one.
     pub trusted: Option<String>,
     /// A setting that, while it is met, trusts every folder, such as VS
     /// Code's `security.workspace.trust.enabled: false`.
@@ -5987,8 +6010,11 @@ impl Validate for TrustedFolders {
         if self.locations.is_empty() {
             return Err("a trusted-folders gate needs locations".into());
         }
-        if self.uri.is_empty() || self.trusted.as_deref() == Some("") {
+        if self.uri.as_deref() == Some("") || self.trusted.as_deref() == Some("") {
             return Err("a trusted-folders gate needs its fields named".into());
+        }
+        if self.uri.is_none() && self.trusted.is_some() {
+            return Err("a trusted-folders gate whose items are paths has no trusted field".into());
         }
         validate_sources(&self.sources)?;
         if let Some(setting) = &self.trust_all {
@@ -6009,7 +6035,13 @@ impl TrustedFolders {
                     .as_ref()
                     .is_none_or(|field| item.get(field) == Some(&Value::Bool(true)))
             })
-            .filter_map(|item| paths::from_uri_value(item.get(&self.uri)?))
+            .filter_map(|item| match &self.uri {
+                Some(uri) => paths::from_uri_value(item.get(uri)?),
+                None => {
+                    let path = paths::lexical(Path::new(item.as_str()?));
+                    paths::is_absolute(&path).then_some(path)
+                }
+            })
             .collect()
     }
 }

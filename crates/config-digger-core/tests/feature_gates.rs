@@ -499,3 +499,40 @@ fn a_cache_time_may_be_a_fractional_number_of_milliseconds() {
         "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
     );
 }
+
+#[test]
+fn a_gate_kept_nowhere_on_disk_is_assumed_on_every_entry_it_affects() {
+    let definition = SQLITE_GATED
+        .replace(
+            "lookup = { block = \"sqlite-json\", anchor = { block = \"home\", root = \"state\" }, key = \"workbench.experiments.statsigBootstrap\", key_path = [\"feature_gates\", \"{gate}\", \"value\"], hash = \"djb2\", cached_at = [\"time\"] }\n",
+            "",
+        )
+        .replace("assumed = true", "assumed = false");
+    let mcp_json = in_home(r".test\mcp.json");
+    let fs = FakeFileSystem::new().with_file(
+        &mcp_json,
+        json!({ "servers": { "docs": { "command": "docs" } } }).to_string(),
+    );
+    let core = Core::with_extra_definitions(
+        fake::ports(fs, FakeEnvironment::with_home(HOME)),
+        &[("test-agent.toml", &definition)],
+    )
+    .unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let item = inventory
+        .items
+        .iter()
+        .find(|item| item.agent == "test-agent")
+        .unwrap();
+    let entry = entry_json(&item.entries[0]);
+    assert_eq!(entry["state"], "effective");
+    assert_eq!(entry["caveats"][0]["code"], "gate_assumed");
+    assert_eq!(entry["caveats"][0]["path"], mcp_json.display().to_string());
+    assert_eq!(
+        entry["caveats"][0]["sentence"],
+        "Depends on Test Agent gate `dedupe_mcp_servers`: assumed off; cannot be read."
+    );
+}

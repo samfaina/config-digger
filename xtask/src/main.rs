@@ -3,6 +3,9 @@
 //! - `schema`: writes the Agent definition and skill manager definition JSON
 //!   Schemas generated from the block enums.
 //! - `bindings`: writes the app's TypeScript types and command wrappers generated from the api DTOs.
+//! - `definitions`: checks the built-in Agent and skill manager definition
+//!   files: each loads, as the schemas' types and their validation read it,
+//!   and the folder holds exactly the files that ship. It writes nothing.
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
@@ -44,8 +47,9 @@ fn main() -> ExitCode {
         ["schema", "--check"] => (SCHEMAS, true),
         ["bindings"] => (BINDINGS, false),
         ["bindings", "--check"] => (BINDINGS, true),
+        ["definitions"] => return check_definitions(),
         _ => {
-            eprintln!("usage: cargo xtask <schema|bindings> [--check]");
+            eprintln!("usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions");
             return ExitCode::from(2);
         }
     };
@@ -68,6 +72,20 @@ fn main() -> ExitCode {
         }
     }
     code
+}
+
+/// The built-in definitions, as CI checks them.
+fn check_definitions() -> ExitCode {
+    let folder = repo_file("crates/config-digger-core/definitions");
+    let problems = config_digger_core::definitions::check_built_in_folder(&folder);
+    if problems.is_empty() {
+        println!("the built-in definitions are valid");
+        return ExitCode::SUCCESS;
+    }
+    for problem in problems {
+        eprintln!("{problem}");
+    }
+    ExitCode::FAILURE
 }
 
 fn repo_file(path: &str) -> PathBuf {
