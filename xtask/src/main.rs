@@ -6,10 +6,17 @@
 //! - `definitions`: checks the built-in Agent and skill manager definition
 //!   files: each loads, as the schemas' types and their validation read it,
 //!   and the folder holds exactly the files that ship. It writes nothing.
+//! - `release <tag>`: checks that the tag is `v` and the workspace version,
+//!   and prints `version=` and `prerelease=` lines for `$GITHUB_OUTPUT`.
+//! - `checksums <dir>`: writes `<dir>/SHA256SUMS` for every other file in it.
+//! - `winget <tag> <installer> <dir>`: writes the winget manifest of the
+//!   tag's release, with the installer's SHA-256, into `<dir>`.
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
-use std::path::PathBuf;
+mod release;
+
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 /// A committed file generated from Rust code.
@@ -48,8 +55,16 @@ fn main() -> ExitCode {
         ["bindings"] => (BINDINGS, false),
         ["bindings", "--check"] => (BINDINGS, true),
         ["definitions"] => return check_definitions(),
+        ["release", tag] => return print_release(tag),
+        ["checksums", dir] => return write_checksums(Path::new(dir)),
+        ["winget", tag, installer, dir] => {
+            return write_winget(tag, Path::new(installer), Path::new(dir));
+        }
         _ => {
-            eprintln!("usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions");
+            eprintln!(
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions\n       \
+                 cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>"
+            );
             return ExitCode::from(2);
         }
     };
@@ -86,6 +101,78 @@ fn check_definitions() -> ExitCode {
         eprintln!("{problem}");
     }
     ExitCode::FAILURE
+}
+
+/// The release `tag` names, checked against the workspace version.
+fn checked_release(tag: &str) -> Result<release::Release, ExitCode> {
+    release::from_tag(tag, env!("CARGO_PKG_VERSION")).map_err(|error| {
+        eprintln!("{error}");
+        ExitCode::FAILURE
+    })
+}
+
+fn print_release(tag: &str) -> ExitCode {
+    match checked_release(tag) {
+        Ok(release) => {
+            println!("version={}", release.version);
+            println!("prerelease={}", release.prerelease);
+            ExitCode::SUCCESS
+        }
+        Err(code) => code,
+    }
+}
+
+fn write_checksums(dir: &Path) -> ExitCode {
+    let sums = dir.join("SHA256SUMS");
+    let files = std::fs::read_dir(dir).and_then(|entries| {
+        let mut files = Vec::new();
+        for entry in entries {
+            let path = entry?.path();
+            if path.is_file() && path != sums {
+                let name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned();
+                files.push((name, std::fs::read(&path)?));
+            }
+        }
+        Ok(files)
+    });
+    let written = files.and_then(|files| std::fs::write(&sums, release::sha256sums(&files)));
+    match written {
+        Ok(()) => {
+            println!("wrote {}", sums.display());
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("cannot write {}: {error}", sums.display());
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn write_winget(tag: &str, installer: &Path, dir: &Path) -> ExitCode {
+    let release = match checked_release(tag) {
+        Ok(release) => release,
+        Err(code) => return code,
+    };
+    let written = std::fs::read(installer).and_then(|bytes| {
+        std::fs::create_dir_all(dir)?;
+        let sha256 = release::sha256(&bytes);
+        for (name, contents) in release::winget_manifest(&release.version, &sha256) {
+            std::fs::write(dir.join(&name), contents)?;
+            println!("wrote {}", dir.join(&name).display());
+        }
+        Ok(())
+    });
+    match written {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("cannot write the winget manifest: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn repo_file(path: &str) -> PathBuf {

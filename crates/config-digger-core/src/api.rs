@@ -12,7 +12,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// The version of every JSON document config-digger emits.
+/// The version of every JSON document config-digger emits. It is 1 at the
+/// first release. Bump it on any breaking change to a document: a field
+/// renamed, removed or retyped. A new field is not one.
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// The core, holding the ports and the loaded definitions.
@@ -473,6 +475,41 @@ impl Core {
     /// exist yet.
     pub fn data_folders(&self) -> Result<DataFolders, Error> {
         DataFolders::locate(self.ports.env.as_ref())
+    }
+
+    /// Every Entry in config-digger's parked-Entry store, in the order of
+    /// their names, read from the store alone: the uninstaller names them
+    /// before it deletes config-digger's data. None when there is no store.
+    pub fn stored_parked_entries(&self) -> Result<Vec<StoredParkedEntry>, Error> {
+        let store = park::store_path(self.ports.env.as_ref())?;
+        let unreadable = |error: &dyn std::fmt::Display| {
+            Error::unexpected(format!("cannot read {}: {error}", store.display()))
+        };
+        let bytes = match self.ports.fs.read(&store) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(unreadable(&error)),
+        };
+        let document: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|error| unreadable(&error))?;
+        let mut stored: Vec<StoredParkedEntry> = park::parked_entries(&document)
+            .into_iter()
+            .map(|(_, parked)| {
+                let origin = parked.origin;
+                let agent_name = self
+                    .definitions
+                    .agents
+                    .iter()
+                    .find(|definition| definition.agent.id == origin.agent)
+                    .map_or(origin.agent, |definition| definition.agent.name.clone());
+                StoredParkedEntry {
+                    name: origin.name,
+                    agent_name,
+                }
+            })
+            .collect();
+        stored.sort_by(|a, b| (&a.name, &a.agent_name).cmp(&(&b.name, &b.agent_name)));
+        Ok(stored)
     }
 
     /// How long History keeps Operations. It is fixed.
@@ -1221,6 +1258,14 @@ impl DataFolders {
             lists: user_list::data_folder(env)?,
         })
     }
+}
+
+/// An Entry in config-digger's parked-Entry store, as the uninstaller names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredParkedEntry {
+    pub name: String,
+    /// Its Agent's name, or the Agent's id when no loaded definition has it.
+    pub agent_name: String,
 }
 
 /// How long History keeps Operations: at least the last `operations`, and

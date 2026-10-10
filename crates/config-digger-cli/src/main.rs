@@ -2,6 +2,7 @@
 //! renders its output as text or as one JSON document.
 
 mod homes_and_projects;
+mod installer;
 mod terminal;
 
 use anstyle::{AnsiColor, Style};
@@ -155,6 +156,12 @@ enum Command {
         /// The shell to complete in.
         #[arg(value_enum)]
         shell: Shell,
+    },
+    /// What the installer and uninstaller run.
+    #[command(hide = true)]
+    Installer {
+        #[command(subcommand)]
+        command: installer::InstallerCommand,
     },
 }
 
@@ -475,8 +482,11 @@ struct DismissBody<'a> {
 }
 
 fn run(cli: &Cli) -> Result<(), Failure> {
-    if let Command::Completions { shell } = &cli.command {
-        return completions(cli, *shell);
+    match &cli.command {
+        Command::Completions { shell } => return completions(cli, *shell),
+        // The uninstaller runs these: they leave History unpruned.
+        Command::Installer { command } => return installer::run(cli, command),
+        _ => {}
     }
     let core = load_core(cli)?;
     // Startup pruning is best-effort: History is pruned again next time.
@@ -639,7 +649,9 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         Command::Agents => homes_and_projects::agents(cli, &core),
         Command::Homes { command } => homes_and_projects::homes(cli, &core, command),
         Command::Projects { command } => homes_and_projects::projects(cli, &core, command),
-        Command::Completions { .. } => unreachable!("completions run without a core"),
+        Command::Completions { .. } | Command::Installer { .. } => {
+            unreachable!("run before History is pruned")
+        }
     }
 }
 

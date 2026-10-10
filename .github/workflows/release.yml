@@ -1,0 +1,76 @@
+name: Release
+
+# Each `vX.Y.Z` tag publishes a GitHub release with the per-user NSIS
+# installer, the CLI-only zip, `SHA256SUMS` and GitHub artifact attestations.
+# `vX.Y.Z-rc.N` tags are published as prereleases. The tag must be the
+# workspace version, which is the one version of every crate.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crates/config-digger-app/ui/package-lock.json
+      - name: Tag is the workspace version
+        id: release
+        shell: bash
+        run: cargo xtask release "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+      - name: Build the installer and the CLI
+        working-directory: crates/config-digger-app/ui
+        run: |
+          npm ci
+          npm run tauri -- build --config tauri.bundle.conf.json
+      - name: Collect the installer and the CLI zip
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item "target/release/bundle/nsis/config-digger_${env:VERSION}_x64-setup.exe" dist/
+          Compress-Archive -Path target/release/config-digger.exe -DestinationPath "dist/config-digger_${env:VERSION}_x64-cli.zip"
+      - name: Checksums
+        run: cargo xtask checksums dist
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/*.zip
+      - name: winget manifest
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: cargo xtask winget "$GITHUB_REF_NAME" "dist/config-digger_${VERSION}_x64-setup.exe" winget
+      - name: Upload the winget manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-manifest
+          path: winget/
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag --title "config-digger $VERSION" --generate-notes "${flags[@]}"
