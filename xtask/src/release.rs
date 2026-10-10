@@ -102,9 +102,10 @@ pub fn winget_manifest(version: &str, installer_sha256: &str) -> Vec<(String, St
          ProductCode: config-digger\n\
          Installers:\n\
          - Architecture: x64\n  \
-           InstallerUrl: {REPOSITORY}/releases/download/v{version}/config-digger_{version}_x64-setup.exe\n  \
+           InstallerUrl: {REPOSITORY}/releases/download/v{version}/{}\n  \
            InstallerSha256: {}\n{}",
         header("installer"),
+        installer_name(version),
         installer_sha256.to_uppercase(),
         footer("installer")
     );

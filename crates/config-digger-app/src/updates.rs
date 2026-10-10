@@ -59,9 +59,10 @@ impl UpdatesState {
     }
 
     /// What the app knows of updates, read without a network call.
-    pub fn status(&self) -> Result<UpdateStatus, api::Error> {
+    pub async fn read_status(&self) -> Result<UpdateStatus, api::Error> {
+        let last_checked = blocking(|| Core::new(Ports::real())?.last_update_check()).await?;
         Ok(UpdateStatus {
-            last_checked: Core::new(Ports::real())?.last_update_check()?,
+            last_checked,
             update: self.notice(),
         })
     }
@@ -72,15 +73,23 @@ impl UpdatesState {
             .map(|update| UpdateNotice::of(&update.version))
     }
 
-    /// Whether the startup check should run now: only on its first call
-    /// since the app started, and only when the user turned it on.
-    pub fn startup_check_due(&self) -> Result<bool, api::Error> {
-        if self.startup_check_ran.swap(true, Ordering::SeqCst) {
-            return Ok(false);
+    /// Checks for updates on the first call since the app started, when
+    /// the user turned "Check for updates on startup" on. Otherwise it makes
+    /// no network call and only reads what the app knows.
+    pub async fn startup_check(&self, app: &AppHandle) -> Result<UpdateStatus, api::Error> {
+        let first = !self.startup_check_ran.swap(true, Ordering::SeqCst);
+        let on = first
+            && blocking(|| {
+                Ok(Core::new(Ports::real())?
+                    .settings()?
+                    .check_updates_on_startup)
+            })
+            .await?;
+        if on {
+            self.check(app).await
+        } else {
+            self.read_status().await
         }
-        Ok(Core::new(Ports::real())?
-            .settings()?
-            .check_updates_on_startup)
     }
 
     /// The release notes of the update found, `None` when none was.
@@ -92,6 +101,14 @@ impl UpdatesState {
     /// when the user asks or turned the startup check on. The time is
     /// recorded once the check succeeds, whatever it finds.
     pub async fn check(&self, app: &AppHandle) -> Result<UpdateStatus, api::Error> {
+        let result = self.check_inner(app).await;
+        if let Err(error) = &result {
+            tracing::warn!(%error, "update check failed");
+        }
+        result
+    }
+
+    async fn check_inner(&self, app: &AppHandle) -> Result<UpdateStatus, api::Error> {
         let update = app
             .updater()
             .map_err(failed_check)?
@@ -112,17 +129,28 @@ impl UpdatesState {
 
     /// Downloads the update found, checks its signature, and runs its
     /// installer in passive mode, which replaces both executables and
-    /// restarts the app. It holds the global write lock throughout, so it
-    /// fails at once while an Operation writes, and no Operation starts
-    /// until the installer took over. On Windows the app exits once the
-    /// installer started, which releases the lock.
+    /// restarts the app. It fails at once while an Operation holds the
+    /// global write lock or the CLI next to the app runs, and holds the lock
+    /// while the update downloads, so no Operation starts then. On Windows
+    /// the app exits once the installer started, which releases the lock.
     pub async fn install(&self) -> Result<(), api::Error> {
+        let result = self.install_inner().await;
+        if let Err(error) = &result {
+            tracing::warn!(code = error.code.code(), "update not installed");
+        }
+        result
+    }
+
+    async fn install_inner(&self) -> Result<(), api::Error> {
         let Some(update) = self.found().clone() else {
             return Err(api::Error::unexpected(
                 "no update was found: check for updates first",
             ));
         };
-        let lock = blocking(|| Core::new(Ports::real())?.lock_for_update()).await?;
+        let cli = std::env::current_exe()
+            .map_err(api::Error::unexpected)?
+            .with_file_name(CLI_EXE);
+        let lock = blocking(move || Core::new(Ports::real())?.lock_for_update(&cli)).await?;
         tracing::info!(version = %update.version, "update installing");
         let installed = update.download_and_install(|_, _| {}, || {}).await;
         drop(lock);
@@ -131,6 +159,9 @@ impl UpdatesState {
         })
     }
 }
+
+/// The CLI the installer puts next to the app, and an update replaces.
+const CLI_EXE: &str = "config-digger.exe";
 
 fn failed_check(error: tauri_plugin_updater::Error) -> api::Error {
     api::Error::unexpected(format!("the update check failed: {error}"))

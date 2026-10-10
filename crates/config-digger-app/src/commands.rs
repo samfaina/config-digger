@@ -424,8 +424,8 @@ pub async fn open_page(page: Page) -> Result<(), api::Error> {
 /// started. It makes no network call.
 #[tauri::command]
 #[specta::specta]
-pub async fn update_status(app: AppHandle) -> Result<UpdateStatus, api::Error> {
-    blocking(move || app.state::<UpdatesState>().status()).await
+pub async fn update_status(updates: State<'_, UpdatesState>) -> Result<UpdateStatus, api::Error> {
+    updates.read_status().await
 }
 
 /// Checks for updates on the first call since the app started, when "Check
@@ -437,18 +437,7 @@ pub async fn startup_update_check(
     app: AppHandle,
     updates: State<'_, UpdatesState>,
 ) -> Result<UpdateStatus, api::Error> {
-    let due = {
-        let app = app.clone();
-        blocking(move || app.state::<UpdatesState>().startup_check_due()).await?
-    };
-    if !due {
-        return update_status(app).await;
-    }
-    let result = updates.check(&app).await;
-    if let Err(error) = &result {
-        tracing::warn!(%error, "startup update check failed");
-    }
-    result
+    updates.startup_check(&app).await
 }
 
 /// Checks for updates now, as Check now in About asks.
@@ -458,11 +447,7 @@ pub async fn check_for_updates(
     app: AppHandle,
     updates: State<'_, UpdatesState>,
 ) -> Result<UpdateStatus, api::Error> {
-    let result = updates.check(&app).await;
-    if let Err(error) = &result {
-        tracing::warn!(%error, "update check failed");
-    }
-    result
+    updates.check(&app).await
 }
 
 /// Installs the update found and restarts the app, as Install and restart
@@ -470,11 +455,7 @@ pub async fn check_for_updates(
 #[tauri::command]
 #[specta::specta]
 pub async fn install_update(updates: State<'_, UpdatesState>) -> Result<(), api::Error> {
-    let result = updates.install().await;
-    if let Err(error) = &result {
-        tracing::warn!(code = error.code.code(), "update not installed");
-    }
-    result
+    updates.install().await
 }
 
 /// Opens the release notes of the update found in the default browser.

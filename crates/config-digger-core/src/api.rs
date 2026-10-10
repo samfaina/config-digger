@@ -485,16 +485,25 @@ impl Core {
         updates::record(&self.ports)
     }
 
-    /// Takes the global write lock for an update install, so that it never
-    /// replaces config-digger while an Operation writes, and no Operation
-    /// starts until the installer took over or the install failed. It fails
-    /// with `Locked` at once while another Operation holds it.
-    pub fn lock_for_update(&self) -> Result<UpdateLock, Error> {
-        let data = history::data_folder(self.ports.env.as_ref())?;
-        self.ports.fs.create_dir_all(&data).map_err(|error| {
-            Error::unexpected(format!("cannot create {}: {error}", data.display()))
-        })?;
-        history::lock(&self.ports, &data).map(UpdateLock)
+    /// Takes the global write lock for an update install, so that the
+    /// install never starts while an Operation writes, and no Operation
+    /// starts while the update downloads. It fails with `Locked` at once
+    /// while another Operation holds it, and is `Blocked` while the CLI the
+    /// installer replaces, `cli`, runs, since Windows would not let it
+    /// replace a running executable.
+    pub fn lock_for_update(&self, cli: &Path) -> Result<UpdateLock, Error> {
+        let (_, lock) = history::create_and_lock(&self.ports)?;
+        let key = paths::lexical_key(cli);
+        let cli_runs = self.ports.processes.running().iter().any(|process| {
+            process
+                .path
+                .as_ref()
+                .is_some_and(|path| paths::lexical_key(path) == key)
+        });
+        if cli_runs {
+            return Err(Error::blocked(explain::cli_running(cli)));
+        }
+        Ok(UpdateLock(lock))
     }
 
     /// The folders config-digger keeps its own data in. None of them has to

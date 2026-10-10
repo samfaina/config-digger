@@ -3,9 +3,9 @@ import type { ThirdPartyLicenses } from "../build/licenses";
 import { commands, type About, type Page } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
-import { UpdateNotice } from "./UpdateNotice";
+import { UpdateBanner } from "./UpdateBanner";
 import { lastCheckedText } from "./updates";
-import type { UpdatesState } from "./useUpdates";
+import type { Updates } from "./useUpdates";
 import { useTransient } from "./useTransient";
 
 /** What each page About links to is called. */
@@ -16,7 +16,7 @@ const PAGE_TITLES: Record<Page, string> = {
 };
 
 /** The About screen: this build, updates, privacy, licenses and links. */
-export function AboutScreen({ updates }: { updates: UpdatesState }) {
+export function AboutScreen({ updates }: { updates: Updates }) {
   const [about, setAbout] = useState<About | null>(null);
   const [licensesOpen, setLicensesOpen] = useState(false);
   const [notice, setNotice] = useTransient<string>(NOTICE_MS);
@@ -66,8 +66,12 @@ export function AboutScreen({ updates }: { updates: UpdatesState }) {
               Updates
               <span className="place-group-line" />
             </h3>
-            {update ? (
-              <UpdateNotice update={update} updates={updates} inline />
+            {update && !updates.later ? (
+              <UpdateBanner update={update} updates={updates} inline />
+            ) : update ? (
+              <div className="about-update" role="status">
+                config-digger {update.version} is available. You put it off: click Check now to see it again.
+              </div>
             ) : (
               updates.error && (
                 <div className="about-update" role="alert">
@@ -75,7 +79,7 @@ export function AboutScreen({ updates }: { updates: UpdatesState }) {
                 </div>
               )
             )}
-            {!update && updates.checkedNow && !updates.error && (
+            {!update && updates.userChecked && !updates.error && (
               <div className="about-update" role="status">
                 config-digger {version} is the latest version.
               </div>

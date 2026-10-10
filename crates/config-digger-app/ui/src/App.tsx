@@ -6,7 +6,7 @@ import { inventoryStart, type InventoryStart } from "./places";
 import { ProjectsScreen, type Tab } from "./ProjectsScreen";
 import { Rail, type Screen } from "./Rail";
 import { SettingsScreen } from "./SettingsScreen";
-import { UpdateNotice } from "./UpdateNotice";
+import { UpdateBanner } from "./UpdateBanner";
 import { useUpdates } from "./useUpdates";
 
 export function App() {
@@ -55,7 +55,7 @@ export function App() {
         )}
       </main>
       {updates.status?.update && !updates.later && screen !== "about" && (
-        <UpdateNotice update={updates.status.update} updates={updates} />
+        <UpdateBanner update={updates.status.update} updates={updates} />
       )}
     </div>
   );

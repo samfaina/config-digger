@@ -5,7 +5,10 @@
 use config_digger_core::api::{
     Action, Context, Core, Error, ErrorCode, Outcome, ScanOptions, Targets,
 };
-use config_digger_core::ports::fake::{self, FakeClock, FakeEnvironment, FakeFileSystem};
+use config_digger_core::ports::RunningProcess;
+use config_digger_core::ports::fake::{
+    self, FakeClock, FakeEnvironment, FakeFileSystem, FakeProcesses,
+};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -31,6 +34,11 @@ fn check_file() -> PathBuf {
 
 fn lock_file() -> PathBuf {
     PathBuf::from(LOCALAPPDATA).join(r"config-digger\lock")
+}
+
+/// The CLI an update replaces, next to the app.
+fn cli() -> PathBuf {
+    PathBuf::from(LOCALAPPDATA).join(r"config-digger\config-digger.exe")
 }
 
 fn claude_json() -> PathBuf {
@@ -80,7 +88,7 @@ fn an_update_cannot_install_while_an_operation_holds_the_lock() {
     fs.lock_elsewhere(lock_file());
 
     let error = core(&fs, &FakeClock::default())
-        .lock_for_update()
+        .lock_for_update(&cli())
         .err()
         .unwrap();
 
@@ -91,7 +99,7 @@ fn an_update_cannot_install_while_an_operation_holds_the_lock() {
 fn no_operation_runs_while_an_update_installs() {
     let fs = FakeFileSystem::new().with_file(claude_json(), ONE_USER_SERVER);
     let clock = FakeClock::default();
-    let installing = core(&fs, &clock).lock_for_update().unwrap();
+    let installing = core(&fs, &clock).lock_for_update(&cli()).unwrap();
 
     let error = remove_linear(&core(&fs, &clock)).err().unwrap();
 
@@ -108,7 +116,7 @@ fn an_update_that_does_not_install_lets_operations_run_again() {
     let fs = FakeFileSystem::new().with_file(claude_json(), ONE_USER_SERVER);
     let clock = FakeClock::default();
 
-    drop(core(&fs, &clock).lock_for_update().unwrap());
+    drop(core(&fs, &clock).lock_for_update(&cli()).unwrap());
 
     assert!(remove_linear(&core(&fs, &clock)).is_ok());
 }
@@ -122,4 +130,37 @@ fn remove_linear(core: &Core) -> Result<Outcome, Error> {
     };
     let plan = core.plan(&snapshot, &Context::default(), Action::Remove, &targets)?;
     core.execute(plan, &[])
+}
+
+#[test]
+fn an_update_cannot_install_while_the_cli_it_replaces_runs() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), ONE_USER_SERVER);
+    let clock = FakeClock::default();
+    let mut ports = fake::ports(fs.clone(), env());
+    ports.clock = Box::new(clock.clone());
+    ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
+        pid: 4242,
+        image: "config-digger.exe".to_owned(),
+        path: Some(PathBuf::from(
+            r"c:\users\fixture\appdata\local\config-digger\CONFIG-DIGGER.EXE",
+        )),
+        cmdline: "config-digger list".to_owned(),
+    }));
+
+    let error = Core::new(ports)
+        .unwrap()
+        .lock_for_update(&cli())
+        .err()
+        .unwrap();
+
+    assert_eq!(error.code, ErrorCode::Blocked);
+    assert!(
+        error.message.contains(&cli().display().to_string()),
+        "{}",
+        error.message
+    );
+    assert!(
+        remove_linear(&core(&fs, &clock)).is_ok(),
+        "the lock is released"
+    );
 }
