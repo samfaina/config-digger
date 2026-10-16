@@ -6,6 +6,8 @@ use config_digger_core::ports::real::RealGitIndex;
 use std::path::Path;
 use std::process::Command;
 
+// The fixture's own git, which the test runs in its console.
+#[allow(clippy::disallowed_methods)]
 fn git(repo: &Path, args: &[&str]) {
     let status = Command::new("git")
         .arg("-C")
