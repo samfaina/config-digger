@@ -207,7 +207,7 @@ impl Harness {
 }
 
 #[cfg(windows)]
-const INSTALL: &str = r"C:\Users\fixture\AppData\Local\config-digger";
+const INSTALL: &str = r"C:\Users\fixture\AppData\Local\Programs\config-digger";
 
 #[cfg(windows)]
 #[test]
@@ -232,7 +232,7 @@ fn add_to_path_appends_the_folder_and_keeps_the_value_unexpanded() {
 #[test]
 fn add_to_path_leaves_a_path_that_has_the_folder_in_another_spelling() {
     use winreg::enums::RegType::REG_EXPAND_SZ;
-    let spelled = r"C:\tools;c:/users/FIXTURE/AppData/Local/config-digger\";
+    let spelled = r"C:\tools;c:/users/FIXTURE/AppData/Local/Programs/config-digger\";
     let key = EnvironmentKey::new("already").with_path(spelled, REG_EXPAND_SZ);
 
     let run = Harness::new().run_on_path(&key, &["installer", "add-to-path", INSTALL]);
@@ -257,7 +257,9 @@ fn add_to_path_creates_a_missing_path() {
 #[test]
 fn remove_from_path_takes_out_every_spelling_and_keeps_the_rest_and_the_type() {
     use winreg::enums::RegType::REG_SZ;
-    let path = format!(r"{INSTALL};C:\tools;C:\USERS\fixture\AppData\Local\config-digger\;D:\bin");
+    let path = format!(
+        r"{INSTALL};C:\tools;C:\USERS\fixture\AppData\Local\PROGRAMS\config-digger\;D:\bin"
+    );
     let key = EnvironmentKey::new("removes").with_path(&path, REG_SZ);
 
     let run = Harness::new().run_on_path(&key, &["installer", "remove-from-path", INSTALL]);
