@@ -1,2 +1,5 @@
 [alias]
 xtask = "run --package xtask --"
+# A release app that runs on its own: without `custom-protocol` it loads the
+# UI from the dev server (`devUrl`), and with none running it shows nothing.
+app-release = "build --release --package config-digger-app --features tauri/custom-protocol"

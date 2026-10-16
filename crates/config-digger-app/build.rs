@@ -78,6 +78,8 @@ fn record_commit() {
 }
 
 /// What `git` prints for `args`, `None` when it fails or prints nothing.
+// Cargo runs the build script in its own console.
+#[allow(clippy::disallowed_methods)]
 fn git(args: &[&str]) -> Option<String> {
     let output = std::process::Command::new("git").args(args).output().ok()?;
     let text = String::from_utf8(output.stdout).ok()?;

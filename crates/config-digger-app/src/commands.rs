@@ -501,6 +501,8 @@ fn ensure_shown(app: &AppHandle, path: &Path) -> Result<(), api::Error> {
 
 /// Opens `target`, a path or a URL, in the app Windows associates with it:
 /// Explorer for a folder, the default browser for a URL.
+// Explorer is a GUI program, so it opens no console window.
+#[allow(clippy::disallowed_methods)]
 fn open_in_windows(target: impl AsRef<OsStr>) -> Result<(), api::Error> {
     let mut explorer = Command::new("explorer.exe");
     explorer.arg(target);
@@ -509,6 +511,8 @@ fn open_in_windows(target: impl AsRef<OsStr>) -> Result<(), api::Error> {
 
 /// Opens Explorer on the folder holding `path`, with `path` selected.
 #[cfg(windows)]
+// Explorer is a GUI program, so it opens no console window.
+#[allow(clippy::disallowed_methods)]
 fn select_in_explorer(path: &Path) -> Result<(), api::Error> {
     use std::os::windows::process::CommandExt;
     // Explorer reads `/select,` and the quoted path as one argument, which
