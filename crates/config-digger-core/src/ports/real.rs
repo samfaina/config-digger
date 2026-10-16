@@ -168,13 +168,8 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
                 paths.push(found);
             }
         }
-        let output = background("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
-            .arg(encoded_command(SCRIPT))
+        let output = powershell(SCRIPT)
             .env("CONFIG_DIGGER_ACL_PATHS", paths.join("\n"))
-            // The one PowerShell 7 sets keeps Windows PowerShell from loading `Get-Acl`.
-            .env_remove("PSModulePath")
-            .stdin(Stdio::null())
             .stderr(Stdio::null())
             .output();
         let Ok(output) = output else {
@@ -283,7 +278,7 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
             }
             Ok(format!("\"{text}\""))
         };
-        let output = background("cmd")
+        let output = background_command("cmd")
             .args(["/D", "/C"])
             .raw_arg(format!("mklink /J {} {}", quoted(link)?, quoted(target)?))
             .stdin(Stdio::null())
@@ -413,13 +408,27 @@ fn encoded_command(script: &str) -> String {
 /// gets a console with no window: the app has no console to share with it,
 /// so a console program would otherwise open a window until it exits.
 #[allow(clippy::disallowed_methods)]
-fn background(program: &str) -> Command {
+fn background_command(program: &str) -> Command {
     let mut command = Command::new(program);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
+    command
+}
+
+/// Windows PowerShell, in the background, to run `script` with nothing on
+/// its stdin.
+#[cfg(windows)]
+fn powershell(script: &str) -> Command {
+    let mut command = background_command("powershell.exe");
+    command
+        .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
+        .arg(encoded_command(script))
+        // The one PowerShell 7 sets keeps Windows PowerShell from loading `Get-Acl`.
+        .env_remove("PSModulePath")
+        .stdin(Stdio::null());
     command
 }
 
@@ -506,7 +515,7 @@ impl GitIndex for RealGitIndex {
         let Some(parent) = path.parent() else {
             return false;
         };
-        background("git")
+        background_command("git")
             .arg("-C")
             .arg(parent)
             .args(["ls-files", "--error-unmatch", "--"])
@@ -596,10 +605,6 @@ impl Clock for RealClock {
 mod tests {
     use super::*;
 
-    /// The app has no console to share, so Windows gives a console program
-    /// it starts a console with a window. A background process has a console
-    /// with no window and nothing else attached: it opened no window, in the
-    /// app or in a terminal, whose console it would otherwise share.
     #[cfg(windows)]
     #[test]
     fn a_background_process_has_no_console_window() {
@@ -612,14 +617,9 @@ $attached = [ConfigDigger.Console]::GetConsoleProcessList((New-Object UInt32[] 6
 $window = [ConfigDigger.Console]::GetConsoleWindow() -ne [System.IntPtr]::Zero
 "attached=$attached window=$window"
 "#;
-        let output = background("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
-            .arg(encoded_command(SCRIPT))
-            .env_remove("PSModulePath")
-            .stdin(Stdio::null())
-            .output()
-            .expect("PowerShell runs");
+        let output = powershell(SCRIPT).output().expect("PowerShell runs");
 
+        // Alone on its console, so it shares none, a terminal's included.
         assert_eq!(
             String::from_utf8_lossy(&output.stdout).trim(),
             "attached=1 window=False"
