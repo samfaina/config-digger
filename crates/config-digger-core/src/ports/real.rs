@@ -141,8 +141,6 @@ impl FileSystem for RealFileSystem {
     /// reach PowerShell through the environment, never in the script.
     #[cfg(windows)]
     fn admin_owned(&self, path: &Path) -> bool {
-        use std::os::windows::process::CommandExt;
-
         const SCRIPT: &str = r#"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $trusted = { param($sid) $sid -eq 'S-1-5-32-544' -or $sid -eq 'S-1-5-18' -or $sid -like 'S-1-5-80-*' -or $sid -eq 'S-1-3-0' -or $sid -eq 'S-1-3-1' }
@@ -170,13 +168,12 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
                 paths.push(found);
             }
         }
-        let output = Command::new("powershell.exe")
+        let output = background("powershell.exe")
             .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
             .arg(encoded_command(SCRIPT))
             .env("CONFIG_DIGGER_ACL_PATHS", paths.join("\n"))
             // The one PowerShell 7 sets keeps Windows PowerShell from loading `Get-Acl`.
             .env_remove("PSModulePath")
-            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
             .stdin(Stdio::null())
             .stderr(Stdio::null())
             .output();
@@ -286,7 +283,7 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
             }
             Ok(format!("\"{text}\""))
         };
-        let output = Command::new("cmd")
+        let output = background("cmd")
             .args(["/D", "/C"])
             .raw_arg(format!("mklink /J {} {}", quoted(link)?, quoted(target)?))
             .stdin(Stdio::null())
@@ -412,6 +409,20 @@ fn encoded_command(script: &str) -> String {
     encoded
 }
 
+/// A command for `program`, which runs in the background. On Windows it
+/// gets a console with no window: the app has no console to share with it,
+/// so a console program would otherwise open a window until it exits.
+#[allow(clippy::disallowed_methods)]
+fn background(program: &str) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    command
+}
+
 /// Copies the folder `from` and everything below it to `to`. A link inside
 /// it is refused: copying it would copy what it points to, or never end.
 fn copy_folder(from: &Path, to: &Path) -> io::Result<()> {
@@ -495,7 +506,7 @@ impl GitIndex for RealGitIndex {
         let Some(parent) = path.parent() else {
             return false;
         };
-        Command::new("git")
+        background("git")
             .arg("-C")
             .arg(parent)
             .args(["ls-files", "--error-unmatch", "--"])
@@ -578,5 +589,40 @@ pub struct RealClock;
 impl Clock for RealClock {
     fn now(&self) -> SystemTime {
         SystemTime::now()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The app has no console to share, so Windows gives a console program
+    /// it starts a console with a window. A background process has a console
+    /// with no window and nothing else attached: it opened no window, in the
+    /// app or in a terminal, whose console it would otherwise share.
+    #[cfg(windows)]
+    #[test]
+    fn a_background_process_has_no_console_window() {
+        const SCRIPT: &str = r#"
+Add-Type -Namespace ConfigDigger -Name Console -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
+[DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList(uint[] list, uint count);
+'@
+$attached = [ConfigDigger.Console]::GetConsoleProcessList((New-Object UInt32[] 64), 64)
+$window = [ConfigDigger.Console]::GetConsoleWindow() -ne [System.IntPtr]::Zero
+"attached=$attached window=$window"
+"#;
+        let output = background("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
+            .arg(encoded_command(SCRIPT))
+            .env_remove("PSModulePath")
+            .stdin(Stdio::null())
+            .output()
+            .expect("PowerShell runs");
+
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "attached=1 window=False"
+        );
     }
 }
