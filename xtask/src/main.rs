@@ -98,29 +98,32 @@ fn main() -> ExitCode {
 fn check_definitions() -> ExitCode {
     let folder = repo_file("crates/config-digger-core/definitions");
     let problems = config_digger_core::definitions::check_built_in_folder(&folder);
-    if problems.is_empty() {
-        println!("the built-in definitions are valid");
-        return ExitCode::SUCCESS;
-    }
-    for problem in problems {
-        eprintln!("{problem}");
-    }
-    ExitCode::FAILURE
+    report(&problems, "the built-in definitions are valid")
 }
 
 /// The installer's install folder, as CI checks it.
 fn check_installer() -> ExitCode {
-    let path = "crates/config-digger-app/installer/hooks.nsh";
-    let hooks = match std::fs::read_to_string(repo_file(path)) {
-        Ok(hooks) => hooks,
-        Err(error) => {
+    let read = |path: &str| {
+        std::fs::read_to_string(repo_file(path)).map_err(|error| {
             eprintln!("cannot read {path}: {error}");
-            return ExitCode::FAILURE;
-        }
+            ExitCode::FAILURE
+        })
     };
-    let problems = installer::problems(&hooks);
+    let files = read("crates/config-digger-app/installer/hooks.nsh")
+        .and_then(|hooks| Ok((hooks, read("crates/config-digger-app/tauri.conf.json")?)));
+    match files {
+        Ok((hooks, tauri_conf)) => report(
+            &installer::problems(&hooks, &tauri_conf),
+            "the installer installs in a folder of its own",
+        ),
+        Err(code) => code,
+    }
+}
+
+/// Prints `problems` and fails, or prints `valid` when there are none.
+fn report(problems: &[impl std::fmt::Display], valid: &str) -> ExitCode {
     if problems.is_empty() {
-        println!("the installer installs in a folder of its own");
+        println!("{valid}");
         return ExitCode::SUCCESS;
     }
     for problem in problems {

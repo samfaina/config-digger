@@ -1,5 +1,5 @@
 //! The installer's install folder, checked against config-digger's data
-//! folders in `hooks.nsh`.
+//! folders in `hooks.nsh` and against Tauri's default in `tauri.conf.json`.
 
 use config_digger_core::api::DataFolders;
 use config_digger_core::ports::{Environment, Hive, RegistryData};
@@ -13,21 +13,32 @@ const APP_DATA: &str = r"C:\Users\fixture\AppData\Roaming";
 const INSTALL_FOLDER: &str = "INSTALL_FOLDER";
 const DATA_FOLDERS: [&str; 2] = ["DATA_LOCAL", "DATA_ROAMING"];
 
-/// What is wrong with the folders `hooks` defines: the data folders must
-/// hold every folder the core keeps data in, and the install folder must be
-/// no data folder, nor a folder inside or above one.
-pub fn problems(hooks: &str) -> Vec<String> {
+/// What is wrong with the folders `hooks` defines, with Tauri's
+/// `tauri_conf`:
+///
+/// - the data folders must hold every folder the core keeps data in;
+/// - the install folder must be no data folder, nor a folder inside or
+///   above one;
+/// - Tauri's default install folder, `$LOCALAPPDATA\<productName>`, must be
+///   one the installer moves to the install folder: a data folder, or a
+///   folder inside or above one.
+pub fn problems(hooks: &str, tauri_conf: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    let install = folder(hooks, INSTALL_FOLDER, &mut problems);
+    let install = defined_folder(hooks, INSTALL_FOLDER, &mut problems);
     let data: Vec<(&str, String)> = DATA_FOLDERS
         .into_iter()
-        .filter_map(|name| Some((name, folder(hooks, name, &mut problems)?)))
+        .filter_map(|name| Some((name, defined_folder(hooks, name, &mut problems)?)))
         .collect();
     let Some(install) = install.filter(|_| problems.is_empty()) else {
         return problems;
     };
-    let core = DataFolders::locate(&Fixture).expect("the fixture has both app data folders");
-    for kept in [core.backups, core.parked, core.logs, core.lists] {
+    let DataFolders {
+        backups,
+        parked,
+        logs,
+        lists,
+    } = DataFolders::locate(&Fixture).expect("the fixture has both app data folders");
+    for kept in [backups, parked, logs, lists] {
         let kept = kept.display().to_string();
         if !data.iter().any(|(_, data)| inside(&kept, data)) {
             problems.push(format!(
@@ -36,20 +47,34 @@ pub fn problems(hooks: &str) -> Vec<String> {
             ));
         }
     }
-    for (name, data) in &data {
-        if inside(&install, data) || inside(data, &install) {
-            problems.push(format!(
-                "the install folder {install} ({INSTALL_FOLDER}) is the data folder \
-                 {data} ({name}), or a folder inside or above it"
-            ));
+    let nested_in_data = |folder: &str| {
+        data.iter()
+            .find(|(_, data)| inside(folder, data) || inside(data, folder))
+    };
+    if let Some((name, data)) = nested_in_data(&install) {
+        problems.push(format!(
+            "the install folder {install} ({INSTALL_FOLDER}) is the data folder \
+             {data} ({name}), or a folder inside or above it"
+        ));
+    }
+    match product_name(tauri_conf) {
+        Some(product) => {
+            let tauri_default = format!(r"{LOCAL_APP_DATA}\{product}");
+            if nested_in_data(&tauri_default).is_none() {
+                problems.push(format!(
+                    "Tauri's default install folder {tauri_default} (productName) is no data \
+                     folder, so the installer would keep it instead of {INSTALL_FOLDER}"
+                ));
+            }
         }
+        None => problems.push("tauri.conf.json has no productName".to_owned()),
     }
     problems
 }
 
 /// The folder `!define name "…"` names, with `$LOCALAPPDATA` and `$APPDATA`
-/// expanded.
-fn folder(hooks: &str, name: &str, problems: &mut Vec<String>) -> Option<String> {
+/// expanded, or `None` after adding the problem that it is missing.
+fn defined_folder(hooks: &str, name: &str, problems: &mut Vec<String>) -> Option<String> {
     let value = hooks.lines().find_map(|line| {
         let rest = line.trim().strip_prefix("!define")?.trim_start();
         let value = rest.strip_prefix(name)?.trim();
@@ -64,6 +89,12 @@ fn folder(hooks: &str, name: &str, problems: &mut Vec<String>) -> Option<String>
             .replace("$LOCALAPPDATA", LOCAL_APP_DATA)
             .replace("$APPDATA", APP_DATA),
     )
+}
+
+/// The `productName` of a Tauri config.
+fn product_name(tauri_conf: &str) -> Option<String> {
+    let config: serde_json::Value = serde_json::from_str(tauri_conf).ok()?;
+    Some(config.get("productName")?.as_str()?.to_owned())
 }
 
 /// Whether `folder` is `outer` or inside it, ignoring case, the kind of
@@ -106,10 +137,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_committed_hooks_install_in_a_folder_of_its_own() {
+    fn the_committed_installer_installs_in_a_folder_of_its_own() {
         let hooks = include_str!("../../crates/config-digger-app/installer/hooks.nsh");
+        let config = include_str!("../../crates/config-digger-app/tauri.conf.json");
 
-        assert_eq!(problems(hooks), Vec::<String>::new());
+        assert_eq!(problems(hooks, config), Vec::<String>::new());
+    }
+
+    /// The problems with `hooks`, for the product name `config-digger`.
+    fn check(hooks: &str) -> Vec<String> {
+        problems(hooks, r#"{ "productName": "config-digger" }"#)
     }
 
     /// `hooks.nsh` text installing in `install`.
@@ -124,7 +161,7 @@ mod tests {
     #[test]
     fn installing_in_a_data_folder_is_a_problem() {
         assert_eq!(
-            problems(&installing_in(r"$LOCALAPPDATA\config-digger")),
+            check(&installing_in(r"$LOCALAPPDATA\config-digger")),
             vec![
                 r"the install folder C:\Users\fixture\AppData\Local\config-digger (INSTALL_FOLDER) is the data folder C:\Users\fixture\AppData\Local\config-digger (DATA_LOCAL), or a folder inside or above it"
                     .to_owned()
@@ -140,7 +177,7 @@ mod tests {
             r"c:\users\FIXTURE\appdata\roaming\",
             "C:/Users/fixture/AppData/Roaming/config-digger/app",
         ] {
-            let problems = problems(&installing_in(install));
+            let problems = check(&installing_in(install));
 
             assert_eq!(problems.len(), 1, "{install}: {problems:?}");
             assert!(
@@ -158,7 +195,7 @@ mod tests {
             r"D:\config-digger",
         ] {
             assert_eq!(
-                problems(&installing_in(install)),
+                check(&installing_in(install)),
                 Vec::<String>::new(),
                 "{install}"
             );
@@ -173,7 +210,7 @@ mod tests {
         );
 
         assert_eq!(
-            problems(&hooks),
+            check(&hooks),
             vec![
                 r"the core keeps data in C:\Users\fixture\AppData\Roaming\config-digger, outside DATA_LOCAL and DATA_ROAMING"
                     .to_owned()
@@ -184,11 +221,34 @@ mod tests {
     #[test]
     fn a_missing_define_is_a_problem() {
         assert_eq!(
-            problems("!define DATA_LOCAL \"$LOCALAPPDATA\\config-digger\"\n"),
+            check("!define DATA_LOCAL \"$LOCALAPPDATA\\config-digger\"\n"),
             vec![
                 "hooks.nsh defines no INSTALL_FOLDER".to_owned(),
                 "hooks.nsh defines no DATA_ROAMING".to_owned()
             ]
+        );
+    }
+
+    #[test]
+    fn a_product_name_whose_tauri_default_is_no_data_folder_is_a_problem() {
+        let hooks = installing_in(r"$LOCALAPPDATA\Programs\config-digger");
+
+        assert_eq!(
+            problems(&hooks, r#"{ "productName": "Config Digger" }"#),
+            vec![
+                r"Tauri's default install folder C:\Users\fixture\AppData\Local\Config Digger (productName) is no data folder, so the installer would keep it instead of INSTALL_FOLDER"
+                    .to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn a_config_without_a_product_name_is_a_problem() {
+        let hooks = installing_in(r"$LOCALAPPDATA\Programs\config-digger");
+
+        assert_eq!(
+            problems(&hooks, "{}"),
+            vec!["tauri.conf.json has no productName".to_owned()]
         );
     }
 }

@@ -64,7 +64,7 @@ With `--json`, every command prints exactly one JSON document with a `schema_ver
 
 Uninstall config-digger from Settings > Apps, or with `winget uninstall samfaina.config-digger`.
 
-By default the uninstaller removes only the app's install folder, `%LOCALAPPDATA%\Programs\config-digger`, and keeps config-digger's data:
+By default the uninstaller removes only the app's install folder, `%LOCALAPPDATA%\Programs\config-digger` unless you picked another, and keeps config-digger's data:
 
 - `%LOCALAPPDATA%\config-digger`: backups, the History of Operations behind Undo, logs and the parked-Entry store;
 - `%APPDATA%\config-digger`: the homes and Projects you added or hid, and the app's settings.

@@ -33,11 +33,23 @@
 ; checks is no data folder, nor a folder inside or above one.
 !define INSTALL_FOLDER "$LOCALAPPDATA\Programs\config-digger"
 
-; Spells the folder on top of the stack with one trailing backslash, so that
-; `C:\a\` is not taken for being inside `C:\ab\`.
-Function WithOneBackslash
+; Spells the folder on top of the stack as a full path, with `..` resolved
+; and slashes turned into backslashes, whether it exists or not, and with
+; one trailing backslash, so that `C:\a\` is not taken for being inside
+; `C:\ab\`. NSIS's own GetFullPathName fails on a folder that doesn't exist.
+; The backslash goes on first: `C:` alone, as NSIS spells `C:\` in $INSTDIR,
+; would be drive C's current folder.
+Function SpelledFolder
   Exch $0
   Push $1
+  Push $2
+  StrCpy $0 "$0\"
+  System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r1, p 0) i .r2'
+  ${If} $2 <> 0
+  ${AndIf} $2 < ${NSIS_MAX_STRLEN}
+    StrCpy $0 $1
+  ${EndIf}
+  Pop $2
   ${Do}
     StrCpy $1 $0 "" -1
     ${If} $1 != "\"
@@ -54,7 +66,7 @@ FunctionEnd
 ; trailing backslash, is `data`, inside it or above it.
 !macro CompareWithDataFolder data
   Push "${data}"
-  Call WithOneBackslash
+  Call SpelledFolder
   Pop $1
   ; Whichever of the two is shorter starts the other.
   StrLen $2 $1
@@ -78,7 +90,7 @@ Function IsDataFolder
   Push $2
   Push $3
   Push $0
-  Call WithOneBackslash
+  Call SpelledFolder
   Pop $0
   StrCpy $3 0
   !insertmacro CompareWithDataFolder "${DATA_LOCAL}"
@@ -92,7 +104,8 @@ FunctionEnd
 
 ; Moves $INSTDIR to the install folder when it is a data folder, or a folder
 ; inside or above one: Tauri's default for `currentUser`,
-; `$LOCALAPPDATA\${PRODUCTNAME}`, a previous install's folder or a `/D=` one.
+; `$LOCALAPPDATA\${PRODUCTNAME}`, which `cargo xtask installer` checks is a
+; data folder, a previous install's folder or a `/D=` one.
 ; With the data out of the install folder, an uninstall keeps it however
 ; Tauri removes that folder.
 Function UseOwnInstallFolder
@@ -110,7 +123,10 @@ FunctionEnd
 ; after Tauri's `.onInit` has set its default or the previous install's.
 !define MUI_CUSTOMFUNCTION_GUIINIT UseOwnInstallFolder
 
-; The directory page's Next button stays disabled on a data folder.
+; The directory page's Next button stays disabled on a data folder, and the
+; page says so. Tauri's directory page is the first to read this.
+!define MUI_DIRECTORYPAGE_TEXT_TOP "$(installFolderText)"
+
 Function .onVerifyInstDir
   Push $0
   Push $INSTDIR
