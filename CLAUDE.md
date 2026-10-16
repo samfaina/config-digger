@@ -6,6 +6,8 @@
 
 Issues and wayfinder maps live in GitHub Issues on samfaina/config-digger, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
+A reported bug: search issues and open PRs for it with `gh` first. Parallel workers may already have a fix in flight.
+
 ### Triage labels
 
 The five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
