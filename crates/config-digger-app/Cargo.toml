@@ -19,16 +19,16 @@ path = "src/main.rs"
 config-digger-core.workspace = true
 rfd.workspace = true
 serde.workspace = true
+# `tauri::generate_context!` writes the plugins' config as JSON values.
+serde_json.workspace = true
 specta.workspace = true
 specta-typescript.workspace = true
 tauri.workspace = true
+tauri-plugin-updater.workspace = true
 tauri-specta.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
 
 [build-dependencies]
 tauri-build.workspace = true

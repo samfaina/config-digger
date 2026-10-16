@@ -60,13 +60,8 @@ pub(crate) fn execute(
         return history::delete_backup(ports, operation, needed_attention);
     }
 
-    let data = history::data_folder(ports.env.as_ref())?;
-    ports
-        .fs
-        .create_dir_all(&data)
-        .map_err(|error| Error::unexpected(format!("cannot create {}: {error}", data.display())))?;
     // Held until this function returns, after Verify and the History write.
-    let _lock = history::lock(ports, &data)?;
+    let (data, _lock) = history::create_and_lock(ports)?;
     // An Agent may have started since the plan: check again before writing.
     let running = running::check(definitions, ports, &planned.installed, &planned.files);
     if !running.blocks.is_empty() {

@@ -11,6 +11,7 @@ mod commands;
 mod lists;
 mod logging;
 mod session;
+mod updates;
 
 use config_digger_core::api::Core;
 use config_digger_core::ports::Ports;
@@ -43,6 +44,11 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::open_data_folder,
         commands::read_about,
         commands::open_page,
+        commands::update_status,
+        commands::startup_update_check,
+        commands::check_for_updates,
+        commands::install_update,
+        commands::open_update_notes,
     ])
 }
 
@@ -67,6 +73,9 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
     tauri::Builder::default()
         .manage(commands::SessionState::default())
         .manage(commands::ActionsState::default())
+        .manage(updates::UpdatesState::default())
+        // Called from Rust only: the `main` capability grants no `updater:*`.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(specta_builder().invoke_handler())
         .run(context)
         .expect("the Tauri app runs");

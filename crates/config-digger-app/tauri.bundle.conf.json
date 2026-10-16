@@ -5,6 +5,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "resources": {
       "../../target/release/config-digger.exe": "config-digger.exe"
     }

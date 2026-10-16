@@ -1830,3 +1830,12 @@ pub(crate) fn provenance_by_name_only(manager: &str) -> String {
         "config-digger takes it to be installed by {manager} from its name or where it is alone, which a folder made by hand matches too."
     )
 }
+
+/// Why an update cannot install while the CLI it replaces runs.
+pub(crate) fn cli_running(cli: &Path) -> String {
+    format!(
+        "the config-digger CLI is running ({}), and the update cannot replace it while it runs: \
+         let it finish or close it, then try again",
+        cli.display()
+    )
+}

@@ -55,6 +55,18 @@ pub(crate) fn lock(ports: &Ports, data: &Path) -> Result<HeldLock, Error> {
         .ok_or_else(|| Error::locked(&lock))
 }
 
+/// Creates the data folder when it is missing and takes the global write
+/// lock in it, as [`lock`] does. Returns the folder with the lock.
+pub(crate) fn create_and_lock(ports: &Ports) -> Result<(PathBuf, HeldLock), Error> {
+    let data = data_folder(ports.env.as_ref())?;
+    ports
+        .fs
+        .create_dir_all(&data)
+        .map_err(|error| Error::unexpected(format!("cannot create {}: {error}", data.display())))?;
+    let lock = lock(ports, &data)?;
+    Ok((data, lock))
+}
+
 /// The folder holding every Operation's backup and manifest.
 pub(crate) fn backups_folder(data: &Path) -> PathBuf {
     data.join("backups")

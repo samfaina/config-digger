@@ -5,6 +5,7 @@ use crate::about::{About, Page};
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
 use crate::lists::{ListChange, Listed};
 use crate::session::{self, ParkedEntry, Places, Session};
+use crate::updates::{UpdateStatus, UpdatesState};
 use config_digger_core::api::{
     self, Backup, Core, DataFolders, Inventory, OperationDetail, OperationSummary, Retention,
     Settings, WarningClass,
@@ -16,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 
 /// The app's [`Session`], once the inventory was read.
 #[derive(Default)]
@@ -419,6 +420,54 @@ pub async fn open_page(page: Page) -> Result<(), api::Error> {
     blocking(move || open_in_windows(&url)).await
 }
 
+/// When the app last checked for updates, and the update found since it
+/// started. It makes no network call.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_status(updates: State<'_, UpdatesState>) -> Result<UpdateStatus, api::Error> {
+    updates.read_status().await
+}
+
+/// Checks for updates on the first call since the app started, when "Check
+/// for updates on startup" is on. Otherwise it makes no network call and
+/// only says what the app knows, as [`update_status`] does.
+#[tauri::command]
+#[specta::specta]
+pub async fn startup_update_check(
+    app: AppHandle,
+    updates: State<'_, UpdatesState>,
+) -> Result<UpdateStatus, api::Error> {
+    updates.startup_check(&app).await
+}
+
+/// Checks for updates now, as Check now in About asks.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_for_updates(
+    app: AppHandle,
+    updates: State<'_, UpdatesState>,
+) -> Result<UpdateStatus, api::Error> {
+    updates.check(&app).await
+}
+
+/// Installs the update found and restarts the app, as Install and restart
+/// asks. It fails at once while an Operation holds the global lock.
+#[tauri::command]
+#[specta::specta]
+pub async fn install_update(updates: State<'_, UpdatesState>) -> Result<(), api::Error> {
+    updates.install().await
+}
+
+/// Opens the release notes of the update found in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_update_notes(updates: State<'_, UpdatesState>) -> Result<(), api::Error> {
+    let Some(url) = updates.release_notes() else {
+        return Err(api::Error::unexpected("no update was found"));
+    };
+    blocking(move || open_in_windows(&url)).await
+}
+
 /// Keeps `session` as the app's last scan, and lists its Projects and
 /// Agent homes.
 fn keep_places(app: &AppHandle, session: Session) -> Places {
@@ -433,7 +482,7 @@ fn scan() -> Result<Session, api::Error> {
 }
 
 /// Runs `task` on a blocking thread.
-async fn blocking<T: Send + 'static>(
+pub(crate) async fn blocking<T: Send + 'static>(
     task: impl FnOnce() -> Result<T, api::Error> + Send + 'static,
 ) -> Result<T, api::Error> {
     tauri::async_runtime::spawn_blocking(task)
