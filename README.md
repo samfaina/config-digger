@@ -10,7 +10,7 @@ Windows 11, x64. Windows 10 22H2 should work but is not tested.
 
 ### Installer
 
-Download `config-digger_<version>_x64-setup.exe` from [GitHub Releases](https://github.com/samfaina/config-digger/releases) and run it. It installs for your user only, without admin rights, into `%LOCALAPPDATA%\config-digger`, with the app and the `config-digger` CLI in the same folder. That is also the folder where config-digger keeps its data (see [Uninstall](#uninstall)).
+Download `config-digger_<version>_x64-setup.exe` from [GitHub Releases](https://github.com/samfaina/config-digger/releases) and run it. It installs for your user only, without admin rights, into `%LOCALAPPDATA%\Programs\config-digger`, with the app and the `config-digger` CLI in the same folder. You can pick another folder, but not one of config-digger's data folders (see [Uninstall](#uninstall)) or a folder inside or above one.
 
 The box "Add the config-digger command to my PATH", checked by default, adds that folder to your user PATH, so `config-digger` works in any new terminal. The uninstaller takes it off again. If you untick the box, later installs and upgrades remember that. The installer never edits your PowerShell `$PROFILE`.
 
@@ -64,7 +64,7 @@ With `--json`, every command prints exactly one JSON document with a `schema_ver
 
 Uninstall config-digger from Settings > Apps, or with `winget uninstall samfaina.config-digger`.
 
-By default the uninstaller removes only the app's own files and keeps config-digger's data:
+By default the uninstaller removes only the app's install folder, `%LOCALAPPDATA%\Programs\config-digger`, and keeps config-digger's data:
 
 - `%LOCALAPPDATA%\config-digger`: backups, the History of Operations behind Undo, logs and the parked-Entry store;
 - `%APPDATA%\config-digger`: the homes and Projects you added or hid, and the app's settings.

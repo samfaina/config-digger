@@ -1,6 +1,11 @@
 ; config-digger's additions to Tauri's NSIS installer, which includes this
 ; file before its own pages (`bundle.windows.nsis.installerHooks`).
 ;
+; - The install folder is `%LOCALAPPDATA%\Programs\config-digger`, not
+;   Tauri's `%LOCALAPPDATA%\config-digger`, which is a data folder. The
+;   installer never installs in a data folder, nor inside or above one, so
+;   an uninstall cannot take the data with the app, and the PATH entry is
+;   no data folder.
 ; - The welcome page carries a checkbox, checked by default, that puts the
 ;   install folder on the user PATH (HKCU). The uninstaller takes it off.
 ;   An unticked box is remembered for the next install, silent ones included.
@@ -23,6 +28,100 @@
 ; config-digger's own data folders, as the core finds them.
 !define DATA_LOCAL "$LOCALAPPDATA\config-digger"
 !define DATA_ROAMING "$APPDATA\config-digger"
+
+; The install folder: a folder of its own, which `cargo xtask installer`
+; checks is no data folder, nor a folder inside or above one.
+!define INSTALL_FOLDER "$LOCALAPPDATA\Programs\config-digger"
+
+; Spells the folder on top of the stack with one trailing backslash, so that
+; `C:\a\` is not taken for being inside `C:\ab\`.
+Function WithOneBackslash
+  Exch $0
+  Push $1
+  ${Do}
+    StrCpy $1 $0 "" -1
+    ${If} $1 != "\"
+      ${ExitDo}
+    ${EndIf}
+    StrCpy $0 $0 -1
+  ${Loop}
+  StrCpy $0 "$0\"
+  Pop $1
+  Exch $0
+FunctionEnd
+
+; Within IsDataFolder: sets $3 to 1 when the folder in $0, with one
+; trailing backslash, is `data`, inside it or above it.
+!macro CompareWithDataFolder data
+  Push "${data}"
+  Call WithOneBackslash
+  Pop $1
+  ; Whichever of the two is shorter starts the other.
+  StrLen $2 $1
+  StrCpy $2 $0 $2
+  ${If} $2 == $1
+    StrCpy $3 1
+  ${EndIf}
+  StrLen $2 $0
+  StrCpy $2 $1 $2
+  ${If} $2 == $0
+    StrCpy $3 1
+  ${EndIf}
+!macroend
+
+; Replaces the folder on top of the stack with 1 when it is one of the data
+; folders, or a folder inside or above one, and with 0 otherwise. NSIS
+; compares strings without case.
+Function IsDataFolder
+  Exch $0
+  Push $1
+  Push $2
+  Push $3
+  Push $0
+  Call WithOneBackslash
+  Pop $0
+  StrCpy $3 0
+  !insertmacro CompareWithDataFolder "${DATA_LOCAL}"
+  !insertmacro CompareWithDataFolder "${DATA_ROAMING}"
+  StrCpy $0 $3
+  Pop $3
+  Pop $2
+  Pop $1
+  Exch $0
+FunctionEnd
+
+; Moves $INSTDIR to the install folder when it is a data folder, or a folder
+; inside or above one: Tauri's default for `currentUser`,
+; `$LOCALAPPDATA\${PRODUCTNAME}`, a previous install's folder or a `/D=` one.
+; With the data out of the install folder, an uninstall keeps it however
+; Tauri removes that folder.
+Function UseOwnInstallFolder
+  Push $0
+  Push $INSTDIR
+  Call IsDataFolder
+  Pop $0
+  ${If} $0 = 1
+    StrCpy $INSTDIR "${INSTALL_FOLDER}"
+  ${EndIf}
+  Pop $0
+FunctionEnd
+
+; Before the first page, so the directory page offers the install folder:
+; after Tauri's `.onInit` has set its default or the previous install's.
+!define MUI_CUSTOMFUNCTION_GUIINIT UseOwnInstallFolder
+
+; The directory page's Next button stays disabled on a data folder.
+Function .onVerifyInstDir
+  Push $0
+  Push $INSTDIR
+  Call IsDataFolder
+  Pop $0
+  ${If} $0 = 1
+    Pop $0
+    Abort
+  ${EndIf}
+  Pop $0
+FunctionEnd
 
 ; Where the PATH choice is remembered: Tauri's `${MANUPRODUCTKEY}` for the
 ; publisher samfaina, not defined yet where this file is included. Tauri
@@ -75,6 +174,13 @@ FunctionEnd
     DetailPrint "config-digger installer ${verb} failed: $0"
   ${EndIf}
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+!macroend
+
+; A silent install has no GUI to have moved $INSTDIR. Tauri's `SetOutPath`
+; has run by now: on a data folder, it creates at most that empty folder.
+!macro NSIS_HOOK_PREINSTALL
+  Call UseOwnInstallFolder
+  SetOutPath $INSTDIR
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL

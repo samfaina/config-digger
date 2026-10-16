@@ -6,6 +6,9 @@
 //! - `definitions`: checks the built-in Agent and skill manager definition
 //!   files: each loads, as the schemas' types and their validation read it,
 //!   and the folder holds exactly the files that ship. It writes nothing.
+//! - `installer`: checks that the installer's install folder in `hooks.nsh`
+//!   is a folder of its own: no data folder, nor a folder inside or above
+//!   one. It writes nothing.
 //! - `release <tag>`: checks that the tag is `v` and the workspace version,
 //!   and prints `version=` and `prerelease=` lines for `$GITHUB_OUTPUT`.
 //! - `checksums <dir>`: writes `<dir>/SHA256SUMS` for every other file in it.
@@ -14,6 +17,7 @@
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
+mod installer;
 mod release;
 
 use std::path::{Path, PathBuf};
@@ -55,6 +59,7 @@ fn main() -> ExitCode {
         ["bindings"] => (BINDINGS, false),
         ["bindings", "--check"] => (BINDINGS, true),
         ["definitions"] => return check_definitions(),
+        ["installer"] => return check_installer(),
         ["release", tag] => return print_release(tag),
         ["checksums", dir] => return write_checksums(Path::new(dir)),
         ["winget", tag, installer, dir] => {
@@ -62,7 +67,7 @@ fn main() -> ExitCode {
         }
         _ => {
             eprintln!(
-                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask definitions\n       \
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|installer>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>"
             );
             return ExitCode::from(2);
@@ -95,6 +100,27 @@ fn check_definitions() -> ExitCode {
     let problems = config_digger_core::definitions::check_built_in_folder(&folder);
     if problems.is_empty() {
         println!("the built-in definitions are valid");
+        return ExitCode::SUCCESS;
+    }
+    for problem in problems {
+        eprintln!("{problem}");
+    }
+    ExitCode::FAILURE
+}
+
+/// The installer's install folder, as CI checks it.
+fn check_installer() -> ExitCode {
+    let path = "crates/config-digger-app/installer/hooks.nsh";
+    let hooks = match std::fs::read_to_string(repo_file(path)) {
+        Ok(hooks) => hooks,
+        Err(error) => {
+            eprintln!("cannot read {path}: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let problems = installer::problems(&hooks);
+    if problems.is_empty() {
+        println!("the installer installs in a folder of its own");
         return ExitCode::SUCCESS;
     }
     for problem in problems {

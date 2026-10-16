@@ -30,6 +30,8 @@ jobs:
         run: cargo xtask schema --check
       - name: Built-in definitions are valid
         run: cargo xtask definitions
+      - name: Installer folder is no data folder
+        run: cargo xtask installer
       - name: TypeScript bindings are current
         run: cargo xtask bindings --check
       - name: UI typecheck, tests and build
