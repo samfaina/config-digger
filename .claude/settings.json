@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(gh pr merge * --merge)",
-      "PowerShell(gh pr merge * --merge)"
+      "PowerShell(gh pr merge * --merge)",
+      "Bash(gh pr view *)",
+      "PowerShell(gh pr view *)",
+      "Bash(gh issue view *)",
+      "PowerShell(gh issue view *)",
+      "Bash(git push origin --delete *)",
+      "PowerShell(git push origin --delete *)"
     ]
   },
   "hooks": {
