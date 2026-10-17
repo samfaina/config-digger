@@ -6,6 +6,9 @@
 //! - `definitions`: checks the built-in Agent and skill manager definition
 //!   files: each loads, as the schemas' types and their validation read it,
 //!   and the folder holds exactly the files that ship. It writes nothing.
+//! - `unverified`: lists every `unverified` mark of the built-in definitions,
+//!   one line each with its file, line, table and sentence: what the
+//!   release gate still has to test. It writes nothing.
 //! - `installer`: checks that the installer's install folder in `hooks.nsh`
 //!   is a folder of its own: no data folder, nor a folder inside or above
 //!   one. It writes nothing.
@@ -53,6 +56,9 @@ const SCHEMAS: &[Generated] = &[
     },
 ];
 
+/// The built-in definitions' folder, relative to the repository root.
+const DEFINITIONS: &str = "crates/config-digger-core/definitions";
+
 const BINDINGS: &[Generated] = &[Generated {
     task: "bindings",
     path: "crates/config-digger-app/ui/src/bindings.ts",
@@ -68,6 +74,7 @@ fn main() -> ExitCode {
         ["bindings"] => (BINDINGS, false),
         ["bindings", "--check"] => (BINDINGS, true),
         ["definitions"] => return check_definitions(),
+        ["unverified"] => return list_unverified(),
         ["installer"] => return check_installer(),
         ["fixtures"] => return check_fixtures(),
         ["release", tag] => return print_release(tag),
@@ -79,7 +86,7 @@ fn main() -> ExitCode {
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         _ => {
             eprintln!(
-                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|installer|fixtures>\n       \
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
                         cargo xtask updater <tag> <dir> | assets <tag> <dir>"
             );
@@ -109,9 +116,27 @@ fn main() -> ExitCode {
 
 /// The built-in definitions, as CI checks them.
 fn check_definitions() -> ExitCode {
-    let folder = repo_file("crates/config-digger-core/definitions");
+    let folder = repo_file(DEFINITIONS);
     let problems = config_digger_core::definitions::check_built_in_folder(&folder);
     report(&problems, "the built-in definitions are valid")
+}
+
+/// The `unverified` marks of the built-in definitions, each as
+/// `<file>:<line>: <table>: <sentence>`, the file relative to the
+/// repository root.
+fn list_unverified() -> ExitCode {
+    let marks = match config_digger_core::definitions::unverified_marks() {
+        Ok(marks) => marks,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    for mark in &marks {
+        println!("{DEFINITIONS}/{mark}");
+    }
+    println!("{} unverified marks", marks.len());
+    ExitCode::SUCCESS
 }
 
 /// The installer's install folder, as CI checks it.

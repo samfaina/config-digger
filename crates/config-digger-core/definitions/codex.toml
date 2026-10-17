@@ -56,11 +56,11 @@ state = "state_5.sqlite"
 
 # The home Orca sets `CODEX_HOME` to for every Codex it starts: a copy of
 # the user's `config.toml`, with Orca's own additions, next to links to
-# `~\.codex\plugins` and `~\.codex\skills` [disk]. How and when Orca copies
-# it is not known: it is taken to follow `~\.codex`, so config-digger only
-# reads it.
+# `~\.codex\plugins` and `~\.codex\skills` [disk]. config-digger only reads
+# it.
 [[mirrored_homes]]
 id = "orca"
+unverified = 'How and when Orca copies this home is not known: it is taken to follow `~\.codex`.'
 owner = "Orca"
 folder = { block = "path", path = "%APPDATA%/orca/codex-runtime-home/home" }
 source = "default"
@@ -88,10 +88,10 @@ id = "plugin"
 # `session_meta` line that opens its `sessions\YYYY\MM\DD\rollout-*.jsonl`,
 # or once archived, its `archived_sessions\rollout-*.jsonl`; and in
 # `state_5.sqlite`, the `cwd` of each thread and the `path` of each root of
-# the projects the app lists. That archived sessions are not kept by date is
-# taken from the source, not observed. The `5` of `state_5.sqlite` is a
-# schema generation, which changes with the version.
+# the projects the app lists. The `5` of `state_5.sqlite` is a schema
+# generation, which changes with the version.
 [projects]
+unverified = "That archived sessions are not kept by date comes from Codex's source, not from disk."
 registries = [
   { block = "toml-keys", anchor = { block = "home", root = "config" }, root = ["projects"] },
   { block = "jsonl-heads", anchor = { block = "home", root = "sessions" }, files = "*/*/*/rollout-*.jsonl", fields = [["payload", "cwd"]] },
@@ -166,11 +166,15 @@ on_read_failure = "stops_agent"
 # caches it in `%CODEX_HOME%\cloud-config-bundle-cache.json` for an hour:
 # `signed_payload.bundle.config_toml.enterprise_managed` lists TOML
 # fragments, highest first, each holding its text in `contents` [source].
-# The cache is read even once it has expired, as of `cached_at`: whether
-# Codex still uses it then is not known, but it shows the account has a
-# cloud layer. Without the file there is no cloud layer to show.
+# The cache is read even once it has expired, as of `cached_at`, since it
+# shows the account has a cloud layer. Without the file there is no cloud
+# layer to show.
 [[locations]]
 id = "cloud-mcp"
+unverified = [
+  "Whether Codex still uses the cached bundle once it has expired is not known.",
+  "What Codex does with a bundle cache it cannot parse is not known.",
+]
 anchor = { block = "home", root = "cloud_bundle" }
 format = { block = "toml-fragments", lists = [["signed_payload", "bundle", "config_toml", "enterprise_managed"], ["signed_payload", "bundle", "requirements_toml", "enterprise_managed"]], contents = "contents", highest_first = true }
 root = ["signed_payload", "bundle", "config_toml", "enterprise_managed", "mcp_servers"]
@@ -209,10 +213,10 @@ on_read_failure = "stops_agent"
 # A plugin's servers, from its `.mcp.json` [source]. The servers its
 # manifest declares in `mcpServers`, which Codex reads instead when there
 # are any, are not read yet. The plugin owns their transport: `config.toml`
-# can only switch them [source]. What Codex does with a `.mcp.json` it
-# cannot parse is not known.
+# can only switch them [source].
 [[locations]]
 id = "plugin-mcp"
+unverified = "What Codex does with a plugin's `.mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = "installed", path = ".mcp.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -226,6 +230,7 @@ on_read_failure = "unknown"
 # The servers of a plugin the account installed, read only.
 [[locations]]
 id = "remote-plugin-mcp"
+unverified = "What Codex does with a `.mcp.json` it cannot parse, in a plugin the account installed, is not known."
 anchor = { block = "plugin", plugins = "remote", path = ".mcp.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -259,11 +264,13 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # it writes a table holding `enabled` alone in the user's `config.toml`,
 # unless a layer above that sets it. That a lower layer's `enabled = false`
 # holds while no higher one sets it follows from the merge [source,
-# sandbox]. That a higher layer's `enabled = true` wins over it, and that
-# Codex starts with a table holding `enabled` alone where no other layer has
-# the server, are unverified until the release gate.
+# sandbox].
 [[items.mcp.disable]]
 block = "merged-field"
+unverified = [
+  "A higher layer's `enabled = true` wins over a lower layer's `enabled = false`.",
+  "Codex starts with a table holding `enabled` alone where no other layer has the server.",
+]
 locations = ["project-mcp", "user-mcp"]
 requires_unset_above = true
 fallback = "user-mcp"
@@ -274,10 +281,10 @@ fallback = "user-mcp"
 # field away. A plugin the account installed honours it too [source], but
 # config-digger only reads such a plugin. Codex reads it from
 # the merged layers, but config-digger reads and writes it in the user's
-# `config.toml` alone. Both plugin switches come from Codex's source only,
-# so they are unverified until the release gate.
+# `config.toml` alone.
 [[items.mcp.disable]]
 block = "json-field"
+unverified = "That Codex honours the switch of a plugin's server, in a plugin the account installed too, comes from its source only."
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "mcp_servers", "{name}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"
@@ -288,11 +295,11 @@ locations = ["plugin-mcp", "remote-plugin-mcp"]
 
 # A plugin is on or off with every server and skill it carries by
 # `[plugins."<id>"] enabled`, which Codex writes `true` when it installs the
-# plugin and its `/plugins` turns `false` and back [source, docs]. A plugin
-# missing from the file is taken as on. These switches are repeated for
-# skills below.
+# plugin and its `/plugins` turns `false` and back [source, docs]. These
+# switches are repeated for skills below.
 [[items.mcp.disable]]
 block = "json-field"
+unverified = "A plugin missing from `config.toml` is taken to be on."
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "plugin"
 context = "all"
@@ -326,12 +333,12 @@ trusted = "trusted"
 # checking the server it built from its layers [source]. The machine's
 # `%ProgramData%\OpenAI\Codex\requirements.toml` is the lowest source and
 # the cloud bundle's `requirements_toml` fragments rank above it, merged
-# name by name [source]. A requirement that matches a command's args, or a
-# URL by prefix or pattern, is not read: its server is taken to meet it.
-# A requirement turns the server off by `enabled = false`, so the server
-# Codex built still beats a plugin's server of the same name [source].
+# name by name [source]. A requirement turns the server off by
+# `enabled = false`, so the server Codex built still beats a plugin's server
+# of the same name [source].
 [[items.mcp.rules]]
 block = "identity-allowlist"
+unverified = "A requirement that matches a command's args, or a URL by prefix or pattern, is not read: its server is taken to meet it."
 identity = "identity"
 locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"]
 sources = [
@@ -353,10 +360,8 @@ sources = [
 
 # Skills come from these roots, Repo first [source]. A skill is a folder
 # holding a `SKILL.md` whose frontmatter has a `name` and a `description`
-# [docs]. How deep Codex looks for skills, and what it does with a
-# `SKILL.md` it cannot read, is not known: skills are taken to be found at
-# any depth, and such a `SKILL.md` to be skipped. A folder whose name starts
-# with `.` is not read, so `.system` is read apart.
+# [docs]. A folder whose name starts with `.` is not read, so `.system` is
+# read apart.
 #
 # `.codex\skills` in each folder whose `.codex\config.toml` is a Project
 # layer, from the repo root down to the Project, read even when the layer
@@ -373,10 +378,10 @@ store_class = "plain"
 on_read_failure = "ignores_file"
 
 # `.agents\skills` in each folder from the repo root down to the Project
-# [source, docs]. Whether trust applies to it is not known: it is taken not
-# to, as for `.codex\skills`.
+# [source, docs].
 [[locations]]
 id = "project-agents-skills"
+unverified = 'Whether trust applies to `.agents\skills` is not known: it is taken not to, as for `.codex\skills`.'
 anchor = { block = "project", path = ".agents/skills", walk = "up-to-repo-root" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
@@ -465,6 +470,10 @@ on_read_failure = "ignores_file"
 # skills with one name are both used [source, docs]. Trust keeps out no
 # skill.
 [items.skill]
+unverified = [
+  "How deep Codex looks for skills is not known: skills are taken to be found at any depth.",
+  "What Codex does with a `SKILL.md` it cannot read is not known: it is taken to be skipped.",
+]
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
 checks = ["frontmatter", "disable", "precedence"]
@@ -475,13 +484,13 @@ checks = ["frontmatter", "disable", "precedence"]
 # of that name, with `enabled = false`, the later rule winning [source].
 # Disable adds a rule by path, which reaches the one skill, written as an
 # absolute path with the links of its folders resolved, since Codex
-# canonicalises the paths of rules before it compares them [source]; how a
-# canonical path is spelled on Windows, with or without `\\?\`, is
-# unverified until the release gate. Enable takes the rule out. Of several
+# canonicalises the paths of rules before it compares them [source]. Enable
+# takes the rule out. Of several
 # rules by path, or by name, for one skill the later counts, but a rule by
 # path and one by name are each read on their own.
 [[items.skill.disable]]
 block = "json-item-list"
+unverified = 'How Codex spells a canonical path on Windows, with or without `\\?\`, is not known.'
 switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}"], named_by = "path", later_wins = true, store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"

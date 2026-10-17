@@ -1,7 +1,9 @@
 //! Agent definitions: TOML data over the closed set of building blocks in
-//! [`blocks`]. Deserialisation plus `validate()` is the only validation path.
+//! [`blocks`]. Taking out its `unverified` [`marks`], deserialisation and
+//! `validate()` are the only validation path.
 
 pub(crate) mod blocks;
+pub mod marks;
 pub mod skill_managers;
 
 use crate::ports::{Environment, FileSystem};
@@ -41,10 +43,26 @@ const FORMAT_VERSION: u32 = 1;
 
 /// The JSON Schema of an Agent definition file, generated from the block enums.
 pub fn json_schema() -> String {
-    let schema = schemars::schema_for!(AgentDefinition);
-    let mut json = serde_json::to_string_pretty(&schema).expect("a schema serialises");
-    json.push('\n');
-    json
+    marks::json_schema::<AgentDefinition>()
+}
+
+/// Every `unverified` mark of the built-in definitions, the Agent
+/// definitions' first and then the skill manager definitions', file by
+/// file in load order, each in the order they appear: what the release
+/// gate still has to test. A skill manager definition's file is named
+/// inside its `skill-managers` folder.
+pub fn unverified_marks() -> Result<Vec<marks::Mark>, String> {
+    let mut found = Vec::new();
+    for (file, text) in BUILT_IN {
+        let (_, marks) = parse_marked(file, text).map_err(|e| e.to_string())?;
+        found.extend(marks);
+    }
+    for (file, text) in skill_managers::BUILT_IN {
+        let file = format!("skill-managers/{file}");
+        let (_, marks) = skill_managers::parse_marked(&file, text).map_err(|e| e.to_string())?;
+        found.extend(marks);
+    }
+    Ok(found)
 }
 
 /// Checks the definition files in `folder`, laid out as the built-in ones
@@ -169,14 +187,23 @@ pub(crate) fn built_in() -> Result<Vec<AgentDefinition>, DefinitionError> {
 }
 
 pub(crate) fn parse(file: &str, text: &str) -> Result<AgentDefinition, DefinitionError> {
+    parse_marked(file, text).map(|(definition, _)| definition)
+}
+
+/// The Agent definition `text` of `file`, and its marks.
+fn parse_marked(
+    file: &str,
+    text: &str,
+) -> Result<(AgentDefinition, Vec<marks::Mark>), DefinitionError> {
     let error = |message: String| DefinitionError {
         kind: "Agent",
         file: file.to_owned(),
         message,
     };
-    let definition: AgentDefinition = toml::from_str(text).map_err(|e| error(e.to_string()))?;
+    let (definition, marks): (AgentDefinition, _) =
+        marks::deserialize(file, text).map_err(error)?;
     definition.validate().map_err(error)?;
-    Ok(definition)
+    Ok((definition, marks))
 }
 
 /// Where an Agent keeps its configuration, in which format, and with what precedence.

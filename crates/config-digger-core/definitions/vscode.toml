@@ -4,6 +4,8 @@
 
 format_version = 1
 verified = { min = "1.129.1", max = "1.129.1" }
+# The shape every setting read from the ExP experiment cache relies on.
+unverified = "The shape of `configs[0].Parameters` in `memento/experiment.service.memento` is inferred from tas-client."
 
 [agent]
 id = "vscode"
@@ -79,13 +81,13 @@ registries = [
 # first folder ranks highest [docs].
 workspace_files = true
 
-# Agent plugins, each in a folder of `~\.vscode\agent-plugins` [disk]. That
-# each sits directly there, with a `plugin.json` at its root or in
-# `.github\plugin` or `.claude-plugin`, is inferred from the formats VS Code
-# reads [docs]. A plugin is named by its manifest's `name`, or else by its
-# folder. VS Code uninstalls one in the Extensions view.
+# Agent plugins, each in a folder of `~\.vscode\agent-plugins` [disk], in
+# the formats VS Code reads [docs]. A plugin is named by its manifest's
+# `name`, or else by its folder. VS Code uninstalls one in the Extensions
+# view.
 [[plugins]]
 id = "agent-plugins"
+unverified = 'That each agent plugin sits directly in `~\.vscode\agent-plugins`, with its `plugin.json` at its root, in `.github\plugin` or in `.claude-plugin`, is inferred from the formats VS Code reads.'
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json"] }
 name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }]
 
@@ -122,8 +124,7 @@ id = "discovered"
 # assignment in `memento/experiment.service.memento` of the store every
 # profile reads, as tas-client's feature data [docs]: each setting this
 # definition reads from the user's settings is read there last, as
-# `configs[0].Parameters`, whose shape is inferred from tas-client. Which
-# settings VS Code marks is not read.
+# `configs[0].Parameters`. Which settings VS Code marks is not read.
 
 # Each collection VS Code builds, lowest order first: `.vscode\mcp.json` (0),
 # `.mcp.json` (1), a `.code-workspace` file's `settings.mcp` (100), the
@@ -135,10 +136,10 @@ id = "discovered"
 # user types, `${workspaceFolder}` and `${userHome}` [docs]. `envFile` is the
 # path of a file of variables, and shown.
 
-# A workspace folder's `.vscode\mcp.json` [docs]. What VS Code does with one
-# it cannot parse is not known.
+# A workspace folder's `.vscode\mcp.json` [docs].
 [[locations]]
 id = "folder-mcp"
+unverified = 'What VS Code does with a `.vscode\mcp.json` it cannot parse is not known.'
 anchor = { block = "project", path = ".vscode/mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
@@ -152,11 +153,13 @@ on_read_failure = "unknown"
 
 # Claude Code's `.mcp.json` in a workspace folder, which VS Code reads under
 # `mcpServers` or as a bare object of servers [docs]. VS Code writes no
-# reference there [docs], and how it reads one is not known, so every value
-# is taken as written: a `${NAME}` Claude Code replaces is a Secret to VS
-# Code.
+# reference there [docs].
 [[locations]]
 id = "dot-mcp"
+unverified = [
+  "How VS Code reads a reference in `.mcp.json` is not known: every value is taken as written, so a `${NAME}` Claude Code replaces is a Secret to VS Code.",
+  "What VS Code does with a `.mcp.json` it cannot parse is not known.",
+]
 anchor = { block = "project", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -168,10 +171,10 @@ provenance = "file"
 store_class = "plain"
 on_read_failure = "unknown"
 
-# A `.code-workspace` file's `settings.mcp` [docs]. What VS Code does with
-# one it cannot parse is not known.
+# A `.code-workspace` file's `settings.mcp` [docs].
 [[locations]]
 id = "workspace-mcp"
+unverified = "What VS Code does with a `.code-workspace` file it cannot parse is not known."
 anchor = { block = "project-file" }
 format = { block = "json", dialect = "jsonc" }
 root = ["settings", "mcp", "servers"]
@@ -192,9 +195,10 @@ on_read_failure = "unknown"
 
 # The profile's `mcp.json` [docs]. VS Code rewrites it whole on every
 # install or remove, dropping its comments, and deletes it once it holds
-# nothing [docs]. What it does with one it cannot parse is not known.
+# nothing [docs].
 [[locations]]
 id = "user-mcp"
+unverified = "What VS Code does with a profile's `mcp.json` it cannot parse is not known."
 anchor = { block = "home", root = "mcp" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
@@ -211,11 +215,10 @@ on_read_failure = "unknown"
 # `state.vscdb`, under `mcp.extCachedServers`, as
 # `{"<publisher.extension>/<provider>": {"servers": [...]}}`, each server
 # with its `label` and its `launch` [docs, disk]. The cache can be stale.
-# How the cache spells a launch's headers and env is not known, so every
-# value of its `env`, `headers`, `args` and `uri` is taken as a Secret. VS
-# Code rebuilds a `state.vscdb` it cannot open from its backup [docs].
+# VS Code rebuilds a `state.vscdb` it cannot open from its backup [docs].
 [[locations]]
 id = "extension-mcp"
+unverified = "How the cache spells a launch's headers and env is not known: every value of its `env`, `headers`, `args` and `uri` is taken as a Secret."
 anchor = { block = "project-storage", path = "state.vscdb" }
 format = { block = "sqlite-json", key = "mcp.extCachedServers" }
 root = ["mcp.extCachedServers", "*", "servers"]
@@ -229,10 +232,13 @@ secrets.fields = [["launch", "env"], ["launch", "headers"], ["launch", "args"], 
 on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries"]
 
-# An agent plugin's servers, in the `.mcp.json` at its root, which is
-# inferred.
+# An agent plugin's servers.
 [[locations]]
 id = "plugin-mcp"
+unverified = [
+  "That an agent plugin's servers are in the `.mcp.json` at its root is inferred.",
+  "What VS Code does with an agent plugin's `.mcp.json` it cannot parse is not known.",
+]
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -246,11 +252,10 @@ on_read_failure = "unknown"
 
 # The configurations of other apps VS Code discovers, each only while its
 # source is on in `chat.mcp.discovery.enabled`, and every source is off by
-# default [disk]. Each is read in its own app's format [docs]. Which of the
-# settings files hold the setting VS Code reads is not known: they are read
-# as for `chat.mcp.collisionBehavior`.
+# default [disk]. Each is read in its own app's format [docs].
 [[locations]]
 id = "claude-desktop-mcp"
+unverified = "Which settings files hold the `chat.mcp.discovery.enabled` VS Code reads is not known: for each app it discovers, they are read as for `chat.mcp.collisionBehavior`."
 anchor = { block = "machine", path = "%APPDATA%/Claude/claude_desktop_config.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -374,11 +379,10 @@ sources = [
 # policy it fetched in `defaultAccount.cachedPolicyData` of the store every
 # profile reads, and reads `policyData.mcp: false` as `"none"` and
 # `policyData.mcpAccess: "registry_only"` as `"registry"`, leaving the
-# setting to the user otherwise [docs]. That `entitlementsFetchedAt` is when
-# it fetched the policy is inferred from its name. config-digger never
-# writes either.
+# setting to the user otherwise [docs]. config-digger never writes either.
 [[items.mcp.rules]]
 block = "global-switch"
+unverified = "That `entitlementsFetchedAt` is when VS Code fetched the policy is inferred from its name."
 off = "none"
 sources = [
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "entitlementsFetchedAt"] },
@@ -406,11 +410,11 @@ sources = [
 # `content.trust.model.key` of the store every profile shares, under
 # `uriTrustInfo`, as `{"uri": <URI>, "trusted": true}` items, and moves
 # them there from the default profile's store when it finds them only in
-# the latter [docs]. That stable VS Code shares that store in
-# `~\.vscode-shared` is inferred from its product name. `--disable-workspace-trust`
-# turns trust off for one launch, which nothing on disk shows.
+# the latter [docs]. `--disable-workspace-trust` turns trust off for one
+# launch, which nothing on disk shows.
 [[items.mcp.gates]]
 block = "trusted-folders"
+unverified = 'That stable VS Code shares that store in `~\.vscode-shared` is inferred from its product name.'
 locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "cursor-workspace-mcp"]
 uri = "uri"
 trusted = "trusted"
@@ -434,11 +438,10 @@ sources = [
 # the workspace's for a workspace's, as `[id, record]` pairs whose record's
 # `trustedAtNonce` is the nonce of the configuration the user trusted and
 # `nonce` that of the one it last saw [docs]. The nonce hashes the launch
-# configuration [docs], which config-digger does not compute: a server is
-# taken as trusted while the two match, though its file may have changed
-# since VS Code last saw it.
+# configuration [docs], which config-digger does not compute.
 [[items.mcp.gates]]
 block = "nonce-trust"
+unverified = "A server is taken to be trusted while its two nonces match, though its file may have changed since VS Code last saw it."
 locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
 trusted_at = "trustedAtNonce"
 nonce = "nonce"
@@ -463,11 +466,13 @@ sources = [
 # the workspace's store decides over the profile's, `true` included, and a
 # server without one is on [docs]. Disable writes `false` to the workspace's
 # store in a Project, and to the profile's otherwise; Enable takes the pair
-# out of both, as VS Code's own Enable does [docs]. That a store holds the
-# pairs in this shape, and the ids, come from VS Code's source only, so
-# they are unverified until the release gate confirms them.
+# out of both, as VS Code's own Enable does [docs].
 [[items.mcp.disable]]
 block = "json-item-list"
+unverified = [
+  "That a store holds the `mcp.enablement` pairs in this shape comes from VS Code's source only.",
+  "That each id is the server's collection followed by its name comes from VS Code's source only.",
+]
 switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
 target = "entry"
 context = "project"
@@ -489,14 +494,13 @@ reason = "disabled_natively"
 layered = true
 
 # Skills are folders holding a `SKILL.md`, read one level down [docs], each
-# named by its folder [docs]. What VS Code does with a `SKILL.md` without a
-# frontmatter, or one whose YAML does not parse, is not known: it is taken
-# to load the first under its folder's name and to skip the second.
+# named by its folder [docs].
 
 # A workspace folder's `.agents`, `.github` and `.claude` skills, in that
-# order [docs]. Whether that order is one VS Code keeps is not known.
+# order [docs].
 [[locations]]
 id = "folder-agents-skills"
+unverified = "Whether VS Code keeps the `.agents`, `.github` and `.claude` order for a workspace folder's skills is not known."
 anchor = { block = "project", path = ".agents/skills" }
 format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" }
 kind = "skill"
@@ -594,6 +598,7 @@ on_read_failure = "ignores_file"
 # The first skill of a name wins: workspace, then personal, then plugin,
 # then extension [docs].
 [items.skill]
+unverified = "What VS Code does with a `SKILL.md` without a frontmatter, or one whose YAML does not parse, is not known: it is taken to load the first under its folder's name and to skip the second."
 precedence = ["folder-agents-skills", "folder-github-skills", "folder-claude-skills", "user-agents-skills", "user-copilot-skills", "user-claude-skills", "plugin-skills", "extension-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "rules", "disable", "precedence"]
@@ -603,12 +608,13 @@ checks = ["frontmatter", "rules", "disable", "precedence"]
 # as VS Code writes a URI: an object whose `path` is the file's, with its
 # drive as the folder spells it, compared without regard to case [docs].
 # Disable adds a URI with its scheme and path only, which is how VS Code
-# reads one back [docs]. Enable takes it out. Which file the URI names, and
-# that a skill VS Code lists there is kept from the model too, come from VS
-# Code's source only, so they are unverified until the release gate
-# confirms them.
+# reads one back [docs]. Enable takes it out.
 [[items.skill.disable]]
 block = "json-item-list"
+unverified = [
+  "That the URI names the skill's `SKILL.md` comes from VS Code's source only.",
+  "That a skill VS Code lists there is kept from the model too comes from VS Code's source only.",
+]
 switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", store_class = "sqlite" }
 target = "entry"
 context = "all"

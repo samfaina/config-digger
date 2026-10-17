@@ -4,14 +4,16 @@
 
 format_version = 1
 verified = { min = "2.16120", max = "2.16120" }
+unverified = [
+  "A classic `%APPDATA%\\Claude` beside a package's `LocalCache` takes precedence for the packaged app too.",
+  "Where the classic installer puts the app is not known.",
+]
 
 # The data folder Claude Desktop reads, `<userData>`, is the first of these
 # that exists [bundle]. `CLAUDE_USER_DATA_DIR` sets it outright [bundle].
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
 # share [bundle]. Each package's app ends with its own `LocalCache`, which
-# no other app sees [docs]. That a classic `%APPDATA%\Claude` beside a
-# package's `LocalCache` takes precedence for the packaged app too is
-# inferred.
+# no other app sees [docs].
 lookup_orders = [
   ["user-data-dir", "claude-data", "classic", "msix"],
   ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc"],
@@ -26,8 +28,7 @@ notes = ["cloud_connectors_not_on_disk"]
 
 # Each MSIX package installs to its own folder under `WindowsApps`, whose
 # manifest gives its version [disk]. A package's app reads the homes of the
-# lookup order up to its own `LocalCache`, and the third-party home. Where
-# the classic installer puts the app is not known.
+# lookup order up to its own `LocalCache`, and the third-party home.
 [[installations]]
 id = "msix"
 folder = "%ProgramFiles%/WindowsApps/Claude_*"
@@ -227,10 +228,10 @@ sources = [
 
 # Likewise every extension, by the policy `isDesktopExtensionEnabled`, or
 # its older name `isDxtEnabled`, or the file's `features.isDxtEnabled`
-# [docs, bundle]. Which default a deployment for a third-party provider
-# takes is not known; on is assumed.
+# [docs, bundle].
 [[items.mcp.rules]]
 block = "global-switch"
+unverified = "Which default a deployment for a third-party provider takes is not known: on is assumed."
 off = false
 every_source = true
 locations = ["extension-mcp"]
@@ -273,10 +274,10 @@ locations = ["extension-mcp"]
 # Skills exist on disk only as Claude Desktop's mirror of the account's
 # skills, in `skills-plugin/<org>/<account>/skills/<name>` [disk]. They are
 # managed in the account, and the app rewrites the mirror as it syncs, so
-# config-digger only reads them. How the app treats a `SKILL.md` it cannot
-# fully read is not known; the account validates skills on upload.
+# config-digger only reads them.
 [[locations]]
 id = "mirrored-skills"
+unverified = "How Claude Desktop treats a `SKILL.md` it cannot fully read is not known; the account validates skills on upload."
 anchor = { block = "home", root = "skills" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
 kind = "skill"

@@ -30,6 +30,10 @@ _Avoid_: Install, binary, copy
 The lowest and highest versions of an Agent that its Agent definition was tested against. An Installation outside it, older or newer, is noted on each Agent home it reads and in the preview of every Operation on that Agent; nothing is turned off. A definition without one is untested.
 _Avoid_: Supported versions, compatible range, verified range
 
+**Unverified mark**:
+A sentence in an Agent definition or skill manager definition saying what one of its facts assumes, for a fact taken from inference or source code alone, or a default taken because the fact is not known. It changes nothing config-digger does; the marks of the built-in definitions list what the release gate still has to test.
+_Avoid_: Assumption, caveat, TODO
+
 **Running Agent**:
 An Agent that config-digger detects, on a best-effort basis, as running for an Agent home that reads a location an Operation writes, or keeps a Disable switch there. It is matched through the `[process]` section of its Agent definition, which an Agent home may replace with its own. config-digger never closes an Agent; what a Running Agent means for a write depends on the location's Store class.
 _Avoid_: Open Agent, live Agent, active Agent
