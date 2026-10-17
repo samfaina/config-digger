@@ -351,6 +351,7 @@ impl Targeted<'_> {
                     op: FolderOp::MoveToBackup,
                     size: folders::measure(self.ports.fs.as_ref(), folder)?,
                     git_versioned: false,
+                    readers: self.snapshot.readers_of_folder(folder),
                 });
             }
             let edit = Edit::Remove {
@@ -476,6 +477,7 @@ impl Targeted<'_> {
             op,
             size,
             git_versioned: entry.git_versioned,
+            readers: self.snapshot.readers_of_folder(&entry.path),
         })
     }
 
@@ -793,6 +795,7 @@ impl Targeted<'_> {
             add_edit(by_file, store.clone(), Syntax::Jsonc, edit, false);
             planned_folders.push(PlannedFolder {
                 git_versioned: self.snapshot.versioned.contains(&entry.path),
+                readers: self.snapshot.readers_of_folder(&entry.path),
                 path: entry.path.clone(),
                 op,
                 size,
@@ -935,6 +938,7 @@ impl Targeted<'_> {
             op,
             size,
             git_versioned: self.ports.git.is_versioned(origin),
+            readers: self.snapshot.readers_of_folder(origin),
         })
     }
 
@@ -1072,7 +1076,7 @@ impl Targeted<'_> {
             &self.before.homes,
         )?;
         let installed = installations::installed_homes(self.definitions, self.snapshot);
-        let running = running::check(self.definitions, self.ports, &installed, &files);
+        let running = running::check(self.definitions, self.ports, &installed, &files, &folders);
         let mut warnings = warnings(&files, &folders, running.warning);
         warnings.extend(action_warning);
         Ok(Planned {
@@ -1221,11 +1225,14 @@ pub(crate) fn plan_undo(
         UndoBlocked::Refused(refused) => refused.into_error(definitions, &snapshot),
         UndoBlocked::Other(error) => error,
     })?;
-    let folders = undo_folders(ports, manifest)?;
+    let mut folders = undo_folders(ports, manifest)?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
         file.switches = snapshot.switch_stores_of(&file.path);
         file.git_versioned = snapshot.versioned.contains(&file.path);
+    }
+    for folder in &mut folders {
+        folder.readers = snapshot.readers_of_folder(&folder.path);
     }
 
     let before = resolve::resolve(definitions, &snapshot, &context);
@@ -1265,7 +1272,7 @@ pub(crate) fn plan_undo(
         &before.homes,
     )?;
     let installed = installations::installed_homes(definitions, &snapshot);
-    let running = running::check(definitions, ports, &installed, &files);
+    let running = running::check(definitions, ports, &installed, &files, &folders);
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
@@ -1629,6 +1636,8 @@ pub(crate) fn undo_folders(
         }
         planned.push(PlannedFolder {
             git_versioned: ports.git.is_versioned(path),
+            // From the scan before the Undo, once planned.
+            readers: Vec::new(),
             path: path.clone(),
             op,
             size,

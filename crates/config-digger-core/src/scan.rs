@@ -16,7 +16,7 @@ use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
     LocationDefinition, NameParts, PROJECT_KEY, PluginNames, PluginsDefinition, References,
 };
-use crate::folders::{AsIf, PlannedFolder};
+use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
 use crate::store::Written;
@@ -437,6 +437,25 @@ impl Snapshot {
         self.readers
             .iter()
             .filter(|reader| reader.path == path)
+            .cloned()
+            .collect()
+    }
+
+    /// The locations that read the skill folder or link at `path`: those
+    /// whose folder holds it, or holds a link that leads into it.
+    pub fn readers_of_folder(&self, path: &Path) -> Vec<LocationReader> {
+        let links = self.entries.iter().filter_map(|entry| {
+            let real = entry.link.as_ref()?.real.as_deref()?;
+            folders::below(real, path).map(|_| entry.path.as_path())
+        });
+        let reached: Vec<&Path> = std::iter::once(path).chain(links).collect();
+        self.readers
+            .iter()
+            .filter(|reader| {
+                reached
+                    .iter()
+                    .any(|at| folders::below(at, &reader.path).is_some())
+            })
             .cloned()
             .collect()
     }

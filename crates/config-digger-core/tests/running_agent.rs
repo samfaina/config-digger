@@ -566,3 +566,169 @@ fn without_an_installation_a_running_agent_still_blocks_its_sqlite_store_but_nev
     assert_eq!(codes, [BlockCode::RunningAgentSqlite]);
     assert_eq!(plan.warnings(), []);
 }
+
+fn review_skill() -> PathBuf {
+    PathBuf::from(HOME).join(r".claude\skills\review")
+}
+
+const SKILL_MD: &str = "---\nname: review\ndescription: Reviews a diff.\n---\n";
+
+/// [`fixture`] with a user skill `review` in `~/.claude/skills`.
+fn skill_fixture() -> FakeFileSystem {
+    fixture().with_file(review_skill().join("SKILL.md"), SKILL_MD)
+}
+
+#[test]
+fn removing_a_skill_folder_the_running_agent_reads_gets_a_warning() {
+    let fs = skill_fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, "review");
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(sentence.contains("Claude Code"), "{sentence}");
+    assert!(sentence.contains(r".claude\skills\review"), "{sentence}");
+    assert!(sentence.contains("until it restarts"), "{sentence}");
+    let error = core.execute(plan, &[]).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AckRequired);
+    assert_eq!(
+        fs.contents(review_skill().join("SKILL.md")).unwrap(),
+        SKILL_MD.as_bytes()
+    );
+}
+
+fn shared_skill() -> PathBuf {
+    PathBuf::from(HOME).join(r".agents\skills\shared")
+}
+
+fn shared_link() -> PathBuf {
+    PathBuf::from(HOME).join(r".claude\skills\shared")
+}
+
+/// [`fixture`] with a skill `shared` in `~/.agents/skills`, which Claude
+/// Code does not read, junctioned into `~/.claude/skills`, which it does.
+fn linked_fixture() -> FakeFileSystem {
+    fixture()
+        .with_file(
+            shared_skill().join("SKILL.md"),
+            "---\nname: shared\ndescription: Shared by several Agents.\n---\n",
+        )
+        .with_folder(PathBuf::from(HOME).join(r".claude\skills"))
+        .with_link(shared_link(), shared_skill())
+}
+
+#[test]
+fn removing_a_linked_entry_the_running_agent_reads_gets_a_warning() {
+    let fs = linked_fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, &shared_link().display().to_string());
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(sentence.contains("Claude Code"), "{sentence}");
+    assert!(sentence.contains(r".claude\skills\shared"), "{sentence}");
+    let error = core.execute(plan, &[]).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AckRequired);
+}
+
+/// An Agent with no process that reads skills from `~/.agents/skills`, as
+/// Codex and Gemini CLI do, so that a link target there is an Entry too.
+const AGENTS_READER: &str = r#"
+format_version = 1
+
+[agent]
+id = "agents-reader"
+name = "Agents Reader"
+
+[[homes]]
+id = "default"
+folder = { block = "path", path = "~" }
+roots.skills = ".agents/skills"
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "user-skills"
+anchor = { block = "home", root = "skills" }
+format = { block = "skill-folder", name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["user-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "disable", "precedence"]
+"#;
+
+#[test]
+fn removing_a_skill_folder_the_running_agent_reads_through_a_link_gets_a_warning() {
+    let fs = linked_fixture();
+    let processes = FakeProcesses::default().with_process(claude_code_cli());
+    let core = core_with(&fs, AGENTS_READER, &processes);
+
+    let plan = remove(&core, &shared_skill().display().to_string());
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(sentence.contains("Claude Code"), "{sentence}");
+}
+
+#[test]
+fn removing_a_skill_folder_no_running_agent_reads_gets_no_warning() {
+    let fs = fixture().with_file(shared_skill().join("SKILL.md"), "---\nname: shared\n---\n");
+    let processes = FakeProcesses::default().with_process(claude_code_cli());
+    let core = core_with(&fs, AGENTS_READER, &processes);
+
+    let plan = remove(&core, &shared_skill().display().to_string());
+
+    assert_eq!(running_agent_sentence(&plan), None);
+    let outcome = core.execute(plan, &[]).unwrap();
+    assert!(outcome.hints.is_empty());
+}
+
+#[test]
+fn an_undo_that_moves_a_skill_folder_back_while_the_agent_runs_gets_the_warning() {
+    let fs = skill_fixture();
+    let processes = FakeProcesses::default();
+    let core = core_with(&fs, AGENTS_READER, &processes);
+    let outcome = core.execute(remove(&core, "review"), &[]).unwrap();
+
+    processes.start(claude_code_cli());
+    let undo = core.plan_undo(&outcome.operation).unwrap();
+
+    let sentence = running_agent_sentence(&undo).expect("a running-agent warning");
+    assert!(sentence.contains(r".claude\skills\review"), "{sentence}");
+}
+
+#[test]
+fn an_agent_that_starts_after_the_preview_of_a_skill_folder_remove_needs_a_fresh_preview() {
+    let fs = skill_fixture();
+    let processes = FakeProcesses::default();
+    let core = core_with(&fs, AGENTS_READER, &processes);
+    let plan = remove(&core, "review");
+    assert!(plan.warnings().is_empty());
+
+    processes.start(claude_code_cli());
+    let error = core.execute(plan, &[]).unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::Stale);
+    assert!(fs.contents(review_skill().join("SKILL.md")).is_some());
+}
+
+#[test]
+fn an_acknowledged_skill_folder_remove_adds_the_restart_hint() {
+    let fs = skill_fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+    let plan = remove(&core, "review");
+
+    let outcome = core.execute(plan, &[WarningClass::RunningAgent]).unwrap();
+
+    assert_eq!(
+        outcome.hints,
+        ["Restart Claude Code so that it reads what the Operation wrote."]
+    );
+    assert_eq!(fs.contents(review_skill().join("SKILL.md")), None);
+}
