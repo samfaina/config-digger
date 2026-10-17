@@ -3355,9 +3355,9 @@ impl Scanner<'_> {
         let mut folders = vec![(root.to_path_buf(), 0)];
         // A link back to a folder already read would never end.
         let mut seen = BTreeSet::new();
-        while let Some((folder, level)) = folders.pop() {
-            let level = level + 1;
-            let above = !format.recursive && level < format.depth;
+        while let Some((folder, folder_depth)) = folders.pop() {
+            let child_depth = folder_depth + 1;
+            let above = !format.recursive && child_depth < format.depth;
             if !seen.insert(paths::canonical_key(fs, &folder)) {
                 continue;
             }
@@ -3388,7 +3388,9 @@ impl Scanner<'_> {
                     continue;
                 }
                 if above {
-                    folders.push((child, level));
+                    if fs.read_dir(&child).is_ok() {
+                        folders.push((child, child_depth));
+                    }
                     continue;
                 }
                 // A link whose target is gone is still an Entry, which
@@ -3425,7 +3427,7 @@ impl Scanner<'_> {
                 let skill_md = child.join(SKILL_MD);
                 if !fs.exists(&skill_md) {
                     if format.recursive {
-                        folders.push((child, level));
+                        folders.push((child, child_depth));
                     }
                     continue;
                 }

@@ -2434,9 +2434,9 @@ impl SqliteJson {
     }
 }
 
-/// A folder whose subfolders holding a `SKILL.md` are skills, each one an
-/// Entry. A folder whose name starts with `.` is never read, and one
-/// without `SKILL.md` is not an Entry.
+/// A folder whose subfolders holding a `SKILL.md`, at the block's depth,
+/// are skills, each one an Entry. A folder whose name starts with `.` is
+/// never read, and one without `SKILL.md` is not an Entry.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SkillFolder {
@@ -2445,8 +2445,9 @@ pub(crate) struct SkillFolder {
     #[serde(default)]
     pub recursive: bool,
     /// How many folders below the location's folder each skill folder
-    /// sits, when the location is not recursive. Folders above that depth
-    /// are read whatever they hold, and only folders at it are skills.
+    /// sits, at least 1: 1 is its direct subfolders. Folders above that
+    /// depth are read whatever they hold, and only folders at it are skills.
+    /// A recursive location keeps 1.
     #[serde(default = "one_folder_down")]
     pub depth: usize,
     /// Where a skill's name comes from.
@@ -2490,7 +2491,8 @@ impl Validate for SkillList {
         }
         if self.skills.recursive || self.skills.depth != 1 {
             return Err(
-                "a skill list names each skill folder; it cannot be recursive or deeper".into(),
+                "a skill list names each skill folder; it cannot be recursive or set a depth"
+                    .into(),
             );
         }
         self.skills.validate()
@@ -2555,7 +2557,7 @@ impl Validate for SkillFolder {
         }
         if self.recursive && self.depth != 1 {
             return Err(
-                "a recursive skill folder reads skills at any depth; it cannot give one".into(),
+                "a recursive skill folder reads skills at any depth; it cannot set a depth".into(),
             );
         }
         if let Some(name) = self

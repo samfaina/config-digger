@@ -197,7 +197,7 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
 }
 
 #[test]
-fn synced_skills_are_read_only_at_the_account_and_skill_level() {
+fn synced_skills_are_read_only_two_folders_below_synced() {
     let synced = in_home(r".claude\skills\synced");
     let fs = with_skill(
         FakeFileSystem::new(),
@@ -206,6 +206,8 @@ fn synced_skills_are_read_only_at_the_account_and_skill_level() {
     );
     let fs = with_skill(fs, synced.join("loose"), &skill_md("loose"));
     let fs = with_skill(fs, synced.join(r"org1_acct1\group\deep"), &skill_md("deep"));
+    let fs = with_skill(fs, synced.join(r"org1_acct1\pdf\inner"), &skill_md("inner"))
+        .with_file(synced.join("notes.txt"), "");
 
     let inventory = no_project(&fs);
 
@@ -216,6 +218,8 @@ fn synced_skills_are_read_only_at_the_account_and_skill_level() {
     assert_eq!(names, ["pdf"]);
     let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
     assert_eq!(entry["provenance"], "cloud_mirror");
+    let inventory = serde_json::to_value(&inventory).unwrap();
+    assert_eq!(inventory["read_failures"], json!([]));
 }
 
 #[test]

@@ -1930,7 +1930,7 @@
           ]
         },
         {
-          "description": "A folder whose subfolders holding a `SKILL.md` are skills, each one an\nEntry. A folder whose name starts with `.` is never read, and one\nwithout `SKILL.md` is not an Entry.",
+          "description": "A folder whose subfolders holding a `SKILL.md`, at the block's depth,\nare skills, each one an Entry. A folder whose name starts with `.` is\nnever read, and one without `SKILL.md` is not an Entry.",
           "type": "object",
           "properties": {
             "recursive": {
@@ -1939,7 +1939,7 @@
               "default": false
             },
             "depth": {
-              "description": "How many folders below the location's folder each skill folder\nsits, when the location is not recursive. Folders above that depth\nare read whatever they hold, and only folders at it are skills.",
+              "description": "How many folders below the location's folder each skill folder\nsits, at least 1: 1 is its direct subfolders. Folders above that\ndepth are read whatever they hold, and only folders at it are skills.\nA recursive location keeps 1.",
               "type": "integer",
               "format": "uint",
               "minimum": 0,
@@ -2175,7 +2175,7 @@
       ]
     },
     "SkillFolder": {
-      "description": "A folder whose subfolders holding a `SKILL.md` are skills, each one an\nEntry. A folder whose name starts with `.` is never read, and one\nwithout `SKILL.md` is not an Entry.",
+      "description": "A folder whose subfolders holding a `SKILL.md`, at the block's depth,\nare skills, each one an Entry. A folder whose name starts with `.` is\nnever read, and one without `SKILL.md` is not an Entry.",
       "type": "object",
       "properties": {
         "recursive": {
@@ -2184,7 +2184,7 @@
           "default": false
         },
         "depth": {
-          "description": "How many folders below the location's folder each skill folder\nsits, when the location is not recursive. Folders above that depth\nare read whatever they hold, and only folders at it are skills.",
+          "description": "How many folders below the location's folder each skill folder\nsits, at least 1: 1 is its direct subfolders. Folders above that\ndepth are read whatever they hold, and only folders at it are skills.\nA recursive location keeps 1.",
           "type": "integer",
           "format": "uint",
           "minimum": 0,
