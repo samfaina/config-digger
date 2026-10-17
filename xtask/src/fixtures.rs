@@ -7,14 +7,14 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 /// The files under a `crates/*/tests/fixtures` folder of `repo` that git
-/// ignores, relative to `repo`, with `/` separators. Tracked files count:
-/// a force-added fixture is one a new copy of would be dropped.
+/// ignores, relative to `repo`, with `/` separators. Tracked files are
+/// checked as if they were new, so a force-added fixture counts.
 pub fn ignored(repo: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
-    let crates = repo.join("crates");
-    let entries = std::fs::read_dir(&crates)
-        .map_err(|error| format!("cannot read {}: {error}", crates.display()))?;
-    for entry in entries.flatten() {
+    let entries = std::fs::read_dir(repo.join("crates"))
+        .map_err(|error| format!("cannot read crates: {error}"))?;
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("cannot read crates: {error}"))?;
         let name = entry.file_name().to_string_lossy().into_owned();
         let fixtures = format!("crates/{name}/tests/fixtures");
         if repo.join(&fixtures).is_dir() {
@@ -62,11 +62,14 @@ fn check_ignore(repo: &Path, files: &[String]) -> Result<Vec<String>, String> {
         .iter()
         .flat_map(|file| [file.as_bytes(), b"\0"].concat())
         .collect();
-    let written = stdin.write_all(&input);
-    drop(stdin);
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("cannot run git: {error}"))?;
+    // git writes what it ignores as it reads, so stdin is written from a
+    // thread of its own while stdout is read: either pipe can fill.
+    let (written, output) = std::thread::scope(|scope| {
+        let writer = scope.spawn(move || stdin.write_all(&input));
+        let output = child.wait_with_output();
+        (writer.join().expect("the stdin writer ends"), output)
+    });
+    let output = output.map_err(|error| format!("cannot run git: {error}"))?;
     written.map_err(|error| format!("cannot write to git check-ignore: {error}"))?;
     // 0: some files are ignored; 1: none is.
     match output.status.code() {
@@ -87,26 +90,22 @@ fn check_ignore(repo: &Path, files: &[String]) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn no_committed_fixture_is_ignored() {
-        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    const GITIGNORE: &str = include_str!("../../.gitignore");
 
-        assert_eq!(ignored(&repo), Ok(Vec::<String>::new()));
-    }
-
-    /// The global exclude that dropped the VS Code fixture of #63.
-    const GLOBAL_EXCLUDE: &str = "**/.claude/settings.local.json\n";
+    /// The global exclude that dropped the VS Code fixture of #63, and a
+    /// folder rule.
+    const GLOBAL_EXCLUDE: &str = "**/.claude/settings.local.json\n.vscode/\n";
 
     const SETTINGS_LOCAL: &str = "crates/demo/tests/fixtures/app/.claude/settings.local.json";
     const VSCODE_MCP: &str = "crates/demo/tests/fixtures/app/.vscode/mcp.json";
 
-    /// A new repository with `gitignore` as its `.gitignore`, `GLOBAL_EXCLUDE`
-    /// as its `core.excludesFile`, and an empty file at each of `files`.
-    fn repo(gitignore: &str, files: &[&str]) -> tempfile::TempDir {
+    /// A new repository with `global_exclude` as its `core.excludesFile`,
+    /// `gitignore` as its `.gitignore`, and an empty file at each of `files`.
+    fn repo(global_exclude: &str, gitignore: &str, files: &[&str]) -> tempfile::TempDir {
         let repo = tempfile::tempdir().expect("a temporary folder");
         git(repo.path(), &["init", "--quiet"]);
         let excludes = repo.path().join(".git").join("global-excludes");
-        std::fs::write(&excludes, GLOBAL_EXCLUDE).expect("the global excludes are written");
+        std::fs::write(&excludes, global_exclude).expect("the global excludes are written");
         git(
             repo.path(),
             &["config", "core.excludesFile", &excludes.to_string_lossy()],
@@ -122,7 +121,7 @@ mod tests {
 
     /// The output of `git args` in `repo`, which must succeed.
     fn git(repo: &Path, args: &[&str]) -> String {
-        let output = std::process::Command::new("git")
+        let output = Command::new("git")
             .arg("-C")
             .arg(repo)
             .args(args)
@@ -131,18 +130,6 @@ mod tests {
         assert!(output.status.success(), "git {args:?} failed: {output:?}");
         String::from_utf8(output.stdout).expect("UTF-8 output")
     }
-
-    #[test]
-    fn a_fixture_a_global_exclude_drops_is_ignored() {
-        let repo = repo(
-            "",
-            &[SETTINGS_LOCAL, "crates/demo/tests/fixtures/app/.mcp.json"],
-        );
-
-        assert_eq!(ignored(repo.path()), Ok(vec![SETTINGS_LOCAL.to_owned()]));
-    }
-
-    const GITIGNORE: &str = include_str!("../../.gitignore");
 
     /// The files `git status` shows in `repo`, untracked ones included.
     fn status(repo: &Path) -> Vec<String> {
@@ -153,8 +140,40 @@ mod tests {
     }
 
     #[test]
+    fn no_committed_fixture_is_ignored() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        assert_eq!(ignored(&repo), Ok(Vec::<String>::new()));
+    }
+
+    #[test]
+    fn a_fixture_a_global_exclude_drops_is_ignored() {
+        let repo = repo(
+            GLOBAL_EXCLUDE,
+            "",
+            &[SETTINGS_LOCAL, "crates/demo/tests/fixtures/app/.mcp.json"],
+        );
+
+        assert_eq!(ignored(repo.path()), Ok(vec![SETTINGS_LOCAL.to_owned()]));
+    }
+
+    #[test]
+    fn every_fixture_git_ignores_is_reported_however_many() {
+        let files: Vec<String> = (0..20000)
+            .map(|n| format!("crates/demo/tests/fixtures/many/{n:05}.json"))
+            .collect();
+        let repo = repo(
+            "*.json\n",
+            "",
+            &files.iter().map(String::as_str).collect::<Vec<_>>(),
+        );
+
+        assert_eq!(ignored(repo.path()), Ok(files));
+    }
+
+    #[test]
     fn the_gitignore_re_includes_a_fixture_a_global_exclude_drops() {
-        let repo = repo(GITIGNORE, &[SETTINGS_LOCAL, VSCODE_MCP]);
+        let repo = repo(GLOBAL_EXCLUDE, GITIGNORE, &[SETTINGS_LOCAL, VSCODE_MCP]);
 
         assert_eq!(ignored(repo.path()), Ok(Vec::new()));
         assert_eq!(
@@ -164,10 +183,19 @@ mod tests {
     }
 
     #[test]
+    fn the_gitignore_re_includes_the_folders_that_hold_fixtures() {
+        let repo = repo("tests/\nfixtures/\n", GITIGNORE, &[VSCODE_MCP]);
+
+        assert_eq!(ignored(repo.path()), Ok(Vec::new()));
+        assert_eq!(status(repo.path()), [".gitignore", VSCODE_MCP]);
+    }
+
+    #[test]
     fn build_output_stays_ignored_inside_and_outside_fixtures() {
         let fixture_target = "crates/demo/tests/fixtures/app/target/debug/out";
         let fixture_modules = "crates/demo/tests/fixtures/app/node_modules/x/index.js";
         let repo = repo(
+            GLOBAL_EXCLUDE,
             GITIGNORE,
             &[
                 fixture_target,
