@@ -1657,7 +1657,7 @@
           ]
         },
         "secrets": {
-          "description": "Fields of this location's Entries that hold Secrets, or that never\ndo, beyond what the core masks by default.",
+          "description": "Fields of this location's Entries that hold Secrets, or that never\ndo, beyond what the core masks by default. The fields, URL fields\nand encrypted prefixes it marks are Secrets in the Entries of every\nlocation that reads the same file, whichever Agent's it is.",
           "$ref": "#/$defs/SecretFields"
         },
         "on_read_failure": {

@@ -705,7 +705,9 @@ pub(crate) struct LocationDefinition {
     /// it, every value is literal text.
     pub interpolation: Option<Interpolation>,
     /// Fields of this location's Entries that hold Secrets, or that never
-    /// do, beyond what the core masks by default.
+    /// do, beyond what the core masks by default. The fields, URL fields
+    /// and encrypted prefixes it marks are Secrets in the Entries of every
+    /// location that reads the same file, whichever Agent's it is.
     #[serde(default)]
     pub secrets: SecretFields,
     /// What the Agent does when it cannot open, decode or parse the location.

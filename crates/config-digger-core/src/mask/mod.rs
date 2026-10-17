@@ -4,7 +4,9 @@
 //! On the common server model, env and header values, a URL's userinfo and
 //! query values, and args after a token-like flag are Secrets; a location's
 //! definition marks more fields, other fields that hold a URL, and fields
-//! that hold a variable name. A
+//! that hold a variable name. The fields any location that reads the same
+//! file marks are Secrets too, so that every Agent's view of the file masks
+//! them. A
 //! reference in the Agent's interpolation syntax is not a Secret: a value
 //! made only of references is shown as it is, and in a mixed value only the
 //! literal text beyond a recognised prefix is masked.
@@ -13,8 +15,8 @@ mod diff;
 
 pub(crate) use diff::{Side, diff, diff_parked};
 
-use crate::definitions::LocationDefinition;
 use crate::definitions::blocks::Interpolate;
+use crate::definitions::{LocationDefinition, SecretFields};
 use serde_json::Value;
 
 /// What a Secret is shown as, whatever its length.
@@ -83,7 +85,17 @@ pub(crate) struct Masked {
 
 /// An Entry of `location` with every Secret masked.
 pub(crate) fn entry(location: &LocationDefinition, value: &Value) -> Masked {
-    let rules = Rules { location };
+    entry_read_by(location, &[], value)
+}
+
+/// An Entry of `location` with every Secret masked, including those that
+/// `reading`, the locations that read its file, mark.
+pub(crate) fn entry_read_by(
+    location: &LocationDefinition,
+    reading: &[&LocationDefinition],
+    value: &Value,
+) -> Masked {
+    let rules = Rules::new(location, reading);
     let mut masked = Masked {
         value: value.clone(),
         key_paths: Vec::new(),
@@ -99,7 +111,7 @@ pub(crate) fn file_fields(
     location: &LocationDefinition,
     document: &Value,
 ) -> Vec<(Vec<String>, Value)> {
-    let rules = Rules { location };
+    let rules = Rules::new(location, &[]);
     let mut found = Vec::new();
     for field in &location.secrets.file_fields {
         collect(document, field, &mut Vec::new(), &mut found);
@@ -170,13 +182,25 @@ fn collect<'v>(
 /// Where Secrets are in the Entries of one location.
 struct Rules<'d> {
     location: &'d LocationDefinition,
+    /// What `location` and each location that reads its file mark as
+    /// Secrets. Only `location`'s own variable names and interpolation
+    /// syntax count, since those are how its Agent reads the Entry.
+    secrets: Vec<&'d SecretFields>,
 }
 
-impl Rules<'_> {
+impl<'d> Rules<'d> {
+    fn new(location: &'d LocationDefinition, reading: &[&'d LocationDefinition]) -> Self {
+        let secrets = std::iter::once(location)
+            .chain(reading.iter().copied())
+            .map(|location| &location.secrets)
+            .collect();
+        Rules { location, secrets }
+    }
+
     /// The value the Agent encrypted that `value` is, masked, if it is one.
     fn encrypted(&self, value: &Value) -> Option<Value> {
         let text = value.as_str()?;
-        let prefix = self.location.secrets.encrypted_prefix(text)?;
+        let prefix = self.encrypted_prefix(text)?;
         Some(Value::String(format!("{prefix}{MASK}")))
     }
 
@@ -313,7 +337,7 @@ impl Rules<'_> {
             path.push(index.to_string());
             let secret = match arg {
                 _ if self.is_variable_name(path) => None,
-                Value::String(text) if self.location.secrets.encrypted_prefix(text).is_some() => {
+                Value::String(text) if self.encrypted_prefix(text).is_some() => {
                     flag = None;
                     self.text(text)
                 }
@@ -358,7 +382,7 @@ impl Rules<'_> {
     /// masked, or `None` when there is none, such as a value made only of
     /// references.
     fn text(&self, text: &str) -> Option<String> {
-        let prefix = match self.location.secrets.encrypted_prefix(text) {
+        let prefix = match self.encrypted_prefix(text) {
             Some(encrypted) => encrypted,
             None => prefix(text),
         };
@@ -465,19 +489,24 @@ impl Rules<'_> {
         }
     }
 
-    fn is_secret_field(&self, path: &[String]) -> bool {
-        self.location
-            .secrets
-            .fields
+    /// The prefix of a value an Agent encrypted that `text` starts with, if any.
+    fn encrypted_prefix<'t>(&self, text: &'t str) -> Option<&'t str> {
+        self.secrets
             .iter()
+            .find_map(|secrets| secrets.encrypted_prefix(text))
+    }
+
+    fn is_secret_field(&self, path: &[String]) -> bool {
+        self.secrets
+            .iter()
+            .flat_map(|secrets| &secrets.fields)
             .any(|field| matches(field, path))
     }
 
     fn is_url_field(&self, path: &[String]) -> bool {
-        self.location
-            .secrets
-            .urls
+        self.secrets
             .iter()
+            .flat_map(|secrets| &secrets.urls)
             .any(|field| matches(field, path))
     }
 

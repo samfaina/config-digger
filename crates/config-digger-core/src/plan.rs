@@ -70,6 +70,9 @@ pub(crate) struct PlannedFile {
     /// The file is the parked-Entry store, whose Secrets are those of the
     /// Entries parked in it.
     pub parked_store: bool,
+    /// For the parked-Entry store, every location the scan read: those that
+    /// read the file an Entry was parked from mark its Secrets too.
+    pub parked_readers: Vec<LocationReader>,
     /// What it writes: the file, or values of the SQLite store it is.
     pub medium: Medium,
 }
@@ -86,7 +89,9 @@ impl PlannedFile {
 
     /// A diff of the file from `before` to `after`, with every Secret masked.
     pub fn diff(&self, definitions: &[AgentDefinition], before: Side, after: Side) -> FileDiff {
-        let store = self.parked_store.then_some(self.path.as_path());
+        let store = self
+            .parked_store
+            .then_some((self.path.as_path(), self.parked_readers.as_slice()));
         file_diff(definitions, &self.readers, &self.path, store, before, after)
     }
 
@@ -104,18 +109,19 @@ impl PlannedFile {
 }
 
 /// A diff of the file at `path` from `before` to `after`, with every Secret
-/// masked: those of the Entries parked in it when it is `store`, the
-/// parked-Entry store, and else those of the Entries `readers` read there.
+/// masked: those of the Entries parked in it when it is the parked-Entry
+/// store of `store`, as the locations that come with it mark them, and else
+/// those of the Entries `readers` read there.
 fn file_diff(
     definitions: &[AgentDefinition],
     readers: &[LocationReader],
     path: &Path,
-    store: Option<&Path>,
+    store: Option<(&Path, &[LocationReader])>,
     before: Side,
     after: Side,
 ) -> FileDiff {
-    if store == Some(path) {
-        mask::diff_parked(definitions, path, before, after)
+    if let Some((_, parked_readers)) = store.filter(|(store, _)| *store == path) {
+        mask::diff_parked(definitions, parked_readers, path, before, after)
     } else {
         mask::diff(definitions, readers, path, before, after)
     }
@@ -1019,11 +1025,16 @@ impl Targeted<'_> {
         created: bool,
         edited: EditedFile,
     ) -> PlannedFile {
+        let parked_store = self.snapshot.parked_store.as_ref() == Some(&path);
         PlannedFile {
             readers: self.snapshot.readers_of(&path),
             switches: self.snapshot.switch_stores_of(&path),
             git_versioned: self.snapshot.versioned.contains(&path),
-            parked_store: self.snapshot.parked_store.as_ref() == Some(&path),
+            parked_store,
+            parked_readers: match parked_store {
+                true => self.snapshot.readers.clone(),
+                false => Vec::new(),
+            },
             parking: false,
             medium: Medium::File,
             path,
@@ -1496,6 +1507,7 @@ pub(crate) fn undo_files<'m>(
                 git_versioned: false,
                 parking: location.parking,
                 parked_store: false,
+                parked_readers: Vec::new(),
                 medium: location.medium.clone(),
             }),
             Err(UndoFailure::Changed(key_path)) => changed.push(ChangedFile {
@@ -1692,7 +1704,10 @@ impl Refused<'_> {
                     name: "as it is now",
                 };
                 let readers = snapshot.readers_of(path);
-                let store = snapshot.parked_store.as_deref();
+                let store = snapshot
+                    .parked_store
+                    .as_deref()
+                    .map(|store| (store, &*snapshot.readers));
                 file_diff(definitions, &readers, path, store, before, after)
             })
             .collect();
@@ -1748,7 +1763,10 @@ pub(crate) fn operation_diff(
         name: "as the Operation wrote it",
     };
     let readers = snapshot.readers_of(path);
-    let store = snapshot.parked_store.as_deref();
+    let store = snapshot
+        .parked_store
+        .as_deref()
+        .map(|store| (store, &*snapshot.readers));
     file_diff(definitions, &readers, path, store, before, after)
 }
 

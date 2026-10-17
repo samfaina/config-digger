@@ -410,6 +410,27 @@ pub(crate) struct LocationReader {
     pub path: PathBuf,
 }
 
+impl LocationReader {
+    /// Its location's definition.
+    pub fn location<'d>(&self, definitions: &'d [AgentDefinition]) -> &'d LocationDefinition {
+        definitions[self.agent_index].location(&self.location)
+    }
+}
+
+/// The definitions of the locations of `readers` that read the file at
+/// `path`.
+pub(crate) fn locations_reading<'d>(
+    definitions: &'d [AgentDefinition],
+    readers: &[LocationReader],
+    path: &Path,
+) -> Vec<&'d LocationDefinition> {
+    readers
+        .iter()
+        .filter(|reader| reader.path == path)
+        .map(|reader| reader.location(definitions))
+        .collect()
+}
+
 impl Snapshot {
     /// The locations that read the file at `path`.
     pub fn readers_of(&self, path: &Path) -> Vec<LocationReader> {
@@ -834,6 +855,7 @@ pub(crate) fn scan_as_if(
         reader: Reader::new(&as_if, written),
         projects: Projects::new(ports),
         entries: Vec::new(),
+        unmasked: Vec::new(),
         readers: Vec::new(),
         storage: Vec::new(),
         cached: BTreeMap::new(),
@@ -995,6 +1017,7 @@ pub(crate) fn scan_as_if(
         }
     }
 
+    scanner.mask_entries(definitions);
     let (parked_store, parked) = scanner.read_parked(definitions, &found, ports);
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
@@ -2367,6 +2390,10 @@ struct Scanner<'p> {
     reader: Reader<'p>,
     projects: Projects<'p>,
     entries: Vec<ScannedEntry>,
+    /// The indices in `entries` of the Entries whose `config` is still their
+    /// real value: they are masked once every location is read, when every
+    /// location that reads their file is known.
+    unmasked: Vec<usize>,
     readers: Vec<LocationReader>,
     /// The folder an Agent home keeps for each Project, as its registry
     /// of such folders records it.
@@ -2892,7 +2919,8 @@ impl Scanner<'_> {
                 continue;
             };
             let key_path = park::key_path(&id);
-            let masked = mask::entry(location, &parked_entry.entry);
+            let reading = locations_reading(definitions, &self.readers, &parked_entry.origin.path);
+            let masked = mask::entry_read_by(location, &reading, &parked_entry.entry);
             self.entries.push(ScannedEntry {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
@@ -2960,8 +2988,7 @@ impl Scanner<'_> {
         if location.one_entry {
             // Named by its plugin, once read.
             if let Some(value) = lookup(&document, &location.root) {
-                let masked = mask::entry(location, value);
-                self.entries.push(ScannedEntry {
+                self.push_unmasked(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
@@ -2969,8 +2996,8 @@ impl Scanner<'_> {
                     key_path: location.root.clone(),
                     name: String::new(),
                     project,
-                    config: masked.value,
-                    masked: masked.key_paths,
+                    config: value.clone(),
+                    masked: Vec::new(),
                     depth,
                     defect: None,
                     link: None,
@@ -3178,6 +3205,26 @@ impl Scanner<'_> {
         }
     }
 
+    /// Adds `entry`, whose `config` is its real value until
+    /// [`Self::mask_entries`] masks it.
+    fn push_unmasked(&mut self, entry: ScannedEntry) {
+        self.unmasked.push(self.entries.len());
+        self.entries.push(entry);
+    }
+
+    /// Masks each Entry added by [`Self::push_unmasked`] with what every
+    /// location that reads its file marks, now that every location is read.
+    fn mask_entries(&mut self, definitions: &[AgentDefinition]) {
+        for index in self.unmasked.drain(..) {
+            let entry = &mut self.entries[index];
+            let location = definitions[entry.agent_index].location(&entry.location);
+            let reading = locations_reading(definitions, &self.readers, &entry.path);
+            let masked = mask::entry_read_by(location, &reading, &entry.config);
+            entry.config = masked.value;
+            entry.masked = masked.key_paths;
+        }
+    }
+
     /// Records that `location` reads the file or folder at `path`.
     fn add_reader(&mut self, home: &FoundHome, location: &LocationDefinition, path: &Path) {
         let reader = LocationReader {
@@ -3265,8 +3312,7 @@ impl Scanner<'_> {
             for found in object.entries {
                 let mut key_path = object.key_path.clone();
                 key_path.push(found.key);
-                let masked = mask::entry(location, found.value);
-                self.entries.push(ScannedEntry {
+                self.push_unmasked(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
@@ -3274,8 +3320,8 @@ impl Scanner<'_> {
                     key_path,
                     name: found.name,
                     project: project.clone(),
-                    config: masked.value,
-                    masked: masked.key_paths,
+                    config: found.value.clone(),
+                    masked: Vec::new(),
                     depth,
                     defect: None,
                     link: None,
