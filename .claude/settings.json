@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(gh pr merge * --merge)",
+      "PowerShell(gh pr merge * --merge)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
