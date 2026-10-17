@@ -2,6 +2,7 @@
 //! [`blocks`]. Deserialisation plus `validate()` is the only validation path.
 
 pub(crate) mod blocks;
+pub mod marks;
 pub mod skill_managers;
 
 use crate::ports::{Environment, FileSystem};
@@ -41,10 +42,27 @@ const FORMAT_VERSION: u32 = 1;
 
 /// The JSON Schema of an Agent definition file, generated from the block enums.
 pub fn json_schema() -> String {
-    let schema = schemars::schema_for!(AgentDefinition);
-    let mut json = serde_json::to_string_pretty(&schema).expect("a schema serialises");
-    json.push('\n');
-    json
+    marks::json_schema::<AgentDefinition>()
+}
+
+/// Every `unverified` mark of the built-in Agent and skill manager
+/// definitions, file by file in load order, each in the order they appear:
+/// what the release gate still has to test. A skill manager definition's
+/// file is named inside its `skill-managers` folder.
+pub fn unverified_marks() -> Result<Vec<marks::Mark>, String> {
+    let agents = BUILT_IN
+        .iter()
+        .map(|(file, text)| ((*file).to_owned(), *text));
+    let managers = skill_managers::BUILT_IN
+        .iter()
+        .map(|(file, text)| (format!("skill-managers/{file}"), *text));
+    let mut found = Vec::new();
+    for (file, text) in agents.chain(managers) {
+        let (_, marks): (toml::Table, _) =
+            marks::deserialize(&file, text).map_err(|e| format!("{file}: {e}"))?;
+        found.extend(marks);
+    }
+    Ok(found)
 }
 
 /// Checks the definition files in `folder`, laid out as the built-in ones
@@ -174,7 +192,7 @@ pub(crate) fn parse(file: &str, text: &str) -> Result<AgentDefinition, Definitio
         file: file.to_owned(),
         message,
     };
-    let definition: AgentDefinition = toml::from_str(text).map_err(|e| error(e.to_string()))?;
+    let (definition, _): (AgentDefinition, _) = marks::deserialize(file, text).map_err(error)?;
     definition.validate().map_err(error)?;
     Ok(definition)
 }

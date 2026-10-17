@@ -86,11 +86,11 @@ id = "system"
 # folder, which the folder then holds, or `link`, which reads the extension's
 # files from the folder `source` names [source, disk]. An extension is named
 # by its manifest's `name`, and Gemini CLI stops loading extensions with an
-# error when two manifests give one `name` [source]: both are taken to be
-# refused, and what becomes of the others is not known. Extensions are the
+# error when two manifests give one `name` [source]. Extensions are the
 # user's alone: no Project has its own [source].
 [[plugins]]
 id = "extensions"
+unverified = "Of two extensions whose manifests give one `name`, both are taken to be refused; what becomes of the other extensions is not known."
 registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = ".gemini-extension-install.json", linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }
 name = { file = "gemini-extension.json", key_path = ["name"] }
 uninstall = "gemini extensions uninstall {id}"
@@ -186,10 +186,10 @@ on_read_failure = "stops_agent"
 # An extension's servers, in `mcpServers` of its `gemini-extension.json`,
 # where `${extensionPath}`, `${workspacePath}` and `${/}` stand for its
 # folder, the Project's and the path separator [source, disk]. Gemini CLI
-# drops a `trust` it finds there [source]. What it does with a manifest it
-# cannot parse is not known.
+# drops a `trust` it finds there [source].
 [[locations]]
 id = "extension-mcp"
+unverified = "What Gemini CLI does with an extension manifest it cannot parse is not known."
 anchor = { block = "plugin", plugins = "extensions", path = "gemini-extension.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -271,10 +271,13 @@ reason = "disabled_by_name"
 # Project below it. With no Project there is no folder to read the rules
 # for. Gemini CLI compares the folders as written, with regard to case
 # [source], and config-digger does too but for the drive letter, which it
-# takes in upper case: that, and rules for a drive other than the home
-# folder's, are unverified until the release gate.
+# takes in upper case.
 [[items.mcp.disable]]
 block = "json-path-rules"
+unverified = [
+  "Gemini CLI spells a folder's drive letter in upper case, as config-digger takes it.",
+  "A rule for a drive other than the home folder's reaches the folders below it as one for the home folder's drive does.",
+]
 switch = { anchor = { block = "home", root = "extension_enablement" }, key_path = ["{plugin_id}", "overrides"], store_class = "plain" }
 reason = "plugin_disabled"
 locations = ["extension-mcp"]
@@ -285,8 +288,8 @@ locations = ["extension-mcp"]
 # character a file name cannot hold replaced by `-` [source, disk]. One
 # without a frontmatter, or whose frontmatter lacks a `name` or a
 # `description`, is skipped [source]. Gemini CLI reads a frontmatter that is
-# not YAML line by line instead [source], which config-digger does not:
-# such a skill is taken to be skipped.
+# not YAML line by line instead [source], which config-digger does not, so
+# it shows such a skill as skipped.
 #
 # `<folder>\.agents\skills` and `<folder>\.gemini\skills`, read only in a
 # folder the user trusts [source].

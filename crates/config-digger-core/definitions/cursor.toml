@@ -99,15 +99,15 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # `~\.cursor\plugins\cache\<marketplace>\<name>\<commit>`, a folder it marks
 # complete with `.cache-complete` once downloaded, and prunes the other
 # commits [code, disk]: a plugin it has not downloaded yet is not listed.
-# Which marketplace Cursor's server picks for a key that names none [code]
-# is not known: the first, by name, whose cache holds the plugin is taken.
-# Of several complete commits, which pruning has not reached yet, the last
-# by name is taken.
+# Cursor's server picks the marketplace of a key that names none [code]. Of
+# several complete commits, which pruning has not reached yet, the last by
+# name is taken.
 # The `.cursor\settings.json` of a workspace file's folders is not read.
 # Cursor uninstalls the plugin in its Customize page, which deletes the key
 # [code].
 [[plugins]]
 id = "project"
+unverified = "Which marketplace Cursor's server picks for a key that names none is not known: the first, by name, whose cache holds the plugin is taken."
 registry = { block = "project-plugin-keys", anchor = { block = "project", path = ".cursor/settings.json" }, dialect = "jsonc", root = ["plugins"], scope = "project", cache = { block = "machine", path = "~/.cursor/plugins/cache" }, marker = ".cache-complete" }
 
 # The local plugins, each a folder of `~\.cursor\plugins\local` whose name
@@ -135,13 +135,15 @@ registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.
 # their comments, and its deeplink installer parses the user's as strict
 # JSON: one it cannot parse it writes again from `{"mcpServers":{}}`,
 # dropping every server [code]. Cursor keeps the sign-in of remote servers
-# in its state [disk]; that it forgets the sign-in of the servers it no
-# longer sees is not known. config-digger never writes a comment into
-# either.
+# in its state [disk]. config-digger never writes a comment into either.
 #
 # `~\.cursor\mcp.json` [docs, disk]. No variable moves it [code].
 [[locations]]
 id = "user-mcp"
+unverified = [
+  "Whether Cursor forgets the sign-in of the servers it no longer sees is not known.",
+  "What Cursor does with a `mcp.json` it cannot parse is not known.",
+]
 anchor = { block = "machine", path = "~/.cursor/mcp.json" }
 name_template = "user-{name}"
 format = { block = "json", dialect = "jsonc" }
@@ -164,6 +166,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # by instead, is not read.
 [[locations]]
 id = "project-mcp"
+unverified = "What Cursor does with a Project's `mcp.json` it cannot parse is not known."
 anchor = { block = "project", path = ".cursor/mcp.json" }
 name_template = "project-{folder_index}-{folder}-{name}"
 format = { block = "json", dialect = "jsonc" }
@@ -187,6 +190,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # identifiers start with `plugin-` and the plugin's name [code, disk].
 [[locations]]
 id = "cursor-plugin-manifest-mcp"
+unverified = "What Cursor does with a plugin manifest it cannot parse is not known."
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 name_template = "plugin-{plugin}-{name}"
 references = { root = ["mcpServers"] }
@@ -203,6 +207,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 
 [[locations]]
 id = "cursor-plugin-mcp"
+unverified = "What Cursor does with a plugin's `mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
 format = { block = "json", dialect = "strict" }
@@ -220,12 +225,14 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # `enable_cc_plugin_import` is on [code]: those its first manifest declares
 # in `mcpServers`, inline, as a path to a file of the plugin or a list of
 # either [code, disk], and those of its `.mcp.json`, or else its `mcp.json`
-# [code]. That Cursor reads the latter only when the manifest declares none
-# is not known: a server both declare under one name is one identifier, and
-# the manifest's is taken to win. Its servers' identifiers start with
-# `plugin-` and the plugin's name [disk].
+# [code]. Its servers' identifiers start with `plugin-` and the plugin's
+# name [disk].
 [[locations]]
 id = "claude-plugin-manifest-mcp"
+unverified = [
+  "Whether Cursor reads a Claude Code plugin's `.mcp.json` only when its manifest declares no servers is not known: a server both declare under one name is one identifier, and the manifest's is taken to win.",
+  "What Cursor does with a Claude Code plugin's manifest it cannot parse is not known.",
+]
 anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 name_template = "plugin-{plugin}-{name}"
 references = { root = ["mcpServers"] }
@@ -243,6 +250,7 @@ when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
 
 [[locations]]
 id = "claude-plugin-mcp"
+unverified = "What Cursor does with a Claude Code plugin's `mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = "claude-code", path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
 format = { block = "json", dialect = "strict" }
@@ -284,11 +292,10 @@ unseen = ["extensions", "team", "marketplace-plugins", "user-pick"]
 # `mcp_profile_scoped_global_disabled_state` is on, the toggle of a server
 # that is not a Project's writes `cursor/disabledGlobalMcpServers` in the
 # profile's store instead, the application's state for the default profile,
-# so that it is Disabled in every Project [code]. That a list of
-# identifiers is what a toggled server leaves in either is not known:
-# Cursor reads one [code], but none was toggled on the research machine.
+# so that it is Disabled in every Project [code].
 [[items.mcp.disable]]
 block = "json-name-list"
+unverified = "A toggled server leaves a list of identifiers in either store: Cursor reads one, but none was toggled on the research machine."
 switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["cursor/disabledMcpServers"], store_class = "sqlite" }
 target = "name"
 context = "project"
@@ -428,9 +435,7 @@ sources = [
 # Skills are folders holding a `SKILL.md`, found at any depth below each
 # skills folder, skipping folders whose name starts with `.` [code, disk].
 # A skill is named by its folder, which its frontmatter `name` must match
-# [docs]. What Cursor does with a `SKILL.md` without a frontmatter, or whose
-# YAML does not parse, is not known: it is taken to load the first under
-# its folder's name and to skip the second.
+# [docs].
 #
 # Cursor reads the `.cursor`, `.claude`, `.codex`, `.grok` and `.agents`
 # skills folders, in that order, in the user's home folder and at the root
@@ -583,9 +588,12 @@ on_read_failure = "ignores_file"
 # at the same path below the folder holding their `.cursor`, `.claude`,
 # `.codex`, `.grok` or `.agents` folder, such as `~\.claude\skills\review`
 # and `~\.agents\skills\review`, and the first in that order wins [code,
-# disk]. Which of two same-named skills of different paths `/name` runs is
-# not known.
+# disk].
 [items.skill]
+unverified = [
+  "What Cursor does with a `SKILL.md` without a frontmatter, or whose YAML does not parse, is not known: it is taken to load the first under its folder's name and to skip the second.",
+  "Which of two same-named skills of different paths `/name` runs is not known.",
+]
 precedence = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
 checks = ["frontmatter", "rules", "disable", "precedence"]
@@ -683,11 +691,12 @@ enable_offered = false
 # Cursor caches the Statsig gates of the signed-in account in the
 # application's state, under `workbench.experiments.statsigBootstrap`, each
 # by the djb2 hash of its name, and when it fetched them in milliseconds
-# [disk]. What each gate does comes from Cursor's code. Claude Code plugins'
+# [disk]. Claude Code plugins'
 # servers load while `enable_cc_plugin_import` is on [code], which it was
 # on the research machine [disk].
 [[feature_gates]]
 name = "enable_cc_plugin_import"
+unverified = "That Claude Code plugins' servers load only while this gate is on comes from Cursor's code only."
 assumed = true
 affects = ["claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
@@ -696,16 +705,20 @@ lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, k
 # [code], which it was on the research machine [disk].
 [[feature_gates]]
 name = "dedupe_mcp_servers"
+unverified = "That this gate collapses servers with the same URL comes from Cursor's code only."
 assumed = true
 affects = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }
 
 # Servers outside Projects are Disabled in the profile's store while
 # `mcp_profile_scoped_global_disabled_state` is on [code]. The research
-# machine held no `cursor/disabledGlobalMcpServers` [disk], so it is taken
-# to be off.
+# machine held no `cursor/disabledGlobalMcpServers` [disk].
 [[feature_gates]]
 name = "mcp_profile_scoped_global_disabled_state"
+unverified = [
+  "That this gate moves the Disabled state of servers outside Projects to the profile's store comes from Cursor's code only.",
+  "This gate is taken to be off, as the research machine held no `cursor/disabledGlobalMcpServers`.",
+]
 assumed = false
 affects = ["user-mcp", "cursor-plugin-manifest-mcp", "cursor-plugin-mcp", "claude-plugin-manifest-mcp", "claude-plugin-mcp"]
 lookup = { block = "sqlite-json", anchor = { block = "home", root = "state" }, key = "workbench.experiments.statsigBootstrap", key_path = ["feature_gates", "{gate}", "value"], hash = "djb2", cached_at = ["time"] }

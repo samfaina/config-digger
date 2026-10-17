@@ -19,6 +19,9 @@
       "items": {
         "$ref": "#/$defs/Detector"
       }
+    },
+    "unverified": {
+      "$ref": "#/$defs/Unverified"
     }
   },
   "additionalProperties": false,
@@ -38,6 +41,9 @@
         "name": {
           "description": "The display name, such as `npx skills`.",
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -63,6 +69,9 @@
             "block": {
               "type": "string",
               "const": "link-target-glob"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -86,6 +95,9 @@
             "block": {
               "type": "string",
               "const": "marker-file"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -109,6 +121,9 @@
             "block": {
               "type": "string",
               "const": "location-glob"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -150,6 +165,9 @@
             "block": {
               "type": "string",
               "const": "lock-file-entry"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -184,6 +202,23 @@
           "description": "Lower case, each run of characters other than `a`-`z`, `0`-`9`, `.`\nand `_` replaced by one `-`, with no `.` or `-` at either end, as\n`npx skills` names folders.",
           "type": "string",
           "const": "lowercase-hyphens-dots"
+        }
+      ]
+    },
+    "Unverified": {
+      "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. It changes nothing the definition does.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "minItems": 1
         }
       ]
     }

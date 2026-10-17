@@ -85,3 +85,50 @@ fn a_file_that_does_not_ship_or_a_missing_one_fails() {
         "{problems:#?}"
     );
 }
+
+/// Words a comment uses for a fact taken from inference, or a default
+/// taken because the fact is not known.
+const UNCERTAIN: &[&str] = &["inferred", "not known", "unverified", "taken to", "assumed"];
+
+/// Each block of consecutive comment lines in `text`, with the 1-based
+/// line it starts on, its lines joined by spaces.
+fn comment_blocks(text: &str) -> Vec<(usize, String)> {
+    let mut blocks: Vec<(usize, String)> = Vec::new();
+    let mut in_block = false;
+    for (index, line) in text.lines().enumerate() {
+        let Some(comment) = line.trim_start().strip_prefix('#') else {
+            in_block = false;
+            continue;
+        };
+        match blocks.last_mut() {
+            Some((_, block)) if in_block => {
+                block.push(' ');
+                block.push_str(comment.trim());
+            }
+            _ => blocks.push((index + 1, comment.trim().to_owned())),
+        }
+        in_block = true;
+    }
+    blocks
+}
+
+#[test]
+fn no_comment_states_an_uncertain_fact_that_belongs_in_a_mark() {
+    let mut uncertain = Vec::new();
+    for folder in ["", "skill-managers"] {
+        for file in std::fs::read_dir(built_in_folder().join(folder)).unwrap() {
+            let file = file.unwrap().path();
+            if !file.is_file() {
+                continue;
+            }
+            let text = std::fs::read_to_string(&file).unwrap();
+            for (line, block) in comment_blocks(&text) {
+                let lower = block.to_lowercase();
+                if UNCERTAIN.iter().any(|word| lower.contains(word)) {
+                    uncertain.push(format!("{}:{line}: {block}", file.display()));
+                }
+            }
+        }
+    }
+    assert_eq!(uncertain, Vec::<String>::new());
+}

@@ -119,6 +119,9 @@
         },
         "skill": {
           "$ref": "#/$defs/ItemRules"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false
@@ -136,6 +139,9 @@
       "items": {
         "$ref": "#/$defs/MachineFileDefinition"
       }
+    },
+    "unverified": {
+      "$ref": "#/$defs/Unverified"
     }
   },
   "additionalProperties": false,
@@ -157,6 +163,9 @@
         },
         "max": {
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -182,6 +191,9 @@
           "items": {
             "$ref": "#/$defs/DefinitionNote"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -237,6 +249,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -264,6 +279,9 @@
             "block": {
               "type": "string",
               "const": "exe-version"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -285,6 +303,9 @@
             "block": {
               "type": "string",
               "const": "appx-identity"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -310,6 +331,9 @@
             "block": {
               "type": "string",
               "const": "json-value"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -334,6 +358,9 @@
             "block": {
               "type": "string",
               "const": "uninstall-key"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -367,6 +394,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -396,6 +426,9 @@
             "block": {
               "type": "string",
               "const": "home"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -419,6 +452,9 @@
             "block": {
               "type": "string",
               "const": "project"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -438,6 +474,9 @@
             "block": {
               "type": "string",
               "const": "machine"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -457,6 +496,9 @@
             "block": {
               "type": "string",
               "const": "settings"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -480,6 +522,9 @@
             "block": {
               "type": "string",
               "const": "plugin"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -506,6 +551,9 @@
             "block": {
               "type": "string",
               "const": "entry"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -522,6 +570,9 @@
             "block": {
               "type": "string",
               "const": "project-file"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -540,6 +591,9 @@
             "block": {
               "type": "string",
               "const": "project-storage"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -635,6 +689,9 @@
               "type": "null"
             }
           ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false
@@ -656,6 +713,9 @@
             "block": {
               "type": "string",
               "const": "pid-named"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -680,6 +740,9 @@
             "block": {
               "type": "string",
               "const": "path"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -698,6 +761,9 @@
             "block": {
               "type": "string",
               "const": "env"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -740,6 +806,9 @@
             "block": {
               "type": "string",
               "const": "json-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -766,6 +835,11 @@
         "roots": {
           "description": "Named roots of the home, each a `/`-separated path relative to its\nfolder. The home is found when any root exists. An Agent home the\nuser adds is laid out like the definition's first home.",
           "type": "object",
+          "properties": {
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
           "additionalProperties": {
             "type": "string"
           }
@@ -800,6 +874,9 @@
           "description": "The home is the definition default, where the Agent keeps its\nconfiguration unless told otherwise. At most one home is, and its\nfolder is one fixed path. Any other home found through a fixed path\nor a search is found at a known location, and one an environment\nvariable names, through that variable.",
           "type": "boolean",
           "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -822,6 +899,9 @@
             "block": {
               "type": "string",
               "const": "unc-variable"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -851,6 +931,9 @@
         "source": {
           "description": "The id of the home it copies, one of the definition's `homes`.",
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -866,6 +949,9 @@
       "properties": {
         "id": {
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -887,6 +973,9 @@
           "items": {
             "$ref": "#/$defs/SettingsSource"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -916,6 +1005,9 @@
             "block": {
               "type": "string",
               "const": "registry-value"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -940,6 +1032,9 @@
             "block": {
               "type": "string",
               "const": "registry-key"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -967,6 +1062,9 @@
             "block": {
               "type": "string",
               "const": "files"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -991,6 +1089,9 @@
           "description": "Whether the Agent opens `.code-workspace` files: such a Project\nreads `project-file` locations in the file itself, and the other\nlocations in a Project in each of its member folders, the first\nmember ranking highest.",
           "type": "boolean",
           "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false
@@ -1020,6 +1121,9 @@
             "block": {
               "type": "string",
               "const": "json-keys"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1055,6 +1159,9 @@
             "block": {
               "type": "string",
               "const": "json-folders"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1102,6 +1209,9 @@
             "block": {
               "type": "string",
               "const": "sqlite-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1130,6 +1240,9 @@
             "block": {
               "type": "string",
               "const": "toml-keys"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1164,6 +1277,9 @@
             "block": {
               "type": "string",
               "const": "jsonl-heads"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1193,6 +1309,9 @@
             "block": {
               "type": "string",
               "const": "sqlite-column"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1273,6 +1392,9 @@
             "string",
             "null"
           ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -1327,6 +1449,9 @@
             "block": {
               "type": "string",
               "const": "json-plugin-records"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1381,6 +1506,9 @@
             "block": {
               "type": "string",
               "const": "plugin-folders"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1430,6 +1558,9 @@
             "block": {
               "type": "string",
               "const": "project-plugin-keys"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1471,6 +1602,9 @@
             "block": {
               "type": "string",
               "const": "plugin-cache"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1499,6 +1633,9 @@
         "version": {
           "description": "The field of a record that holds the version installed.",
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -1527,6 +1664,9 @@
         "kind": {
           "description": "What that field holds for a linked plugin.",
           "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -1585,6 +1725,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -1728,6 +1871,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -1755,6 +1901,9 @@
             "block": {
               "type": "string",
               "const": "json"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1770,6 +1919,9 @@
             "block": {
               "type": "string",
               "const": "toml"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1824,6 +1976,9 @@
             "block": {
               "type": "string",
               "const": "skill-folder"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1857,6 +2012,9 @@
             "block": {
               "type": "string",
               "const": "skill-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1889,6 +2047,9 @@
             "block": {
               "type": "string",
               "const": "manifest-skills"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1910,6 +2071,9 @@
             "block": {
               "type": "string",
               "const": "sqlite-json"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -1944,6 +2108,9 @@
             "block": {
               "type": "string",
               "const": "toml-fragments"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2043,6 +2210,9 @@
         "no_name": {
           "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
           "$ref": "#/$defs/SkillFallback"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2167,6 +2337,9 @@
             "block": {
               "type": "string",
               "const": "braces"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2231,6 +2404,9 @@
             "type": "string"
           },
           "default": []
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false
@@ -2298,6 +2474,11 @@
             "types": {
               "description": "The type of each field, when the Entry holds it.",
               "type": "object",
+              "properties": {
+                "unverified": {
+                  "$ref": "#/$defs/Unverified"
+                }
+              },
               "additionalProperties": {
                 "$ref": "#/$defs/FieldType"
               }
@@ -2310,6 +2491,9 @@
             "block": {
               "type": "string",
               "const": "fields"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2363,6 +2547,9 @@
             "block": {
               "type": "string",
               "const": "feature-gate"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2391,6 +2578,9 @@
             "block": {
               "type": "string",
               "const": "setting"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2484,6 +2674,9 @@
             "maxItems": 2
           },
           "default": []
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2514,6 +2707,9 @@
           "description": "Whether a list holds its highest text first, rather than last.",
           "type": "boolean",
           "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2532,6 +2728,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2590,6 +2789,9 @@
           "items": {
             "$ref": "#/$defs/Rule"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2617,6 +2819,9 @@
             "block": {
               "type": "string",
               "const": "exact-name"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2642,6 +2847,9 @@
             "block": {
               "type": "string",
               "const": "case-insensitive-name"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2663,6 +2871,9 @@
             "block": {
               "type": "string",
               "const": "path-key"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2696,6 +2907,9 @@
             "block": {
               "type": "string",
               "const": "same-url"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2712,6 +2926,9 @@
             "block": {
               "type": "string",
               "const": "never"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2737,6 +2954,9 @@
         },
         "default": {
           "description": "The value the Agent takes when no source holds the setting."
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -2804,6 +3024,9 @@
             "block": {
               "type": "string",
               "const": "deep-merge"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2856,6 +3079,9 @@
             "block": {
               "type": "string",
               "const": "overlay-fields"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -2974,6 +3200,9 @@
             "block": {
               "type": "string",
               "const": "json-name-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3058,6 +3287,9 @@
             "block": {
               "type": "string",
               "const": "json-field"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3132,6 +3364,9 @@
             "block": {
               "type": "string",
               "const": "json-item-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3167,6 +3402,9 @@
             "block": {
               "type": "string",
               "const": "json-path-rules"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3203,6 +3441,9 @@
             "block": {
               "type": "string",
               "const": "merged-field"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3225,6 +3466,9 @@
             "block": {
               "type": "string",
               "const": "park"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3291,6 +3535,9 @@
           "description": "Whether the Agent reads the switch, in a Project's file, only when it\nstarts in a folder its Item kind's folder-trust gates trust, such as\nGemini CLI, which ignores a Project's settings in a folder the user\nhas not trusted. Elsewhere it Disables nothing and Disable skips it.",
           "type": "boolean",
           "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -3397,6 +3644,9 @@
             "block": {
               "type": "string",
               "const": "managed-exclusive"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3430,6 +3680,9 @@
             "block": {
               "type": "string",
               "const": "approval-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3461,6 +3714,9 @@
             "block": {
               "type": "string",
               "const": "policy-field"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3516,6 +3772,9 @@
             "block": {
               "type": "string",
               "const": "trusted-folders"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3554,6 +3813,9 @@
             "block": {
               "type": "string",
               "const": "nonce-trust"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3594,6 +3856,9 @@
             "block": {
               "type": "string",
               "const": "approval-hash"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3634,6 +3899,9 @@
             "block": {
               "type": "string",
               "const": "project-trust"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3692,6 +3960,9 @@
             "block": {
               "type": "string",
               "const": "folder-trust"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3777,6 +4048,9 @@
             "block": {
               "type": "string",
               "const": "allow-deny-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3817,6 +4091,9 @@
             "block": {
               "type": "string",
               "const": "global-switch"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3860,6 +4137,9 @@
             "block": {
               "type": "string",
               "const": "identity-allowlist"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -3903,6 +4183,9 @@
             "string",
             "null"
           ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false
@@ -3958,6 +4241,9 @@
               "type": "null"
             }
           ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -4009,6 +4295,9 @@
             "block": {
               "type": "string",
               "const": "json-value"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -4061,6 +4350,9 @@
             "block": {
               "type": "string",
               "const": "sqlite-json"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -4107,6 +4399,9 @@
             "block": {
               "type": "string",
               "const": "env"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
             }
           },
           "additionalProperties": false,
@@ -4135,6 +4430,9 @@
             "type": "string"
           },
           "default": []
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -4171,6 +4469,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -4194,6 +4495,9 @@
           "description": "The values it may hold, such as the ways of signing in that fetch\nan organisation's controls.",
           "type": "array",
           "items": true
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
@@ -4228,11 +4532,31 @@
           "description": "Whether the Agent reads the file only while only an administrator\ncan change it and the folders above it, as Gemini CLI reads its\nsystem settings: otherwise its Entries are Unread, and nothing it\nholds is read.",
           "type": "boolean",
           "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
         }
       },
       "additionalProperties": false,
       "required": [
         "path"
+      ]
+    },
+    "Unverified": {
+      "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. It changes nothing the definition does.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "minItems": 1
+        }
       ]
     }
   }
