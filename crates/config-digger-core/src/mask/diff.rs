@@ -192,7 +192,7 @@ fn masked_lines(
     match secrets {
         Secrets::Locations(locations) => {
             for location in locations {
-                replacements.extend(secret_spans(location, text)?);
+                replacements.extend(secret_spans(location, locations, text)?);
             }
         }
         Secrets::Parked(definitions) => replacements.extend(parked_spans(definitions, text)?),
@@ -203,9 +203,11 @@ fn masked_lines(
 }
 
 /// Where each Secret of a location's Entries is in `text`, with what it is
-/// masked as.
+/// masked as, those of the fields `readers`, the locations that read the
+/// file, mark included.
 fn secret_spans(
     location: &LocationDefinition,
+    readers: &[&LocationDefinition],
     text: &str,
 ) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
     // A folder of skill folders is no file, and holds no Secret a diff shows.
@@ -225,7 +227,7 @@ fn secret_spans(
     let mut secrets = super::file_fields(location, &document);
     for object in objects {
         for found in object.entries {
-            let masked = super::entry(location, found.value);
+            let masked = super::entry_read_by(location, readers, found.value);
             for relative in &masked.key_paths {
                 let mut key_path = object.key_path.clone();
                 key_path.push(found.key.clone());

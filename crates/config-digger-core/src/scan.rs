@@ -834,6 +834,7 @@ pub(crate) fn scan_as_if(
         reader: Reader::new(&as_if, written),
         projects: Projects::new(ports),
         entries: Vec::new(),
+        unmasked: Vec::new(),
         readers: Vec::new(),
         storage: Vec::new(),
         cached: BTreeMap::new(),
@@ -995,6 +996,7 @@ pub(crate) fn scan_as_if(
         }
     }
 
+    scanner.mask_entries(definitions);
     let (parked_store, parked) = scanner.read_parked(definitions, &found, ports);
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
@@ -2367,6 +2369,10 @@ struct Scanner<'p> {
     reader: Reader<'p>,
     projects: Projects<'p>,
     entries: Vec<ScannedEntry>,
+    /// The indices in `entries` of the Entries whose `config` is still their
+    /// real value: they are masked once every location is read, when every
+    /// location that reads their file is known.
+    unmasked: Vec<usize>,
     readers: Vec<LocationReader>,
     /// The folder an Agent home keeps for each Project, as its registry
     /// of such folders records it.
@@ -2960,7 +2966,7 @@ impl Scanner<'_> {
         if location.one_entry {
             // Named by its plugin, once read.
             if let Some(value) = lookup(&document, &location.root) {
-                let masked = mask::entry(location, value);
+                self.unmasked.push(self.entries.len());
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
@@ -2969,8 +2975,8 @@ impl Scanner<'_> {
                     key_path: location.root.clone(),
                     name: String::new(),
                     project,
-                    config: masked.value,
-                    masked: masked.key_paths,
+                    config: value.clone(),
+                    masked: Vec::new(),
                     depth,
                     defect: None,
                     link: None,
@@ -3178,6 +3184,27 @@ impl Scanner<'_> {
         }
     }
 
+    /// Masks the Secrets of each Entry read so far whose `config` is still
+    /// its real value, those of the fields any location that reads its file
+    /// marks included, so that every Agent's view of the file masks them.
+    fn mask_entries(&mut self, definitions: &Definitions) {
+        let mut readers: BTreeMap<&Path, Vec<&LocationDefinition>> = BTreeMap::new();
+        for reader in &self.readers {
+            let location = definitions[reader.agent_index].location(&reader.location);
+            readers.entry(&reader.path).or_default().push(location);
+        }
+        for index in self.unmasked.drain(..) {
+            let entry = &mut self.entries[index];
+            let location = definitions[entry.agent_index].location(&entry.location);
+            let readers = readers
+                .get(entry.path.as_path())
+                .map_or(&[][..], Vec::as_slice);
+            let masked = mask::entry_read_by(location, readers, &entry.config);
+            entry.config = masked.value;
+            entry.masked = masked.key_paths;
+        }
+    }
+
     /// Records that `location` reads the file or folder at `path`.
     fn add_reader(&mut self, home: &FoundHome, location: &LocationDefinition, path: &Path) {
         let reader = LocationReader {
@@ -3265,7 +3292,7 @@ impl Scanner<'_> {
             for found in object.entries {
                 let mut key_path = object.key_path.clone();
                 key_path.push(found.key);
-                let masked = mask::entry(location, found.value);
+                self.unmasked.push(self.entries.len());
                 self.entries.push(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
@@ -3274,8 +3301,8 @@ impl Scanner<'_> {
                     key_path,
                     name: found.name,
                     project: project.clone(),
-                    config: masked.value,
-                    masked: masked.key_paths,
+                    config: found.value.clone(),
+                    masked: Vec::new(),
                     depth,
                     defect: None,
                     link: None,
