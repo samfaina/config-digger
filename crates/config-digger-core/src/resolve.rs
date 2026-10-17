@@ -480,17 +480,31 @@ pub(crate) fn resolve(
                         .iter()
                         .filter(|hit| hit.state == api::State::Disabled)
                         .collect();
+                    // The switches of managed policy that turn it off.
+                    let by_policy: Vec<&Hit> = disabling
+                        .iter()
+                        .filter(|hit| hit.mechanism.policy())
+                        .collect();
+                    let policy_check = checks.contains(&Check::Policy);
                     // Each check the Entry fails, in the Agent's order.
                     let mut failed: Vec<(Check, api::State, api::Reason)> = Vec::new();
                     for &check in checks {
                         match check {
-                            Check::Policy | Check::Approval | Check::Trust | Check::Rules => failed
-                                .extend(
+                            Check::Policy | Check::Approval | Check::Trust | Check::Rules => {
+                                failed.extend(
                                     kept[index]
                                         .iter()
                                         .filter(|(known, _, _)| *known == check)
                                         .cloned(),
-                                ),
+                                );
+                                if check == Check::Policy {
+                                    failed.extend(
+                                        by_policy.iter().map(|hit| {
+                                            (check, hit.state(), hit.reason(agent_name))
+                                        }),
+                                    );
+                                }
+                            }
                             Check::Disable => {
                                 if let Some(parked) = parked[index] {
                                     failed.push((
@@ -508,15 +522,14 @@ pub(crate) fn resolve(
                                         },
                                     ));
                                 }
-                                // A switch of managed policy Blocks.
-                                failed.extend(disabling.iter().map(|hit| {
-                                    let state = if hit.mechanism.policy() {
-                                        api::State::Blocked
-                                    } else {
-                                        api::State::Disabled
-                                    };
-                                    (check, state, hit.reason(agent_name))
-                                }));
+                                // A switch of managed policy Blocks, at the
+                                // policy check when the Agent has one.
+                                failed.extend(
+                                    disabling
+                                        .iter()
+                                        .filter(|hit| !(hit.mechanism.policy() && policy_check))
+                                        .map(|hit| (check, hit.state(), hit.reason(agent_name))),
+                                );
                                 // A field that turns the built server off
                                 // turns off every Entry that could take part.
                                 if let Some(off) = merged
@@ -749,7 +762,7 @@ pub(crate) fn resolve(
                         .filter(|_| state == api::State::Disabled)
                         .map(|off| explain::turned_off_enable(&off.field, &off.switch));
                     // What managed policy turns off, Enable never lifts.
-                    let by_policy = disabling.iter().any(|hit| hit.mechanism.policy());
+                    let by_policy = !by_policy.is_empty();
                     let enable = match mirrored
                         .or_else(|| rules::enable_not_offered(&by_rule))
                         .or(turned_off)

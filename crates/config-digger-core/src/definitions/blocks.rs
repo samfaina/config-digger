@@ -1063,7 +1063,7 @@ impl SettingsSource {
     pub fn user_writable(&self) -> bool {
         match self {
             SettingsSource::RegistryValue(block) => block.user_writable,
-            SettingsSource::RegistryKey(block) => block.user_writable,
+            SettingsSource::RegistryKey(_) => false,
             SettingsSource::Files(block) => block.user_writable,
         }
     }
@@ -1081,10 +1081,6 @@ pub(crate) struct RegistryKeySource {
     pub hive: RegistryHive,
     /// The key below the hive, `\`-separated.
     pub key: String,
-    /// Whether the user can write it, so that the Agent never merges it
-    /// with another source.
-    #[serde(default)]
-    pub user_writable: bool,
 }
 
 impl Validate for RegistryKeySource {

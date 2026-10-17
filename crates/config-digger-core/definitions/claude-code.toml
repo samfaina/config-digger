@@ -74,9 +74,9 @@ plugins = ".claude/plugins"
 
 # The settings an organisation deploys, highest first [docs]. The cache of
 # server-managed settings, which claude.ai or a gateway delivers, ranks
-# above them all. Claude Code reads them only from the first source that
-# holds a setting, a key other than the two control keys. When the highest
-# source that holds a control key or a setting sets
+# above them all [docs]. Claude Code reads them only from the first source
+# that holds a setting, a key other than the two control keys [docs]. When
+# the highest source that holds a control key or a setting sets
 # `managedSourcesBehavior = "merge"`, it merges that source with every
 # admin source below it that holds a setting: a higher source's value
 # wins, and lists combine [docs]. The HKCU value is user-writable: it
@@ -672,7 +672,7 @@ locations = ["plugin-skills"]
 # managed, local, Project, user, and a higher file's variable wins [docs].
 # The managed `env` is read from every admin source, drop-ins included,
 # whichever source supplies the other managed settings [docs]. A Project's
-# settings bypass the cache in that Project alone. A Claude apps gateway
+# settings bypass the cache in that Project alone [docs]. A Claude apps gateway
 # session also skips the fetch, which nothing on disk shows.
 [[feature_gates]]
 name = "tengu_claudeai_skills_sync_enabled"

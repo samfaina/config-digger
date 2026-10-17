@@ -371,11 +371,15 @@ pub(crate) struct SettingsDefinition {
     pub merge: Option<MergeKey>,
 }
 
-/// A top-level key and the value it holds to turn something on.
+/// The control key that has the Agent merge sources of settings, and the
+/// value that turns merging on.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MergeKey {
+    /// A top-level key, one of the settings' `control_keys`, such as
+    /// `managedSourcesBehavior`.
     pub key: String,
+    /// The value it holds while the Agent merges, such as `"merge"`.
     pub value: serde_json::Value,
 }
 

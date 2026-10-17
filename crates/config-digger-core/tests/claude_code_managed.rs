@@ -1123,3 +1123,54 @@ fn merging_takes_an_allow_list_whole_from_the_highest_source_holding_one() {
         pair("blocked", "policy")
     );
 }
+
+#[test]
+fn a_source_holding_only_control_keys_holds_no_setting() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({ "wslInheritsWindowsSettings": true })),
+    );
+    let env = env().with_registry_value(
+        Hive::LocalMachine,
+        POLICIES,
+        "Settings",
+        &managed_server("wiki", "https://mcp.corp.example/wiki"),
+    );
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    assert_eq!(state_and_code(&inventory, "wiki"), pair("effective", ""));
+}
+
+#[test]
+fn merging_ranks_a_higher_source_over_the_drop_ins_below_it() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({
+            "managedSourcesBehavior": "merge",
+            "managedMcpServers": { "wiki": { "type": "http", "url": "https://mcp.corp.example/wiki" } },
+        })),
+    )
+    .with_file(
+        in_program_files(r"ClaudeCode\managed-settings.d\10-wiki.json"),
+        managed_server("wiki", "https://mcp.corp.example/wiki-v2"),
+    );
+
+    let inventory = inventory(&fs);
+
+    let wiki = server(&inventory, "wiki");
+    assert_eq!(
+        states(wiki),
+        [
+            (
+                r"C:\Users\fixture\.claude\remote-settings.json#managedMcpServers.wiki".to_owned(),
+                "effective".to_owned()
+            ),
+            (
+                r"C:\Program Files\ClaudeCode\managed-settings.d\10-wiki.json#managedMcpServers.wiki"
+                    .to_owned(),
+                "shadowed".to_owned()
+            ),
+        ]
+    );
+}

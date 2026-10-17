@@ -675,3 +675,18 @@ fn a_projects_settings_env_yields_to_the_managed_env() {
     let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
     assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
 }
+
+#[test]
+fn a_variable_in_the_remote_settings_env_bypasses_the_cache() {
+    let fs = claude_home(&cached(json!(false))).with_file(
+        in_home(r".claude\remote-settings.json"),
+        json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_assumed"),
+        bypassed_by("DISABLE_TELEMETRY")
+    );
+}

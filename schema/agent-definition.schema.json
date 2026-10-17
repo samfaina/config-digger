@@ -1053,11 +1053,6 @@
               "description": "The key below the hive, `\\`-separated.",
               "type": "string"
             },
-            "user_writable": {
-              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source.",
-              "type": "boolean",
-              "default": false
-            },
             "block": {
               "type": "string",
               "const": "registry-key"
@@ -1110,13 +1105,16 @@
       ]
     },
     "MergeKey": {
-      "description": "A top-level key and the value it holds to turn something on.",
+      "description": "The control key that has the Agent merge sources of settings, and the\nvalue that turns merging on.",
       "type": "object",
       "properties": {
         "key": {
+          "description": "A top-level key, one of the settings' `control_keys`, such as\n`managedSourcesBehavior`.",
           "type": "string"
         },
-        "value": true,
+        "value": {
+          "description": "The value it holds while the Agent merges, such as `\"merge\"`."
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }

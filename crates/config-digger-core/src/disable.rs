@@ -3,7 +3,7 @@
 //! and what Enable lifts. Disable never writes a git-versioned file, so a
 //! switch in one is skipped for the next mechanism.
 
-use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
+use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
     MechanismTarget, MergedField, Switched,
@@ -53,7 +53,17 @@ impl Hit<'_> {
         locator::render(&self.switch.path, &self.key_path)
     }
 
-    /// Why the Entry is Disabled, as its State's reason.
+    /// The State the switch gives the Entry: Blocked for managed policy,
+    /// Disabled otherwise.
+    pub fn state(&self) -> State {
+        if self.mechanism.policy() {
+            State::Blocked
+        } else {
+            State::Disabled
+        }
+    }
+
+    /// Why the Entry is Disabled, or Blocked by policy, as its State's reason.
     pub fn reason(&self, agent_name: &str) -> Reason {
         let holds = self.holds();
         if self.mechanism.policy() {

@@ -845,3 +845,56 @@ fn of_merged_managed_sources_the_highest_holding_a_plugin_decides() {
     let context7 = entry_at(&inventory, &path, &["mcpServers", "context7"]);
     assert_eq!(code(context7.state), "blocked");
 }
+
+#[test]
+fn disable_of_a_plugin_the_managed_settings_force_on_is_refused() {
+    let core = with_managed_plugins(json!({ "superpowers@claude-plugins-official": true }));
+
+    let refused = plan(
+        &core,
+        &Context::default(),
+        Action::Disable,
+        &["superpowers:brainstorming"],
+    );
+
+    assert!(refused.is_err(), "Disable was planned");
+}
+
+#[test]
+fn a_plugin_forced_off_is_blocked_before_its_servers_shape_is_checked() {
+    let path = in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json");
+    let fs = fixture()
+        .with_file(
+            &path,
+            json!({ "mcpServers": { "context7": { "type": "http" } } }).to_string(),
+        )
+        .with_file(
+            managed_settings(),
+            json!({ "enabledPlugins": { "context7@claude-plugins-official": false } }).to_string(),
+        );
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
+        .with_var("ProgramFiles", PROGRAM_FILES);
+    let core = Core::new(fake::ports(fs, env)).unwrap();
+
+    let inventory = inventory(&core, &Context::default());
+
+    let entry = entry_json(entry_at(&inventory, &path, &["mcpServers", "context7"]));
+    assert_eq!(entry["state"], "blocked");
+    assert_eq!(entry["reason"]["code"], "policy");
+    assert_eq!(entry["secondary"][0]["code"], "malformed_entry");
+}
+
+#[test]
+fn remote_settings_force_a_plugin_off_as_the_one_managed_source() {
+    let fs = fixture().with_file(
+        PathBuf::from(HOME).join(r".claude\remote-settings.json"),
+        json!({ "enabledPlugins": { "supabase@claude-plugins-official": false } }).to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    let entry = entry_json(&item(&inventory, "plugin:supabase:supabase").entries[0]);
+    assert_eq!(entry["state"], "blocked");
+    assert_eq!(entry["reason"]["code"], "policy");
+}
