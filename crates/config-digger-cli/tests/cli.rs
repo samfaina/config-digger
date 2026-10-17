@@ -2406,7 +2406,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     );
     let native = harness.path(r".local\bin\claude.exe");
     std::fs::create_dir_all(native.parent().unwrap()).unwrap();
-    std::fs::write(&native, executable(Some([2, 1, 290, 0]))).unwrap();
+    std::fs::write(&native, executable(Some([2, 1, 310, 0]))).unwrap();
 
     let json = harness.run(&["agents", "--json"]);
     let text = harness.run(&["agents", "--wide"]);
@@ -2415,10 +2415,10 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     let agent = &json.document()["agents"][0];
     assert_eq!(
         agent["tested"],
-        json!({ "min": "2.1.286", "max": "2.1.286" })
+        json!({ "min": "2.1.286", "max": "2.1.302" })
     );
     let home = &agent["homes"][0];
-    assert_eq!(home["installations"][0]["version"], "2.1.290");
+    assert_eq!(home["installations"][0]["version"], "2.1.310");
     assert_eq!(home["installations"][0]["out_of_range"], true);
     assert_eq!(home["last_ran"], "2.1.284");
     assert_eq!(home["notes"][0]["code"], "version_outside_tested_range");
@@ -2430,7 +2430,13 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     let row: Vec<&str> = lines[2].split_whitespace().collect();
     assert_eq!(
         row[..5],
-        ["default", "definition", "default", "2.1.290!", "2.1.286"]
+        [
+            "default",
+            "definition",
+            "default",
+            "2.1.310!",
+            "2.1.286-2.1.302"
+        ]
     );
     assert!(
         text.stdout.contains("Last ran with 2.1.284."),
@@ -2439,7 +2445,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     );
     assert!(
         text.stdout.contains(
-            "Claude Code 2.1.290 is newer than the versions this definition was tested with (2.1.286)."
+            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.286 to 2.1.302)."
         ),
         "{}",
         text.stdout
@@ -2462,7 +2468,13 @@ fn agents_says_when_no_installation_is_found_and_still_exits_0() {
         .collect();
     assert_eq!(
         row[..5],
-        ["default", "definition", "default", "none", "2.1.286"]
+        [
+            "default",
+            "definition",
+            "default",
+            "none",
+            "2.1.286-2.1.302"
+        ]
     );
     assert!(
         text.stdout

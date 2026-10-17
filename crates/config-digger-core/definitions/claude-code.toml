@@ -1,9 +1,9 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Claude Code. Facts from docs/research/claude-code.md
-# (verified against 2.1.286).
+# (verified against 2.1.286 to 2.1.302).
 
 format_version = 1
-verified = { min = "2.1.286", max = "2.1.286" }
+verified = { min = "2.1.286", max = "2.1.302" }
 
 [agent]
 id = "claude-code"
@@ -28,7 +28,8 @@ versions = [{ block = "json-value", file = "node_modules/@anthropic-ai/claude-co
 
 # The copy Claude Desktop downloads, one folder per version, for its classic
 # install [docs] and virtualised into its MSIX package [disk]. 2.1.284 sat in
-# its version folder; 2.1.286 sits one hash-named folder further down [disk].
+# its version folder; 2.1.286 and 2.1.299 sit one hash-named folder further
+# down [disk].
 [[installations]]
 id = "claude-desktop"
 folder = "%APPDATA%/Claude/claude-code/{*,*/*}"
@@ -50,8 +51,7 @@ key_path = ["lastReleaseNotesSeen"]
 # The native Installation runs as `claude.exe` from `~/.local/bin`. Claude
 # Desktop is also `claude.exe`, so the path tells them apart. Each running
 # session keeps `~/.claude/sessions/<pid>.json`, which also covers an npm
-# Installation in `node.exe`; only its name is read, since it holds a
-# `peerToken`.
+# Installation in `node.exe`; only its name is read.
 [process]
 images = ["claude.exe"]
 paths = ["~/.local/bin/claude.exe"]
@@ -282,10 +282,14 @@ checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
 # names in `enabledMcpjsonServers`, or `enableAllProjectMcpServers: true`,
 # in any settings file [docs, disk], and in the Project's state in
 # `~/.claude.json` [docs]. `disabledMcpjsonServers` wins over an approval
-# [docs], so it is checked first.
+# [docs], so it is checked first. Since 2.1.299 a list written as one
+# plain-string name no longer voids its settings file [docs].
 [[items.mcp.gates]]
 block = "approval-list"
-unverified = "A Project's state in `~/.claude.json` also holds `enableAllProjectMcpServers`."
+unverified = [
+  "A Project's state in `~/.claude.json` also holds `enableAllProjectMcpServers`.",
+  "What Claude Code reads from an `enabledMcpjsonServers` written as one plain-string name is not known: it is taken to approve nothing.",
+]
 locations = ["project-mcp"]
 prompt = "on-start"
 sources = [
@@ -360,6 +364,7 @@ reason = "disabled_by_name"
 # name [docs]. The local settings file is the one meant to stay out of git.
 [[items.mcp.disable]]
 block = "json-name-list"
+unverified = "What Claude Code reads from a `disabledMcpjsonServers` written as one plain-string name is not known: it is taken to skip nothing."
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
 target = "name"
 context = "project"
@@ -383,6 +388,7 @@ locations = ["project-mcp"]
 # second applies in every Project.
 [[items.mcp.disable]]
 block = "json-name-list"
+unverified = "What Claude Code reads from a `disabledMcpjsonServers` written as one plain-string name is not known: it is taken to skip nothing."
 switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
 target = "name"
 context = "project"
@@ -393,6 +399,7 @@ enable_offered = false
 
 [[items.mcp.disable]]
 block = "json-name-list"
+unverified = "What Claude Code reads from a `disabledMcpjsonServers` written as one plain-string name is not known: it is taken to skip nothing."
 switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
 target = "name"
 context = "all"
@@ -541,9 +548,18 @@ when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 # Enterprise beats personal, and personal beats project [docs]. A local
 # skill beats a synced one, which then answers only to
 # `/anthropic-skills:<name>` [docs]. Claude Code skips a skill it cannot
-# load before they compete.
+# load before they compete. It ignores a frontmatter `name` over 256
+# characters since 2.1.292 [docs]. Since 2.1.299 it skips a skill whose
+# folder name holds hidden, direction-changing or blank-like characters,
+# `<` or `>`, and ignores such a `name` [docs]. The same check refuses a
+# name over 256 characters, a space at either end or next to a `:`, and a
+# leading or trailing `:`, while the gate `tengu_slate_wicket` is on, as it
+# is by default [binary]. config-digger does not check this yet (#171).
 [items.skill]
-unverified = "Whether Claude Code rewrites a skill name that is not lower case and hyphens is not known: names are used as written."
+unverified = [
+  "Whether Claude Code rewrites a skill name that is not lower case and hyphens is not known: names are used as written.",
+  "Which characters Claude Code's 2.1.299 name rule refuses is known from its changelog and binary alone: every skill is taken to pass it.",
+]
 precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence", "rules"]

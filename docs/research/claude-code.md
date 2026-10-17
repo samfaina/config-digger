@@ -2,11 +2,12 @@
 
 Issue: [#8](https://github.com/samfaina/config-digger/issues/8). Terms follow [`CONTEXT.md`](../../CONTEXT.md).
 
-Verified against Claude Code **2.1.286** (native install, `installMethod: "native"`) on Windows 11, home `C:\Users\kgon1`, on 2026-10-01. Each fact is tagged:
+Verified against Claude Code **2.1.286** (native install, `installMethod: "native"`) on Windows 11, home `C:\Users\kgon1`, on 2026-10-01, and re-checked against **2.1.302** on 2026-10-17 ([§10](#10-re-check-against-21302)). Each fact is tagged:
 
 - **[disk]**: verified on disk, read-only
 - **[docs]**: stated by the docs and not observable on this machine
 - **[contradicts docs]**: what's on disk differs from or goes beyond what the docs say
+- **[binary]**: read from the strings of the installed `claude.exe`
 
 Secret values are never reproduced. Where one would appear, the text shows only the key name or `***`.
 
@@ -246,6 +247,22 @@ For Remove, the native commands are `claude mcp remove`, `claude plugin uninstal
 | CLI binary | `~/.local/bin/claude` → symlink into `~/.local/share/claude/versions/` | same | [setup](https://code.claude.com/docs/en/setup) |
 | path-list separator (`CLAUDE_CODE_PLUGIN_DIRS`, `CLAUDE_CODE_PLUGIN_SEED_DIR`) | `:` | `:` (Windows: `;`) | [env-vars](https://code.claude.com/docs/en/env-vars) |
 | plugin component paths containing `\` | rejected | rejected (they load on Windows only) | [plugin loading](https://code.claude.com/docs/en/plugins/loading) |
+
+## 10. Re-check against 2.1.302
+
+Issue: [#101](https://github.com/samfaina/config-digger/issues/101). On 2026-10-17 the facts in `claude-code.toml` were re-checked against the [changelog](https://code.claude.com/docs/en/changelog) entries for 2.1.287 to 2.1.302, the 2.1.302 binary's settings schema and messages, and this machine's files [disk].
+
+**Unchanged.** The native Installation still runs as `%USERPROFILE%\.local\bin\claude.exe`, with 2.1.296, 2.1.301 and 2.1.302 under `versions\`. Claude Desktop's MSIX copy of 2.1.299 sits at `claude-code\2.1.299\<hash>\claude.exe`, as 2.1.286 did. `lastReleaseNotesSeen` reads `2.1.302`. `projects` still holds `mcpServers`, `disabledMcpServers`, `enabledMcpjsonServers` and `disabledMcpjsonServers` per Project. `installed_plugins.json` is still `version: 2` with the same record fields, and superseded versions still carry `.orphaned_at`. Synced skills still sit at `skills\synced\<uuid>_<uuid>\<name>\`, next to `manifest.json`, `.last-complete-round` and `.staging\`. An empty `.bucket-<uuid>_<uuid>` file now sits beside the `<uuid>_<uuid>` folder; it is not a folder, so it is never read as one. `cachedGrowthBookFeatures` and `cachedGrowthBookFeaturesAt` are still in `~/.claude.json`, and `tengu_claudeai_skills_sync_enabled` is `true` here [disk]. The settings schema still types `enabledMcpjsonServers` and `disabledMcpjsonServers` as lists of strings [binary].
+
+**Changed:**
+
+- **Skill names (2.1.299).** "Changed skill and command loading: one whose file or folder name has hidden, direction-changing or blank-like characters, `<` or `>` is no longer offered until renamed; such a `name:` is ignored" ([changelog](https://code.claude.com/docs/en/changelog)). 2.1.292 already ignored a skill's `name` over 256 characters ([changelog](https://code.claude.com/docs/en/changelog)) [docs]. In the binary, the check warns "a name may not hold hidden, direction-changing or blank-like characters, < or >, or be over 256 characters". It also refuses a space at either end, a space next to a `:`, and a leading or trailing `:`. The strict check applies while the GrowthBook gate `tengu_slate_wicket` is on, which it is by default; the gate is absent from this machine's cache [binary, disk]. config-digger does not model this yet, so the definition marks it `unverified` ([#171](https://github.com/samfaina/config-digger/issues/171)).
+- **Plain-string MCP approval lists (2.1.299).** "Fixed a settings file being ignored when `enabledMcpjsonServers` or `disabledMcpjsonServers` held a single server name (letters, digits, - or _) as a plain string" ([changelog](https://code.claude.com/docs/en/changelog)). config-digger reads such a value as naming nothing, which the definition marks `unverified` ([#172](https://github.com/samfaina/config-digger/issues/172)).
+- **Session files.** `sessions\<pid>.json` no longer holds `peerToken` or `procStartFt`. Its keys now include `pid`, `procStart`, `sessionId`, `cwd`, `kind`, `status` and `version`, and a `<pid>.<hash>.key` file still sits beside it [disk]. config-digger reads only the file name, so nothing changes.
+
+2.1.290 "Fixed skills not being found when asked for by the name in SKILL.md when their folder has a different name …: the skill listing now shows both names" ([changelog](https://code.claude.com/docs/en/changelog)) [docs]. That is how a skill is invoked, not which of two same-named skills wins, so the definition still names a skill by its frontmatter `name`. Whether the folder name also competes belongs to [#105](https://github.com/samfaina/config-digger/issues/105).
+
+Nothing else in the range touches a location, format, Disable switch or skill rule the definition reads. Other changes include `disableClaudeAiConnectors` and `allowedMcpServers` URL rules now applying to `.mcp.json` and plugin servers (2.1.290), which the definition already assumed, and plugin installs at project or local Scope no longer adding a second record when only the drive letter's case differs (2.1.295). `verified` is raised to `2.1.286`–`2.1.302`.
 
 ## Sources
 
