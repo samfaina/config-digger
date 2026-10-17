@@ -88,14 +88,14 @@ pub(crate) fn entry(location: &LocationDefinition, value: &Value) -> Masked {
     entry_read_by(location, &[], value)
 }
 
-/// An Entry of `location` with every Secret masked, those of the fields
-/// that `readers`, the locations that read its file, mark included.
+/// An Entry of `location` with every Secret masked, including those that
+/// `reading`, the locations that read its file, mark.
 pub(crate) fn entry_read_by(
     location: &LocationDefinition,
-    readers: &[&LocationDefinition],
+    reading: &[&LocationDefinition],
     value: &Value,
 ) -> Masked {
-    let rules = Rules::new(location, readers);
+    let rules = Rules::new(location, reading);
     let mut masked = Masked {
         value: value.clone(),
         key_paths: Vec::new(),
@@ -189,9 +189,9 @@ struct Rules<'d> {
 }
 
 impl<'d> Rules<'d> {
-    fn new(location: &'d LocationDefinition, readers: &[&'d LocationDefinition]) -> Self {
+    fn new(location: &'d LocationDefinition, reading: &[&'d LocationDefinition]) -> Self {
         let secrets = std::iter::once(location)
-            .chain(readers.iter().copied())
+            .chain(reading.iter().copied())
             .map(|location| &location.secrets)
             .collect();
         Rules { location, secrets }

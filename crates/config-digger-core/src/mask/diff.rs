@@ -8,7 +8,7 @@ use crate::definitions::blocks::{JsonFormat, Parse};
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{self, Syntax};
 use crate::park;
-use crate::scan::{self, LocationReader};
+use crate::scan::{self, LocationReader, locations_reading};
 use serde_json::Value;
 use similar::{DiffOp, DiffTag, TextDiff};
 use std::ops::Range;
@@ -40,30 +40,41 @@ pub(crate) fn diff(
 ) -> FileDiff {
     let locations: Vec<&LocationDefinition> = readers
         .iter()
-        .map(|reader| definitions[reader.agent_index].location(&reader.location))
+        .map(|reader| reader.location(definitions))
         .collect();
     masked_diff(path, before, after, &Secrets::Locations(locations))
 }
 
 /// A diff from `before` to `after` of the parked-Entry store at `path`, with
 /// every Secret of each parked Entry masked on both sides, as the location it
-/// was parked from masks it. Every text value of a parked Entry whose Agent
-/// or location is not loaded is masked.
+/// was parked from masks it, with what the locations of `readers` that read
+/// its file mark. Every text value of a parked Entry whose Agent or location
+/// is not loaded is masked.
 pub(crate) fn diff_parked(
     definitions: &[AgentDefinition],
+    readers: &[LocationReader],
     path: &Path,
     before: Side,
     after: Side,
 ) -> FileDiff {
-    masked_diff(path, before, after, &Secrets::Parked(definitions))
+    let secrets = Secrets::Parked {
+        definitions,
+        readers,
+    };
+    masked_diff(path, before, after, &secrets)
 }
 
 /// Where the Secrets of a file are found.
 enum Secrets<'d> {
     /// In the Entries of the locations that read it.
     Locations(Vec<&'d LocationDefinition>),
-    /// In the Entries parked in it: it is the parked-Entry store.
-    Parked(&'d [AgentDefinition]),
+    /// In the Entries parked in it: it is the parked-Entry store. `readers`
+    /// are every location read, those of the files the Entries were parked
+    /// from among them.
+    Parked {
+        definitions: &'d [AgentDefinition],
+        readers: &'d [LocationReader],
+    },
 }
 
 /// A diff from `before` to `after` of the file at `path`, with each
@@ -195,7 +206,10 @@ fn masked_lines(
                 replacements.extend(secret_spans(location, locations, text)?);
             }
         }
-        Secrets::Parked(definitions) => replacements.extend(parked_spans(definitions, text)?),
+        Secrets::Parked {
+            definitions,
+            readers,
+        } => replacements.extend(parked_spans(definitions, readers, text)?),
     }
     replacements.sort_by_key(|(range, _)| (range.start, range.end));
     replacements.dedup_by(|later, earlier| later.0.start < earlier.0.end);
@@ -203,11 +217,11 @@ fn masked_lines(
 }
 
 /// Where each Secret of a location's Entries is in `text`, with what it is
-/// masked as, those of the fields `readers`, the locations that read the
-/// file, mark included.
+/// masked as, including those that `reading`, the locations that read the
+/// file, mark.
 fn secret_spans(
     location: &LocationDefinition,
-    readers: &[&LocationDefinition],
+    reading: &[&LocationDefinition],
     text: &str,
 ) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
     // A folder of skill folders is no file, and holds no Secret a diff shows.
@@ -227,7 +241,7 @@ fn secret_spans(
     let mut secrets = super::file_fields(location, &document);
     for object in objects {
         for found in object.entries {
-            let masked = super::entry_read_by(location, readers, found.value);
+            let masked = super::entry_read_by(location, reading, found.value);
             for relative in &masked.key_paths {
                 let mut key_path = object.key_path.clone();
                 key_path.push(found.key.clone());
@@ -250,9 +264,11 @@ fn secret_spans(
 }
 
 /// Where each Secret of the Entries parked in the store whose text is `text`
-/// is, with what it is masked as.
+/// is, with what it is masked as, including those the locations of
+/// `readers` that read the file an Entry was parked from mark.
 fn parked_spans(
     definitions: &[AgentDefinition],
+    readers: &[LocationReader],
     text: &str,
 ) -> Result<Vec<(Range<usize>, String)>, Unparsed> {
     let format = JsonFormat::STRICT;
@@ -264,12 +280,15 @@ fn parked_spans(
         .parse(text)
         .map_err(|error| unparsed(error.position))?;
     let mut secrets: Vec<(Vec<String>, Value)> = Vec::new();
-    for (id, value, location) in park::raw_entries(&document, definitions) {
+    for (id, value, location, origin) in park::raw_entries(&document, definitions) {
         let mut at = park::key_path(id);
         at.push(park::ENTRY.to_owned());
         let masked: Vec<(Vec<String>, Value)> = match location {
             Some(location) => {
-                let masked = super::entry(location, value);
+                let reading = origin
+                    .map(|origin| locations_reading(definitions, readers, origin))
+                    .unwrap_or_default();
+                let masked = super::entry_read_by(location, &reading, value);
                 masked
                     .key_paths
                     .iter()

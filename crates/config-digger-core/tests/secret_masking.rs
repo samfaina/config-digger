@@ -228,15 +228,18 @@ const TWO_SERVERS: &str = r#"{
 }
 "#;
 
-fn plan_remove(fs: &FakeFileSystem, selector: &str) -> Plan {
-    let core = core(fs);
+fn plan_with(core: &Core, action: Action, selector: &str) -> Plan {
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
     };
-    core.plan(&snapshot, &Context::default(), Action::Remove, &targets)
+    core.plan(&snapshot, &Context::default(), action, &targets)
         .unwrap()
+}
+
+fn plan_remove(fs: &FakeFileSystem, selector: &str) -> Plan {
+    plan_with(&core(fs), Action::Remove, selector)
 }
 
 #[test]
@@ -569,12 +572,16 @@ fn context7_in_claude_code_and_cursor(servers: Value) -> FakeFileSystem {
         )
 }
 
-fn inventory_with_cursor(fs: &FakeFileSystem) -> Inventory {
-    let env = FakeEnvironment::with_home(HOME)
+/// An environment where Cursor and Claude Desktop find their folders too.
+fn app_data_env() -> FakeEnvironment {
+    FakeEnvironment::with_home(HOME)
         .with_var("APPDATA", APP_DATA)
         .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
-        .with_var("USERPROFILE", HOME);
-    let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
+        .with_var("USERPROFILE", HOME)
+}
+
+fn inventory_with_cursor(fs: &FakeFileSystem) -> Inventory {
+    let core = Core::new(fake::ports(fs.clone(), app_data_env())).unwrap();
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
     core.resolve(&snapshot, &Context::default())
 }
@@ -669,35 +676,26 @@ const AUTH_SERVERS: &str = r#"{
 }
 "#;
 
-/// A core that loads [`MARKS_CLAUDE_JSON`] through `--definitions`, over
-/// `~/.claude.json` holding [`AUTH_SERVERS`].
-fn core_with_marker() -> Core {
+/// A core that loads the definition `marker` through `--definitions`, over
+/// the file at `path` holding `text`.
+fn core_with_marker(path: PathBuf, text: &str, marker: &str) -> Core {
     let fs = FakeFileSystem::new()
-        .with_file(claude_json(), AUTH_SERVERS)
-        .with_file(
-            PathBuf::from(DEFINITIONS).join("marker.toml"),
-            MARKS_CLAUDE_JSON,
-        );
-    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
-    let loaded =
-        Core::with_definitions_folder(fake::ports(fs, env), &PathBuf::from(DEFINITIONS)).unwrap();
+        .with_file(path, text)
+        .with_file(PathBuf::from(DEFINITIONS).join("marker.toml"), marker);
+    let ports = fake::ports(fs, app_data_env());
+    let loaded = Core::with_definitions_folder(ports, &PathBuf::from(DEFINITIONS)).unwrap();
     assert!(loaded.rejected.is_empty(), "{:?}", loaded.rejected);
     loaded.core
 }
 
-fn plan_remove_with(core: &Core, selector: &str) -> Plan {
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    let targets = Targets {
-        selectors: vec![selector.to_owned()],
-        all: false,
-    };
-    core.plan(&snapshot, &Context::default(), Action::Remove, &targets)
-        .unwrap()
+/// [`AUTH_SERVERS`] in `~/.claude.json`, with [`MARKS_CLAUDE_JSON`] loaded.
+fn claude_json_with_marker() -> Core {
+    core_with_marker(claude_json(), AUTH_SERVERS, MARKS_CLAUDE_JSON)
 }
 
 #[test]
 fn a_field_a_loaded_definition_marks_is_masked_in_claude_code_s_view() {
-    let core = core_with_marker();
+    let core = claude_json_with_marker();
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
 
     let inventory = core.resolve(&snapshot, &Context::default());
@@ -716,9 +714,9 @@ fn a_field_a_loaded_definition_marks_is_masked_in_claude_code_s_view() {
 
 #[test]
 fn preview_and_history_diffs_mask_a_field_a_loaded_definition_marks() {
-    let core = core_with_marker();
+    let core = claude_json_with_marker();
 
-    let plan = plan_remove_with(&core, "context7");
+    let plan = plan_with(&core, Action::Remove, "context7");
 
     let preview = serde_json::to_string(plan.preview()).unwrap();
     assert!(!preview.contains(SECRET), "{preview}");
@@ -732,4 +730,51 @@ fn preview_and_history_diffs_mask_a_field_a_loaded_definition_marks() {
     let history = serde_json::to_string(&operation).unwrap();
     assert!(!history.contains(SECRET), "{history}");
     assert!(history.contains("CLIENT_SECRET"), "{history}");
+}
+
+/// Claude Desktop's classic user file, whose servers config-digger parks
+/// to Disable them.
+fn desktop_config() -> PathBuf {
+    PathBuf::from(APP_DATA).join(r"Claude\claude_desktop_config.json")
+}
+
+/// An Agent loaded through `--definitions` that reads the servers of
+/// Claude Desktop's classic user file and marks their `auth.CLIENT_SECRET`.
+fn marks_desktop_config() -> String {
+    MARKS_CLAUDE_JSON
+        .replace(r#"path = "~""#, r#"path = "%APPDATA%/Claude""#)
+        .replace(".claude.json", "claude_desktop_config.json")
+}
+
+/// The server `notes` of Claude Desktop, parked out of its user file, while
+/// [`marks_desktop_config`] is loaded.
+fn parked_notes() -> (Core, String) {
+    let servers = json!({ "mcpServers": { "notes": {
+        "command": "notes-mcp",
+        "auth": { "CLIENT_SECRET": SECRET },
+    }}});
+    let core = core_with_marker(
+        desktop_config(),
+        &servers.to_string(),
+        &marks_desktop_config(),
+    );
+    let locator = format!("{}#mcpServers.notes", desktop_config().display());
+    let plan = plan_with(&core, Action::Disable, &locator);
+    let preview = serde_json::to_string(plan.preview()).unwrap();
+    assert!(!preview.contains(SECRET), "{preview}");
+    let parked = core.execute(plan, &[]).unwrap().operation;
+    (core, parked)
+}
+
+#[test]
+fn a_parked_entry_masks_a_field_a_reader_of_its_file_marks() {
+    let (core, parked) = parked_notes();
+
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+    let entry = entry_of(&inventory, "claude-desktop", "notes");
+    assert_eq!(entry.config["auth"]["CLIENT_SECRET"], "••••");
+    assert!(!serde_json::to_string(&inventory).unwrap().contains(SECRET));
+    let history = serde_json::to_string(&core.history_show(&parked).unwrap()).unwrap();
+    assert!(!history.contains(SECRET), "{history}");
 }

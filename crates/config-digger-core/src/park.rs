@@ -197,13 +197,19 @@ pub(crate) fn free_id(name: &str, taken: &[String]) -> String {
 }
 
 /// Each parked Entry's value in the manifest `document`, by id, with the
-/// location it was parked from when its Agent and location are loaded.
+/// location it was parked from when its Agent and location are loaded, and
+/// the file it was parked from.
 /// Parked Entries are read as they are, so that the value of one that does
 /// not read as a parked Entry is found too.
 pub(crate) fn raw_entries<'d>(
     document: &'d Value,
     definitions: &'d [AgentDefinition],
-) -> Vec<(&'d str, &'d Value, Option<&'d LocationDefinition>)> {
+) -> Vec<(
+    &'d str,
+    &'d Value,
+    Option<&'d LocationDefinition>,
+    Option<&'d Path>,
+)> {
     entries(document)
         .into_iter()
         .flatten()
@@ -219,7 +225,7 @@ pub(crate) fn raw_entries<'d>(
                         .iter()
                         .find(|location| Some(location.id.as_str()) == text("location"))
                 });
-            Some((id.as_str(), value, location))
+            Some((id.as_str(), value, location, text("path").map(Path::new)))
         })
         .collect()
 }

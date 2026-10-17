@@ -410,6 +410,27 @@ pub(crate) struct LocationReader {
     pub path: PathBuf,
 }
 
+impl LocationReader {
+    /// Its location's definition.
+    pub fn location<'d>(&self, definitions: &'d [AgentDefinition]) -> &'d LocationDefinition {
+        definitions[self.agent_index].location(&self.location)
+    }
+}
+
+/// The definitions of the locations of `readers` that read the file at
+/// `path`.
+pub(crate) fn locations_reading<'d>(
+    definitions: &'d [AgentDefinition],
+    readers: &[LocationReader],
+    path: &Path,
+) -> Vec<&'d LocationDefinition> {
+    readers
+        .iter()
+        .filter(|reader| reader.path == path)
+        .map(|reader| reader.location(definitions))
+        .collect()
+}
+
 impl Snapshot {
     /// The locations that read the file at `path`.
     pub fn readers_of(&self, path: &Path) -> Vec<LocationReader> {
@@ -2898,7 +2919,8 @@ impl Scanner<'_> {
                 continue;
             };
             let key_path = park::key_path(&id);
-            let masked = mask::entry(location, &parked_entry.entry);
+            let reading = locations_reading(definitions, &self.readers, &parked_entry.origin.path);
+            let masked = mask::entry_read_by(location, &reading, &parked_entry.entry);
             self.entries.push(ScannedEntry {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
@@ -2966,8 +2988,7 @@ impl Scanner<'_> {
         if location.one_entry {
             // Named by its plugin, once read.
             if let Some(value) = lookup(&document, &location.root) {
-                self.unmasked.push(self.entries.len());
-                self.entries.push(ScannedEntry {
+                self.push_unmasked(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
@@ -3184,22 +3205,21 @@ impl Scanner<'_> {
         }
     }
 
-    /// Masks the Secrets of each Entry read so far whose `config` is still
-    /// its real value, those of the fields any location that reads its file
-    /// marks included, so that every Agent's view of the file masks them.
-    fn mask_entries(&mut self, definitions: &Definitions) {
-        let mut readers: BTreeMap<&Path, Vec<&LocationDefinition>> = BTreeMap::new();
-        for reader in &self.readers {
-            let location = definitions[reader.agent_index].location(&reader.location);
-            readers.entry(&reader.path).or_default().push(location);
-        }
+    /// Adds `entry`, whose `config` is its real value until
+    /// [`Self::mask_entries`] masks it.
+    fn push_unmasked(&mut self, entry: ScannedEntry) {
+        self.unmasked.push(self.entries.len());
+        self.entries.push(entry);
+    }
+
+    /// Masks each Entry added by [`Self::push_unmasked`] with what every
+    /// location that reads its file marks, now that every location is read.
+    fn mask_entries(&mut self, definitions: &[AgentDefinition]) {
         for index in self.unmasked.drain(..) {
             let entry = &mut self.entries[index];
             let location = definitions[entry.agent_index].location(&entry.location);
-            let readers = readers
-                .get(entry.path.as_path())
-                .map_or(&[][..], Vec::as_slice);
-            let masked = mask::entry_read_by(location, readers, &entry.config);
+            let reading = locations_reading(definitions, &self.readers, &entry.path);
+            let masked = mask::entry_read_by(location, &reading, &entry.config);
             entry.config = masked.value;
             entry.masked = masked.key_paths;
         }
@@ -3292,8 +3312,7 @@ impl Scanner<'_> {
             for found in object.entries {
                 let mut key_path = object.key_path.clone();
                 key_path.push(found.key);
-                self.unmasked.push(self.entries.len());
-                self.entries.push(ScannedEntry {
+                self.push_unmasked(ScannedEntry {
                     agent_index: home.agent_index,
                     home: home.home.clone(),
                     location: location.id.clone(),
