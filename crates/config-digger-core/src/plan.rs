@@ -1550,7 +1550,7 @@ pub(crate) fn undo_files<'m>(
 /// what it did there, last first, or why its Undo is refused: something is
 /// at a location it emptied, its copy in the backup or the parked-Entry
 /// store is gone, or what it put back changed since. History runs the same
-/// check.
+/// check. The folders' readers are left for the caller to fill in.
 pub(crate) fn undo_folders(
     ports: &Ports,
     manifest: &history::Manifest,
@@ -1636,7 +1636,6 @@ pub(crate) fn undo_folders(
         }
         planned.push(PlannedFolder {
             git_versioned: ports.git.is_versioned(path),
-            // From the scan before the Undo, once planned.
             readers: Vec::new(),
             path: path.clone(),
             op,

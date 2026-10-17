@@ -12,6 +12,7 @@ use crate::folders::PlannedFolder;
 use crate::paths;
 use crate::plan::PlannedFile;
 use crate::ports::{Ports, RunningProcess};
+use crate::scan::LocationReader;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -34,7 +35,8 @@ pub(crate) struct RunningCheck {
 /// in it.
 struct RunningReader<'d> {
     agent_name: &'d str,
-    files: BTreeMap<PathBuf, StoreClass>,
+    /// The written files and moved folders it reads.
+    read: BTreeMap<PathBuf, StoreClass>,
     /// The files among them it rewrites from memory that an Entry is
     /// parked out of or put back into.
     parking: BTreeSet<PathBuf>,
@@ -44,14 +46,26 @@ struct RunningReader<'d> {
 }
 
 impl RunningReader<'_> {
-    /// The files of `class`, but those that block as parking.
+    /// The files and folders of `class`, but those that block as parking.
     fn paths(&self, class: StoreClass) -> Vec<&Path> {
-        self.files
+        self.read
             .iter()
-            .filter(|(path, file_class)| **file_class == class && !self.parking.contains(*path))
+            .filter(|(path, read_class)| **read_class == class && !self.parking.contains(*path))
             .map(|(path, _)| path.as_path())
             .collect()
     }
+}
+
+/// A written file or a moved folder that an Agent home reads, or keeps a
+/// Disable switch in.
+struct Touched<'a> {
+    path: &'a PathBuf,
+    /// An Entry is parked out of the file or put back into it.
+    parking: bool,
+    agent_index: usize,
+    home: &'a str,
+    /// How the file or folder behaves while the Agent runs.
+    class: StoreClass,
 }
 
 /// Checks the readers of `files` and `folders`, and the Agents with
@@ -59,48 +73,60 @@ impl RunningReader<'_> {
 /// running for a home in `installed`, which an Installation found reads,
 /// gets the warning and the hints; any running Agent blocks a write to a
 /// SQLite store it holds.
-pub(crate) fn check(
+pub(crate) fn check<'a>(
     definitions: &[AgentDefinition],
     ports: &Ports,
     installed: &BTreeSet<(usize, String)>,
-    files: &[PlannedFile],
-    folders: &[PlannedFolder],
+    files: &'a [PlannedFile],
+    folders: &'a [PlannedFolder],
 ) -> RunningCheck {
     let mut processes: Option<Vec<RunningProcess>> = None;
     // Whether the Agent of each home runs, since a home may override its process.
     let mut detected: BTreeMap<(usize, &str), bool> = BTreeMap::new();
     let mut readers: BTreeMap<usize, RunningReader> = BTreeMap::new();
+    let located = |reader: &'a LocationReader| {
+        let class = reader.location(definitions).store_class;
+        (reader.agent_index, reader.home.as_str(), class)
+    };
     // Each Agent home that reads a written file, or keeps a Disable switch
-    // in it, then each that reads a moved folder: with whether an Entry is
-    // parked out of the file or put back into it.
-    let in_files = files.iter().flat_map(|file| {
-        let locations = file.readers.iter().map(|reader| {
-            let class = reader.location(definitions).store_class;
-            (reader.agent_index, reader.home.as_str(), class)
+    // in it, then each that reads a moved folder.
+    let in_files =
+        files.iter().flat_map(|file| {
+            let switches = file
+                .switches
+                .iter()
+                .map(|store| (store.agent_index, store.home.as_str(), store.store_class));
+            file.readers.iter().map(located).chain(switches).map(
+                move |(agent_index, home, class)| Touched {
+                    path: &file.path,
+                    parking: file.parking,
+                    agent_index,
+                    home,
+                    class,
+                },
+            )
         });
-        let switches = file
-            .switches
+    let in_folders = folders.iter().flat_map(|folder| {
+        folder
+            .readers
             .iter()
-            .map(|store| (store.agent_index, store.home.as_str(), store.store_class));
-        locations
-            .chain(switches)
-            .map(move |(agent_index, home, class)| {
-                (&file.path, file.parking, agent_index, home, class)
+            .map(located)
+            .map(move |(agent_index, home, class)| Touched {
+                path: &folder.path,
+                parking: false,
+                agent_index,
+                home,
+                class,
             })
     });
-    let in_folders = folders.iter().flat_map(|folder| {
-        folder.readers.iter().map(move |reader| {
-            let class = reader.location(definitions).store_class;
-            (
-                &folder.path,
-                false,
-                reader.agent_index,
-                reader.home.as_str(),
-                class,
-            )
-        })
-    });
-    for (path, parking, agent_index, home, class) in in_files.chain(in_folders) {
+    for Touched {
+        path,
+        parking,
+        agent_index,
+        home,
+        class,
+    } in in_files.chain(in_folders)
+    {
         let definition = &definitions[agent_index];
         let running = *detected.entry((agent_index, home)).or_insert_with(|| {
             definition.process(home).is_some_and(|process| {
@@ -113,12 +139,12 @@ pub(crate) fn check(
         }
         let reader = readers.entry(agent_index).or_insert_with(|| RunningReader {
             agent_name: &definition.agent.name,
-            files: BTreeMap::new(),
+            read: BTreeMap::new(),
             parking: BTreeSet::new(),
             installed: false,
         });
         reader.installed |= installed.contains(&(agent_index, home.to_owned()));
-        let stored = reader.files.entry(path.clone()).or_insert(class);
+        let stored = reader.read.entry(path.clone()).or_insert(class);
         *stored = (*stored).max(class);
         if parking && class == StoreClass::RewrittenWhileRunning {
             reader.parking.insert(path.clone());

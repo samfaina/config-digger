@@ -1,6 +1,7 @@
 //! Running-Agent detection and store classes through the core `api`, with a
-//! fake process port: the warning or block a write to a location gets while
-//! an Agent that reads it runs, and the hints its result adds.
+//! fake process port: the warning or block a write to a location, or a move
+//! of a skill folder, gets while an Agent that reads it runs, and the hints
+//! its result adds.
 
 use config_digger_core::api::{
     Action, BlockCode, Context, Core, ErrorCode, Plan, ScanOptions, StoreClass, Targets,
@@ -85,15 +86,20 @@ fn claude_desktop() -> RunningProcess {
 
 /// A core over `fs` with `running` as the processes on this machine.
 fn core(fs: &FakeFileSystem, running: &[RunningProcess]) -> Core {
+    let processes = running
+        .iter()
+        .fold(FakeProcesses::default(), |processes, process| {
+            processes.with_process(process.clone())
+        });
+    core_watching(fs, &processes)
+}
+
+/// A core over `fs` with `processes` as the processes on this machine, which
+/// a test can start more of.
+fn core_watching(fs: &FakeFileSystem, processes: &FakeProcesses) -> Core {
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     let mut ports = fake::ports(fs.clone(), env);
-    ports.processes = Box::new(
-        running
-            .iter()
-            .fold(FakeProcesses::default(), |processes, process| {
-                processes.with_process(process.clone())
-            }),
-    );
+    ports.processes = Box::new(processes.clone());
     Core::new(ports).unwrap()
 }
 
@@ -571,6 +577,7 @@ fn review_skill() -> PathBuf {
     PathBuf::from(HOME).join(r".claude\skills\review")
 }
 
+/// The `SKILL.md` of the skill `review`.
 const SKILL_MD: &str = "---\nname: review\ndescription: Reviews a diff.\n---\n";
 
 /// [`fixture`] with a user skill `review` in `~/.claude/skills`.
@@ -677,7 +684,7 @@ fn removing_a_skill_folder_the_running_agent_reads_through_a_link_gets_a_warning
 }
 
 #[test]
-fn removing_a_skill_folder_no_running_agent_reads_gets_no_warning() {
+fn removing_a_skill_folder_that_no_running_agent_reads_gets_no_warning() {
     let fs = fixture().with_file(shared_skill().join("SKILL.md"), "---\nname: shared\n---\n");
     let processes = FakeProcesses::default().with_process(claude_code_cli());
     let core = core_with(&fs, AGENTS_READER, &processes);
@@ -693,7 +700,7 @@ fn removing_a_skill_folder_no_running_agent_reads_gets_no_warning() {
 fn an_undo_that_moves_a_skill_folder_back_while_the_agent_runs_gets_the_warning() {
     let fs = skill_fixture();
     let processes = FakeProcesses::default();
-    let core = core_with(&fs, AGENTS_READER, &processes);
+    let core = core_watching(&fs, &processes);
     let outcome = core.execute(remove(&core, "review"), &[]).unwrap();
 
     processes.start(claude_code_cli());
@@ -707,7 +714,7 @@ fn an_undo_that_moves_a_skill_folder_back_while_the_agent_runs_gets_the_warning(
 fn an_agent_that_starts_after_the_preview_of_a_skill_folder_remove_needs_a_fresh_preview() {
     let fs = skill_fixture();
     let processes = FakeProcesses::default();
-    let core = core_with(&fs, AGENTS_READER, &processes);
+    let core = core_watching(&fs, &processes);
     let plan = remove(&core, "review");
     assert!(plan.warnings().is_empty());
 
@@ -731,4 +738,16 @@ fn an_acknowledged_skill_folder_remove_adds_the_restart_hint() {
         ["Restart Claude Code so that it reads what the Operation wrote."]
     );
     assert_eq!(fs.contents(review_skill().join("SKILL.md")), None);
+}
+
+#[test]
+fn a_running_agent_without_an_installation_for_that_home_never_warns_of_a_skill_folder() {
+    let fs = FakeFileSystem::new()
+        .with_file(claude_json(), CLAUDE_JSON)
+        .with_file(review_skill().join("SKILL.md"), SKILL_MD);
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, "review");
+
+    assert_eq!(running_agent_sentence(&plan), None);
 }

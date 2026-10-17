@@ -69,7 +69,8 @@ pub(crate) struct PlannedFolder {
     pub size: FolderSize,
     /// The folder is in the index of its git repo.
     pub git_versioned: bool,
-    /// The locations that read the folder: those whose folder holds it.
+    /// The locations that read the folder: those whose folder holds it, or
+    /// holds a link that leads into it.
     pub readers: Vec<LocationReader>,
 }
 
