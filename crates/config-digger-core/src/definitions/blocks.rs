@@ -2444,6 +2444,11 @@ pub(crate) struct SkillFolder {
     /// A skill folder's own subfolders never are.
     #[serde(default)]
     pub recursive: bool,
+    /// How many folders below the location's folder each skill folder
+    /// sits, when the location is not recursive. Folders above that depth
+    /// are read whatever they hold, and only folders at it are skills.
+    #[serde(default = "one_folder_down")]
+    pub depth: usize,
     /// Where a skill's name comes from.
     pub name_from: NameFrom,
     /// How the Agent rewrites a name into the one it uses, if it does.
@@ -2483,8 +2488,10 @@ impl Validate for SkillList {
         if self.field.is_empty() {
             return Err("a skill-list field must not be empty".into());
         }
-        if self.skills.recursive {
-            return Err("a skill list names each skill folder; it cannot be recursive".into());
+        if self.skills.recursive || self.skills.depth != 1 {
+            return Err(
+                "a skill list names each skill folder; it cannot be recursive or deeper".into(),
+            );
         }
         self.skills.validate()
     }
@@ -2536,8 +2543,21 @@ pub(crate) enum SkillDefect {
     Reserved,
 }
 
+/// What a skill folder's `depth` is when a definition leaves it out.
+fn one_folder_down() -> usize {
+    1
+}
+
 impl Validate for SkillFolder {
     fn validate(&self) -> Result<(), String> {
+        if self.depth == 0 {
+            return Err("a skill folder's depth must be at least 1".into());
+        }
+        if self.recursive && self.depth != 1 {
+            return Err(
+                "a recursive skill folder reads skills at any depth; it cannot give one".into(),
+            );
+        }
         if let Some(name) = self
             .reserved
             .iter()

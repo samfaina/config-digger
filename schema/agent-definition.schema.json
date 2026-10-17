@@ -1938,6 +1938,13 @@
               "type": "boolean",
               "default": false
             },
+            "depth": {
+              "description": "How many folders below the location's folder each skill folder\nsits, when the location is not recursive. Folders above that depth\nare read whatever they hold, and only folders at it are skills.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0,
+              "default": 1
+            },
             "name_from": {
               "description": "Where a skill's name comes from.",
               "$ref": "#/$defs/NameFrom"
@@ -2175,6 +2182,13 @@
           "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth.\nA skill folder's own subfolders never are.",
           "type": "boolean",
           "default": false
+        },
+        "depth": {
+          "description": "How many folders below the location's folder each skill folder\nsits, when the location is not recursive. Folders above that depth\nare read whatever they hold, and only folders at it are skills.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 1
         },
         "name_from": {
           "description": "Where a skill's name comes from.",
