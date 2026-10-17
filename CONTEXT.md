@@ -30,6 +30,10 @@ _Avoid_: Install, binary, copy
 The lowest and highest versions of an Agent that its Agent definition was tested against. An Installation outside it, older or newer, is noted on each Agent home it reads and in the preview of every Operation on that Agent; nothing is turned off. A definition without one is untested.
 _Avoid_: Supported versions, compatible range, verified range
 
+**Running Agent**:
+An Agent that config-digger detects, on a best-effort basis, as running for an Agent home that reads a location an Operation writes, or keeps a Disable switch there. It is matched through the `[process]` section of its Agent definition, which an Agent home may replace with its own. config-digger never closes an Agent; what a Running Agent means for a write depends on the location's Store class.
+_Avoid_: Open Agent, live Agent, active Agent
+
 **Feature gate**:
 A switch on the Agent vendor's side that changes how the Agent treats its configuration, such as whether Cursor collapses servers with the same URL. config-digger sees at most the value the Agent last cached, as of when it cached it; otherwise it assumes the Agent's default.
 _Avoid_: Flag, experiment, rollout
@@ -60,6 +64,10 @@ _Avoid_: Record, definition, setting
 An Entry whose location is a junction or symlink to another location. It is its own Entry, separate from its target: taking it away removes the link, not what it points to.
 _Avoid_: Alias, shortcut, mirror
 
+**Git-versioned**:
+Said of an Entry or location that is in the index of the git repo that contains it; ignored and untracked files don't count, and nothing does when git cannot be asked. A change to one shows in the git diff and reaches every clone once committed, so a Remove, or any other write inside one, needs its own acknowledgement. Disable never writes to one, not even to move an Entry out of it into config-digger's store: when every way to Disable an Entry would write to one, Disable is not offered. config-digger never stages or commits.
+_Avoid_: Tracked, committed, in the repo
+
 **Scope**:
 The level at which an Agent applies an Entry, such as managed, user, project or local. Each Agent has its own Scopes, so an Entry read by several Agents has a Scope for each of them. A Scope does not decide on its own which Entry wins: an Agent can rank two locations of the same Scope, as VS Code ranks `.vscode/mcp.json` above `.mcp.json`.
 _Avoid_: Level, layer, tier
@@ -74,7 +82,7 @@ _Avoid_: Active, winning, resolved
 
 **Shadowed**:
 Said of an Entry that loses, for a given Agent home and Project (or none), to the Effective Entry of the same Item and therefore has no effect in that Agent.
-_Avoid_: Overridden, hidden, inactive
+_Avoid_: Overridden, hidden, inactive. "Hide" is the user's verb for Agent homes and Projects (`homes hide`, `projects hide`), never for Entries.
 
 **State**:
 What one Agent does with an Entry for a given Agent home and Project (or none): Effective, Shadowed, Merged, Disabled, Blocked, Unread or Invalid. An Entry has exactly one State per context, set by the first of the Agent's own checks that it fails. Any other checks it also fails are listed as secondary reasons.
@@ -101,7 +109,7 @@ Said of an Entry that the Agent never reads in any context, such as one in an Ag
 _Avoid_: Orphaned, stale, ignored
 
 **Leftover**:
-An Unread Entry keyed to a missing Project in a user file, such as a Claude Code `projects["<path>"]` key. The leftovers of every missing Project are listed together and can be Removed in one Operation, or all of one Project's at once. Removing them never touches the Project's key itself, nor any trust it records.
+An Unread Entry keyed to a missing Project in a user file, such as an MCP server under a Claude Code `projects["<path>"]` key. The leftovers of every missing Project are listed together and can be Removed in one Operation, or all of one Project's at once. Removing them never touches the Project's key itself, nor any trust it records.
 _Avoid_: Orphan, stale entry, remnant
 
 **Invalid**:
@@ -133,6 +141,10 @@ _Avoid_: Delete, uninstall, purge
 **Operation**:
 A set of Disables, Enables and Removes confirmed together in one preview. It takes effect entirely or not at all, and is undone as a unit.
 _Avoid_: Change, transaction, batch
+
+**Store class**:
+How safe a location is to write while its Agent runs, declared per location and per Disable switch in the Agent definition. `plain`: the Agent reads it and leaves it alone, so a write warns that the Agent may not see the change until it restarts. `rewritten-while-running`: the Agent rewrites it from memory, such as `~/.claude.json`, so a write warns strongly that the Agent may overwrite it, and moving an Entry out of it into config-digger's store, or back, is blocked. `sqlite`: the Agent holds it open as a SQLite database, so a write is blocked, and no acknowledgement lifts it. The blocks apply to any Running Agent, the warnings only when an Installation config-digger found reads the Agent home it runs for. A file shared by locations or switches of several classes takes the strongest.
+_Avoid_: Write class, store type, safety level
 
 **Undo**:
 Revert one Operation, as long as nothing it touched has changed since. Any Operation in the history can be undone, not only the last one, and an Undo is itself an Operation.
