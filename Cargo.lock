@@ -5455,6 +5455,7 @@ dependencies = [
  "config-digger-core",
  "serde_json",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]

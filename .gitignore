@@ -1,3 +1,10 @@
+# Fixture files stay in, whatever a contributor's global excludes drop:
+# `**/.claude/settings.local.json` and other dotfiles Agents use. The repo's
+# rules beat `core.excludesFile`, and later rules here beat this one, so
+# build output stays ignored even inside a fixture.
+# `cargo xtask fixtures` fails when git ignores a fixture file.
+!crates/*/tests/fixtures/**
+
 .claude/worktrees/
 target/
 node_modules/

@@ -9,6 +9,9 @@
 //! - `installer`: checks that the installer's install folder in `hooks.nsh`
 //!   is a folder of its own: no data folder, nor a folder inside or above
 //!   one. It writes nothing.
+//! - `fixtures`: checks that git ignores no file under a
+//!   `crates/*/tests/fixtures` folder, the contributor's global excludes
+//!   included. It writes nothing.
 //! - `release <tag>`: checks that the tag is `v` and the workspace version,
 //!   and prints `version=` and `prerelease=` lines for `$GITHUB_OUTPUT`.
 //! - `checksums <dir>`: writes `<dir>/SHA256SUMS` for every other file in it.
@@ -22,6 +25,7 @@
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
+mod fixtures;
 mod installer;
 mod release;
 
@@ -65,6 +69,7 @@ fn main() -> ExitCode {
         ["bindings", "--check"] => (BINDINGS, true),
         ["definitions"] => return check_definitions(),
         ["installer"] => return check_installer(),
+        ["fixtures"] => return check_fixtures(),
         ["release", tag] => return print_release(tag),
         ["checksums", dir] => return write_checksums(Path::new(dir)),
         ["winget", tag, installer, dir] => {
@@ -74,7 +79,7 @@ fn main() -> ExitCode {
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         _ => {
             eprintln!(
-                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|installer>\n       \
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|installer|fixtures>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
                         cargo xtask updater <tag> <dir> | assets <tag> <dir>"
             );
@@ -125,6 +130,23 @@ fn check_installer() -> ExitCode {
             "the installer installs in a folder of its own",
         ),
         Err(code) => code,
+    }
+}
+
+/// The fixture files, as CI checks them.
+fn check_fixtures() -> ExitCode {
+    match fixtures::ignored(&repo_file("")) {
+        Ok(ignored) => report(
+            &ignored
+                .iter()
+                .map(|file| format!("git ignores the fixture file {file}"))
+                .collect::<Vec<_>>(),
+            "git ignores no fixture file",
+        ),
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
     }
 }
 
