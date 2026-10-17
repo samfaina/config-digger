@@ -225,7 +225,7 @@ fn objects(schema: &serde_json::Value) -> Vec<&serde_json::Value> {
 }
 
 #[test]
-fn both_schemas_accept_marks_with_a_sentence_on_any_table() {
+fn both_schemas_give_every_table_a_mark_of_sentences() {
     for schema in [
         config_digger_core::definitions::json_schema(),
         config_digger_core::definitions::skill_managers::json_schema(),
@@ -259,7 +259,8 @@ fn both_schemas_accept_marks_with_a_sentence_on_any_table() {
 fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
     let marks = config_digger_core::definitions::unverified_marks().unwrap();
 
-    // The inferred facts #119 names, by file, table and a word of each.
+    // Inferred facts of the built-in definitions, by file, table and a
+    // word of each.
     for (file, location, word) in [
         ("claude-desktop.toml", "", "LocalCache"),
         (

@@ -88,7 +88,7 @@ fn a_file_that_does_not_ship_or_a_missing_one_fails() {
 
 /// Words a comment uses for a fact taken from inference, or a default
 /// taken because the fact is not known.
-const UNCERTAIN: &[&str] = &["inferred", "not known", "unverified", "taken to", "assumed"];
+const UNCERTAIN: &[&str] = &["inferred", "not known", "unverified", "taken", "assumed"];
 
 /// Each block of consecutive comment lines in `text`, with the 1-based
 /// line it starts on, its lines joined by spaces.

@@ -56,6 +56,9 @@ const SCHEMAS: &[Generated] = &[
     },
 ];
 
+/// The built-in definitions' folder, relative to the repository root.
+const DEFINITIONS: &str = "crates/config-digger-core/definitions";
+
 const BINDINGS: &[Generated] = &[Generated {
     task: "bindings",
     path: "crates/config-digger-app/ui/src/bindings.ts",
@@ -113,14 +116,14 @@ fn main() -> ExitCode {
 
 /// The built-in definitions, as CI checks them.
 fn check_definitions() -> ExitCode {
-    let folder = repo_file("crates/config-digger-core/definitions");
+    let folder = repo_file(DEFINITIONS);
     let problems = config_digger_core::definitions::check_built_in_folder(&folder);
     report(&problems, "the built-in definitions are valid")
 }
 
 /// The `unverified` marks of the built-in definitions, each as
-/// `<file>:<line>: <table>: <sentence>`, the table `(top)` for the top of
-/// the file.
+/// `<file>:<line>: <table>: <sentence>`, the file relative to the
+/// repository root.
 fn list_unverified() -> ExitCode {
     let marks = match config_digger_core::definitions::unverified_marks() {
         Ok(marks) => marks,
@@ -130,15 +133,7 @@ fn list_unverified() -> ExitCode {
         }
     };
     for mark in &marks {
-        let table = if mark.location.is_empty() {
-            "(top)"
-        } else {
-            &mark.location
-        };
-        println!(
-            "crates/config-digger-core/definitions/{}:{}: {table}: {}",
-            mark.file, mark.line, mark.sentence
-        );
+        println!("{DEFINITIONS}/{mark}");
     }
     println!("{} unverified marks", marks.len());
     ExitCode::SUCCESS

@@ -5,6 +5,7 @@
 
 use super::DefinitionError;
 use super::blocks::Validate;
+use super::marks::{self, Mark};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -30,7 +31,7 @@ const FORMAT_VERSION: u32 = 1;
 
 /// The JSON Schema of a skill manager definition file.
 pub fn json_schema() -> String {
-    super::marks::json_schema::<SkillManagerDefinition>()
+    marks::json_schema::<SkillManagerDefinition>()
 }
 
 /// The built-in skill manager definitions, in the order a tie between
@@ -43,15 +44,23 @@ pub(crate) fn built_in() -> Result<Vec<SkillManagerDefinition>, DefinitionError>
 }
 
 pub(crate) fn parse(file: &str, text: &str) -> Result<SkillManagerDefinition, DefinitionError> {
+    parse_marked(file, text).map(|(definition, _)| definition)
+}
+
+/// The skill manager definition `text` of `file`, and its marks.
+pub(super) fn parse_marked(
+    file: &str,
+    text: &str,
+) -> Result<(SkillManagerDefinition, Vec<Mark>), DefinitionError> {
     let error = |message: String| DefinitionError {
         kind: "skill manager",
         file: file.to_owned(),
         message,
     };
-    let (definition, _): (SkillManagerDefinition, _) =
-        super::marks::deserialize(file, text).map_err(error)?;
+    let (definition, marks): (SkillManagerDefinition, _) =
+        marks::deserialize(file, text).map_err(error)?;
     definition.validate().map_err(error)?;
-    Ok(definition)
+    Ok((definition, marks))
 }
 
 /// How a skill manager lays out the skills it installs.

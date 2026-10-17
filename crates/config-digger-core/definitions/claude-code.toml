@@ -398,13 +398,14 @@ enable_offered = false
 # `claude plugin disable --scope local|project|user` writes [docs, disk].
 # Settings merge the key across files, local over Project over user [docs]:
 # the first of these switches that holds the plugin decides. The managed
-# settings, which force a plugin on or off [docs], are not read. A plugin
-# missing from every file is taken as on. Disable writes `false` to the local settings in
-# a Project, and to the user settings otherwise; Enable sets `true`. The
-# shared Project settings belong to the team, so config-digger only reads
-# them. These switches are repeated for skills below.
+# settings, which force a plugin on or off [docs], are not read. Disable
+# writes `false` to the local settings in a Project, and to the user
+# settings otherwise; Enable sets `true`. The shared Project settings belong
+# to the team, so config-digger only reads them. These switches are
+# repeated for skills below.
 [[items.mcp.disable]]
 block = "json-field"
+unverified = "A plugin missing from every settings file is taken to be on."
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
 target = "plugin"
 context = "project"

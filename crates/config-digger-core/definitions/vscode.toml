@@ -4,7 +4,7 @@
 
 format_version = 1
 verified = { min = "1.129.1", max = "1.129.1" }
-# Every setting read from the ExP experiment cache relies on it.
+# The shape every setting read from the ExP experiment cache relies on.
 unverified = "The shape of `configs[0].Parameters` in `memento/experiment.service.memento` is inferred from tas-client."
 
 [agent]
@@ -438,11 +438,10 @@ sources = [
 # the workspace's for a workspace's, as `[id, record]` pairs whose record's
 # `trustedAtNonce` is the nonce of the configuration the user trusted and
 # `nonce` that of the one it last saw [docs]. The nonce hashes the launch
-# configuration [docs], which config-digger does not compute: a server is
-# taken as trusted while the two match, though its file may have changed
-# since VS Code last saw it.
+# configuration [docs], which config-digger does not compute.
 [[items.mcp.gates]]
 block = "nonce-trust"
+unverified = "A server is taken to be trusted while its two nonces match, though its file may have changed since VS Code last saw it."
 locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
 trusted_at = "trustedAtNonce"
 nonce = "nonce"

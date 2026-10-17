@@ -88,10 +88,10 @@ id = "plugin"
 # `session_meta` line that opens its `sessions\YYYY\MM\DD\rollout-*.jsonl`,
 # or once archived, its `archived_sessions\rollout-*.jsonl`; and in
 # `state_5.sqlite`, the `cwd` of each thread and the `path` of each root of
-# the projects the app lists. That archived sessions are not kept by date is
-# taken from the source, not observed. The `5` of `state_5.sqlite` is a
-# schema generation, which changes with the version.
+# the projects the app lists. The `5` of `state_5.sqlite` is a schema
+# generation, which changes with the version.
 [projects]
+unverified = "That archived sessions are not kept by date comes from Codex's source, not from disk."
 registries = [
   { block = "toml-keys", anchor = { block = "home", root = "config" }, root = ["projects"] },
   { block = "jsonl-heads", anchor = { block = "home", root = "sessions" }, files = "*/*/*/rollout-*.jsonl", fields = [["payload", "cwd"]] },
@@ -284,7 +284,7 @@ fallback = "user-mcp"
 # `config.toml` alone.
 [[items.mcp.disable]]
 block = "json-field"
-unverified = "That Codex honours the switch of a plugin's server comes from its source only."
+unverified = "That Codex honours the switch of a plugin's server, in a plugin the account installed too, comes from its source only."
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "mcp_servers", "{name}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"
@@ -295,11 +295,11 @@ locations = ["plugin-mcp", "remote-plugin-mcp"]
 
 # A plugin is on or off with every server and skill it carries by
 # `[plugins."<id>"] enabled`, which Codex writes `true` when it installs the
-# plugin and its `/plugins` turns `false` and back [source, docs]. A plugin
-# missing from the file is taken as on. These switches are repeated for
-# skills below.
+# plugin and its `/plugins` turns `false` and back [source, docs]. These
+# switches are repeated for skills below.
 [[items.mcp.disable]]
 block = "json-field"
+unverified = "A plugin missing from `config.toml` is taken to be on."
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "plugin"
 context = "all"
@@ -333,12 +333,12 @@ trusted = "trusted"
 # checking the server it built from its layers [source]. The machine's
 # `%ProgramData%\OpenAI\Codex\requirements.toml` is the lowest source and
 # the cloud bundle's `requirements_toml` fragments rank above it, merged
-# name by name [source]. A requirement that matches a command's args, or a
-# URL by prefix or pattern, is not read, and its server counts as meeting it.
-# A requirement turns the server off by `enabled = false`, so the server
-# Codex built still beats a plugin's server of the same name [source].
+# name by name [source]. A requirement turns the server off by
+# `enabled = false`, so the server Codex built still beats a plugin's server
+# of the same name [source].
 [[items.mcp.rules]]
 block = "identity-allowlist"
+unverified = "A requirement that matches a command's args, or a URL by prefix or pattern, is not read: its server is taken to meet it."
 identity = "identity"
 locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"]
 sources = [
