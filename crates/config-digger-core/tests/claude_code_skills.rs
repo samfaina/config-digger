@@ -197,6 +197,32 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
 }
 
 #[test]
+fn synced_skills_are_read_only_two_folders_below_synced() {
+    let synced = in_home(r".claude\skills\synced");
+    let fs = with_skill(
+        FakeFileSystem::new(),
+        synced.join(r"org1_acct1\pdf"),
+        &skill_md("pdf"),
+    );
+    let fs = with_skill(fs, synced.join("loose"), &skill_md("loose"));
+    let fs = with_skill(fs, synced.join(r"org1_acct1\group\deep"), &skill_md("deep"));
+    let fs = with_skill(fs, synced.join(r"org1_acct1\pdf\inner"), &skill_md("inner"))
+        .with_file(synced.join("notes.txt"), "");
+
+    let inventory = no_project(&fs);
+
+    let names: Vec<&str> = skills(&inventory)
+        .iter()
+        .map(|item| item.name.as_str())
+        .collect();
+    assert_eq!(names, ["pdf"]);
+    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(entry["provenance"], "cloud_mirror");
+    let inventory = serde_json::to_value(&inventory).unwrap();
+    assert_eq!(inventory["read_failures"], json!([]));
+}
+
+#[test]
 fn project_skills_are_read_in_the_project_and_its_parents_up_to_the_repo_root() {
     let repo = PathBuf::from(r"E:\repo");
     let project = repo.join(r"packages\frontend");

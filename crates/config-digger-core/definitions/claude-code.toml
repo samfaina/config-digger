@@ -497,13 +497,17 @@ on_read_failure = "ignores_file"
 
 # Skills synced from claude.ai sit one level deeper than the docs say, in
 # `synced/<org>_<account>/<name>` [disk], next to `manifest.json` and a
-# `.staging` folder. Claude Code owns this copy. It syncs these skills into
-# its sessions only while its claude.ai sync gate is on [docs].
+# `.staging` folder, and are read at that depth only. Claude Code owns this
+# copy. It syncs these skills into its sessions only while its claude.ai
+# sync gate is on [docs].
 [[locations]]
 id = "synced-skills"
-unverified = "Claude Code skips the synced skills folder while its claude.ai sync gate is off."
+unverified = [
+  "Claude Code skips the synced skills folder while its claude.ai sync gate is off.",
+  "Claude Code reads a synced skill only at `synced/<org>_<account>/<name>`, not directly under `synced/` or deeper.",
+]
 anchor = { block = "home", root = "skills", path = "synced" }
-format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", depth = 2, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
 kind = "skill"
 scope = "user"
 provenance = "cloud-mirror"

@@ -3338,8 +3338,10 @@ impl Scanner<'_> {
 impl Scanner<'_> {
     /// Adds a skill Entry for each folder holding a `SKILL.md` below the
     /// folder `root`, at the real path its parent folders lead to. A folder
-    /// named with a leading `.` is never read, and one without `SKILL.md`
-    /// only when the location is recursive.
+    /// named with a leading `.` is never read. One without `SKILL.md` is
+    /// read only when the location is recursive, and one above the
+    /// location's depth always is, where only folders at the depth are
+    /// skills.
     fn read_skills(
         &mut self,
         home: &FoundHome,
@@ -3350,10 +3352,12 @@ impl Scanner<'_> {
         depth: usize,
     ) {
         let fs = self.reader.fs;
-        let mut folders = vec![root.to_path_buf()];
+        let mut folders = vec![(root.to_path_buf(), 0)];
         // A link back to a folder already read would never end.
         let mut seen = BTreeSet::new();
-        while let Some(folder) = folders.pop() {
+        while let Some((folder, folder_depth)) = folders.pop() {
+            let child_depth = folder_depth + 1;
+            let above = !format.recursive && child_depth < format.depth;
             if !seen.insert(paths::canonical_key(fs, &folder)) {
                 continue;
             }
@@ -3381,6 +3385,12 @@ impl Scanner<'_> {
                     continue;
                 };
                 if name.starts_with('.') {
+                    continue;
+                }
+                if above {
+                    if fs.read_dir(&child).is_ok() {
+                        folders.push((child, child_depth));
+                    }
                     continue;
                 }
                 // A link whose target is gone is still an Entry, which
@@ -3417,7 +3427,7 @@ impl Scanner<'_> {
                 let skill_md = child.join(SKILL_MD);
                 if !fs.exists(&skill_md) {
                     if format.recursive {
-                        folders.push(child);
+                        folders.push((child, child_depth));
                     }
                     continue;
                 }
