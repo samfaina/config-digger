@@ -399,7 +399,7 @@ pub(crate) fn failed_files(
     for source in rule_sources.chain(gate_sources) {
         let anchor = &source.anchor;
         let paths: Vec<PathBuf> = match anchor.settings() {
-            Some(id) => snapshot.settings_of(entry.agent_index, id).read().to_vec(),
+            Some(id) => snapshot.settings_of(entry.agent_index, id).read(),
             None if anchor.in_project() => project
                 .and_then(|project| anchor.path(roots, Some(project)))
                 .into_iter()

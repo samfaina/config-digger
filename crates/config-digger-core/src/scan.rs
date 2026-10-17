@@ -4,9 +4,9 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, FindsBy, Format, Gate,
-    GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate, LookUp,
-    ManifestSkills, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
+    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy, Format,
+    Gate, GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate,
+    LookUp, ManifestSkills, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
     PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
     RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
     is_entry_key,
@@ -227,21 +227,54 @@ pub(crate) struct ScannedSettings {
     /// The files of each source, highest first. A registry value stands as
     /// `<HKLM|HKCU>\<key>\<value>`.
     pub sources: Vec<Vec<PathBuf>>,
-    /// The source the Agent reads: the first that holds any setting.
-    pub selected: Option<usize>,
+    /// The sources the Agent reads, highest first: the first that holds any
+    /// setting, and those it merges with it.
+    pub merged: Vec<usize>,
+    /// The sources the Agent reads the keys it reads from every source
+    /// from, highest first: each the user cannot write, or the one it reads
+    /// when the user can write that one.
+    pub every_source: Vec<usize>,
 }
 
 impl ScannedSettings {
-    /// The files of the source the Agent reads.
-    pub fn read(&self) -> &[PathBuf] {
-        self.selected
-            .map_or(&[], |selected| &self.sources[selected])
+    /// The files of the sources the Agent reads, each overriding those
+    /// before it: the lowest source first, and in each source, its files
+    /// in order.
+    pub fn read(&self) -> Vec<PathBuf> {
+        self.merged
+            .iter()
+            .rev()
+            .flat_map(|&source| self.sources[source].iter().cloned())
+            .collect()
+    }
+
+    /// The files of the sources the Agent reads the keys it reads from
+    /// every source from, the one it reads first first: the highest source
+    /// first, and in each source, its last file first.
+    pub fn every_source_files(&self) -> Vec<PathBuf> {
+        self.every_source
+            .iter()
+            .flat_map(|&source| self.sources[source].iter().rev().cloned())
+            .collect()
+    }
+
+    /// The index of the source `path` is a file of.
+    pub fn source_of(&self, path: &Path) -> Option<usize> {
+        self.sources
+            .iter()
+            .position(|files| files.iter().any(|file| file == path))
+    }
+
+    /// The first file of the highest source the Agent reads.
+    pub fn first_read(&self) -> Option<&Path> {
+        let selected = *self.merged.first()?;
+        self.sources[selected].first().map(PathBuf::as_path)
     }
 
     /// Whether `path` is a file of a source the Agent skips.
     pub fn skips(&self, path: &Path) -> bool {
         self.sources.iter().flatten().any(|file| file == path)
-            && !self.read().contains(&path.to_path_buf())
+            && !self.read().iter().any(|file| file == path)
     }
 }
 
@@ -269,6 +302,9 @@ fn settings_named<'s>(
 pub(crate) struct ScannedGate {
     pub agent_index: usize,
     pub home: String,
+    /// The key of the Project where a file of the Project changes how it
+    /// reads, or `None` for how it reads everywhere else.
+    pub project: Option<String>,
     /// The gate's name.
     pub name: String,
     /// The file the Agent caches it in.
@@ -1055,6 +1091,7 @@ pub(crate) fn scan_as_if(
         &projects,
         &scanner.storage,
         &installed,
+        &settings,
         &scanner.entries,
         &mut scanner.reader,
     );
@@ -1068,7 +1105,14 @@ pub(crate) fn scan_as_if(
         &mut scanner.reader,
     );
     let switch_files = switch_files(definitions, &found, &projects, &installed, &scanner.entries);
-    let gates = read_gates(definitions, &found, &mut scanner.reader, ports);
+    let gates = read_gates(
+        definitions,
+        &found,
+        &projects,
+        &settings,
+        &mut scanner.reader,
+        ports,
+    );
     let exclusive = exclusive_files(definitions, &found, &as_if);
     scanner.entries = one_per_entry(definitions, scanner.entries);
     for entry in &mut scanner.entries {
@@ -1231,22 +1275,67 @@ fn read_settings(
                     }
                 })
                 .collect();
-            // A file that cannot be read or parsed may hold settings too.
-            let holds = |path: &PathBuf, reader: &mut Reader| match reader.peek(path) {
-                Ok(None) => false,
-                Ok(Some(text)) => JsonFormat::STRICT.parse(text).map_or(true, |document| {
-                    document.as_object().is_none_or(|object| !object.is_empty())
-                }),
-                Err(_) => true,
-            };
-            let selected = sources
+            // Whether each source holds any setting, and the merge key's
+            // value, as its last file that holds one says. A file that
+            // cannot be read or parsed may hold settings too.
+            let merge_key = settings.merge.as_ref().map(|merge| merge.key.as_str());
+            let held: Vec<(bool, Option<serde_json::Value>)> = sources
                 .iter()
-                .position(|files| files.iter().any(|path| holds(path, reader)));
+                .map(|files| {
+                    let mut holds = false;
+                    let mut merge = None;
+                    for path in files {
+                        let document = match reader.peek(path) {
+                            Ok(None) => continue,
+                            Ok(Some(text)) => JsonFormat::STRICT.parse(text).ok(),
+                            Err(_) => None,
+                        };
+                        let Some(object) = document.as_ref().and_then(|value| value.as_object())
+                        else {
+                            holds = true;
+                            continue;
+                        };
+                        holds |= object
+                            .keys()
+                            .any(|key| !settings.control_keys.contains(key));
+                        if let Some(value) = merge_key.and_then(|key| object.get(key)) {
+                            merge = Some(value.clone());
+                        }
+                    }
+                    (holds, merge)
+                })
+                .collect();
+            let selected = held.iter().position(|(holds, _)| *holds);
+            // The highest source that holds the merge key or any setting
+            // decides whether the Agent merges.
+            let merging = settings.merge.as_ref().is_some_and(|merge| {
+                held.iter()
+                    .find(|(holds, value)| *holds || value.is_some())
+                    .and_then(|(_, value)| value.as_ref())
+                    == Some(&merge.value)
+            });
+            let mut merged: Vec<usize> = selected.into_iter().collect();
+            if let Some(selected) =
+                selected.filter(|&selected| merging && !settings.sources[selected].user_writable())
+            {
+                merged.extend(
+                    (selected + 1..sources.len()).filter(|&source| {
+                        held[source].0 && !settings.sources[source].user_writable()
+                    }),
+                );
+            }
+            let every_source = match selected {
+                Some(selected) if settings.sources[selected].user_writable() => vec![selected],
+                _ => (0..sources.len())
+                    .filter(|&source| !settings.sources[source].user_writable())
+                    .collect(),
+            };
             scanned.push(ScannedSettings {
                 agent_index,
                 id: settings.id.clone(),
                 sources,
-                selected,
+                merged,
+                every_source,
             });
         }
     }
@@ -1328,10 +1417,14 @@ fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader)
 
 /// Each Feature gate of each found Agent home: bypassed when a variable
 /// makes the Agent ignore its cache, else the value it cached, else
-/// unreadable. Nothing here applies the gate's assumed default.
+/// unreadable. A gate is read again for each existing Project folder whose
+/// files change how it reads, as when a Project's settings set a variable
+/// that bypasses it. Nothing here applies the gate's assumed default.
 fn read_gates(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
+    projects: &[ScannedProject],
+    settings: &[ScannedSettings],
     reader: &mut Reader,
     ports: &Ports,
 ) -> Vec<ScannedGate> {
@@ -1347,16 +1440,9 @@ fn read_gates(
                 .anchor()
                 .path(&home.roots, None)
                 .expect("validation puts a lookup in the Agent home");
-            let bypassed = gate.bypass.as_ref().and_then(|bypass| {
-                let maps: Vec<serde_json::Map<String, serde_json::Value>> = bypass
-                    .env_maps()
-                    .iter()
-                    .filter_map(|map| {
-                        let path = map.anchor.path(&home.roots, None)?;
-                        let document = JsonFormat::STRICT.parse(reader.peek(&path).ok()??).ok()?;
-                        lookup(&document, &map.key_path)?.as_object().cloned()
-                    })
-                    .collect();
+            let bypassed = |project: Option<&Path>, reader: &mut Reader| {
+                let bypass = gate.bypass.as_ref()?;
+                let maps = env_maps(bypass.env_maps(), home, project, settings, reader);
                 // A variable in a map replaces the one in the environment.
                 let var = |name: &str| {
                     maps.iter()
@@ -1365,45 +1451,107 @@ fn read_gates(
                         .or_else(|| ports.env.var(name))
                 };
                 bypass.bypassed_by(&var)
-            });
-            let reading = match bypassed {
-                Some(variable) => GateReading::Bypassed(variable),
-                None => {
-                    let text = match cache.store() {
-                        GateStore::JsonFile => reader.peek(&path).ok().flatten().map(str::to_owned),
-                        GateStore::SqliteItem(key) => {
-                            reader.fs.read_sqlite_item(&path, key).ok().flatten()
-                        }
-                    };
-                    text.and_then(|text| JsonFormat::STRICT.parse(&text).ok())
-                        .and_then(|document| cache.cached(&document, &gate.name))
-                        .map_or(GateReading::Unreadable, GateReading::Cached)
-                }
             };
-            gates.push(ScannedGate {
-                agent_index: home.agent_index,
-                home: home.home.clone(),
-                name: gate.name.clone(),
-                path,
-                reading,
-            });
+            let everywhere = bypassed(None, reader);
+            let text = match cache.store() {
+                GateStore::JsonFile => reader.peek(&path).ok().flatten().map(str::to_owned),
+                GateStore::SqliteItem(key) => reader.fs.read_sqlite_item(&path, key).ok().flatten(),
+            };
+            let cached = text
+                .and_then(|text| JsonFormat::STRICT.parse(&text).ok())
+                .and_then(|document| cache.cached(&document, &gate.name))
+                .map_or(GateReading::Unreadable, GateReading::Cached);
+            let reading = |bypassed: Option<String>| {
+                bypassed.map_or_else(|| cached.clone(), GateReading::Bypassed)
+            };
+            let in_projects = gate
+                .bypass
+                .as_ref()
+                .is_some_and(|bypass| bypass.env_maps().iter().any(|map| map.anchor.in_project()));
+            let mut readings = Vec::new();
+            if in_projects {
+                for project in projects.iter().filter(|project| project.is_folder()) {
+                    let here = bypassed(Some(&project.path), reader);
+                    if here != everywhere {
+                        readings.push((Some(project.key.clone()), reading(here)));
+                    }
+                }
+            }
+            readings.push((None, reading(everywhere)));
+            for (project, reading) in readings {
+                gates.push(ScannedGate {
+                    agent_index: home.agent_index,
+                    home: home.home.clone(),
+                    project,
+                    name: gate.name.clone(),
+                    path: path.clone(),
+                    reading,
+                });
+            }
         }
     }
     gates
 }
 
+/// The objects `maps` name for `home`, in their order, those in a Project
+/// read in the Project folder `project` and skipped without one. Of a map
+/// in settings, the object of each file is read, the one that overrides the
+/// others first.
+fn env_maps(
+    maps: &[EnvMap],
+    home: &FoundHome,
+    project: Option<&Path>,
+    settings: &[ScannedSettings],
+    reader: &mut Reader,
+) -> Vec<serde_json::Map<String, serde_json::Value>> {
+    let mut objects = Vec::new();
+    for map in maps {
+        let files: Vec<PathBuf> = match map.anchor.settings() {
+            Some(id) => settings_named(settings, home.agent_index, id)
+                .map(|known| {
+                    if map.every_source {
+                        known.every_source_files()
+                    } else {
+                        known.read().into_iter().rev().collect()
+                    }
+                })
+                .unwrap_or_default(),
+            None if map.anchor.in_project() => project
+                .and_then(|project| map.anchor.path(&home.roots, Some(project)))
+                .into_iter()
+                .collect(),
+            None => map.anchor.path(&home.roots, None).into_iter().collect(),
+        };
+        for path in files {
+            let Some(text) = reader.peek(&path).ok().flatten() else {
+                continue;
+            };
+            let object = JsonFormat::STRICT
+                .parse(text)
+                .ok()
+                .and_then(|document| lookup(&document, &map.key_path)?.as_object().cloned());
+            objects.extend(object);
+        }
+    }
+    objects
+}
+
 /// Every place each Disable mechanism's switch is, for each found Agent
 /// home: in each existing Project folder for a switch in a Project, under
-/// each spelling of each Project key for a switch keyed by `{project}`, and
-/// once otherwise. A switch file that is missing is read as empty; one that
+/// each spelling of each Project key for a switch keyed by `{project}`, in
+/// each file the Agent reads of the settings a settings anchor names, the
+/// one read last first, and once otherwise. A switch file that is missing
+/// is read as empty; one that
 /// cannot be read or parsed as JSON, or that is a Read failure for the
 /// Agent home, is listed apart and has no places.
+#[allow(clippy::too_many_arguments)]
 fn read_switches(
     definitions: &[AgentDefinition],
     found: &[FoundHome],
     projects: &[ScannedProject],
     storage: &[StorageFolder],
     installed: &Installed,
+    settings: &[ScannedSettings],
     entries: &[ScannedEntry],
     reader: &mut Reader,
 ) -> (Vec<ScannedSwitch>, BTreeSet<PathBuf>) {
@@ -1421,7 +1569,7 @@ fn read_switches(
                     home,
                     projects,
                     storage,
-                    settings: &[],
+                    settings,
                     plugins: plugins_of(installed, home),
                     entries: covered(definition, entries, home, kind, block),
                 };
@@ -1548,7 +1696,7 @@ fn read_rules(
                     entries: Vec::new(),
                 };
                 let format = setting.format();
-                for place in places.read(
+                let mut read = places.read(
                     &setting.anchor,
                     &setting.key_path,
                     format.as_ref(),
@@ -1557,7 +1705,22 @@ fn read_rules(
                     setting.cached_at.as_deref(),
                     reader,
                     &mut unreadable,
-                ) {
+                );
+                // Only the highest source holding the value counts.
+                let known = setting
+                    .anchor
+                    .settings()
+                    .filter(|_| setting.highest_source)
+                    .and_then(|id| settings_named(settings, home.agent_index, id));
+                if let Some(known) = known {
+                    let highest = read
+                        .iter()
+                        .filter(|place| place.value.is_some())
+                        .filter_map(|place| known.source_of(&place.path))
+                        .min();
+                    read.retain(|place| known.source_of(&place.path) == highest);
+                }
+                for place in read {
                     values.push(ScannedSetting {
                         agent_index: home.agent_index,
                         home: home.home.clone(),
@@ -1667,16 +1830,16 @@ impl Places<'_> {
         let home = self.home;
         let files: Vec<(PathBuf, Option<String>, Option<Owner>)> =
             if let Some(id) = anchor.settings() {
-                // A later file of the source overrides an earlier one, so it
-                // comes first.
+                // A file read later overrides an earlier one, so it comes
+                // first.
                 settings_named(self.settings, home.agent_index, id)
                     .into_iter()
                     .flat_map(|known| {
                         known
                             .read()
-                            .iter()
+                            .into_iter()
                             .rev()
-                            .map(|path| (path.clone(), None, None))
+                            .map(|path| (path, None, None))
                     })
                     .collect()
             } else if let Some(beside) = anchor.entry() {

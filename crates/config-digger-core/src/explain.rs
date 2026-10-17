@@ -968,6 +968,37 @@ pub(crate) fn already_disabled(locator: &str) -> String {
     format!("cannot Disable {locator}: it is Disabled already")
 }
 
+/// A Blocked Entry's reason, when the switch of managed policy `holds`
+/// turns it off, or the plugin `plugin` it is part of.
+pub(crate) fn switched_off_by_policy(
+    plugin: Option<&str>,
+    holds: &str,
+    agent_name: &str,
+) -> String {
+    match plugin {
+        Some(plugin) => format!(
+            "Blocked by policy: {holds}, so {agent_name} skips every server and skill of the plugin {plugin}."
+        ),
+        None => format!("Blocked by policy: {holds}, so {agent_name} skips it."),
+    }
+}
+
+/// Why Disable is not offered for an Entry a switch of managed policy,
+/// `holds`, forces on, or off when not `on`, or forces its plugin so for
+/// a switch of a plugin.
+pub(crate) fn policy_option(holds: &str, on: bool, plugin: bool) -> String {
+    let what = if plugin { "the plugin" } else { "it" };
+    let way = if on { "on" } else { "off" };
+    format!(
+        "Disable is not offered: {holds}, which forces {what} {way}, and config-digger never overrides managed policy."
+    )
+}
+
+/// What Enable says of an Entry a switch of managed policy, `holds`, turns off.
+pub(crate) fn policy_enable_not_offered(holds: &str) -> String {
+    format!("Enable is not offered: {holds}, and config-digger never overrides managed policy.")
+}
+
 /// What Disable says of an Entry that is Disabled already.
 pub(crate) fn already_disabled_option() -> String {
     "Disable is not offered: the Entry is Disabled already.".to_owned()

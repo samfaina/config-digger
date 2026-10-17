@@ -3,8 +3,8 @@
 
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
-    self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, FolderTrust, Gate, Holds,
-    JsonFormat, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect,
+    self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Disables, FolderTrust, Gate,
+    Holds, JsonFormat, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect,
     SkillFallback,
 };
 use crate::definitions::skill_managers::Strength;
@@ -149,7 +149,8 @@ pub(crate) fn resolve(
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
         let key = if competes(definition, snapshot, entry, project_key.map(String::as_str)) {
-            item_key(definition, snapshot, &in_context, entry, &unread)
+            let project = project_key.map(String::as_str);
+            item_key(definition, snapshot, &in_context, entry, project, &unread)
         } else {
             ItemKey::Alone(
                 entry.name.clone(),
@@ -346,7 +347,10 @@ pub(crate) fn resolve(
             // The URL each remote Entry competes by, while it does.
             let urls: Vec<Option<String>> = entries
                 .iter()
-                .map(|entry| url_key(definition, snapshot, entry, &unread))
+                .map(|entry| {
+                    let project = project_key.map(String::as_str);
+                    url_key(definition, snapshot, entry, project, &unread)
+                })
                 .collect();
             let shadowed_by = |index: usize, winner: usize| {
                 let same_endpoint = definition
@@ -504,8 +508,14 @@ pub(crate) fn resolve(
                                         },
                                     ));
                                 }
+                                // A switch of managed policy Blocks.
                                 failed.extend(disabling.iter().map(|hit| {
-                                    (check, api::State::Disabled, hit.reason(agent_name))
+                                    let state = if hit.mechanism.policy() {
+                                        api::State::Blocked
+                                    } else {
+                                        api::State::Disabled
+                                    };
+                                    (check, state, hit.reason(agent_name))
                                 }));
                                 // A field that turns the built server off
                                 // turns off every Entry that could take part.
@@ -738,11 +748,14 @@ pub(crate) fn resolve(
                         .as_ref()
                         .filter(|_| state == api::State::Disabled)
                         .map(|off| explain::turned_off_enable(&off.field, &off.switch));
+                    // What managed policy turns off, Enable never lifts.
+                    let by_policy = disabling.iter().any(|hit| hit.mechanism.policy());
                     let enable = match mirrored
                         .or_else(|| rules::enable_not_offered(&by_rule))
                         .or(turned_off)
                     {
                         Some(sentence) => Some(api::EnableOption::NotOffered { sentence }),
+                        None if by_policy => None,
                         None => {
                             let unparks = parked[index]
                                 .map(|parked| explain::enable_unparks(&entry.name, &parked.origin));
@@ -761,10 +774,11 @@ pub(crate) fn resolve(
                             }
                         }
                     };
-                    let disable = if disabling.is_empty()
-                        && by_rule.is_empty()
-                        && parked[index].is_none()
-                        && off.is_none()
+                    let disable = if by_policy
+                        || disabling.is_empty()
+                            && by_rule.is_empty()
+                            && parked[index].is_none()
+                            && off.is_none()
                     {
                         disable::option(definition, snapshot, entry, context_project.as_ref())
                     } else {
@@ -1226,15 +1240,17 @@ fn competes(
 /// by: its name, or for an Entry of a location that competes by endpoint,
 /// the name of the Entry the Agent ranks highest among those of other
 /// locations that have its endpoint and are read, or else its endpoint; or
-/// for a remote Entry that competes by URL, its URL.
+/// for a remote Entry that competes by URL, its URL. The context's Project
+/// has the key `project`.
 fn item_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     in_context: &[&ScannedEntry],
     entry: &ScannedEntry,
+    project: Option<&str>,
     unread: &dyn Fn(&ScannedEntry) -> bool,
 ) -> ItemKey {
-    if let Some(url) = url_key(definition, snapshot, entry, unread) {
+    if let Some(url) = url_key(definition, snapshot, entry, project, unread) {
         return ItemKey::Url(url);
     }
     let location = definition.location(&entry.location);
@@ -1505,21 +1521,18 @@ fn read_failure_caveats(
     caveats
 }
 
-/// For an Entry of settings, how many files of its source are read after
-/// its own, each overriding it; 0 for any other Entry.
+/// For an Entry of settings, how many files the Agent reads after its own,
+/// each overriding it: the later files of its source, and those of the
+/// higher sources merged with it. 0 for any other Entry, and for one the
+/// Agent never reads.
 fn overridden(definition: &AgentDefinition, snapshot: &Snapshot, entry: &ScannedEntry) -> usize {
     let Some(id) = definition.location(&entry.location).anchor.settings() else {
         return 0;
     };
-    snapshot
-        .settings_of(entry.agent_index, id)
-        .sources
-        .iter()
-        .find_map(|files| {
-            let at = files.iter().position(|file| *file == entry.path)?;
-            Some(files.len() - 1 - at)
-        })
-        .unwrap_or(0)
+    let read = snapshot.settings_of(entry.agent_index, id).read();
+    read.iter()
+        .position(|file| *file == entry.path)
+        .map_or(0, |at| read.len() - 1 - at)
 }
 
 /// Whether `entry` is in a file its Agent skips unread, since someone other
@@ -1542,7 +1555,7 @@ fn skipped_source<'s>(
     if !settings.skips(&entry.path) {
         return None;
     }
-    Some((&settings.id, settings.read().first()?))
+    Some((&settings.id, settings.first_read()?))
 }
 
 /// The gates of its Item kind that Block `entry` in the context of the
@@ -1837,15 +1850,18 @@ fn needs_trusted_folder(
         })
 }
 
-/// Whether the Feature gate `name` of the Agent home of `entry` is on: the
-/// value the Agent last cached, or else the definition's assumed default.
+/// Whether the Feature gate `name` of the Agent home of `entry` is on in
+/// the context of the Project with the key `project`: the value the Agent
+/// last cached, or else the definition's assumed default.
 pub(crate) fn gate_on(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     name: &str,
+    project: Option<&str>,
 ) -> bool {
-    let cached = scanned_gate(snapshot, entry, name).and_then(|gate| match gate.reading {
+    let reading = scanned_gate(snapshot, entry, name, project).map(|gate| &gate.reading);
+    let cached = reading.and_then(|reading| match reading {
         GateReading::Cached(cached) => Some(cached.on),
         GateReading::Unreadable | GateReading::Bypassed(_) => None,
     });
@@ -1856,14 +1872,23 @@ pub(crate) fn gate_on(
     })
 }
 
+/// The Feature gate `name` of the Agent home of `entry` as it reads in the
+/// context of the Project with the key `project`: as it reads there, or
+/// else everywhere.
 fn scanned_gate<'s>(
     snapshot: &'s Snapshot,
     entry: &ScannedEntry,
     name: &str,
+    project: Option<&str>,
 ) -> Option<&'s ScannedGate> {
-    snapshot.gates.iter().find(|gate| {
+    let of_entry = |gate: &&ScannedGate| {
         gate.agent_index == entry.agent_index && gate.home == entry.home && gate.name == name
-    })
+    };
+    let mut gates = snapshot.gates.iter().filter(of_entry);
+    gates
+        .clone()
+        .find(|gate| project.is_some() && gate.project.as_deref() == project)
+        .or_else(|| gates.find(|gate| gate.project.is_none()))
 }
 
 /// What the source of a setting `owner` names holds for `entry` in the
@@ -1897,7 +1922,7 @@ fn closed<'d>(
     entry: &ScannedEntry,
     project: Option<&str>,
 ) -> Option<Closed<'d>> {
-    let gate_on = |name: &str| gate_on(definition, snapshot, entry, name);
+    let gate_on = |name: &str| gate_on(definition, snapshot, entry, name, project);
     let location = definition
         .locations
         .iter()
@@ -1973,7 +1998,7 @@ fn gate_caveats(
                     sentence: explain::gate_assumed(agent_name, &gate.name, gate.assumed, None),
                 });
             }
-            let scanned = scanned_gate(snapshot, entry, &gate.name)?;
+            let scanned = scanned_gate(snapshot, entry, &gate.name, project)?;
             let (code, sentence) = match &scanned.reading {
                 GateReading::Cached(cached) => (
                     api::CaveatCode::GateCached,
@@ -2161,11 +2186,12 @@ fn url_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
+    project: Option<&str>,
     unread: &dyn Fn(&ScannedEntry) -> bool,
 ) -> Option<String> {
     let location = definition.location(&entry.location);
     let block = definition.rules(location.kind).competition.same_url()?;
-    if unread(entry) || !gate_on(definition, snapshot, entry, &block.gate) {
+    if unread(entry) || !gate_on(definition, snapshot, entry, &block.gate, project) {
         return None;
     }
     block.url_of(&location.id, &entry.config)

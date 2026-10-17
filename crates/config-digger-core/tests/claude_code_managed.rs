@@ -909,3 +909,217 @@ fn allow_managed_mcp_servers_only_leaves_only_the_managed_allow_list() {
     );
     assert_eq!(state_and_code(&inventory, "linear"), pair("effective", ""));
 }
+
+/// The cache of server-managed settings, in the user's `~/.claude`.
+fn remote_settings(settings: Value) -> (PathBuf, String) {
+    (
+        in_home(r".claude\remote-settings.json"),
+        settings.to_string(),
+    )
+}
+
+#[test]
+fn remote_settings_rank_above_every_other_managed_source() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({ "managedMcpServers": {
+            "wiki": { "type": "http", "url": "https://mcp.corp.example/wiki" },
+        } })),
+    );
+    let env = env().with_registry_value(
+        Hive::LocalMachine,
+        POLICIES,
+        "Settings",
+        &managed_server("wiki", "https://mcp.corp.example/wiki-v2"),
+    );
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    let wiki = server(&inventory, "wiki");
+    assert_eq!(
+        states(wiki),
+        [
+            (
+                r"C:\Users\fixture\.claude\remote-settings.json#managedMcpServers.wiki".to_owned(),
+                "effective".to_owned()
+            ),
+            (
+                r"HKLM\SOFTWARE\Policies\ClaudeCode\Settings#managedMcpServers.wiki".to_owned(),
+                "unread".to_owned()
+            ),
+        ]
+    );
+    let remote = entry_json(&wiki.entries[0]);
+    assert_eq!(remote["scope"], "managed");
+    assert_eq!(remote["provenance"], "managed");
+    assert_eq!(remote["disable"]["code"], "read_only");
+    assert_eq!(remote["remove"]["code"], "read_only");
+}
+
+#[test]
+fn remote_settings_lists_apply_as_policy() {
+    let fs = with(
+        servers_home(),
+        remote_settings(json!({
+            "deniedMcpServers": [{ "serverName": "notes" }],
+            "allowedMcpServers": [{ "serverName": "notes" }],
+        })),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        state_and_code(&inventory, "notes"),
+        pair("blocked", "policy")
+    );
+    assert_eq!(
+        state_and_code(&inventory, "linear"),
+        pair("blocked", "policy")
+    );
+}
+
+#[test]
+fn a_source_set_to_merge_is_merged_with_the_admin_sources_below_it() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({
+            "managedSourcesBehavior": "merge",
+            "managedMcpServers": { "wiki": { "type": "http", "url": "https://mcp.corp.example/wiki" } },
+        })),
+    )
+    .with_file(
+        in_program_files(r"ClaudeCode\managed-settings.json"),
+        managed_server("tickets", "https://mcp.corp.example/tickets"),
+    );
+    let env = env()
+        .with_registry_value(
+            Hive::LocalMachine,
+            POLICIES,
+            "Settings",
+            &managed_server("wiki", "https://mcp.corp.example/wiki-v2"),
+        )
+        .with_registry_value(
+            Hive::CurrentUser,
+            POLICIES,
+            "Settings",
+            &managed_server("mine", "https://mcp.example/mine"),
+        );
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    let wiki = server(&inventory, "wiki");
+    assert_eq!(
+        states(wiki),
+        [
+            (
+                r"C:\Users\fixture\.claude\remote-settings.json#managedMcpServers.wiki".to_owned(),
+                "effective".to_owned()
+            ),
+            (
+                r"HKLM\SOFTWARE\Policies\ClaudeCode\Settings#managedMcpServers.wiki".to_owned(),
+                "shadowed".to_owned()
+            ),
+        ]
+    );
+    assert_eq!(state_and_code(&inventory, "tickets"), pair("effective", ""));
+    // The user-writable registry value never merges with another source.
+    assert_eq!(
+        state_and_code(&inventory, "mine"),
+        pair("unread", "source_skipped")
+    );
+}
+
+#[test]
+fn merging_lists_combines_them_from_every_merged_source() {
+    let fs = with(
+        with(
+            servers_home(),
+            remote_settings(json!({
+                "managedSourcesBehavior": "merge",
+                "deniedMcpServers": [{ "serverName": "notes" }],
+            })),
+        ),
+        managed_settings(json!({ "deniedMcpServers": [{ "serverName": "linear" }] })),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        state_and_code(&inventory, "notes"),
+        pair("blocked", "policy")
+    );
+    assert_eq!(
+        state_and_code(&inventory, "linear"),
+        pair("blocked", "policy")
+    );
+}
+
+#[test]
+fn a_lower_source_cannot_opt_into_merging_with_the_source_above_it() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({ "managedMcpServers": {
+            "wiki": { "type": "http", "url": "https://mcp.corp.example/wiki" },
+        } })),
+    )
+    .with_file(
+        in_program_files(r"ClaudeCode\managed-settings.json"),
+        json!({
+            "managedSourcesBehavior": "merge",
+            "managedMcpServers": { "tickets": { "type": "http", "url": "https://mcp.corp.example/tickets" } },
+        })
+        .to_string(),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        state_and_code(&inventory, "tickets"),
+        pair("unread", "source_skipped")
+    );
+}
+
+#[test]
+fn a_source_holding_only_the_merge_switch_decides_the_merge_but_supplies_no_policy() {
+    let fs = with(
+        claude_home(&json!({})),
+        remote_settings(json!({ "managedSourcesBehavior": "merge" })),
+    )
+    .with_file(
+        in_program_files(r"ClaudeCode\managed-settings.json"),
+        managed_server("tickets", "https://mcp.corp.example/tickets"),
+    );
+    let env = env().with_registry_value(
+        Hive::LocalMachine,
+        POLICIES,
+        "Settings",
+        &managed_server("wiki", "https://mcp.corp.example/wiki"),
+    );
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    assert_eq!(state_and_code(&inventory, "wiki"), pair("effective", ""));
+    assert_eq!(state_and_code(&inventory, "tickets"), pair("effective", ""));
+}
+
+#[test]
+fn merging_takes_an_allow_list_whole_from_the_highest_source_holding_one() {
+    let fs = with(
+        with(
+            servers_home(),
+            remote_settings(json!({
+                "managedSourcesBehavior": "merge",
+                "allowedMcpServers": [{ "serverName": "notes" }],
+            })),
+        ),
+        managed_settings(json!({ "allowedMcpServers": [{ "serverName": "linear" }] })),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(state_and_code(&inventory, "notes"), pair("effective", ""));
+    assert_eq!(
+        state_and_code(&inventory, "linear"),
+        pair("blocked", "policy")
+    );
+}

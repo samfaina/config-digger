@@ -723,3 +723,125 @@ fn a_server_the_manifest_declares_replaces_the_same_named_one_of_the_plugins_mcp
         reason.sentence
     );
 }
+
+const PROGRAM_FILES: &str = r"C:\Program Files";
+
+fn managed_settings() -> PathBuf {
+    PathBuf::from(PROGRAM_FILES).join(r"ClaudeCode\managed-settings.json")
+}
+
+/// The fixture, with `enabledPlugins` in the managed settings file.
+fn with_managed_plugins(enabled: Value) -> Core {
+    let fs = fixture().with_file(
+        managed_settings(),
+        json!({ "enabledPlugins": enabled }).to_string(),
+    );
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
+        .with_var("ProgramFiles", PROGRAM_FILES);
+    Core::new(fake::ports(fs, env)).unwrap()
+}
+
+#[test]
+fn a_plugin_the_managed_settings_force_off_is_blocked_by_policy() {
+    let core = with_managed_plugins(json!({ "supabase@claude-plugins-official": false }));
+
+    let inventory = inventory(&core, &Context::default());
+
+    let switch = format!(
+        r"{PROGRAM_FILES}\ClaudeCode\managed-settings.json#enabledPlugins.supabase@claude-plugins-official"
+    );
+    for name in ["plugin:supabase:supabase", "supabase:supabase-postgres"] {
+        let entry = entry_json(&item(&inventory, name).entries[0]);
+        assert_eq!(entry["state"], "blocked", "{name}");
+        assert_eq!(
+            entry["reason"],
+            json!({
+                "code": "policy",
+                "effective": null,
+                "switch": switch,
+                "sentence": format!(
+                    r"Blocked by policy: `enabledPlugins.supabase@claude-plugins-official` is false in {PROGRAM_FILES}\ClaudeCode\managed-settings.json, so Claude Code skips every server and skill of the plugin supabase@claude-plugins-official."
+                ),
+            }),
+            "{name}"
+        );
+        assert_eq!(entry["enable"], Value::Null, "{name}");
+    }
+}
+
+#[test]
+fn enable_of_a_plugin_the_managed_settings_force_off_is_refused() {
+    let core = with_managed_plugins(json!({ "superpowers@claude-plugins-official": false }));
+
+    let refused = plan(
+        &core,
+        &Context::default(),
+        Action::Enable,
+        &["superpowers:brainstorming"],
+    );
+
+    assert!(refused.is_err(), "Enable was planned");
+}
+
+#[test]
+fn a_plugin_the_managed_settings_force_on_cannot_be_disabled() {
+    let core = with_managed_plugins(json!({ "superpowers@claude-plugins-official": true }));
+
+    let inventory = inventory(&core, &Context::default());
+
+    // The user settings turn it off, which the managed value overrides.
+    for name in [
+        "superpowers:brainstorming",
+        "plugin:superpowers:episodic-memory",
+    ] {
+        let entry = entry_json(&item(&inventory, name).entries[0]);
+        assert_eq!(entry["state"], "effective", "{name}");
+        assert_eq!(
+            entry["disable"],
+            json!({
+                "status": "not_offered",
+                "code": "policy",
+                "sentence": format!(
+                    r"Disable is not offered: `enabledPlugins.superpowers@claude-plugins-official` is true in {PROGRAM_FILES}\ClaudeCode\managed-settings.json, which forces the plugin on, and config-digger never overrides managed policy."
+                ),
+            }),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn of_merged_managed_sources_the_highest_holding_a_plugin_decides() {
+    let fs = fixture()
+        .with_file(
+            PathBuf::from(HOME).join(r".claude\remote-settings.json"),
+            json!({
+                "managedSourcesBehavior": "merge",
+                "enabledPlugins": { "supabase@claude-plugins-official": true },
+            })
+            .to_string(),
+        )
+        .with_file(
+            managed_settings(),
+            json!({ "enabledPlugins": {
+                "supabase@claude-plugins-official": false,
+                "context7@claude-plugins-official": false,
+            } })
+            .to_string(),
+        );
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
+        .with_var("ProgramFiles", PROGRAM_FILES);
+    let core = Core::new(fake::ports(fs, env)).unwrap();
+
+    let inventory = inventory(&core, &Context::default());
+
+    assert_eq!(
+        code(item(&inventory, "plugin:supabase:supabase").state),
+        "effective"
+    );
+    let path = in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json");
+    let context7 = entry_at(&inventory, &path, &["mcpServers", "context7"]);
+    assert_eq!(code(context7.state), "blocked");
+}
