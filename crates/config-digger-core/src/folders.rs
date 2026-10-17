@@ -5,6 +5,7 @@
 
 use crate::api::{Error, FolderChange, FolderChangeKind};
 use crate::ports::{FileSystem, HeldLock};
+use crate::scan::LocationReader;
 use crate::{explain, paths, skill};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
@@ -68,6 +69,9 @@ pub(crate) struct PlannedFolder {
     pub size: FolderSize,
     /// The folder is in the index of its git repo.
     pub git_versioned: bool,
+    /// The locations that read the folder: those whose folder holds it, or
+    /// holds a link that leads into it.
+    pub readers: Vec<LocationReader>,
 }
 
 impl PlannedFolder {

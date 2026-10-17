@@ -627,6 +627,30 @@ fn disable_of_a_user_skill_parks_its_folder_in_config_digger_s_store() {
 }
 
 #[test]
+fn parking_a_skill_while_cursor_runs_warns_that_it_reads_the_folder() {
+    let fs = with_review(cursor()).with_file(
+        format!(r"{LOCAL_APP_DATA}\Programs\cursor\Cursor.exe"),
+        fake::executable(Some([3, 22, 12, 0])),
+    );
+    let core = core_while_cursor_runs(&fs);
+    let selector = user_skill("review").display().to_string();
+
+    let plan = plan(&core, &context(None), Action::Disable, &[&selector]).unwrap();
+
+    let warning = plan
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::RunningAgent)
+        .expect("a running-agent warning");
+    assert!(warning.sentence.contains("Cursor"), "{}", warning.sentence);
+    assert!(
+        warning.sentence.contains(r".cursor\skills\review"),
+        "{}",
+        warning.sentence
+    );
+}
+
+#[test]
 fn a_parked_skill_is_listed_as_disabled_where_it_was() {
     let fs = with_review(cursor());
     park_review(&fs);
