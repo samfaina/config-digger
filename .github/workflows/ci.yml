@@ -32,6 +32,8 @@ jobs:
         run: cargo xtask definitions
       - name: Installer folder is no data folder
         run: cargo xtask installer
+      - name: Git ignores no fixture file
+        run: cargo xtask fixtures
       - name: TypeScript bindings are current
         run: cargo xtask bindings --check
       - name: UI typecheck, tests and build
