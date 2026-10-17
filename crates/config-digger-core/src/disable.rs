@@ -3,7 +3,7 @@
 //! and what Enable lifts. Disable never writes a git-versioned file, so a
 //! switch in one is skipped for the next mechanism.
 
-use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode};
+use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
     MechanismTarget, MergedField, Switched,
@@ -53,9 +53,27 @@ impl Hit<'_> {
         locator::render(&self.switch.path, &self.key_path)
     }
 
-    /// Why the Entry is Disabled, as its State's reason.
+    /// The State the switch gives the Entry: Blocked for managed policy,
+    /// Disabled otherwise.
+    pub fn state(&self) -> State {
+        if self.mechanism.policy() {
+            State::Blocked
+        } else {
+            State::Disabled
+        }
+    }
+
+    /// Why the Entry is Disabled, or Blocked by policy, as its State's reason.
     pub fn reason(&self, agent_name: &str) -> Reason {
         let holds = self.holds();
+        if self.mechanism.policy() {
+            return Reason {
+                code: ReasonCode::Policy,
+                effective: None,
+                switch: Some(self.locator()),
+                sentence: explain::switched_off_by_policy(self.plugin(), &holds, agent_name),
+            };
+        }
         let (code, sentence) = match self.mechanism.reason() {
             DisableReason::DisabledByName => (
                 ReasonCode::DisabledByName,
@@ -76,6 +94,12 @@ impl Hit<'_> {
             switch: Some(self.locator()),
             sentence,
         }
+    }
+
+    /// The id of the plugin the switch holds the Entry by, for a switch of
+    /// a whole plugin.
+    fn plugin(&self) -> Option<&str> {
+        (self.mechanism.target() == MechanismTarget::Plugin).then_some(&*self.key)
     }
 
     /// What the switch holds, as a sentence says it.
@@ -210,6 +234,11 @@ fn set_for<'a>(
             continue;
         };
         for switch in switches {
+            // Of the files of one layer, such as merged managed settings,
+            // the first that holds a value decides too.
+            if mechanism.layered() && layer_decided {
+                break;
+            }
             let value = switch.value_for(&key);
             // Enable taking a switch away leaves the next layer to decide.
             let unset =
@@ -245,6 +274,49 @@ fn set_for<'a>(
     (disabling, partial)
 }
 
+/// The first switch of managed policy that holds a value for `entry` in
+/// the context of the Project with the key `project`, forcing it on or off.
+fn policy_hold<'a>(
+    definition: &'a AgentDefinition,
+    snapshot: &'a Snapshot,
+    entry: &'a ScannedEntry,
+    project: Option<&str>,
+) -> Option<Hit<'a>> {
+    let location = definition.location(&entry.location);
+    let folder = project
+        .and_then(|key| snapshot.project(key))
+        .map(|project| project.path.as_path());
+    definition
+        .rules(location.kind)
+        .disable
+        .iter()
+        .enumerate()
+        .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
+        .filter(|(_, mechanism)| {
+            mechanism.policy()
+                && mechanism.covers(&location.id)
+                && mechanism.covers_plugin(plugin_scope(entry))
+                && switch_read(definition, snapshot, entry, *mechanism, project)
+        })
+        .find_map(|(index, mechanism)| {
+            let key = switch_key(mechanism, entry)?;
+            snapshot
+                .switches_of(entry, location.kind, index)
+                .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project)
+                .find_map(|switch| {
+                    let value = switch.value_for(&key)?;
+                    Some(Hit {
+                        mechanism,
+                        switch,
+                        key_path: switch.key_path_for(&key),
+                        value: Some(value),
+                        key: key.clone(),
+                        folder,
+                    })
+                })
+        })
+}
+
 /// What the switch of `mechanism` holds `entry` by: the id of the plugin
 /// it is part of, for a switch keyed by plugin alone, the id its location's
 /// `switch_id` makes, for a switch per Entry of a location that has one, and
@@ -275,6 +347,9 @@ fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<Cow<'e
 pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result<String, String> {
     if location.provenance.read_only() {
         return Err(explain::read_only_enable());
+    }
+    if let Some(hit) = disabling.iter().find(|hit| hit.mechanism.policy()) {
+        return Err(explain::policy_enable_not_offered(&hit.holds()));
     }
     if let Some(hit) = disabling.iter().find(|hit| !hit.mechanism.enable_offered()) {
         return Err(explain::enable_not_offered(&hit.holds()));
@@ -345,6 +420,12 @@ pub(crate) fn choose(
     }
     if location.provenance.read_only() {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
+    }
+    let context = project.map(|project| project.key);
+    if let Some(hit) = policy_hold(definition, snapshot, entry, context) {
+        let on = !hit.mechanism.disables(hit.value, &hit.key, hit.folder);
+        let sentence = explain::policy_option(&hit.holds(), on, hit.plugin().is_some());
+        return Err((DisableNotOffered::Policy, sentence));
     }
     let merged_field = definition
         .rules(location.kind)
@@ -705,7 +786,7 @@ fn switch_read(
     mechanism: Switched,
     project: Option<&str>,
 ) -> bool {
-    let gate_on = |name: &str| resolve::gate_on(definition, snapshot, entry, name);
+    let gate_on = |name: &str| resolve::gate_on(definition, snapshot, entry, name, project);
     let kind = definition.location(&entry.location).kind;
     mechanism
         .when()

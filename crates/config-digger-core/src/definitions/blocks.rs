@@ -1057,6 +1057,18 @@ impl Validate for SettingsSource {
     }
 }
 
+impl SettingsSource {
+    /// Whether the user can write the source, such as an `HKCU` policy, so
+    /// that the Agent never merges it with another source.
+    pub fn user_writable(&self) -> bool {
+        match self {
+            SettingsSource::RegistryValue(block) => block.user_writable,
+            SettingsSource::RegistryKey(_) => false,
+            SettingsSource::Files(block) => block.user_writable,
+        }
+    }
+}
+
 /// The values of a key in the Windows registry, each one setting, such as
 /// Claude Desktop's policy under `HKLM\SOFTWARE\Policies\Claude`. A string
 /// value reads as a string, and a DWORD as `true` when it is 1 and `false`
@@ -1125,6 +1137,10 @@ pub(crate) struct RegistryValueSource {
     pub key: String,
     /// The value's name.
     pub value: String,
+    /// Whether the user can write it, so that the Agent never merges it
+    /// with another source.
+    #[serde(default)]
+    pub user_writable: bool,
 }
 
 impl Validate for RegistryValueSource {
@@ -1172,25 +1188,28 @@ impl RegistryHive {
     }
 }
 
-/// A JSON file on the machine, and the `.json` files of a drop-in folder,
-/// by name, read after it, such as Claude Code's `managed-settings.json`
-/// and `managed-settings.d`. They are one source.
+/// A JSON file, and the `.json` files of a drop-in folder, by name, read
+/// after it, such as Claude Code's `managed-settings.json` and
+/// `managed-settings.d`, or a copy the Agent caches in the user's home,
+/// such as Claude Code's `~/.claude/remote-settings.json`. They are one
+/// source.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FilesSource {
-    /// Starts with `%NAME%` or a drive; `/`-separated.
+    /// Starts with `~/`, `%NAME%` or a drive; `/`-separated.
     pub path: String,
     /// The drop-in folder, written as `path` is.
     pub drop_ins: Option<String>,
+    /// Whether the user can write it, so that the Agent never merges it
+    /// with another source.
+    #[serde(default)]
+    pub user_writable: bool,
 }
 
 impl Validate for FilesSource {
     fn validate(&self) -> Result<(), String> {
         for path in std::iter::once(&self.path).chain(&self.drop_ins) {
             MachineAnchor { path: path.clone() }.validate()?;
-            if path.starts_with("~/") {
-                return Err(format!("path `{path}` must start with `%NAME%` or a drive"));
-            }
         }
         Ok(())
     }
@@ -4014,6 +4033,12 @@ pub(crate) trait Disables {
     /// Entry decides, and the others are ignored.
     fn layered(&self) -> bool;
 
+    /// Whether the switch is managed policy: what it Disables is Blocked,
+    /// and while it holds a value for an Entry, Disable is not offered.
+    fn policy(&self) -> bool {
+        false
+    }
+
     fn locations(&self) -> &[String];
 
     /// The Feature gates under which the Agent reads the switch, every one
@@ -4228,6 +4253,10 @@ impl Disables for Switched<'_> {
 
     fn layered(&self) -> bool {
         self.block().layered()
+    }
+
+    fn policy(&self) -> bool {
+        self.block().policy()
     }
 
     fn disables(&self, value: Option<&Value>, name: &str, folder: Option<&Path>) -> bool {
@@ -4581,6 +4610,13 @@ pub(crate) struct JsonField {
     /// whose field holds a value for the Entry decides.
     #[serde(default)]
     pub layered: bool,
+    /// Whether the field is managed policy, such as `enabledPlugins` in
+    /// Claude Code's managed settings, which forces a plugin on or off: an
+    /// Entry it Disables is Blocked, by `policy`, and while it holds a
+    /// value for an Entry, Disable is not offered. config-digger only
+    /// reads it, so `enable_offered` must be false.
+    #[serde(default)]
+    pub policy: bool,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -4611,6 +4647,9 @@ impl Validate for JsonField {
             return Err(
                 "a switch named_by a list item is only read: enable_offered must be false".into(),
             );
+        }
+        if self.policy && self.enable_offered {
+            return Err("a policy switch is only read: enable_offered must be false".into());
         }
         match (self.enable_action, &self.enabled_value) {
             (EnableAction::RemoveItem, _) => {
@@ -4669,6 +4708,10 @@ impl Disables for JsonField {
 
     fn layered(&self) -> bool {
         self.layered
+    }
+
+    fn policy(&self) -> bool {
+        self.policy
     }
 
     fn disables(&self, value: Option<&Value>, _name: &str, _folder: Option<&Path>) -> bool {
@@ -5276,9 +5319,12 @@ pub(crate) fn is_entry_key(key: &str) -> bool {
 impl Validate for Switch {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
-        if !self.anchor.per_plugin() && self.anchor.entry().is_none() {
+        let per_file = self.anchor.per_plugin() || self.anchor.entry().is_some();
+        // A switch in settings is only read, from every file the Agent
+        // reads of them.
+        if !per_file && self.anchor.settings().is_none() {
             self.anchor.one_file()?;
-        } else if self.key_path.iter().any(|key| key == PLUGIN_KEY) {
+        } else if per_file && self.key_path.iter().any(|key| key == PLUGIN_KEY) {
             return Err(format!(
                 "a switch holds `{PLUGIN_KEY}` in its file's path or its key path, not both"
             ));
@@ -5414,6 +5460,12 @@ pub(crate) struct SettingPlace {
     /// `policy`, rather than Disabled.
     #[serde(default)]
     pub policy: bool,
+    /// With a settings anchor, the Agent takes the value whole from the
+    /// highest source it reads that holds it, ignoring those of the lower
+    /// sources it merges with that one, as Claude Code takes
+    /// `allowedMcpServers`. The files of that source still combine.
+    #[serde(default)]
+    pub highest_source: bool,
     /// The dialect the Agent reads the file in. Omitted for strict JSON.
     pub dialect: Option<JsonDialect>,
     /// Whether the file is a SQLite store, such as VS Code's `state.vscdb`,
@@ -5490,6 +5542,9 @@ impl Validate for SettingPlace {
         }
         if self.anchor.walk() != ProjectWalk::None {
             return Err("a setting cannot walk up from the Project folder".into());
+        }
+        if self.highest_source && self.anchor.settings().is_none() {
+            return Err("highest_source needs a settings anchor".into());
         }
         if self.anchor.plugin().is_some() || self.anchor.entry().is_some() {
             return Err("a setting cannot lie in a plugin's folder, nor beside an Entry".into());
@@ -6816,7 +6871,8 @@ pub(crate) struct EnvBypass {
     pub variables: Vec<BypassVariable>,
     /// Maps of variables the Agent applies over the environment it starts
     /// in, such as the `env` of Claude Code's user settings, highest
-    /// first. A variable there replaces the one in the environment.
+    /// first. A variable there replaces the one in the environment. A map
+    /// in a Project applies in that Project only.
     #[serde(default)]
     pub env_maps: Vec<EnvMap>,
 }
@@ -6845,13 +6901,22 @@ pub(crate) enum VariableValues {
 }
 
 /// A JSON object of variable names and string values in a file of the
-/// Agent home or the machine, such as the `env` of a settings file.
+/// Agent home, the machine or the Project, or in settings, such as the
+/// `env` of a settings file. In settings, a later file read overrides an
+/// earlier one, variable by variable.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EnvMap {
     pub anchor: Anchor,
     /// The key path of the object, one key per segment.
     pub key_path: Vec<String>,
+    /// With a settings anchor, the Agent reads the object from every source
+    /// it reads such keys from, and not only from those it reads settings
+    /// from, as Claude Code reads `env`: each source the user cannot write,
+    /// or the one it reads when the user can write that one. A higher
+    /// source's variable wins.
+    #[serde(default)]
+    pub every_source: bool,
 }
 
 impl Validate for EnvBypass {
@@ -6865,12 +6930,23 @@ impl Validate for EnvBypass {
             }
         }
         for map in &self.env_maps {
-            map.anchor.validate().map_err(|e| format!("env map: {e}"))?;
-            map.anchor.one_file().map_err(|e| format!("env map: {e}"))?;
-            if map.anchor.in_project() {
-                return Err("an env map must lie in the Agent home or the machine".into());
+            let context = |e: String| format!("env map: {e}");
+            map.anchor.validate().map_err(context)?;
+            if map.anchor.settings().is_none() {
+                map.anchor.one_file().map_err(context)?;
             }
-            validate_key_path(&map.key_path).map_err(|e| format!("env map: {e}"))?;
+            if map.every_source && map.anchor.settings().is_none() {
+                return Err(context("every_source needs a settings anchor".into()));
+            }
+            if map.anchor.walk() != ProjectWalk::None
+                || map.anchor.project_storage().is_some()
+                || map.anchor.project_file()
+            {
+                return Err(context(
+                    "an env map lies in one file of the Project folder".into(),
+                ));
+            }
+            validate_key_path(&map.key_path).map_err(context)?;
         }
         Ok(())
     }

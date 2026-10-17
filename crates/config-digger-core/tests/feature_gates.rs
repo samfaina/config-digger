@@ -536,3 +536,157 @@ fn a_gate_kept_nowhere_on_disk_is_assumed_on_every_entry_it_affects() {
         "Depends on Test Agent gate `dedupe_mcp_servers`: assumed off; cannot be read."
     );
 }
+
+const PROGRAM_FILES: &str = r"C:\Program Files";
+const POLICIES: &str = r"SOFTWARE\Policies\ClaudeCode";
+
+fn managed_env() -> FakeEnvironment {
+    FakeEnvironment::with_home(HOME).with_var("ProgramFiles", PROGRAM_FILES)
+}
+
+#[test]
+fn a_variable_in_a_managed_drop_in_env_bypasses_the_cache() {
+    let fs = claude_home(&cached(json!(false)))
+        .with_file(
+            format!(r"{PROGRAM_FILES}\ClaudeCode\managed-settings.json"),
+            json!({ "model": "opus" }).to_string(),
+        )
+        .with_file(
+            format!(r"{PROGRAM_FILES}\ClaudeCode\managed-settings.d\10-telemetry.json"),
+            json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+        );
+
+    let inventory = inventory_with(&fs, managed_env());
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_assumed"),
+        bypassed_by("DISABLE_TELEMETRY")
+    );
+}
+
+#[test]
+fn a_variable_in_every_admin_source_env_bypasses_the_cache_even_one_claude_code_skips() {
+    // The registry policy holds settings, so Claude Code skips the
+    // managed settings file, but still reads its `env`.
+    let fs = claude_home(&cached(json!(false))).with_file(
+        format!(r"{PROGRAM_FILES}\ClaudeCode\managed-settings.json"),
+        json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+    );
+    let env = managed_env().with_registry_value(
+        config_digger_core::ports::Hive::LocalMachine,
+        POLICIES,
+        "Settings",
+        &json!({ "model": "opus" }).to_string(),
+    );
+
+    let inventory = inventory_with(&fs, env);
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_assumed"),
+        bypassed_by("DISABLE_TELEMETRY")
+    );
+}
+
+#[test]
+fn the_user_registry_policy_env_is_not_read_beneath_an_admin_source() {
+    let fs = claude_home(&cached(json!(false))).with_file(
+        format!(r"{PROGRAM_FILES}\ClaudeCode\managed-settings.json"),
+        json!({ "model": "opus" }).to_string(),
+    );
+    let env = managed_env().with_registry_value(
+        config_digger_core::ports::Hive::CurrentUser,
+        POLICIES,
+        "Settings",
+        &json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+    );
+
+    let inventory = inventory_with(&fs, env);
+
+    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
+}
+
+const PROJECT: &str = r"E:\projects\petme-app";
+
+fn inventory_in(fs: &FakeFileSystem, project: Option<&str>) -> Inventory {
+    let core = Core::new(fake::ports(fs.clone(), FakeEnvironment::with_home(HOME))).unwrap();
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+    core.resolve(
+        &snapshot,
+        &Context {
+            project: project.map(PathBuf::from),
+        },
+    )
+}
+
+#[test]
+fn a_variable_in_a_projects_settings_env_bypasses_the_cache_in_that_project_only() {
+    for file in [r".claude\settings.json", r".claude\settings.local.json"] {
+        let fs = claude_home(&cached(json!(false))).with_file(
+            PathBuf::from(PROJECT).join(file),
+            json!({ "env": { "DISABLE_GROWTHBOOK": "1" } }).to_string(),
+        );
+
+        let in_project = inventory_in(&fs, Some(PROJECT));
+        let entry = entry_json(&skill(&in_project, "pdf").entries[0]);
+        assert_eq!(entry["state"], "effective", "{file}");
+        assert_eq!(
+            pdf_caveat(&in_project, "gate_assumed"),
+            bypassed_by("DISABLE_GROWTHBOOK"),
+            "{file}"
+        );
+
+        let outside = inventory_in(&fs, None);
+        let entry = entry_json(&skill(&outside, "pdf").entries[0]);
+        assert_eq!(entry["state"], "unread", "{file}");
+        assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{file}");
+    }
+}
+
+#[test]
+fn a_projects_settings_env_yields_to_the_managed_env() {
+    let fs = claude_home(&cached(json!(false)))
+        .with_file(
+            PathBuf::from(PROJECT).join(r".claude\settings.json"),
+            json!({ "env": { "DISABLE_GROWTHBOOK": "1" } }).to_string(),
+        )
+        .with_file(
+            format!(r"{PROGRAM_FILES}\ClaudeCode\managed-settings.json"),
+            json!({ "env": { "DISABLE_GROWTHBOOK": "0" } }).to_string(),
+        );
+    let core = Core::new(fake::ports(fs, managed_env())).unwrap();
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+
+    let inventory = core.resolve(
+        &snapshot,
+        &Context {
+            project: Some(PathBuf::from(PROJECT)),
+        },
+    );
+
+    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
+}
+
+#[test]
+fn a_variable_in_the_remote_settings_env_bypasses_the_cache() {
+    let fs = claude_home(&cached(json!(false))).with_file(
+        in_home(r".claude\remote-settings.json"),
+        json!({ "env": { "DISABLE_TELEMETRY": "1" } }).to_string(),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_assumed"),
+        bypassed_by("DISABLE_TELEMETRY")
+    );
+}

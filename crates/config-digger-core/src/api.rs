@@ -1888,6 +1888,9 @@ pub enum DisableNotOffered {
     /// to, and the Agent home it is copied from holds no Entry it was
     /// copied from to act on instead.
     Mirrored,
+    /// Managed policy forces the Entry on or off, and config-digger never
+    /// overrides it.
+    Policy,
 }
 
 /// Whether Remove is offered for an Entry, and if not, why, and what to

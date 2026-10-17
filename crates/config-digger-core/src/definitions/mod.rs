@@ -350,8 +350,8 @@ pub(crate) struct FeatureGateDefinition {
 }
 
 /// One set of settings, which the Agent reads from the first of its
-/// sources that holds any setting, and from no other. Entries in the
-/// others are Unread.
+/// sources that holds any setting, and from no other, unless `merge` says
+/// otherwise. Entries in the sources it skips are Unread.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SettingsDefinition {
@@ -359,6 +359,28 @@ pub(crate) struct SettingsDefinition {
     pub id: String,
     /// Highest first.
     pub sources: Vec<SettingsSource>,
+    /// Top-level keys that say how the Agent reads the sources rather than
+    /// set anything, such as Claude Code's `managedSourcesBehavior`: a
+    /// source holding only these holds no setting.
+    #[serde(default)]
+    pub control_keys: Vec<String>,
+    /// The control key that, holding a value, has the Agent merge the source
+    /// it reads with every source below it that holds any setting and that
+    /// the user cannot write. The Agent reads it from the highest source that
+    /// holds it or any setting.
+    pub merge: Option<MergeKey>,
+}
+
+/// The control key that has the Agent merge sources of settings, and the
+/// value that turns merging on.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MergeKey {
+    /// A top-level key, one of the settings' `control_keys`, such as
+    /// `managedSourcesBehavior`.
+    pub key: String,
+    /// The value it holds while the Agent merges, such as `"merge"`.
+    pub value: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1258,6 +1280,14 @@ impl AgentDefinition {
             for source in &settings.sources {
                 source.validate().map_err(context)?;
             }
+            if let Some(merge) = &settings.merge
+                && !settings.control_keys.contains(&merge.key)
+            {
+                return Err(context(format!(
+                    "merge key `{}` must be one of control_keys",
+                    merge.key
+                )));
+            }
         }
 
         unique(
@@ -1341,7 +1371,7 @@ impl AgentDefinition {
             if let Some(bypass) = &gate.bypass {
                 bypass.validate().map_err(context)?;
                 for map in bypass.env_maps() {
-                    self.validate_home_root(&map.anchor).map_err(context)?;
+                    self.validate_setting(&map.anchor).map_err(context)?;
                 }
             }
         }
@@ -1826,6 +1856,16 @@ impl AgentDefinition {
             for (index, mechanism) in rules.disable.iter().enumerate() {
                 let context = |e: String| context(format!("disable[{index}]: {e}"));
                 mechanism.validate().map_err(context)?;
+                if let Some(switched) = mechanism.switched() {
+                    let anchor = &switched.switch().anchor;
+                    if anchor.settings().is_some() && switched.enable_offered() {
+                        return Err(context(
+                            "a switch in settings is only read: enable_offered must be false"
+                                .into(),
+                        ));
+                    }
+                    self.validate_setting(anchor).map_err(context)?;
+                }
                 if let Some(id) = mechanism
                     .locations()
                     .iter()
@@ -2997,27 +3037,85 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
     }
 
     #[test]
-    fn a_settings_anchor_cannot_hold_a_disable_switch() {
-        let text = with_disable(&name_list(false, "").replace(
+    fn a_disable_switch_in_settings_is_only_read() {
+        let switch = name_list(false, "").replace(
             r#"{ block = "home", root = "state" }"#,
             r#"{ block = "settings", settings = "managed" }"#,
-        ));
+        );
+        let text = with_policy(
+            &format!("disable = [{switch}]\n"),
+            r#"["disable", "precedence"]"#,
+        );
         assert!(
-            error(&text).contains("one file is needed"),
+            error(&text).contains("a switch in settings is only read"),
             "{}",
             error(&text)
         );
+        let text = text.replace(
+            r#"reason = "disabled_by_name""#,
+            r#"reason = "disabled_by_name", enable_offered = false"#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
     #[test]
-    fn settings_need_sources_that_name_a_registry_key_or_machine_files() {
+    fn a_policy_switch_is_only_read() {
+        let text = with_disable(&json_field(
+            r#", enable_action = "delete-key", policy = true"#,
+        ));
+        assert!(
+            error(&text).contains("a policy switch is only read"),
+            "{}",
+            error(&text)
+        );
+        let text = with_disable(&json_field(
+            r#", enable_action = "delete-key", policy = true, enable_offered = false"#,
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn settings_need_sources_that_name_a_registry_key_or_files() {
         let text = with_policy("", r#"["disable", "precedence"]"#)
             .replace(r#"'SOFTWARE\Policies\Test'"#, r#"'HKLM/SOFTWARE'"#);
         assert!(error(&text).contains("registry key"), "{}", error(&text));
         let text = with_policy("", r#"["disable", "precedence"]"#)
-            .replace("%ProgramFiles%/Test/settings.d", "~/settings.d");
+            .replace("%ProgramFiles%/Test/settings.d", "%ProgramFiles%/Test/*.d");
+        assert!(error(&text).contains("wildcards"), "{}", error(&text));
+        // A copy the Agent caches in the user's home is a source too.
+        let text = with_policy("", r#"["disable", "precedence"]"#)
+            .replace("%ProgramFiles%/Test/settings.d", "~/.test/settings.d");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn the_merge_key_of_settings_is_a_control_key() {
+        let merging = |control_keys: &str| {
+            with_policy("", r#"["disable", "precedence"]"#).replace(
+                "id = \"managed\"\n",
+                &format!(
+                    "id = \"managed\"\ncontrol_keys = {control_keys}\nmerge = {{ key = \"behavior\", value = \"merge\" }}\n"
+                ),
+            )
+        };
+        let text = merging("[]");
         assert!(
-            error(&text).contains("`%NAME%` or a drive"),
+            error(&text).contains("merge key `behavior` must be one of control_keys"),
+            "{}",
+            error(&text)
+        );
+        let text = merging(r#"["behavior"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn only_a_setting_in_settings_is_read_from_the_highest_source() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"{ anchor = { block = "home", root = "state" }, key_path = ["denied"] }"#,
+            r#"{ anchor = { block = "home", root = "state" }, key_path = ["denied"], highest_source = true }"#,
+        );
+        assert!(
+            error(&text).contains("highest_source needs a settings anchor"),
             "{}",
             error(&text)
         );

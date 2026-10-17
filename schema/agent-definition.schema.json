@@ -960,7 +960,7 @@
       ]
     },
     "SettingsDefinition": {
-      "description": "One set of settings, which the Agent reads from the first of its\nsources that holds any setting, and from no other. Entries in the\nothers are Unread.",
+      "description": "One set of settings, which the Agent reads from the first of its\nsources that holds any setting, and from no other, unless `merge` says\notherwise. Entries in the sources it skips are Unread.",
       "type": "object",
       "properties": {
         "id": {
@@ -973,6 +973,25 @@
           "items": {
             "$ref": "#/$defs/SettingsSource"
           }
+        },
+        "control_keys": {
+          "description": "Top-level keys that say how the Agent reads the sources rather than\nset anything, such as Claude Code's `managedSourcesBehavior`: a\nsource holding only these holds no setting.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "merge": {
+          "description": "The control key that, holding a value, has the Agent merge the source\nit reads with every source below it that holds any setting and that\nthe user cannot write. The Agent reads it from the highest source that\nholds it or any setting.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MergeKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"
@@ -1001,6 +1020,11 @@
             "value": {
               "description": "The value's name.",
               "type": "string"
+            },
+            "user_writable": {
+              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source.",
+              "type": "boolean",
+              "default": false
             },
             "block": {
               "type": "string",
@@ -1045,11 +1069,11 @@
           ]
         },
         {
-          "description": "A JSON file on the machine, and the `.json` files of a drop-in folder,\nby name, read after it, such as Claude Code's `managed-settings.json`\nand `managed-settings.d`. They are one source.",
+          "description": "A JSON file, and the `.json` files of a drop-in folder, by name, read\nafter it, such as Claude Code's `managed-settings.json` and\n`managed-settings.d`, or a copy the Agent caches in the user's home,\nsuch as Claude Code's `~/.claude/remote-settings.json`. They are one\nsource.",
           "type": "object",
           "properties": {
             "path": {
-              "description": "Starts with `%NAME%` or a drive; `/`-separated.",
+              "description": "Starts with `~/`, `%NAME%` or a drive; `/`-separated.",
               "type": "string"
             },
             "drop_ins": {
@@ -1058,6 +1082,11 @@
                 "string",
                 "null"
               ]
+            },
+            "user_writable": {
+              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source.",
+              "type": "boolean",
+              "default": false
             },
             "block": {
               "type": "string",
@@ -1073,6 +1102,27 @@
             "path"
           ]
         }
+      ]
+    },
+    "MergeKey": {
+      "description": "The control key that has the Agent merge sources of settings, and the\nvalue that turns merging on.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "A top-level key, one of the settings' `control_keys`, such as\n`managedSourcesBehavior`.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value it holds while the Agent merges, such as `\"merge\"`."
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "value"
       ]
     },
     "ProjectsDefinition": {
@@ -2626,6 +2676,11 @@
           "type": "boolean",
           "default": false
         },
+        "highest_source": {
+          "description": "With a settings anchor, the Agent takes the value whole from the\nhighest source it reads that holds it, ignoring those of the lower\nsources it merges with that one, as Claude Code takes\n`allowedMcpServers`. The files of that source still combine.",
+          "type": "boolean",
+          "default": false
+        },
         "dialect": {
           "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
           "anyOf": [
@@ -3272,6 +3327,11 @@
             },
             "layered": {
               "description": "Whether the field is one layer of a setting the Agent merges across\nfiles, such as Claude Code's `enabledPlugins`: among the layered\nmechanisms of the Item kind, in the definition's order, the first\nwhose field holds a value for the Entry decides.",
+              "type": "boolean",
+              "default": false
+            },
+            "policy": {
+              "description": "Whether the field is managed policy, such as `enabledPlugins` in\nClaude Code's managed settings, which forces a plugin on or off: an\nEntry it Disables is Blocked, by `policy`, and while it holds a\nvalue for an Entry, Disable is not offered. config-digger only\nreads it, so `enable_offered` must be false.",
               "type": "boolean",
               "default": false
             },
@@ -4404,7 +4464,7 @@
               }
             },
             "env_maps": {
-              "description": "Maps of variables the Agent applies over the environment it starts\nin, such as the `env` of Claude Code's user settings, highest\nfirst. A variable there replaces the one in the environment.",
+              "description": "Maps of variables the Agent applies over the environment it starts\nin, such as the `env` of Claude Code's user settings, highest\nfirst. A variable there replaces the one in the environment. A map\nin a Project applies in that Project only.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/EnvMap"
@@ -4471,7 +4531,7 @@
       ]
     },
     "EnvMap": {
-      "description": "A JSON object of variable names and string values in a file of the\nAgent home or the machine, such as the `env` of a settings file.",
+      "description": "A JSON object of variable names and string values in a file of the\nAgent home, the machine or the Project, or in settings, such as the\n`env` of a settings file. In settings, a later file read overrides an\nearlier one, variable by variable.",
       "type": "object",
       "properties": {
         "anchor": {
@@ -4483,6 +4543,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "every_source": {
+          "description": "With a settings anchor, the Agent reads the object from every source\nit reads such keys from, and not only from those it reads settings\nfrom, as Claude Code reads `env`: each source the user cannot write,\nor the one it reads when the user can write that one. A higher\nsource's variable wins.",
+          "type": "boolean",
+          "default": false
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"

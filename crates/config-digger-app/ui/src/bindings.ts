@@ -460,7 +460,12 @@ export type DisableNotOffered =
  *  to, and the Agent home it is copied from holds no Entry it was
  *  copied from to act on instead.
  */
-"mirrored";
+"mirrored" | 
+/**
+ *  Managed policy forces the Entry on or off, and config-digger never
+ *  overrides it.
+ */
+"policy";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
