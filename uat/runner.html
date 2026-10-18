@@ -181,16 +181,19 @@ textarea {
 
 <script id="uat-logic">
 const Uat = (() => {
-  const NEEDS_NOTES = {
-    ko: "Escribe en las notas qué falló.",
-    blocked: "Escribe en las notas qué lo bloquea.",
+  /** Each status a result can have: its label, and what its notes must
+   * say when it needs notes. */
+  const STATUSES = {
+    ok: { label: "OK" },
+    ko: { label: "KO", needs: "Escribe en las notas qué falló." },
+    blocked: { label: "Bloqueado", needs: "Escribe en las notas qué lo bloquea." },
   };
 
   /** The database document of a step's result. Throws when the status
    * needs notes and there are none. */
   function result(id, status, notes, version, now) {
     const text = notes.trim();
-    if (NEEDS_NOTES[status] && !text) throw new Error(NEEDS_NOTES[status]);
+    if (STATUSES[status].needs && !text) throw new Error(STATUSES[status].needs);
     return { id, status, notes: text, time: now.toISOString(), version };
   }
 
@@ -199,11 +202,15 @@ const Uat = (() => {
     return plan.sections.flatMap((section) => section.steps);
   }
 
-  /** How many of the plan's steps have a result. A result whose step left
-   * the plan does not count. */
+  /** How many of the plan's steps have a result, in all and by status. A
+   * result whose step left the plan does not count. */
   function progress(plan, results) {
     const all = steps(plan);
-    return { done: all.filter((step) => results[step.id]).length, total: all.length };
+    const counts = Object.fromEntries(Object.keys(STATUSES).map((status) => [status, 0]));
+    for (const step of all) {
+      if (results[step.id]) counts[results[step.id].status] += 1;
+    }
+    return { done: all.filter((step) => results[step.id]).length, total: all.length, counts };
   }
 
   /** The step to show after `id`: the next one without a result, starting
@@ -214,8 +221,6 @@ const Uat = (() => {
     const order = [...all.slice(at + 1), ...all.slice(0, at + 1)];
     return (order.find((step) => !results[step.id]) ?? all[at]).id;
   }
-
-  const LABELS = { ok: "OK", ko: "KO", blocked: "Bloqueado" };
 
   /** A table cell's text: a pipe would end the cell, a line break the row. */
   function cell(text) {
@@ -228,12 +233,12 @@ const Uat = (() => {
       .map((step) => [step, results[step.id]])
       .filter(([, result]) => result && result.status !== "ok")
       .map(([step, result]) =>
-        `| ${step.id} | ${cell(step.title)} | ${LABELS[result.status]} | ${cell(result.notes)} |`);
+        `| ${step.id} | ${cell(step.title)} | ${STATUSES[result.status].label} | ${cell(result.notes)} |`);
     if (!rows.length) return "Ningún paso en KO ni bloqueado.";
     return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
   }
 
-  return { LABELS, result, steps, progress, nextStep, exportMarkdown };
+  return { STATUSES, result, steps, progress, nextStep, exportMarkdown };
 })();
 </script>
 <script>
@@ -305,24 +310,20 @@ const Uat = (() => {
 
   function chip(status) {
     return status
-      ? el("span", { class: `chip ${status}` }, Uat.LABELS[status])
+      ? el("span", { class: `chip ${status}` }, Uat.STATUSES[status].label)
       : el("span", { class: "chip" }, "Pendiente");
   }
 
   function renderProgress() {
-    const all = Uat.steps(state.plan);
-    const { done, total } = Uat.progress(state.plan, state.results);
-    const count = (status) => all.filter((step) => state.results[step.id]?.status === status).length;
-    for (const status of ["ok", "ko", "blocked"]) {
-      $(`bar-${status}`).style.width = total ? `${(count(status) / total) * 100}%` : "0";
+    const { done, total, counts } = Uat.progress(state.plan, state.results);
+    for (const status of Object.keys(Uat.STATUSES)) {
+      $(`bar-${status}`).style.width = total ? `${(counts[status] / total) * 100}%` : "0";
     }
     $("bar").setAttribute("aria-valuenow", String(done));
     $("bar").setAttribute("aria-valuemax", String(total));
     $("counts").replaceChildren(
       el("span", {}, `${done} de ${total} pasos`),
-      el("span", {}, `OK ${count("ok")}`),
-      el("span", {}, `KO ${count("ko")}`),
-      el("span", {}, `Bloqueados ${count("blocked")}`),
+      ...Object.entries(Uat.STATUSES).map(([status, { label }]) => el("span", {}, `${label} ${counts[status]}`)),
       el("span", {}, `Pendientes ${total - done}`));
   }
 
@@ -348,12 +349,16 @@ const Uat = (() => {
     const at = all.findIndex((s) => s.id === step.id);
     // A draft survives a re-render from the database; a new step starts
     // from its saved notes.
-    const draft = $("notes")?.dataset.step === step.id ? $("notes").value : null;
+    // The focus and cursor stay too, so a write from another tab does not
+    // interrupt typing.
+    const old = $("notes")?.dataset.step === step.id ? $("notes") : null;
+    const typing = old !== null && document.activeElement === old;
+    const draft = old?.value;
     const notes = el("textarea", { id: "notes", "data-step": step.id, "aria-describedby": "notes-hint" });
     notes.value = draft ?? saved?.notes ?? "";
     const verdict = (status) => {
       const button = el("button", { type: "button", class: status, "aria-pressed": String(saved?.status === status) },
-        Uat.LABELS[status]);
+        Uat.STATUSES[status].label);
       button.disabled = !state.canWrite || state.saving;
       button.addEventListener("click", () => record(step.id, status, notes.value));
       return button;
@@ -365,7 +370,7 @@ const Uat = (() => {
       return button;
     };
     const savedLine = saved
-      ? `Guardado: ${Uat.LABELS[saved.status]} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
+      ? `Guardado: ${Uat.STATUSES[saved.status].label} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
       : "Sin resultado todavía.";
 
     $("step").replaceChildren(
@@ -382,13 +387,17 @@ const Uat = (() => {
         : null,
       el("div", { class: "block expect" }, el("h3", {}, "Resultado esperado"), el("p", {}, step.expect)),
       el("div", { class: "verdict" },
-        el("div", { class: "verdict-buttons" }, verdict("ok"), verdict("ko"), verdict("blocked")),
+        el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
         el("label", { for: "notes" }, "Notas"),
         notes,
         el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas."),
         state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
         el("p", { class: "saved" }, savedLine)),
       el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])));
+    if (typing) {
+      notes.focus();
+      notes.setSelectionRange(old.selectionStart, old.selectionEnd);
+    }
   }
 
   function render() {
@@ -467,6 +476,9 @@ const Uat = (() => {
     db.collection("results").onSnapshot(
       (snap) => {
         state.results = Object.fromEntries(snap.docs.map((doc) => [doc.id, doc.data()]));
+        // Export only once the results are in: before, it would read as a
+        // run with nothing to report.
+        $("export").disabled = false;
         render();
       },
       (error) => {
@@ -485,16 +497,21 @@ const Uat = (() => {
       notice(`${error.message} El runner necesita plan.json y run.json publicados junto a la página.`, true);
       return;
     }
+    if (typeof state.run.name !== "string" || typeof state.run.version !== "string") {
+      notice("run.json necesita name y version, como { \"name\": \"config-digger 0.1.0-rc.2 UAT\", \"version\": \"0.1.0-rc.2\" }.", true);
+      return;
+    }
     document.documentElement.lang = state.plan.language;
     document.title = state.run.name;
     $("run-name").textContent = state.run.name;
     $("run-meta").textContent = `${state.plan.title} · versión ${state.run.version}`;
-    $("export").disabled = false;
     const ids = Uat.steps(state.plan).map((step) => step.id);
     const wanted = [location.hash.slice(1), remembered()].find((id) => ids.includes(id));
     state.current = wanted ?? ids[0];
     render();
-    connect();
+    connect().catch((error) => {
+      notice(`No se pudo conectar con los resultados: ${error?.message ?? error}. Recarga la página.`, true);
+    });
   }
 
   start();

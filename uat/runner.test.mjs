@@ -1,5 +1,6 @@
 // The runner's logic, the `uat-logic` script inside runner.html, run by
-// `node --test uat/`. The page itself stays one self-contained file.
+// `node --test uat/runner.test.mjs`. The page itself stays one
+// self-contained file.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -55,12 +56,17 @@ function results(...docs) {
   return Object.fromEntries(docs.map((doc) => [doc.id, doc]));
 }
 
-test("progress counts the plan's steps that have a result", () => {
+test("progress counts the plan's steps that have a result, by status", () => {
   const done = results(
     Uat.result("1.2", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "blocked", "Espera a #175", "0.1.0-rc.2", NOW),
     Uat.result("9.9", "ok", "", "0.1.0-rc.2", NOW),
   );
-  assert.deepEqual(Uat.progress(PLAN, done), { done: 1, total: 3 });
+  assert.deepEqual(Uat.progress(PLAN, done), {
+    done: 2,
+    total: 3,
+    counts: { ok: 1, ko: 0, blocked: 1 },
+  });
 });
 
 test("the export is a Markdown table of the KO and Blocked steps, in plan order", () => {

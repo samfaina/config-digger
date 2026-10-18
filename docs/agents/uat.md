@@ -78,7 +78,7 @@ The tester works in the page. Each OK, KO or Blocked writes `results/<step id>` 
    { "id": "3.2", "status": "ko", "notes": "…", "time": "2026-10-18T09:30:00.000Z", "version": "0.1.0-rc.2" }
    ```
 
-   `status` is `ok`, `ko` or `blocked`. Match each `id` to its step in `uat/plan.json` at the commit the run was published from.
+   `status` is `ok`, `ko` or `blocked`: the tester's verdict on the step. It is not an Entry's State, so a ticket says "KO" or "Blocked", never "status". Match each `id` to its step in `uat/plan.json` at the commit the run was published from.
 
 2. For each `ko` and `blocked` result, check for a duplicate first, as `CLAUDE.md` asks for any reported bug:
 
@@ -89,7 +89,7 @@ The tester works in the page. Each OK, KO or Blocked writes `results/<step id>` 
 
    A finding already filed gets a comment on that issue instead: the step, the notes and the run.
 
-3. File one issue per finding, in the format of `docs/agents/issue-tracker.md` and the vocabulary of `CONTEXT.md`. Start the body with the Parent of the walk's issue, then the line naming the run and step:
+3. File one issue per finding, in the format of `docs/agents/issue-tracker.md` and the vocabulary of `CONTEXT.md`. Start the body with the Parent of the walk's issue, then the line naming the run and step. For the 0.1 walk (#154) the Parent is #38:
 
    ```markdown
    ## Parent
