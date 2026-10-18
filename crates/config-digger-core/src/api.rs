@@ -352,6 +352,53 @@ impl Core {
             .collect()
     }
 
+    /// Checks the existing folder `folder` as an Agent home of the Agent
+    /// `agent`, as [`Core::add_home`] would add it, without adding it: which
+    /// files the Agent reads there, and whether any of them is there.
+    pub fn check_home(&self, folder: &Path, agent: &str) -> Result<HomeCheck, Error> {
+        let (definition, folder) =
+            user_list::home_to_add(&self.definitions, &self.ports, folder, agent)?;
+        let home = definition.added_home();
+        let configured = home.configured(&home.roots_in(&folder), self.ports.fs.as_ref());
+        let looked_for: Vec<String> = home
+            .own_roots()
+            .map(|(_, root)| root.replace('/', "\\"))
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let no_configuration = (!configured)
+            .then(|| explain::no_configuration_in(&definition.agent.name, &folder, &looked_for));
+        Ok(HomeCheck {
+            agent: definition.agent.id.clone(),
+            agent_name: definition.agent.name.clone(),
+            folder,
+            looked_for,
+            no_configuration,
+        })
+    }
+
+    /// Checks the existing folder or `.code-workspace` file `path` as a
+    /// Project, as [`Core::add_project`] would add it, without adding it:
+    /// which Agents list an Agent home there, hidden or not.
+    pub fn check_project(&self, path: &Path) -> Result<ProjectCheck, Error> {
+        let path = user_list::project_to_add(&self.ports, path)?;
+        let fs = self.ports.fs.as_ref();
+        let key = paths::canonical_key(fs, &path);
+        let mut home_of: Vec<String> = Vec::new();
+        for home in self.listing()?.homes {
+            if paths::canonical_key(fs, &home.folder) == key && !home_of.contains(&home.agent_name)
+            {
+                home_of.push(home.agent_name);
+            }
+        }
+        let warning = (!home_of.is_empty()).then(|| explain::project_is_home(&path, &home_of));
+        Ok(ProjectCheck {
+            path,
+            home_of,
+            warning,
+        })
+    }
+
     /// Adds the existing folder `folder` as an Agent home of the Agent
     /// `agent`, laid out like the Agent's first home, with no other check:
     /// a home with none of the files the Agent reads is listed as such.
@@ -1491,6 +1538,34 @@ pub struct Home {
     /// the definition's tested range. None of them changes a State or
     /// blocks a write.
     pub notes: Vec<AgentNote>,
+}
+
+/// A folder checked as an Agent home of one Agent, before it is added.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct HomeCheck {
+    pub agent: String,
+    pub agent_name: String,
+    /// The folder's real path.
+    pub folder: PathBuf,
+    /// Each file and folder the Agent reads in a home, other than those
+    /// other Agents read too, relative to the folder, in path order.
+    pub looked_for: Vec<String>,
+    /// When none of `looked_for` is there, the sentence saying so, rendered
+    /// by the core. The folder can still be added.
+    pub no_configuration: Option<String>,
+}
+
+/// A folder or `.code-workspace` file checked as a Project, before it is added.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct ProjectCheck {
+    /// Its real path.
+    pub path: PathBuf,
+    /// The name of each Agent with an Agent home listed at it, hidden or
+    /// not, in the order the homes are listed.
+    pub home_of: Vec<String>,
+    /// When there is one, the sentence saying so, rendered by the core. It
+    /// can still be added.
+    pub warning: Option<String>,
 }
 
 /// Why the Agent never reads an Agent home: its lookup order picks another.

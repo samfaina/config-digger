@@ -1,6 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  ADD_LABELS,
+  addHomeOffer,
+  addProjectOffer,
+  homeToCheck,
+  NO_HOME_CHOSEN,
+  projectToCheck,
+  type Checked,
+  type HomeToAdd,
+} from "./adding";
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
-import { call, NOTICE_MS, type Notify } from "./desktop";
+import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import {
   changedSentence,
@@ -83,7 +93,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <span className="grow" />
         <button type="button" className="cta" onClick={() => setAdding(tab)}>
           <Icon name="folder" small />
-          {tab === "projects" ? "Add Project" : "Add Agent home"}
+          {ADD_LABELS[tab]}
         </button>
       </header>
 
@@ -407,6 +417,7 @@ function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: Show
       <div className="place-name">{row.label}</div>
       <div className="place-sub mono">{row.path}</div>
       <div className="tags">
+        {row.agent && <span className="tag">{row.agent}</span>}
         {row.tags.map((tag) => (
           <span key={tag.text} className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>
             {tag.text}
@@ -496,12 +507,13 @@ function SideRow({ title, text, count }: { title: string; text: string; count?: 
   );
 }
 
-/** A small dialog with a title, its body, and Cancel and Add. */
+/** A small dialog with a title, its body, what to know before Add, and Cancel and Add. */
 function AddDialog({
   title,
   sub,
   error,
-  busy,
+  warning,
+  addable,
   onAdd,
   onClose,
   children,
@@ -509,7 +521,9 @@ function AddDialog({
   title: string;
   sub: string;
   error: string | null;
-  busy: boolean;
+  /** What to know before Add, which does not stop it. */
+  warning: string | null;
+  addable: boolean;
   onAdd: () => void;
   onClose: () => void;
   children: ReactNode;
@@ -522,6 +536,12 @@ function AddDialog({
         </h1>
         <p className="dialog-subtitle">{sub}</p>
         {children}
+        {warning && (
+          <div className="alert" role="status">
+            <Icon name="flag" small />
+            {warning}
+          </div>
+        )}
         {error && (
           <div className="alert" role="alert">
             <Icon name="flag" small />
@@ -533,7 +553,7 @@ function AddDialog({
           <button type="button" className="cta secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="cta" disabled={busy} onClick={onAdd}>
+          <button type="button" className="cta" disabled={!addable} onClick={onAdd}>
             Add
           </button>
         </footer>
@@ -569,17 +589,54 @@ async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
 
 type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void; notify: Notify };
 
-/** Add Project: a folder or `.code-workspace` file, typed or picked. */
+/** How long an Add dialog waits after the last keystroke before the core checks what is chosen. */
+const CHECK_DELAY_MS = 300;
+
+/**
+ * The core's last check of `asked`, once it has stayed the same for
+ * {@link CHECK_DELAY_MS}, with no result when the check failed. `key` names
+ * `asked`, which is checked again only when `key` changes.
+ */
+function useCheck<Asked, Result>(
+  asked: Asked | null,
+  key: string,
+  check: (asked: Asked) => Promise<CommandResult<Result>>,
+): Checked<Asked, Result> | null {
+  const [checked, setChecked] = useState<Checked<Asked, Result> | null>(null);
+  useEffect(() => {
+    if (asked === null) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      void call(() => check(asked)).then((result) => {
+        if (current) setChecked({ asked, result: result.status === "ok" ? result.data : null });
+      });
+    }, CHECK_DELAY_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+    // `key` stands for `asked`, a new object on every render.
+  }, [key]);
+  return checked;
+}
+
+/** Add Project: a folder or `.code-workspace` file, typed or picked, checked before Add. */
 function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
   const [path, setPath] = useState("");
   const { error, busy, add } = useAdd(onAdd, onClose);
+  const asked = projectToCheck(path);
+  const checked = useCheck(asked, asked ?? "", (asked) => commands.checkProject(asked));
+  const offer = addProjectOffer(path, checked, busy);
   return (
     <AddDialog
-      title="Add Project"
+      title={ADD_LABELS.projects}
       sub="A folder or a .code-workspace file. config-digger evaluates it for every Agent and writes nothing to any Agent."
       error={error}
-      busy={busy || path.trim() === ""}
-      onAdd={() => void add({ kind: "add_project", path: path.trim() })}
+      warning={offer.warning}
+      addable={offer.addable}
+      onAdd={() => {
+        if (asked) void add({ kind: "add_project", path: asked });
+      }}
       onClose={onClose}
     >
       <div className="add-field">
@@ -596,38 +653,60 @@ function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
   );
 }
 
-/** Add Agent home: an Agent and an existing folder, typed or picked. */
+/** Add Agent home: an Agent, chosen explicitly, and an existing folder, typed or picked, checked before Add. */
 function AddHomeDialog({ agents, onAdd, onClose, notify }: AddProps & { agents: Agent[] }) {
-  // The first Agent until one is picked, even when the Agents are read after the dialog opens.
-  const [picked, setAgent] = useState<string | null>(null);
-  const agent = picked ?? agents[0]?.id ?? "";
-  const [folder, setFolder] = useState("");
+  const [choice, setChoice] = useState<HomeToAdd>(NO_HOME_CHOSEN);
   const { error, busy, add } = useAdd(onAdd, onClose);
+  const asked = homeToCheck(choice);
+  const checked = useCheck(asked, asked ? `${asked.agent}|${asked.folder}` : "", (asked) =>
+    commands.checkHome(asked.folder, asked.agent),
+  );
+  const offer = addHomeOffer(choice, checked, busy);
   return (
     <AddDialog
-      title="Add Agent home"
+      title={ADD_LABELS.homes}
       sub="A folder an Agent reads its user configuration from, such as another CODEX_HOME."
       error={error}
-      busy={busy || folder.trim() === "" || agent === ""}
-      onAdd={() => void add({ kind: "add_home", folder: folder.trim(), agent })}
+      warning={offer.warning}
+      addable={offer.addable}
+      onAdd={() => {
+        if (asked) void add({ kind: "add_home", ...asked });
+      }}
       onClose={onClose}
     >
       <div className="add-field">
-        <select className="add-input" aria-label="Agent" value={agent} onChange={(event) => setAgent(event.target.value)}>
+        <select
+          className="add-input"
+          aria-label="Agent"
+          value={choice.agent}
+          onChange={(event) => setChoice({ ...choice, agent: event.target.value })}
+        >
+          <option value="" disabled>
+            Choose an Agent…
+          </option>
           {agents.map((each) => (
             <option key={each.id} value={each.id}>
               {each.name}
             </option>
           ))}
         </select>
-        <input className="add-input mono" aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)} />
-        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setFolder, notify)}>
+        <input
+          className="add-input mono"
+          aria-label="Folder"
+          value={choice.folder}
+          onChange={(event) => setChoice({ ...choice, folder: event.target.value })}
+        />
+        <button
+          type="button"
+          className="cta small secondary"
+          onClick={() => void pick("folder", (picked) => setChoice((now) => ({ ...now, folder: picked })), notify)}
+        >
           Choose…
         </button>
       </div>
       <p className="side-note">
-        Any existing folder is accepted. config-digger reads it with the definition of the Agent you pick; if none of the
-        files that definition expects are there, the home is listed with "No configuration found".
+        config-digger reads the folder with the definition of the Agent you choose. When none of the files that definition
+        reads in a home is there, it says so before you add it; an empty home can still be added.
       </p>
     </AddDialog>
   );

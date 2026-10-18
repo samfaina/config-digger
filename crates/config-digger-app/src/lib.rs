@@ -38,6 +38,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::dismiss_operation,
         commands::read_places,
         commands::change_list,
+        commands::check_home,
+        commands::check_project,
         commands::pick_location,
         commands::read_settings,
         commands::save_settings,

@@ -2229,8 +2229,8 @@ fn find_homes(
             continue;
         }
         let definition = &definitions[agent_index];
-        let mut roots = definition.homes[0].roots_in(&added.folder);
-        let configured = definition.homes[0].configured(&roots, fs);
+        let mut roots = definition.added_home().roots_in(&added.folder);
+        let configured = definition.added_home().configured(&roots, fs);
         roots.extend(machine_paths(definition, ports));
         found.push(FoundHome {
             agent_index,

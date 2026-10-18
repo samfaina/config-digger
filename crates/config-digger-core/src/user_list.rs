@@ -167,6 +167,21 @@ fn existing(fs: &dyn FileSystem, path: &Path, workspace: bool) -> Result<PathBuf
     }
 }
 
+/// The definition of the Agent `agent`, in any case, and the real path of
+/// `folder`, which must be an existing folder, to add as its home.
+pub(crate) fn home_to_add<'a>(
+    definitions: &'a [AgentDefinition],
+    ports: &Ports,
+    folder: &Path,
+    agent: &str,
+) -> Result<(&'a AgentDefinition, PathBuf), Error> {
+    let definition = definitions
+        .iter()
+        .find(|definition| definition.agent.id.eq_ignore_ascii_case(agent))
+        .ok_or_else(|| Error::no_agent(agent))?;
+    Ok((definition, existing(ports.fs.as_ref(), folder, false)?))
+}
+
 /// Adds the folder `folder` as an Agent home of the Agent `agent`, once.
 /// Returns the Agent's id and the folder's real path.
 pub(crate) fn add_home(
@@ -175,12 +190,8 @@ pub(crate) fn add_home(
     folder: &Path,
     agent: &str,
 ) -> Result<(String, PathBuf), Error> {
-    let agent = definitions
-        .iter()
-        .find(|definition| definition.agent.id.eq_ignore_ascii_case(agent))
-        .map(|definition| definition.agent.id.clone())
-        .ok_or_else(|| Error::no_agent(agent))?;
-    let folder = existing(ports.fs.as_ref(), folder, false)?;
+    let (definition, folder) = home_to_add(definitions, ports, folder, agent)?;
+    let agent = definition.agent.id.clone();
     let added = AddedHome {
         agent: agent.clone(),
         folder: folder.clone(),
@@ -198,10 +209,16 @@ pub(crate) fn add_home(
     Ok((agent, folder))
 }
 
+/// The real path of `path`, which must be an existing folder or
+/// `.code-workspace` file, to add as a Project.
+pub(crate) fn project_to_add(ports: &Ports, path: &Path) -> Result<PathBuf, Error> {
+    existing(ports.fs.as_ref(), path, true)
+}
+
 /// Adds the existing folder or `.code-workspace` file `path` as a Project,
 /// once. Returns its real path.
 pub(crate) fn add_project(ports: &Ports, path: &Path) -> Result<PathBuf, Error> {
-    let path = existing(ports.fs.as_ref(), path, true)?;
+    let path = project_to_add(ports, path)?;
     UserList::update(ports, |list| {
         let key = paths::key(&path);
         if !list.projects.iter().any(|added| paths::key(added) == key) {

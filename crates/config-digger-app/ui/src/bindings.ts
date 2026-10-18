@@ -67,6 +67,16 @@ export const commands = {
 	 *  configuration.
 	 */
 	changeList: (change: ListChange) => typedError<ListChanged, Error>(__TAURI_INVOKE("change_list", { change })),
+	/**
+	 *  Checks `folder` as an Agent home of `agent` before it is added: whether
+	 *  any of the files the Agent reads in a home is there. It changes nothing.
+	 */
+	checkHome: (folder: string, agent: string) => typedError<HomeCheck, Error>(__TAURI_INVOKE("check_home", { folder, agent })),
+	/**
+	 *  Checks `path` as a Project before it is added: which Agents list an
+	 *  Agent home there. It changes nothing.
+	 */
+	checkProject: (path: string) => typedError<ProjectCheck, Error>(__TAURI_INVOKE("check_project", { path })),
 	/**  Opens the Windows picker over the window, `None` when it is cancelled. */
 	pickLocation: (pick: Pick) => typedError<string | null, Error>(__TAURI_INVOKE("pick_location", { pick })),
 	/**
@@ -841,6 +851,24 @@ export type Home = {
 	notes: AgentNote[],
 };
 
+/**  A folder checked as an Agent home of one Agent, before it is added. */
+export type HomeCheck = {
+	agent: string,
+	agent_name: string,
+	/**  The folder's real path. */
+	folder: string,
+	/**
+	 *  Each file and folder the Agent reads in a home, other than those
+	 *  other Agents read too, relative to the folder, in path order.
+	 */
+	looked_for: string[],
+	/**
+	 *  When none of `looked_for` is there, the sentence saying so, rendered
+	 *  by the core. The folder can still be added.
+	 */
+	no_configuration: string | null,
+};
+
 /**  Where an Agent home came from. */
 export type HomeSource = 
 /**  The location the Agent definition gives as its default. */
@@ -1328,6 +1356,22 @@ export type Project = {
 	 *  its path in user files. Each counts once, however many Agents read it.
 	 */
 	entries: number,
+};
+
+/**  A folder or `.code-workspace` file checked as a Project, before it is added. */
+export type ProjectCheck = {
+	/**  Its real path. */
+	path: string,
+	/**
+	 *  The name of each Agent with an Agent home listed at it, hidden or
+	 *  not, in the order the homes are listed.
+	 */
+	home_of: string[],
+	/**
+	 *  When there is one, the sentence saying so, rendered by the core. It
+	 *  can still be added.
+	 */
+	warning: string | null,
 };
 
 /**  How an Entry got where it is, which decides how it can be taken away. */

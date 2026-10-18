@@ -277,6 +277,15 @@ describe("the Agent homes tab", () => {
     });
     expect(group.homes[1].actions).toEqual(["unhide", "remove_from_list"]);
   });
+
+  test("names the Agent on the row of a home the user added, whose label is its folder", () => {
+    const added = String.raw`E:\cd-throwaway\codex-home`;
+    const [group] = homeGroups(
+      places({ agents: [agent({ homes: [home(), home({ home: added, folder: added, source: { kind: "added" } })] })] }),
+    );
+
+    expect(group.homes.map((row) => row.agent)).toEqual([null, "Claude Code"]);
+  });
 });
 
 describe("what the Inventory opens on", () => {
