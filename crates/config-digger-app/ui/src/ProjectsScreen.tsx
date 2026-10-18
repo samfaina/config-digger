@@ -25,6 +25,7 @@ import {
 } from "./places";
 import { useActionDialog } from "./useActionDialog";
 import { reads } from "./reads";
+import { Select } from "./Select";
 import { usePlaces } from "./usePlaces";
 import { useTransient } from "./useTransient";
 
@@ -679,21 +680,16 @@ function AddHomeDialog({ agents, onAdd, onClose, notify }: AddProps & { agents: 
       onClose={onClose}
     >
       <div className="add-field">
-        <select
+        <Select
           className="add-input"
-          aria-label="Agent"
+          label="Agent"
           value={choice.agent}
-          onChange={(event) => setChoice({ ...choice, agent: event.target.value })}
-        >
-          <option value="" disabled>
-            Choose an Agent…
-          </option>
-          {agents.map((each) => (
-            <option key={each.id} value={each.id}>
-              {each.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Choose an Agent…", disabled: true },
+            ...agents.map((each) => ({ value: each.id, label: each.name })),
+          ]}
+          onChange={(agent) => setChoice({ ...choice, agent })}
+        />
         <input
           className="add-input mono"
           aria-label="Folder"

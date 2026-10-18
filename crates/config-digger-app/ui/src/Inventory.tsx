@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
 import { NOTICE_MS, type Notify } from "./desktop";
+import type { DropdownOption } from "./dropdown";
 import { EmptyInventory } from "./EmptyInventory";
 import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
@@ -8,6 +9,7 @@ import { Icon } from "./icons";
 import { LinkTag } from "./Location";
 import type { InventoryStart } from "./places";
 import { ReadFailureCard } from "./ReadFailureCard";
+import { Select } from "./Select";
 import { StatePill } from "./StatePill";
 import { STATE_LABELS } from "./states";
 import { useActionDialog } from "./useActionDialog";
@@ -306,13 +308,9 @@ type BannerProps = {
 function Banner({ inventory, project, agentName, stats, reading, refresh, selectProject }: BannerProps) {
   const projects = inventory?.projects ?? [];
   const failuresOf = (path: string) => projectFailures(inventory?.read_failures ?? [], path);
-  const option = (path: string) => {
+  const option = (path: string, group?: string): DropdownOption => {
     const failed = failuresOf(path);
-    return (
-      <option key={path} value={path}>
-        {failed > 0 ? `${path} · ${couldNotBeRead(failed)}` : path}
-      </option>
-    );
+    return { value: path, label: failed > 0 ? `${path} · ${couldNotBeRead(failed)}` : path, group };
   };
   const present = projects.filter((p) => !p.missing).map((p) => p.path);
   const missing = projects.filter((p) => p.missing).map((p) => p.path);
@@ -331,15 +329,17 @@ function Banner({ inventory, project, agentName, stats, reading, refresh, select
           Project
           {project !== null && <FailureBadge count={failuresOf(project)} where="this Project" />}
         </div>
-        <select
+        <Select
           className="banner-select"
+          label="Project"
           value={project ?? ""}
-          onChange={(event) => selectProject(event.target.value === "" ? null : event.target.value)}
-        >
-          <option value="">No Project</option>
-          {present.map(option)}
-          {missing.length > 0 && <optgroup label="Missing Projects">{missing.map(option)}</optgroup>}
-        </select>
+          options={[
+            { value: "", label: "No Project" },
+            ...present.map((path) => option(path)),
+            ...missing.map((path) => option(path, "Missing Projects")),
+          ]}
+          onChange={(chosen) => selectProject(chosen === "" ? null : chosen)}
+        />
       </div>
       <div>
         <div className="caption">Inventory read</div>
@@ -503,13 +503,14 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
           {notRead(chosen)}
           <FailureBadge count={failuresOf(chosen)} where="this home" />
           {own.length > 1 ? (
-            <select value={chosen.home} title={chosen.folder} onChange={(event) => onHome(agent, event.target.value)}>
-              {own.map((home) => (
-                <option key={home.home} value={home.home}>
-                  {homeLabel(home, failuresOf(home))}
-                </option>
-              ))}
-            </select>
+            <Select
+              className="home-select"
+              label={`${agentName} home`}
+              value={chosen.home}
+              title={chosen.folder}
+              options={own.map((home) => ({ value: home.home, label: homeLabel(home, failuresOf(home)) }))}
+              onChange={(home) => onHome(agent, home)}
+            />
           ) : (
             <span className="dim" title={chosen.folder}>
               {chosen.home}
