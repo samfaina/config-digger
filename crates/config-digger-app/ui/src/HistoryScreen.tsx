@@ -14,6 +14,7 @@ import {
   type UndoRefusal,
 } from "./history";
 import { Icon } from "./icons";
+import { Notice } from "./Notice";
 import { useActionDialog } from "./useActionDialog";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
@@ -26,7 +27,7 @@ export function HistoryScreen() {
   const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
   // An Undo of the selected Operation that the core refused, shown in its detail.
   const [refused, setRefused] = useState<{ operation: string; refusal: UndoRefusal } | null>(null);
-  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
   const dialog = useActionDialog({
     onClosed: reload,
     // History is the screen already open.
@@ -64,7 +65,11 @@ export function HistoryScreen() {
 
   const dismiss = async (operation: string) => {
     const result = await commands.dismissOperation(operation);
-    setNotice(result.status === "ok" ? `Dismissed Operation ${operation}.` : `It couldn't be dismissed: ${result.error.message}`);
+    setNotice(
+      result.status === "ok"
+        ? { kind: "success", text: `Dismissed Operation ${operation}.` }
+        : { kind: "error", text: `It couldn't be dismissed: ${result.error.message}` },
+    );
     reload();
   };
 
@@ -136,11 +141,7 @@ export function HistoryScreen() {
         </section>
       </div>
 
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && <Notice notice={notice} />}
 
       {dialog.view}
     </div>

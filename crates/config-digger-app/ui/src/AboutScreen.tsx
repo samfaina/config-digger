@@ -3,6 +3,7 @@ import type { ThirdPartyLicenses } from "../build/licenses";
 import { commands, type About, type Page } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
+import { Notice } from "./Notice";
 import { UpdateBanner } from "./UpdateBanner";
 import { lastCheckedText } from "./updates";
 import type { Updates } from "./useUpdates";
@@ -19,18 +20,18 @@ const PAGE_TITLES: Record<Page, string> = {
 export function AboutScreen({ updates }: { updates: Updates }) {
   const [about, setAbout] = useState<About | null>(null);
   const [licensesOpen, setLicensesOpen] = useState(false);
-  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
 
   useEffect(() => {
     void call(commands.readAbout).then((result) => {
       if (result.status === "ok") setAbout(result.data);
-      else setNotice(`This build couldn't be read: ${result.error.message}`);
+      else setNotice({ kind: "error", text: `This build couldn't be read: ${result.error.message}` });
     });
   }, [setNotice]);
 
   const open = async (page: Page) => {
     const result = await call(() => commands.openPage(page));
-    if (result.status === "error") setNotice(`The browser couldn't open it: ${result.error.message}`);
+    if (result.status === "error") setNotice({ kind: "error", text: `The browser couldn't open it: ${result.error.message}` });
   };
 
   const version = about?.version ?? "";
@@ -149,11 +150,7 @@ export function AboutScreen({ updates }: { updates: Updates }) {
 
       {licensesOpen && <LicensesDialog onClose={() => setLicensesOpen(false)} />}
 
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && <Notice notice={notice} />}
     </div>
   );
 }

@@ -23,6 +23,13 @@
   --state-unread: #5e5f66;
   --state-invalid: #f85149;
 
+  --notice-information: #3f4890;
+  --notice-information-edge: #b4bfff;
+  --notice-success: #1f5a35;
+  --notice-success-edge: #6ee07f;
+  --notice-error: #8a2f36;
+  --notice-error-edge: #ffaba5;
+
   --mono: "Cascadia Mono", Consolas, monospace;
 
   color-scheme: dark;
@@ -1174,18 +1181,54 @@ p {
   gap: 6px;
 }
 
-/* A short notice, such as after a copy */
+/* A short notice, such as after a copy: a card tinted by its kind, with an
+   accent edge and an icon in the kind's colour. */
 
 .notice {
   position: fixed;
   left: 50%;
   bottom: 24px;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(620px, calc(100vw - 48px));
   transform: translateX(-50%);
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: #34353f;
+  padding: 10px 16px 10px 12px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-radius: 14px;
   box-shadow: 0 8px 24px #00000066;
+  color: var(--white);
   font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.notice.information {
+  border-left-color: var(--notice-information-edge);
+  background: var(--notice-information);
+}
+
+.notice.information .icon {
+  color: var(--notice-information-edge);
+}
+
+.notice.success {
+  border-left-color: var(--notice-success-edge);
+  background: var(--notice-success);
+}
+
+.notice.success .icon {
+  color: var(--notice-success-edge);
+}
+
+.notice.error {
+  border-left-color: var(--notice-error-edge);
+  background: var(--notice-error);
+}
+
+.notice.error .icon {
+  color: var(--notice-error-edge);
 }
 
 .tile:focus-visible,

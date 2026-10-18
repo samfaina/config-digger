@@ -7,6 +7,7 @@ import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
 import { LinkTag } from "./Location";
+import { Notice } from "./Notice";
 import type { InventoryStart } from "./places";
 import { ReadFailureCard } from "./ReadFailureCard";
 import { Select } from "./Select";
@@ -68,7 +69,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: start?.state ?? null });
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
-  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
   // Whatever the dialog did, the inventory and History are read again.
   const dialog = useActionDialog({
     onClosed: () => {
@@ -275,11 +276,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         </div>
       )}
 
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && <Notice notice={notice} />}
 
       {dialog.view}
     </div>
