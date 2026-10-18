@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Agent, Entry, Home, Inventory, Item, ReadFailure } from "./bindings";
+import { inventoryStart } from "./places";
 import {
   agentStats,
   chosenHomes,
@@ -13,6 +14,7 @@ import {
   homeFailures,
   itemKey,
   itemsShown,
+  leftoversNotShown,
   projectFailures,
   readerItem,
   stateCounts,
@@ -120,20 +122,92 @@ describe("chosen homes", () => {
     const skipped = home({ home: "skipped", not_read: { read_instead: "default", sentence: "Skipped." } });
     const homes = [skipped, home(), desktopStore, desktopClassic];
 
-    expect(chosenHomes(homes, {})).toEqual({ "claude-code": "default", "claude-desktop": "store" });
+    expect(chosenHomes(homes, {}, [])).toEqual({ "claude-code": "default", "claude-desktop": "store" });
   });
 
   test("keep a choice the user made while that home is listed", () => {
     const homes = [desktopStore, desktopClassic];
 
-    expect(chosenHomes(homes, { "claude-desktop": "classic" })).toEqual({ "claude-desktop": "classic" });
-    expect(chosenHomes(homes, { "claude-desktop": "gone" })).toEqual({ "claude-desktop": "store" });
+    expect(chosenHomes(homes, { "claude-desktop": "classic" }, [])).toEqual({ "claude-desktop": "classic" });
+    expect(chosenHomes(homes, { "claude-desktop": "gone" }, [])).toEqual({ "claude-desktop": "store" });
   });
 
   test("fall back to the first home when the Agent reads none of them", () => {
     const skipped = home({ not_read: { read_instead: null, sentence: "Skipped." } });
 
-    expect(chosenHomes([skipped], {})).toEqual({ "claude-code": "default" });
+    expect(chosenHomes([skipped], {}, [])).toEqual({ "claude-code": "default" });
+  });
+});
+
+describe("a missing Project's leftovers", () => {
+  const gone = String.raw`E:\cd-throwaway\project-gone`;
+  const addedFolder = String.raw`E:\cd-throwaway\claude-code-home`;
+  const addedFile = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
+  const added = home({ home: addedFolder, folder: addedFolder, source: { kind: "added" } });
+  const leftover = item({
+    home: addedFolder,
+    name: "cd-throwaway-leftover",
+    state: "unread",
+    entries: [
+      entry({
+        path: addedFile,
+        key_path: ["projects", "E:/cd-throwaway/project-gone", "mcpServers", "cd-throwaway-leftover"],
+        locator: `${addedFile}#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`,
+        scope: "local",
+        state: "unread",
+        reason: { code: "project_missing", effective: null, switch: null, sentence: "Its Project is missing." },
+      }),
+    ],
+  });
+  const missing = inventory({
+    project: gone,
+    homes: [home(), added],
+    items: [item({ name: "context7" }), leftover],
+  });
+
+  test("are shown in the added home that holds them, not the Agent's first", () => {
+    const homes = chosenHomes(missing.homes, {}, missing.items);
+    const shown = itemsShown(missing.items, { agent: "all", homes });
+
+    expect(filterItems(shown, { kind: "all", text: "", state: "unread" }).map((i) => i.name)).toEqual([
+      "cd-throwaway-leftover",
+    ]);
+  });
+
+  test("are listed whether the Inventory opens on them or on their Project", () => {
+    for (const show of [{ kind: "leftovers", path: gone }, { kind: "project", path: gone }] as const) {
+      const start = inventoryStart(show);
+      const homes = chosenHomes(missing.homes, start.homes, missing.items);
+      const shown = itemsShown(missing.items, { agent: start.agent, homes });
+
+      expect(filterItems(shown, { kind: "all", text: "", state: start.state }).map((i) => i.name)).toContain(
+        "cd-throwaway-leftover",
+      );
+    }
+  });
+
+  test("in a home the user didn't choose are named, with how many", () => {
+    const selection = { agent: "all", homes: chosenHomes(missing.homes, { "claude-code": "default" }, missing.items) };
+
+    expect(leftoversNotShown(missing, selection)).toEqual([
+      {
+        agent: "claude-code",
+        home: addedFolder,
+        sentence: `1 leftover of this Project is in the Agent home ${addedFolder} of Claude Code, which isn't shown.`,
+      },
+    ]);
+  });
+
+  test("in a home not shown are named only for the selected Agents", () => {
+    const homes = chosenHomes(missing.homes, { "claude-code": "default" }, missing.items);
+
+    expect(leftoversNotShown(missing, { agent: "claude-desktop", homes })).toEqual([]);
+  });
+
+  test("are not named when the home that holds them is shown", () => {
+    const selection = { agent: "all", homes: chosenHomes(missing.homes, {}, missing.items) };
+
+    expect(leftoversNotShown(missing, selection)).toEqual([]);
   });
 });
 
