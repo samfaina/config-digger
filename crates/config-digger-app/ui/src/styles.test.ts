@@ -35,7 +35,8 @@ const rules = (source: string): Rule[] => {
 };
 
 const allRules = rules(css);
-const tokens = new Set(allRules.find((rule) => rule.selector === ":root")?.declarations.keys());
+const rootValues = allRules.find((rule) => rule.selector === ":root")?.declarations ?? new Map<string, string>();
+const tokens = new Set(rootValues.keys());
 const isScrollbar = (rule: Rule) => rule.selector.includes("::-webkit-scrollbar") || [...rule.declarations.keys()].some((name) => name.startsWith("scrollbar-"));
 const scrollbarRules = allRules.filter(isScrollbar);
 const declared = (selector: string, name: string) => scrollbarRules.find((rule) => rule.selector === selector)?.declarations.get(name);
@@ -84,7 +85,6 @@ describe("the app's scrollbars", () => {
   });
 });
 
-const rootValues = allRules.find((rule) => rule.selector === ":root")?.declarations ?? new Map<string, string>();
 const rule = (selector: string) => allRules.find((found) => found.selector === selector)?.declarations ?? new Map<string, string>();
 const KINDS = ["information", "success", "error"] as const;
 
@@ -121,10 +121,10 @@ describe("a notice", () => {
     expect(rule(".notice").get("border-radius")).toBe(rule(".entry-card").get("border-radius"));
   });
 
-  test("of each kind takes its background, text and accent edge from :root tokens of its own", () => {
+  test("of each kind takes its background and accent edge from :root tokens of its own", () => {
     for (const kind of KINDS) {
       const declarations = rule(`.notice.${kind}`);
-      for (const name of ["background", "color", "border-left-color"]) {
+      for (const name of ["background", "border-left-color"]) {
         expect(declarations.get(name), `.notice.${kind} ${name}`).toMatch(new RegExp(String.raw`^var\(--notice-${kind}[\w-]*\)$`));
         colour(declarations.get(name));
       }
@@ -144,17 +144,24 @@ describe("a notice", () => {
       const declarations = rule(`.notice.${kind}`);
       const background = colour(declarations.get("background"));
       const edge = colour(declarations.get("border-left-color"));
-      expect(surfaces, kind).not.toContain(background);
+      // Lighter than every surface by a clear step, not only by its hue.
+      for (const surface of surfaces) expect(contrast(background, surface), `${kind} on ${surface}`).toBeGreaterThanOrEqual(1.6);
       // An accent edge is a graphic that has to be seen: WCAG asks 3:1 of it.
       for (const surface of [...surfaces, background]) expect(contrast(edge, surface), `${kind} edge on ${surface}`).toBeGreaterThanOrEqual(3);
     }
   });
 
   test("of each kind has text that meets WCAG AA on its background", () => {
+    const text = colour(rule(".notice").get("color"));
     for (const kind of KINDS) {
-      const declarations = rule(`.notice.${kind}`);
-      expect(contrast(colour(declarations.get("color")), colour(declarations.get("background"))), kind).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(text, colour(rule(`.notice.${kind}`).get("background"))), kind).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  test("shows above an open dialog and the Undo snackbar, as a dialog's buttons notify too", () => {
+    const layer = (selector: string) => Number(rule(selector).get("z-index"));
+    expect(layer(".notice")).toBeGreaterThan(layer(".dialog-backdrop"));
+    expect(layer(".notice")).toBeGreaterThan(layer(".snackbar"));
   });
 
   test("of each kind draws its icon in the colour of its accent edge", () => {

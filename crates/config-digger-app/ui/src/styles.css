@@ -23,15 +23,12 @@
   --state-unread: #5e5f66;
   --state-invalid: #f85149;
 
-  --notice-information: #262b4a;
-  --notice-information-text: #ffffff;
-  --notice-information-edge: #8fa1ff;
-  --notice-success: #1c3a28;
-  --notice-success-text: #ffffff;
-  --notice-success-edge: #4ac95c;
-  --notice-error: #4a2024;
-  --notice-error-text: #ffffff;
-  --notice-error-edge: #ff7b72;
+  --notice-information: #3f4890;
+  --notice-information-edge: #b4bfff;
+  --notice-success: #1f5a35;
+  --notice-success-edge: #6ee07f;
+  --notice-error: #8a2f36;
+  --notice-error-edge: #ffaba5;
 
   --mono: "Cascadia Mono", Consolas, monospace;
 
@@ -1191,7 +1188,7 @@ p {
   position: fixed;
   left: 50%;
   bottom: 24px;
-  z-index: 6;
+  z-index: 65;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1202,6 +1199,7 @@ p {
   border-left-style: solid;
   border-radius: 14px;
   box-shadow: 0 8px 24px #00000066;
+  color: var(--white);
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -1209,7 +1207,6 @@ p {
 .notice.information {
   border-left-color: var(--notice-information-edge);
   background: var(--notice-information);
-  color: var(--notice-information-text);
 }
 
 .notice.information .icon {
@@ -1219,7 +1216,6 @@ p {
 .notice.success {
   border-left-color: var(--notice-success-edge);
   background: var(--notice-success);
-  color: var(--notice-success-text);
 }
 
 .notice.success .icon {
@@ -1229,7 +1225,6 @@ p {
 .notice.error {
   border-left-color: var(--notice-error-edge);
   background: var(--notice-error);
-  color: var(--notice-error-text);
 }
 
 .notice.error .icon {

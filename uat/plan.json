@@ -270,7 +270,7 @@
             "Mira el aviso que sale abajo, en el centro."
           ],
           "commands": [],
-          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde oscuro y destaca sobre el panel. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Se va solo a los pocos segundos.",
+          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde y destaca, más claro que el panel y las tarjetas. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Se va solo a los pocos segundos.",
           "covers": ["#184"]
         },
         {
@@ -290,7 +290,34 @@
               "text": "([ordered]@{ 'Backups and Operation history' = \"$env:LOCALAPPDATA\\config-digger\\backups\"; 'Parked Entries' = \"$env:LOCALAPPDATA\\config-digger\\parked\"; 'Logs' = \"$env:LOCALAPPDATA\\config-digger\\logs\"; 'Your lists and settings' = \"$env:APPDATA\\config-digger\" }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
             }
           ],
-          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul oscuro, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
+          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
+          "covers": ["#184"]
+        },
+        {
+          "id": "5.3",
+          "title": "Un aviso de error",
+          "goal": "Un aviso de error tiene la misma forma que los otros, es rojo y se lee en cuanto sale.",
+          "instructions": [
+            "Ve a Settings.",
+            "Pulsa el interruptor Check for updates on startup y otra vez, para dejarlo como estaba.",
+            "Ejecuta la primera orden en PowerShell, que deja el archivo de ajustes en solo lectura.",
+            "Pulsa otra vez el interruptor Check for updates on startup.",
+            "Mira el aviso que sale abajo, en el centro.",
+            "Ejecuta la segunda orden, que quita la solo lectura."
+          ],
+          "commands": [
+            {
+              "label": "Poner los ajustes en solo lectura",
+              "shell": "powershell",
+              "text": "Set-ItemProperty \"$env:APPDATA\\config-digger\\settings.json\" -Name IsReadOnly -Value $true"
+            },
+            {
+              "label": "Quitar la solo lectura",
+              "shell": "powershell",
+              "text": "Set-ItemProperty \"$env:APPDATA\\config-digger\\settings.json\" -Name IsReadOnly -Value $false"
+            }
+          ],
+          "expect": "Sale un recuadro con la forma del paso 5.1, de fondo rojo, con un borde rosa claro a la izquierda, un icono «!» rosa claro y el texto blanco «The setting couldn't be saved: cannot write …», que acaba en un error de acceso denegado. El interruptor vuelve a como estaba.",
           "covers": ["#184"]
         }
       ]
