@@ -84,7 +84,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const shown = useMemo(() => itemsShown(inventory?.items ?? [], { agent, homes }), [inventory, agent, homes]);
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
   const flags = flagsShown(inventory?.agent_flags ?? [], selection);
-  const elsewhere = inventory ? leftoversNotShown(inventory, selection) : [];
+  const notShown = inventory ? leftoversNotShown(inventory, selection) : [];
   useEffect(() => {
     if (!inventory || !startItem.current) return;
     const item = findItem(inventory.items, startItem.current);
@@ -128,6 +128,8 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         refresh={refresh}
         selectProject={(next) => {
           selectProject(next);
+          // Each Project opens on its own homes, so a missing one shows the homes holding its leftovers.
+          setHomeChoice({});
           setDetail(null);
         }}
       />
@@ -211,7 +213,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
               </div>
             ))}
-            {elsewhere.map((leftovers) => (
+            {notShown.map((leftovers) => (
               <div key={`${leftovers.agent}|${leftovers.home}`} className="alert" role="status">
                 <Icon name="flag" small />
                 {leftovers.sentence}

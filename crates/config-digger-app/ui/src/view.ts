@@ -36,8 +36,8 @@ export function agentsOf(homes: Home[]): { agent: string; agentName: string }[] 
 
 /**
  * The home shown for each Agent: the one the user chose while it is listed,
- * otherwise the first one among `items` holding a leftover of the context's
- * missing Project, otherwise the first one the Agent reads, otherwise its first.
+ * otherwise the first one among `items` holding a leftover, otherwise the
+ * first one the Agent reads, otherwise its first.
  */
 export function chosenHomes(homes: Home[], choice: HomeChoice, items: Item[]): HomeChoice {
   const chosen: HomeChoice = {};
@@ -50,12 +50,15 @@ export function chosenHomes(homes: Home[], choice: HomeChoice, items: Item[]): H
   return chosen;
 }
 
-/** Whether an Entry is a leftover: Unread because it is keyed to a missing Project. */
+/**
+ * Whether an Entry is a leftover: Unread because it is keyed to a missing
+ * Project, and no plugin's, which only the Agent uninstalls.
+ */
 function isLeftover(entry: Entry): boolean {
-  return entry.reason?.code === "project_missing";
+  return entry.reason?.code === "project_missing" && entry.plugin === null;
 }
 
-/** The leftovers among `items` in the Agent home `home` of `agent`. */
+/** The leftovers among `items` in the Agent home `home` of `agent`, each once, since an Entry is in one Item per home. */
 function leftoversIn(items: Item[], { agent, home }: { agent: string; home: string }): Entry[] {
   return items
     .filter((item) => item.agent === agent && item.home === home)
@@ -63,9 +66,14 @@ function leftoversIn(items: Item[], { agent, home }: { agent: string; home: stri
     .filter(isLeftover);
 }
 
+/** Whether the selection is of `agent`, alone or under All Agents. */
+function isSelected(agent: string, selection: Selection): boolean {
+  return selection.agent === "all" || selection.agent === agent;
+}
+
 /** Whether the selection shows what the Agent home `home` of `agent` holds. */
 function isShown({ agent, home }: { agent: string; home: string }, selection: Selection): boolean {
-  return (selection.agent === "all" || selection.agent === agent) && selection.homes[agent] === home;
+  return isSelected(agent, selection) && selection.homes[agent] === home;
 }
 
 /** The Items of the selected Agents, each in its chosen home. */
@@ -74,17 +82,17 @@ export function itemsShown(items: Item[], selection: Selection): Item[] {
 }
 
 /** An Agent home of a selected Agent that holds leftovers the selection doesn't show. */
-export type LeftoversElsewhere = { agent: string; home: string; sentence: string };
+export type LeftoversNotShown = { agent: string; home: string; sentence: string };
 
 /**
  * The homes of the selected Agents, other than their chosen ones, that hold
  * leftovers of the context's missing Project, so that none is left out unsaid.
  */
-export function leftoversNotShown(inventory: Inventory, selection: Selection): LeftoversElsewhere[] {
+export function leftoversNotShown(inventory: Inventory, selection: Selection): LeftoversNotShown[] {
   return inventory.homes
-    .filter((home) => (selection.agent === "all" || selection.agent === home.agent) && !isShown(home, selection))
+    .filter((home) => isSelected(home.agent, selection) && !isShown(home, selection))
     .flatMap((home) => {
-      const count = new Set(leftoversIn(inventory.items, home).map((entry) => entry.locator)).size;
+      const count = leftoversIn(inventory.items, home).length;
       if (count === 0) return [];
       const leftovers = count === 1 ? "1 leftover of this Project is" : `${count} leftovers of this Project are`;
       const sentence = `${leftovers} in the Agent home ${home.home} of ${home.agent_name}, which isn't shown.`;

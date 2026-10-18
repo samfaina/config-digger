@@ -174,7 +174,7 @@ describe("a missing Project's leftovers", () => {
     ]);
   });
 
-  test("are listed whether the Inventory opens on them or on their Project", () => {
+  test("are listed whether the Inventory opens on them or on their Project, with no home chosen", () => {
     for (const show of [{ kind: "leftovers", path: gone }, { kind: "project", path: gone }] as const) {
       const start = inventoryStart(show);
       const homes = chosenHomes(missing.homes, start.homes, missing.items);
@@ -202,6 +202,19 @@ describe("a missing Project's leftovers", () => {
     const homes = chosenHomes(missing.homes, { "claude-code": "default" }, missing.items);
 
     expect(leftoversNotShown(missing, { agent: "claude-desktop", homes })).toEqual([]);
+  });
+
+  test("leave out a plugin's Entries, which only the Agent uninstalls", () => {
+    const plugin = { id: "notes@market", name: "notes", scope: "local", version: null, folder: String.raw`C:\plugins\notes` };
+    const bound = item({
+      ...leftover,
+      entries: leftover.entries.map((leftoverEntry) => ({ ...leftoverEntry, plugin })),
+    });
+    const homes = [home(), added];
+    const items = [item({ name: "context7" }), bound];
+
+    expect(chosenHomes(homes, {}, items)).toEqual({ "claude-code": "default" });
+    expect(leftoversNotShown(inventory({ project: gone, homes, items }), { agent: "all", homes: { "claude-code": "default" } })).toEqual([]);
   });
 
   test("are not named when the home that holds them is shown", () => {
