@@ -381,11 +381,17 @@ impl Core {
     /// Project, as [`Core::add_project`] would add it, without adding it:
     /// which Agents list an Agent home there, hidden or not.
     pub fn check_project(&self, path: &Path) -> Result<ProjectCheck, Error> {
+        self.check_project_in(&self.listing()?, path)
+    }
+
+    /// Checks `path` as [`Core::check_project`] does, against `listing`, a
+    /// scan read earlier, without reading the disk again.
+    pub fn check_project_in(&self, listing: &Snapshot, path: &Path) -> Result<ProjectCheck, Error> {
         let path = user_list::project_to_add(&self.ports, path)?;
         let fs = self.ports.fs.as_ref();
         let key = paths::canonical_key(fs, &path);
         let mut home_of: Vec<String> = Vec::new();
-        for home in self.listing()?.homes {
+        for home in self.listed(listing).homes {
             if paths::canonical_key(fs, &home.folder) == key && !home_of.contains(&home.agent_name)
             {
                 home_of.push(home.agent_name);
@@ -404,20 +410,48 @@ impl Core {
     /// a home with none of the files the Agent reads is listed as such.
     /// Returns the home as it is now listed.
     pub fn add_home(&self, folder: &Path, agent: &str) -> Result<Home, Error> {
-        let (agent, folder) = user_list::add_home(&self.definitions, &self.ports, folder, agent)?;
-        self.find_home(
+        let (agent, folder) = self.add_home_to_list(folder, agent)?;
+        self.home_in(
             &self.listing()?,
             &folder.display().to_string(),
             Some(&agent),
         )
-        .cloned()
+    }
+
+    /// Adds `folder` as an Agent home of `agent`, as [`Core::add_home`]
+    /// does, without reading it. Returns the Agent's id and the folder's
+    /// real path, by which [`Core::home_in`] finds it in a later scan.
+    pub fn add_home_to_list(&self, folder: &Path, agent: &str) -> Result<(String, PathBuf), Error> {
+        user_list::add_home(&self.definitions, &self.ports, folder, agent)
+    }
+
+    /// The one Agent home of `snapshot`, hidden or not, whose id or folder
+    /// is `home`, among the homes of `agent` when it is given.
+    pub fn home_in(
+        &self,
+        snapshot: &Snapshot,
+        home: &str,
+        agent: Option<&str>,
+    ) -> Result<Home, Error> {
+        self.find_home(&self.listed(snapshot), home, agent).cloned()
     }
 
     /// Hides the Agent home `home`, discovered or added: it is listed
     /// only when hidden ones are asked for. `home` is its id or its folder,
     /// and `agent` narrows it down to one Agent's homes.
     pub fn hide_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
-        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        self.hide_home_in(&self.listing()?, home, agent)
+    }
+
+    /// Hides the Agent home `home` as [`Core::hide_home`] does, looking for
+    /// it in `listing`, a scan read earlier, without reading the disk again.
+    pub fn hide_home_in(
+        &self,
+        listing: &Snapshot,
+        home: &str,
+        agent: Option<&str>,
+    ) -> Result<Home, Error> {
+        let found = self.home_in(listing, home, agent)?;
         user_list::hide_home(&self.ports, &found.agent, &found.home)?;
         Ok(Home {
             hidden: true,
@@ -427,7 +461,18 @@ impl Core {
 
     /// Lists the hidden Agent home `home` again, as [`Core::hide_home`] names it.
     pub fn unhide_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
-        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        self.unhide_home_in(&self.listing()?, home, agent)
+    }
+
+    /// Lists the hidden Agent home `home` again, looking for it as
+    /// [`Core::hide_home_in`] does.
+    pub fn unhide_home_in(
+        &self,
+        listing: &Snapshot,
+        home: &str,
+        agent: Option<&str>,
+    ) -> Result<Home, Error> {
+        let found = self.home_in(listing, home, agent)?;
         if !found.hidden {
             return Err(Error::not_hidden(home));
         }
@@ -441,15 +486,34 @@ impl Core {
     /// Adds the existing folder or `.code-workspace` file `path` as a
     /// Project. Returns the Project as it is now listed.
     pub fn add_project(&self, path: &Path) -> Result<Project, Error> {
-        let path = user_list::add_project(&self.ports, path)?;
-        self.find_project(&self.listing()?, &path).cloned()
+        let path = self.add_project_to_list(path)?;
+        self.project_in(&self.listing()?, &path)
+    }
+
+    /// Adds `path` as a Project, as [`Core::add_project`] does, without
+    /// reading it. Returns its real path, by which [`Core::project_in`]
+    /// finds it in a later scan.
+    pub fn add_project_to_list(&self, path: &Path) -> Result<PathBuf, Error> {
+        user_list::add_project(&self.ports, path)
+    }
+
+    /// The Project of `snapshot`, hidden or not, that `path` names, in any
+    /// spelling.
+    pub fn project_in(&self, snapshot: &Snapshot, path: &Path) -> Result<Project, Error> {
+        self.find_project(&self.listed(snapshot), path).cloned()
     }
 
     /// Hides the Project `path`, discovered or added, in any spelling: it
     /// is listed only when hidden ones are asked for, and still evaluated
     /// when picked as the context.
     pub fn hide_project(&self, path: &Path) -> Result<Project, Error> {
-        let found = self.find_project(&self.listing()?, path)?.clone();
+        self.hide_project_in(&self.listing()?, path)
+    }
+
+    /// Hides the Project `path` as [`Core::hide_project`] does, looking for
+    /// it in `listing`, a scan read earlier, without reading the disk again.
+    pub fn hide_project_in(&self, listing: &Snapshot, path: &Path) -> Result<Project, Error> {
+        let found = self.project_in(listing, path)?;
         user_list::hide_project(&self.ports, &found.path)?;
         Ok(Project {
             hidden: true,
@@ -459,7 +523,13 @@ impl Core {
 
     /// Lists the hidden Project `path` again.
     pub fn unhide_project(&self, path: &Path) -> Result<Project, Error> {
-        let found = self.find_project(&self.listing()?, path)?.clone();
+        self.unhide_project_in(&self.listing()?, path)
+    }
+
+    /// Lists the hidden Project `path` again, looking for it as
+    /// [`Core::hide_project_in`] does.
+    pub fn unhide_project_in(&self, listing: &Snapshot, path: &Path) -> Result<Project, Error> {
+        let found = self.project_in(listing, path)?;
         if !found.hidden {
             return Err(Error::not_hidden(&path.display().to_string()));
         }
@@ -474,7 +544,18 @@ impl Core {
     /// the user added. It is refused for a home found without the user,
     /// which only hiding takes off the list.
     pub fn forget_home(&self, home: &str, agent: Option<&str>) -> Result<Home, Error> {
-        let found = self.find_home(&self.listing()?, home, agent)?.clone();
+        self.forget_home_in(&self.listing()?, home, agent)
+    }
+
+    /// Forgets the Agent home `home` as [`Core::forget_home`] does, looking
+    /// for it as [`Core::hide_home_in`] does.
+    pub fn forget_home_in(
+        &self,
+        listing: &Snapshot,
+        home: &str,
+        agent: Option<&str>,
+    ) -> Result<Home, Error> {
+        let found = self.home_in(listing, home, agent)?;
         if found.source != HomeSource::Added {
             return Err(Error::blocked(explain::forget_refused_home(
                 &found.home,
@@ -489,7 +570,13 @@ impl Core {
     /// Project an Agent's registry records, which only hiding takes off the
     /// list.
     pub fn forget_project(&self, path: &Path) -> Result<Project, Error> {
-        let found = self.find_project(&self.listing()?, path)?.clone();
+        self.forget_project_in(&self.listing()?, path)
+    }
+
+    /// Forgets the Project `path` as [`Core::forget_project`] does, looking
+    /// for it as [`Core::hide_project_in`] does.
+    pub fn forget_project_in(&self, listing: &Snapshot, path: &Path) -> Result<Project, Error> {
+        let found = self.project_in(listing, path)?;
         if !found.registered_by.is_empty() {
             let names: Vec<&str> = found
                 .registered_by
@@ -602,10 +689,16 @@ impl Core {
         }
     }
 
-    /// Every Agent home and Project, hidden ones included, with no Project
-    /// as context.
-    fn listing(&self) -> Result<Inventory, Error> {
-        Ok(self.resolve(&self.scan(&ScanOptions::default())?, &Context::default()))
+    /// Reads every Agent home and Project, to find the one a list change
+    /// names.
+    fn listing(&self) -> Result<Snapshot, Error> {
+        self.scan(&ScanOptions::default())
+    }
+
+    /// Every Agent home and Project of `snapshot`, hidden ones included,
+    /// with no Project as context.
+    fn listed(&self, snapshot: &Snapshot) -> Inventory {
+        self.resolve(snapshot, &Context::default())
     }
 
     /// The one home of `inventory` whose id or folder is `selector`, among

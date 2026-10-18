@@ -3,8 +3,8 @@
 
 use crate::about::{About, Page};
 use crate::actions::{ActionPreview, ActionRequest, Actions, Executed};
-use crate::lists::{ListChange, Listed};
-use crate::session::{self, ParkedEntry, Places, Session};
+use crate::lists::{self, ListChange, ListChanged};
+use crate::session::{self, ParkedEntry, Places, Scans, Session, SessionState};
 use crate::updates::{UpdateStatus, UpdatesState};
 use config_digger_core::api::{
     self, Backup, Core, DataFolders, HomeCheck, Inventory, OperationDetail, OperationSummary,
@@ -19,19 +19,6 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 
-/// The app's [`Session`], once the inventory was read.
-#[derive(Default)]
-pub struct SessionState(Mutex<Option<Session>>);
-
-impl SessionState {
-    fn lock(&self) -> MutexGuard<'_, Option<Session>> {
-        // A panic in another command leaves the session as it was.
-        self.0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-}
-
 /// Reads every Agent home and resolves its Items for `project`, or for no
 /// Project, leaving out the Agent homes and Projects the user hid.
 #[tauri::command]
@@ -44,7 +31,7 @@ pub async fn read_inventory(
     let result = blocking(move || {
         let mut session = scan()?;
         let inventory = session.resolve(project);
-        *app.state::<SessionState>().lock() = Some(session);
+        app.state::<SessionState>().keep(session);
         Ok(inventory)
     })
     .await;
@@ -259,32 +246,33 @@ pub async fn read_places(app: AppHandle) -> Result<Places, api::Error> {
     blocking(move || Ok(keep_places(&app, scan()?))).await
 }
 
-/// What a change to config-digger's lists did, read again at once.
-#[derive(Debug, Clone, Serialize, specta::Type)]
-pub struct ListChanged {
-    /// The Project or Agent home it changed, as it is listed now.
-    pub listed: Listed,
-    /// Every Project and Agent home, read again after the change.
-    pub places: Places,
-}
-
-/// Adds, hides, lists again or forgets a Project or an Agent home, then
-/// reads every Agent home and Project again. It writes no Agent
-/// configuration.
+/// Adds, hides, lists again or forgets a Project or an Agent home, as the
+/// last scan lists it, then reads every Agent home and Project once. It
+/// writes no Agent configuration.
 #[tauri::command]
 #[specta::specta]
 pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChanged, api::Error> {
-    let result = blocking(move || {
-        let core = Core::new(Ports::real())?;
-        let listed = change.apply(&core)?;
-        let places = keep_places(&app, Session::scan(core)?);
-        Ok(ListChanged { listed, places })
+    blocking(move || {
+        let started = Instant::now();
+        let scans = Scans::new(scan);
+        let result = lists::change_list(&app.state::<SessionState>(), &change, &scans);
+        let (change, scans) = (change.kind(), scans.count());
+        let elapsed_ms = started.elapsed().as_millis();
+        match &result {
+            Ok(_) => tracing::info!(change, scans, elapsed_ms, "list changed"),
+            Err(error) => {
+                tracing::warn!(
+                    code = error.code.code(),
+                    change,
+                    scans,
+                    elapsed_ms,
+                    "list not changed"
+                )
+            }
+        }
+        result
     })
-    .await;
-    if let Err(error) = &result {
-        tracing::warn!(code = error.code.code(), "list not changed");
-    }
-    result
+    .await
 }
 
 /// Checks `folder` as an Agent home of `agent` before it is added: whether
@@ -296,11 +284,15 @@ pub async fn check_home(folder: PathBuf, agent: String) -> Result<HomeCheck, api
 }
 
 /// Checks `path` as a Project before it is added: which Agents list an
-/// Agent home there. It changes nothing.
+/// Agent home there, as the last scan lists them. It changes nothing.
 #[tauri::command]
 #[specta::specta]
-pub async fn check_project(path: PathBuf) -> Result<ProjectCheck, api::Error> {
-    blocking(move || Core::new(Ports::real())?.check_project(&path)).await
+pub async fn check_project(app: AppHandle, path: PathBuf) -> Result<ProjectCheck, api::Error> {
+    blocking(move || match app.state::<SessionState>().lock().as_ref() {
+        Some(session) => session.core().check_project_in(session.snapshot(), &path),
+        None => Core::new(Ports::real())?.check_project(&path),
+    })
+    .await
 }
 
 /// What the Windows picker picks.
@@ -488,7 +480,7 @@ pub async fn open_update_notes(updates: State<'_, UpdatesState>) -> Result<(), a
 /// Agent homes.
 fn keep_places(app: &AppHandle, session: Session) -> Places {
     let places = session.places();
-    *app.state::<SessionState>().lock() = Some(session);
+    app.state::<SessionState>().keep(session);
     places
 }
 

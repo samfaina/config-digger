@@ -7,8 +7,10 @@ use config_digger_core::api::{
     ScanOptions, Snapshot,
 };
 use serde::Serialize;
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
 /// What the Projects & homes screen lists: every Project and Agent home,
 /// hidden ones included, as `projects list` and `homes list` do with
@@ -51,6 +53,50 @@ pub struct Session {
     openable: HashSet<String>,
 }
 
+/// The app's [`Session`], once the inventory was read.
+#[derive(Default)]
+pub struct SessionState(Mutex<Option<Session>>);
+
+impl SessionState {
+    pub fn lock(&self) -> MutexGuard<'_, Option<Session>> {
+        // A panic in another command leaves the session as it was.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Keeps `session` as the app's last scan.
+    pub fn keep(&self, session: Session) {
+        *self.lock() = Some(session);
+    }
+}
+
+/// Reads every Agent home and Project into a new [`Session`], counting the
+/// full scans, so that a command's log line can say how many it ran.
+pub struct Scans {
+    read: Box<dyn Fn() -> Result<Session, Error>>,
+    count: Cell<u32>,
+}
+
+impl Scans {
+    pub fn new(read: impl Fn() -> Result<Session, Error> + 'static) -> Self {
+        Self {
+            read: Box::new(read),
+            count: Cell::new(0),
+        }
+    }
+
+    pub fn scan(&self) -> Result<Session, Error> {
+        self.count.set(self.count.get() + 1);
+        (self.read)()
+    }
+
+    /// How many scans ran, failed ones included.
+    pub fn count(&self) -> u32 {
+        self.count.get()
+    }
+}
+
 impl Session {
     /// Scans every Agent home and Project.
     pub fn scan(core: Core) -> Result<Self, Error> {
@@ -60,6 +106,16 @@ impl Session {
             snapshot,
             openable: HashSet::new(),
         })
+    }
+
+    /// The core this scan was read with.
+    pub fn core(&self) -> &Core {
+        &self.core
+    }
+
+    /// What was read.
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
     }
 
     /// The inventory for `project`, or for no Project, without the Agent

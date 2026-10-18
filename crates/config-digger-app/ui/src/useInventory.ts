@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Inventory } from "./bindings";
 import { call, type CommandResult } from "./desktop";
+import { reads } from "./reads";
 
 export type InventoryRead = {
   /** The last inventory read, kept while a new read runs or after one fails. */
@@ -16,8 +17,8 @@ export type InventoryRead = {
 
 /**
  * Reads the inventory on start, for `initialProject` or for no Project,
- * whenever the window regains focus, and on `refresh`, for the Project last
- * selected.
+ * whenever the window regains focus while nothing else is read, and on
+ * `refresh`, for the Project last selected.
  */
 export function useInventory(initialProject: string | null = null): InventoryRead {
   const [inventory, setInventory] = useState<Inventory | null>(null);
@@ -45,7 +46,7 @@ export function useInventory(initialProject: string | null = null): InventoryRea
     inFlight.current = true;
     setReading(true);
     try {
-      await load(projectRef.current, commands.readInventory);
+      await reads.during(() => load(projectRef.current, commands.readInventory));
     } finally {
       inFlight.current = false;
       setReading(false);
@@ -63,7 +64,10 @@ export function useInventory(initialProject: string | null = null): InventoryRea
 
   useEffect(() => {
     void refresh();
-    const onFocus = () => void refresh();
+    // A read of another screen or the Windows picker running holds it off.
+    const onFocus = () => {
+      if (!reads.busy()) void refresh();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
