@@ -252,17 +252,15 @@ describe("the result", () => {
     });
   });
 
-  test("of a Delete backup offers no Undo, since its Operation can no longer be undone", () => {
-    const result = appliedResult(outcome({ sentence: "Deleted the backup of 20261001-143012-a3f." }), "delete_backup");
-
-    expect(result).toMatchObject({ kind: "applied", undo: null });
-  });
-
-  test("of a Delete backup names the Operation, says its backup was deleted and that it can no longer be undone", () => {
-    const result = appliedResult(outcome({ sentence: "Deleted the backup of 20261001-143012-a3f." }), "delete_backup");
+  test("of a Delete backup names the Operation, says its backup was deleted, and offers no Undo, since it can no longer be undone", () => {
+    const result = appliedResult(
+      outcome({ sentence: "Deleted the backup of 20261001-143012-a3f. It can no longer be undone." }),
+      "delete_backup",
+    );
 
     expect(result).toMatchObject({
       kind: "applied",
+      undo: null,
       note: "Operation 20261001-143012-a3f · backup deleted · can no longer be undone",
     });
   });

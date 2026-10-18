@@ -211,6 +211,7 @@ const failed = (name: StepName): Step => ({ name, status: "failed" });
 
 /** What an applied Operation of `action` did, with Verify amber when States differ from the prediction. */
 export function appliedResult(outcome: Outcome, action: Action): Result {
+  const deleted = action === "delete_backup";
   return {
     kind: "applied",
     steps: [
@@ -220,11 +221,8 @@ export function appliedResult(outcome: Outcome, action: Action): Result {
     ],
     sentence: outcome.sentence,
     hints: outcome.hints,
-    undo: action === "delete_backup" ? null : outcome.operation,
-    note:
-      action === "delete_backup"
-        ? `Operation ${outcome.operation} · backup deleted · can no longer be undone`
-        : `Operation ${outcome.operation} · backup kept`,
+    undo: deleted ? null : outcome.operation,
+    note: `Operation ${outcome.operation} · ${deleted ? "backup deleted · can no longer be undone" : "backup kept"}`,
     differences: outcome.differences,
   };
 }

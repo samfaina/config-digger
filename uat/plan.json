@@ -401,10 +401,13 @@
           "instructions": [
             "Con el home de Claude Code de prueba añadido (paso 1.2), elige ese home en el Inventario.",
             "Elige el servidor cd-throwaway-user.",
-            "Pulsa Disable y, en el diálogo, pulsa Disable.",
-            "Apunta el id de la línea gris que empieza por «Operation» y pulsa Done.",
+            "Pulsa Disable.",
+            "En el diálogo, pulsa Disable.",
+            "Apunta el id de la línea gris que empieza por «Operation».",
+            "Pulsa Done.",
             "Ve a History y elige esa Operation.",
-            "Pulsa Delete backup y, en el diálogo, pulsa Delete backup.",
+            "Pulsa Delete backup.",
+            "En el diálogo, pulsa Delete backup.",
             "Lee el resultado."
           ],
           "commands": [],
