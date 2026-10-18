@@ -29,6 +29,7 @@ import {
   itemsShown,
   KIND_NAMES,
   KIND_TITLES,
+  leftoversNotShown,
   projectFailures,
   readerItem,
   samePath,
@@ -78,11 +79,12 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   // The Item another screen opened it on, selected once the inventory is read.
   const startItem = useRef(start?.item ?? null);
 
-  const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice), [inventory, homeChoice]);
+  const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice, inventory?.items ?? []), [inventory, homeChoice]);
   const selection: Selection = { agent, homes };
   const shown = useMemo(() => itemsShown(inventory?.items ?? [], { agent, homes }), [inventory, agent, homes]);
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
   const flags = flagsShown(inventory?.agent_flags ?? [], selection);
+  const notShown = inventory ? leftoversNotShown(inventory, selection) : [];
   useEffect(() => {
     if (!inventory || !startItem.current) return;
     const item = findItem(inventory.items, startItem.current);
@@ -126,6 +128,8 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         refresh={refresh}
         selectProject={(next) => {
           selectProject(next);
+          // Each Project opens on its own homes, so a missing one shows the homes holding its leftovers.
+          setHomeChoice({});
           setDetail(null);
         }}
       />
@@ -207,6 +211,16 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
               <div key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} className="alert" role="status" title={flag.path}>
                 <Icon name="flag" small />
                 {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
+              </div>
+            ))}
+            {notShown.map((leftovers) => (
+              <div key={`${leftovers.agent}|${leftovers.home}`} className="alert" role="status">
+                <Icon name="flag" small />
+                {leftovers.sentence}
+                <span className="grow" />
+                <button type="button" className="link" onClick={() => chooseHome(leftovers.agent, leftovers.home)}>
+                  Show
+                </button>
               </div>
             ))}
             <div className="scroll">
