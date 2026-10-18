@@ -26,7 +26,7 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 
 ### Adding or changing steps when a feature lands
 
-1. Add a step for each acceptance criterion a person must see in the running app or installer. Code that tests already cover needs no step.
+1. Add a step for each acceptance criterion a person must see in the running app or installer. Code that tests already cover needs no step. The look of a UI change is checked only here, never by screenshots in the PR (see `docs/agents/issue-tracker.md`).
 2. Put it in the section of the screen or flow it walks. Start a new section when none fits.
 3. Give it the next free number in its section. **Never renumber a step.** Results and tickets point at step ids, so a step keeps its id when steps are added, moved or removed around it. A removed step's id is not reused. The order of the steps in the file is the order of the walk, so `3.7` may come before `3.4`.
 4. Write one action per instruction line, and an `expect` the tester can check by looking: names, counts, the exact message.

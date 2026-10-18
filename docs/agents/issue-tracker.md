@@ -13,6 +13,12 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
+## How the look of a UI change is checked
+
+The repo is public, and screenshots of the app show paths from the developer's machine. So no ticket asks for a screenshot in its PR, and no PR carries one.
+
+When a ticket's acceptance criterion is something a person must see (a colour, a layout, how a panel sits near the window's edge), the criterion asks for a UAT step that walks it, as `docs/agents/uat.md` says. The UAT walk is where the look is signed off.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

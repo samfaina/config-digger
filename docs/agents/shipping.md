@@ -18,3 +18,4 @@ Read by the `ship-tickets` skill (samfaina/agent-skills).
   2. `## What's in it`: one bullet per change, each led by its term in bold.
   3. `## Testing`: each test file touched, with the cases it covers.
   4. `Closes #<n>`
+- **No screenshots or other images**, even when the issue asks for them: the repo is public. Say in the body which UAT steps walk the look instead (see `docs/agents/issue-tracker.md`).
