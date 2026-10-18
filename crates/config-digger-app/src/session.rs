@@ -4,11 +4,14 @@
 
 use config_digger_core::api::{
     Agent, Backup, Context, Core, Error, Inventory, ItemKind, Leftovers, Parked, Project,
-    ScanOptions, Snapshot,
+    ProjectCheck, ScanOptions, Snapshot,
 };
 use serde::Serialize;
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 
 /// What the Projects & homes screen lists: every Project and Agent home,
 /// hidden ones included, as `projects list` and `homes list` do with
@@ -46,20 +49,96 @@ pub struct ParkedEntry {
 pub struct Session {
     core: Core,
     snapshot: Snapshot,
+    /// When the scan started, in the order of every scan this app read.
+    started: u64,
     /// The locations shown so far: every Entry and Read failure of each
     /// resolved context, and every backup copy listed.
     openable: HashSet<String>,
 }
 
+/// The app's [`Session`], once the inventory was read.
+#[derive(Default)]
+pub struct SessionState(Mutex<Option<Session>>);
+
+impl SessionState {
+    /// The last scan kept, `None` until one was.
+    pub fn lock(&self) -> MutexGuard<'_, Option<Session>> {
+        // A panic in another command leaves the session as it was.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Keeps `session` as the app's last scan, unless the one kept started
+    /// after it, as when a read outlasts a list change: the locations it
+    /// showed can still be opened then.
+    pub fn keep(&self, session: Session) {
+        let mut kept = self.lock();
+        match kept.as_mut() {
+            Some(newer) if newer.started > session.started => {
+                newer.openable.extend(session.openable);
+            }
+            _ => *kept = Some(session),
+        }
+    }
+}
+
+/// Reads every Agent home and Project into a new [`Session`], counting the
+/// full scans, so that a command's log line can say how many it ran.
+pub struct Scans {
+    read: Box<dyn Fn() -> Result<Session, Error>>,
+    count: Cell<u32>,
+}
+
+impl Scans {
+    /// Scans with `read`, which counts as one full scan each time it runs.
+    pub fn new(read: impl Fn() -> Result<Session, Error> + 'static) -> Self {
+        Self {
+            read: Box::new(read),
+            count: Cell::new(0),
+        }
+    }
+
+    /// Reads every Agent home and Project once.
+    pub fn scan(&self) -> Result<Session, Error> {
+        self.count.set(self.count.get() + 1);
+        (self.read)()
+    }
+
+    /// How many scans ran, failed ones included.
+    pub fn count(&self) -> u32 {
+        self.count.get()
+    }
+}
+
 impl Session {
     /// Scans every Agent home and Project.
     pub fn scan(core: Core) -> Result<Self, Error> {
+        /// How many scans started since the app did.
+        static STARTED: AtomicU64 = AtomicU64::new(0);
+        let started = STARTED.fetch_add(1, Ordering::Relaxed);
         let snapshot = core.scan(&ScanOptions::default())?;
         Ok(Self {
             core,
             snapshot,
+            started,
             openable: HashSet::new(),
         })
+    }
+
+    /// The core this scan was read with.
+    pub fn core(&self) -> &Core {
+        &self.core
+    }
+
+    /// What was read.
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Checks `path` as a Project before it is added, against this scan.
+    pub fn check_project(&self, path: &Path) -> Result<ProjectCheck, Error> {
+        self.core.check_project_in(&self.snapshot, path)
     }
 
     /// The inventory for `project`, or for no Project, without the Agent
@@ -364,6 +443,29 @@ mod tests {
 
         assert_eq!(hidden.len(), 2);
         assert!(hidden.iter().all(|entry| entry.hidden));
+    }
+
+    #[test]
+    fn a_scan_read_before_the_one_kept_does_not_replace_it_but_what_it_showed_opens() {
+        let fs = fixture();
+        let mut older = session(&fs);
+        core(&fs).hide_home("default", Some("claude-code")).unwrap();
+        let newer = session(&fs);
+        let kept = SessionState::default();
+        kept.keep(newer);
+
+        older.resolve(None);
+        kept.keep(older);
+
+        let kept = kept.lock();
+        let kept = kept.as_ref().unwrap();
+        assert!(kept.places().agents.iter().any(|agent| {
+            agent
+                .homes
+                .iter()
+                .any(|home| home.home == "default" && home.hidden)
+        }));
+        assert!(kept.can_open(&claude_json()));
     }
 
     #[test]

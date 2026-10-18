@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type ListChange, type ListChanged, type Places } from "./bindings";
 import { call, type CommandResult } from "./desktop";
+import { reads, whenIdle } from "./reads";
 
 export type PlacesRead = {
   /** Every Project and Agent home, kept while a new read runs or after one fails. */
@@ -11,7 +12,10 @@ export type PlacesRead = {
   change: (change: ListChange) => Promise<CommandResult<ListChanged>>;
 };
 
-/** Reads every Project and Agent home on start, whenever the window regains focus, and on `reload`. */
+/**
+ * Reads every Project and Agent home on start, whenever the window regains
+ * focus while nothing else is read, and on `reload`.
+ */
 export function usePlaces(): PlacesRead {
   const [places, setPlaces] = useState<Places | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -25,7 +29,7 @@ export function usePlaces(): PlacesRead {
     inFlight.current = true;
     const before = changes.current;
     try {
-      const result = await call(commands.readPlaces);
+      const result = await reads.during(() => call(commands.readPlaces));
       if (changes.current !== before) return;
       if (result.status === "ok") {
         setPlaces(result.data);
@@ -40,7 +44,7 @@ export function usePlaces(): PlacesRead {
 
   const change = useCallback(async (change: ListChange) => {
     changes.current += 1;
-    const result = await call(() => commands.changeList(change));
+    const result = await reads.during(() => call(() => commands.changeList(change)));
     if (result.status === "ok") {
       setPlaces(result.data.places);
       setError(null);
@@ -50,7 +54,7 @@ export function usePlaces(): PlacesRead {
 
   useEffect(() => {
     void reload();
-    const onFocus = () => void reload();
+    const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);

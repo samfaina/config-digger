@@ -62,9 +62,9 @@ export const commands = {
 	 */
 	readPlaces: () => typedError<Places, Error>(__TAURI_INVOKE("read_places")),
 	/**
-	 *  Adds, hides, lists again or forgets a Project or an Agent home, then
-	 *  reads every Agent home and Project again. It writes no Agent
-	 *  configuration.
+	 *  Adds, hides, lists again or forgets a Project or an Agent home, as the
+	 *  last scan lists it, then reads every Agent home and Project once. It
+	 *  writes no Agent configuration.
 	 */
 	changeList: (change: ListChange) => typedError<ListChanged, Error>(__TAURI_INVOKE("change_list", { change })),
 	/**
@@ -74,7 +74,7 @@ export const commands = {
 	checkHome: (folder: string, agent: string) => typedError<HomeCheck, Error>(__TAURI_INVOKE("check_home", { folder, agent })),
 	/**
 	 *  Checks `path` as a Project before it is added: which Agents list an
-	 *  Agent home there. It changes nothing.
+	 *  Agent home there, as the last scan lists them. It changes nothing.
 	 */
 	checkProject: (path: string) => typedError<ProjectCheck, Error>(__TAURI_INVOKE("check_project", { path })),
 	/**  Opens the Windows picker over the window, `None` when it is cancelled. */

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Settings, type SettingsRead } from "./bindings";
 import { call, type CommandResult } from "./desktop";
+import { reads, whenIdle } from "./reads";
 
 export type SettingsState = {
   /** The settings, data folders and parked Entries, kept after a read fails. */
@@ -10,7 +11,10 @@ export type SettingsState = {
   save: (settings: Settings) => Promise<CommandResult<Settings>>;
 };
 
-/** Reads the settings, data folders and parked Entries on start and whenever the window regains focus. */
+/**
+ * Reads the settings, data folders and parked Entries on start and whenever
+ * the window regains focus while nothing else is read.
+ */
 export function useSettings(): SettingsState {
   const [read, setRead] = useState<SettingsRead | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -24,7 +28,7 @@ export function useSettings(): SettingsState {
     inFlight.current = true;
     const before = saves.current;
     try {
-      const result = await call(commands.readSettings);
+      const result = await reads.during(() => call(commands.readSettings));
       if (saves.current !== before) return;
       if (result.status === "ok") {
         setRead(result.data);
@@ -49,7 +53,7 @@ export function useSettings(): SettingsState {
 
   useEffect(() => {
     void reload();
-    const onFocus = () => void reload();
+    const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);

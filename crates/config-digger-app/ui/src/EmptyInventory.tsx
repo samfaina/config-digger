@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { commands } from "./bindings";
 import { call } from "./desktop";
 import { Icon } from "./icons";
+import { reads } from "./reads";
 import { emptyInventory, type EmptyReason } from "./view";
 
 type Props = {
@@ -23,7 +24,7 @@ export function EmptyInventory({ readAt, reading, refresh, onAddHome, onOpenHome
   useEffect(() => {
     // The Agents, with any home the user hid, say what was looked for.
     let current = true;
-    void call(commands.readPlaces).then((result) => {
+    void reads.during(() => call(commands.readPlaces)).then((result) => {
       if (!current) return;
       if (result.status === "ok") {
         setWhy(emptyInventory(result.data.agents));

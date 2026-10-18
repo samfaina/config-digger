@@ -73,7 +73,7 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
     });
 
     tauri::Builder::default()
-        .manage(commands::SessionState::default())
+        .manage(session::SessionState::default())
         .manage(commands::ActionsState::default())
         .manage(updates::UpdatesState::default())
         // Called from Rust only: the `main` capability grants no `updater:*`.

@@ -24,6 +24,7 @@ import {
   type ShowInInventory,
 } from "./places";
 import { useActionDialog } from "./useActionDialog";
+import { reads } from "./reads";
 import { usePlaces } from "./usePlaces";
 import { useTransient } from "./useTransient";
 
@@ -580,9 +581,12 @@ function useAdd(onAdd: (change: ListChange) => Promise<string | null>, onClose: 
   return { error, busy, add };
 }
 
-/** Opens the Windows picker, filling `set` with what was picked. */
+/**
+ * Opens the Windows picker, filling `set` with what was picked. The focus it
+ * gives back on closing reads nothing again.
+ */
 async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
-  const result = await call(() => commands.pickLocation(what));
+  const result = await reads.during(() => call(() => commands.pickLocation(what)));
   if (result.status === "error") notify(`The Windows picker couldn't open: ${result.error.message}`);
   else if (result.data !== null) set(result.data);
 }
