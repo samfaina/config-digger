@@ -1,5 +1,16 @@
 import { describe, expect, test } from "vitest";
-import { CLOSED, PANEL_EDGE, onFieldClick, onKey, onOptionClick, onOptionHover, type DropdownOption, placePanel, type DropdownState } from "./dropdown";
+import {
+  CLOSED,
+  PANEL_EDGE,
+  TYPING_PAUSE_MS,
+  onFieldClick,
+  onKey,
+  onOptionClick,
+  onOptionHover,
+  placePanel,
+  type DropdownOption,
+  type DropdownState,
+} from "./dropdown";
 
 const agents: DropdownOption[] = [
   { value: "", label: "Choose an Agent…", disabled: true },
@@ -9,10 +20,11 @@ const agents: DropdownOption[] = [
 ];
 
 const key = (name: string, altKey = false) => ({ key: name, altKey });
+const open = (active: number): DropdownState => ({ ...CLOSED, open: true, active });
 
 describe("the keyboard on a closed dropdown", () => {
-  test("Enter, Space and Alt+Down open it on the chosen option", () => {
-    for (const opener of [key("Enter"), key(" "), key("ArrowDown", true)]) {
+  test("Enter, Space, Alt+Down and Alt+Up open it on the chosen option", () => {
+    for (const opener of [key("Enter"), key(" "), key("ArrowDown", true), key("ArrowUp", true)]) {
       const reaction = onKey(CLOSED, agents, "codex", opener, 0);
       expect(reaction.state).toMatchObject({ open: true, active: 2 });
       expect(reaction.choose).toBeNull();
@@ -34,8 +46,6 @@ describe("the keyboard on a closed dropdown", () => {
 });
 
 describe("the keyboard on an open dropdown", () => {
-  const open = (active: number) => ({ ...CLOSED, open: true, active });
-
   test("the arrows move the active option past disabled ones and stop at the ends", () => {
     expect(onKey(open(1), agents, "claude", key("ArrowDown"), 0).state).toEqual(open(2));
     expect(onKey(open(3), agents, "claude", key("ArrowDown"), 0).state).toEqual(open(3));
@@ -56,8 +66,6 @@ describe("the keyboard on an open dropdown", () => {
 });
 
 describe("closing an open dropdown", () => {
-  const open = (active: number) => ({ ...CLOSED, open: true, active });
-
   test("Enter, Space and Alt+Up choose the active option and close", () => {
     for (const chooser of [key("Enter"), key(" "), key("ArrowUp", true), key("ArrowDown", true)]) {
       expect(onKey(open(3), agents, "claude", chooser, 0)).toEqual({ state: CLOSED, choose: "copilot", handled: true });
@@ -83,7 +91,6 @@ describe("closing an open dropdown", () => {
 });
 
 describe("typing on a dropdown", () => {
-  const open = (active: number) => ({ ...CLOSED, open: true, active });
   const type = (state: DropdownState, value: string, text: string, startAt = 0) => {
     let reaction = { state, choose: null as string | null, handled: false };
     [...text].forEach((char, at) => {
@@ -101,12 +108,12 @@ describe("typing on a dropdown", () => {
   test("the same letter again goes on to the next option with it, round to the top", () => {
     const first = type(open(1), "claude", "c");
     expect(first.state.active).toBe(2);
-    expect(type(first.state, "claude", "c", 2000).state.active).toBe(1);
+    expect(type(first.state, "claude", "c", 100 + TYPING_PAUSE_MS).state.active).toBe(1);
   });
 
   test("a pause starts the search again", () => {
     const first = type(open(1), "claude", "g");
-    expect(type(first.state, "claude", "c", 2000).state.active).toBe(1);
+    expect(type(first.state, "claude", "c", 100 + TYPING_PAUSE_MS).state.active).toBe(1);
   });
 
   test("a space inside a search is part of it, not a choice", () => {
@@ -134,8 +141,6 @@ describe("typing on a dropdown", () => {
 });
 
 describe("the mouse on a dropdown", () => {
-  const open = (active: number) => ({ ...CLOSED, open: true, active });
-
   test("a click on the field opens the panel on the chosen option, and a second click closes it", () => {
     const opened = onFieldClick(CLOSED, agents, "codex");
     expect(opened).toEqual(open(2));

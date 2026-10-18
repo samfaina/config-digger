@@ -628,6 +628,7 @@ p {
 
 .banner-select,
 .home-select {
+  min-width: 140px;
   max-width: 340px;
   margin-top: 4px;
   padding: 4px 8px;
@@ -638,6 +639,7 @@ p {
 }
 
 .home-select {
+  min-width: 0;
   max-width: 150px;
   margin-top: 0;
   font-size: 12px;
@@ -646,7 +648,7 @@ p {
 /* The app's dropdown: a field, and its panel of options over the page */
 
 .select-field {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--white);

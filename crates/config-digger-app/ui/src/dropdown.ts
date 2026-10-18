@@ -27,10 +27,13 @@ export type Reaction = { state: DropdownState; choose: string | null; handled: b
 
 const ignored = (state: DropdownState): Reaction => ({ state, choose: null, handled: false });
 
+/** The index of the option holding `value`, or -1. */
+const indexOf = (options: DropdownOption[], value: string) => options.findIndex((option) => option.value === value);
+
 /** The panel opened on the chosen option, or on the first one that can be picked. */
 function opened(options: DropdownOption[], value: string): DropdownState {
-  const chosen = options.findIndex((option) => option.value === value);
-  return { ...CLOSED, open: true, active: chosen >= 0 ? chosen : options.findIndex((option) => !option.disabled) };
+  const chosen = indexOf(options, value);
+  return { ...CLOSED, open: true, active: chosen >= 0 ? chosen : next(options, -1, 1) };
 }
 
 /** The panel closed on option `at`, chosen when it can be picked and is not the value already. */
@@ -41,10 +44,10 @@ function chooseAt(options: DropdownOption[], value: string, at: number, handled:
 }
 
 /**
- * The next option that can be picked from `from`, one `step` at a time, or
- * `from` itself at the end of the list.
+ * The next option that can be picked from `from`, going down (1) or up (-1),
+ * or `from` itself at the end of the list.
  */
-function step(options: DropdownOption[], from: number, by: 1 | -1): number {
+function next(options: DropdownOption[], from: number, by: 1 | -1): number {
   for (let at = from + by; at >= 0 && at < options.length; at += by) {
     if (!options[at].disabled) return at;
   }
@@ -52,16 +55,16 @@ function step(options: DropdownOption[], from: number, by: 1 | -1): number {
 }
 
 /** Where an arrow, Home or End goes from `from`, or null for any other key. */
-function moved(options: DropdownOption[], from: number, key: string): number | null {
+function moveFrom(options: DropdownOption[], from: number, key: string): number | null {
   switch (key) {
     case "ArrowDown":
-      return step(options, from, 1);
+      return next(options, from, 1);
     case "ArrowUp":
-      return step(options, from, -1);
+      return next(options, from, -1);
     case "Home":
-      return step(options, -1, 1);
+      return next(options, -1, 1);
     case "End":
-      return step(options, options.length, -1);
+      return next(options, options.length, -1);
   }
   return null;
 }
@@ -89,7 +92,7 @@ export function onKey(state: DropdownState, options: DropdownOption[], value: st
   const searching = state.typed !== "" && now - state.typedAt < TYPING_PAUSE_MS;
   if (key.key.length === 1 && !key.altKey && (key.key !== " " || searching)) {
     const typed = (searching ? state.typed : "") + key.key;
-    const from = state.open ? state.active : options.findIndex((option) => option.value === value);
+    const from = state.open ? state.active : indexOf(options, value);
     const found = search(options, from, typed);
     const next = { ...state, typed, typedAt: now };
     if (found === null) return { state: next, choose: null, handled: true };
@@ -97,19 +100,15 @@ export function onKey(state: DropdownState, options: DropdownOption[], value: st
     const chosen = options[found].value;
     return { state: next, choose: chosen !== value ? chosen : null, handled: true };
   }
+  const alt = key.altKey && (key.key === "ArrowUp" || key.key === "ArrowDown");
   if (!state.open) {
-    if (key.key === "Enter" || key.key === " " || (key.altKey && key.key === "ArrowDown")) {
-      return { state: opened(options, value), choose: null, handled: true };
-    }
+    if (key.key === "Enter" || key.key === " " || alt) return { state: opened(options, value), choose: null, handled: true };
     // Closed, a move chooses at once, as a native select does on Windows.
-    const from = options.findIndex((option) => option.value === value);
-    const to = moved(options, from, key.key);
-    if (to === null) return ignored(state);
-    const option = options[to];
-    return { state, choose: option && option.value !== value ? option.value : null, handled: true };
+    const to = moveFrom(options, indexOf(options, value), key.key);
+    return to === null ? ignored(state) : chooseAt(options, value, to, true);
   }
   const choose = (handled: boolean) => chooseAt(options, value, state.active, handled);
-  if (key.altKey && (key.key === "ArrowUp" || key.key === "ArrowDown")) return choose(true);
+  if (alt) return choose(true);
   switch (key.key) {
     case "Enter":
     case " ":
@@ -119,7 +118,7 @@ export function onKey(state: DropdownState, options: DropdownOption[], value: st
     case "Escape":
       return { state: CLOSED, choose: null, handled: true };
   }
-  const to = moved(options, state.active, key.key);
+  const to = moveFrom(options, state.active, key.key);
   if (to !== null) return { state: { ...state, active: to }, choose: null, handled: true };
   return ignored(state);
 }

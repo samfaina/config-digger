@@ -25,7 +25,7 @@ type SelectProps = {
 };
 
 /** Runs of options next to each other with the same group, with each option's index. */
-function runs(options: DropdownOption[]): { group?: string; items: { option: DropdownOption; at: number }[] }[] {
+function groupRuns(options: DropdownOption[]): { group?: string; items: { option: DropdownOption; at: number }[] }[] {
   const all: { group?: string; items: { option: DropdownOption; at: number }[] }[] = [];
   options.forEach((option, at) => {
     const last = all.at(-1);
@@ -54,6 +54,9 @@ export function Select({ value, options, onChange, label, title, className }: Se
     if (reaction.choose !== null) onChange(reaction.choose);
   };
   const close = () => setState(CLOSED);
+  // Options that change while the panel is open, as on an Inventory read, would leave it with the old list's size and active option.
+  const optionsKey = JSON.stringify(options.map((option) => [option.value, option.label]));
+  useEffect(close, [optionsKey]);
 
   // Measured once open, before paint: the panel first renders hidden at its content's size.
   useLayoutEffect(() => {
@@ -63,7 +66,9 @@ export function Select({ value, options, onChange, label, title, className }: Se
     }
     if (!field.current || !panel.current) return;
     const box = field.current.getBoundingClientRect();
-    const content = { width: panel.current.offsetWidth, height: panel.current.scrollHeight };
+    // Rounded up, borders included: a size rounded down would bring up a scrollbar the content does not need.
+    const size = panel.current.getBoundingClientRect();
+    const content = { width: Math.ceil(size.width), height: Math.ceil(size.height) };
     setPlacement(placePanel(box, content, { width: window.innerWidth, height: window.innerHeight }));
   }, [state.open]);
 
@@ -108,7 +113,11 @@ export function Select({ value, options, onChange, label, title, className }: Se
         onKeyDown={(event) => {
           if (event.ctrlKey || event.metaKey) return;
           const reaction = onKey(state, options, value, { key: event.key, altKey: event.altKey }, event.timeStamp);
-          if (reaction.handled) event.preventDefault();
+          if (reaction.handled) {
+            // An Escape that closes the panel is not one for a dialog around it.
+            event.preventDefault();
+            event.stopPropagation();
+          }
           apply(reaction);
         }}
         onBlur={close}
@@ -128,13 +137,13 @@ export function Select({ value, options, onChange, label, title, className }: Se
             // The focus stays on the field, so a click in the panel does not blur it.
             onMouseDown={(event) => event.preventDefault()}
           >
-            {runs(options).map((run, index) => {
+            {groupRuns(options).map((run, index) => {
               const items = run.items.map(({ option, at }) => (
                 <div
                   key={at}
                   id={optionId(at)}
                   data-index={at}
-                  className={`select-option${at === state.active ? " active" : ""}${option.value === value ? " chosen" : ""}`}
+                  className={`select-option${at === state.active ? " active" : ""}${option.value === value && !option.disabled ? " chosen" : ""}`}
                   role="option"
                   aria-selected={at === state.active}
                   aria-disabled={option.disabled || undefined}
