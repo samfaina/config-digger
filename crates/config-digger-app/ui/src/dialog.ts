@@ -4,6 +4,7 @@
 import type {
   Action,
   ActionPreview,
+  Change,
   Error as ApiError,
   Difference,
   ErrorCode,
@@ -62,6 +63,48 @@ export function applyButton(
 function leftoverCount(preview: Preview): string {
   const count = new Set(preview.changes.map((change) => change.locator)).size;
   return `${count} ${count === 1 ? "leftover" : "leftovers"}`;
+}
+
+/**
+ * A change as the What changes block lists it, under its Project and its
+ * file. `key` is its locator past the file, in pieces that each end where
+ * the line may wrap, at a path or key separator; a skill folder has none.
+ */
+export type ChangeLine = { change: Change; key: string[] };
+
+/** The changes to one file, under the file's name, with its full path for hover and copy. */
+export type FileGroup = { path: string; name: string; changes: ChangeLine[] };
+
+/** The changes in one Project, or in no Project, file by file. */
+export type ProjectGroup = { project: string | null; files: FileGroup[] };
+
+/** The changes under their Project, then under their file, each group where its first change comes. */
+export function changeGroups(changes: Change[]): ProjectGroup[] {
+  const groups: ProjectGroup[] = [];
+  for (const change of changes) {
+    let group = groups.find((group) => group.project === change.project);
+    if (!group) groups.push((group = { project: change.project, files: [] }));
+    let file = group.files.find((file) => file.path === change.path);
+    if (!file) group.files.push((file = { path: change.path, name: fileName(change.path), changes: [] }));
+    file.changes.push({ change, key: wrapPoints(locatorKey(change)) });
+  }
+  return groups;
+}
+
+/** The locator past its file, such as `mcpServers.notes`, or all of it when it does not start with the file. */
+function locatorKey({ path, locator }: Change): string {
+  if (locator === path) return "";
+  return locator.startsWith(`${path}#`) ? locator.slice(path.length + 1) : locator;
+}
+
+/** `text` in pieces that each end at a path or key separator, so that a line wraps there and never mid-word. */
+function wrapPoints(text: string): string[] {
+  return text.match(/[^\\/.#]*[\\/.#]|[^\\/.#]+/g) ?? [];
+}
+
+/** The last part of a path, such as `.claude.json`. */
+function fileName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }
 
 /** One location the Operation touches, as the Files section lists it. */

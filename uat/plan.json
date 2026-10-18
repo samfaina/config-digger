@@ -342,6 +342,34 @@
           "covers": ["#185"]
         }
       ]
+    },
+    {
+      "id": "7",
+      "title": "Diálogo de una acción",
+      "steps": [
+        {
+          "id": "7.1",
+          "title": "El bloque What changes de Remove leftovers",
+          "goal": "Cada cambio de What changes se lee: el nombre de la Entry delante, cada parte en su línea, y la clave larga corta y partida solo en sus separadores.",
+          "instructions": [
+            "Con el home de Claude Code de prueba añadido (paso 1.2), ve a Projects & homes.",
+            "En la sección Missing, pulsa Remove leftovers en la fila de E:/cd-throwaway/project-gone.",
+            "Mira el bloque What changes del diálogo.",
+            "Deja el ratón sobre la clave gris del cambio, sin pulsar.",
+            "Pulsa el botón de copiar que hay a su derecha.",
+            "Estrecha la ventana hasta que la clave no quepa en una línea.",
+            "Pulsa Cancel."
+          ],
+          "commands": [],
+          "expect": "Arriba sale el Project E:/cd-throwaway/project-gone en su línea, debajo el archivo .claude.json y, debajo, el cambio en su recuadro: cd-throwaway-leftover en negrita, Claude Code en la línea siguiente, la clave projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover en gris y monoespaciada, y Unread → Removed al final, con espacio entre las líneas. Sobre la clave sale un tooltip con el locator entero, que empieza por E:\\cd-throwaway\\claude-code-home\\.claude.json#. Al copiarlo sale el aviso «Copied the locator.». Con la ventana estrecha, la clave pasa a la línea siguiente tras un punto o una barra, nunca en medio de una palabra.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#186"]
+        }
+      ]
     }
   ]
 }

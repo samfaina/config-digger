@@ -205,3 +205,18 @@ describe("a selected filter row of Entries by State", () => {
     expect(selected).toMatch(/^#000000[0-9a-f]{2}$/i);
   });
 });
+
+describe("a change in the What changes block", () => {
+  test("puts each of its lines under the last, with space between them", () => {
+    const row = styled(".change-row");
+    expect(row.get("display")).toBe("flex");
+    expect(row.get("flex-direction")).toBe("column");
+    expect(parseFloat(row.get("gap") ?? "0")).toBeGreaterThan(0);
+  });
+
+  test("wraps its key only where a path or key separator lets it, never mid-word", () => {
+    const key = styled(".change-key");
+    expect(key.get("overflow-wrap")).toBe("normal");
+    expect(key.get("word-break")).toBe("normal");
+  });
+});
