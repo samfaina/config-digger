@@ -3,6 +3,7 @@ import type { ActionPreview, Change, Error as ApiError, FileChange, FolderChange
 import {
   appliedResult,
   applyButton,
+  changeGroups,
   diffView,
   failedResult,
   keptAcknowledgements,
@@ -387,5 +388,42 @@ describe("the subtitle", () => {
     expect(subtitle(preview({ action: "undo", undo_of: "20261001-143012-a3f", changes: [change()] }))).toBe(
       "Undoes Operation 20261001-143012-a3f",
     );
+  });
+});
+
+describe("the What changes block", () => {
+  const claudeJson = String.raw`C:\Users\me\.claude.json`;
+  const gone = "E:/cd-throwaway/project-gone";
+  const other = "E:/cd-throwaway/project-other";
+  const leftover = (project: string, name: string) => `${claudeJson}#projects.${project}.mcpServers.${name}`;
+  // Three leftovers' changes: one read by two Agents in one Project, one in another Project.
+  const changes = [
+    change({ item: "cd-throwaway-leftover", project: gone, locator: leftover(gone, "cd-throwaway-leftover"), after: "removed" }),
+    change({ item: "cd-throwaway-other", project: other, locator: leftover(other, "cd-throwaway-other"), after: "removed" }),
+    change({ agent: "vscode", agent_name: "VS Code", item: "cd-throwaway-leftover", project: gone, locator: leftover(gone, "cd-throwaway-leftover"), after: "removed" }),
+  ];
+
+  test("groups the changes under their Project, then under their file, in the order each first comes", () => {
+    const groups = changeGroups(changes);
+
+    expect(groups.map((group) => group.project)).toEqual([gone, other]);
+    expect(groups[0].files.map((file) => [file.name, file.path])).toEqual([[".claude.json", claudeJson]]);
+    expect(groups[0].files[0].changes.map((line) => line.change.agent_name)).toEqual(["Claude Code", "VS Code"]);
+    expect(groups[1].files[0].changes.map((line) => line.change.item)).toEqual(["cd-throwaway-other"]);
+  });
+
+  test("shortens a long locator to its key under its file's name, in pieces that each end at a path or key separator", () => {
+    const [line] = changeGroups(changes)[0].files[0].changes;
+
+    expect(line.keyPieces).toEqual(["projects.", "E:/", "cd-throwaway/", "project-gone.", "mcpServers.", "cd-throwaway-leftover"]);
+    expect(line.change.locator).toBe(String.raw`C:\Users\me\.claude.json#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`);
+  });
+
+  test("gives a skill folder, whose locator is its path, no key, its folder's name standing for it", () => {
+    const folder = String.raw`C:\Users\me\.claude\skills\pdf`;
+    const [group] = changeGroups([change({ item: "pdf", path: folder, locator: folder })]);
+
+    expect(group.files[0].name).toBe("pdf");
+    expect(group.files[0].changes[0].keyPieces).toEqual([]);
   });
 });

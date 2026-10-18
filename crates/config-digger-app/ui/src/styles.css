@@ -612,6 +612,11 @@ p {
   cursor: pointer;
 }
 
+.icon-button.small {
+  width: 22px;
+  height: 22px;
+}
+
 .cta.danger {
   background: #b93a35;
   box-shadow: 0 4px 14px #f8514933;
@@ -1308,27 +1313,71 @@ p {
   background: var(--line);
 }
 
+/* What changes: each Project, then each file in it, then each change to
+   that file, the Entry's name first and every other part on a line of its own. */
+
 .changes {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.change-project {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.change-project-name {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.change-file {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
+.change-file-name,
+.change-locator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .change-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--tile);
 }
 
-.change-what {
-  flex: 1;
+.change-item {
+  overflow-wrap: anywhere;
+}
+
+/* A long key, such as `projects.E:/…/project-gone.mcpServers.x`, wraps
+   only at the <wbr> after each separator. */
+.change-key {
   min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.change-key-piece {
+  white-space: nowrap;
 }
 
 .change-states {
+  margin-top: 2px;
   display: flex;
   align-items: center;
   gap: 6px;

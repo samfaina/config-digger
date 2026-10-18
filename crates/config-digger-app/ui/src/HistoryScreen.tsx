@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BackupDiffs, BackupPath, ChangeRow, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
+import { BackupDiffs, BackupPath, Changes, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
 import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
 import { call, NOTICE_MS, type Notify } from "./desktop";
 import {
@@ -297,15 +297,7 @@ function DetailSections({ detail, notify }: { detail: OperationDetail; notify: N
   return (
     <>
       <DialogSection title="States changed">
-        {detail.changes.length === 0 ? (
-          <p className="dim">No State changes in any Agent.</p>
-        ) : (
-          <div className="changes">
-            {detail.changes.map((change) => (
-              <ChangeRow key={`${change.agent}|${change.home}|${change.locator}|${change.project ?? ""}`} change={change} />
-            ))}
-          </div>
-        )}
+        <Changes changes={detail.changes} notify={notify} />
       </DialogSection>
 
       {detail.rollback.length > 0 && (

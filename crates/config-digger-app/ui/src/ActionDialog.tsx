@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   commands,
   type ActionPreview,
@@ -13,11 +13,13 @@ import { call, copy, revealLocation, type Notify } from "./desktop";
 import {
   appliedResult,
   applyButton,
+  changeGroups,
   diffView,
   failedResult,
   keptAcknowledgements,
   locations,
   subtitle,
+  type ChangeLine,
   type Location,
   type Result,
   type Step,
@@ -235,6 +237,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
             onCheckAgain={() => void checkAgain()}
             onCancel={close}
             onApply={() => void apply(phase.planned, phase.acknowledged)}
+            notify={notify}
           />
         )}
 
@@ -272,10 +275,11 @@ type PreviewBodyProps = {
   onCheckAgain: () => void;
   onCancel: () => void;
   onApply: () => void;
+  notify: Notify;
 };
 
 /** The preview: What changes, Before you apply, Files, and the footer with Cancel and Apply. */
-function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onCheckAgain, onCancel, onApply }: PreviewBodyProps) {
+function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onCheckAgain, onCancel, onApply, notify }: PreviewBodyProps) {
   const { preview, warnings, blocks } = planned;
   const button = applyButton(planned, acknowledged, { leftovers });
   const before = blocks.length + warnings.length + preview.info.length;
@@ -292,15 +296,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
       )}
 
       <DialogSection title="What changes">
-        {preview.changes.length === 0 ? (
-          <p className="dim">No State changes in any Agent.</p>
-        ) : (
-          <div className="changes">
-            {preview.changes.map((change) => (
-              <ChangeRow key={`${change.agent}|${change.home}|${change.locator}|${change.project ?? ""}`} change={change} />
-            ))}
-          </div>
-        )}
+        <Changes changes={preview.changes} notify={notify} />
         {preview.effective.map((effective) => (
           <p key={`${effective.agent}|${effective.home}|${effective.item}`} className="effective-change">
             {effective.sentence}
@@ -383,24 +379,74 @@ export function DialogSection({ title, children }: { title: string; children: Re
   );
 }
 
-/** One (Agent, Entry, Project) whose State the Operation changes, before → after. */
-export function ChangeRow({ change }: { change: Change }) {
+/** The States an Operation changes, under each Project, then under each file. */
+export function Changes({ changes, notify }: { changes: Change[]; notify: Notify }) {
+  if (changes.length === 0) return <p className="dim">No State changes in any Agent.</p>;
+  return (
+    <div className="changes">
+      {changeGroups(changes).map((group) => (
+        <section key={group.project ?? ""} className="change-project">
+          <h3 className="change-project-name">{group.project ?? "No Project"}</h3>
+          {group.files.map((file) => (
+            <div key={file.path} className="change-file">
+              <div className="change-file-name">
+                <Tooltip text={file.path}>
+                  <span className="mono">{file.name}</span>
+                </Tooltip>
+                <CopyButton text={file.path} what="path" notify={notify} />
+              </div>
+              {file.changes.map((line) => (
+                <ChangeRow key={`${line.change.agent}|${line.change.home}|${line.change.locator}`} line={line} notify={notify} />
+              ))}
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** One (Agent, Entry, Project) whose State the Operation changes: the Entry, its Agent, its key, then before → after. */
+function ChangeRow({ line: { change, keyPieces }, notify }: { line: ChangeLine; notify: Notify }) {
   return (
     <div className="change-row">
-      <div className="change-what">
-        <div>
-          <b>{change.agent_name}</b>
-          {change.home !== "default" && <span className="dim"> ({change.home})</span>} · {change.item}
-          <span className="dim"> · {change.project ?? "No Project"}</span>
-        </div>
-        <div className="mono dim">{change.locator}</div>
+      <b className="change-item">{change.item}</b>
+      <div className="dim">
+        {change.agent_name}
+        {change.home !== "default" && ` (${change.home})`}
       </div>
+      {keyPieces.length > 0 && (
+        <div className="change-locator">
+          <Tooltip text={change.locator}>
+            <span className="mono dim change-key">
+              {keyPieces.map((piece, index) => (
+                <Fragment key={index}>
+                  <span className="change-key-piece">{piece}</span>
+                  <wbr />
+                </Fragment>
+              ))}
+            </span>
+          </Tooltip>
+          <CopyButton text={change.locator} what="locator" notify={notify} />
+        </div>
+      )}
       <div className="change-states">
         <StateAfterPill state={change.before} />
         <span className="dim">→</span>
         <StateAfterPill state={change.after} />
       </div>
     </div>
+  );
+}
+
+/** A small Copy button, such as for a locator. */
+function CopyButton({ text, what, notify }: { text: string; what: string; notify: Notify }) {
+  return (
+    <Tooltip text={`Copy the ${what}`}>
+      <button type="button" className="icon-button small" aria-label={`Copy the ${what}`} onClick={() => void copy(text, what, notify)}>
+        <Icon name="copy" small />
+      </button>
+    </Tooltip>
   );
 }
 
