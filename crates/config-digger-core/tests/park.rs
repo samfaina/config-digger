@@ -465,9 +465,17 @@ fn an_entry_parked_from_a_toml_file_is_removed_from_the_store() {
     assert_eq!(read_json(&fs, store())["entries"], json!({}));
 }
 
+/// The Store package's install folder, as Windows names it.
+const PACKAGE: &str = r"C:\Program Files\WindowsApps\Claude_2.16120.0.0_x64__pzs8sxrjxfjjc";
+
 /// A core over `fs` while Claude Desktop runs from its Store package.
 fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
-    let package = r"C:\Program Files\WindowsApps\Claude_2.16120.0.0_x64__pzs8sxrjxfjjc";
+    core_while_claude_runs(fs, Some(PathBuf::from(PACKAGE).join(r"app\claude.exe")))
+}
+
+/// A core over `fs` while a `claude.exe` runs from `path`, `None` when the
+/// OS hides it.
+fn core_while_claude_runs(fs: &FakeFileSystem, path: Option<PathBuf>) -> Core {
     let mut ports = fake::ports(
         fs.clone(),
         env().with_var("ProgramFiles", r"C:\Program Files"),
@@ -475,7 +483,7 @@ fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
     ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
         pid: 5151,
         image: "claude.exe".to_owned(),
-        path: Some(PathBuf::from(package).join(r"app\claude.exe")),
+        path,
         cmdline: String::new(),
     }));
     Core::new(ports).unwrap()
@@ -488,8 +496,7 @@ fn parking_is_blocked_while_claude_desktop_runs() {
 
     let plan = plan_with(&core, Action::Disable, "notes").unwrap();
 
-    assert_eq!(plan.blocks().len(), 1, "{:?}", plan.blocks());
-    assert_eq!(to_json(plan.blocks()[0].code), "running_agent_parking");
+    assert_parking_blocked(&plan);
     assert!(
         plan.blocks()[0].sentence.contains("Close Claude Desktop"),
         "{}",
@@ -509,7 +516,168 @@ fn putting_a_parked_entry_back_is_blocked_while_claude_desktop_runs() {
 
     let plan = plan_with(&core_while_desktop_runs(&fs), Action::Enable, "notes").unwrap();
 
+    assert_parking_blocked(&plan);
+}
+
+/// A Claude Desktop home the user added outside the definition's homes.
+const ADDED: &str = r"E:\cd-throwaway\claude-desktop-home";
+
+/// The Store package's data folder and its install folder, an Installation
+/// that reads an added home, and a classic data folder at `ADDED`.
+fn desktop_and_added() -> FakeFileSystem {
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(r"tests\fixtures\claude-desktop\classic");
+    let installed = desktop()
+        .with_file(
+            PathBuf::from(PACKAGE).join("AppxManifest.xml"),
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10">
+  <Identity Name="Claude" Publisher="CN=Anthropic" Version="2.16120.0.0" ProcessorArchitecture="x64" />
+</Package>
+"#,
+        )
+        .with_file(
+            PathBuf::from(PACKAGE).join(r"app\claude.exe"),
+            fake::executable(Some([2, 16120, 0, 0])),
+        );
+    load(installed, &fixture, Path::new(ADDED))
+}
+
+fn assert_parking_blocked(plan: &Plan) {
+    assert_eq!(plan.blocks().len(), 1, "{:?}", plan.blocks());
     assert_eq!(to_json(plan.blocks()[0].code), "running_agent_parking");
+}
+
+/// The running Claude Desktop reads no file of the plan: it neither blocks
+/// nor warns.
+fn assert_desktop_reads_none_of(plan: &Plan) {
+    assert_eq!(plan.blocks(), &[], "{:?}", plan.blocks());
+    assert!(
+        plan.warnings()
+            .iter()
+            .all(|warning| warning.class != WarningClass::RunningAgent),
+        "{:?}",
+        plan.warnings()
+    );
+}
+
+#[test]
+fn parking_in_an_added_home_elsewhere_goes_ahead_while_claude_desktop_runs() {
+    let fs = desktop_and_added();
+    let core = core_while_desktop_runs(&fs);
+    core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+
+    let plan = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+    assert_desktop_reads_none_of(&plan);
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(
+        read_json(&fs, Path::new(ADDED).join("claude_desktop_config.json"))["mcpServers"],
+        json!({})
+    );
+}
+
+#[test]
+fn a_claude_exe_whose_path_is_hidden_blocks_parking_in_the_definition_s_home_only() {
+    let fs = desktop_and_added();
+    let core = core_while_claude_runs(&fs, None);
+    core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+
+    let in_definition_home = plan_with(&core, Action::Disable, "notes").unwrap();
+    let in_added_home = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+    assert_parking_blocked(&in_definition_home);
+    assert_desktop_reads_none_of(&in_added_home);
+}
+
+// An added home in the folder of a definition's home is that home, so
+// `notes` names one Entry.
+
+#[test]
+fn parking_in_an_added_home_in_another_case_of_a_definition_s_home_is_blocked() {
+    let fs = desktop();
+    let core = core_while_desktop_runs(&fs);
+    let spelled = msix().display().to_string().to_uppercase();
+    core.add_home(Path::new(&spelled), "claude-desktop")
+        .unwrap();
+
+    assert_parking_blocked(&plan_with(&core, Action::Disable, "notes").unwrap());
+}
+
+#[test]
+fn parking_in_an_added_home_linked_to_a_definition_s_home_is_blocked() {
+    let link = r"E:\cd-throwaway\desktop-link";
+    let fs = desktop().with_link(link, msix());
+    let core = core_while_desktop_runs(&fs);
+    core.add_home(Path::new(link), "claude-desktop").unwrap();
+
+    assert_parking_blocked(&plan_with(&core, Action::Disable, "notes").unwrap());
+}
+
+/// An Agent that picks no home by lookup order, whose servers in its home
+/// file have no switch, and which rewrites that file from memory.
+const HOME_PARKING_AGENT: &str = r#"
+format_version = 1
+
+[agent]
+id = "home-parking-agent"
+name = "Home Parking Agent"
+
+[process]
+images = ["home-parking-agent.exe"]
+
+[[homes]]
+id = "default"
+folder = { block = "path", path = "~" }
+roots.state = ".home-parking-agent.json"
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "user-mcp"
+anchor = { block = "home", root = "state" }
+format = { block = "json", dialect = "strict" }
+root = ["servers"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "rewritten-while-running"
+on_read_failure = "ignores_file"
+
+[items.mcp]
+precedence = ["user-mcp"]
+competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
+
+[[items.mcp.disable]]
+block = "park"
+locations = ["user-mcp"]
+"#;
+
+#[test]
+fn parking_in_an_added_home_of_an_agent_without_lookup_orders_is_blocked_while_it_runs() {
+    let added = r"E:\cd-throwaway\home-parking-agent-home";
+    let fs = FakeFileSystem::new()
+        .with_file(PathBuf::from(HOME).join(".home-parking-agent.json"), "{}")
+        .with_file(
+            Path::new(added).join(".home-parking-agent.json"),
+            r#"{ "servers": { "alpha": { "command": "a" } } }"#,
+        );
+    let mut ports = fake::ports(fs.clone(), env());
+    ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
+        pid: 6161,
+        image: "home-parking-agent.exe".to_owned(),
+        path: None,
+        cmdline: String::new(),
+    }));
+    let core =
+        Core::with_extra_definitions(ports, &[("home-parking-agent.toml", HOME_PARKING_AGENT)])
+            .unwrap();
+    core.add_home(Path::new(added), "home-parking-agent")
+        .unwrap();
+
+    assert_parking_blocked(&plan_with(&core, Action::Disable, "alpha").unwrap());
 }
 
 #[test]

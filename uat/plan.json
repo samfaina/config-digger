@@ -368,6 +368,31 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#186"]
+        },
+        {
+          "id": "7.2",
+          "title": "Disable en un home de Claude Desktop añadido, con Claude Desktop abierto",
+          "goal": "Un Claude Desktop abierto no bloquea ni avisa al aparcar una Entry de un home añadido que no lee.",
+          "instructions": [
+            "Abre Claude Desktop y déjalo abierto.",
+            "En config-digger, ve a Projects & homes y pulsa Add Agent home.",
+            "Elige Claude Desktop como Agent.",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "Vuelve al Inventario y elige ese home.",
+            "Elige el servidor cd-throwaway-desktop.",
+            "Pulsa Disable.",
+            "Mira el diálogo. Si tiene avisos con casilla, márcalas.",
+            "En el diálogo, pulsa Disable.",
+            "Pulsa Done."
+          ],
+          "commands": [],
+          "expect": "El diálogo no tiene ninguna frase que empiece por «Claude Desktop is running», ni como bloqueo ni como aviso, y su botón Disable se puede pulsar. Tras Done, cd-throwaway-desktop sale como Disabled en ese home.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#188"]
         }
       ]
     }
