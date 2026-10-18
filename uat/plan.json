@@ -372,7 +372,7 @@
         {
           "id": "7.2",
           "title": "Disable en un home de Claude Desktop añadido, con Claude Desktop abierto",
-          "goal": "Un Claude Desktop abierto no bloquea aparcar una Entry de un home añadido que no lee.",
+          "goal": "Un Claude Desktop abierto no bloquea ni avisa al aparcar una Entry de un home añadido que no lee.",
           "instructions": [
             "Abre Claude Desktop y déjalo abierto.",
             "En config-digger, ve a Projects & homes y pulsa Add Agent home.",
@@ -386,7 +386,7 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "El diálogo no tiene el bloqueo «Claude Desktop is running and rewrites … Close Claude Desktop and retry.» y su botón Disable se puede pulsar. Tras Done, cd-throwaway-desktop sale como Disabled en ese home.",
+          "expect": "El diálogo no tiene ninguna frase que empiece por «Claude Desktop is running», ni como bloqueo ni como aviso, y su botón Disable se puede pulsar. Tras Done, cd-throwaway-desktop sale como Disabled en ese home.",
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",

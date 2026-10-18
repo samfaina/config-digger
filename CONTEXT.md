@@ -35,7 +35,7 @@ A sentence in an Agent definition or skill manager definition saying what one of
 _Avoid_: Assumption, caveat, TODO
 
 **Running Agent**:
-An Agent that config-digger detects, on a best-effort basis, as running for an Agent home that reads a location an Operation writes, or a skill folder it moves, or keeps a Disable switch there. It is matched through the `[process]` section of its Agent definition, which an Agent home may replace with its own. config-digger never closes an Agent; what a Running Agent means for a write depends on the location's Store class.
+An Agent that config-digger detects, on a best-effort basis, as running for an Agent home that reads a location an Operation writes, or a skill folder it moves, or keeps a Disable switch there. It is matched through the `[process]` section of its Agent definition, which an Agent home may replace with its own. An Agent that picks its home by lookup order, such as Claude Desktop, never runs for an Agent home the user added outside the homes of its definition, since no launch reads it; one added in the folder of a definition's home, however spelled, is that home. config-digger never closes an Agent; what a Running Agent means for a write depends on the location's Store class.
 _Avoid_: Open Agent, live Agent, active Agent
 
 **Feature gate**:

@@ -17,27 +17,30 @@ use crate::scan::{LocationReader, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-/// The Agent homes of a snapshot, by Agent index and id, that tell what a
-/// running Agent reads.
+/// The Agent homes of a snapshot, by Agent index and id, that tell which
+/// homes a running Agent may read.
 #[derive(Default)]
 pub(crate) struct RunningHomes {
     /// Those an Installation found reads: an Agent can run only for them.
     pub installed: BTreeSet<(usize, String)>,
-    /// Those the user added outside the definition's homes. A home the user
-    /// added in the folder of one of them, however spelled, is that home.
-    /// No running Agent holds their files in memory, so parking in them is
-    /// never blocked.
-    pub added: BTreeSet<(usize, String)>,
+    /// Those no launch of their Agent reads: homes the user added outside
+    /// the definition's homes of an Agent that picks its home by lookup
+    /// order, such as Claude Desktop. A home added in the folder of a
+    /// definition's home, however spelled, is that home and not one of them.
+    pub read_by_no_launch: BTreeSet<(usize, String)>,
 }
 
 impl RunningHomes {
     pub fn of(definitions: &[AgentDefinition], snapshot: &Snapshot) -> RunningHomes {
         RunningHomes {
             installed: installations::installed_homes(definitions, snapshot),
-            added: snapshot
+            read_by_no_launch: snapshot
                 .homes
                 .iter()
-                .filter(|home| home.declared.is_none())
+                .filter(|home| {
+                    home.declared.is_none()
+                        && !definitions[home.agent_index].lookup_orders.is_empty()
+                })
                 .map(|home| (home.agent_index, home.home.clone()))
                 .collect(),
         }
@@ -97,10 +100,10 @@ struct Touched<'a> {
 }
 
 /// Checks the readers of `files` and `folders`, and the Agents with
-/// switches in `files`, against the processes running now. Only an Agent
-/// running for an installed home of `homes` gets the warning and the hints;
-/// any running Agent blocks a write to a SQLite store it holds, and parking
-/// in a file it rewrites from memory but in an added home.
+/// switches in `files`, against the processes running now. An Agent never
+/// runs for a home of `homes` that no launch reads. Only an Agent running
+/// for an installed home of `homes` gets the warning and the hints; any
+/// running Agent blocks a write to a SQLite store it holds.
 pub(crate) fn check<'a>(
     definitions: &[AgentDefinition],
     ports: &Ports,
@@ -155,6 +158,10 @@ pub(crate) fn check<'a>(
         class,
     } in in_files.chain(in_folders)
     {
+        let key = (agent_index, home.to_owned());
+        if homes.read_by_no_launch.contains(&key) {
+            continue;
+        }
         let definition = &definitions[agent_index];
         let running = *detected.entry((agent_index, home)).or_insert_with(|| {
             definition.process(home).is_some_and(|process| {
@@ -171,11 +178,10 @@ pub(crate) fn check<'a>(
             parking: BTreeSet::new(),
             installed: false,
         });
-        let key = (agent_index, home.to_owned());
         reader.installed |= homes.installed.contains(&key);
         let stored = reader.read.entry(path.clone()).or_insert(class);
         *stored = (*stored).max(class);
-        if parking && class == StoreClass::RewrittenWhileRunning && !homes.added.contains(&key) {
+        if parking && class == StoreClass::RewrittenWhileRunning {
             reader.parking.insert(path.clone());
         }
     }
