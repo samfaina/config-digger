@@ -34,6 +34,33 @@ test("an OK is stored with its id, notes, time and app version", () => {
   });
 });
 
+test("KO or Blocked without notes waits as the step's pending verdict", () => {
+  assert.deepEqual(Uat.choose("ko", " ", "ok"), { save: null, pending: "ko" });
+  assert.deepEqual(Uat.choose("blocked", "", undefined), { save: null, pending: "blocked" });
+});
+
+test("KO or Blocked with notes saves on the first click, and OK always does", () => {
+  assert.deepEqual(Uat.choose("ko", "Sale vacío", "ok"), { save: "ko", pending: null });
+  assert.deepEqual(Uat.choose("blocked", "Espera a #175", undefined), { save: "blocked", pending: null });
+  assert.deepEqual(Uat.choose("ok", "", "ko"), { save: "ok", pending: null });
+});
+
+test("the step's saved verdict without notes drops the pending one and saves nothing", () => {
+  assert.deepEqual(Uat.choose("ko", "", "ko"), { save: null, pending: null });
+});
+
+test("a pending verdict shows as chosen, unlike the saved one it would replace", () => {
+  assert.equal(Uat.look("ko", "ko", "ok"), "pending");
+  assert.equal(Uat.look("ok", "ko", "ok"), null);
+  assert.equal(Uat.look("blocked", "ko", "ok"), null);
+});
+
+test("with nothing pending the saved verdict shows as chosen", () => {
+  assert.equal(Uat.look("ok", null, "ok"), "saved");
+  assert.equal(Uat.look("ko", null, "ok"), null);
+  assert.equal(Uat.look("ok", null, undefined), null);
+});
+
 /** A plan of two sections, three steps. */
 const PLAN = {
   title: "Prueba",

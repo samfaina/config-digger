@@ -134,6 +134,9 @@ pre {
 .verdict-buttons button[aria-pressed="true"].ok { background: var(--ok-bg); border-color: var(--ok); }
 .verdict-buttons button[aria-pressed="true"].ko { background: var(--ko-bg); border-color: var(--ko); }
 .verdict-buttons button[aria-pressed="true"].blocked { background: var(--blocked-bg); border-color: var(--blocked); }
+/* A pending verdict is chosen but not stored: an outline, no fill. */
+.verdict-buttons button[aria-pressed="true"].pending { background: var(--surface); border-style: dashed; border-width: 2px; padding: 5px 11px; }
+.pending-save { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 label { font-weight: 500; }
 textarea {
   width: 100%; min-height: 84px; resize: vertical; font: inherit; color: var(--ink);
@@ -181,12 +184,12 @@ textarea {
 
 <script id="uat-logic">
 const Uat = (() => {
-  /** Each status a result can have: its label, and what its notes must
-   * say when it needs notes. */
+  /** Each status a result can have: its label and, when it needs notes,
+   * what they must say and the button that saves it once they do. */
   const STATUSES = {
     ok: { label: "OK" },
-    ko: { label: "KO", needs: "Escribe en las notas qué falló." },
-    blocked: { label: "Bloqueado", needs: "Escribe en las notas qué lo bloquea." },
+    ko: { label: "KO", needs: "Escribe en las notas qué falló.", save: "Guardar KO" },
+    blocked: { label: "Bloqueado", needs: "Escribe en las notas qué lo bloquea.", save: "Guardar bloqueado" },
   };
 
   /** The database document of a step's result. Throws when the status
@@ -195,6 +198,22 @@ const Uat = (() => {
     const text = notes.trim();
     if (STATUSES[status].needs && !text) throw new Error(STATUSES[status].needs);
     return { id, status, notes: text, time: now.toISOString(), version };
+  }
+
+  /** What a click on a verdict button does: `save` the status, or make it
+   * the step's `pending` verdict, which waits for the notes it needs.
+   * `saved` is the step's stored status: clicking it, like any save, drops
+   * the pending verdict. */
+  function choose(status, notes, saved) {
+    if (STATUSES[status].needs && !notes.trim()) return { save: null, pending: status === saved ? null : status };
+    return { save: status, pending: null };
+  }
+
+  /** How a verdict button shows: "pending" for the step's pending verdict,
+   * "saved" for its stored one while nothing is pending, else null. */
+  function look(status, pending, saved) {
+    if (pending) return status === pending ? "pending" : null;
+    return status === saved ? "saved" : null;
   }
 
   /** Every step of the plan, in order. */
@@ -238,7 +257,7 @@ const Uat = (() => {
     return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
   }
 
-  return { STATUSES, result, steps, progress, nextStep, exportMarkdown };
+  return { STATUSES, result, choose, look, steps, progress, nextStep, exportMarkdown };
 })();
 </script>
 <script>
@@ -253,6 +272,9 @@ const Uat = (() => {
     canWrite: false,
     saving: false,
     problem: "",
+    // A KO or Blocked picked on the current step before its notes: chosen,
+    // not stored yet.
+    pending: null,
   };
 
   // The step on screen, so a reload comes back to it. A convenience only:
@@ -354,15 +376,51 @@ const Uat = (() => {
     const old = $("notes")?.dataset.step === step.id ? $("notes") : null;
     const typing = old !== null && document.activeElement === old;
     const draft = old?.value;
-    const notes = el("textarea", { id: "notes", "data-step": step.id, "aria-describedby": "notes-hint" });
+    const notes = el("textarea", { id: "notes", "data-step": step.id });
     notes.value = draft ?? saved?.notes ?? "";
+    // Another tab may have stored the pending verdict meanwhile.
+    if (state.pending === saved?.status) state.pending = null;
+    const locked = !state.canWrite || state.saving;
     const verdict = (status) => {
-      const button = el("button", { type: "button", class: status, "aria-pressed": String(saved?.status === status) },
-        Uat.STATUSES[status].label);
-      button.disabled = !state.canWrite || state.saving;
-      button.addEventListener("click", () => record(step.id, status, notes.value));
+      const look = Uat.look(status, state.pending, saved?.status);
+      const { label } = Uat.STATUSES[status];
+      const button = el("button", { type: "button", class: status, "aria-pressed": String(look !== null) }, label);
+      if (look === "pending") {
+        button.classList.add("pending");
+        button.setAttribute("aria-label", `${label}, sin guardar`);
+      }
+      button.disabled = locked;
+      button.addEventListener("click", () => {
+        const { save, pending } = Uat.choose(status, notes.value, saved?.status);
+        state.pending = pending;
+        if (save) {
+          record(step.id, save, notes.value);
+          return;
+        }
+        state.problem = "";
+        renderStep();
+        $("notes").focus();
+      });
       return button;
     };
+    // While a verdict is pending, the notes it needs and the button that
+    // saves it sit under the field; the button wakes once there is text.
+    const pending = state.pending && Uat.STATUSES[state.pending];
+    // No alert role: the focus moves to the notes, which read it out, and a
+    // re-render from the database would announce it again. A hidden element
+    // named in aria-describedby is still read, so the notes name it only
+    // while it shows.
+    const missing = el("p", { class: "problem", id: "notes-missing" }, pending?.needs ?? "");
+    const saveButton = pending ? el("button", { type: "button", class: "primary" }, pending.save) : null;
+    const followNotes = () => {
+      const blank = !notes.value.trim();
+      missing.hidden = !pending || !blank;
+      notes.setAttribute("aria-describedby", missing.hidden ? "notes-hint" : "notes-missing notes-hint");
+      if (saveButton) saveButton.disabled = blank || locked;
+    };
+    saveButton?.addEventListener("click", () => record(step.id, state.pending, notes.value));
+    notes.addEventListener("input", followNotes);
+    followNotes();
     const move = (label, to) => {
       const button = el("button", { type: "button" }, label);
       if (to) button.addEventListener("click", () => show(to.id));
@@ -390,6 +448,9 @@ const Uat = (() => {
         el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
         el("label", { for: "notes" }, "Notas"),
         notes,
+        saveButton
+          ? el("div", { class: "pending-save" }, saveButton, missing)
+          : missing,
         el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas."),
         state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
         el("p", { class: "saved" }, savedLine)),
@@ -409,6 +470,7 @@ const Uat = (() => {
   function show(id) {
     state.current = id;
     state.problem = "";
+    state.pending = null;
     remember(id);
     render();
     $("step").scrollIntoView({ block: "nearest" });
