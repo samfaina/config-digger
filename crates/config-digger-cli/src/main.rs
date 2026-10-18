@@ -1855,37 +1855,46 @@ fn clap_message(error: &clap::Error) -> String {
 }
 
 /// The State before and after of each (Agent, Entry, Project) an Operation
-/// changes, one row each.
+/// changes. An Entry whose State changes the same way in every context it
+/// reaches is one row, saying in how many; otherwise it is one row per
+/// context, naming its Project.
 fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
-    let rows: Vec<[(&str, Style); 4]> = changes
-        .iter()
-        .map(|change| {
-            [
-                (change.agent_name.as_str(), Style::new()),
-                (change.item.as_str(), Style::new()),
-                (
-                    state_after_label(change.before),
-                    state_after_style(change.before),
-                ),
-                (
-                    state_after_label(change.after),
-                    state_after_style(change.after),
-                ),
-            ]
-        })
-        .collect();
     let header = [
         ("AGENT", DIM),
         ("ITEM", DIM),
         ("BEFORE", DIM),
         ("AFTER", DIM),
     ];
+    let mut changes = change_rows(changes);
+    let states: Vec<[(&str, Style); 4]> = changes
+        .iter()
+        .map(|&(change, _)| state_cells(change))
+        .collect();
+    // The Project and the Entry share the room the other columns leave, the
+    // Project's middle elided to half of it.
+    let project_width = last_column_width(&column_widths(&header, &states), width)
+        .map(|room| room.saturating_sub(GAP.len()) / 2)
+        .filter(|&project_width| project_width >= MIN_LOCATION_WIDTH);
+    if let Some(project_width) = project_width {
+        for (_, project) in &mut changes {
+            *project = terminal::elide_middle(project, project_width);
+        }
+    }
+    let rows: Vec<[(&str, Style); 5]> = states
+        .iter()
+        .zip(&changes)
+        .map(|(&[agent, item, before, after], (_, project))| {
+            [agent, item, before, after, (project.as_str(), Style::new())]
+        })
+        .collect();
+    let [agent, item, before, after] = header;
+    let header = [agent, item, before, after, ("PROJECT", DIM)];
     let widths = column_widths(&header, &rows);
     let location_width = last_column_width(&widths, width);
     let mut out = table_line(&header, &widths, "ENTRY".to_owned(), DIM)
         .fit(width)
         .render();
-    for (change, cells) in changes.iter().zip(&rows) {
+    for ((change, _), cells) in changes.iter().zip(&rows) {
         let entry = elide_locator(&change.locator, &change.path, location_width);
         out.push_str(
             &table_line(cells, &widths, entry, Style::new())
@@ -1894,4 +1903,64 @@ fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
         );
     }
     out
+}
+
+/// A change's AGENT, ITEM, BEFORE and AFTER cells.
+fn state_cells(change: &api::Change) -> [(&str, Style); 4] {
+    [
+        (change.agent_name.as_str(), Style::new()),
+        (change.item.as_str(), Style::new()),
+        (
+            state_after_label(change.before),
+            state_after_style(change.before),
+        ),
+        (
+            state_after_label(change.after),
+            state_after_style(change.after),
+        ),
+    ]
+}
+
+/// The rows of the changes table, each with its PROJECT cell: the changes of
+/// one (Agent, Entry) together, where it first appears, as one row with the
+/// number of contexts when they all go from the same State to the same State,
+/// else one row per context with its Project.
+fn change_rows(changes: &[api::Change]) -> Vec<(&api::Change, String)> {
+    let mut entries: Vec<Vec<&api::Change>> = Vec::new();
+    for change in changes {
+        let same_entry = |entry: &&mut Vec<&api::Change>| {
+            entry[0].agent == change.agent
+                && entry[0].home == change.home
+                && entry[0].locator == change.locator
+        };
+        match entries.iter_mut().find(same_entry) {
+            Some(entry) => entry.push(change),
+            None => entries.push(vec![change]),
+        }
+    }
+    entries
+        .into_iter()
+        .flat_map(|entry| {
+            let first = entry[0];
+            let same_effect = entry
+                .iter()
+                .all(|change| change.before == first.before && change.after == first.after);
+            if entry.len() > 1 && same_effect {
+                vec![(first, format!("{} contexts", entry.len()))]
+            } else {
+                entry
+                    .into_iter()
+                    .map(|change| (change, project_label(change.project.as_deref())))
+                    .collect()
+            }
+        })
+        .collect()
+}
+
+/// A context's Project, or `No Project`.
+fn project_label(project: Option<&Path>) -> String {
+    match project {
+        Some(project) => project.display().to_string(),
+        None => "No Project".to_owned(),
+    }
 }
