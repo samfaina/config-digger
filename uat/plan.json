@@ -127,7 +127,8 @@
           "instructions": [
             "Con el home de Claude Code de prueba elegido en el Inventario (paso 1.2), deja el ratón quieto sobre el botón Inventory de la barra de la izquierda.",
             "Aparta el ratón.",
-            "Elige el servidor cd-throwaway-user y deja el ratón sobre el botón de copiar de su configuración.",
+            "Elige el servidor cd-throwaway-user.",
+            "Deja el ratón sobre el botón de copiar de su configuración.",
             "Deja el ratón sobre la ubicación de una fila de la lista de Entries."
           ],
           "commands": [],

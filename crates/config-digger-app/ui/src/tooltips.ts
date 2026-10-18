@@ -14,9 +14,10 @@ export const HIDDEN: TooltipState = { hovered: false, focused: false, shown: fal
 /**
  * What happens to the control: the pointer comes in or leaves, the hover
  * delay ends, the control gets the focus from the keyboard or a click, or
- * loses it, the control is clicked or gets another key, or Escape is pressed.
+ * loses it, the control is clicked or gets another key, the window scrolls
+ * or resizes, which moves the control, or Escape is pressed.
  */
-export type TooltipEvent = "enter" | "leave" | "delay" | "keyboard focus" | "pointer focus" | "blur" | "press" | "escape";
+export type TooltipEvent = "enter" | "leave" | "delay" | "keyboard focus" | "pointer focus" | "blur" | "press" | "move" | "escape";
 
 /**
  * The next state, and whether the event was the tooltip's, so it goes no
@@ -44,6 +45,7 @@ function next(state: TooltipState, event: Exclude<TooltipEvent, "escape">): Tool
     case "blur":
       return { ...state, focused: false, shown: state.shown && state.hovered };
     case "press":
+    case "move":
       return { ...state, shown: false, waiting: false };
   }
 }

@@ -40,6 +40,14 @@ describe("pressing the control", () => {
   });
 });
 
+describe("the window scrolling or resizing", () => {
+  test("hides the tooltip, which would be left away from its control, and cancels the hover delay", () => {
+    expect(after("enter", "delay", "move").shown).toBe(false);
+    expect(after("keyboard focus", "move").shown).toBe(false);
+    expect(after("enter", "move", "delay").shown).toBe(false);
+  });
+});
+
 describe("Escape", () => {
   test("hides a tooltip shown by hover or by focus, and is the tooltip's", () => {
     for (const shown of [after("enter", "delay"), after("keyboard focus")]) {
@@ -90,7 +98,7 @@ describe("placing the tooltip", () => {
 
 describe("what a screen reader gets", () => {
   test("the tooltip describes a control whose name does not already say it", () => {
-    expect(describes("C:\Users\me\.claude", undefined)).toBe(true);
+    expect(describes("C:\\Users\\me\\.claude", undefined)).toBe(true);
     expect(describes("Copy the configuration, with every Secret masked", "Copy the configuration")).toBe(true);
   });
 

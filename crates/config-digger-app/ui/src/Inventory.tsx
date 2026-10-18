@@ -535,20 +535,20 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       .map((home) => {
         const selected = selection.homes[agent] === home.home;
         return (
-          <button
-            type="button"
-            key={home.home}
-            className={`tile home-tile${selected ? " selected" : ""}`}
-            aria-pressed={selected}
-            title={home.no_configuration ?? home.folder}
-            onClick={() => onHome(agent, home.home)}
-          >
-            <span className="home-name">{home.home}</span>
-            <span className="grow" />
-            {mirrored(home)}
-            {notRead(home)}
-            <FailureBadge count={failuresOf(home)} where="this home" />
-          </button>
+          <Tooltip key={home.home} text={home.no_configuration ?? home.folder}>
+            <button
+              type="button"
+              className={`tile home-tile${selected ? " selected" : ""}`}
+              aria-pressed={selected}
+              onClick={() => onHome(agent, home.home)}
+            >
+              <span className="home-name">{home.home}</span>
+              <span className="grow" />
+              {mirrored(home)}
+              {notRead(home)}
+              <FailureBadge count={failuresOf(home)} where="this home" />
+            </button>
+          </Tooltip>
         );
       });
   }

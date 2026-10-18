@@ -21,7 +21,8 @@ type ControlProps = {
   ref?: Ref<HTMLElement>;
   "aria-label"?: string;
   "aria-describedby"?: string;
-  onMouseEnter?: (event: MouseEvent<HTMLElement>) => void;
+  "data-tooltip"?: string;
+  onMouseOver?: (event: MouseEvent<HTMLElement>) => void;
   onMouseLeave?: (event: MouseEvent<HTMLElement>) => void;
   onMouseDown?: (event: MouseEvent<HTMLElement>) => void;
   onFocus?: (event: FocusEvent<HTMLElement>) => void;
@@ -37,8 +38,9 @@ function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
 /**
  * The app's tooltip, where a `title` would show the system's: `text` shown
  * next to the one element in `children` on hover after a short delay and on
- * keyboard focus, hidden on leave, on blur, on a click or a key, and on
- * Escape. Screen readers get the text through `aria-describedby`, unless the
+ * keyboard focus, hidden on leave, on blur, on a click or a key, on a scroll
+ * or a resize, and on Escape. Of tooltips inside one another, the innermost
+ * under the pointer shows, as with `title`. Screen readers get the text through `aria-describedby`, unless the
  * control's `aria-label` already says it. No `text`, no tooltip.
  */
 export function Tooltip({ text, children }: { text?: string; children: ReactElement<ControlProps> }) {
@@ -82,6 +84,19 @@ export function Tooltip({ text, children }: { text?: string; children: ReactElem
     return () => document.removeEventListener("keydown", onKey, true);
   }, [state]);
 
+  // A scroll or a resize would leave the tooltip away from its control.
+  const active = state.shown || state.waiting;
+  useEffect(() => {
+    if (!active) return;
+    const onMove = () => send("move");
+    window.addEventListener("resize", onMove);
+    document.addEventListener("scroll", onMove, true);
+    return () => {
+      window.removeEventListener("resize", onMove);
+      document.removeEventListener("scroll", onMove, true);
+    };
+  }, [active]);
+
   // Measured once shown, before paint: the tooltip first renders hidden at its content's size.
   useLayoutEffect(() => {
     if (!state.shown || !control.current || !tip.current) {
@@ -102,9 +117,12 @@ export function Tooltip({ text, children }: { text?: string; children: ReactElem
       {cloneElement(children, {
         ref,
         "aria-describedby": describedBy,
-        onMouseEnter: (event) => {
-          props.onMouseEnter?.(event);
-          send("enter");
+        "data-tooltip": "",
+        onMouseOver: (event) => {
+          props.onMouseOver?.(event);
+          // Over another control with a tooltip inside this one, that one shows instead.
+          const inner = event.target instanceof Element && event.target.closest("[data-tooltip]") !== event.currentTarget;
+          send(inner ? "leave" : "enter");
         },
         onMouseLeave: (event) => {
           props.onMouseLeave?.(event);
