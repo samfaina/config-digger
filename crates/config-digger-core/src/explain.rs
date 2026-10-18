@@ -1499,6 +1499,16 @@ pub(crate) fn no_configuration_in(
     )
 }
 
+/// Add Project's warning when `path` is the folder of an Agent home of
+/// each of `agent_names` already listed.
+pub(crate) fn project_is_home(path: &Path, agent_names: &[String]) -> String {
+    format!(
+        "{} is already listed as an Agent home of {}. As a Project, it is read as a folder Agents are started on, not as their configuration.",
+        path.display(),
+        and_list(agent_names)
+    )
+}
+
 /// Why `path` cannot be added: it is not an existing folder, or
 /// `.code-workspace` file when `workspace` is allowed.
 pub(crate) fn not_existing(path: &Path, workspace: bool) -> String {

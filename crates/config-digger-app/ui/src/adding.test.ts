@@ -1,24 +1,25 @@
 import { describe, expect, test } from "vitest";
-import { addHomeOffer, ADDS, homeToCheck, NO_HOME_CHOSEN, projectWarning, type HomeChecked } from "./adding";
-import type { Agent, Home, HomeCheck, Places } from "./bindings";
+import {
+  ADD_LABELS,
+  addHomeOffer,
+  addProjectOffer,
+  homeToCheck,
+  NO_HOME_CHOSEN,
+  projectToCheck,
+  type HomeChecked,
+  type ProjectChecked,
+} from "./adding";
+import type { HomeCheck } from "./bindings";
 
 const CODEX_HOME = String.raw`E:\cd-throwaway\codex-home`;
 
 describe("what the header button adds", () => {
   test("names it, as the title of the dialog it opens does, for each tab", () => {
-    expect(ADDS).toEqual({ projects: "Add Project", homes: "Add Agent home" });
+    expect(ADD_LABELS).toEqual({ projects: "Add Project", homes: "Add Agent home" });
   });
 });
 
 describe("the Add Agent home dialog", () => {
-  test("starts with no Agent chosen, and offers Add only once an Agent and a folder are", () => {
-    expect(addHomeOffer(NO_HOME_CHOSEN, null, false).addable).toBe(false);
-    expect(addHomeOffer({ agent: "", folder: CODEX_HOME }, null, false).addable).toBe(false);
-    expect(addHomeOffer({ agent: "codex", folder: "  " }, null, false).addable).toBe(false);
-    expect(addHomeOffer({ agent: "codex", folder: CODEX_HOME }, null, false).addable).toBe(true);
-    expect(addHomeOffer({ agent: "codex", folder: CODEX_HOME }, null, true).addable).toBe(false);
-  });
-
   const EMPTY = String.raw`No configuration found for Claude Code in E:\cd-throwaway\codex-home: none of .claude.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries.`;
 
   function check(overrides: Partial<HomeCheck> = {}): HomeCheck {
@@ -32,51 +33,68 @@ describe("the Add Agent home dialog", () => {
     };
   }
 
-  test("checks the folder once an Agent and a folder are chosen", () => {
+  const CHOSEN = { agent: "claude-code", folder: CODEX_HOME };
+  const CHECKED: HomeChecked = { asked: CHOSEN, result: check() };
+
+  test("checks the folder only once an Agent and a folder are chosen", () => {
     expect(homeToCheck(NO_HOME_CHOSEN)).toBeNull();
     expect(homeToCheck({ agent: "", folder: CODEX_HOME })).toBeNull();
-    expect(homeToCheck({ agent: "claude-code", folder: ` ${CODEX_HOME} ` })).toEqual({ agent: "claude-code", folder: CODEX_HOME });
+    expect(homeToCheck({ agent: "claude-code", folder: "  " })).toBeNull();
+    expect(homeToCheck({ agent: "claude-code", folder: ` ${CODEX_HOME} ` })).toEqual(CHOSEN);
+  });
+
+  test("starts with no Agent chosen, and offers Add only once an Agent and a folder are chosen and checked", () => {
+    expect(addHomeOffer(NO_HOME_CHOSEN, null, false).addable).toBe(false);
+    expect(addHomeOffer({ agent: "", folder: CODEX_HOME }, null, false).addable).toBe(false);
+    expect(addHomeOffer(CHOSEN, null, false).addable).toBe(false);
+    expect(addHomeOffer(CHOSEN, CHECKED, false).addable).toBe(true);
+    expect(addHomeOffer(CHOSEN, CHECKED, true).addable).toBe(false);
   });
 
   test("warns before Add, still offering it, when the folder holds none of the files the Agent reads", () => {
-    const choice = { agent: "claude-code", folder: CODEX_HOME };
-    const checked: HomeChecked = { checked: homeToCheck(choice)!, check: check() };
-
-    expect(addHomeOffer(choice, checked, false)).toEqual({ addable: true, warning: EMPTY });
-    expect(addHomeOffer(choice, { ...checked, check: check({ no_configuration: null }) }, false).warning).toBeNull();
+    expect(addHomeOffer(CHOSEN, CHECKED, false)).toEqual({ addable: true, warning: EMPTY });
+    expect(addHomeOffer(CHOSEN, { asked: CHOSEN, result: check({ no_configuration: null }) }, false)).toEqual({
+      addable: true,
+      warning: null,
+    });
   });
 
-  test("drops the warning of a check made for another Agent or folder", () => {
-    const checked: HomeChecked = { checked: { agent: "claude-code", folder: CODEX_HOME }, check: check() };
+  test("leaves a folder the core could not check to Add, which says why it refuses it", () => {
+    expect(addHomeOffer(CHOSEN, { asked: CHOSEN, result: null }, false)).toEqual({ addable: true, warning: null });
+  });
 
-    expect(addHomeOffer({ agent: "codex", folder: CODEX_HOME }, checked, false).warning).toBeNull();
-    expect(addHomeOffer({ agent: "claude-code", folder: String.raw`E:\other` }, checked, false).warning).toBeNull();
+  test("waits for a new check once the Agent or the folder changes", () => {
+    expect(addHomeOffer({ agent: "codex", folder: CODEX_HOME }, CHECKED, false)).toEqual({ addable: false, warning: null });
+    expect(addHomeOffer({ agent: "claude-code", folder: String.raw`E:\other` }, CHECKED, false)).toEqual({
+      addable: false,
+      warning: null,
+    });
   });
 });
 
 describe("the Add Project dialog", () => {
-  function home(agent: string, agent_name: string, folder: string, hidden = false): Home {
-    return { agent, agent_name, home: folder, folder, source: { kind: "added" }, hidden } as Home;
-  }
+  const WARNING = `${CODEX_HOME} is already listed as an Agent home of Claude Code. As a Project, it is read as a folder Agents are started on, not as their configuration.`;
+  const CHECKED: ProjectChecked = { asked: CODEX_HOME, result: { path: CODEX_HOME, home_of: ["Claude Code"], warning: WARNING } };
 
-  function places(agents: Pick<Agent, "id" | "name" | "homes">[]): Places {
-    return { read_at: "2026-10-10T09:00:00Z", projects: [], leftovers: [], agents: agents as Agent[] };
-  }
-
-  const listed = places([
-    { id: "claude-code", name: "Claude Code", homes: [home("claude-code", "Claude Code", CODEX_HOME)] },
-    { id: "codex", name: "Codex", homes: [home("codex", "Codex", CODEX_HOME, true)] },
-  ]);
-
-  test("warns when the folder is an Agent home already in the list, hidden or not, in any spelling", () => {
-    const sentence = "is already listed as an Agent home of Claude Code and Codex. As a Project, it is read as a folder Agents are started on, not as their configuration.";
-
-    expect(projectWarning(listed, CODEX_HOME)).toBe(`${CODEX_HOME} ${sentence}`);
-    expect(projectWarning(listed, " e:/CD-throwaway/codex-home/ ")).toBe(`e:/CD-throwaway/codex-home/ ${sentence}`);
+  test("checks the path only once one is typed or picked", () => {
+    expect(projectToCheck("  ")).toBeNull();
+    expect(projectToCheck(` ${CODEX_HOME} `)).toBe(CODEX_HOME);
   });
 
-  test("says nothing for a folder no listed home is at", () => {
-    expect(projectWarning(listed, String.raw`E:\cd-throwaway\codex-home\src`)).toBeNull();
-    expect(projectWarning(listed, "")).toBeNull();
+  test("warns before Add, still offering it, when the folder is an Agent home already in the list", () => {
+    expect(addProjectOffer(` ${CODEX_HOME}`, CHECKED, false)).toEqual({ addable: true, warning: WARNING });
+  });
+
+  test("offers Add without a warning once checked, and waits for the check of a changed path", () => {
+    const elsewhere = String.raw`E:\code\shop`;
+
+    expect(addProjectOffer(elsewhere, { asked: elsewhere, result: { path: elsewhere, home_of: [], warning: null } }, false)).toEqual({
+      addable: true,
+      warning: null,
+    });
+    expect(addProjectOffer(elsewhere, { asked: elsewhere, result: null }, false)).toEqual({ addable: true, warning: null });
+    expect(addProjectOffer(elsewhere, CHECKED, false)).toEqual({ addable: false, warning: null });
+    expect(addProjectOffer("", null, false).addable).toBe(false);
+    expect(addProjectOffer(CODEX_HOME, CHECKED, true).addable).toBe(false);
   });
 });

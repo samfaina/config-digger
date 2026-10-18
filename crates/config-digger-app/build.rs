@@ -16,6 +16,7 @@ fn main() {
         "read_places",
         "change_list",
         "check_home",
+        "check_project",
         "pick_location",
         "read_settings",
         "save_settings",

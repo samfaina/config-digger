@@ -1972,12 +1972,29 @@ impl HomeDefinition {
     pub fn configured(&self, roots: &BTreeMap<String, PathBuf>, fs: &dyn FileSystem) -> bool {
         roots
             .iter()
-            .filter(|(name, _)| !self.shared_roots.contains(name))
+            .filter(|(name, _)| self.is_own_root(name))
             .any(|(_, root)| fs.exists(root))
+    }
+
+    /// Each root of the home other Agents do not read too, as its path
+    /// relative to the home's folder, by name.
+    pub fn own_roots(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.roots.iter().filter(|(name, _)| self.is_own_root(name))
+    }
+
+    /// Whether the root `name` is not one other Agents read too.
+    fn is_own_root(&self, name: &str) -> bool {
+        !self.shared_roots.iter().any(|shared| shared == name)
     }
 }
 
 impl AgentDefinition {
+    /// The home an Agent home the user adds is laid out like, at a folder
+    /// none of the definition's homes finds: the first.
+    pub fn added_home(&self) -> &HomeDefinition {
+        &self.homes[0]
+    }
+
     /// The `[[settings]]` with the id `id`, which a settings anchor names.
     pub fn declared_settings(&self, id: &str) -> Result<&SettingsDefinition, String> {
         self.settings

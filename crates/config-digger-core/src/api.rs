@@ -358,12 +358,10 @@ impl Core {
     pub fn check_home(&self, folder: &Path, agent: &str) -> Result<HomeCheck, Error> {
         let (definition, folder) =
             user_list::home_to_add(&self.definitions, &self.ports, folder, agent)?;
-        let home = &definition.homes[0];
+        let home = definition.added_home();
         let configured = home.configured(&home.roots_in(&folder), self.ports.fs.as_ref());
         let looked_for: Vec<String> = home
-            .roots
-            .iter()
-            .filter(|(name, _)| !home.shared_roots.contains(name))
+            .own_roots()
             .map(|(_, root)| root.replace('/', "\\"))
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
@@ -376,6 +374,28 @@ impl Core {
             folder,
             looked_for,
             no_configuration,
+        })
+    }
+
+    /// Checks the existing folder or `.code-workspace` file `path` as a
+    /// Project, as [`Core::add_project`] would add it, without adding it:
+    /// which Agents list an Agent home there, hidden or not.
+    pub fn check_project(&self, path: &Path) -> Result<ProjectCheck, Error> {
+        let path = user_list::project_to_add(&self.ports, path)?;
+        let fs = self.ports.fs.as_ref();
+        let key = paths::canonical_key(fs, &path);
+        let mut home_of: Vec<String> = Vec::new();
+        for home in self.listing()?.homes {
+            if paths::canonical_key(fs, &home.folder) == key && !home_of.contains(&home.agent_name)
+            {
+                home_of.push(home.agent_name);
+            }
+        }
+        let warning = (!home_of.is_empty()).then(|| explain::project_is_home(&path, &home_of));
+        Ok(ProjectCheck {
+            path,
+            home_of,
+            warning,
         })
     }
 
@@ -1533,6 +1553,19 @@ pub struct HomeCheck {
     /// When none of `looked_for` is there, the sentence saying so, rendered
     /// by the core. The folder can still be added.
     pub no_configuration: Option<String>,
+}
+
+/// A folder or `.code-workspace` file checked as a Project, before it is added.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct ProjectCheck {
+    /// Its real path.
+    pub path: PathBuf,
+    /// The name of each Agent with an Agent home listed at it, hidden or
+    /// not, in the order the homes are listed.
+    pub home_of: Vec<String>,
+    /// When there is one, the sentence saying so, rendered by the core. It
+    /// can still be added.
+    pub warning: Option<String>,
 }
 
 /// Why the Agent never reads an Agent home: its lookup order picks another.

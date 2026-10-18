@@ -209,10 +209,16 @@ pub(crate) fn add_home(
     Ok((agent, folder))
 }
 
+/// The real path of `path`, which must be an existing folder or
+/// `.code-workspace` file, to add as a Project.
+pub(crate) fn project_to_add(ports: &Ports, path: &Path) -> Result<PathBuf, Error> {
+    existing(ports.fs.as_ref(), path, true)
+}
+
 /// Adds the existing folder or `.code-workspace` file `path` as a Project,
 /// once. Returns its real path.
 pub(crate) fn add_project(ports: &Ports, path: &Path) -> Result<PathBuf, Error> {
-    let path = existing(ports.fs.as_ref(), path, true)?;
+    let path = project_to_add(ports, path)?;
     UserList::update(ports, |list| {
         let key = paths::key(&path);
         if !list.projects.iter().any(|added| paths::key(added) == key) {

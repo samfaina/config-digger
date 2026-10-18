@@ -8,7 +8,7 @@ use crate::session::{self, ParkedEntry, Places, Session};
 use crate::updates::{UpdateStatus, UpdatesState};
 use config_digger_core::api::{
     self, Backup, Core, DataFolders, HomeCheck, Inventory, OperationDetail, OperationSummary,
-    Retention, Settings, WarningClass,
+    ProjectCheck, Retention, Settings, WarningClass,
 };
 use config_digger_core::ports::Ports;
 use serde::{Deserialize, Serialize};
@@ -293,6 +293,14 @@ pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChang
 #[specta::specta]
 pub async fn check_home(folder: PathBuf, agent: String) -> Result<HomeCheck, api::Error> {
     blocking(move || Core::new(Ports::real())?.check_home(&folder, &agent)).await
+}
+
+/// Checks `path` as a Project before it is added: which Agents list an
+/// Agent home there. It changes nothing.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_project(path: PathBuf) -> Result<ProjectCheck, api::Error> {
+    blocking(move || Core::new(Ports::real())?.check_project(&path)).await
 }
 
 /// What the Windows picker picks.

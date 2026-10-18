@@ -18,6 +18,7 @@
     "allow-read-places",
     "allow-change-list",
     "allow-check-home",
+    "allow-check-project",
     "allow-pick-location",
     "allow-read-settings",
     "allow-save-settings",

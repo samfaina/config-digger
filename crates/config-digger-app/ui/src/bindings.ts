@@ -72,6 +72,11 @@ export const commands = {
 	 *  any of the files the Agent reads in a home is there. It changes nothing.
 	 */
 	checkHome: (folder: string, agent: string) => typedError<HomeCheck, Error>(__TAURI_INVOKE("check_home", { folder, agent })),
+	/**
+	 *  Checks `path` as a Project before it is added: which Agents list an
+	 *  Agent home there. It changes nothing.
+	 */
+	checkProject: (path: string) => typedError<ProjectCheck, Error>(__TAURI_INVOKE("check_project", { path })),
 	/**  Opens the Windows picker over the window, `None` when it is cancelled. */
 	pickLocation: (pick: Pick) => typedError<string | null, Error>(__TAURI_INVOKE("pick_location", { pick })),
 	/**
@@ -1351,6 +1356,22 @@ export type Project = {
 	 *  its path in user files. Each counts once, however many Agents read it.
 	 */
 	entries: number,
+};
+
+/**  A folder or `.code-workspace` file checked as a Project, before it is added. */
+export type ProjectCheck = {
+	/**  Its real path. */
+	path: string,
+	/**
+	 *  The name of each Agent with an Agent home listed at it, hidden or
+	 *  not, in the order the homes are listed.
+	 */
+	home_of: string[],
+	/**
+	 *  When there is one, the sentence saying so, rendered by the core. It
+	 *  can still be added.
+	 */
+	warning: string | null,
 };
 
 /**  How an Entry got where it is, which decides how it can be taken away. */

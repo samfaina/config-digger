@@ -1,7 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { addHomeOffer, ADDS, homeToCheck, NO_HOME_CHOSEN, projectWarning, type HomeChecked, type HomeToAdd } from "./adding";
+import {
+  ADD_LABELS,
+  addHomeOffer,
+  addProjectOffer,
+  homeToCheck,
+  NO_HOME_CHOSEN,
+  projectToCheck,
+  type Checked,
+  type HomeToAdd,
+} from "./adding";
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
-import { call, NOTICE_MS, type Notify } from "./desktop";
+import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import {
   changedSentence,
@@ -84,7 +93,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <span className="grow" />
         <button type="button" className="cta" onClick={() => setAdding(tab)}>
           <Icon name="folder" small />
-          {ADDS[tab]}
+          {ADD_LABELS[tab]}
         </button>
       </header>
 
@@ -114,9 +123,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         {tab === "projects" ? <ProjectsSide places={places} /> : <HomesSide />}
       </div>
 
-      {adding === "projects" && (
-        <AddProjectDialog places={places} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
-      )}
+      {adding === "projects" && <AddProjectDialog onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />}
       {adding === "homes" && (
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
@@ -410,7 +417,7 @@ function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: Show
       <div className="place-name">{row.label}</div>
       <div className="place-sub mono">{row.path}</div>
       <div className="tags">
-        <span className="tag">{row.agent}</span>
+        {row.agent && <span className="tag">{row.agent}</span>}
         {row.tags.map((tag) => (
           <span key={tag.text} className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>
             {tag.text}
@@ -467,7 +474,7 @@ const HOME_SOURCES: [string, string][] = [
   ["Default location", "Where each Agent definition says the Agent keeps its user configuration."],
   ["Environment variable", "CODEX_HOME, GEMINI_CLI_HOME and CLAUDE_USER_DATA_DIR, as config-digger sees them."],
   ["Known location", "MSIX packages, VS Code profiles, and homes other tools keep, such as Orca's Mirrored Codex home."],
-  ["Added by you", "Any existing folder, read with the definition of the Agent you choose."],
+  ["Added by you", "Any existing folder, read with the Agent definition you pick."],
 ];
 
 /** Where Agent homes come from. */
@@ -500,13 +507,13 @@ function SideRow({ title, text, count }: { title: string; text: string; count?: 
   );
 }
 
-/** A small dialog with a title, its body, and Cancel and Add. */
+/** A small dialog with a title, its body, what to know before Add, and Cancel and Add. */
 function AddDialog({
   title,
   sub,
   error,
   warning,
-  busy,
+  addable,
   onAdd,
   onClose,
   children,
@@ -516,7 +523,7 @@ function AddDialog({
   error: string | null;
   /** What to know before Add, which does not stop it. */
   warning: string | null;
-  busy: boolean;
+  addable: boolean;
   onAdd: () => void;
   onClose: () => void;
   children: ReactNode;
@@ -546,7 +553,7 @@ function AddDialog({
           <button type="button" className="cta secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="cta" disabled={busy} onClick={onAdd}>
+          <button type="button" className="cta" disabled={!addable} onClick={onAdd}>
             Add
           </button>
         </footer>
@@ -582,18 +589,54 @@ async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
 
 type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void; notify: Notify };
 
-/** Add Project: a folder or `.code-workspace` file, typed or picked, with a warning when it is a listed Agent home. */
-function AddProjectDialog({ places, onAdd, onClose, notify }: AddProps & { places: Places | null }) {
+/** How long an Add dialog waits after the last keystroke before the core checks what is chosen. */
+const CHECK_DELAY_MS = 300;
+
+/**
+ * The core's last check of `asked`, once it has stayed the same for
+ * {@link CHECK_DELAY_MS}, with no result when the check failed. `key` names
+ * `asked`, which is checked again only when `key` changes.
+ */
+function useCheck<Asked, Result>(
+  asked: Asked | null,
+  key: string,
+  check: (asked: Asked) => Promise<CommandResult<Result>>,
+): Checked<Asked, Result> | null {
+  const [checked, setChecked] = useState<Checked<Asked, Result> | null>(null);
+  useEffect(() => {
+    if (asked === null) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      void call(() => check(asked)).then((result) => {
+        if (current) setChecked({ asked, result: result.status === "ok" ? result.data : null });
+      });
+    }, CHECK_DELAY_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+    // `key` stands for `asked`, a new object on every render.
+  }, [key]);
+  return checked;
+}
+
+/** Add Project: a folder or `.code-workspace` file, typed or picked, checked before Add. */
+function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
   const [path, setPath] = useState("");
   const { error, busy, add } = useAdd(onAdd, onClose);
+  const asked = projectToCheck(path);
+  const checked = useCheck(asked, asked ?? "", (asked) => commands.checkProject(asked));
+  const offer = addProjectOffer(path, checked, busy);
   return (
     <AddDialog
-      title={ADDS.projects}
+      title={ADD_LABELS.projects}
       sub="A folder or a .code-workspace file. config-digger evaluates it for every Agent and writes nothing to any Agent."
       error={error}
-      warning={places && projectWarning(places, path)}
-      busy={busy || path.trim() === ""}
-      onAdd={() => void add({ kind: "add_project", path: path.trim() })}
+      warning={offer.warning}
+      addable={offer.addable}
+      onAdd={() => {
+        if (asked) void add({ kind: "add_project", path: asked });
+      }}
       onClose={onClose}
     >
       <div className="add-field">
@@ -610,39 +653,22 @@ function AddProjectDialog({ places, onAdd, onClose, notify }: AddProps & { place
   );
 }
 
-/** How long Add Agent home waits after the last keystroke before it checks the folder. */
-const CHECK_DELAY_MS = 300;
-
 /** Add Agent home: an Agent, chosen explicitly, and an existing folder, typed or picked, checked before Add. */
 function AddHomeDialog({ agents, onAdd, onClose, notify }: AddProps & { agents: Agent[] }) {
   const [choice, setChoice] = useState<HomeToAdd>(NO_HOME_CHOSEN);
-  const [checked, setChecked] = useState<HomeChecked | null>(null);
   const { error, busy, add } = useAdd(onAdd, onClose);
   const asked = homeToCheck(choice);
-  const { agent, folder } = asked ?? NO_HOME_CHOSEN;
-  // A folder that cannot be checked, such as one that does not exist yet, is
-  // left to Add, which says why it refuses it.
-  useEffect(() => {
-    if (agent === "" || folder === "") return;
-    let current = true;
-    const timer = setTimeout(() => {
-      void call(() => commands.checkHome(folder, agent)).then((result) => {
-        if (current && result.status === "ok") setChecked({ checked: { agent, folder }, check: result.data });
-      });
-    }, CHECK_DELAY_MS);
-    return () => {
-      current = false;
-      clearTimeout(timer);
-    };
-  }, [agent, folder]);
+  const checked = useCheck(asked, asked ? `${asked.agent}|${asked.folder}` : "", (asked) =>
+    commands.checkHome(asked.folder, asked.agent),
+  );
   const offer = addHomeOffer(choice, checked, busy);
   return (
     <AddDialog
-      title={ADDS.homes}
+      title={ADD_LABELS.homes}
       sub="A folder an Agent reads its user configuration from, such as another CODEX_HOME."
       error={error}
       warning={offer.warning}
-      busy={!offer.addable}
+      addable={offer.addable}
       onAdd={() => {
         if (asked) void add({ kind: "add_home", ...asked });
       }}

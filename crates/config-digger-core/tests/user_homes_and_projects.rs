@@ -157,6 +157,35 @@ fn a_folder_is_checked_only_when_it_exists_for_a_known_agent() {
 }
 
 #[test]
+fn a_folder_is_checked_before_it_is_added_as_a_project_for_the_agent_homes_listed_there() {
+    let fs = claude_code_home()
+        .with_folder(ALT)
+        .with_folder(Path::new(ALT).join("src"));
+    let core = core(&fs);
+    core.add_home(Path::new(ALT), "claude-code").unwrap();
+    core.add_home(Path::new(ALT), "codex").unwrap();
+    core.hide_home(ALT, Some("codex")).unwrap();
+
+    let at_alt = core.check_project(Path::new("d:/ALT-claude/")).unwrap();
+    let at_home = core.check_project(Path::new(HOME)).unwrap();
+    let inside = core.check_project(&Path::new(ALT).join("src")).unwrap();
+
+    assert_eq!(at_alt.path, PathBuf::from(ALT));
+    assert_eq!(at_alt.home_of, ["Claude Code", "Codex"]);
+    assert_eq!(
+        at_alt.warning.as_deref(),
+        Some(
+            r"D:\alt-claude is already listed as an Agent home of Claude Code and Codex. As a Project, it is read as a folder Agents are started on, not as their configuration."
+        )
+    );
+    assert_eq!(at_home.home_of, ["Claude Code"]);
+    assert_eq!(inside.home_of, Vec::<String>::new());
+    assert_eq!(inside.warning, None);
+    let missing = core.check_project(Path::new(r"D:\nowhere")).unwrap_err();
+    assert_eq!(missing.code, ErrorCode::InvalidPath);
+}
+
+#[test]
 fn a_home_is_added_only_at_an_existing_folder_for_a_known_agent() {
     let fs = claude_code_home().with_file(Path::new(ALT).join("notes.txt"), "x");
     let core = core(&fs);

@@ -278,17 +278,13 @@ describe("the Agent homes tab", () => {
     expect(group.homes[1].actions).toEqual(["unhide", "remove_from_list"]);
   });
 
-  test("names the Agent that reads each home on its row", () => {
-    const groups = homeGroups(
-      places({
-        agents: [
-          agent({ homes: [home({ home: "E:\\cd-throwaway\\codex-home", folder: "E:\\cd-throwaway\\codex-home", source: { kind: "added" } })] }),
-          agent({ id: "codex", name: "Codex", homes: [home({ agent: "codex", agent_name: "Codex" })] }),
-        ],
-      }),
+  test("names the Agent on the row of a home the user added, whose label is its folder", () => {
+    const added = String.raw`E:\cd-throwaway\codex-home`;
+    const [group] = homeGroups(
+      places({ agents: [agent({ homes: [home(), home({ home: added, folder: added, source: { kind: "added" } })] })] }),
     );
 
-    expect(groups.map((group) => group.homes[0].agent)).toEqual(["Claude Code", "Codex"]);
+    expect(group.homes.map((row) => row.agent)).toEqual([null, "Claude Code"]);
   });
 });
 
