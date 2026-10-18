@@ -2,8 +2,8 @@
 //! Projects & homes screen changes them. These live in config-digger's own
 //! lists: no change here writes any Agent configuration.
 
-use crate::session::{Places, Scans, SessionState};
-use config_digger_core::api::{Core, Error, Home, Project, Snapshot};
+use crate::session::{Places, Scans, Session, SessionState};
+use config_digger_core::api::{Error, Home, Project};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -57,16 +57,12 @@ pub fn change_list(
     change: &ListChange,
     scans: &Scans,
 ) -> Result<ListChanged, Error> {
-    let applied = {
-        let mut last = kept.lock();
-        if last.is_none() {
-            *last = Some(scans.scan()?);
-        }
-        let last = last.as_ref().expect("read above");
-        change.apply(last.core(), last.snapshot())?
-    };
+    if kept.lock().is_none() {
+        kept.keep(scans.scan()?);
+    }
+    let applied = change.apply(kept.lock().as_ref().expect("kept above"))?;
     let session = scans.scan()?;
-    let listed = applied.listed(session.core(), session.snapshot())?;
+    let listed = applied.listed(&session)?;
     let places = session.places();
     kept.keep(session);
     Ok(ListChanged { listed, places })
@@ -87,9 +83,10 @@ impl ListChange {
         }
     }
 
-    /// Writes the change to config-digger's lists through `core`, looking
-    /// for what it names in `listing`.
-    fn apply(&self, core: &Core, listing: &Snapshot) -> Result<Applied, Error> {
+    /// Writes the change to config-digger's lists, looking for what it
+    /// names in the scan `last`.
+    fn apply(&self, last: &Session) -> Result<Applied, Error> {
+        let (core, listing) = (last.core(), last.snapshot());
         let home = |home: Home| Applied::Home {
             agent: home.agent,
             home: home.home,
@@ -141,8 +138,9 @@ enum Applied {
 }
 
 impl Applied {
-    /// The Project or Agent home changed, as `snapshot` lists it.
-    fn listed(self, core: &Core, snapshot: &Snapshot) -> Result<Listed, Error> {
+    /// The Project or Agent home changed, as the scan `session` lists it.
+    fn listed(self, session: &Session) -> Result<Listed, Error> {
+        let (core, snapshot) = (session.core(), session.snapshot());
         Ok(match self {
             Applied::Project(path) => Listed::Project {
                 project: core.project_in(snapshot, &path)?,
@@ -158,7 +156,7 @@ impl Applied {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::Session;
+    use config_digger_core::api::Core;
     use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
     use std::path::Path;
 

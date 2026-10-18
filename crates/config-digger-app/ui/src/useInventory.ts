@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Inventory } from "./bindings";
 import { call, type CommandResult } from "./desktop";
-import { reads } from "./reads";
+import { reads, whenIdle } from "./reads";
 
 export type InventoryRead = {
   /** The last inventory read, kept while a new read runs or after one fails. */
@@ -64,10 +64,7 @@ export function useInventory(initialProject: string | null = null): InventoryRea
 
   useEffect(() => {
     void refresh();
-    // A read of another screen or the Windows picker running holds it off.
-    const onFocus = () => {
-      if (!reads.busy()) void refresh();
-    };
+    const onFocus = whenIdle(reads, () => void refresh());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);

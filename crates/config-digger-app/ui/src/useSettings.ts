@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Settings, type SettingsRead } from "./bindings";
 import { call, type CommandResult } from "./desktop";
-import { reads } from "./reads";
+import { reads, whenIdle } from "./reads";
 
 export type SettingsState = {
   /** The settings, data folders and parked Entries, kept after a read fails. */
@@ -53,11 +53,7 @@ export function useSettings(): SettingsState {
 
   useEffect(() => {
     void reload();
-    // A read of another screen, a list change or the Windows picker running
-    // holds it off.
-    const onFocus = () => {
-      if (!reads.busy()) void reload();
-    };
+    const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);

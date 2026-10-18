@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createReads } from "./reads";
+import { createReads, whenIdle } from "./reads";
 
 /** A read that settles when told to. */
 function pending() {
@@ -52,5 +52,23 @@ describe("a focus re-read", () => {
     second.settle(true);
     await runningSecond;
     expect(reads.busy()).toBe(false);
+  });
+});
+
+describe("a focus handler", () => {
+  test("reads again only when nothing else is read", async () => {
+    const reads = createReads();
+    let reread = 0;
+    const onFocus = whenIdle(reads, () => (reread += 1));
+    const read = pending();
+
+    const running = reads.during(() => read.promise);
+    onFocus();
+    expect(reread).toBe(0);
+
+    read.settle(true);
+    await running;
+    onFocus();
+    expect(reread).toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type ListChange, type ListChanged, type Places } from "./bindings";
 import { call, type CommandResult } from "./desktop";
-import { reads } from "./reads";
+import { reads, whenIdle } from "./reads";
 
 export type PlacesRead = {
   /** Every Project and Agent home, kept while a new read runs or after one fails. */
@@ -54,11 +54,7 @@ export function usePlaces(): PlacesRead {
 
   useEffect(() => {
     void reload();
-    // A read of another screen, a list change or the Windows picker running
-    // holds it off.
-    const onFocus = () => {
-      if (!reads.busy()) void reload();
-    };
+    const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);

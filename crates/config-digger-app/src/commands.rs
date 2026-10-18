@@ -256,19 +256,22 @@ pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChang
         let started = Instant::now();
         let scans = Scans::new(scan);
         let result = lists::change_list(&app.state::<SessionState>(), &change, &scans);
-        let (change, scans) = (change.kind(), scans.count());
+        let (kind, scan_count) = (change.kind(), scans.count());
         let elapsed_ms = started.elapsed().as_millis();
         match &result {
-            Ok(_) => tracing::info!(change, scans, elapsed_ms, "list changed"),
-            Err(error) => {
-                tracing::warn!(
-                    code = error.code.code(),
-                    change,
-                    scans,
-                    elapsed_ms,
-                    "list not changed"
-                )
-            }
+            Ok(_) => tracing::info!(
+                change = kind,
+                scans = scan_count,
+                elapsed_ms,
+                "list changed"
+            ),
+            Err(error) => tracing::warn!(
+                code = error.code.code(),
+                change = kind,
+                scans = scan_count,
+                elapsed_ms,
+                "list not changed"
+            ),
         }
         result
     })
@@ -289,7 +292,7 @@ pub async fn check_home(folder: PathBuf, agent: String) -> Result<HomeCheck, api
 #[specta::specta]
 pub async fn check_project(app: AppHandle, path: PathBuf) -> Result<ProjectCheck, api::Error> {
     blocking(move || match app.state::<SessionState>().lock().as_ref() {
-        Some(session) => session.core().check_project_in(session.snapshot(), &path),
+        Some(session) => session.check_project(&path),
         None => Core::new(Ports::real())?.check_project(&path),
     })
     .await

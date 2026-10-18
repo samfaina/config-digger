@@ -11,6 +11,7 @@ export type Reads = {
   busy: () => boolean;
 };
 
+/** A new set of reads, none of them running. */
 export function createReads(): Reads {
   let running = 0;
   return {
@@ -28,3 +29,10 @@ export function createReads(): Reads {
 
 /** The app's reads, shared by every screen. */
 export const reads = createReads();
+
+/** A focus handler that runs `reread` only when none of `running` is running. */
+export function whenIdle(running: Reads, reread: () => void): () => void {
+  return () => {
+    if (!running.busy()) reread();
+  };
+}
