@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import type { ActionPreview, Change, Error as ApiError, FileChange, FolderChange, Outcome, Preview, Warning } from "./bindings";
 import {
   appliedResult,
-  changeGroups,
   applyButton,
+  changeGroups,
   diffView,
   failedResult,
   keptAcknowledgements,
@@ -415,7 +415,7 @@ describe("the What changes block", () => {
   test("shortens a long locator to its key under its file's name, in pieces that each end at a path or key separator", () => {
     const [line] = changeGroups(changes)[0].files[0].changes;
 
-    expect(line.key).toEqual(["projects.", "E:/", "cd-throwaway/", "project-gone.", "mcpServers.", "cd-throwaway-leftover"]);
+    expect(line.keyPieces).toEqual(["projects.", "E:/", "cd-throwaway/", "project-gone.", "mcpServers.", "cd-throwaway-leftover"]);
     expect(line.change.locator).toBe(String.raw`C:\Users\me\.claude.json#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`);
   });
 
@@ -424,6 +424,6 @@ describe("the What changes block", () => {
     const [group] = changeGroups([change({ item: "pdf", path: folder, locator: folder })]);
 
     expect(group.files[0].name).toBe("pdf");
-    expect(group.files[0].changes[0].key).toEqual([]);
+    expect(group.files[0].changes[0].keyPieces).toEqual([]);
   });
 });

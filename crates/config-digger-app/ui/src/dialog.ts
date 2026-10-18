@@ -67,10 +67,10 @@ function leftoverCount(preview: Preview): string {
 
 /**
  * A change as the What changes block lists it, under its Project and its
- * file. `key` is its locator past the file, in pieces that each end where
+ * file. `keyPieces` is its locator past the file, in pieces that each end where
  * the line may wrap, at a path or key separator; a skill folder has none.
  */
-export type ChangeLine = { change: Change; key: string[] };
+export type ChangeLine = { change: Change; keyPieces: string[] };
 
 /** The changes to one file, under the file's name, with its full path for hover and copy. */
 export type FileGroup = { path: string; name: string; changes: ChangeLine[] };
@@ -86,7 +86,7 @@ export function changeGroups(changes: Change[]): ProjectGroup[] {
     if (!group) groups.push((group = { project: change.project, files: [] }));
     let file = group.files.find((file) => file.path === change.path);
     if (!file) group.files.push((file = { path: change.path, name: fileName(change.path), changes: [] }));
-    file.changes.push({ change, key: wrapPoints(locatorKey(change)) });
+    file.changes.push({ change, keyPieces: wrapPoints(locatorKey(change)) });
   }
   return groups;
 }

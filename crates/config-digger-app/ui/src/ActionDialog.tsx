@@ -407,7 +407,7 @@ export function Changes({ changes, notify }: { changes: Change[]; notify: Notify
 }
 
 /** One (Agent, Entry, Project) whose State the Operation changes: the Entry, its Agent, its key, then before → after. */
-function ChangeRow({ line: { change, key }, notify }: { line: ChangeLine; notify: Notify }) {
+function ChangeRow({ line: { change, keyPieces }, notify }: { line: ChangeLine; notify: Notify }) {
   return (
     <div className="change-row">
       <b className="change-item">{change.item}</b>
@@ -415,13 +415,13 @@ function ChangeRow({ line: { change, key }, notify }: { line: ChangeLine; notify
         {change.agent_name}
         {change.home !== "default" && ` (${change.home})`}
       </div>
-      {key.length > 0 && (
+      {keyPieces.length > 0 && (
         <div className="change-locator">
           <Tooltip text={change.locator}>
             <span className="mono dim change-key">
-              {key.map((piece, index) => (
+              {keyPieces.map((piece, index) => (
                 <Fragment key={index}>
-                  {piece}
+                  <span className="change-key-piece">{piece}</span>
                   <wbr />
                 </Fragment>
               ))}

@@ -612,6 +612,11 @@ p {
   cursor: pointer;
 }
 
+.icon-button.small {
+  width: 22px;
+  height: 22px;
+}
+
 .cta.danger {
   background: #b93a35;
   box-shadow: 0 4px 14px #f8514933;
@@ -1367,9 +1372,8 @@ p {
   word-break: normal;
 }
 
-.icon-button.small {
-  width: 22px;
-  height: 22px;
+.change-key-piece {
+  white-space: nowrap;
 }
 
 .change-states {

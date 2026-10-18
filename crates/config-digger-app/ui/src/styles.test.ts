@@ -218,5 +218,7 @@ describe("a change in the What changes block", () => {
     const key = styled(".change-key");
     expect(key.get("overflow-wrap")).toBe("normal");
     expect(key.get("word-break")).toBe("normal");
+    // Each piece stays whole, as a browser would also break after the hyphen of `cd-throwaway`.
+    expect(styled(".change-key-piece").get("white-space")).toBe("nowrap");
   });
 });
