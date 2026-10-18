@@ -72,7 +72,7 @@ fn note_codes(home: &Home) -> Vec<AgentNoteCode> {
 
 #[test]
 fn a_newer_version_is_noted_as_outside_the_tested_range() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 290, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
 
     let home = home(&core(&fs), "claude-code");
 
@@ -88,7 +88,7 @@ fn a_newer_version_is_noted_as_outside_the_tested_range() {
     );
     assert_eq!(
         note.sentence,
-        "Claude Code 2.1.290 is newer than the versions this definition was tested with (2.1.286)."
+        "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.286 to 2.1.302)."
     );
 }
 
@@ -101,7 +101,7 @@ fn an_older_version_is_treated_like_a_newer_one() {
     assert!(home.installations[0].out_of_range);
     assert_eq!(
         home.notes[0].sentence,
-        "Claude Code 2.0.9 is older than the versions this definition was tested with (2.1.286)."
+        "Claude Code 2.0.9 is older than the versions this definition was tested with (2.1.286 to 2.1.302)."
     );
 }
 
@@ -111,10 +111,10 @@ fn the_version_is_read_again_at_every_scan() {
     let core = core(&fs);
     assert_eq!(note_codes(&home(&core, "claude-code")), []);
 
-    fs.put_file(native_claude(), fake::executable(Some([2, 1, 291, 0])));
+    fs.put_file(native_claude(), fake::executable(Some([2, 1, 311, 0])));
 
     let home = home(&core, "claude-code");
-    assert_eq!(home.installations[0].version.as_deref(), Some("2.1.291"));
+    assert_eq!(home.installations[0].version.as_deref(), Some("2.1.311"));
     assert_eq!(
         note_codes(&home),
         [AgentNoteCode::VersionOutsideTestedRange]
@@ -171,7 +171,7 @@ fn the_agent_lists_its_tested_range() {
     let tested = agents[0].tested.as_ref().expect("a tested range");
     assert_eq!(
         (tested.min.as_str(), tested.max.as_str()),
-        ("2.1.286", "2.1.286")
+        ("2.1.286", "2.1.302")
     );
 }
 
@@ -251,7 +251,7 @@ fn remove_notes(core: &Core) -> Plan {
 
 #[test]
 fn an_operation_on_the_agent_gets_the_note_as_an_informational_line_and_still_applies() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 290, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
     let core = core(&fs);
 
     let plan = remove_notes(&core);
@@ -266,7 +266,7 @@ fn an_operation_on_the_agent_gets_the_note_as_an_informational_line_and_still_ap
         info,
         [(
             InfoCode::VersionOutsideTestedRange,
-            "Claude Code 2.1.290 is newer than the versions this definition was tested with (2.1.286)."
+            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.286 to 2.1.302)."
         )]
     );
     assert_eq!(plan.preview().info[0].path, native_claude());
@@ -299,7 +299,7 @@ fn an_operation_on_an_agent_within_its_tested_range_has_no_version_line() {
 
 #[test]
 fn an_undo_of_an_operation_on_the_agent_gets_the_line_too() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 290, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
     let core = core(&fs);
     let outcome = core.execute(remove_notes(&core), &[]).unwrap();
 
