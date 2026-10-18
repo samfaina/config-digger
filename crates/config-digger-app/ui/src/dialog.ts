@@ -181,6 +181,8 @@ export type Result =
       hints: string[];
       /** The Operation to undo, `null` for a Delete backup, after which its Operation cannot be. */
       undo: string | null;
+      /** The Operation and what became of its backup, such as `Operation 20261001-143012-a3f · backup kept`. */
+      note: string;
       /** Where the States after differ from the preview's prediction. */
       differences: Difference[];
     }
@@ -219,6 +221,10 @@ export function appliedResult(outcome: Outcome, action: Action): Result {
     sentence: outcome.sentence,
     hints: outcome.hints,
     undo: action === "delete_backup" ? null : outcome.operation,
+    note:
+      action === "delete_backup"
+        ? `Operation ${outcome.operation} · backup deleted · can no longer be undone`
+        : `Operation ${outcome.operation} · backup kept`,
     differences: outcome.differences,
   };
 }
