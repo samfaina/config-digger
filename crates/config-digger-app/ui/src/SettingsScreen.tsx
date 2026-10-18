@@ -2,6 +2,7 @@ import { useState } from "react";
 import { commands, type DataFolder } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
+import { Notice } from "./Notice";
 import type { InventoryStart } from "./places";
 import { dataFolderRows, parkedRows, type ParkedRow } from "./settings";
 import { useSettings } from "./useSettings";
@@ -17,22 +18,22 @@ type Props = {
 export function SettingsScreen({ onShow, onOpenAbout }: Props) {
   const { read, error, save } = useSettings();
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
 
   const toggleUpdates = async () => {
     if (!read) return;
     setSaving(true);
     try {
       const result = await save({ check_updates_on_startup: !read.settings.check_updates_on_startup });
-      if (result.status === "error") setNotice(`The setting couldn't be saved: ${result.error.message}`);
+      if (result.status === "error") setNotice({ kind: "error", text: `The setting couldn't be saved: ${result.error.message}` });
     } finally {
       setSaving(false);
     }
   };
   const openFolder = async (folder: DataFolder) => {
     const result = await call(() => commands.openDataFolder(folder));
-    if (result.status === "error") setNotice(`It couldn't be opened: ${result.error.message}`);
-    else if (!result.data) setNotice("config-digger has kept nothing there yet.");
+    if (result.status === "error") setNotice({ kind: "error", text: `It couldn't be opened: ${result.error.message}` });
+    else if (!result.data) setNotice({ kind: "information", text: "config-digger has kept nothing there yet." });
   };
 
   const onStartup = read?.settings.check_updates_on_startup ?? false;
@@ -126,11 +127,7 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
         </section>
       </div>
 
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && <Notice notice={notice} />}
     </div>
   );
 }

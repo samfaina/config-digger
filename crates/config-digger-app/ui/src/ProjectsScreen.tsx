@@ -12,6 +12,7 @@ import {
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
 import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
+import { Notice } from "./Notice";
 import {
   changedSentence,
   homeGroups,
@@ -47,7 +48,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const { places, error, reload, change } = usePlaces();
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
-  const [notice, setNotice] = useTransient<string>(NOTICE_MS);
+  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
   // Remove leftovers is an Operation, previewed like any other.
   const dialog = useActionDialog({ onClosed: reload, onOpenHistory, notify: setNotice });
 
@@ -55,13 +56,13 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const apply = async (request: ListChange): Promise<string | null> => {
     const result = await change(request);
     if (result.status === "error") return result.error.message;
-    setNotice(changedSentence(request, result.data.listed));
+    setNotice({ kind: "success", text: changedSentence(request, result.data.listed) });
     return null;
   };
   /** Applies a change from a row, whose refusal shows as a notice. */
   const act = (request: ListChange) =>
     void apply(request).then((refused) => {
-      if (refused !== null) setNotice(refused);
+      if (refused !== null) setNotice({ kind: "error", text: refused });
     });
 
   const projectCount = places?.projects.length ?? 0;
@@ -130,11 +131,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
 
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && <Notice notice={notice} />}
 
       {dialog.view}
     </div>
@@ -588,7 +585,7 @@ function useAdd(onAdd: (change: ListChange) => Promise<string | null>, onClose: 
  */
 async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
   const result = await reads.during(() => call(() => commands.pickLocation(what)));
-  if (result.status === "error") notify(`The Windows picker couldn't open: ${result.error.message}`);
+  if (result.status === "error") notify({ kind: "error", text: `The Windows picker couldn't open: ${result.error.message}` });
   else if (result.data !== null) set(result.data);
 }
 

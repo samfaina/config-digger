@@ -255,6 +255,45 @@
           "covers": ["#183"]
         }
       ]
+    },
+    {
+      "id": "5",
+      "title": "Avisos",
+      "steps": [
+        {
+          "id": "5.1",
+          "title": "Un aviso de éxito",
+          "goal": "Los avisos se ven como tarjetas de la app, no como píldoras, y uno de éxito es verde.",
+          "instructions": [
+            "Con el home de Claude Code de prueba elegido en el Inventario (paso 1.2), elige el servidor cd-throwaway-user.",
+            "En su Entry, pulsa Copy path.",
+            "Mira el aviso que sale abajo, en el centro."
+          ],
+          "commands": [],
+          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde oscuro y destaca sobre el panel. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Se va solo a los pocos segundos.",
+          "covers": ["#184"]
+        },
+        {
+          "id": "5.2",
+          "title": "Un aviso de información",
+          "goal": "Un aviso de información tiene la misma forma que uno de éxito y su propio color.",
+          "instructions": [
+            "Ejecuta la orden en PowerShell y apunta una carpeta que salga con False.",
+            "Ve a Settings.",
+            "En Data on this computer, pulsa Open folder en la fila de esa carpeta.",
+            "Mira el aviso que sale abajo, en el centro."
+          ],
+          "commands": [
+            {
+              "label": "Ver qué carpetas de datos existen",
+              "shell": "powershell",
+              "text": "([ordered]@{ 'Backups and Operation history' = \"$env:LOCALAPPDATA\\config-digger\\backups\"; 'Parked Entries' = \"$env:LOCALAPPDATA\\config-digger\\parked\"; 'Logs' = \"$env:LOCALAPPDATA\\config-digger\\logs\"; 'Your lists and settings' = \"$env:APPDATA\\config-digger\" }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
+            }
+          ],
+          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul oscuro, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
+          "covers": ["#184"]
+        }
+      ]
     }
   ]
 }

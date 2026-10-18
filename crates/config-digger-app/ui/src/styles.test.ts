@@ -83,3 +83,85 @@ describe("the app's scrollbars", () => {
     }
   });
 });
+
+const rootValues = allRules.find((rule) => rule.selector === ":root")?.declarations ?? new Map<string, string>();
+const rule = (selector: string) => allRules.find((found) => found.selector === selector)?.declarations ?? new Map<string, string>();
+const KINDS = ["information", "success", "error"] as const;
+
+/** The colour a `var(--token)` value names, as `#rrggbb`. */
+const colour = (value: string | undefined) => {
+  const token = value?.match(/^var\((--[\w-]+)\)$/)?.[1];
+  const hex = token === undefined ? undefined : rootValues.get(token);
+  expect(hex, `${value} is a :root token holding an opaque colour`).toMatch(/^#[0-9a-f]{6}$/i);
+  return hex as string;
+};
+
+/** The WCAG 2 contrast ratio of two `#rrggbb` colours. */
+const contrast = (one: string, other: string) => {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((at) => {
+      const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [light, dark] = [luminance(one), luminance(other)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+};
+
+describe("the contrast helper of these tests", () => {
+  test("gives the ratios WCAG gives", () => {
+    expect(contrast("#ffffff", "#000000")).toBeCloseTo(21, 5);
+    expect(contrast("#777777", "#ffffff")).toBeCloseTo(4.48, 2);
+  });
+});
+
+describe("a notice", () => {
+  test("has the corner radius of the app's cards, not a pill's", () => {
+    expect(rule(".notice").get("border-radius")).toBe(rule(".entry-card").get("border-radius"));
+  });
+
+  test("of each kind takes its background, text and accent edge from :root tokens of its own", () => {
+    for (const kind of KINDS) {
+      const declarations = rule(`.notice.${kind}`);
+      for (const name of ["background", "color", "border-left-color"]) {
+        expect(declarations.get(name), `.notice.${kind} ${name}`).toMatch(new RegExp(String.raw`^var\(--notice-${kind}[\w-]*\)$`));
+        colour(declarations.get(name));
+      }
+    }
+    expect(rule(".notice").get("border-left-width")).toMatch(/^[3-9]px$/);
+  });
+
+  test("differs by kind, in its background and in its accent edge", () => {
+    for (const name of ["background", "border-left-color"]) {
+      expect(new Set(KINDS.map((kind) => colour(rule(`.notice.${kind}`).get(name)))).size, name).toBe(3);
+    }
+  });
+
+  test("stands out from every surface of the app", () => {
+    const surfaces = ["--background", "--rail", "--panel", "--tile", "--tile-hover", "--button"].map((token) => colour(`var(${token})`));
+    for (const kind of KINDS) {
+      const declarations = rule(`.notice.${kind}`);
+      const background = colour(declarations.get("background"));
+      const edge = colour(declarations.get("border-left-color"));
+      expect(surfaces, kind).not.toContain(background);
+      // An accent edge is a graphic that has to be seen: WCAG asks 3:1 of it.
+      for (const surface of [...surfaces, background]) expect(contrast(edge, surface), `${kind} edge on ${surface}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  test("of each kind has text that meets WCAG AA on its background", () => {
+    for (const kind of KINDS) {
+      const declarations = rule(`.notice.${kind}`);
+      expect(contrast(colour(declarations.get("color")), colour(declarations.get("background"))), kind).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test("of each kind draws its icon in the colour of its accent edge", () => {
+    for (const kind of KINDS) {
+      const edge = rule(`.notice.${kind}`).get("border-left-color");
+      expect(edge, kind).toBeDefined();
+      expect(rule(`.notice.${kind} .icon`).get("color"), kind).toBe(edge);
+    }
+  });
+});

@@ -51,6 +51,25 @@ const ICONS = {
       <circle cx="12" cy="12" r="9.5" mask={`url(#${mask})`} />
     </>
   ),
+  done: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <path d="M7.5 12.3l3 3 6-6.3" fill="none" stroke="#000" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      </mask>
+      <circle cx="12" cy="12" r="9.5" mask={`url(#${mask})`} />
+    </>
+  ),
+  warning: (mask: string) => (
+    <>
+      <mask id={mask}>
+        <rect width="24" height="24" fill="#fff" />
+        <rect x="10.8" y="6.5" width="2.4" height="7" rx="1.2" fill="#000" />
+        <circle cx="12" cy="16.4" r="1.5" fill="#000" />
+      </mask>
+      <circle cx="12" cy="12" r="9.5" mask={`url(#${mask})`} />
+    </>
+  ),
   refresh: () => (
     <>
       <path d="M20 12a8 8 0 1 1-2.6-5.9" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
