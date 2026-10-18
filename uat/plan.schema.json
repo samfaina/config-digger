@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/samfaina/config-digger/blob/main/uat/plan.schema.json",
+  "title": "UAT plan",
+  "description": "The manual UAT walk of config-digger: ordered sections of steps, which uat/runner.html shows one at a time. Keys are in English; the text is in the tester's language.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "language", "sections"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "title": {
+      "description": "The walk's name, shown at the top of the runner.",
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "description": "The BCP 47 tag of the plan's text, such as \"es\".",
+      "type": "string",
+      "minLength": 2
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/section" }
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "steps"],
+      "properties": {
+        "id": {
+          "description": "The section's number, the first half of its steps' ids.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "goal", "instructions", "commands", "expect", "covers"],
+      "properties": {
+        "id": {
+          "description": "Stable: a step keeps its id when steps are added, moved or removed around it, so results and tickets keep pointing at it.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "goal": {
+          "description": "Why the step exists: what it proves.",
+          "type": "string",
+          "minLength": 1
+        },
+        "instructions": {
+          "description": "One action per line.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "commands": {
+          "description": "Commands the tester copies, in the order the instructions use them.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "expect": {
+          "description": "What the tester must see for the step to pass.",
+          "type": "string",
+          "minLength": 1
+        },
+        "setup": {
+          "description": "A data reset to run before the step.",
+          "$ref": "#/$defs/command"
+        },
+        "covers": {
+          "description": "The issues or spec sections the step checks, such as \"#75\" or \"#38 story 12\".",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "shell", "text"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "shell": { "enum": ["powershell", "cmd", "bash"] },
+        "text": {
+          "description": "The command exactly as the tester pastes it.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

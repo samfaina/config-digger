@@ -1,0 +1,110 @@
+// The runner's logic, the `uat-logic` script inside runner.html, run by
+// `node --test uat/runner.test.mjs`. The page itself stays one
+// self-contained file.
+
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+
+const html = readFileSync(new URL("./runner.html", import.meta.url), "utf8");
+const logic = html.match(/<script id="uat-logic">([\s\S]*?)<\/script>/)[1];
+const Uat = new Function(`${logic}; return Uat;`)();
+
+const NOW = new Date("2026-10-18T09:30:00Z");
+
+test("a KO needs notes", () => {
+  assert.throws(() => Uat.result("1.2", "ko", "  ", "0.1.0-rc.2", NOW), {
+    message: "Escribe en las notas qué falló.",
+  });
+});
+
+test("a Blocked step needs notes", () => {
+  assert.throws(() => Uat.result("1.2", "blocked", "", "0.1.0-rc.2", NOW), {
+    message: "Escribe en las notas qué lo bloquea.",
+  });
+});
+
+test("an OK is stored with its id, notes, time and app version", () => {
+  assert.deepEqual(Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW), {
+    id: "1.1",
+    status: "ok",
+    notes: "",
+    time: "2026-10-18T09:30:00.000Z",
+    version: "0.1.0-rc.2",
+  });
+});
+
+/** A plan of two sections, three steps. */
+const PLAN = {
+  title: "Prueba",
+  language: "es",
+  sections: [
+    {
+      id: "1",
+      title: "Inventario",
+      steps: [
+        { id: "1.1", title: "Abrir la app" },
+        { id: "1.2", title: "Añadir el home" },
+      ],
+    },
+    { id: "2", title: "History", steps: [{ id: "2.1", title: "Deshacer" }] },
+  ],
+};
+
+/** Results keyed by step id, as the runner keeps them. */
+function results(...docs) {
+  return Object.fromEntries(docs.map((doc) => [doc.id, doc]));
+}
+
+test("progress counts the plan's steps that have a result, by status", () => {
+  const done = results(
+    Uat.result("1.2", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "blocked", "Espera a #175", "0.1.0-rc.2", NOW),
+    Uat.result("9.9", "ok", "", "0.1.0-rc.2", NOW),
+  );
+  assert.deepEqual(Uat.progress(PLAN, done), {
+    done: 2,
+    total: 3,
+    counts: { ok: 1, ko: 0, blocked: 1 },
+  });
+});
+
+test("the export is a Markdown table of the KO and Blocked steps, in plan order", () => {
+  const done = results(
+    Uat.result("2.1", "blocked", "Espera a #175", "0.1.0-rc.2", NOW),
+    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("1.2", "ko", "Sale vacío | sin servidores\nNi skills", "0.1.0-rc.2", NOW),
+  );
+  assert.equal(
+    Uat.exportMarkdown(PLAN, done),
+    [
+      "| Paso | Título | Estado | Notas |",
+      "| --- | --- | --- | --- |",
+      "| 1.2 | Añadir el home | KO | Sale vacío \\| sin servidores<br>Ni skills |",
+      "| 2.1 | Deshacer | Bloqueado | Espera a #175 |",
+    ].join("\n"),
+  );
+});
+
+test("the export says so when no step is KO or Blocked", () => {
+  const done = results(Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW));
+  assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso en KO ni bloqueado.");
+});
+
+test("after a result the runner moves on to the next step without one", () => {
+  const done = results(
+    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "ok", "", "0.1.0-rc.2", NOW),
+  );
+  assert.equal(Uat.nextStep(PLAN, done, "2.1"), "1.2");
+  assert.equal(Uat.nextStep(PLAN, done, "1.1"), "1.2");
+});
+
+test("once every step has a result the runner stays on the step", () => {
+  const done = results(
+    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("1.2", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "ok", "", "0.1.0-rc.2", NOW),
+  );
+  assert.equal(Uat.nextStep(PLAN, done, "1.2"), "1.2");
+});
