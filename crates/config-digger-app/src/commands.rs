@@ -7,8 +7,8 @@ use crate::lists::{ListChange, Listed};
 use crate::session::{self, ParkedEntry, Places, Session};
 use crate::updates::{UpdateStatus, UpdatesState};
 use config_digger_core::api::{
-    self, Backup, Core, DataFolders, Inventory, OperationDetail, OperationSummary, Retention,
-    Settings, WarningClass,
+    self, Backup, Core, DataFolders, HomeCheck, Inventory, OperationDetail, OperationSummary,
+    Retention, Settings, WarningClass,
 };
 use config_digger_core::ports::Ports;
 use serde::{Deserialize, Serialize};
@@ -285,6 +285,14 @@ pub async fn change_list(app: AppHandle, change: ListChange) -> Result<ListChang
         tracing::warn!(code = error.code.code(), "list not changed");
     }
     result
+}
+
+/// Checks `folder` as an Agent home of `agent` before it is added: whether
+/// any of the files the Agent reads in a home is there. It changes nothing.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_home(folder: PathBuf, agent: String) -> Result<HomeCheck, api::Error> {
+    blocking(move || Core::new(Ports::real())?.check_home(&folder, &agent)).await
 }
 
 /// What the Windows picker picks.

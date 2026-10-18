@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { addHomeOffer, ADDS, homeToCheck, NO_HOME_CHOSEN, projectWarning, type HomeChecked, type HomeToAdd } from "./adding";
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
 import { call, NOTICE_MS, type Notify } from "./desktop";
 import { Icon } from "./icons";
@@ -83,7 +84,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <span className="grow" />
         <button type="button" className="cta" onClick={() => setAdding(tab)}>
           <Icon name="folder" small />
-          {tab === "projects" ? "Add Project" : "Add Agent home"}
+          {ADDS[tab]}
         </button>
       </header>
 
@@ -113,7 +114,9 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         {tab === "projects" ? <ProjectsSide places={places} /> : <HomesSide />}
       </div>
 
-      {adding === "projects" && <AddProjectDialog onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />}
+      {adding === "projects" && (
+        <AddProjectDialog places={places} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
+      )}
       {adding === "homes" && (
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
@@ -407,6 +410,7 @@ function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: Show
       <div className="place-name">{row.label}</div>
       <div className="place-sub mono">{row.path}</div>
       <div className="tags">
+        <span className="tag">{row.agent}</span>
         {row.tags.map((tag) => (
           <span key={tag.text} className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>
             {tag.text}
@@ -463,7 +467,7 @@ const HOME_SOURCES: [string, string][] = [
   ["Default location", "Where each Agent definition says the Agent keeps its user configuration."],
   ["Environment variable", "CODEX_HOME, GEMINI_CLI_HOME and CLAUDE_USER_DATA_DIR, as config-digger sees them."],
   ["Known location", "MSIX packages, VS Code profiles, and homes other tools keep, such as Orca's Mirrored Codex home."],
-  ["Added by you", "Any existing folder, read with the Agent definition you pick."],
+  ["Added by you", "Any existing folder, read with the definition of the Agent you choose."],
 ];
 
 /** Where Agent homes come from. */
@@ -501,6 +505,7 @@ function AddDialog({
   title,
   sub,
   error,
+  warning,
   busy,
   onAdd,
   onClose,
@@ -509,6 +514,8 @@ function AddDialog({
   title: string;
   sub: string;
   error: string | null;
+  /** What to know before Add, which does not stop it. */
+  warning: string | null;
   busy: boolean;
   onAdd: () => void;
   onClose: () => void;
@@ -522,6 +529,12 @@ function AddDialog({
         </h1>
         <p className="dialog-subtitle">{sub}</p>
         {children}
+        {warning && (
+          <div className="alert" role="status">
+            <Icon name="flag" small />
+            {warning}
+          </div>
+        )}
         {error && (
           <div className="alert" role="alert">
             <Icon name="flag" small />
@@ -569,15 +582,16 @@ async function pick(what: Pick, set: (path: string) => void, notify: Notify) {
 
 type AddProps = { onAdd: (change: ListChange) => Promise<string | null>; onClose: () => void; notify: Notify };
 
-/** Add Project: a folder or `.code-workspace` file, typed or picked. */
-function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
+/** Add Project: a folder or `.code-workspace` file, typed or picked, with a warning when it is a listed Agent home. */
+function AddProjectDialog({ places, onAdd, onClose, notify }: AddProps & { places: Places | null }) {
   const [path, setPath] = useState("");
   const { error, busy, add } = useAdd(onAdd, onClose);
   return (
     <AddDialog
-      title="Add Project"
+      title={ADDS.projects}
       sub="A folder or a .code-workspace file. config-digger evaluates it for every Agent and writes nothing to any Agent."
       error={error}
+      warning={places && projectWarning(places, path)}
       busy={busy || path.trim() === ""}
       onAdd={() => void add({ kind: "add_project", path: path.trim() })}
       onClose={onClose}
@@ -596,38 +610,77 @@ function AddProjectDialog({ onAdd, onClose, notify }: AddProps) {
   );
 }
 
-/** Add Agent home: an Agent and an existing folder, typed or picked. */
+/** How long Add Agent home waits after the last keystroke before it checks the folder. */
+const CHECK_DELAY_MS = 300;
+
+/** Add Agent home: an Agent, chosen explicitly, and an existing folder, typed or picked, checked before Add. */
 function AddHomeDialog({ agents, onAdd, onClose, notify }: AddProps & { agents: Agent[] }) {
-  // The first Agent until one is picked, even when the Agents are read after the dialog opens.
-  const [picked, setAgent] = useState<string | null>(null);
-  const agent = picked ?? agents[0]?.id ?? "";
-  const [folder, setFolder] = useState("");
+  const [choice, setChoice] = useState<HomeToAdd>(NO_HOME_CHOSEN);
+  const [checked, setChecked] = useState<HomeChecked | null>(null);
   const { error, busy, add } = useAdd(onAdd, onClose);
+  const asked = homeToCheck(choice);
+  const { agent, folder } = asked ?? NO_HOME_CHOSEN;
+  // A folder that cannot be checked, such as one that does not exist yet, is
+  // left to Add, which says why it refuses it.
+  useEffect(() => {
+    if (agent === "" || folder === "") return;
+    let current = true;
+    const timer = setTimeout(() => {
+      void call(() => commands.checkHome(folder, agent)).then((result) => {
+        if (current && result.status === "ok") setChecked({ checked: { agent, folder }, check: result.data });
+      });
+    }, CHECK_DELAY_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [agent, folder]);
+  const offer = addHomeOffer(choice, checked, busy);
   return (
     <AddDialog
-      title="Add Agent home"
+      title={ADDS.homes}
       sub="A folder an Agent reads its user configuration from, such as another CODEX_HOME."
       error={error}
-      busy={busy || folder.trim() === "" || agent === ""}
-      onAdd={() => void add({ kind: "add_home", folder: folder.trim(), agent })}
+      warning={offer.warning}
+      busy={!offer.addable}
+      onAdd={() => {
+        if (asked) void add({ kind: "add_home", ...asked });
+      }}
       onClose={onClose}
     >
       <div className="add-field">
-        <select className="add-input" aria-label="Agent" value={agent} onChange={(event) => setAgent(event.target.value)}>
+        <select
+          className="add-input"
+          aria-label="Agent"
+          value={choice.agent}
+          onChange={(event) => setChoice({ ...choice, agent: event.target.value })}
+        >
+          <option value="" disabled>
+            Choose an Agent…
+          </option>
           {agents.map((each) => (
             <option key={each.id} value={each.id}>
               {each.name}
             </option>
           ))}
         </select>
-        <input className="add-input mono" aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)} />
-        <button type="button" className="cta small secondary" onClick={() => void pick("folder", setFolder, notify)}>
+        <input
+          className="add-input mono"
+          aria-label="Folder"
+          value={choice.folder}
+          onChange={(event) => setChoice({ ...choice, folder: event.target.value })}
+        />
+        <button
+          type="button"
+          className="cta small secondary"
+          onClick={() => void pick("folder", (picked) => setChoice((now) => ({ ...now, folder: picked })), notify)}
+        >
           Choose…
         </button>
       </div>
       <p className="side-note">
-        Any existing folder is accepted. config-digger reads it with the definition of the Agent you pick; if none of the
-        files that definition expects are there, the home is listed with "No configuration found".
+        config-digger reads the folder with the definition of the Agent you choose. When none of the files that definition
+        reads in a home is there, it says so before you add it; an empty home can still be added.
       </p>
     </AddDialog>
   );

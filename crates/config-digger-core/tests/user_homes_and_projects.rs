@@ -110,6 +110,53 @@ fn an_added_home_without_the_expected_files_says_so() {
 }
 
 #[test]
+fn a_folder_is_checked_for_the_files_an_agent_reads_before_it_is_added() {
+    // A Codex home: only `config.toml`, none of Claude Code's files.
+    let fs = claude_code_home().with_file(Path::new(ALT).join("config.toml"), "");
+    let core = core(&fs);
+
+    let as_claude_code = core.check_home(Path::new(ALT), "Claude-Code").unwrap();
+    let as_codex = core.check_home(Path::new(ALT), "codex").unwrap();
+
+    assert_eq!(as_claude_code.agent, "claude-code");
+    assert_eq!(as_claude_code.agent_name, "Claude Code");
+    assert_eq!(as_claude_code.folder, PathBuf::from(ALT));
+    assert_eq!(
+        as_claude_code.looked_for,
+        [
+            ".claude.json",
+            r".claude\plugins",
+            r".claude\settings.json",
+            r".claude\skills"
+        ]
+    );
+    assert_eq!(
+        as_claude_code.no_configuration.as_deref(),
+        Some(
+            r"No configuration found for Claude Code in D:\alt-claude: none of .claude.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries."
+        )
+    );
+    assert_eq!(as_codex.no_configuration, None);
+    // Checking adds nothing.
+    assert_eq!(homes(&inventory(&core, true)).len(), 1);
+}
+
+#[test]
+fn a_folder_is_checked_only_when_it_exists_for_a_known_agent() {
+    let fs = claude_code_home().with_folder(ALT);
+    let core = core(&fs);
+
+    let missing = core
+        .check_home(Path::new(r"D:\nowhere"), "claude-code")
+        .unwrap_err();
+    let unknown = core.check_home(Path::new(ALT), "zed").unwrap_err();
+
+    assert_eq!(missing.code, ErrorCode::InvalidPath);
+    assert_eq!(missing.message, r"D:\nowhere is not an existing folder");
+    assert_eq!(unknown.code, ErrorCode::NoMatch);
+}
+
+#[test]
 fn a_home_is_added_only_at_an_existing_folder_for_a_known_agent() {
     let fs = claude_code_home().with_file(Path::new(ALT).join("notes.txt"), "x");
     let core = core(&fs);

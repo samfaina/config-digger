@@ -55,7 +55,12 @@ fn field_list<S: AsRef<str>>(fields: &[S]) -> String {
         .iter()
         .map(|field| format!("`{}`", field.as_ref()))
         .collect();
-    match fields.split_last() {
+    and_list(&fields)
+}
+
+/// `words` as a sentence lists them: separated by commas, the last by "and".
+fn and_list(words: &[String]) -> String {
+    match words.split_last() {
         None => String::new(),
         Some((last, [])) => last.clone(),
         Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
@@ -1476,6 +1481,22 @@ pub(crate) fn read_failure_target(path: &Path, failure: &str) -> String {
 /// An Agent home where none of the files the Agent reads exists.
 pub(crate) fn no_configuration(agent_name: &str) -> String {
     format!("No configuration found for {agent_name}")
+}
+
+/// Why an Agent home of `agent_name` at `folder` would be listed with no
+/// configuration: none of `looked_for`, the files and folders the Agent
+/// reads in a home, is there.
+pub(crate) fn no_configuration_in(
+    agent_name: &str,
+    folder: &Path,
+    looked_for: &[String],
+) -> String {
+    format!(
+        "{} in {}: none of {} is there. It can still be added, as a home with no Entries.",
+        no_configuration(agent_name),
+        folder.display(),
+        and_list(looked_for)
+    )
 }
 
 /// Why `path` cannot be added: it is not an existing folder, or

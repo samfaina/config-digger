@@ -131,6 +131,8 @@ export type HomeRow = {
   home: Home;
   /** Its id, which is its folder when the user added it. */
   label: string;
+  /** The name of the Agent that reads it. */
+  agent: string;
   path: string;
   tags: HomeTag[];
   /** What it is, when it is Mirrored, not read or without configuration, and other notes. */
@@ -199,6 +201,7 @@ function homeRow(home: Home): HomeRow {
   return {
     home,
     label: home.home,
+    agent: home.agent_name,
     path: home.folder,
     tags,
     notes,

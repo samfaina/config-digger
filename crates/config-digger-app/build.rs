@@ -15,6 +15,7 @@ fn main() {
         "dismiss_operation",
         "read_places",
         "change_list",
+        "check_home",
         "pick_location",
         "read_settings",
         "save_settings",

@@ -67,6 +67,11 @@ export const commands = {
 	 *  configuration.
 	 */
 	changeList: (change: ListChange) => typedError<ListChanged, Error>(__TAURI_INVOKE("change_list", { change })),
+	/**
+	 *  Checks `folder` as an Agent home of `agent` before it is added: whether
+	 *  any of the files the Agent reads in a home is there. It changes nothing.
+	 */
+	checkHome: (folder: string, agent: string) => typedError<HomeCheck, Error>(__TAURI_INVOKE("check_home", { folder, agent })),
 	/**  Opens the Windows picker over the window, `None` when it is cancelled. */
 	pickLocation: (pick: Pick) => typedError<string | null, Error>(__TAURI_INVOKE("pick_location", { pick })),
 	/**
@@ -839,6 +844,24 @@ export type Home = {
 	 *  blocks a write.
 	 */
 	notes: AgentNote[],
+};
+
+/**  A folder checked as an Agent home of one Agent, before it is added. */
+export type HomeCheck = {
+	agent: string,
+	agent_name: string,
+	/**  The folder's real path. */
+	folder: string,
+	/**
+	 *  Each file and folder the Agent reads in a home, other than those
+	 *  other Agents read too, relative to the folder, in path order.
+	 */
+	looked_for: string[],
+	/**
+	 *  When none of `looked_for` is there, the sentence saying so, rendered
+	 *  by the core. The folder can still be added.
+	 */
+	no_configuration: string | null,
 };
 
 /**  Where an Agent home came from. */

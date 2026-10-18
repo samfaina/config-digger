@@ -167,6 +167,21 @@ fn existing(fs: &dyn FileSystem, path: &Path, workspace: bool) -> Result<PathBuf
     }
 }
 
+/// The definition of the Agent `agent`, in any case, and the real path of
+/// `folder`, which must be an existing folder, to add as its home.
+pub(crate) fn home_to_add<'a>(
+    definitions: &'a [AgentDefinition],
+    ports: &Ports,
+    folder: &Path,
+    agent: &str,
+) -> Result<(&'a AgentDefinition, PathBuf), Error> {
+    let definition = definitions
+        .iter()
+        .find(|definition| definition.agent.id.eq_ignore_ascii_case(agent))
+        .ok_or_else(|| Error::no_agent(agent))?;
+    Ok((definition, existing(ports.fs.as_ref(), folder, false)?))
+}
+
 /// Adds the folder `folder` as an Agent home of the Agent `agent`, once.
 /// Returns the Agent's id and the folder's real path.
 pub(crate) fn add_home(
@@ -175,12 +190,8 @@ pub(crate) fn add_home(
     folder: &Path,
     agent: &str,
 ) -> Result<(String, PathBuf), Error> {
-    let agent = definitions
-        .iter()
-        .find(|definition| definition.agent.id.eq_ignore_ascii_case(agent))
-        .map(|definition| definition.agent.id.clone())
-        .ok_or_else(|| Error::no_agent(agent))?;
-    let folder = existing(ports.fs.as_ref(), folder, false)?;
+    let (definition, folder) = home_to_add(definitions, ports, folder, agent)?;
+    let agent = definition.agent.id.clone();
     let added = AddedHome {
         agent: agent.clone(),
         folder: folder.clone(),

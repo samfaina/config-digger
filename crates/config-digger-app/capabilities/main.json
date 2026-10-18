@@ -17,6 +17,7 @@
     "allow-dismiss-operation",
     "allow-read-places",
     "allow-change-list",
+    "allow-check-home",
     "allow-pick-location",
     "allow-read-settings",
     "allow-save-settings",

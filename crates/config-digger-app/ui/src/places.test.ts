@@ -277,6 +277,19 @@ describe("the Agent homes tab", () => {
     });
     expect(group.homes[1].actions).toEqual(["unhide", "remove_from_list"]);
   });
+
+  test("names the Agent that reads each home on its row", () => {
+    const groups = homeGroups(
+      places({
+        agents: [
+          agent({ homes: [home({ home: "E:\\cd-throwaway\\codex-home", folder: "E:\\cd-throwaway\\codex-home", source: { kind: "added" } })] }),
+          agent({ id: "codex", name: "Codex", homes: [home({ agent: "codex", agent_name: "Codex" })] }),
+        ],
+      }),
+    );
+
+    expect(groups.map((group) => group.homes[0].agent)).toEqual(["Claude Code", "Codex"]);
+  });
 });
 
 describe("what the Inventory opens on", () => {
