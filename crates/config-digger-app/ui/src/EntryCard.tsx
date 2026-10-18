@@ -4,6 +4,7 @@ import { Icon } from "./icons";
 import { LinkTag, Location } from "./Location";
 import { StatePill } from "./StatePill";
 import { entryActions } from "./view";
+import { Tooltip } from "./Tooltip";
 
 type Props = {
   entry: Entry;
@@ -46,9 +47,9 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
         {entry.git_versioned && <span className="tag git">git-versioned</span>}
         {entry.link && <LinkTag link={entry.link} withTarget />}
         {entry.parked && (
-          <span className="tag" title={`Parked ${entry.parked.parked_at}`}>
-            parked from {entry.parked.locator}
-          </span>
+          <Tooltip text={`Parked ${entry.parked.parked_at}`}>
+            <span className="tag">parked from {entry.parked.locator}</span>
+          </Tooltip>
         )}
       </div>
 
@@ -56,15 +57,16 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
 
       <div className="config">
         <pre className="mono">{config}</pre>
-        <button
-          type="button"
-          className="icon-button"
-          title="Copy the configuration, with every Secret masked"
-          aria-label="Copy the configuration"
-          onClick={() => void copy(config, "configuration, with every Secret masked", notify)}
-        >
-          <Icon name="copy" small />
-        </button>
+        <Tooltip text="Copy the configuration, with every Secret masked">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Copy the configuration"
+            onClick={() => void copy(config, "configuration, with every Secret masked", notify)}
+          >
+            <Icon name="copy" small />
+          </button>
+        </Tooltip>
       </div>
 
       <ul className="sentences">
@@ -72,9 +74,9 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
           <li className="reason">
             {entry.reason.sentence} {showWinnerButton(entry.reason.effective)}
             {entry.reason.switch && (
-              <span className="pointer mono" title="The switch behind it">
-                {entry.reason.switch}
-              </span>
+              <Tooltip text="The switch behind it">
+                <span className="pointer mono">{entry.reason.switch}</span>
+              </Tooltip>
             )}
           </li>
         )}
@@ -104,18 +106,13 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
         <div className="also">
           <span className="dim">Also read by</span>
           {entry.also_read_by.map((reader) => (
-            <button
-              type="button"
-              key={`${reader.agent}|${reader.home}`}
-              className="reader"
-              title={reader.sentence}
-              disabled={onReader === null}
-              onClick={() => onReader?.(reader)}
-            >
-              {reader.agent_name}
-              {reader.home !== "default" && <span className="dim"> ({reader.home})</span>}
-              <StatePill state={reader.state} small />
-            </button>
+            <Tooltip key={`${reader.agent}|${reader.home}`} text={reader.sentence}>
+              <button type="button" className="reader" disabled={onReader === null} onClick={() => onReader?.(reader)}>
+                {reader.agent_name}
+                {reader.home !== "default" && <span className="dim"> ({reader.home})</span>}
+                <StatePill state={reader.state} small />
+              </button>
+            </Tooltip>
           ))}
         </div>
       )}
@@ -136,27 +133,24 @@ function EntryActionRow({
     <div className="entry-actions">
       <div className="row-buttons">
         {primary && (
+          <Tooltip text={primary.offered ? undefined : primary.note}>
+            <button type="button" className="cta" disabled={!primary.offered} onClick={() => onAction(primary.verb, entry)}>
+              <Icon name={primary.verb === "disable" ? "pause" : "play"} small />
+              {primary.verb === "disable" ? "Disable" : "Enable"}
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip text={remove.offered ? undefined : remove.note}>
           <button
             type="button"
-            className="cta"
-            disabled={!primary.offered}
-            title={primary.offered ? undefined : primary.note}
-            onClick={() => onAction(primary.verb, entry)}
+            className={`cta ${remove.danger ? "danger" : "secondary"}`}
+            disabled={!remove.offered}
+            onClick={() => onAction("remove", entry)}
           >
-            <Icon name={primary.verb === "disable" ? "pause" : "play"} small />
-            {primary.verb === "disable" ? "Disable" : "Enable"}
+            <Icon name="trash" small />
+            Remove
           </button>
-        )}
-        <button
-          type="button"
-          className={`cta ${remove.danger ? "danger" : "secondary"}`}
-          disabled={!remove.offered}
-          title={remove.offered ? undefined : remove.note}
-          onClick={() => onAction("remove", entry)}
-        >
-          <Icon name="trash" small />
-          Remove
-        </button>
+        </Tooltip>
       </div>
       {primary && <p className="action-note">{primary.note}</p>}
       <p className="action-note">{remove.note}</p>
@@ -166,15 +160,16 @@ function EntryActionRow({
           <p className="action-note">{howToRemove.sentence}</p>
           <div className="command">
             <code className="mono">{howToRemove.command}</code>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Copy the command"
-              title="Copy the command"
-              onClick={() => void copy(howToRemove.command, "command", notify)}
-            >
-              <Icon name="copy" small />
-            </button>
+            <Tooltip text="Copy the command">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Copy the command"
+                onClick={() => void copy(howToRemove.command, "command", notify)}
+              >
+                <Icon name="copy" small />
+              </button>
+            </Tooltip>
           </div>
         </div>
       )}

@@ -720,6 +720,24 @@ p {
   text-transform: uppercase;
 }
 
+/* The app's tooltip, where a title would show the system's. Lines in its text break. */
+.tooltip {
+  position: fixed;
+  z-index: 80;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tile);
+  box-shadow: 0 8px 24px #00000066;
+  color: var(--white);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

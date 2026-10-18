@@ -41,6 +41,7 @@ import {
   type ItemFilter,
   type Selection,
 } from "./view";
+import { Tooltip } from "./Tooltip";
 
 /** What the detail panel shows: an Item's Entries, or the Read failures in the context. */
 type Detail = { kind: "item"; key: string } | { kind: "failures" } | null;
@@ -210,10 +211,12 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
               </div>
             )}
             {flags.map((flag) => (
-              <div key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} className="alert" role="status" title={flag.path}>
-                <Icon name="flag" small />
-                {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
-              </div>
+              <Tooltip key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} text={flag.path}>
+                <div className="alert" role="status">
+                  <Icon name="flag" small />
+                  {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
+                </div>
+              </Tooltip>
             ))}
             {notShown.map((leftovers) => (
               <div key={`${leftovers.agent}|${leftovers.home}`} className="alert" role="status">
@@ -287,10 +290,12 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
 function FailureBadge({ count, where }: { count: number; where: string }) {
   if (count === 0) return null;
   return (
-    <span className="badge" title={`${couldNotBeRead(count)} in ${where}`}>
-      <Icon name="flag" small />
-      {count}
-    </span>
+    <Tooltip text={`${couldNotBeRead(count)} in ${where}`}>
+      <span className="badge">
+        <Icon name="flag" small />
+        {count}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -343,10 +348,12 @@ function Banner({ inventory, project, agentName, stats, reading, refresh, select
       </div>
       <div>
         <div className="caption">Inventory read</div>
-        <div className="banner-value" title={inventory?.read_at}>
-          {inventory ? readTime(inventory.read_at) : "—"}
-          <span className="caption"> · on focus</span>
-        </div>
+        <Tooltip text={inventory?.read_at}>
+          <div className="banner-value">
+            {inventory ? readTime(inventory.read_at) : "—"}
+            <span className="caption"> · on focus</span>
+          </div>
+        </Tooltip>
       </div>
       <span className="grow" />
       <button type="button" className="cta secondary" onClick={refresh} disabled={reading}>
@@ -400,9 +407,11 @@ function AgentsPane({ inventory, selection, onAgent }: AgentsPaneProps) {
           {agent === "all" && <Icon name="users" small />}
           {name}
           {flagged.length > 0 && (
-            <span className="warn" title={flagged.map((flag) => `${flag.agent_name}: ${flag.sentence}`).join("\n")}>
-              <Icon name="flag" small />
-            </span>
+            <Tooltip text={flagged.map((flag) => `${flag.agent_name}: ${flag.sentence}`).join("\n")}>
+              <span className="warn">
+                <Icon name="flag" small />
+              </span>
+            </Tooltip>
           )}
         </span>
         <span className="agent-counts">
@@ -475,15 +484,15 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   // Another tool copies a Mirrored home, so config-digger only reads it.
   const mirrored = (home: Home) =>
     home.mirror && (
-      <span className="tag" title={home.mirror.sentence}>
-        {home.mirror.label}
-      </span>
+      <Tooltip text={home.mirror.sentence}>
+        <span className="tag">{home.mirror.label}</span>
+      </Tooltip>
     );
   const notRead = (home: Home) =>
     home.not_read && (
-      <span className="tag" title={home.not_read.sentence}>
-        not read
-      </span>
+      <Tooltip text={home.not_read.sentence}>
+        <span className="tag">not read</span>
+      </Tooltip>
     );
 
   let body;
@@ -507,14 +516,14 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               className="home-select"
               label={`${agentName} home`}
               value={chosen.home}
-              title={chosen.folder}
+              tooltip={chosen.folder}
               options={own.map((home) => ({ value: home.home, label: homeLabel(home, failuresOf(home)) }))}
               onChange={(home) => onHome(agent, home)}
             />
           ) : (
-            <span className="dim" title={chosen.folder}>
-              {chosen.home}
-            </span>
+            <Tooltip text={chosen.folder}>
+              <span className="dim">{chosen.home}</span>
+            </Tooltip>
           )}
         </div>
       );
@@ -526,20 +535,20 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       .map((home) => {
         const selected = selection.homes[agent] === home.home;
         return (
-          <button
-            type="button"
-            key={home.home}
-            className={`tile home-tile${selected ? " selected" : ""}`}
-            aria-pressed={selected}
-            title={home.no_configuration ?? home.folder}
-            onClick={() => onHome(agent, home.home)}
-          >
-            <span className="home-name">{home.home}</span>
-            <span className="grow" />
-            {mirrored(home)}
-            {notRead(home)}
-            <FailureBadge count={failuresOf(home)} where="this home" />
-          </button>
+          <Tooltip key={home.home} text={home.no_configuration ?? home.folder}>
+            <button
+              type="button"
+              className={`tile home-tile${selected ? " selected" : ""}`}
+              aria-pressed={selected}
+              onClick={() => onHome(agent, home.home)}
+            >
+              <span className="home-name">{home.home}</span>
+              <span className="grow" />
+              {mirrored(home)}
+              {notRead(home)}
+              <FailureBadge count={failuresOf(home)} where="this home" />
+            </button>
+          </Tooltip>
         );
       });
   }
@@ -582,9 +591,11 @@ function ItemList({ inventory, items, agent, flags, selected, onSelect }: ItemLi
             <div className="group">
               {group.title}
               {flagged.length > 0 && (
-                <span className="warn" title={flagged.map((flag) => flag.sentence).join("\n")}>
-                  <Icon name="flag" small />
-                </span>
+                <Tooltip text={flagged.map((flag) => flag.sentence).join("\n")}>
+                  <span className="warn">
+                    <Icon name="flag" small />
+                  </span>
+                </Tooltip>
               )}
               <span className="line" />
               {group.items.length}
@@ -615,9 +626,11 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
       </span>
       <span className="item-text">
         <span className="item-name">{item.name}</span>
-        <span className="item-location" title={effective.locator}>
-          {effective.scope} · {effective.locator}
-        </span>
+        <Tooltip text={effective.locator}>
+          <span className="item-location">
+            {effective.scope} · {effective.locator}
+          </span>
+        </Tooltip>
       </span>
       {effective.git_versioned && <span className="tag">git-versioned</span>}
       {effective.link && <LinkTag link={effective.link} />}

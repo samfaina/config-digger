@@ -13,6 +13,7 @@ import {
   type Reaction,
 } from "./dropdown";
 import { Icon } from "./icons";
+import { Tooltip } from "./Tooltip";
 
 type SelectProps = {
   value: string;
@@ -20,7 +21,8 @@ type SelectProps = {
   onChange: (value: string) => void;
   /** The accessible name, when no visible label names the field. */
   label?: string;
-  title?: string;
+  /** Shown on the field in a Tooltip. */
+  tooltip?: string;
   className?: string;
 };
 
@@ -40,7 +42,7 @@ function groupRuns(options: DropdownOption[]): { group?: string; items: { option
  * look, where a native `<select>` would show the system's list. The field
  * keeps the focus while the panel is open, so Escape leaves it there.
  */
-export function Select({ value, options, onChange, label, title, className }: SelectProps) {
+export function Select({ value, options, onChange, label, tooltip, className }: SelectProps) {
   const id = useId();
   const [state, setState] = useState<DropdownState>(CLOSED);
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -98,33 +100,35 @@ export function Select({ value, options, onChange, label, title, className }: Se
 
   return (
     <>
-      <div
-        ref={field}
-        className={`select-field${className ? ` ${className}` : ""}${state.open ? " open" : ""}`}
-        role="combobox"
-        tabIndex={0}
-        aria-label={label}
-        aria-haspopup="listbox"
-        aria-expanded={state.open}
-        aria-controls={state.open ? `${id}-list` : undefined}
-        aria-activedescendant={state.open && state.active >= 0 ? optionId(state.active) : undefined}
-        title={title}
-        onClick={() => setState(onFieldClick(state, options, value))}
-        onKeyDown={(event) => {
-          if (event.ctrlKey || event.metaKey) return;
-          const reaction = onKey(state, options, value, { key: event.key, altKey: event.altKey }, event.timeStamp);
-          if (reaction.handled) {
-            // An Escape that closes the panel is not one for a dialog around it.
-            event.preventDefault();
-            event.stopPropagation();
-          }
-          apply(reaction);
-        }}
-        onBlur={close}
-      >
-        <span className="select-value">{chosen?.label ?? ""}</span>
-        <Icon name="chevron" small />
-      </div>
+      {/* None while the panel is open, which it would cover. */}
+      <Tooltip text={state.open ? undefined : tooltip}>
+        <div
+          ref={field}
+          className={`select-field${className ? ` ${className}` : ""}${state.open ? " open" : ""}`}
+          role="combobox"
+          tabIndex={0}
+          aria-label={label}
+          aria-haspopup="listbox"
+          aria-expanded={state.open}
+          aria-controls={state.open ? `${id}-list` : undefined}
+          aria-activedescendant={state.open && state.active >= 0 ? optionId(state.active) : undefined}
+          onClick={() => setState(onFieldClick(state, options, value))}
+          onKeyDown={(event) => {
+            if (event.ctrlKey || event.metaKey) return;
+            const reaction = onKey(state, options, value, { key: event.key, altKey: event.altKey }, event.timeStamp);
+            if (reaction.handled) {
+              // An Escape that closes the panel is not one for a dialog around it.
+              event.preventDefault();
+              event.stopPropagation();
+            }
+            apply(reaction);
+          }}
+          onBlur={close}
+        >
+          <span className="select-value">{chosen?.label ?? ""}</span>
+          <Icon name="chevron" small />
+        </div>
+      </Tooltip>
       {state.open &&
         createPortal(
           <div

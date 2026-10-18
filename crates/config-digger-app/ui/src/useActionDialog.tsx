@@ -4,6 +4,7 @@ import type { ActionRequest } from "./bindings";
 import type { Notify } from "./desktop";
 import type { UndoRefusal } from "./history";
 import { useTransient } from "./useTransient";
+import { Tooltip } from "./Tooltip";
 
 /** How long the Undo snackbar stays after an Operation. */
 const SNACKBAR_MS = 10_000;
@@ -42,9 +43,11 @@ export function useActionDialog({ onClosed, onOpenHistory, notify, onRefused }: 
           <button type="button" className="snackbar-action" onClick={() => open({ kind: "undo", operation: snackbar.operation })}>
             Undo
           </button>
-          <button type="button" className="icon-button" aria-label="Dismiss" title="Dismiss" onClick={() => setSnackbar(null)}>
-            ✕
-          </button>
+          <Tooltip text="Dismiss">
+            <button type="button" className="icon-button" aria-label="Dismiss" onClick={() => setSnackbar(null)}>
+              ✕
+            </button>
+          </Tooltip>
         </div>
       )}
 
