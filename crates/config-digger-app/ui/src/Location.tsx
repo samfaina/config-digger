@@ -1,14 +1,15 @@
 import type { Link } from "./bindings";
 import { copy, openLocation, type Notify } from "./desktop";
 import { Icon } from "./icons";
+import { Tooltip } from "./Tooltip";
 
 /** The tag of a Linked Entry, as the CLI tags it, with where it points. */
 export function LinkTag({ link, withTarget = false }: { link: Link; withTarget?: boolean }) {
   const label = link.broken ? "junction, broken" : "junction";
   return (
-    <span className="tag junction" title={link.target}>
-      {withTarget ? `${label} → ${link.target}` : label}
-    </span>
+    <Tooltip text={link.target}>
+      <span className="tag junction">{withTarget ? `${label} → ${link.target}` : label}</span>
+    </Tooltip>
   );
 }
 

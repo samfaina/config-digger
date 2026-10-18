@@ -17,6 +17,7 @@ import { Icon } from "./icons";
 import { useActionDialog } from "./useActionDialog";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
+import { Tooltip } from "./Tooltip";
 
 /** The History · Undo screen: every Operation, newest first, and the detail of the one selected. */
 export function HistoryScreen() {
@@ -257,10 +258,12 @@ function OperationPane({ summary, detail, detailError, time, refusal, onUndo, on
 function UndoButton({ undo, onUndo }: { undo: UndoAction; onUndo: () => void }) {
   if (!undo.offered) {
     return (
-      <span className="not-undoable" title={undo.why} tabIndex={0} aria-label={`Can't undo: ${undo.why}`}>
-        <Icon name="info" small />
-        Can't undo
-      </span>
+      <Tooltip text={undo.why}>
+        <span className="not-undoable" tabIndex={0} aria-label={`Can't undo: ${undo.why}`}>
+          <Icon name="info" small />
+          Can't undo
+        </span>
+      </Tooltip>
     );
   }
   return (

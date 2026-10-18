@@ -1,4 +1,5 @@
 import { Icon, type IconName } from "./icons";
+import { Tooltip } from "./Tooltip";
 
 export type Screen = "inventory" | "history" | "settings" | "projects" | "about";
 
@@ -15,16 +16,17 @@ type Props = { current: Screen; onSelect: (screen: Screen) => void };
 /** The navigation rail: logo, Projects & homes, the main screens in one pill, About at the bottom. */
 export function Rail({ current, onSelect }: Props) {
   const button = (screen: Screen, icon: IconName) => (
-    <button
-      type="button"
-      className={`rail-button${current === screen ? " selected" : ""}`}
-      title={SCREEN_TITLES[screen]}
-      aria-label={SCREEN_TITLES[screen]}
-      aria-current={current === screen ? "page" : undefined}
-      onClick={() => onSelect(screen)}
-    >
-      <Icon name={icon} />
-    </button>
+    <Tooltip text={SCREEN_TITLES[screen]}>
+      <button
+        type="button"
+        className={`rail-button${current === screen ? " selected" : ""}`}
+        aria-label={SCREEN_TITLES[screen]}
+        aria-current={current === screen ? "page" : undefined}
+        onClick={() => onSelect(screen)}
+      >
+        <Icon name={icon} />
+      </button>
+    </Tooltip>
   );
   return (
     <nav className="rail">

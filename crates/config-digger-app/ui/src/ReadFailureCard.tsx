@@ -3,6 +3,7 @@ import { commands, type Backup, type ReadFailure, type ReadFailureKind } from ".
 import { revealLocation, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import { Location } from "./Location";
+import { Tooltip } from "./Tooltip";
 
 const KIND_LABELS: Record<ReadFailureKind, string> = {
   parse: "Parse error",
@@ -45,16 +46,12 @@ export function ReadFailureCard({ failure, notify }: { failure: ReadFailure; not
         <div className="backups">
           <div className="caption">Backups in History</div>
           {backups.map((backup) => (
-            <button
-              type="button"
-              key={backup.copy}
-              className="chip-button"
-              title={backup.copy}
-              onClick={() => void revealLocation(backup.copy, notify)}
-            >
-              <Icon name="history" small />
-              {new Date(backup.created_at).toLocaleString()} · {backup.title}
-            </button>
+            <Tooltip key={backup.copy} text={backup.copy}>
+              <button type="button" className="chip-button" onClick={() => void revealLocation(backup.copy, notify)}>
+                <Icon name="history" small />
+                {new Date(backup.created_at).toLocaleString()} · {backup.title}
+              </button>
+            </Tooltip>
           ))}
         </div>
       )}

@@ -25,6 +25,7 @@ import {
 import { undoRefusal, type UndoRefusal } from "./history";
 import { Icon } from "./icons";
 import { StatePill } from "./StatePill";
+import { Tooltip } from "./Tooltip";
 
 /** Where the dialog is: planning, previewing, applying, or done applying. */
 type Phase =
@@ -338,10 +339,12 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
             );
           })}
           {preview.info.map((info, index) => (
-            <div key={`info-${index}`} className="check info" title={info.path}>
-              <Icon name="info" small />
-              <div>{info.sentence}</div>
-            </div>
+            <Tooltip key={`info-${index}`} text={info.path}>
+              <div className="check info">
+                <Icon name="info" small />
+                <div>{info.sentence}</div>
+              </div>
+            </Tooltip>
           ))}
         </DialogSection>
       )}
