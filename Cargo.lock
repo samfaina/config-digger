@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-app"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "config-digger-core",
  "rfd",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-cli"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "anstream",
  "anstyle",
@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-core"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "humantime",
  "jsonc-parser",
@@ -5450,7 +5450,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "config-digger-core",
  "serde_json",
