@@ -431,7 +431,7 @@ function AgentsPane({ inventory, selection, onAgent }: AgentsPaneProps) {
 }
 
 /** One bar per State; clicking one filters the Items list by it. */
-function StateBars({ items, state, onState }: { items: Item[]; state: State | null; onState: (state: State | null) => void }) {
+export function StateBars({ items, state, onState }: { items: Item[]; state: State | null; onState: (state: State | null) => void }) {
   const { total, counts } = stateCounts(items);
   return (
     <section className="panel">
@@ -450,7 +450,7 @@ function StateBars({ items, state, onState }: { items: Item[]; state: State | nu
           <button
             type="button"
             key={barState}
-            className={`bar state-${barState}${state === barState ? " on" : ""}`}
+            className={`bar state-${barState}${state === barState ? " selected" : ""}`}
             aria-pressed={state === barState}
             onClick={() => onState(state === barState ? null : barState)}
           >

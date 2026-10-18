@@ -321,6 +321,27 @@
           "covers": ["#184"]
         }
       ]
+    },
+    {
+      "id": "6",
+      "title": "Filtros del Inventario",
+      "steps": [
+        {
+          "id": "6.1",
+          "title": "Una fila de Entries by State elegida",
+          "goal": "Una fila elegida de Entries by State se ve tan elegida como una tarjeta de Agent, y distinta de una fila bajo el ratón.",
+          "instructions": [
+            "Con el home de Claude Code de prueba elegido en el Inventario (paso 1.2), mira la tarjeta All Agents del panel Agents.",
+            "En el panel Entries by State, deja el ratón sobre la primera fila, sin pulsar.",
+            "Pulsa esa fila.",
+            "Aparta el ratón del panel.",
+            "Pulsa clear, arriba a la derecha del panel."
+          ],
+          "commands": [],
+          "expect": "Bajo el ratón, la fila solo toma un fondo gris un poco más claro. Al pulsarla toma el mismo degradado lila con halo que la tarjeta All Agents, y lo conserva al apartar el ratón. Su carril se oscurece y la barra de color y la cuenta se leen bien sobre el degradado. La lista de Items solo muestra los de ese State. Con clear, la fila vuelve a no tener fondo y la lista muestra otra vez todos los Items.",
+          "covers": ["#185"]
+        }
+      ]
     }
   ]
 }

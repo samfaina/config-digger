@@ -172,3 +172,36 @@ describe("a notice", () => {
     }
   });
 });
+
+/** The declarations that reach `selector`, from every rule outside an at-rule that lists it, later rules winning. */
+const styled = (selector: string) =>
+  new Map(
+    allRules
+      .filter((found) => found.at.length === 0 && found.selector.split(",").some((listed) => listed.trim() === selector))
+      .flatMap((found) => [...found.declarations]),
+  );
+
+describe("a selected filter row of Entries by State", () => {
+  test("is drawn as a selected Agent tile is, with its gradient and its glow", () => {
+    const tile = styled(".tile.selected");
+    expect(tile.get("background")).toMatch(/gradient/);
+    expect(tile.get("box-shadow")).toBeDefined();
+    for (const name of ["background", "box-shadow"]) expect(styled(".bar.selected").get(name), name).toBe(tile.get(name));
+  });
+
+  test("looks different from a hovered row", () => {
+    const hovered = styled(".bar:hover:not(.selected)");
+    expect(hovered.get("background")).toBeDefined();
+    expect(hovered.get("background")).not.toBe(styled(".bar.selected").get("background"));
+    const hovers = allRules.flatMap((found) => found.selector.split(",")).filter((selector) => selector.includes(".bar:hover"));
+    for (const selector of hovers) expect(selector, "a hover rule that reaches a selected row too").toContain(":not(.selected)");
+  });
+
+  test("keeps its track in sight on the gradient, darker than on an unselected row", () => {
+    const track = styled(".bar-track").get("background");
+    const selected = styled(".bar.selected .bar-track").get("background");
+    expect(track).toMatch(/^#ffffff[0-9a-f]{2}$/i);
+    // A black tint, as a white one fades into the gradient.
+    expect(selected).toMatch(/^#000000[0-9a-f]{2}$/i);
+  });
+});
