@@ -1028,8 +1028,8 @@ fn with_three_gemini_projects() -> Harness {
         )
 }
 
-/// The rows of the changes table for the Entry at `locator`.
-fn change_rows<'a>(stdout: &'a str, locator: &str) -> Vec<&'a str> {
+/// The rows of the changes table for Gemini CLI's Entry at `locator`.
+fn gemini_change_rows<'a>(stdout: &'a str, locator: &str) -> Vec<&'a str> {
     stdout
         .lines()
         .filter(|line| line.contains("Gemini CLI") && line.ends_with(locator))
@@ -1037,7 +1037,8 @@ fn change_rows<'a>(stdout: &'a str, locator: &str) -> Vec<&'a str> {
 }
 
 #[test]
-fn the_preview_prints_an_entry_with_the_same_effect_everywhere_once_with_its_contexts() {
+fn the_preview_prints_an_entry_whose_state_changes_the_same_way_everywhere_once_with_its_contexts()
+{
     let harness = with_three_gemini_projects();
     let notes = locator(
         &harness.path(".gemini").join("settings.json"),
@@ -1047,7 +1048,7 @@ fn the_preview_prints_an_entry_with_the_same_effect_everywhere_once_with_its_con
     let run = harness.run(&["disable", "notes", "--no-project", "--dry-run"]);
 
     assert_eq!(run.code, 0, "{}", run.stderr);
-    let rows: Vec<Vec<&str>> = change_rows(&run.stdout, &notes)
+    let rows: Vec<Vec<&str>> = gemini_change_rows(&run.stdout, &notes)
         .iter()
         .map(|row| row.split_whitespace().skip(2).take(5).collect())
         .collect();
@@ -1060,7 +1061,7 @@ fn the_preview_prints_an_entry_with_the_same_effect_everywhere_once_with_its_con
 }
 
 #[test]
-fn the_preview_prints_an_entry_whose_effect_differs_once_per_context_naming_the_project() {
+fn the_preview_prints_an_entry_whose_state_change_differs_once_per_context_naming_the_project() {
     let harness = with_three_gemini_projects();
     let linear = locator(
         &harness.path(".gemini").join("settings.json"),
@@ -1076,12 +1077,7 @@ fn the_preview_prints_an_entry_whose_effect_differs_once_per_context_naming_the_
         "wide-reach",
         "--yes",
     ]);
-    assert_eq!(
-        run.code, 0,
-        "{}
-{}",
-        run.stdout, run.stderr
-    );
+    assert_eq!(run.code, 0, "{}\n{}", run.stdout, run.stderr);
     let operation = harness.run(&["history", "--json"]).document()["operations"][0]["id"]
         .as_str()
         .unwrap()
@@ -1090,7 +1086,7 @@ fn the_preview_prints_an_entry_whose_effect_differs_once_per_context_naming_the_
 
     assert_eq!(history.code, 0, "{}", history.stderr);
     for stdout in [&run.stdout, &history.stdout] {
-        let rows: Vec<Vec<&str>> = change_rows(stdout, &linear)
+        let rows: Vec<Vec<&str>> = gemini_change_rows(stdout, &linear)
             .iter()
             .map(|row| row.split_whitespace().skip(2).take(4).collect())
             .collect();
@@ -1108,7 +1104,7 @@ fn the_preview_prints_an_entry_whose_effect_differs_once_per_context_naming_the_
 }
 
 #[test]
-fn the_preview_elides_each_project_to_keep_the_entry_s_key_in_the_terminal_width() {
+fn the_preview_elides_each_project_so_the_entry_key_fits_the_terminal_width() {
     let harness = with_three_gemini_projects();
 
     let run = harness.run_with_env(
@@ -1129,7 +1125,8 @@ fn the_preview_elides_each_project_to_keep_the_entry_s_key_in_the_terminal_width
     }
     // The end of a Project's folder tells the rows apart, so it survives the cut.
     assert!(run.stdout.contains('…'), "{}", run.stdout);
-    assert!(run.stdout.contains(r"\gamma  "), "{}", run.stdout);
+    let gamma = format!("{}gamma  ", std::path::MAIN_SEPARATOR);
+    assert!(run.stdout.contains(&gamma), "{}", run.stdout);
 }
 
 #[test]

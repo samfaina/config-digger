@@ -1859,7 +1859,7 @@ fn clap_message(error: &clap::Error) -> String {
 /// reaches is one row, saying in how many; otherwise it is one row per
 /// context, naming its Project.
 fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
-    let header = [
+    let state_header = [
         ("AGENT", DIM),
         ("ITEM", DIM),
         ("BEFORE", DIM),
@@ -1872,7 +1872,7 @@ fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
         .collect();
     // The Project and the Entry share the room the other columns leave, the
     // Project's middle elided to half of it.
-    let project_width = last_column_width(&column_widths(&header, &states), width)
+    let project_width = last_column_width(&column_widths(&state_header, &states), width)
         .map(|room| room.saturating_sub(GAP.len()) / 2)
         .filter(|&project_width| project_width >= MIN_LOCATION_WIDTH);
     if let Some(project_width) = project_width {
@@ -1887,7 +1887,7 @@ fn render_changes(changes: &[api::Change], width: Option<usize>) -> String {
             [agent, item, before, after, (project.as_str(), Style::new())]
         })
         .collect();
-    let [agent, item, before, after] = header;
+    let [agent, item, before, after] = state_header;
     let header = [agent, item, before, after, ("PROJECT", DIM)];
     let widths = column_widths(&header, &rows);
     let location_width = last_column_width(&widths, width);
@@ -1926,29 +1926,29 @@ fn state_cells(change: &api::Change) -> [(&str, Style); 4] {
 /// number of contexts when they all go from the same State to the same State,
 /// else one row per context with its Project.
 fn change_rows(changes: &[api::Change]) -> Vec<(&api::Change, String)> {
-    let mut entries: Vec<Vec<&api::Change>> = Vec::new();
+    let mut by_entry: Vec<Vec<&api::Change>> = Vec::new();
     for change in changes {
-        let same_entry = |entry: &&mut Vec<&api::Change>| {
-            entry[0].agent == change.agent
-                && entry[0].home == change.home
-                && entry[0].locator == change.locator
+        let same_entry = |of_entry: &&mut Vec<&api::Change>| {
+            of_entry[0].agent == change.agent
+                && of_entry[0].home == change.home
+                && of_entry[0].locator == change.locator
         };
-        match entries.iter_mut().find(same_entry) {
-            Some(entry) => entry.push(change),
-            None => entries.push(vec![change]),
+        match by_entry.iter_mut().find(same_entry) {
+            Some(of_entry) => of_entry.push(change),
+            None => by_entry.push(vec![change]),
         }
     }
-    entries
+    by_entry
         .into_iter()
-        .flat_map(|entry| {
-            let first = entry[0];
-            let same_effect = entry
+        .flat_map(|of_entry| {
+            let first = of_entry[0];
+            let same_way = of_entry
                 .iter()
                 .all(|change| change.before == first.before && change.after == first.after);
-            if entry.len() > 1 && same_effect {
-                vec![(first, format!("{} contexts", entry.len()))]
+            if of_entry.len() > 1 && same_way {
+                vec![(first, format!("{} contexts", of_entry.len()))]
             } else {
-                entry
+                of_entry
                     .into_iter()
                     .map(|change| (change, project_label(change.project.as_deref())))
                     .collect()
