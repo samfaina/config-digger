@@ -247,14 +247,22 @@ describe("the result", () => {
       sentence: "Disabled notes for Claude Code.",
       hints: ["Restart Claude Code so that it reads what the Operation wrote."],
       undo: "20261001-143012-a3f",
+      note: "Operation 20261001-143012-a3f · backup kept",
       differences: [],
     });
   });
 
-  test("of a Delete backup offers no Undo, since its Operation can no longer be undone", () => {
-    const result = appliedResult(outcome({ sentence: "Deleted the backup of 20261001-143012-a3f." }), "delete_backup");
+  test("of a Delete backup names the Operation, says its backup was deleted, and offers no Undo, since it can no longer be undone", () => {
+    const result = appliedResult(
+      outcome({ sentence: "Deleted the backup of 20261001-143012-a3f. It can no longer be undone." }),
+      "delete_backup",
+    );
 
-    expect(result).toMatchObject({ kind: "applied", undo: null });
+    expect(result).toMatchObject({
+      kind: "applied",
+      undo: null,
+      note: "Operation 20261001-143012-a3f · backup deleted · can no longer be undone",
+    });
   });
 
   test("verified with differences marks Verify amber and lists Predicted against Actual", () => {

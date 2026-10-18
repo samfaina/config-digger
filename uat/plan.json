@@ -393,6 +393,31 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#188"]
+        },
+        {
+          "id": "7.3",
+          "title": "El resultado de Delete backup",
+          "goal": "Tras Delete backup, el resultado nombra la Operation, dice que su backup se borró y que ya no se puede deshacer, sin un id vacío.",
+          "instructions": [
+            "Con el home de Claude Code de prueba añadido (paso 1.2), elige ese home en el Inventario.",
+            "Elige el servidor cd-throwaway-user.",
+            "Pulsa Disable.",
+            "En el diálogo, pulsa Disable.",
+            "Apunta el id de la línea gris que empieza por «Operation».",
+            "Pulsa Done.",
+            "Ve a History y elige esa Operation.",
+            "Pulsa Delete backup.",
+            "En el diálogo, pulsa Delete backup.",
+            "Lee el resultado."
+          ],
+          "commands": [],
+          "expect": "Tras Disable, la línea gris dice «Operation <id> · backup kept». Tras Delete backup, el resultado dice «Deleted the backup of <id>. It can no longer be undone.» y, debajo, la línea gris «Operation <id> · backup deleted · can no longer be undone», con el mismo id apuntado. No sale «backup kept», ni «Operation  ·» sin id, ni botón Undo.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#189"]
         }
       ]
     }

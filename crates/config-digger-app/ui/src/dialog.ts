@@ -181,6 +181,8 @@ export type Result =
       hints: string[];
       /** The Operation to undo, `null` for a Delete backup, after which its Operation cannot be. */
       undo: string | null;
+      /** The Operation and what became of its backup, such as `Operation 20261001-143012-a3f · backup kept`. */
+      note: string;
       /** Where the States after differ from the preview's prediction. */
       differences: Difference[];
     }
@@ -209,6 +211,7 @@ const failed = (name: StepName): Step => ({ name, status: "failed" });
 
 /** What an applied Operation of `action` did, with Verify amber when States differ from the prediction. */
 export function appliedResult(outcome: Outcome, action: Action): Result {
+  const deleted = action === "delete_backup";
   return {
     kind: "applied",
     steps: [
@@ -218,7 +221,8 @@ export function appliedResult(outcome: Outcome, action: Action): Result {
     ],
     sentence: outcome.sentence,
     hints: outcome.hints,
-    undo: action === "delete_backup" ? null : outcome.operation,
+    undo: deleted ? null : outcome.operation,
+    note: `Operation ${outcome.operation} · ${deleted ? "backup deleted · can no longer be undone" : "backup kept"}`,
     differences: outcome.differences,
   };
 }

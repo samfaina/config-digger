@@ -614,7 +614,7 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
                   {hint}
                 </div>
               ))}
-              <div className="faint">Operation {result.undo} · backup kept</div>
+              <div className="faint">{result.note}</div>
             </div>
           </div>
           {result.differences.length > 0 && (
