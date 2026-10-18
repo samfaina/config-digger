@@ -16,10 +16,10 @@ use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
+use crate::running::RunningHomes;
 use crate::scan::{LocationReader, ScannedEntry, Snapshot, SwitchStore};
 use crate::store::{self, Medium, Written};
-use crate::{explain, history, installations, park, resolve, rules, running, scan, select};
-use std::collections::BTreeSet;
+use crate::{explain, history, park, resolve, rules, running, scan, select};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -41,9 +41,8 @@ pub(crate) struct Planned {
     /// The Read failures before the Operation: Verify fails it when a
     /// written file no longer parses for a reader that could read it.
     pub read_failures: Vec<ReadFailure>,
-    /// The Agent homes an Installation found reads, by Agent index and
-    /// id: an Agent can run only for them.
-    pub installed: BTreeSet<(usize, String)>,
+    /// The Agent homes that tell what a running Agent reads.
+    pub homes: RunningHomes,
 }
 
 /// The edits to one file.
@@ -1075,8 +1074,8 @@ impl Targeted<'_> {
             &self.before.read_failures,
             &self.before.homes,
         )?;
-        let installed = installations::installed_homes(self.definitions, self.snapshot);
-        let running = running::check(self.definitions, self.ports, &installed, &files, &folders);
+        let homes = RunningHomes::of(self.definitions, self.snapshot);
+        let running = running::check(self.definitions, self.ports, &homes, &files, &folders);
         let mut warnings = warnings(&files, &folders, running.warning);
         warnings.extend(action_warning);
         Ok(Planned {
@@ -1090,7 +1089,7 @@ impl Targeted<'_> {
             folders,
             preview,
             read_failures: self.before.read_failures.clone(),
-            installed,
+            homes,
         })
     }
 }
@@ -1271,8 +1270,8 @@ pub(crate) fn plan_undo(
         &before.read_failures,
         &before.homes,
     )?;
-    let installed = installations::installed_homes(definitions, &snapshot);
-    let running = running::check(definitions, ports, &installed, &files, &folders);
+    let homes = RunningHomes::of(definitions, &snapshot);
+    let running = running::check(definitions, ports, &homes, &files, &folders);
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
@@ -1284,7 +1283,7 @@ pub(crate) fn plan_undo(
         folders,
         preview,
         read_failures: before.read_failures,
-        installed,
+        homes,
     })
 }
 
@@ -1335,7 +1334,7 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
         warnings,
         blocks: Vec::new(),
         read_failures: Vec::new(),
-        installed: BTreeSet::new(),
+        homes: RunningHomes::default(),
     })
 }
 

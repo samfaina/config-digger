@@ -9,12 +9,40 @@ use crate::definitions::blocks::{Sessions, StoreClass};
 use crate::definitions::{AgentDefinition, ProcessDefinition};
 use crate::explain;
 use crate::folders::PlannedFolder;
+use crate::installations;
 use crate::paths;
 use crate::plan::PlannedFile;
 use crate::ports::{Ports, RunningProcess};
-use crate::scan::LocationReader;
+use crate::scan::{LocationReader, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+
+/// The Agent homes of a snapshot, by Agent index and id, that tell what a
+/// running Agent reads.
+#[derive(Default)]
+pub(crate) struct RunningHomes {
+    /// Those an Installation found reads: an Agent can run only for them.
+    pub installed: BTreeSet<(usize, String)>,
+    /// Those the user added outside the definition's homes. A home the user
+    /// added in the folder of one of them, however spelled, is that home.
+    /// No running Agent holds their files in memory, so parking in them is
+    /// never blocked.
+    pub added: BTreeSet<(usize, String)>,
+}
+
+impl RunningHomes {
+    pub fn of(definitions: &[AgentDefinition], snapshot: &Snapshot) -> RunningHomes {
+        RunningHomes {
+            installed: installations::installed_homes(definitions, snapshot),
+            added: snapshot
+                .homes
+                .iter()
+                .filter(|home| home.declared.is_none())
+                .map(|home| (home.agent_index, home.home.clone()))
+                .collect(),
+        }
+    }
+}
 
 /// What the running Agents mean for an Operation's writes.
 pub(crate) struct RunningCheck {
@@ -70,13 +98,13 @@ struct Touched<'a> {
 
 /// Checks the readers of `files` and `folders`, and the Agents with
 /// switches in `files`, against the processes running now. Only an Agent
-/// running for a home in `installed`, which an Installation found reads,
-/// gets the warning and the hints; any running Agent blocks a write to a
-/// SQLite store it holds.
+/// running for an installed home of `homes` gets the warning and the hints;
+/// any running Agent blocks a write to a SQLite store it holds, and parking
+/// in a file it rewrites from memory but in an added home.
 pub(crate) fn check<'a>(
     definitions: &[AgentDefinition],
     ports: &Ports,
-    installed: &BTreeSet<(usize, String)>,
+    homes: &RunningHomes,
     files: &'a [PlannedFile],
     folders: &'a [PlannedFolder],
 ) -> RunningCheck {
@@ -143,10 +171,11 @@ pub(crate) fn check<'a>(
             parking: BTreeSet::new(),
             installed: false,
         });
-        reader.installed |= installed.contains(&(agent_index, home.to_owned()));
+        let key = (agent_index, home.to_owned());
+        reader.installed |= homes.installed.contains(&key);
         let stored = reader.read.entry(path.clone()).or_insert(class);
         *stored = (*stored).max(class);
-        if parking && class == StoreClass::RewrittenWhileRunning {
+        if parking && class == StoreClass::RewrittenWhileRunning && !homes.added.contains(&key) {
             reader.parking.insert(path.clone());
         }
     }

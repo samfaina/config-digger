@@ -468,6 +468,12 @@ fn an_entry_parked_from_a_toml_file_is_removed_from_the_store() {
 /// A core over `fs` while Claude Desktop runs from its Store package.
 fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
     let package = r"C:\Program Files\WindowsApps\Claude_2.16120.0.0_x64__pzs8sxrjxfjjc";
+    core_while_claude_runs(fs, Some(PathBuf::from(package).join(r"app\claude.exe")))
+}
+
+/// A core over `fs` while a `claude.exe` runs from `path`, `None` when the
+/// OS hides it.
+fn core_while_claude_runs(fs: &FakeFileSystem, path: Option<PathBuf>) -> Core {
     let mut ports = fake::ports(
         fs.clone(),
         env().with_var("ProgramFiles", r"C:\Program Files"),
@@ -475,7 +481,7 @@ fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
     ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
         pid: 5151,
         image: "claude.exe".to_owned(),
-        path: Some(PathBuf::from(package).join(r"app\claude.exe")),
+        path,
         cmdline: String::new(),
     }));
     Core::new(ports).unwrap()
@@ -509,6 +515,74 @@ fn putting_a_parked_entry_back_is_blocked_while_claude_desktop_runs() {
 
     let plan = plan_with(&core_while_desktop_runs(&fs), Action::Enable, "notes").unwrap();
 
+    assert_eq!(to_json(plan.blocks()[0].code), "running_agent_parking");
+}
+
+/// A Claude Desktop home the user added outside the definition's homes.
+const ADDED: &str = r"E:\cd-throwaway\claude-desktop-home";
+
+/// The Store package's data folder, and a classic data folder at `ADDED`.
+fn desktop_and_added() -> FakeFileSystem {
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(r"tests\fixtures\claude-desktop\classic");
+    load(desktop(), &fixture, Path::new(ADDED))
+}
+
+#[test]
+fn parking_in_an_added_home_elsewhere_goes_ahead_while_claude_desktop_runs() {
+    let fs = desktop_and_added();
+    let core = core_while_desktop_runs(&fs);
+    core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+
+    let plan = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+    assert_eq!(plan.blocks(), &[], "{:?}", plan.blocks());
+    let acks = [WarningClass::RunningAgent, WarningClass::WideReach];
+    core.execute(plan, &acks).unwrap();
+    assert_eq!(
+        read_json(&fs, Path::new(ADDED).join("claude_desktop_config.json"))["mcpServers"],
+        json!({})
+    );
+}
+
+#[test]
+fn a_claude_exe_whose_path_is_hidden_blocks_parking_in_the_real_home_only() {
+    let fs = desktop_and_added();
+    let core = core_while_claude_runs(&fs, None);
+    core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+
+    let real = plan_with(&core, Action::Disable, "notes").unwrap();
+    let added = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+    assert_eq!(real.blocks().len(), 1, "{:?}", real.blocks());
+    assert_eq!(to_json(real.blocks()[0].code), "running_agent_parking");
+    assert_eq!(added.blocks(), &[], "{:?}", added.blocks());
+}
+
+#[test]
+fn parking_in_an_added_home_in_another_case_of_the_real_home_s_folder_is_blocked() {
+    let fs = desktop();
+    let core = core_while_desktop_runs(&fs);
+    let spelled = msix().display().to_string().to_uppercase();
+    core.add_home(Path::new(&spelled), "claude-desktop")
+        .unwrap();
+
+    let plan = plan_with(&core, Action::Disable, "notes").unwrap();
+
+    assert_eq!(plan.blocks().len(), 1, "{:?}", plan.blocks());
+    assert_eq!(to_json(plan.blocks()[0].code), "running_agent_parking");
+}
+
+#[test]
+fn parking_in_an_added_home_linked_to_the_real_home_s_folder_is_blocked() {
+    let link = r"E:\cd-throwaway\desktop-link";
+    let fs = desktop().with_link(link, msix());
+    let core = core_while_desktop_runs(&fs);
+    core.add_home(Path::new(link), "claude-desktop").unwrap();
+
+    let plan = plan_with(&core, Action::Disable, "notes").unwrap();
+
+    assert_eq!(plan.blocks().len(), 1, "{:?}", plan.blocks());
     assert_eq!(to_json(plan.blocks()[0].code), "running_agent_parking");
 }
 

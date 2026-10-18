@@ -66,7 +66,7 @@ pub(crate) fn execute(
     let running = running::check(
         definitions,
         ports,
-        &planned.installed,
+        &planned.homes,
         &planned.files,
         &planned.folders,
     );
