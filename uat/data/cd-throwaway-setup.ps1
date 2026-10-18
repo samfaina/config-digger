@@ -118,5 +118,22 @@ Write-TestFile "$Root\claude-desktop-home\claude_desktop_config.json" @"
 }
 "@
 
+# A second Claude Code home with 30 user servers and 30 Projects, so that the
+# Items, the Projects and the Project dropdown scroll in the smallest window.
+$many = 1..30 | ForEach-Object { "{0:D2}" -f $_ }
+$manyServers = ($many | ForEach-Object { "    `"cd-throwaway-many-$_`": { `"command`": `"npx`", `"args`": [`"-y`", `"cd-throwaway-many-$_`"] }" }) -join ",`n"
+$manyProjects = ($many | ForEach-Object { "    `"$slash/many/project-$_`": {}" }) -join ",`n"
+$many | ForEach-Object { New-Item -ItemType Directory -Force "$Root\many\project-$_" | Out-Null }
+Write-TestFile "$Root\claude-code-many-home\.claude.json" @"
+{
+  "mcpServers": {
+$manyServers
+  },
+  "projects": {
+$manyProjects
+  }
+}
+"@
+
 Write-Host "Created the throwaway homes and Projects in $Root"
 Get-ChildItem $Root -Recurse -File | ForEach-Object { "  " + $_.FullName.Substring($Root.Length + 1) }

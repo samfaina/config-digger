@@ -36,6 +36,38 @@
   box-sizing: border-box;
 }
 
+/* Scrollbars, for every scrolling area: thin, a faint thumb that lightens on
+   hover. Chromium drops the ::-webkit-scrollbar rules, and their hover, where
+   scrollbar-color or scrollbar-width applies, so those stay for other engines. */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: var(--faint);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--grey);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--faint) transparent;
+  }
+}
+
 body {
   margin: 0;
   height: 100vh;
