@@ -997,6 +997,138 @@ fn remove_dry_run_in_text_says_nothing_was_written() {
     assert_eq!(read(&harness.path(".claude.json")), TWO_USER_SERVERS);
 }
 
+/// A Gemini CLI home with user servers `linear` and `notes` and three
+/// Projects, `alpha`, `beta` and `gamma`, where a Project `linear` shadows
+/// the user one in `gamma`. Folder trust is off, so no server is Blocked.
+fn with_three_gemini_projects() -> Harness {
+    let harness = Harness::new().with_file(
+        ".gemini/settings.json",
+        &json!({
+            "security": { "folderTrust": { "enabled": false } },
+            "mcpServers": { "linear": { "httpUrl": "https://user" }, "notes": { "command": "n" } }
+        })
+        .to_string(),
+    );
+    let projects: serde_json::Map<String, Value> = ["alpha", "beta", "gamma"]
+        .into_iter()
+        .map(|name| {
+            std::fs::create_dir(harness.root.path().join(name)).unwrap();
+            let path = harness.cwd().join(name).display().to_string();
+            (path, json!(name))
+        })
+        .collect();
+    harness
+        .with_file(
+            ".gemini/projects.json",
+            &json!({ "projects": projects }).to_string(),
+        )
+        .with_cwd_file(
+            "gamma/.gemini/settings.json",
+            &json!({ "mcpServers": { "linear": { "httpUrl": "https://local" } } }).to_string(),
+        )
+}
+
+/// The rows of the changes table for Gemini CLI's Entry at `locator`.
+fn gemini_change_rows<'a>(stdout: &'a str, locator: &str) -> Vec<&'a str> {
+    stdout
+        .lines()
+        .filter(|line| line.contains("Gemini CLI") && line.ends_with(locator))
+        .collect()
+}
+
+#[test]
+fn the_preview_prints_an_entry_whose_state_changes_the_same_way_everywhere_once_with_its_contexts()
+{
+    let harness = with_three_gemini_projects();
+    let notes = locator(
+        &harness.path(".gemini").join("settings.json"),
+        "mcpServers.notes",
+    );
+
+    let run = harness.run(&["disable", "notes", "--no-project", "--dry-run"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let rows: Vec<Vec<&str>> = gemini_change_rows(&run.stdout, &notes)
+        .iter()
+        .map(|row| row.split_whitespace().skip(2).take(5).collect())
+        .collect();
+    assert_eq!(
+        rows,
+        [["notes", "Effective", "Disabled", "4", "contexts"]],
+        "{}",
+        run.stdout
+    );
+}
+
+#[test]
+fn the_preview_prints_an_entry_whose_state_change_differs_once_per_context_naming_the_project() {
+    let harness = with_three_gemini_projects();
+    let linear = locator(
+        &harness.path(".gemini").join("settings.json"),
+        "mcpServers.linear",
+    );
+    let project = |name: &str| harness.cwd().join(name).display().to_string();
+
+    let run = harness.run(&[
+        "disable",
+        "linear",
+        "--no-project",
+        "--ack",
+        "wide-reach",
+        "--yes",
+    ]);
+    assert_eq!(run.code, 0, "{}\n{}", run.stdout, run.stderr);
+    let operation = harness.run(&["history", "--json"]).document()["operations"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let history = harness.run(&["history", "show", &operation]);
+
+    assert_eq!(history.code, 0, "{}", history.stderr);
+    for stdout in [&run.stdout, &history.stdout] {
+        let rows: Vec<Vec<&str>> = gemini_change_rows(stdout, &linear)
+            .iter()
+            .map(|row| row.split_whitespace().skip(2).take(4).collect())
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                vec!["linear", "Effective", "Disabled", "No"],
+                vec!["linear", "Effective", "Disabled", &project("alpha")],
+                vec!["linear", "Effective", "Disabled", &project("beta")],
+                vec!["linear", "Shadowed", "Disabled", &project("gamma")],
+            ],
+            "{stdout}"
+        );
+    }
+}
+
+#[test]
+fn the_preview_elides_each_project_so_the_entry_key_fits_the_terminal_width() {
+    let harness = with_three_gemini_projects();
+
+    let run = harness.run_with_env(
+        &["disable", "linear", "--no-project", "--dry-run"],
+        &[("COLUMNS", "100")],
+    );
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let rows: Vec<&str> = run
+        .stdout
+        .lines()
+        .filter(|line| line.trim_start().starts_with("Gemini CLI  "))
+        .collect();
+    assert_eq!(rows.len(), 5, "{}", run.stdout);
+    for row in rows {
+        assert!(row.chars().count() <= 100, "too wide:\n{}", run.stdout);
+        assert!(row.ends_with("#mcpServers.linear"), "{}", run.stdout);
+    }
+    // The end of a Project's folder tells the rows apart, so it survives the cut.
+    assert!(run.stdout.contains('…'), "{}", run.stdout);
+    let gamma = format!("{}gamma  ", std::path::MAIN_SEPARATOR);
+    assert!(run.stdout.contains(&gamma), "{}", run.stdout);
+}
+
 #[test]
 fn remove_json_without_yes_is_one_error_document_exiting_4() {
     let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
