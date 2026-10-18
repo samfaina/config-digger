@@ -173,13 +173,19 @@
           "title": "La barra del Inventario",
           "goal": "Las barras de desplazamiento tienen el aspecto de la app, no las del sistema.",
           "instructions": [
-            "Haz la ventana de config-digger baja, de unos 900 × 400, hasta que la lista de Entries del Inventario no quepa.",
-            "Con el home de Claude Code de prueba elegido (paso 1.2), mira la barra de la lista de Entries.",
-            "Pasa el ratón por encima de la barra y arrástrala.",
-            "Elige el servidor cd-throwaway-user y, si su configuración no cabe, mira también su barra."
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "Elige Claude Code como Agent.",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-many-home.",
+            "Vuelve al Inventario y elige ese home.",
+            "Mira la barra de la lista de Items.",
+            "Pasa el ratón por encima del tirador de la barra.",
+            "Arrastra el tirador hasta abajo."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema: el tirador es gris tenue, se aclara al pasar el ratón por encima y se arrastra con normalidad. La configuración usa la misma barra.",
+          "expect": "La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Al final de la lista sale cd-throwaway-many-30.",
           "covers": ["#183"]
         },
         {
@@ -187,11 +193,13 @@
           "title": "La barra de Projects & homes",
           "goal": "La pantalla Projects & homes usa la misma barra.",
           "instructions": [
-            "Con la ventana baja del paso 4.1, ve a Projects & homes.",
-            "Mira la barra de cada lista que no quepa, y pasa el ratón por encima."
+            "Con la ventana pequeña del paso 4.1, ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "Mira la barra de la lista de Projects.",
+            "Pasa el ratón por encima del tirador."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema: el tirador es gris tenue, se aclara al pasar el ratón por encima y se arrastra con normalidad. Es igual a la del Inventario.",
+          "expect": "La lista tiene los 30 Projects de E:\\cd-throwaway\\many y no cabe entera. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
           "covers": ["#183"]
         },
         {
@@ -199,26 +207,36 @@
           "title": "La barra de History",
           "goal": "La pantalla History usa la misma barra.",
           "instructions": [
-            "Si History no tiene Operations, ve al Inventario, pulsa Disable en cd-throwaway-user, aplica, y luego Enable y aplica, hasta tener unas cuantas.",
-            "Con la ventana baja del paso 4.1, ve a History.",
-            "Mira la barra de la lista de Operations y la de los detalles de una Operation, y pasa el ratón por encima."
+            "Con la ventana pequeña del paso 4.1, ve al Inventario, con el home claude-code-many-home elegido.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\many\\project-01.",
+            "Elige el servidor cd-throwaway-many-01.",
+            "Pulsa Disable.",
+            "En el diálogo, pulsa Disable.",
+            "Pulsa Done.",
+            "Repite los cuatro pasos anteriores con cd-throwaway-many-02 hasta cd-throwaway-many-12.",
+            "Ve a History.",
+            "Mira la barra de la lista de Operations.",
+            "Pasa el ratón por encima del tirador."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema: el tirador es gris tenue, se aclara al pasar el ratón por encima y se arrastra con normalidad. Es igual a la del Inventario.",
+          "expect": "La lista tiene 12 Operations Disable y no cabe entera. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
           "covers": ["#183"]
         },
         {
           "id": "4.4",
           "title": "La barra de un diálogo",
-          "goal": "Los diálogos usan la misma barra, también en su texto largo.",
+          "goal": "Los diálogos usan la misma barra, también en un texto largo dentro de ellos.",
           "instructions": [
-            "Con la ventana baja del paso 4.1, pulsa About en la barra de la izquierda.",
-            "Abre la lista de licencias de terceros y despliega una licencia.",
-            "Mira la barra del diálogo, la de la lista y la del texto de la licencia, y pasa el ratón por encima.",
-            "Cierra el diálogo. En el Inventario, pulsa Disable en cd-throwaway-user y mira la barra de su vista previa. Pulsa Cancel."
+            "Con la ventana pequeña del paso 4.1, pulsa About en la barra de la izquierda.",
+            "Pulsa Third-party licenses.",
+            "Mira la barra de la lista de licencias.",
+            "Pasa el ratón por encima del tirador.",
+            "Despliega la primera licencia.",
+            "Mira la barra de su texto.",
+            "Pulsa Close."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema: el tirador es gris tenue, se aclara al pasar el ratón por encima y se arrastra con normalidad. Las barras del diálogo, de la lista, del texto y de la vista previa son iguales a la del Inventario.",
+          "expect": "La lista de licencias y el texto de la licencia se desplazan cada uno con su barra. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Las dos son iguales a la de la lista de Items del Inventario.",
           "covers": ["#183"]
         },
         {
@@ -226,12 +244,14 @@
           "title": "La barra del panel de un desplegable",
           "goal": "El panel abierto de un desplegable usa la misma barra.",
           "instructions": [
-            "Haz la ventana de config-digger baja, de unos 600 × 300.",
-            "Ve a Projects & homes, pulsa Add Agent home y abre el desplegable Agent.",
-            "Si el panel no cabe entero, mira su barra y pasa el ratón por encima."
+            "Con la ventana pequeña del paso 4.1, ve al Inventario, con el home claude-code-many-home elegido.",
+            "Haz clic en el campo Project de la cabecera.",
+            "Mira la barra del panel que se abre.",
+            "Pasa el ratón por encima del tirador.",
+            "Pulsa Escape."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema: el tirador es gris tenue, se aclara al pasar el ratón por encima y se arrastra con normalidad. El panel se desplaza con su propia barra, igual a la del Inventario.",
+          "expect": "El panel no cabe entero en la ventana y se desplaza con su propia barra. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
           "covers": ["#183"]
         }
       ]

@@ -34,14 +34,14 @@ const rules = (source: string): Rule[] => {
   return found;
 };
 
-const all = rules(css);
-const tokens = new Set([...(all.find((rule) => rule.selector === ":root")?.declarations.keys() ?? [])]);
+const allRules = rules(css);
+const tokens = new Set(allRules.find((rule) => rule.selector === ":root")?.declarations.keys());
 const isScrollbar = (rule: Rule) => rule.selector.includes("::-webkit-scrollbar") || [...rule.declarations.keys()].some((name) => name.startsWith("scrollbar-"));
-const scrollbarRules = all.filter(isScrollbar);
+const scrollbarRules = allRules.filter(isScrollbar);
 const declared = (selector: string, name: string) => scrollbarRules.find((rule) => rule.selector === selector)?.declarations.get(name);
 
-/** The colours of a declaration's value, which must each be a `:root` token or `transparent`. */
-const colours = (value: string) => value.replace(/var\(--[\w-]+\)|transparent/g, "").match(/#[0-9a-f]+|rgba?\(|hsla?\(/gi) ?? [];
+/** The colours of a declaration's value that are neither a `:root` token nor `transparent`. */
+const rawColours = (value: string) => value.replace(/var\(--[\w-]+\)|transparent/g, "").match(/#[0-9a-f]+|rgba?\(|hsla?\(/gi) ?? [];
 const tokensUsed = (value: string) => [...value.matchAll(/var\((--[\w-]+)\)/g)].map(([, token]) => token);
 
 describe("the app's scrollbars", () => {
@@ -63,14 +63,14 @@ describe("the app's scrollbars", () => {
   test("take every colour from the :root tokens", () => {
     for (const rule of scrollbarRules) {
       for (const value of rule.declarations.values()) {
-        expect(colours(value), `${rule.selector}: ${value}`).toEqual([]);
+        expect(rawColours(value), `${rule.selector}: ${value}`).toEqual([]);
         for (const token of tokensUsed(value)) expect(tokens, `${rule.selector}: ${value}`).toContain(token);
       }
     }
   });
 
   test("are set once, for every element, so no scrolling area draws its own", () => {
-    const scrolling = all.filter((rule) => ["overflow", "overflow-x", "overflow-y"].some((name) => /auto|scroll/.test(rule.declarations.get(name) ?? "")));
+    const scrolling = allRules.filter((rule) => ["overflow", "overflow-x", "overflow-y"].some((name) => /auto|scroll/.test(rule.declarations.get(name) ?? "")));
     expect(scrolling.map((rule) => rule.selector)).toEqual(expect.arrayContaining([".scroll", ".select-panel", ".dialog", ".diff"]));
     for (const selector of scrollbarRules.flatMap((rule) => rule.selector.split(","))) {
       expect(selector.trim()).toMatch(/^(\*|::-webkit-scrollbar[\w-]*(:hover)?)$/);

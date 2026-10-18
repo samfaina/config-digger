@@ -36,11 +36,9 @@
   box-sizing: border-box;
 }
 
-/* Scrollbars: thin, a faint thumb that lightens on hover, no track. They are
-   set once here for every scrolling area. WebView2 draws them from the
-   ::-webkit-scrollbar rules, which Chromium ignores wherever scrollbar-color
-   or scrollbar-width is set, and those have no hover state, so the standard
-   properties only reach browsers without the pseudo-elements. */
+/* Scrollbars, for every scrolling area: thin, a faint thumb that lightens on
+   hover. Chromium drops the ::-webkit-scrollbar rules, and their hover, where
+   scrollbar-color or scrollbar-width applies, so those stay for other engines. */
 
 ::-webkit-scrollbar {
   width: 10px;
