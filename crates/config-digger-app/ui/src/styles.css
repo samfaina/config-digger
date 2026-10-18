@@ -865,6 +865,10 @@ p {
   background: #ffffff0a;
 }
 
+.bar.selected .bar-track {
+  background: #0000002e;
+}
+
 .bar-track i {
   position: absolute;
   inset: 0 auto 0 0;

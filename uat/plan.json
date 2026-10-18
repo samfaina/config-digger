@@ -338,7 +338,7 @@
             "Pulsa clear, arriba a la derecha del panel."
           ],
           "commands": [],
-          "expect": "Bajo el ratón, la fila solo toma un fondo gris un poco más claro. Al pulsarla toma el mismo degradado lila con halo que la tarjeta All Agents, y lo conserva al apartar el ratón. La lista de Items solo muestra los de ese State. Con clear, la fila vuelve a no tener fondo y la lista muestra otra vez todos los Items.",
+          "expect": "Bajo el ratón, la fila solo toma un fondo gris un poco más claro. Al pulsarla toma el mismo degradado lila con halo que la tarjeta All Agents, y lo conserva al apartar el ratón. Su carril se oscurece y la barra de color y la cuenta se leen bien sobre el degradado. La lista de Items solo muestra los de ese State. Con clear, la fila vuelve a no tener fondo y la lista muestra otra vez todos los Items.",
           "covers": ["#185"]
         }
       ]

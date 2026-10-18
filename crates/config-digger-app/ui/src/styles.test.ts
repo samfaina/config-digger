@@ -193,6 +193,15 @@ describe("a selected filter row of Entries by State", () => {
     const hovered = styled(".bar:hover:not(.selected)");
     expect(hovered.get("background")).toBeDefined();
     expect(hovered.get("background")).not.toBe(styled(".bar.selected").get("background"));
-    expect(styled(".bar:hover").size, "a hover rule that reaches a selected row too").toBe(0);
+    const hovers = allRules.flatMap((found) => found.selector.split(",")).filter((selector) => selector.includes(".bar:hover"));
+    for (const selector of hovers) expect(selector, "a hover rule that reaches a selected row too").toContain(":not(.selected)");
+  });
+
+  test("keeps its track in sight on the gradient, darker than on an unselected row", () => {
+    const track = styled(".bar-track").get("background");
+    const selected = styled(".bar.selected .bar-track").get("background");
+    expect(track).toMatch(/^#ffffff[0-9a-f]{2}$/i);
+    // A black tint, as a white one fades into the gradient.
+    expect(selected).toMatch(/^#000000[0-9a-f]{2}$/i);
   });
 });
