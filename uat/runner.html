@@ -1,0 +1,502 @@
+<title>config-digger UAT</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap">
+<style>
+/* A test protocol sheet: the step list on the left, one step on the
+   right, the run's progress on top. */
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --ink: #18211e;
+  --muted: #5b6763;
+  --line: #d6ddda;
+  --accent: #1f5f8b;
+  --accent-ink: #ffffff;
+  --code-bg: #eaefed;
+  --ok: #1d7a46;
+  --ok-bg: #e3f2e8;
+  --ko: #b3261e;
+  --ko-bg: #fbe7e5;
+  --blocked: #8a5a00;
+  --blocked-bg: #fbf0d9;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111715; --surface: #18201d; --ink: #e3ebe7; --muted: #9aa8a3;
+    --line: #2c3833; --accent: #7cb8e4; --accent-ink: #0d1a24; --code-bg: #0c1210;
+    --ok: #6fd39a; --ok-bg: #143323; --ko: #ff9389; --ko-bg: #3d1915;
+    --blocked: #f0c36a; --blocked-bg: #3a2c0f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111715; --surface: #18201d; --ink: #e3ebe7; --muted: #9aa8a3;
+  --line: #2c3833; --accent: #7cb8e4; --accent-ink: #0d1a24; --code-bg: #0c1210;
+  --ok: #6fd39a; --ok-bg: #143323; --ko: #ff9389; --ko-bg: #3d1915;
+  --blocked: #f0c36a; --blocked-bg: #3a2c0f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.page { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; letter-spacing: 0.01em; }
+h2 { font-size: 1.6rem; line-height: 1.2; }
+h3 {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); margin: 0; font-weight: 600;
+}
+p { margin: 0; }
+button {
+  font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); padding: 6px 12px;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+button:focus-visible, textarea:focus-visible, .step-link:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* The run's header */
+.run { display: grid; gap: 10px; }
+.run-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; justify-content: space-between; }
+.run-meta { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; display: flex; }
+.bar span { display: block; height: 100%; transition: width 0.3s; }
+.bar .ok { background: var(--ok); }
+.bar .ko { background: var(--ko); }
+.bar .blocked { background: var(--blocked); }
+.counts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.notice { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 10px 14px; }
+.notice.error { border-color: var(--ko); background: var(--ko-bg); }
+
+/* Sidebar and step */
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } .steps { order: 2; } }
+.steps { display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 760px) { .steps { position: static; } }
+.section { display: grid; gap: 4px; }
+.section ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.step-link {
+  width: 100%; text-align: left; border: 1px solid transparent; background: none;
+  display: grid; grid-template-columns: 2.6em minmax(0, 1fr) auto; gap: 8px; align-items: baseline;
+  padding: 5px 8px;
+}
+.step-link[aria-current="step"] { background: var(--surface); border-color: var(--line); }
+.step-id { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.step-title { overflow-wrap: anywhere; }
+.chip {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; border-radius: 999px;
+  padding: 1px 8px; white-space: nowrap; color: var(--muted); border: 1px solid var(--line);
+}
+.chip.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.chip.ko { color: var(--ko); background: var(--ko-bg); border-color: transparent; }
+.chip.blocked { color: var(--blocked); background: var(--blocked-bg); border-color: transparent; }
+
+.step {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px; display: grid; gap: 18px; min-width: 0;
+}
+.eyebrow { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; color: var(--muted); font-size: 0.85rem; }
+.eyebrow .step-id { font-size: 0.85rem; }
+.covers { display: flex; flex-wrap: wrap; gap: 6px; }
+.block { display: grid; gap: 8px; }
+.instructions { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; }
+.command { display: grid; gap: 4px; }
+.command-head { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+.command-label { font-weight: 500; }
+.shell { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.code-row { display: flex; gap: 8px; align-items: stretch; }
+pre {
+  margin: 0; flex: 1; min-width: 0; overflow-x: auto; background: var(--code-bg);
+  border-radius: 6px; padding: 8px 10px; font: 0.85rem/1.5 var(--font-mono);
+}
+.setup { border-left: 3px solid var(--blocked); padding-left: 12px; }
+.expect { border-left: 3px solid var(--accent); padding-left: 12px; }
+.verdict { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
+.verdict-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.verdict-buttons button { min-width: 96px; font-weight: 600; }
+.verdict-buttons .ok { color: var(--ok); }
+.verdict-buttons .ko { color: var(--ko); }
+.verdict-buttons .blocked { color: var(--blocked); }
+.verdict-buttons button[aria-pressed="true"].ok { background: var(--ok-bg); border-color: var(--ok); }
+.verdict-buttons button[aria-pressed="true"].ko { background: var(--ko-bg); border-color: var(--ko); }
+.verdict-buttons button[aria-pressed="true"].blocked { background: var(--blocked-bg); border-color: var(--blocked); }
+label { font-weight: 500; }
+textarea {
+  width: 100%; min-height: 84px; resize: vertical; font: inherit; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+}
+.hint { color: var(--muted); font-size: 0.85rem; }
+.problem { color: var(--ko); font-weight: 500; }
+.saved { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.nav { display: flex; justify-content: space-between; gap: 8px; }
+.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.export { display: grid; gap: 8px; }
+.export textarea { font-family: var(--font-mono); font-size: 0.8rem; min-height: 120px; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+</style>
+
+<div class="page">
+  <header class="run">
+    <div class="run-top">
+      <div>
+        <h1 id="run-name">UAT de config-digger</h1>
+        <p class="run-meta" id="run-meta">Cargando el plan…</p>
+      </div>
+      <button type="button" id="export" class="primary" disabled>Exportar KO y bloqueados</button>
+    </div>
+    <div class="bar" role="progressbar" id="bar" aria-label="Progreso del recorrido" aria-valuemin="0" aria-valuenow="0" aria-valuemax="0">
+      <span class="ok" id="bar-ok" style="width:0"></span>
+      <span class="ko" id="bar-ko" style="width:0"></span>
+      <span class="blocked" id="bar-blocked" style="width:0"></span>
+    </div>
+    <div class="counts" id="counts"></div>
+    <div class="export" id="export-panel" hidden>
+      <p id="export-status" role="status"></p>
+      <textarea id="export-text" readonly aria-label="Tabla Markdown de los KO y bloqueados"></textarea>
+    </div>
+    <p class="notice" id="notice" hidden></p>
+  </header>
+
+  <div class="layout">
+    <nav class="steps" id="steps" aria-label="Pasos"></nav>
+    <main class="step" id="step">
+      <p class="hint">Aquí aparecerá el primer paso del plan en cuanto se cargue plan.json.</p>
+    </main>
+  </div>
+</div>
+
+<script id="uat-logic">
+const Uat = (() => {
+  const NEEDS_NOTES = {
+    ko: "Escribe en las notas qué falló.",
+    blocked: "Escribe en las notas qué lo bloquea.",
+  };
+
+  /** The database document of a step's result. Throws when the status
+   * needs notes and there are none. */
+  function result(id, status, notes, version, now) {
+    const text = notes.trim();
+    if (NEEDS_NOTES[status] && !text) throw new Error(NEEDS_NOTES[status]);
+    return { id, status, notes: text, time: now.toISOString(), version };
+  }
+
+  /** Every step of the plan, in order. */
+  function steps(plan) {
+    return plan.sections.flatMap((section) => section.steps);
+  }
+
+  /** How many of the plan's steps have a result. A result whose step left
+   * the plan does not count. */
+  function progress(plan, results) {
+    const all = steps(plan);
+    return { done: all.filter((step) => results[step.id]).length, total: all.length };
+  }
+
+  /** The step to show after `id`: the next one without a result, starting
+   * over at the top, or `id` itself once every step has one. */
+  function nextStep(plan, results, id) {
+    const all = steps(plan);
+    const at = all.findIndex((step) => step.id === id);
+    const order = [...all.slice(at + 1), ...all.slice(0, at + 1)];
+    return (order.find((step) => !results[step.id]) ?? all[at]).id;
+  }
+
+  const LABELS = { ok: "OK", ko: "KO", blocked: "Bloqueado" };
+
+  /** A table cell's text: a pipe would end the cell, a line break the row. */
+  function cell(text) {
+    return text.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+  }
+
+  /** The KO and Blocked steps as a Markdown table, in plan order. */
+  function exportMarkdown(plan, results) {
+    const rows = steps(plan)
+      .map((step) => [step, results[step.id]])
+      .filter(([, result]) => result && result.status !== "ok")
+      .map(([step, result]) =>
+        `| ${step.id} | ${cell(step.title)} | ${LABELS[result.status]} | ${cell(result.notes)} |`);
+    if (!rows.length) return "Ningún paso en KO ni bloqueado.";
+    return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
+  }
+
+  return { LABELS, result, steps, progress, nextStep, exportMarkdown };
+})();
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    plan: null,
+    run: null,
+    results: {},
+    current: null,
+    db: null,
+    canWrite: false,
+    saving: false,
+    problem: "",
+  };
+
+  // The step on screen, so a reload comes back to it. A convenience only:
+  // the results live in the database.
+  function remember(id) {
+    try { localStorage.setItem("uat-step", id); } catch {}
+  }
+  function remembered() {
+    try { return localStorage.getItem("uat-step"); } catch { return null; }
+  }
+
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === "class") node.className = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value);
+    }
+    node.append(...children.filter((child) => child != null));
+    return node;
+  }
+
+  function notice(text, error = false) {
+    $("notice").hidden = !text;
+    $("notice").textContent = text;
+    $("notice").classList.toggle("error", error);
+  }
+
+  /** Copies `text` from a click; when the frame refuses, selects `fallback`
+   * so the tester copies it by hand. */
+  async function copy(text, button, fallback) {
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "Copiado";
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(fallback);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      button.textContent = "Pulsa Ctrl+C";
+    }
+    setTimeout(() => { button.textContent = "Copiar"; }, 1600);
+  }
+
+  function commandBlock(command) {
+    const pre = el("pre", {}, el("code", {}, command.text));
+    const button = el("button", { type: "button", "aria-label": `Copiar: ${command.label}` }, "Copiar");
+    button.addEventListener("click", () => copy(command.text, button, pre));
+    return el("div", { class: "command" },
+      el("div", { class: "command-head" },
+        el("span", { class: "command-label" }, command.label),
+        el("span", { class: "shell" }, command.shell)),
+      el("div", { class: "code-row" }, pre, button));
+  }
+
+  function chip(status) {
+    return status
+      ? el("span", { class: `chip ${status}` }, Uat.LABELS[status])
+      : el("span", { class: "chip" }, "Pendiente");
+  }
+
+  function renderProgress() {
+    const all = Uat.steps(state.plan);
+    const { done, total } = Uat.progress(state.plan, state.results);
+    const count = (status) => all.filter((step) => state.results[step.id]?.status === status).length;
+    for (const status of ["ok", "ko", "blocked"]) {
+      $(`bar-${status}`).style.width = total ? `${(count(status) / total) * 100}%` : "0";
+    }
+    $("bar").setAttribute("aria-valuenow", String(done));
+    $("bar").setAttribute("aria-valuemax", String(total));
+    $("counts").replaceChildren(
+      el("span", {}, `${done} de ${total} pasos`),
+      el("span", {}, `OK ${count("ok")}`),
+      el("span", {}, `KO ${count("ko")}`),
+      el("span", {}, `Bloqueados ${count("blocked")}`),
+      el("span", {}, `Pendientes ${total - done}`));
+  }
+
+  function renderSteps() {
+    $("steps").replaceChildren(...state.plan.sections.map((section) =>
+      el("div", { class: "section" },
+        el("h3", {}, `${section.id}. ${section.title}`),
+        el("ol", {}, ...section.steps.map((step) => {
+          const link = el("button", { type: "button", class: "step-link", onclick: () => show(step.id) },
+            el("span", { class: "step-id" }, step.id),
+            el("span", { class: "step-title" }, step.title),
+            chip(state.results[step.id]?.status));
+          if (step.id === state.current) link.setAttribute("aria-current", "step");
+          return el("li", {}, link);
+        })))));
+  }
+
+  function renderStep() {
+    const section = state.plan.sections.find((s) => s.steps.some((step) => step.id === state.current));
+    const step = section.steps.find((s) => s.id === state.current);
+    const saved = state.results[step.id];
+    const all = Uat.steps(state.plan);
+    const at = all.findIndex((s) => s.id === step.id);
+    // A draft survives a re-render from the database; a new step starts
+    // from its saved notes.
+    const draft = $("notes")?.dataset.step === step.id ? $("notes").value : null;
+    const notes = el("textarea", { id: "notes", "data-step": step.id, "aria-describedby": "notes-hint" });
+    notes.value = draft ?? saved?.notes ?? "";
+    const verdict = (status) => {
+      const button = el("button", { type: "button", class: status, "aria-pressed": String(saved?.status === status) },
+        Uat.LABELS[status]);
+      button.disabled = !state.canWrite || state.saving;
+      button.addEventListener("click", () => record(step.id, status, notes.value));
+      return button;
+    };
+    const move = (label, to) => {
+      const button = el("button", { type: "button" }, label);
+      if (to) button.addEventListener("click", () => show(to.id));
+      else button.disabled = true;
+      return button;
+    };
+    const savedLine = saved
+      ? `Guardado: ${Uat.LABELS[saved.status]} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
+      : "Sin resultado todavía.";
+
+    $("step").replaceChildren(
+      el("div", { class: "eyebrow" },
+        el("span", { class: "step-id" }, `Paso ${step.id}`),
+        el("span", {}, `${section.id}. ${section.title}`),
+        el("span", { class: "covers" }, ...step.covers.map((c) => el("span", { class: "chip" }, c)))),
+      el("div", { class: "block" }, el("h2", {}, step.title), el("p", {}, step.goal)),
+      step.setup ? el("div", { class: "block setup" }, el("h3", {}, "Antes de empezar"), commandBlock(step.setup)) : null,
+      el("div", { class: "block" }, el("h3", {}, "Instrucciones"),
+        el("ol", { class: "instructions" }, ...step.instructions.map((line) => el("li", {}, line)))),
+      step.commands.length
+        ? el("div", { class: "block" }, el("h3", {}, "Comandos"), ...step.commands.map(commandBlock))
+        : null,
+      el("div", { class: "block expect" }, el("h3", {}, "Resultado esperado"), el("p", {}, step.expect)),
+      el("div", { class: "verdict" },
+        el("div", { class: "verdict-buttons" }, verdict("ok"), verdict("ko"), verdict("blocked")),
+        el("label", { for: "notes" }, "Notas"),
+        notes,
+        el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas."),
+        state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
+        el("p", { class: "saved" }, savedLine)),
+      el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])));
+  }
+
+  function render() {
+    renderProgress();
+    renderSteps();
+    renderStep();
+  }
+
+  function show(id) {
+    state.current = id;
+    state.problem = "";
+    remember(id);
+    render();
+    $("step").scrollIntoView({ block: "nearest" });
+  }
+
+  async function record(id, status, notes) {
+    let doc;
+    try {
+      doc = Uat.result(id, status, notes, state.run.version, new Date());
+    } catch (error) {
+      state.problem = error.message;
+      renderStep();
+      return;
+    }
+    state.saving = true;
+    state.problem = "";
+    renderStep();
+    try {
+      await state.db.collection("results").doc(id).set(doc);
+      state.results = { ...state.results, [id]: doc };
+      state.saving = false;
+      show(Uat.nextStep(state.plan, state.results, id));
+    } catch (error) {
+      state.saving = false;
+      if (error?.code === "invalid_argument") {
+        state.canWrite = false;
+        notice("Tu acceso a esta página no permite guardar resultados. Pide acceso de Contributor o superior.", true);
+      }
+      state.problem = error?.code === "quota_exceeded"
+        ? "La base de datos de la página está llena: no se pudo guardar."
+        : `No se pudo guardar el resultado (${error?.code ?? "error"}). Inténtalo otra vez.`;
+      render();
+    }
+  }
+
+  $("export").addEventListener("click", () => {
+    const text = Uat.exportMarkdown(state.plan, state.results);
+    $("export-panel").hidden = false;
+    $("export-text").value = text;
+    navigator.clipboard.writeText(text).then(
+      () => { $("export-status").textContent = "Tabla copiada al portapapeles."; },
+      () => {
+        $("export-text").select();
+        $("export-status").textContent = "El navegador no dejó copiar: la tabla está seleccionada, pulsa Ctrl+C.";
+      });
+  });
+
+  async function loadJson(name) {
+    const response = await fetch(name, { cache: "no-store" });
+    if (!response.ok) throw new Error(`No se pudo leer ${name} (${response.status}).`);
+    return response.json();
+  }
+
+  async function connect() {
+    const db = await window.claude?.use("db");
+    if (!db) {
+      notice("Los resultados no se pueden guardar en esta vista. Abre el artifact en claude.ai con tu sesión iniciada.", true);
+      return;
+    }
+    const user = await window.claude.use("user");
+    const may = user ? await user.can("data.write") : null;
+    state.db = db;
+    state.canWrite = may !== false;
+    if (may === false) notice("Tu acceso a esta página es de solo lectura: ves los resultados, pero no puedes guardarlos.");
+    db.collection("results").onSnapshot(
+      (snap) => {
+        state.results = Object.fromEntries(snap.docs.map((doc) => [doc.id, doc.data()]));
+        render();
+      },
+      (error) => {
+        notice(`Se perdió la conexión con los resultados (${error.code}). Recarga la página.`, true);
+        state.canWrite = false;
+        render();
+      });
+    render();
+  }
+
+  async function start() {
+    try {
+      [state.plan, state.run] = await Promise.all([loadJson("plan.json"), loadJson("run.json")]);
+    } catch (error) {
+      $("run-meta").textContent = "";
+      notice(`${error.message} El runner necesita plan.json y run.json publicados junto a la página.`, true);
+      return;
+    }
+    document.documentElement.lang = state.plan.language;
+    document.title = state.run.name;
+    $("run-name").textContent = state.run.name;
+    $("run-meta").textContent = `${state.plan.title} · versión ${state.run.version}`;
+    $("export").disabled = false;
+    const ids = Uat.steps(state.plan).map((step) => step.id);
+    const wanted = [location.hash.slice(1), remembered()].find((id) => ids.includes(id));
+    state.current = wanted ?? ids[0];
+    render();
+    connect();
+  }
+
+  start();
+})();
+</script>
