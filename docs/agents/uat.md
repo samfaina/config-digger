@@ -68,7 +68,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`, and give the tester the link. Post it on the walk's issue too.
 
-The tester works in the page. Each OK, KO or Blocked writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. The Export button copies the KO and Blocked rows as a Markdown table.
+The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. The Export button copies the KO and Blocked rows as a Markdown table.
 
 ## Turning a run's results into tickets
 
