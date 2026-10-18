@@ -359,7 +359,8 @@ p {
   font-size: 13.5px;
 }
 
-.tile.selected {
+.tile.selected,
+.bar.selected {
   background: linear-gradient(100deg, var(--primary), #5d4c9e);
   box-shadow: 0 4px 16px #7d67cb33;
 }
@@ -845,8 +846,7 @@ p {
   cursor: pointer;
 }
 
-.bar:hover,
-.bar.on {
+.bar:hover:not(.selected) {
   background: var(--tile);
 }
 

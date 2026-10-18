@@ -172,3 +172,27 @@ describe("a notice", () => {
     }
   });
 });
+
+/** The declarations that reach `selector`, from every rule outside an at-rule that lists it, later rules winning. */
+const styled = (selector: string) =>
+  new Map(
+    allRules
+      .filter((found) => found.at.length === 0 && found.selector.split(",").some((listed) => listed.trim() === selector))
+      .flatMap((found) => [...found.declarations]),
+  );
+
+describe("a selected filter row of Entries by State", () => {
+  test("is drawn as a selected Agent tile is, with its gradient and its glow", () => {
+    const tile = styled(".tile.selected");
+    expect(tile.get("background")).toMatch(/gradient/);
+    expect(tile.get("box-shadow")).toBeDefined();
+    for (const name of ["background", "box-shadow"]) expect(styled(".bar.selected").get(name), name).toBe(tile.get(name));
+  });
+
+  test("looks different from a hovered row", () => {
+    const hovered = styled(".bar:hover:not(.selected)");
+    expect(hovered.get("background")).toBeDefined();
+    expect(hovered.get("background")).not.toBe(styled(".bar.selected").get("background"));
+    expect(styled(".bar:hover").size, "a hover rule that reaches a selected row too").toBe(0);
+  });
+});
