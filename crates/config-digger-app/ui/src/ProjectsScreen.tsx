@@ -88,11 +88,6 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
             </button>
           ))}
         </span>
-        <p className="places-about dim">
-          {tab === "projects"
-            ? "Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk."
-            : "Each Agent reads its user configuration from one or more homes. Entries in different homes never compete."}
-        </p>
         <span className="grow" />
         <button type="button" className="cta" onClick={() => setAdding(tab)}>
           <Icon name="folder" small />
@@ -102,6 +97,12 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
 
       <div className="panes">
         <section className="panel places-list">
+          {/* Under the tabs rather than beside them, where it would squeeze them at the smallest window. */}
+          <p className="places-about dim">
+            {tab === "projects"
+              ? "Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk."
+              : "Each Agent reads its user configuration from one or more homes. Entries in different homes never compete."}
+          </p>
           {error && (
             <div className="alert" role="alert">
               <Icon name="flag" small />

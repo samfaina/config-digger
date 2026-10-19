@@ -222,3 +222,113 @@ describe("a change in the What changes block", () => {
     expect(styled(".change-key-piece").get("white-space")).toBe("nowrap");
   });
 });
+
+const smallest = JSON.parse(readFileSync(new URL("../../tauri.conf.json", import.meta.url), "utf8")).app.windows[0] as { minWidth: number; minHeight: number };
+
+/** A length in pixels, such as `10px`. */
+const px = (value: string | undefined) => {
+  expect(value, "a length in px").toMatch(/^\d+(\.\d+)?px$/);
+  return parseFloat(value as string);
+};
+/** The top or the left of a `padding` shorthand, in pixels. */
+const padding = (selector: string, side: "top" | "left") => {
+  const [top, left = top] = (styled(selector).get("padding") ?? "").split(/\s+/);
+  return px(side === "top" ? top : left);
+};
+/** Whether a flex item may shrink below its basis down to its min-width or min-height. */
+const shrinks = (selector: string) => {
+  const flex = styled(selector).get("flex");
+  return flex !== "none" && flex?.split(/\s+/)[1] !== "0";
+};
+
+describe("the Inventory at the smallest window the app allows", () => {
+  const PANES = [".column", ".items", ".detail"];
+
+  test("fits its Agents, Items and detail panes side by side in the width", () => {
+    const around = 2 * padding(".app", "left") + px(styled(".rail").get("width")) + px(styled(".app").get("gap"));
+    const panes = PANES.reduce((sum, pane) => sum + px(styled(pane).get("min-width")), 0);
+    const gaps = (PANES.length - 1) * px(styled(".panes").get("gap"));
+    expect(around + panes + gaps).toBeLessThanOrEqual(smallest.minWidth);
+    for (const pane of PANES) {
+      expect(shrinks(pane), `${pane} shrinks to its min-width`).toBe(true);
+      expect(styled(pane).get("width"), `${pane} has no fixed width`).toBeUndefined();
+    }
+  });
+
+  test("leaves the Items list room for an Item's name beside its icon and State", () => {
+    expect(px(styled(".items").get("min-width"))).toBeGreaterThanOrEqual(320);
+  });
+
+  test("fits its Agents, Entries by State and Agent home blocks one under the other in the height, under the banner", () => {
+    const BLOCKS = [".agents", ".states", ".homes"];
+    const banner = px(styled(".ring").get("height")) + 2 * padding(".banner", "top");
+    const around = 2 * padding(".app", "top") + banner + px(styled(".inventory").get("gap"));
+    const blocks = BLOCKS.reduce((sum, block) => sum + px(styled(block).get("min-height")), 0);
+    const gaps = (BLOCKS.length - 1) * px(styled(".column").get("gap"));
+    expect(around + blocks + gaps).toBeLessThanOrEqual(smallest.minHeight);
+    for (const block of BLOCKS) expect(shrinks(block), `${block} shrinks to its min-height`).toBe(true);
+  });
+
+  test("keeps the Agents block room for its title and two Agents", () => {
+    expect(px(styled(".agents").get("min-height"))).toBeGreaterThanOrEqual(180);
+  });
+
+  test("scrolls the rows of each of those blocks inside the block, under its title", () => {
+    // The Agents block scrolls in its `.scroll`; the other two in their own lists.
+    for (const body of [".scroll", ".bars", ".home-list"]) {
+      const declarations = styled(body);
+      expect(declarations.get("overflow") ?? declarations.get("overflow-y"), body).toBe("auto");
+      expect(declarations.get("min-height"), body).toBe("0");
+      expect(declarations.get("flex"), body).toBe("1");
+    }
+  });
+});
+
+/** The declarations that reach `selector` inside the at-rule `at`. */
+const styledIn = (at: RegExp, selector: string) =>
+  new Map(
+    allRules
+      .filter((found) => found.at.length === 1 && at.test(found.at[0]) && found.selector.split(",").some((listed) => listed.trim() === selector))
+      .flatMap((found) => [...found.declarations]),
+  );
+
+describe("text in the Inventory at the smallest window", () => {
+  test("breaks a long Item name, Item title or detail line instead of running over its neighbours", () => {
+    for (const selector of [".item-name", ".detail .panel-title", ".detail-context"]) {
+      expect(styled(selector).get("overflow-wrap"), selector).toBe("anywhere");
+    }
+  });
+
+  test("cuts a long Item location to one line, as its tooltip holds the full path", () => {
+    const location = styled(".item-location");
+    expect(location.get("text-overflow")).toBe("ellipsis");
+    expect(location.get("white-space")).toBe("nowrap");
+  });
+
+  test("puts an Item's tags, Entry count and State under its name and location in a narrow Items list", () => {
+    expect(styled(".items").get("container")).toBe("items / inline-size");
+    const narrow = /^@container items \(max-width: \d+px\)$/;
+    expect(styledIn(narrow, ".item-row").get("flex-wrap")).toBe("wrap");
+    // The name and location take the rest of the first line, after the icon.
+    expect(styledIn(narrow, ".item-text").get("flex-basis")).toBe("calc(100% - 44px)");
+    expect(px(styled(".item-icon").get("width")) + px(styled(".item-row").get("gap"))).toBe(44);
+    // The second line starts under the name, and the State ends it on the right.
+    expect(styledIn(narrow, ".item-text + *").get("margin-left")).toBe("44px");
+    expect(styledIn(narrow, ".item-row .state-pill").get("margin-left")).toBe("auto");
+  });
+
+  test("cuts a tag in a row of tags at the row's width, such as one naming where an Entry was parked from", () => {
+    const tag = styled(".tags .tag");
+    expect(tag.get("max-width")).toBe("100%");
+    expect(tag.get("overflow")).toBe("hidden");
+    expect(tag.get("text-overflow")).toBe("ellipsis");
+  });
+});
+
+describe("the Projects & homes banner at the smallest window", () => {
+  test("keeps the screen's title and each tab of its switch on one line", () => {
+    for (const selector of [".banner-title", ".places-tabs button"]) {
+      expect(styled(selector).get("white-space"), selector).toBe("nowrap");
+    }
+  });
+});
