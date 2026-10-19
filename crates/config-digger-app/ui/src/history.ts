@@ -1,7 +1,7 @@
 // What the History · Undo screen shows, worked out from the Operations the
 // core lists and details. Nothing here calls the core or renders.
 
-import type { Error as ApiError, FileDiff, OperationSummary } from "./bindings";
+import type { Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
 
 /** How a status reads at a glance. */
 export type StatusTone = "applied" | "undone" | "undo" | "failed" | "attention";
@@ -103,6 +103,21 @@ export type UndoRefusal = {
   /** A masked diff from each backed-up file to what it holds now, or the notice of why none can be shown. */
   diffs: FileDiff[];
 };
+
+/**
+ * What pressing Undo does: shows at once the refusal the detail already
+ * holds, waits while the detail of one History says is refused is read, or
+ * opens the dialog on the Undo's preview.
+ */
+export type UndoPress = { kind: "refused"; refusal: UndoRefusal } | { kind: "reading" } | { kind: "dialog" };
+
+/** What pressing Undo does on `summary`, whose detail is `null` while it is read. */
+export function undoPress(summary: OperationSummary, detail: OperationDetail | null): UndoPress {
+  if (detail === null) return summary.undoable ? { kind: "dialog" } : { kind: "reading" };
+  const error = detail.undo_refusal;
+  if (error === null) return { kind: "dialog" };
+  return { kind: "refused", refusal: { reason: error.message, backup: error.backup ?? detail.backup, diffs: error.diffs } };
+}
 
 /** The refusal planning an Undo failed with, or `null` when it failed otherwise. */
 export function undoRefusal(error: ApiError): UndoRefusal | null {

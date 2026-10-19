@@ -1220,10 +1220,8 @@ pub(crate) fn plan_undo(
             .map_err(Error::unexpected)
     };
     let snapshot = scan(&[], &[])?;
-    let mut files = undo_files(ports, manifest).map_err(|blocked| match blocked {
-        UndoBlocked::Refused(refused) => refused.into_error(definitions, &snapshot),
-        UndoBlocked::Other(error) => error,
-    })?;
+    let mut files = undo_files(ports, manifest)
+        .map_err(|blocked| blocked.into_error(definitions, &snapshot))?;
     let mut folders = undo_folders(ports, manifest)?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
@@ -1478,6 +1476,31 @@ impl UndoBlocked<'_> {
             UndoBlocked::Refused(refused) => refused.message(),
             UndoBlocked::Other(error) => error.message.clone(),
         }
+    }
+
+    /// Why, as the error planning the Undo fails with, its diffs masked for
+    /// the locations of `snapshot` that read each file.
+    fn into_error(self, definitions: &[AgentDefinition], snapshot: &Snapshot) -> Error {
+        match self {
+            UndoBlocked::Refused(refused) => refused.into_error(definitions, snapshot),
+            UndoBlocked::Other(error) => error,
+        }
+    }
+}
+
+/// The error planning the Undo of `manifest` fails with because of its files
+/// and skill folders, as [`plan_undo`] returns it, or `None` when they allow
+/// it. Its diffs are masked for the locations of `snapshot` that read each
+/// file. Why History alone stops it is left to [`history::not_undoable`].
+pub(crate) fn undo_refusal(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    manifest: &history::Manifest,
+    snapshot: &Snapshot,
+) -> Option<Error> {
+    match undo_files(ports, manifest) {
+        Err(blocked) => Some(blocked.into_error(definitions, snapshot)),
+        Ok(_) => undo_folders(ports, manifest).err(),
     }
 }
 

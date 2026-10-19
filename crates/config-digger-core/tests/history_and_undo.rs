@@ -523,6 +523,42 @@ fn history_says_why_an_undo_would_be_refused() {
 }
 
 #[test]
+fn the_detail_of_an_operation_holds_the_refusal_its_undo_would_meet() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let undo = undo_with(&core(&fs), &removed.operation).unwrap();
+    let rotated = TWO_USER_SERVERS.replace("https://mcp.linear.app/mcp", "https://rotated");
+    fs.put_file(claude_json(), rotated);
+
+    let operation = core(&fs).history_show(&undo.operation).unwrap();
+
+    let refused = core(&fs).plan_undo(&undo.operation).err().unwrap();
+    assert_eq!(operation.undo_refusal, Some(refused));
+    // One History does not offer to undo, since it was undone, has none.
+    assert_eq!(
+        core(&fs)
+            .history_show(&removed.operation)
+            .unwrap()
+            .undo_refusal,
+        None
+    );
+}
+
+#[test]
+fn the_detail_of_an_operation_holds_the_block_its_undo_would_meet() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    let readded = TWO_USER_SERVERS.replace("https://mcp.linear.app/mcp", "https://readded");
+    fs.put_file(claude_json(), readded);
+
+    let operation = core(&fs).history_show(&removed.operation).unwrap();
+
+    let blocked = core(&fs).plan_undo(&removed.operation).err().unwrap();
+    assert_eq!(blocked.code, ErrorCode::Blocked);
+    assert_eq!(operation.undo_refusal, Some(blocked));
+}
+
+#[test]
 fn an_undo_is_refused_when_the_file_it_changed_is_gone() {
     let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
     let removed = remove(&fs, "linear");

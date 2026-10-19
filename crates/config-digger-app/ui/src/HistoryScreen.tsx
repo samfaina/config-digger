@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BackupDiffs, BackupPath, Changes, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
 import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
 import { call, NOTICE_MS, type Notify } from "./desktop";
@@ -9,8 +9,10 @@ import {
   operationRow,
   operationTime,
   selectedOperation,
+  undoPress,
   type OperationRow,
   type UndoAction,
+  type UndoPress,
   type UndoRefusal,
 } from "./history";
 import { Icon } from "./icons";
@@ -129,7 +131,12 @@ export function HistoryScreen() {
               detailError={detail && "error" in detail ? detail.error : null}
               time={operationTime(summary.created_at, now)}
               refusal={refused?.operation === summary.id ? refused.refusal : null}
-              onUndo={() => {
+              onUndo={(press) => {
+                // A refusal the detail already holds shows at once, without a preview.
+                if (press.kind === "refused") {
+                  setRefused({ operation: summary.id, refusal: press.refusal });
+                  return;
+                }
                 setRefused(null);
                 dialog.open({ kind: "undo", operation: summary.id });
               }}
@@ -181,7 +188,7 @@ type PaneProps = {
   detailError: ApiError | null;
   time: string;
   refusal: UndoRefusal | null;
-  onUndo: () => void;
+  onUndo: (press: UndoPress) => void;
   onDeleteBackup: () => void;
   onDismiss: () => void;
   notify: Notify;
@@ -191,6 +198,7 @@ type PaneProps = {
 function OperationPane({ summary, detail, detailError, time, refusal, onUndo, onDeleteBackup, onDismiss, notify }: PaneProps) {
   const row = operationRow(summary);
   const actions = operationActions(summary);
+  const press = undoPress(summary, detail);
   return (
     <>
       <h2 className="panel-title">
@@ -249,14 +257,14 @@ function OperationPane({ summary, detail, detailError, time, refusal, onUndo, on
           </button>
         )}
         <span className="grow" />
-        <UndoButton undo={actions.undo} onUndo={onUndo} />
+        <UndoButton undo={actions.undo} reading={press.kind === "reading"} onUndo={() => onUndo(press)} />
       </footer>
     </>
   );
 }
 
-/** Undo, or in its place why the Operation cannot be undone. */
-function UndoButton({ undo, onUndo }: { undo: UndoAction; onUndo: () => void }) {
+/** Undo, or in its place why the Operation cannot be undone. While `reading`, it waits for the detail. */
+function UndoButton({ undo, reading, onUndo }: { undo: UndoAction; reading: boolean; onUndo: () => void }) {
   if (!undo.offered) {
     return (
       <Tooltip text={undo.why}>
@@ -268,7 +276,7 @@ function UndoButton({ undo, onUndo }: { undo: UndoAction; onUndo: () => void }) 
     );
   }
   return (
-    <button type="button" className="cta" onClick={onUndo}>
+    <button type="button" className="cta" disabled={reading} onClick={onUndo}>
       <Icon name="history" small />
       Undo
     </button>
@@ -277,9 +285,12 @@ function UndoButton({ undo, onUndo }: { undo: UndoAction; onUndo: () => void }) 
 
 /** Why the Undo was refused, the backup → now diffs, and where to recover from by hand. No "restore anyway". */
 function RefusalBlock({ refusal, notify }: { refusal: UndoRefusal; notify: Notify }) {
+  const block = useRef<HTMLDivElement>(null);
+  // Each refusal is brought into view, such as one the dialog closed on while the detail was scrolled down.
+  useEffect(() => block.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [refusal]);
   return (
     <>
-      <div className="dialog-callout danger" role="alert">
+      <div ref={block} className="dialog-callout danger" role="alert">
         <Icon name="flag" small />
         <div>
           <div className="callout-title">Can't undo</div>

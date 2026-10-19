@@ -414,7 +414,7 @@ describe("the What changes block", () => {
   test("groups the changes under their Project, then under their file, in the order each first comes", () => {
     const groups = changeGroups(changes);
 
-    expect(groups.map((group) => group.project)).toEqual([gone, other]);
+    expect(groups.map((group) => group.title)).toEqual([gone, other]);
     expect(groups[0].files.map((file) => [file.name, file.path])).toEqual([[".claude.json", claudeJson]]);
     expect(groups[0].files[0].changes.map((line) => line.change.agent_name)).toEqual(["Claude Code", "VS Code"]);
     expect(groups[1].files[0].changes.map((line) => line.change.item)).toEqual(["cd-throwaway-other"]);
@@ -425,6 +425,32 @@ describe("the What changes block", () => {
 
     expect(line.keyPieces).toEqual(["projects.", "E:/", "cd-throwaway/", "project-gone.", "mcpServers.", "cd-throwaway-leftover"]);
     expect(line.change.locator).toBe(String.raw`C:\Users\me\.claude.json#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`);
+  });
+
+  test("lists an Entry whose State changes the same way in every context it reaches once, under how many contexts", () => {
+    // A user-scope Entry, predicted in No Project and in each of two Projects.
+    const groups = changeGroups([
+      change(),
+      change({ project: String.raw`E:\app` }),
+      change({ project: String.raw`E:\web` }),
+      change({ agent: "vscode", agent_name: "VS Code", project: String.raw`E:\app` }),
+    ]);
+
+    expect(groups.map((group) => group.title)).toEqual(["3 contexts", String.raw`E:\app`]);
+    expect(groups[0].files[0].changes.map((line) => line.change.agent_name)).toEqual(["Claude Code"]);
+    expect(groups[1].files[0].changes.map((line) => line.change.agent_name)).toEqual(["VS Code"]);
+  });
+
+  test("lists an Entry whose State changes differently by context once per context, under each Project", () => {
+    const groups = changeGroups([
+      change(),
+      change({ project: String.raw`E:\app` }),
+      change({ project: String.raw`E:\web`, before: "shadowed" }),
+    ]);
+
+    expect(groups.map((group) => group.title)).toEqual(["No Project", String.raw`E:\app`, String.raw`E:\web`]);
+    expect(groups.map((group) => group.files[0].changes.length)).toEqual([1, 1, 1]);
+    expect(groups[2].files[0].changes[0].change.before).toBe("shadowed");
   });
 
   test("gives a skill folder, whose locator is its path, no key, its folder's name standing for it", () => {
