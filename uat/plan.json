@@ -340,6 +340,22 @@
           "commands": [],
           "expect": "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file». Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.», y su fila dice «Folder · Added by you», con los botones Open in Inventory y Remove from list.",
           "covers": ["#75"]
+        },
+        {
+          "id": "10.10",
+          "title": "Projects & homes en la ventana más pequeña",
+          "goal": "Con la ventana más pequeña que deja la app, la cabecera de Projects & homes tiene su título, sus pestañas y su botón en una línea cada uno, y la descripción de la pestaña no les quita sitio.",
+          "instructions": [
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "Mira la cabecera y el principio de la lista.",
+            "Abre la pestaña Agent homes.",
+            "Mira la cabecera y el principio de la lista."
+          ],
+          "commands": [],
+          "expect": "En las dos pestañas, el título Projects & homes, cada pestaña (Projects · N y Agent homes · N) y el botón Add Project o Add Agent home ocupan una línea cada uno. La descripción no está en la cabecera: sale encima de la lista, «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.» en Projects y «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.» en Agent homes.",
+          "covers": ["#221"]
         }
       ]
     },
@@ -384,7 +400,8 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "En el Inventario, elige All Agents en Agents.",
-            "En Agent home, abajo a la izquierda, abre el desplegable de la fila de Claude Code. Sale cuando Claude Code tiene dos homes o más: el tuyo y claude-code-home del paso 1.2.",
+            "En Agent home, abajo a la izquierda, desplázate dentro del bloque hasta la fila de Claude Code.",
+            "Abre el desplegable de esa fila. Sale cuando Claude Code tiene dos homes o más: el tuyo y claude-code-home del paso 1.2.",
             "Pulsa Escape.",
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
@@ -395,7 +412,7 @@
           ],
           "commands": [],
           "expect": "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo, entero y sin pasar de ese borde. El panel de Agent se abre entero debajo de su campo.",
-          "covers": ["#181"]
+          "covers": ["#181", "#221"]
         },
         {
           "id": "2.4",
@@ -460,13 +477,14 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "Deja el ratón sobre el botón About, abajo en la barra de la izquierda.",
-            "En el Inventario, elige Claude Code en Agents.",
+            "En el Inventario, desplázate dentro del bloque Agents hasta Claude Code.",
+            "Elige Claude Code.",
             "En Agent home, elige claude-code-home.",
-            "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items."
+            "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items: la línea gris bajo su nombre."
           ],
           "commands": [],
           "expect": "Los dos tooltips quedan enteros dentro de la ventana. El de About, en la esquina de abajo a la izquierda, sale encima del botón y no pasa del borde izquierdo. El de la fila muestra la ruta entera de la skill, partida en varias líneas.",
-          "covers": ["#182"]
+          "covers": ["#182", "#221"]
         }
       ]
     },
@@ -559,6 +577,28 @@
           "commands": [],
           "expect": "El panel no cabe entero en la ventana y se desplaza con su propia barra. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
           "covers": ["#183"]
+        },
+        {
+          "id": "4.6",
+          "title": "Los bloques del Inventario en la ventana más pequeña",
+          "goal": "Con la ventana más pequeña que deja la app, cada bloque del Inventario muestra sus filas y se usa, desplazándose dentro de sí cuando no cabe, y ningún texto se monta sobre otro.",
+          "instructions": [
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "En el Inventario, elige All Agents en Agents.",
+            "Desplázate hasta abajo dentro del bloque Agents.",
+            "Desplázate hasta abajo dentro del bloque Entries by State.",
+            "Desplázate hasta abajo dentro del bloque Agent home.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-many-home, el home que añade el paso 4.1.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\many\\project-01.",
+            "Deja el ratón sobre el campo Project.",
+            "Elige el servidor cd-throwaway-many-01 de la lista de Items.",
+            "Mira la lista de Items y el panel de la derecha.",
+            "Deja el ratón sobre la ubicación de la fila cd-throwaway-many-01: la línea gris bajo su nombre."
+          ],
+          "commands": [],
+          "expect": "Agents muestra su título y al menos dos Agents; Entries by State y Agent home, su título y al menos una fila. Al desplazarte dentro de un bloque, llegas a su última fila y los otros dos bloques no se mueven. Claude Code y claude-code-many-home se eligen con un clic. La lista de Items y el panel de la derecha tienen más o menos el mismo ancho, y la columna de la izquierda es algo más estrecha que cada uno. Ningún texto se monta sobre otro: en cada fila de Items, el nombre y debajo la ubicación van junto al icono, y el número de Entries y el State en otra línea, bajo ellos. La ubicación acaba en «…» y su tooltip muestra la ruta entera. El tooltip del campo Project muestra E:\\cd-throwaway\\many\\project-01 entero.",
+          "covers": ["#221"]
         }
       ]
     },

@@ -47,7 +47,7 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
         {entry.git_versioned && <span className="tag git">git-versioned</span>}
         {entry.link && <LinkTag link={entry.link} withTarget />}
         {entry.parked && (
-          <Tooltip text={`Parked ${entry.parked.parked_at}`}>
+          <Tooltip text={`Parked from ${entry.parked.locator}\non ${entry.parked.parked_at}`}>
             <span className="tag">parked from {entry.parked.locator}</span>
           </Tooltip>
         )}

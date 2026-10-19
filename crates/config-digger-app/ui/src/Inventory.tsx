@@ -337,6 +337,7 @@ function Banner({ inventory, project, agentName, stats, reading, refresh, select
           className="banner-select"
           label="Project"
           value={project ?? ""}
+          tooltip={project ?? undefined}
           options={[
             { value: "", label: "No Project" },
             ...present.map((path) => option(path)),
@@ -436,7 +437,7 @@ function AgentsPane({ inventory, selection, onAgent }: AgentsPaneProps) {
 export function StateBars({ items, state, onState }: { items: Item[]; state: State | null; onState: (state: State | null) => void }) {
   const { total, counts } = stateCounts(items);
   return (
-    <section className="panel">
+    <section className="panel states">
       <h2 className="panel-title">
         Entries by State
         <span className="grow" />
@@ -552,7 +553,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       });
   }
   return (
-    <section className="panel">
+    <section className="panel homes">
       <h2 className="panel-title">Agent home</h2>
       <div className="home-list">{body}</div>
     </section>
@@ -631,10 +632,12 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
           </span>
         </Tooltip>
       </span>
-      {effective.git_versioned && <span className="tag">git-versioned</span>}
-      {effective.link && <LinkTag link={effective.link} />}
-      <span className="item-count">{entries}</span>
-      <StatePill state={item.state} />
+      <span className="item-side">
+        {effective.git_versioned && <span className="tag">git-versioned</span>}
+        {effective.link && <LinkTag link={effective.link} />}
+        <span className="item-count">{entries}</span>
+        <StatePill state={item.state} />
+      </span>
     </button>
   );
 }
