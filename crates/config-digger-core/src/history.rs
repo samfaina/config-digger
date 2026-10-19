@@ -506,6 +506,10 @@ pub(crate) fn detail(
             .as_ref()
             .map(|record| record.differences.clone())
             .unwrap_or_default(),
+        undo_refusal: not_undoable(manifest, &manifests)
+            .is_none()
+            .then(|| plan::undo_refusal(definitions, ports, manifest, &snapshot))
+            .flatten(),
         backup: folder,
     })
 }

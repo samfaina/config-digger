@@ -1126,6 +1126,13 @@ export type OperationDetail = {
 	verify: Verify | null,
 	/**  Where the States after differed from the prediction. */
 	differences: Difference[],
+	/**
+	 *  For an Operation History offers to undo, the error planning its Undo
+	 *  fails with now because of its files, as [`Core::plan_undo`] returns
+	 *  it: an `undo_refused` one carries a diff from each backed-up file to
+	 *  what it holds now. `None` when its files allow the Undo.
+	 */
+	undo_refusal: Error | null,
 };
 
 /**  One file an Operation touched. */

@@ -66,7 +66,7 @@ function leftoverCount(preview: Preview): string {
 }
 
 /**
- * A change as the What changes block lists it, under its Project and its
+ * A change as the What changes block lists it, under its context and its
  * file. `keyPieces` is its locator past the file, in pieces that each end where
  * the line may wrap, at a path or key separator; a skill folder has none.
  */
@@ -75,18 +75,38 @@ export type ChangeLine = { change: Change; keyPieces: string[] };
 /** The changes to one file, under the file's name, with its full path for hover and copy. */
 export type FileGroup = { path: string; name: string; changes: ChangeLine[] };
 
-/** The changes in one Project, or in no Project, file by file. */
-export type ProjectGroup = { project: string | null; files: FileGroup[] };
+/**
+ * The changes in one context, file by file, under its Project or "No
+ * Project", or under how many contexts they reach, such as "3 contexts".
+ */
+export type ContextGroup = { title: string; files: FileGroup[] };
 
-/** The changes under their Project, then under their file, each group where its first change comes. */
-export function changeGroups(changes: Change[]): ProjectGroup[] {
-  const groups: ProjectGroup[] = [];
+/**
+ * The changes under their context, then under their file, each group where
+ * its first change comes. The changes of one (Agent, Entry) that all go from
+ * the same State to the same State in several contexts are one line, under
+ * how many contexts; else each is a line under its Project.
+ */
+export function changeGroups(changes: Change[]): ContextGroup[] {
+  const byEntry: Change[][] = [];
   for (const change of changes) {
-    let group = groups.find((group) => group.project === change.project);
-    if (!group) groups.push((group = { project: change.project, files: [] }));
+    const ofEntry = byEntry.find(([first]) => first.agent === change.agent && first.home === change.home && first.locator === change.locator);
+    if (ofEntry) ofEntry.push(change);
+    else byEntry.push([change]);
+  }
+  const groups: ContextGroup[] = [];
+  const add = (title: string, change: Change) => {
+    let group = groups.find((group) => group.title === title);
+    if (!group) groups.push((group = { title, files: [] }));
     let file = group.files.find((file) => file.path === change.path);
     if (!file) group.files.push((file = { path: change.path, name: fileName(change.path), changes: [] }));
     file.changes.push({ change, keyPieces: wrapPoints(locatorKey(change)) });
+  };
+  for (const ofEntry of byEntry) {
+    const [first] = ofEntry;
+    const sameWay = ofEntry.every((change) => change.before === first.before && change.after === first.after);
+    if (ofEntry.length > 1 && sameWay) add(`${ofEntry.length} contexts`, first);
+    else for (const change of ofEntry) add(change.project ?? "No Project", change);
   }
   return groups;
 }

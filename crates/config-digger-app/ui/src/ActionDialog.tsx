@@ -379,14 +379,14 @@ export function DialogSection({ title, children }: { title: string; children: Re
   );
 }
 
-/** The States an Operation changes, under each Project, then under each file. */
+/** The States an Operation changes, under each context, then under each file. */
 export function Changes({ changes, notify }: { changes: Change[]; notify: Notify }) {
   if (changes.length === 0) return <p className="dim">No State changes in any Agent.</p>;
   return (
     <div className="changes">
       {changeGroups(changes).map((group) => (
-        <section key={group.project ?? ""} className="change-project">
-          <h3 className="change-project-name">{group.project ?? "No Project"}</h3>
+        <section key={group.title} className="change-project">
+          <h3 className="change-project-name">{group.title}</h3>
           {group.files.map((file) => (
             <div key={file.path} className="change-file">
               <div className="change-file-name">

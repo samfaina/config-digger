@@ -1,7 +1,7 @@
 // What the History · Undo screen shows, worked out from the Operations the
 // core lists and details. Nothing here calls the core or renders.
 
-import type { Error as ApiError, FileDiff, OperationSummary } from "./bindings";
+import type { Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
 
 /** How a status reads at a glance. */
 export type StatusTone = "applied" | "undone" | "undo" | "failed" | "attention";
@@ -95,7 +95,7 @@ export function recoveryBanner(history: OperationSummary[]): string | null {
   return count === 1 ? "An Operation needs manual recovery" : `${count} Operations need manual recovery`;
 }
 
-/** An Undo the core refused because what the Operation touched changed since. */
+/** An Undo the core refuses, or blocks, because what the Operation touched changed since. */
 export type UndoRefusal = {
   reason: string;
   /** The Operation's backup folder, to recover from by hand. */
@@ -104,8 +104,32 @@ export type UndoRefusal = {
   diffs: FileDiff[];
 };
 
+/**
+ * What pressing Undo does: shows at once the refusal the detail already
+ * holds, waits while the detail of one History says is refused is read, or
+ * opens the dialog on the Undo's preview.
+ */
+export type UndoPress = { kind: "refused"; refusal: UndoRefusal } | { kind: "reading" } | { kind: "dialog" };
+
+/**
+ * What pressing Undo does on `summary`, whose detail is `null` while it is
+ * read, or `"unread"` when it couldn't be: then the dialog plans the Undo
+ * and says why it is refused, if it is.
+ */
+export function undoPress(summary: OperationSummary, detail: OperationDetail | "unread" | null): UndoPress {
+  if (detail === null) return summary.undoable ? { kind: "dialog" } : { kind: "reading" };
+  if (detail === "unread") return { kind: "dialog" };
+  const error = detail.undo_refusal;
+  if (error === null || (error.code !== "undo_refused" && error.code !== "blocked")) return { kind: "dialog" };
+  return { kind: "refused", refusal: refusalOf(error, error.backup ?? detail.backup) };
+}
+
 /** The refusal planning an Undo failed with, or `null` when it failed otherwise. */
 export function undoRefusal(error: ApiError): UndoRefusal | null {
   if (error.code !== "undo_refused" || error.backup === null) return null;
-  return { reason: error.message, backup: error.backup, diffs: error.diffs };
+  return refusalOf(error, error.backup);
+}
+
+function refusalOf(error: ApiError, backup: string): UndoRefusal {
+  return { reason: error.message, backup, diffs: error.diffs };
 }

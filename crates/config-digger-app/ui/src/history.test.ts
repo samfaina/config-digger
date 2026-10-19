@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
-import type { Error as ApiError, FileDiff, OperationSummary } from "./bindings";
+import type { Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
 import {
   operationActions,
   operationRow,
   operationTime,
   recoveryBanner,
   selectedOperation,
+  undoPress,
   undoRefusal,
 } from "./history";
 
@@ -219,6 +220,74 @@ describe("a refused Undo", () => {
   test("is only an Undo the core refused for what changed, not another failure to plan", () => {
     expect(undoRefusal(error({ code: "blocked", message: "Operation x cannot be undone" }))).toBeNull();
     expect(undoRefusal(error({ code: "undo_refused", message: "refused", backup: null }))).toBeNull();
+  });
+});
+
+describe("pressing Undo", () => {
+  const backup = String.raw`C:\Users\me\AppData\Local\config-digger\backups\20261002-095812-a3f`;
+  const reason = String.raw`Undo refused: \`mcpServers.notes\` in C:\Users\me\.claude.json changed since the Operation.`;
+  const diff: FileDiff = {
+    path: String.raw`C:\Users\me\.claude.json`,
+    diff: "@@ -1 +1 @@\n-a\n+b\n",
+    diff_unavailable: null,
+    diff_note: null,
+    changed_lines: 2,
+  };
+  const error = (overrides: Partial<ApiError>): ApiError => ({
+    code: "unexpected",
+    message: "",
+    candidates: [],
+    backup: null,
+    diffs: [],
+    failed: null,
+    ...overrides,
+  });
+  const refused = summary({ undoable: false, not_undoable: reason });
+  const detail = (overrides: Partial<OperationDetail> = {}): OperationDetail => ({
+    summary: refused,
+    project: null,
+    changes: [],
+    locations: [],
+    backup,
+    cause: null,
+    rollback: [],
+    verify: null,
+    differences: [],
+    undo_refusal: null,
+    ...overrides,
+  });
+
+  test("shows the refusal its detail already holds at once, with the diffs from the backup, and opens no dialog", () => {
+    const press = undoPress(refused, detail({ undo_refusal: error({ code: "undo_refused", message: reason, backup, diffs: [diff] }) }));
+
+    expect(press).toEqual({ kind: "refused", refusal: { reason, backup, diffs: [diff] } });
+  });
+
+  test("shows a block its files already meet at once, with the Operation's backup folder", () => {
+    const blocked = String.raw`\`mcpServers.notes\` in C:\Users\me\.claude.json appeared since Operation 20261002-095812-a3f, and the Undo would overwrite it`;
+
+    const press = undoPress(refused, detail({ undo_refusal: error({ code: "blocked", message: blocked }) }));
+
+    expect(press).toEqual({ kind: "refused", refusal: { reason: blocked, backup, diffs: [] } });
+  });
+
+  test("opens the dialog on the Undo's preview when its detail holds no refusal", () => {
+    expect(undoPress(summary(), detail({ summary: summary() }))).toEqual({ kind: "dialog" });
+  });
+
+  test("waits for the detail while it is read, when History already says the Undo would be refused", () => {
+    expect(undoPress(refused, null)).toEqual({ kind: "reading" });
+    expect(undoPress(summary(), null)).toEqual({ kind: "dialog" });
+  });
+
+  test("opens the dialog when the detail couldn't be read, so that planning the Undo says why it is refused", () => {
+    expect(undoPress(refused, "unread")).toEqual({ kind: "dialog" });
+  });
+
+  test("opens the dialog when checking the Undo failed otherwise than by a refusal or a block", () => {
+    const unexpected = error({ code: "unexpected", message: "cannot read the manifest" });
+
+    expect(undoPress(refused, detail({ undo_refusal: unexpected }))).toEqual({ kind: "dialog" });
   });
 });
 

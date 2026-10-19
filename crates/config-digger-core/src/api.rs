@@ -1366,6 +1366,11 @@ pub struct OperationDetail {
     pub verify: Option<Verify>,
     /// Where the States after differed from the prediction.
     pub differences: Vec<Difference>,
+    /// For an Operation History offers to undo, the error planning its Undo
+    /// fails with now because of its files, as [`Core::plan_undo`] returns
+    /// it: an `undo_refused` one carries a diff from each backed-up file to
+    /// what it holds now. `None` when its files allow the Undo.
+    pub undo_refusal: Option<Error>,
 }
 
 /// One file an Operation touched.

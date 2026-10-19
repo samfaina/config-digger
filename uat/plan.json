@@ -817,8 +817,8 @@
               "text": "notepad E:\\cd-throwaway\\codex-home\\config.toml"
             }
           ],
-          "expect": "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo. Al pulsarlo sale un recuadro rojo Can't undo que dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …». Debajo salen la sección Backup → now con la diferencia y los botones Open backup folder y Copy path. No hay ningún botón para restaurar a la fuerza.",
-          "covers": ["#74", "#218"]
+          "expect": "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo, y en States changed cada cambio sale una sola vez: uno que cambia igual en varios contextos sale bajo un título como «3 contexts». Al pulsar Undo no se abre ningún diálogo: en el acto, arriba del detalle y a la vista, sale un recuadro rojo Can't undo que dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …». Debajo salen la sección Backup → now con la diferencia y los botones Open backup folder y Copy path. No hay ningún botón para restaurar a la fuerza.",
+          "covers": ["#74", "#218", "#220"]
         },
         {
           "id": "11.5",
