@@ -1,34 +1,32 @@
 //! The UAT plan, `uat/plan.json`, checked against its JSON Schema,
-//! `uat/plan.schema.json`, and against the rules a schema cannot say: every
-//! step id is unique, no step asks for a window smaller than the app's
-//! smallest, the `minWidth` and `minHeight` of its main window in
-//! `crates/config-digger-app/tauri.conf.json`, and no step presses Add Agent
-//! home before it opens the Agent homes tab, the only place the button is.
+//! `uat/plan.schema.json`, and against the rules a schema cannot say:
+//!
+//! - every step id is unique;
+//! - no step asks for a window smaller than the app's smallest, the
+//!   `minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`;
+//! - a step opens the Agent homes tab before it presses Add Agent home, which
+//!   is only there.
 
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-fn uat_file(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../uat")
-        .join(name)
-}
-
-fn read_json(name: &str) -> Value {
-    let text = std::fs::read_to_string(uat_file(name)).unwrap();
+/// A JSON file of the repo, at `path` from its root.
+fn read_json(path: &str) -> Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join(path);
+    let text = std::fs::read_to_string(path).unwrap();
     serde_json::from_str(&text).unwrap()
 }
 
 fn plan() -> Value {
-    read_json("plan.json")
+    read_json("uat/plan.json")
 }
 
 /// The smallest the app's main window can be, as `(width, height)`.
 fn smallest_window() -> (u64, u64) {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../crates/config-digger-app/tauri.conf.json");
-    let config: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let config = read_json("crates/config-digger-app/tauri.conf.json");
     let window = &config["app"]["windows"][0];
     (
         window["minWidth"].as_u64().unwrap(),
@@ -55,26 +53,20 @@ fn window_sizes(line: &str) -> Vec<(u64, u64)> {
 /// the plan, then every step id used twice, then every window too small and
 /// every Add Agent home pressed outside the Agent homes tab.
 fn problems(plan: &Value) -> Vec<String> {
-    let schema = read_json("plan.schema.json");
+    let schema = read_json("uat/plan.schema.json");
     let validator = jsonschema::validator_for(&schema).unwrap();
     let mut problems: Vec<String> = validator
         .iter_errors(plan)
         .map(|error| format!("{}: {error}", error.instance_path()))
         .collect();
+    let (min_width, min_height) = smallest_window();
     let mut ids = HashSet::new();
     for section in plan["sections"].as_array().into_iter().flatten() {
         for step in section["steps"].as_array().into_iter().flatten() {
-            if let Some(id) = step["id"].as_str()
-                && !ids.insert(id)
-            {
+            let id = step["id"].as_str().unwrap_or("?");
+            if !ids.insert(id) {
                 problems.push(format!("step {id} is in the plan twice"));
             }
-        }
-    }
-    let (min_width, min_height) = smallest_window();
-    for section in plan["sections"].as_array().into_iter().flatten() {
-        for step in section["steps"].as_array().into_iter().flatten() {
-            let id = step["id"].as_str().unwrap_or("?");
             // Add Agent home is a button of the Agent homes tab only.
             let mut agent_homes_tab = false;
             for line in step["instructions"].as_array().into_iter().flatten() {
@@ -86,8 +78,9 @@ fn problems(plan: &Value) -> Vec<String> {
                         ));
                     }
                 }
-                agent_homes_tab |= line.contains("pestaña Agent homes");
-                if line.to_lowercase().contains("pulsa add agent home") && !agent_homes_tab {
+                let line = line.to_lowercase();
+                agent_homes_tab |= line.contains("pestaña agent homes");
+                if line.contains("pulsa add agent home") && !agent_homes_tab {
                     problems.push(format!(
                         "step {id} presses Add Agent home without opening the Agent homes tab first"
                     ));

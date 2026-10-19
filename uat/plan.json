@@ -91,7 +91,7 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "En el Inventario, elige All Agents en Agents.",
-            "En Agent home, abajo a la izquierda, abre el desplegable de la fila de Claude Code.",
+            "En Agent home, abajo a la izquierda, abre el desplegable de la fila de Claude Code. Sale cuando Claude Code tiene dos homes o más: el tuyo y claude-code-home del paso 1.2.",
             "Pulsa Escape.",
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
@@ -101,7 +101,7 @@
             "Pulsa Cancel."
           ],
           "commands": [],
-          "expect": "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, queda entero dentro de ella: se abre debajo del campo si cabe y encima si no, sin pasar del borde. El panel de Agent se abre entero debajo de su campo.",
+          "expect": "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo, entero y sin pasar de ese borde. El panel de Agent se abre entero debajo de su campo.",
           "covers": ["#181"]
         },
         {
@@ -167,7 +167,9 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "Deja el ratón sobre el botón About, abajo en la barra de la izquierda.",
-            "En el Inventario, deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items."
+            "En el Inventario, elige Claude Code en Agents.",
+            "En Agent home, elige claude-code-home.",
+            "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items."
           ],
           "commands": [],
           "expect": "Los dos tooltips quedan enteros dentro de la ventana. El de About, en la esquina de abajo a la izquierda, sale encima del botón y no pasa del borde izquierdo. El de la fila muestra la ruta entera de la skill, partida en varias líneas.",
