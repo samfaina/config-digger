@@ -4,6 +4,7 @@ import { inventoryStart } from "./places";
 import {
   agentStats,
   chosenHomes,
+  homeChoices,
   emptyInventory,
   entryActions,
   failuresInContext,
@@ -122,20 +123,20 @@ describe("chosen homes", () => {
     const skipped = home({ home: "skipped", not_read: { read_instead: "default", sentence: "Skipped." } });
     const homes = [skipped, home(), desktopStore, desktopClassic];
 
-    expect(chosenHomes(homes, {}, [])).toEqual({ "claude-code": "default", "claude-desktop": "store" });
+    expect(chosenHomes(homes, homeChoices(), [])).toEqual({ "claude-code": "default", "claude-desktop": "store" });
   });
 
   test("keep a choice the user made while that home is listed", () => {
     const homes = [desktopStore, desktopClassic];
 
-    expect(chosenHomes(homes, { "claude-desktop": "classic" }, [])).toEqual({ "claude-desktop": "classic" });
-    expect(chosenHomes(homes, { "claude-desktop": "gone" }, [])).toEqual({ "claude-desktop": "store" });
+    expect(chosenHomes(homes, homeChoices({ "claude-desktop": "classic" }), [])).toEqual({ "claude-desktop": "classic" });
+    expect(chosenHomes(homes, homeChoices({ "claude-desktop": "gone" }), [])).toEqual({ "claude-desktop": "store" });
   });
 
   test("fall back to the first home when the Agent reads none of them", () => {
     const skipped = home({ not_read: { read_instead: null, sentence: "Skipped." } });
 
-    expect(chosenHomes([skipped], {}, [])).toEqual({ "claude-code": "default" });
+    expect(chosenHomes([skipped], homeChoices(), [])).toEqual({ "claude-code": "default" });
   });
 });
 
@@ -166,7 +167,7 @@ describe("a missing Project's leftovers", () => {
   });
 
   test("are shown in the added home that holds them, not the Agent's first", () => {
-    const homes = chosenHomes(missing.homes, {}, missing.items);
+    const homes = chosenHomes(missing.homes, homeChoices(), missing.items);
     const shown = itemsShown(missing.items, { agent: "all", homes });
 
     expect(filterItems(shown, { kind: "all", text: "", state: "unread" }).map((i) => i.name)).toEqual([
@@ -177,7 +178,7 @@ describe("a missing Project's leftovers", () => {
   test("are listed whether the Inventory opens on them or on their Project, with no home chosen", () => {
     for (const show of [{ kind: "leftovers", path: gone }, { kind: "project", path: gone }] as const) {
       const start = inventoryStart(show);
-      const homes = chosenHomes(missing.homes, start.homes, missing.items);
+      const homes = chosenHomes(missing.homes, homeChoices(start.homes), missing.items);
       const shown = itemsShown(missing.items, { agent: start.agent, homes });
 
       expect(filterItems(shown, { kind: "all", text: "", state: start.state }).map((i) => i.name)).toContain(
@@ -187,7 +188,7 @@ describe("a missing Project's leftovers", () => {
   });
 
   test("in a home the user didn't choose are named, with how many", () => {
-    const selection = { agent: "all", homes: chosenHomes(missing.homes, { "claude-code": "default" }, missing.items) };
+    const selection = { agent: "all", homes: chosenHomes(missing.homes, homeChoices({ "claude-code": "default" }), missing.items) };
 
     expect(leftoversNotShown(missing, selection)).toEqual([
       {
@@ -199,7 +200,7 @@ describe("a missing Project's leftovers", () => {
   });
 
   test("in a home not shown are named only for the selected Agents", () => {
-    const homes = chosenHomes(missing.homes, { "claude-code": "default" }, missing.items);
+    const homes = chosenHomes(missing.homes, homeChoices({ "claude-code": "default" }), missing.items);
 
     expect(leftoversNotShown(missing, { agent: "claude-desktop", homes })).toEqual([]);
   });
@@ -213,12 +214,12 @@ describe("a missing Project's leftovers", () => {
     const homes = [home(), added];
     const items = [item({ name: "context7" }), bound];
 
-    expect(chosenHomes(homes, {}, items)).toEqual({ "claude-code": "default" });
+    expect(chosenHomes(homes, homeChoices(), items)).toEqual({ "claude-code": "default" });
     expect(leftoversNotShown(inventory({ project: gone, homes, items }), { agent: "all", homes: { "claude-code": "default" } })).toEqual([]);
   });
 
   test("are not named when the home that holds them is shown", () => {
-    const selection = { agent: "all", homes: chosenHomes(missing.homes, {}, missing.items) };
+    const selection = { agent: "all", homes: chosenHomes(missing.homes, homeChoices(), missing.items) };
 
     expect(leftoversNotShown(missing, selection)).toEqual([]);
   });

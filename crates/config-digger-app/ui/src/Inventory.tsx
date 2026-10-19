@@ -27,6 +27,7 @@ import {
   findItem,
   flagsShown,
   groupItems,
+  homeChoices,
   homeFailures,
   itemKey,
   itemsShown,
@@ -37,8 +38,10 @@ import {
   readerItem,
   samePath,
   stateCounts,
+  withHomeChosen,
+  withProjectChosen,
   type AgentStats,
-  type HomeChoice,
+  type HomeChoices,
   type ItemFilter,
   type Selection,
 } from "./view";
@@ -65,7 +68,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const { inventory, project, error, reading, refresh, selectProject } = useInventory(start?.project ?? null);
   const { history, reload: reloadHistory } = useHistory();
   const [agent, setAgent] = useState(start?.agent ?? "all");
-  const [homeChoice, setHomeChoice] = useState<HomeChoice>(start?.homes ?? {});
+  const [homeChoice, setHomeChoice] = useState<HomeChoices>(homeChoices(start?.homes));
   const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: start?.state ?? null });
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
@@ -103,7 +106,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
     setDetail(null);
   };
   const chooseHome = (agentId: string, home: string) => {
-    setHomeChoice((choice) => ({ ...choice, [agentId]: home }));
+    setHomeChoice((choices) => withHomeChosen(choices, agentId, home));
     setDetail(null);
   };
   const showWinner = (locator: string) => {
@@ -113,7 +116,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const openReader = (reader: AlsoReadBy, locator: string) => {
     const item = inventory && readerItem(inventory, reader, locator);
     if (!item) return;
-    setHomeChoice((choice) => ({ ...choice, [reader.agent]: reader.home }));
+    setHomeChoice((choices) => withHomeChosen(choices, reader.agent, reader.home));
     if (agent !== "all") setAgent(reader.agent);
     setDetail({ kind: "item", key: itemKey(item) });
     setFlash(locator);
@@ -132,8 +135,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         refresh={refresh}
         selectProject={(next) => {
           selectProject(next);
-          // Each Project opens on its own homes, so a missing one shows the homes holding its leftovers.
-          setHomeChoice({});
+          setHomeChoice((choices) => withProjectChosen(choices, inventory?.projects ?? [], next));
           setDetail(null);
         }}
       />

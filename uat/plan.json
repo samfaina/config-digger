@@ -526,7 +526,7 @@
           ],
           "commands": [],
           "expect": "La lista tiene 12 Operations Disable y no cabe entera. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
-          "covers": ["#183"]
+          "covers": ["#183", "#218"]
         },
         {
           "id": "4.4",
@@ -756,7 +756,7 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#74"]
+          "covers": ["#74", "#218"]
         },
         {
           "id": "11.2",
@@ -818,7 +818,7 @@
             }
           ],
           "expect": "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo. Al pulsarlo sale un recuadro rojo Can't undo que dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …». Debajo salen la sección Backup → now con la diferencia y los botones Open backup folder y Copy path. No hay ningún botón para restaurar a la fuerza.",
-          "covers": ["#74"]
+          "covers": ["#74", "#218"]
         },
         {
           "id": "11.5",

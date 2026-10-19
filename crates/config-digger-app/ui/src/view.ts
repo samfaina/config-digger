@@ -13,6 +13,7 @@ import type {
   Inventory,
   Item,
   ItemKind,
+  Project,
   ReadFailure,
   State,
   Verb,
@@ -35,17 +36,46 @@ export function agentsOf(homes: Home[]): { agent: string; agentName: string }[] 
 }
 
 /**
+ * The home the user chose for each Agent, and, while the Project chosen is
+ * missing, those chosen since: until the user chooses one, each Agent opens
+ * on the home holding the Project's leftovers.
+ */
+export type HomeChoices = { choice: HomeChoice; sinceMissing: HomeChoice | null };
+
+/** The homes chosen in `choice`, with no missing Project chosen. */
+export function homeChoices(choice: HomeChoice = {}): HomeChoices {
+  return { choice, sinceMissing: null };
+}
+
+/** `choices` once the user chooses `home` for `agent`. */
+export function withHomeChosen({ choice, sinceMissing }: HomeChoices, agent: string, home: string): HomeChoices {
+  return { choice: { ...choice, [agent]: home }, sinceMissing: sinceMissing && { ...sinceMissing, [agent]: home } };
+}
+
+/**
+ * `choices` once the user chooses `project` among `projects`: the homes
+ * chosen stay, and a missing Project opens on the homes holding its leftovers.
+ */
+export function withProjectChosen({ choice }: HomeChoices, projects: Project[], project: string | null): HomeChoices {
+  const missing = project !== null && projects.some((p) => p.missing && samePath(p.path, project));
+  return { choice, sinceMissing: missing ? {} : null };
+}
+
+/**
  * The home shown for each Agent: the one the user chose while it is listed,
  * otherwise the first one among `items` holding a leftover, otherwise the
- * first one the Agent reads, otherwise its first.
+ * first one the Agent reads, otherwise its first. While a missing Project is
+ * chosen, the home holding a leftover comes before one chosen earlier.
  */
-export function chosenHomes(homes: Home[], choice: HomeChoice, items: Item[]): HomeChoice {
+export function chosenHomes(homes: Home[], { choice, sinceMissing }: HomeChoices, items: Item[]): HomeChoice {
   const chosen: HomeChoice = {};
   for (const { agent } of agentsOf(homes)) {
     const own = homes.filter((home) => home.agent === agent);
-    const kept = own.find((home) => home.home === choice[agent]);
+    const listed = (name: string | undefined) => own.find((home) => home.home === name);
+    const kept = listed(choice[agent]);
     const holding = own.find((home) => leftoversIn(items, home).length > 0);
-    chosen[agent] = (kept ?? holding ?? own.find((home) => home.not_read === null) ?? own[0]).home;
+    const preferred = sinceMissing ? (listed(sinceMissing[agent]) ?? holding ?? kept) : (kept ?? holding);
+    chosen[agent] = (preferred ?? own.find((home) => home.not_read === null) ?? own[0]).home;
   }
   return chosen;
 }

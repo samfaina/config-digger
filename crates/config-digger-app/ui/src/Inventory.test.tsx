@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import type { Entry, Item, State } from "./bindings";
+import type { Entry, Home, Item, Project, State } from "./bindings";
 import { StateBars } from "./Inventory";
+import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
 
 function entry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -67,5 +68,94 @@ describe("the Entries by State filter", () => {
       expect(bar).toMatch(/aria-pressed="false"/);
       expect(bar).not.toMatch(/selected/);
     }
+  });
+});
+
+function home(overrides: Partial<Home> = {}): Home {
+  return {
+    agent: "codex",
+    agent_name: "Codex",
+    home: "default",
+    folder: String.raw`C:\Users\me`,
+    source: { kind: "default" },
+    hidden: false,
+    not_read: null,
+    mirror: null,
+    no_configuration: null,
+    scopes: ["user", "project"],
+    installations: [],
+    out_of_range: false,
+    last_ran: null,
+    entries: 0,
+    notes: [],
+    ...overrides,
+  };
+}
+
+function project(path: string, missing = false): Project {
+  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0 };
+}
+
+describe("choosing a Project", () => {
+  const codexHome = String.raw`E:\cd-throwaway\codex-home`;
+  const homes = [home(), home({ home: codexHome, folder: codexHome, source: { kind: "added" } })];
+  const present = String.raw`E:\cd-throwaway\project`;
+  const projects = [project(present)];
+
+  test("keeps the home chosen for each Agent", () => {
+    const chosen = withProjectChosen(withHomeChosen(homeChoices(), "codex", codexHome), projects, present);
+
+    expect(chosenHomes(homes, chosen, [])).toEqual({ codex: codexHome });
+  });
+
+  describe("that is missing", () => {
+    const gone = String.raw`E:\cd-throwaway\project-gone`;
+    const claudeHome = String.raw`E:\cd-throwaway\claude-code-home`;
+    const claudeFile = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
+    const both = [
+      ...homes,
+      home({ agent: "claude-code", agent_name: "Claude Code" }),
+      home({ agent: "claude-code", agent_name: "Claude Code", home: claudeHome, folder: claudeHome, source: { kind: "added" } }),
+    ];
+    const leftover = item({
+      home: claudeHome,
+      name: "cd-throwaway-leftover",
+      state: "unread",
+      entries: [
+        entry({
+          path: claudeFile,
+          key_path: ["projects", "E:/cd-throwaway/project-gone", "mcpServers", "cd-throwaway-leftover"],
+          locator: `${claudeFile}#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`,
+          scope: "local",
+          state: "unread",
+          reason: { code: "project_missing", effective: null, switch: null, sentence: "Its Project is missing." },
+        }),
+      ],
+    });
+    const withGone = [...projects, project(gone, true)];
+    // The user chose the default home of Claude Code and codex-home before choosing the missing Project.
+    const earlier = withHomeChosen(withHomeChosen(homeChoices(), "claude-code", "default"), "codex", codexHome);
+
+    test("opens on the homes holding its leftovers, and keeps the home chosen for the other Agents", () => {
+      const chosen = withProjectChosen(earlier, withGone, gone);
+
+      expect(chosenHomes(both, chosen, [leftover])).toEqual({ codex: codexHome, "claude-code": claudeHome });
+    });
+
+    test("shows the home the user then chooses, and keeps the other Agents on theirs", () => {
+      const opened = withProjectChosen(earlier, withGone, gone);
+      const codexDefault = withHomeChosen(opened, "codex", "default");
+      const claudeDefault = withHomeChosen(codexDefault, "claude-code", "default");
+
+      expect(chosenHomes(both, codexDefault, [leftover])).toEqual({ codex: "default", "claude-code": claudeHome });
+      expect(chosenHomes(both, claudeDefault, [leftover])).toEqual({ codex: "default", "claude-code": "default" });
+    });
+
+    test("leaves no home chosen that the user didn't choose, once another Project is chosen", () => {
+      const opened = withProjectChosen(homeChoices(), withGone, gone);
+      const after = withProjectChosen(withHomeChosen(opened, "codex", codexHome), withGone, present);
+
+      expect(chosenHomes(both, after, [])).toEqual({ codex: codexHome, "claude-code": "default" });
+    });
   });
 });
