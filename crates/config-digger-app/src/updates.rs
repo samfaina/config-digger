@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_check_says_only_why_for_about_to_say_it_failed() {
+    fn a_failed_check_carries_only_its_cause() {
         let error = failed_check(tauri_plugin_updater::Error::ReleaseNotFound);
 
         assert_eq!(
