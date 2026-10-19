@@ -4,7 +4,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 
 | File | What it is |
 | --- | --- |
-| `uat/plan.json` | The walk: ordered sections of steps. |
+| `uat/plan.json` | The walk: ordered sections of steps, from a PC without config-digger through install, every screen, update and uninstall. |
 | `uat/plan.schema.json` | The plan's JSON Schema. |
 | `uat/runner.html` | The runner page, published as a private claude.ai Artifact for each run. |
 | `uat/runner.test.mjs` | Tests of the runner's logic. Run them with `node --test uat/runner.test.mjs`. |
@@ -28,7 +28,7 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 
 1. Add a step for each acceptance criterion a person must see in the running app or installer. Code that tests already cover needs no step. The look of a UI change is checked only here, never by screenshots in the PR (see `docs/agents/issue-tracker.md`).
 2. Put it in the section of the screen or flow it walks. Start a new section when none fits.
-3. Give it the next free number in its section. **Never renumber a step.** Results and tickets point at step ids, so a step keeps its id when steps are added, moved or removed around it. A removed step's id is not reused. The order of the steps in the file is the order of the walk, so `3.7` may come before `3.4`.
+3. Give it the next free number in its section. **Never renumber a step.** Results and tickets point at step ids, so a step keeps its id when steps are added, moved or removed around it. A removed step's id is not reused. The order of the steps in the file is the order of the walk, so `3.7` may come before `3.4`. Sections work the same way: a new section takes the next free number wherever it goes in the walk, so section 9 (Instalar) comes before section 1 (Datos de prueba).
 4. Write one action per instruction line, and an `expect` the tester can check by looking: names, counts, the exact message.
 5. Use only throwaway data: `cd-throwaway-*` Entries and the fake Secret `not-a-real-secret`. When a step needs data the setup script does not create yet, add it to the script, and use `setup` when the step needs it fresh.
 6. List the issue in `covers`.

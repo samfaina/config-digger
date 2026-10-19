@@ -24,6 +24,16 @@ fn plan() -> Value {
     read_json("uat/plan.json")
 }
 
+/// The place of section 1 in `plan`, which the walk need not start with.
+fn section_1(plan: &Value) -> usize {
+    plan["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|section| section["id"] == "1")
+        .unwrap()
+}
+
 /// The smallest the app's main window can be, as `(width, height)`.
 fn smallest_window() -> (u64, u64) {
     let config = read_json("crates/config-digger-app/tauri.conf.json");
@@ -99,21 +109,25 @@ fn the_plan_matches_its_schema() {
 #[test]
 fn a_step_without_what_to_expect_fails() {
     let mut plan = plan();
-    plan["sections"][0]["steps"][0]
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]
         .as_object_mut()
         .unwrap()
         .remove("expect");
     assert_eq!(
         problems(&plan),
-        [r#"/sections/0/steps/0: "expect" is a required property"#]
+        [format!(
+            r#"/sections/{at}/steps/0: "expect" is a required property"#
+        )]
     );
 }
 
 #[test]
 fn a_step_id_used_twice_fails() {
     let mut plan = plan();
-    let second = plan["sections"][0]["steps"][1].clone();
-    plan["sections"][0]["steps"]
+    let at = section_1(&plan);
+    let second = plan["sections"][at]["steps"][1].clone();
+    plan["sections"][at]["steps"]
         .as_array_mut()
         .unwrap()
         .push(second);
@@ -123,7 +137,8 @@ fn a_step_id_used_twice_fails() {
 #[test]
 fn a_window_smaller_than_the_app_allows_fails() {
     let mut plan = plan();
-    plan["sections"][0]["steps"][0]["instructions"]
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]["instructions"]
         .as_array_mut()
         .unwrap()
         .push("Haz la ventana de config-digger de unos 600 × 400.".into());
@@ -136,7 +151,8 @@ fn a_window_smaller_than_the_app_allows_fails() {
 #[test]
 fn add_agent_home_before_the_agent_homes_tab_fails() {
     let mut plan = plan();
-    plan["sections"][0]["steps"][0]["instructions"]
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]["instructions"]
         .as_array_mut()
         .unwrap()
         .push("Ve a Projects & homes y pulsa Add Agent home.".into());
