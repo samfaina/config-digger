@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import type { Entry, Home, Item, Project, State } from "./bindings";
-import { pickHome, pickProject, StateBars, type HomePick } from "./Inventory";
-import { chosenHomes } from "./view";
+import { StateBars } from "./Inventory";
+import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
 
 function entry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -96,18 +96,16 @@ function project(path: string, missing = false): Project {
   return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0 };
 }
 
-describe("picking a Project", () => {
+describe("choosing a Project", () => {
   const codexHome = String.raw`E:\cd-throwaway\codex-home`;
   const homes = [home(), home({ home: codexHome, folder: codexHome, source: { kind: "added" } })];
   const present = String.raw`E:\cd-throwaway\project`;
   const projects = [project(present)];
-  const opened: HomePick = { choice: {}, leftoversFirst: false };
 
-  test("keeps the home picked for each Agent", () => {
-    const picked = pickHome(chosenHomes(homes, opened.choice, []), "codex", codexHome);
-    const next = pickProject(picked, projects, present);
+  test("keeps the home chosen for each Agent", () => {
+    const chosen = withProjectChosen(withHomeChosen(homeChoices(), "codex", codexHome), projects, present);
 
-    expect(chosenHomes(homes, next.choice, [], next.leftoversFirst)).toEqual({ codex: codexHome });
+    expect(chosenHomes(homes, chosen, [])).toEqual({ codex: codexHome });
   });
 
   describe("that is missing", () => {
@@ -135,32 +133,29 @@ describe("picking a Project", () => {
       ],
     });
     const withGone = [...projects, project(gone, true)];
+    // The user chose the default home of Claude Code and codex-home before choosing the missing Project.
+    const earlier = withHomeChosen(withHomeChosen(homeChoices(), "claude-code", "default"), "codex", codexHome);
 
-    test("opens on the homes holding its leftovers, and keeps the home picked for the other Agents", () => {
-      const picked = pickHome(chosenHomes(both, opened.choice, []), "codex", codexHome);
-      const next = pickProject(picked, withGone, gone);
+    test("opens on the homes holding its leftovers, and keeps the home chosen for the other Agents", () => {
+      const chosen = withProjectChosen(earlier, withGone, gone);
 
-      expect(chosenHomes(both, next.choice, [leftover], next.leftoversFirst)).toEqual({
-        codex: codexHome,
-        "claude-code": claudeHome,
-      });
+      expect(chosenHomes(both, chosen, [leftover])).toEqual({ codex: codexHome, "claude-code": claudeHome });
     });
 
-    test("lets the user then pick another home, and keeps the other Agents on the homes shown", () => {
-      const before = pickHome(chosenHomes(both, opened.choice, []), "claude-code", "default");
-      const next = pickProject(before, withGone, gone);
-      const shown = chosenHomes(both, next.choice, [leftover], next.leftoversFirst);
-      const picked = pickHome(shown, "codex", codexHome);
-      const back = pickHome(chosenHomes(both, picked.choice, [leftover], picked.leftoversFirst), "claude-code", "default");
+    test("shows the home the user then chooses, and keeps the other Agents on theirs", () => {
+      const opened = withProjectChosen(earlier, withGone, gone);
+      const codexDefault = withHomeChosen(opened, "codex", "default");
+      const claudeDefault = withHomeChosen(codexDefault, "claude-code", "default");
 
-      expect(chosenHomes(both, picked.choice, [leftover], picked.leftoversFirst)).toEqual({
-        codex: codexHome,
-        "claude-code": claudeHome,
-      });
-      expect(chosenHomes(both, back.choice, [leftover], back.leftoversFirst)).toEqual({
-        codex: codexHome,
-        "claude-code": "default",
-      });
+      expect(chosenHomes(both, codexDefault, [leftover])).toEqual({ codex: "default", "claude-code": claudeHome });
+      expect(chosenHomes(both, claudeDefault, [leftover])).toEqual({ codex: "default", "claude-code": "default" });
+    });
+
+    test("leaves no home chosen that the user didn't choose, once another Project is chosen", () => {
+      const opened = withProjectChosen(homeChoices(), withGone, gone);
+      const after = withProjectChosen(withHomeChosen(opened, "codex", codexHome), withGone, present);
+
+      expect(chosenHomes(both, after, [])).toEqual({ codex: codexHome, "claude-code": "default" });
     });
   });
 });

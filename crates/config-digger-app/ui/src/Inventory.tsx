@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, Project, State, Verb } from "./bindings";
+import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
 import { NOTICE_MS, type Notify } from "./desktop";
 import type { DropdownOption } from "./dropdown";
 import { EmptyInventory } from "./EmptyInventory";
@@ -27,6 +27,7 @@ import {
   findItem,
   flagsShown,
   groupItems,
+  homeChoices,
   homeFailures,
   itemKey,
   itemsShown,
@@ -37,8 +38,10 @@ import {
   readerItem,
   samePath,
   stateCounts,
+  withHomeChosen,
+  withProjectChosen,
   type AgentStats,
-  type HomeChoice,
+  type HomeChoices,
   type ItemFilter,
   type Selection,
 } from "./view";
@@ -49,23 +52,6 @@ type Detail = { kind: "item"; key: string } | { kind: "failures" } | null;
 
 /** How long a "show winner" mark stays. */
 const FLASH_MS = 1600;
-
-/**
- * The home the user picked for each Agent, and whether the missing Project
- * just picked opens each Agent on the home holding its leftovers instead.
- */
-export type HomePick = { choice: HomeChoice; leftoversFirst: boolean };
-
-/** Picking `project` keeps the home picked for each Agent, except that a missing one opens on the homes holding its leftovers. */
-export function pickProject(pick: HomePick, projects: Project[], project: string | null): HomePick {
-  const missing = project !== null && projects.some((p) => p.missing && samePath(p.path, project));
-  return { choice: pick.choice, leftoversFirst: missing };
-}
-
-/** Picking `home` for `agent` keeps every other Agent on the home `shown` shows. */
-export function pickHome(shown: HomeChoice, agent: string, home: string): HomePick {
-  return { choice: { ...shown, [agent]: home }, leftoversFirst: false };
-}
 
 type InventoryProps = {
   /** Where it opens, when another screen opens it on something. */
@@ -82,7 +68,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const { inventory, project, error, reading, refresh, selectProject } = useInventory(start?.project ?? null);
   const { history, reload: reloadHistory } = useHistory();
   const [agent, setAgent] = useState(start?.agent ?? "all");
-  const [homePick, setHomePick] = useState<HomePick>({ choice: start?.homes ?? {}, leftoversFirst: false });
+  const [homeChoice, setHomeChoice] = useState<HomeChoices>(homeChoices(start?.homes));
   const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: start?.state ?? null });
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
@@ -100,10 +86,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   // The Item another screen opened it on, selected once the inventory is read.
   const startItem = useRef(start?.item ?? null);
 
-  const homes = useMemo(
-    () => chosenHomes(inventory?.homes ?? [], homePick.choice, inventory?.items ?? [], homePick.leftoversFirst),
-    [inventory, homePick],
-  );
+  const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice, inventory?.items ?? []), [inventory, homeChoice]);
   const selection: Selection = { agent, homes };
   const shown = useMemo(() => itemsShown(inventory?.items ?? [], { agent, homes }), [inventory, agent, homes]);
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
@@ -123,7 +106,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
     setDetail(null);
   };
   const chooseHome = (agentId: string, home: string) => {
-    setHomePick(pickHome(homes, agentId, home));
+    setHomeChoice((choices) => withHomeChosen(choices, agentId, home));
     setDetail(null);
   };
   const showWinner = (locator: string) => {
@@ -133,7 +116,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const openReader = (reader: AlsoReadBy, locator: string) => {
     const item = inventory && readerItem(inventory, reader, locator);
     if (!item) return;
-    setHomePick(pickHome(homes, reader.agent, reader.home));
+    setHomeChoice((choices) => withHomeChosen(choices, reader.agent, reader.home));
     if (agent !== "all") setAgent(reader.agent);
     setDetail({ kind: "item", key: itemKey(item) });
     setFlash(locator);
@@ -152,7 +135,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         refresh={refresh}
         selectProject={(next) => {
           selectProject(next);
-          setHomePick((pick) => pickProject(pick, inventory?.projects ?? [], next));
+          setHomeChoice((choices) => withProjectChosen(choices, inventory?.projects ?? [], next));
           setDetail(null);
         }}
       />
