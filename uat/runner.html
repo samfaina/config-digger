@@ -42,6 +42,8 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+/* A display rule, such as .export's grid, would otherwise show a hidden element. */
+[hidden] { display: none !important; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -50,7 +52,9 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 20px 40px;
 }
-.page { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+/* Every grid track is minmax(0, 1fr): an auto track grows to its widest
+   unbreakable line, a long command, and pushes the text past the window. */
+.page { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
 h1 { font-size: 1.35rem; letter-spacing: 0.01em; }
 h2 { font-size: 1.6rem; line-height: 1.2; }
@@ -70,7 +74,7 @@ button:focus-visible, textarea:focus-visible, .step-link:focus-visible {
 }
 
 /* The run's header */
-.run { display: grid; gap: 10px; }
+.run { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .run-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; justify-content: space-between; }
 .run-meta { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; display: flex; }
@@ -107,25 +111,27 @@ button:focus-visible, textarea:focus-visible, .step-link:focus-visible {
 
 .step {
   background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-  padding: 20px; display: grid; gap: 18px; min-width: 0;
+  padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0;
+  overflow-wrap: anywhere;
 }
 .eyebrow { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; color: var(--muted); font-size: 0.85rem; }
 .eyebrow .step-id { font-size: 0.85rem; }
 .covers { display: flex; flex-wrap: wrap; gap: 6px; }
-.block { display: grid; gap: 8px; }
+.block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .instructions { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; }
-.command { display: grid; gap: 4px; }
+.command { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .command-head { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
 .command-label { font-weight: 500; }
 .shell { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
 .code-row { display: flex; gap: 8px; align-items: stretch; }
 pre {
-  margin: 0; flex: 1; min-width: 0; overflow-x: auto; background: var(--code-bg);
+  /* A command wraps, so the tester reads all of it before copying it. */
+  margin: 0; flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg);
   border-radius: 6px; padding: 8px 10px; font: 0.85rem/1.5 var(--font-mono);
 }
 .setup { border-left: 3px solid var(--blocked); padding-left: 12px; }
 .expect { border-left: 3px solid var(--accent); padding-left: 12px; }
-.verdict { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
+.verdict { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
 .verdict-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .verdict-buttons button { min-width: 96px; font-weight: 600; }
 .verdict-buttons .ok { color: var(--ok); }
@@ -431,7 +437,8 @@ const Uat = (() => {
       ? `Guardado: ${Uat.STATUSES[saved.status].label} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
       : "Sin resultado todavía.";
 
-    $("step").replaceChildren(
+    // replaceChildren would print a missing block as the text "null".
+    $("step").replaceChildren(...[
       el("div", { class: "eyebrow" },
         el("span", { class: "step-id" }, `Paso ${step.id}`),
         el("span", {}, `${section.id}. ${section.title}`),
@@ -454,7 +461,8 @@ const Uat = (() => {
         el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas."),
         state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
         el("p", { class: "saved" }, savedLine)),
-      el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])));
+      el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])),
+    ].filter((block) => block != null));
     if (typing) {
       notes.focus();
       notes.setSelectionRange(old.selectionStart, old.selectionEnd);
