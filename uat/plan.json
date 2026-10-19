@@ -4,8 +4,144 @@
   "language": "es",
   "sections": [
     {
+      "id": "8",
+      "title": "Antes de empezar",
+      "steps": [
+        {
+          "id": "8.1",
+          "title": "Empezar sin config-digger ni sus datos",
+          "goal": "El recorrido empieza como en un PC que nunca tuvo config-digger: sin la app, sin sus datos y sin la elección de PATH guardada.",
+          "instructions": [
+            "Lee la regla de oro: toca solo lo que empiece por cd-throwaway. La app también muestra tu configuración real; mírala si quieres, pero no pulses nunca Disable, Enable ni Remove sobre ella.",
+            "Ten a mano el Bloc de notas y una ventana de PowerShell en la raíz del repositorio.",
+            "Ejecuta la primera orden.",
+            "Si alguna línea sale con True y config-digger guarda History o Entries aparcadas de tu configuración real, para y marca el paso Bloqueado: los pasos siguientes borran esos datos.",
+            "Si «La app» sale con True, cierra config-digger.",
+            "Desinstálalo desde Configuración de Windows → Aplicaciones → Aplicaciones instaladas, con la casilla Delete config-digger data marcada.",
+            "En el aviso del desinstalador, pulsa Aceptar.",
+            "Si alguna otra línea sigue con True, ejecuta la segunda orden, que borra los datos de config-digger que queden.",
+            "Ejecuta otra vez la primera orden."
+          ],
+          "commands": [
+            {
+              "label": "Ver qué queda de config-digger",
+              "shell": "powershell",
+              "text": "([ordered]@{ 'La app' = \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; 'Backups, History y Entries aparcados' = \"$env:LOCALAPPDATA\\config-digger\"; 'Listas y ajustes' = \"$env:APPDATA\\config-digger\"; 'Elección de PATH' = 'HKCU:\\Software\\samfaina\\config-digger' }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
+            },
+            {
+              "label": "Borrar los datos de config-digger que queden",
+              "shell": "powershell",
+              "text": "Remove-Item \"$env:LOCALAPPDATA\\config-digger\", \"$env:APPDATA\\config-digger\", HKCU:\\Software\\samfaina\\config-digger -Recurse -Force -ErrorAction SilentlyContinue"
+            }
+          ],
+          "expect": "La última vez, las cuatro líneas de la primera orden salen con False.",
+          "covers": ["#154"]
+        }
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Instalar",
+      "steps": [
+        {
+          "id": "9.1",
+          "title": "Descargar el instalador",
+          "goal": "El instalador de la versión de esta ejecución se descarga de su release en GitHub.",
+          "instructions": [
+            "Abre https://github.com/samfaina/config-digger/releases en el navegador.",
+            "Entra en la release de la versión que nombra el título de esta página.",
+            "Baja hasta Assets.",
+            "Haz clic en config-digger_<versión>_x64-setup.exe para guardarlo en Descargas."
+          ],
+          "commands": [],
+          "expect": "El instalador queda en Descargas, con la versión del título de esta página en su nombre.",
+          "covers": ["#78"]
+        },
+        {
+          "id": "9.2",
+          "title": "Primera instalación, con PATH",
+          "goal": "El instalador instala en su propia carpeta, no deja usar la carpeta de datos y, con la casilla de PATH marcada, una terminal nueva encuentra config-digger.",
+          "instructions": [
+            "Haz doble clic en el instalador, en Descargas.",
+            "Si Windows dice «Windows protegió su PC», pulsa Más información: la app aún no está firmada.",
+            "Pulsa Ejecutar de todas formas.",
+            "En la primera página, mira la casilla Add the config-digger command to my PATH sin tocarla.",
+            "Pulsa Next.",
+            "En la página de carpeta, borra Programs\\ de la ruta propuesta, para que quede C:\\Users\\<tú>\\AppData\\Local\\config-digger, la carpeta de datos.",
+            "Mira el botón para seguir.",
+            "Vuelve a escribir la ruta propuesta.",
+            "Termina la instalación con los botones por defecto.",
+            "Abre una ventana nueva de PowerShell: las que ya estaban abiertas no ven el PATH nuevo.",
+            "Ejecuta la orden."
+          ],
+          "commands": [
+            {
+              "label": "Buscar config-digger en el PATH",
+              "shell": "powershell",
+              "text": "Get-Command config-digger | Select-Object Source"
+            }
+          ],
+          "expect": "La casilla de PATH empieza marcada. La página de carpeta propone C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger y dice «It can't be config-digger's data folder, %LOCALAPPDATA%\\config-digger or %APPDATA%\\config-digger, nor a folder inside or above one.». Con la carpeta de datos, el botón para seguir se pone gris, y se activa otra vez con la ruta propuesta. La orden imprime C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe.",
+          "covers": ["#78", "#152"]
+        },
+        {
+          "id": "9.3",
+          "title": "Segunda instalación, sin PATH",
+          "goal": "Con la casilla de PATH desmarcada, el instalador quita config-digger del PATH y guarda la elección.",
+          "instructions": [
+            "Vuelve a abrir el instalador, en Descargas.",
+            "En la primera página, desmarca Add the config-digger command to my PATH.",
+            "Pulsa Next.",
+            "En la página Already Installed, elige Add/Reinstall components.",
+            "Sigue hasta el final con los botones por defecto.",
+            "Abre una ventana nueva de PowerShell.",
+            "Ejecuta la primera orden.",
+            "Ejecuta la segunda orden, que lee lo que guardó el instalador."
+          ],
+          "commands": [
+            {
+              "label": "Buscar config-digger en el PATH",
+              "shell": "powershell",
+              "text": "Get-Command config-digger | Select-Object Source"
+            },
+            {
+              "label": "Leer la elección de PATH guardada",
+              "shell": "powershell",
+              "text": "Get-ItemProperty HKCU:\\Software\\samfaina\\config-digger | Select-Object KeepPathAlone"
+            }
+          ],
+          "expect": "La casilla de PATH empieza marcada. La primera orden da un error en rojo: config-digger no se reconoce. La segunda imprime KeepPathAlone con el valor 1, que quiere decir sin PATH.",
+          "covers": ["#78"]
+        },
+        {
+          "id": "9.4",
+          "title": "Tercera instalación: recuerda la elección",
+          "goal": "El instalador recuerda la última elección de PATH, y al marcarla otra vez config-digger vuelve al PATH.",
+          "instructions": [
+            "Abre el instalador por tercera vez.",
+            "Mira la casilla Add the config-digger command to my PATH.",
+            "Márcala.",
+            "Pulsa Next.",
+            "En la página Already Installed, elige Add/Reinstall components.",
+            "Sigue hasta el final con los botones por defecto.",
+            "Abre una ventana nueva de PowerShell.",
+            "Ejecuta la orden."
+          ],
+          "commands": [
+            {
+              "label": "Buscar config-digger en el PATH",
+              "shell": "powershell",
+              "text": "Get-Command config-digger | Select-Object Source"
+            }
+          ],
+          "expect": "La casilla de PATH empieza desmarcada, porque recuerda la elección del paso 9.3. La orden imprime otra vez C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe. El PATH queda puesto para la sección Desinstalar.",
+          "covers": ["#78"]
+        }
+      ]
+    },
+    {
       "id": "1",
-      "title": "Preparación",
+      "title": "Datos de prueba",
       "steps": [
         {
           "id": "1.1",
@@ -35,18 +171,175 @@
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
             "Pulsa Add Agent home.",
-            "Elige Claude Code como Agent.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
             "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-home.",
-            "Vuelve al Inventario y elige ese home."
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Busca la fila nueva en la lista de Agent homes.",
+            "Vuelve al Inventario.",
+            "Elige ese home."
           ],
           "commands": [],
-          "expect": "El Inventario de ese home muestra el servidor cd-throwaway-user y la skill cd-throwaway-user-skill. El Secret de cd-throwaway-user sale enmascarado, nunca como ghp_not-a-real-secret.",
+          "expect": "Sale el aviso «Added E:\\cd-throwaway\\claude-code-home as an Agent home of Claude Code.». La fila de E:\\cd-throwaway\\claude-code-home está bajo el grupo Claude Code, con las etiquetas Claude Code y added by you. El Inventario de ese home muestra el servidor cd-throwaway-user y la skill cd-throwaway-user-skill. El Secret de cd-throwaway-user sale enmascarado, nunca como ghp_not-a-real-secret.",
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#75", "#175"]
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Projects & homes",
+      "steps": [
+        {
+          "id": "10.1",
+          "title": "Abrir la pantalla Projects & homes",
+          "goal": "La pantalla se abre desde la barra de la izquierda, con sus dos pestañas.",
+          "instructions": [
+            "En la barra de la izquierda, deja el ratón sobre el icono de la carpeta.",
+            "Haz clic en él."
+          ],
+          "commands": [],
+          "expect": "El tooltip dice «Projects & homes». La pantalla muestra arriba las pestañas Projects · N y Agent homes · N y el botón Add Project o Add Agent home, según la pestaña abierta.",
+          "covers": ["#75"]
+        },
+        {
+          "id": "10.2",
+          "title": "Añadir el home de Codex de prueba",
+          "goal": "Add Agent home guarda el home con el Agent elegido, y su fila lo muestra.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Codex.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\codex-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Busca la fila nueva en la lista de Agent homes."
+          ],
+          "commands": [],
+          "expect": "Sale el aviso «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.». La fila de E:\\cd-throwaway\\codex-home está bajo el grupo Codex, con las etiquetas Codex y added by you. No sale ninguna fila de codex-home bajo Claude Code.",
+          "covers": ["#75", "#175"]
+        },
+        {
+          "id": "10.3",
+          "title": "Añadir el home de Claude Desktop de prueba",
+          "goal": "Add Agent home guarda el home con el Agent elegido, y su fila lo muestra.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Desktop.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Busca la fila nueva en la lista de Agent homes."
+          ],
+          "commands": [],
+          "expect": "Sale el aviso «Added E:\\cd-throwaway\\claude-desktop-home as an Agent home of Claude Desktop.». La fila de E:\\cd-throwaway\\claude-desktop-home está bajo el grupo Claude Desktop, con las etiquetas Claude Desktop y added by you. No sale ninguna fila de claude-desktop-home bajo Claude Code.",
+          "covers": ["#75", "#175"]
+        },
+        {
+          "id": "10.4",
+          "title": "Cada home guardado con su Agent",
+          "goal": "La lista que guarda config-digger tiene cada home de prueba con su Agent, no todos como Claude Code.",
+          "instructions": [
+            "Ejecuta la orden en PowerShell.",
+            "Lee la tabla que imprime."
+          ],
+          "commands": [
+            {
+              "label": "Ver los homes que guarda config-digger",
+              "shell": "powershell",
+              "text": "(Get-Content \"$env:APPDATA\\config-digger\\homes-and-projects.json\" -Raw | ConvertFrom-Json).homes | Format-Table agent, folder"
+            }
+          ],
+          "expect": "La tabla tiene estas tres filas, cada una con su Agent: claude-code E:\\cd-throwaway\\claude-code-home, codex E:\\cd-throwaway\\codex-home y claude-desktop E:\\cd-throwaway\\claude-desktop-home. Ninguna de esas carpetas sale con otro Agent.",
+          "covers": ["#175"]
+        },
+        {
+          "id": "10.5",
+          "title": "La pestaña Projects",
+          "goal": "La pestaña Projects lista los Projects que conoce Claude Code y, aparte, los que faltan con sus leftovers.",
+          "instructions": [
+            "Abre la pestaña Projects.",
+            "Busca los Projects de E:\\cd-throwaway en la lista.",
+            "Mira el grupo Missing."
+          ],
+          "commands": [],
+          "expect": "Salen E:\\cd-throwaway\\project y E:\\cd-throwaway\\project-hide, cada uno con la línea «Folder · Known to Claude Code». E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home no salen como Projects. El grupo ▾ Missing · 1 está abierto, con E:/cd-throwaway/project-gone, la línea «The folder no longer exists · known to Claude Code» y «1 leftover».",
+          "covers": ["#75"]
+        },
+        {
+          "id": "10.6",
+          "title": "Show leftovers",
+          "goal": "Show leftovers lleva al Inventario con los leftovers del Project que falta.",
+          "instructions": [
+            "En la fila de E:/cd-throwaway/project-gone, pulsa Show leftovers.",
+            "Mira la cabecera, los filtros y la lista de Items."
+          ],
+          "commands": [],
+          "expect": "Se abre el Inventario con E:/cd-throwaway/project-gone en el campo Project, All Agents elegido y el filtro de State Unread. La lista de Items muestra cd-throwaway-leftover.",
+          "covers": ["#75", "#176"]
+        },
+        {
+          "id": "10.7",
+          "title": "Remove leftovers",
+          "goal": "Remove leftovers borra el leftover en una Operation verificada, tras enseñar qué cambia.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "En la fila de E:/cd-throwaway/project-gone, pulsa Remove leftovers.",
+            "Abre la sección Files · 1.",
+            "Mira el diff.",
+            "Lee las casillas de Before you apply, si las hay.",
+            "Si alguna nombra una ruta fuera de E:\\cd-throwaway, para y marca el paso KO.",
+            "Marca las casillas.",
+            "Pulsa Remove 1 leftover.",
+            "Apunta el id de la Operation del resultado: lo usa el paso 11.6.",
+            "Pulsa Done."
+          ],
+          "commands": [],
+          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, la fila de project-gone dice No leftovers y ofrece Hide.",
+          "covers": ["#75"]
+        },
+        {
+          "id": "10.8",
+          "title": "Hide y Unhide",
+          "goal": "Un Project oculto sale de la lista principal, se ve en Hidden y vuelve con Unhide.",
+          "instructions": [
+            "En la fila de E:\\cd-throwaway\\project-hide, pulsa Hide.",
+            "Mira la lista principal.",
+            "Abre el grupo ▸ Hidden · 1.",
+            "En la fila de project-hide, pulsa Unhide."
+          ],
+          "commands": [],
+          "expect": "Hide da el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.» y el Project sale de la lista principal. El grupo Hidden · 1 empieza cerrado y, abierto, muestra el Project en gris. Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.» y el Project vuelve a la lista principal.",
+          "covers": ["#75"]
+        },
+        {
+          "id": "10.9",
+          "title": "Add Project",
+          "goal": "Add Project rechaza una ruta que no existe y añade una carpeta elegida con el selector de Windows.",
+          "instructions": [
+            "Pulsa Add Project.",
+            "Escribe E:\\cd-throwaway\\no-existe en el campo.",
+            "Pulsa Add.",
+            "Borra el campo.",
+            "Pulsa Choose folder….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\project-extra.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add."
+          ],
+          "commands": [],
+          "expect": "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file». Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.», y su fila dice «Folder · Added by you», con los botones Open in Inventory y Remove from list.",
+          "covers": ["#75"]
         }
       ]
     },
@@ -433,6 +726,350 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#189"]
+        }
+      ]
+    },
+    {
+      "id": "11",
+      "title": "History · Undo",
+      "steps": [
+        {
+          "id": "11.1",
+          "title": "Una Operation desde el Inventario",
+          "goal": "Disable de una Entry de Codex enseña el diff con el Secret enmascarado y acaba en una Operation verificada.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Abre la sección Files · 1.",
+            "Mira el diff.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable."
+          ],
+          "commands": [],
+          "expect": "Sobre la tarjeta, la línea dice «MCP server · Codex · …» y la Entry sale Effective. El diálogo se titula «Disable 1 Entry». El diff añade enabled = false y, en args, el valor tras --api-key sale como ••••; not-a-real-secret no sale en ninguna parte. Pasan Back up, Write y Verify, y el resultado dice «Disabled 1 Entry. Operation <id>: verified.», con los botones Undo, Open History y Done.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.2",
+          "title": "La lista y el detalle de History",
+          "goal": "History lista la Operation nueva, elegida, con su detalle y su backup.",
+          "instructions": [
+            "Pulsa Open History.",
+            "Mira la fila de arriba y el detalle de la derecha.",
+            "Pulsa Open backup folder.",
+            "Mira la carpeta que se abre.",
+            "Cierra el Explorador."
+          ],
+          "commands": [],
+          "expect": "History se titula «N Operations». La fila de arriba, «Disable 1 Entry», tiene la etiqueta Applied y está elegida. El detalle tiene States changed (Effective → Disabled), Files · 1 con el mismo diff y ••••, y Backup con la ruta de la copia. El Explorador abre esa carpeta, con manifest.json y una copia de config.toml cuyo nombre empieza por 1-.",
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.3",
+          "title": "Undo",
+          "goal": "Undo deshace la Operation en una Operation nueva, y la original ya no se puede deshacer otra vez.",
+          "instructions": [
+            "Con esa Operation elegida, pulsa Undo.",
+            "Si hay casillas de aviso, márcalas.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
+            "En la Operation original, deja el ratón sobre Can't undo."
+          ],
+          "commands": [],
+          "expect": "La vista previa se titula «Undo <id> \"Disable 1 Entry\"». El resultado dice «Undid <id>. Operation <id nuevo>: verified.». La lista tiene una fila nueva con la etiqueta Undo of <id>. La original dice Undone by <id nuevo> y muestra Can't undo, con el tooltip «It was undone by <id nuevo>; undo that Operation to apply it again.».",
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.4",
+          "title": "Un Undo rechazado",
+          "goal": "Un Undo se rechaza cuando el archivo cambió después de la Operation, y nada lo restaura a la fuerza.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "Ejecuta la orden, que abre config.toml en el Bloc de notas.",
+            "Cambia enabled = false por enabled = true.",
+            "Guarda con Ctrl+S.",
+            "Cierra el Bloc de notas.",
+            "Ve a History y elige el último «Disable 1 Entry».",
+            "Lee el aviso del detalle.",
+            "Pulsa Undo."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config.toml en el Bloc de notas",
+              "shell": "powershell",
+              "text": "notepad E:\\cd-throwaway\\codex-home\\config.toml"
+            }
+          ],
+          "expect": "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo. Al pulsarlo sale un recuadro rojo Can't undo que dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …». Debajo salen la sección Backup → now con la diferencia y los botones Open backup folder y Copy path. No hay ningún botón para restaurar a la fuerza.",
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.5",
+          "title": "Una Operation fallida",
+          "goal": "Si la escritura falla, la Operation se deshace sola y History la muestra como fallida.",
+          "instructions": [
+            "Ejecuta la primera orden, que deja config.toml en solo lectura.",
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Close.",
+            "Ve a History y elige esa Operation.",
+            "Ejecuta la segunda orden, que quita la solo lectura: sin ella fallan los pasos siguientes."
+          ],
+          "commands": [
+            {
+              "label": "Poner config.toml en solo lectura",
+              "shell": "powershell",
+              "text": "attrib +r E:\\cd-throwaway\\codex-home\\config.toml"
+            },
+            {
+              "label": "Quitar la solo lectura",
+              "shell": "powershell",
+              "text": "attrib -r E:\\cd-throwaway\\codex-home\\config.toml"
+            }
+          ],
+          "expect": "cd-throwaway-codex sale Effective por el cambio a mano del paso 11.4. El diálogo muestra Back up ✓, Write failed ✗ y Rollback ✓, un recuadro rojo «Nothing of this Operation was kept» y la causa «cannot write E:\\cd-throwaway\\codex-home\\config.toml: Acceso denegado. (os error 5)». En History, la Operation tiene la etiqueta Failed, rolled back, una sección Rollback con el archivo como never written, y Can't undo.",
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.6",
+          "title": "Needs attention y la barra del Inventario",
+          "goal": "Una Operation que necesita recuperación a mano sale en una barra roja del Inventario y se puede descartar en History.",
+          "instructions": [
+            "Cierra config-digger con la X de la ventana.",
+            "Ejecuta la orden, cambiando ID por el id que apuntaste en el paso 10.7.",
+            "En el Bloc de notas, cambia la línea \"status\": \"applied\", por \"status\": \"needs_attention\", con las comillas y la coma.",
+            "Guarda con Ctrl+S.",
+            "Cierra el Bloc de notas.",
+            "Abre config-digger.",
+            "En la barra roja del Inventario, pulsa Open History.",
+            "Pulsa Dismiss.",
+            "Vuelve al Inventario."
+          ],
+          "commands": [
+            {
+              "label": "Abrir el registro de la Operation",
+              "shell": "powershell",
+              "text": "notepad \"$env:LOCALAPPDATA\\config-digger\\backups\\ID\\manifest.json\""
+            }
+          ],
+          "expect": "El Inventario muestra una barra roja «An Operation needs manual recovery» con el botón Open History. En History, la Operation tiene la etiqueta Needs attention y un recuadro rojo «This Operation needs manual recovery». Dismiss da el aviso «Dismissed Operation <id>.» y la etiqueta pasa a Rollback incomplete, dismissed. La barra roja ya no está en el Inventario.",
+          "covers": ["#74"]
+        },
+        {
+          "id": "11.7",
+          "title": "Delete backup",
+          "goal": "Delete backup borra el backup de una Operation, que deja de poder deshacerse.",
+          "instructions": [
+            "En History, elige la Operation del Undo rechazado del paso 11.4.",
+            "Pulsa Delete backup.",
+            "Lee el diálogo.",
+            "En el diálogo, pulsa Delete backup.",
+            "Lee el resultado y el detalle de la Operation."
+          ],
+          "commands": [],
+          "expect": "El diálogo se titula «Delete the backup of <id> \"Disable 1 Entry\"» y avisa de que el backup se borra para siempre y de que la Operation ya no se podrá deshacer. El resultado dice «Deleted the backup of <id>. It can no longer be undone.», con la línea «Operation <id> · backup deleted · can no longer be undone». La etiqueta pasa a Applied, backup deleted, not undoable. Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.» y el botón Delete backup ya no está.",
+          "covers": ["#74", "#189"]
+        }
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Actualizar",
+      "steps": [
+        {
+          "id": "12.1",
+          "title": "Los mandos del updater",
+          "goal": "El updater está apagado por defecto, no ha buscado nada y explica lo que encuentra al pulsar Check now.",
+          "instructions": [
+            "Ve a Settings.",
+            "Mira el panel Updates.",
+            "Pulsa el enlace Version and Check now are in About →.",
+            "Mira la versión y la línea Last checked.",
+            "Pulsa Check now.",
+            "Lee el mensaje que sale en Updates."
+          ],
+          "commands": [],
+          "expect": "El interruptor Check for updates on startup está apagado, con el texto «Off by default. While it is off, config-digger makes no network call unless you click Check now in About.». About muestra la versión del título de esta página y «Last checked: never.». Con una release candidate, Check now muestra un error que empieza por «The update check failed:», con esas palabras una sola vez, y sigue con la causa. Con la versión final dice «config-digger <versión> is the latest version.». Si sale otra cosa, marca KO y copia el texto exacto en las notas.",
+          "covers": ["#79"]
+        },
+        {
+          "id": "12.2",
+          "title": "Actualizar desde la app",
+          "goal": "Una actualización desde la app reemplaza los dos ejecutables y deja el PATH y los datos como estaban.",
+          "instructions": [
+            "Mira la versión del título de esta página.",
+            "Si es una release candidate, que acaba en -rc y un número, marca el paso Bloqueado con la nota «El updater solo lee releases/latest y una release candidate nunca es la última, así que a una rc instalada no se le ofrece ninguna actualización.» y pasa al paso siguiente.",
+            "Si es la versión final, cierra config-digger.",
+            "Desinstálalo desde Configuración de Windows sin marcar Delete config-digger data.",
+            "Instala la última release candidate desde su release en GitHub, con la casilla de PATH marcada.",
+            "Abre config-digger.",
+            "Ve a About.",
+            "Pulsa Check now.",
+            "En el aviso «config-digger <versión> is available.», pulsa Install and restart.",
+            "Cuando config-digger vuelva a abrirse, mira la versión en About.",
+            "Abre una ventana nueva de PowerShell.",
+            "Ejecuta la orden.",
+            "Ve a History."
+          ],
+          "commands": [
+            {
+              "label": "Ver la versión y la ruta del CLI",
+              "shell": "powershell",
+              "text": "config-digger --version; Get-Command config-digger | Select-Object Source"
+            }
+          ],
+          "expect": "Con una release candidate, el paso queda Bloqueado con su motivo. Con la versión final, About muestra la versión del título tras reiniciar. La orden imprime «config-digger <esa versión>» y C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe. History conserva las Operations de este recorrido.",
+          "covers": ["#79"]
+        }
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Desinstalar",
+      "steps": [
+        {
+          "id": "13.1",
+          "title": "Aparcar cd-throwaway-desktop",
+          "goal": "Hay una Entry aparcada, que el aviso de desinstalar tiene que nombrar.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Claude Desktop.",
+            "En Agent home, elige claude-desktop-home.",
+            "Elige el servidor cd-throwaway-desktop que sale Effective. Si hiciste el paso 7.2 hay otro, Disabled: el que se aparcó entonces.",
+            "Pulsa Disable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done."
+          ],
+          "commands": [],
+          "expect": "Da igual que Claude Desktop esté abierto: el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running». El resultado dice «Disabled 1 Entry. Operation <id>: verified.». Tras Done, esa cd-throwaway-desktop sale como Disabled, porque está aparcada.",
+          "covers": ["#78", "#188"]
+        },
+        {
+          "id": "13.2",
+          "title": "Desinstalar sin borrar datos",
+          "goal": "Desinstalar sin «Delete config-digger data» quita la app y su PATH, y conserva los backups, History y los Entries aparcados.",
+          "instructions": [
+            "Cierra config-digger con la X de la ventana.",
+            "Abre Configuración de Windows con Windows+I y ve a Aplicaciones → Aplicaciones instaladas.",
+            "En la fila de config-digger, pulsa ··· y elige Desinstalar.",
+            "Confirma.",
+            "En el desinstalador, deja sin marcar Delete config-digger data.",
+            "Pulsa Uninstall.",
+            "Abre una ventana nueva de PowerShell.",
+            "Ejecuta la primera orden.",
+            "Ejecuta la segunda orden.",
+            "Vuelve a instalar con el mismo instalador, con la casilla de PATH marcada.",
+            "Abre config-digger.",
+            "Mira History y el Inventario de claude-desktop-home."
+          ],
+          "commands": [
+            {
+              "label": "Ver qué conserva la desinstalación",
+              "shell": "powershell",
+              "text": "Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; Test-Path \"$env:LOCALAPPDATA\\config-digger\\parked\\manifest.json\"; (Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\backups\").Count"
+            },
+            {
+              "label": "Buscar config-digger en el PATH",
+              "shell": "powershell",
+              "text": "Get-Command config-digger | Select-Object Source"
+            }
+          ],
+          "expect": "La primera orden imprime False (la app ya no está), True (la Entry aparcada sigue) y un número mayor que 0 (los backups siguen). La segunda da un error en rojo: config-digger no se reconoce, porque el desinstalador lo quitó del PATH. Tras reinstalar, History tiene todas las Operations del recorrido y cd-throwaway-desktop sigue Disabled.",
+          "covers": ["#78"]
+        },
+        {
+          "id": "13.3",
+          "title": "Borrar datos, pero cancelar",
+          "goal": "Marcar «Delete config-digger data» avisa de lo que se borra, nombrando los Entries aparcados, y Cancelar conserva los datos.",
+          "instructions": [
+            "Cierra config-digger con la X de la ventana.",
+            "Desinstálalo otra vez desde Configuración de Windows.",
+            "En el desinstalador, marca Delete config-digger data.",
+            "Pulsa Uninstall.",
+            "Lee el aviso.",
+            "Pulsa Cancelar.",
+            "Cuando termine la desinstalación, abre una ventana nueva de PowerShell.",
+            "Ejecuta la orden."
+          ],
+          "commands": [
+            {
+              "label": "Ver qué conserva la desinstalación",
+              "shell": "powershell",
+              "text": "Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; Test-Path \"$env:LOCALAPPDATA\\config-digger\\parked\\manifest.json\"; (Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\backups\").Count"
+            }
+          ],
+          "expect": "El aviso dice «Deleting config-digger data deletes every backup, and with them the Undo history.» y luego «It also deletes these parked Entries, which the uninstaller never restores. To keep one, cancel and Enable it in config-digger first:», con una línea cd-throwaway-desktop (Claude Desktop) por cada vez que lo aparcaste: dos si hiciste el paso 7.2. Acaba con «Click OK to delete the data, or Cancel to keep it and uninstall only the app.», y Cancelar es el botón por defecto. La desinstalación termina igual, y la orden imprime False, True y un número mayor que 0.",
+          "covers": ["#78"]
+        },
+        {
+          "id": "13.4",
+          "title": "Borrar datos de verdad",
+          "goal": "Aceptar el aviso borra las dos carpetas de datos y la elección de PATH guardada.",
+          "instructions": [
+            "Instala otra vez con el mismo instalador, con la casilla de PATH marcada. No hace falta abrir la app.",
+            "Desinstálalo desde Configuración de Windows.",
+            "En el desinstalador, marca Delete config-digger data.",
+            "Pulsa Uninstall.",
+            "En el aviso, pulsa Aceptar.",
+            "Abre una ventana nueva de PowerShell.",
+            "Ejecuta la orden."
+          ],
+          "commands": [
+            {
+              "label": "Ver qué queda de config-digger",
+              "shell": "powershell",
+              "text": "([ordered]@{ 'La app' = \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; 'Backups, History y Entries aparcados' = \"$env:LOCALAPPDATA\\config-digger\"; 'Listas y ajustes' = \"$env:APPDATA\\config-digger\"; 'Elección de PATH' = 'HKCU:\\Software\\samfaina\\config-digger' }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
+            }
+          ],
+          "expect": "Las cuatro líneas salen con False: la app, las dos carpetas de datos y la elección de PATH ya no están.",
+          "covers": ["#78"]
+        },
+        {
+          "id": "13.5",
+          "title": "Borrar los datos de prueba",
+          "goal": "Al acabar no queda nada de los datos de prueba.",
+          "instructions": [
+            "Ejecuta la primera orden, que borra E:\\cd-throwaway.",
+            "Ejecuta la segunda orden."
+          ],
+          "commands": [
+            {
+              "label": "Borrar los datos de prueba",
+              "shell": "powershell",
+              "text": "Remove-Item E:\\cd-throwaway -Recurse -Force"
+            },
+            {
+              "label": "Comprobar que ya no están",
+              "shell": "powershell",
+              "text": "Test-Path E:\\cd-throwaway"
+            }
+          ],
+          "expect": "La segunda orden imprime False.",
+          "covers": ["#190"]
         }
       ]
     }
