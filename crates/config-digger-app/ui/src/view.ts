@@ -37,15 +37,17 @@ export function agentsOf(homes: Home[]): { agent: string; agentName: string }[] 
 /**
  * The home shown for each Agent: the one the user chose while it is listed,
  * otherwise the first one among `items` holding a leftover, otherwise the
- * first one the Agent reads, otherwise its first.
+ * first one the Agent reads, otherwise its first. With `leftoversFirst`, the
+ * home holding a leftover comes before the one the user chose.
  */
-export function chosenHomes(homes: Home[], choice: HomeChoice, items: Item[]): HomeChoice {
+export function chosenHomes(homes: Home[], choice: HomeChoice, items: Item[], leftoversFirst = false): HomeChoice {
   const chosen: HomeChoice = {};
   for (const { agent } of agentsOf(homes)) {
     const own = homes.filter((home) => home.agent === agent);
     const kept = own.find((home) => home.home === choice[agent]);
     const holding = own.find((home) => leftoversIn(items, home).length > 0);
-    chosen[agent] = (kept ?? holding ?? own.find((home) => home.not_read === null) ?? own[0]).home;
+    const picked = leftoversFirst ? (holding ?? kept) : (kept ?? holding);
+    chosen[agent] = (picked ?? own.find((home) => home.not_read === null) ?? own[0]).home;
   }
   return chosen;
 }

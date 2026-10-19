@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import type { Entry, Item, State } from "./bindings";
-import { StateBars } from "./Inventory";
+import type { Entry, Home, Item, Project, State } from "./bindings";
+import { pickHome, pickProject, StateBars, type HomePick } from "./Inventory";
+import { chosenHomes } from "./view";
 
 function entry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -67,5 +68,99 @@ describe("the Entries by State filter", () => {
       expect(bar).toMatch(/aria-pressed="false"/);
       expect(bar).not.toMatch(/selected/);
     }
+  });
+});
+
+function home(overrides: Partial<Home> = {}): Home {
+  return {
+    agent: "codex",
+    agent_name: "Codex",
+    home: "default",
+    folder: String.raw`C:\Users\me`,
+    source: { kind: "default" },
+    hidden: false,
+    not_read: null,
+    mirror: null,
+    no_configuration: null,
+    scopes: ["user", "project"],
+    installations: [],
+    out_of_range: false,
+    last_ran: null,
+    entries: 0,
+    notes: [],
+    ...overrides,
+  };
+}
+
+function project(path: string, missing = false): Project {
+  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0 };
+}
+
+describe("picking a Project", () => {
+  const codexHome = String.raw`E:\cd-throwaway\codex-home`;
+  const homes = [home(), home({ home: codexHome, folder: codexHome, source: { kind: "added" } })];
+  const present = String.raw`E:\cd-throwaway\project`;
+  const projects = [project(present)];
+  const opened: HomePick = { choice: {}, leftoversFirst: false };
+
+  test("keeps the home picked for each Agent", () => {
+    const picked = pickHome(chosenHomes(homes, opened.choice, []), "codex", codexHome);
+    const next = pickProject(picked, projects, present);
+
+    expect(chosenHomes(homes, next.choice, [], next.leftoversFirst)).toEqual({ codex: codexHome });
+  });
+
+  describe("that is missing", () => {
+    const gone = String.raw`E:\cd-throwaway\project-gone`;
+    const claudeHome = String.raw`E:\cd-throwaway\claude-code-home`;
+    const claudeFile = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
+    const both = [
+      ...homes,
+      home({ agent: "claude-code", agent_name: "Claude Code" }),
+      home({ agent: "claude-code", agent_name: "Claude Code", home: claudeHome, folder: claudeHome, source: { kind: "added" } }),
+    ];
+    const leftover = item({
+      home: claudeHome,
+      name: "cd-throwaway-leftover",
+      state: "unread",
+      entries: [
+        entry({
+          path: claudeFile,
+          key_path: ["projects", "E:/cd-throwaway/project-gone", "mcpServers", "cd-throwaway-leftover"],
+          locator: `${claudeFile}#projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover`,
+          scope: "local",
+          state: "unread",
+          reason: { code: "project_missing", effective: null, switch: null, sentence: "Its Project is missing." },
+        }),
+      ],
+    });
+    const withGone = [...projects, project(gone, true)];
+
+    test("opens on the homes holding its leftovers, and keeps the home picked for the other Agents", () => {
+      const picked = pickHome(chosenHomes(both, opened.choice, []), "codex", codexHome);
+      const next = pickProject(picked, withGone, gone);
+
+      expect(chosenHomes(both, next.choice, [leftover], next.leftoversFirst)).toEqual({
+        codex: codexHome,
+        "claude-code": claudeHome,
+      });
+    });
+
+    test("lets the user then pick another home, and keeps the other Agents on the homes shown", () => {
+      const before = pickHome(chosenHomes(both, opened.choice, []), "claude-code", "default");
+      const next = pickProject(before, withGone, gone);
+      const shown = chosenHomes(both, next.choice, [leftover], next.leftoversFirst);
+      const picked = pickHome(shown, "codex", codexHome);
+      const back = pickHome(chosenHomes(both, picked.choice, [leftover], picked.leftoversFirst), "claude-code", "default");
+
+      expect(chosenHomes(both, picked.choice, [leftover], picked.leftoversFirst)).toEqual({
+        codex: codexHome,
+        "claude-code": claudeHome,
+      });
+      expect(chosenHomes(both, back.choice, [leftover], back.leftoversFirst)).toEqual({
+        codex: codexHome,
+        "claude-code": "default",
+      });
+    });
   });
 });
