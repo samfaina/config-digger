@@ -163,8 +163,9 @@ impl UpdatesState {
 /// The CLI the installer puts next to the app, and an update replaces.
 const CLI_EXE: &str = "config-digger.exe";
 
+/// A check that failed, with only its cause: About says the check failed.
 fn failed_check(error: tauri_plugin_updater::Error) -> api::Error {
-    api::Error::unexpected(format!("the update check failed: {error}"))
+    api::Error::unexpected(error)
 }
 
 #[cfg(test)]
@@ -182,6 +183,16 @@ mod tests {
                 release_notes: "https://github.com/samfaina/config-digger/releases/tag/v0.2.0"
                     .to_owned(),
             }
+        );
+    }
+
+    #[test]
+    fn a_failed_check_carries_only_its_cause() {
+        let error = failed_check(tauri_plugin_updater::Error::ReleaseNotFound);
+
+        assert_eq!(
+            error.message,
+            "Could not fetch a valid release JSON from the remote"
         );
     }
 }

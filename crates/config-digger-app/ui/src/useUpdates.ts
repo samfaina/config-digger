@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { commands, type UpdateStatus } from "./bindings";
 import { call } from "./desktop";
+import { checkFailedText } from "./updates";
 
 export type Updates = {
   /** What the app knows of updates, `null` until it was read. */
@@ -55,7 +56,7 @@ export function useUpdates(): Updates {
         setUserChecked(true);
         setLater(false);
       } else {
-        setError(`The update check failed: ${result.error.message}`);
+        setError(checkFailedText(result.error.message));
       }
     } finally {
       setChecking(false);
