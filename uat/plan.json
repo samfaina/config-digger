@@ -32,7 +32,9 @@
           "goal": "Un home añadido a mano aparece en el Inventario con sus Entries.",
           "instructions": [
             "Abre config-digger.",
-            "Ve a Projects & homes y pulsa Add Agent home.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
             "Elige Claude Code como Agent.",
             "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-home.",
             "Vuelve al Inventario y elige ese home."
@@ -87,12 +89,19 @@
           "title": "El panel cerca del borde de la ventana",
           "goal": "El panel no se sale de la ventana cerca de sus bordes.",
           "instructions": [
-            "Haz la ventana de config-digger baja y estrecha, de unos 600 × 400.",
-            "Abre el desplegable de Project.",
-            "Ve a Projects & homes, pulsa Add Agent home y abre el desplegable Agent."
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "En el Inventario, elige All Agents en Agents.",
+            "En Agent home, abajo a la izquierda, abre el desplegable de la fila de Claude Code. Sale cuando Claude Code tiene dos homes o más: el tuyo y claude-code-home del paso 1.2.",
+            "Pulsa Escape.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "Abre el desplegable Agent.",
+            "Pulsa Escape.",
+            "Pulsa Cancel."
           ],
           "commands": [],
-          "expect": "Los dos paneles quedan enteros dentro de la ventana. Cuando no cabe debajo del campo, el panel se abre encima o se desplaza con su propia barra.",
+          "expect": "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo, entero y sin pasar de ese borde. El panel de Agent se abre entero debajo de su campo.",
           "covers": ["#181"]
         },
         {
@@ -100,7 +109,9 @@
           "title": "El desplegable Agent de Add Agent home",
           "goal": "La opción de aviso «Choose an Agent…» se ve pero no se puede elegir.",
           "instructions": [
-            "En Projects & homes, pulsa Add Agent home.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
             "Abre el desplegable Agent.",
             "Haz clic en «Choose an Agent…».",
             "Haz clic en Codex."
@@ -154,12 +165,14 @@
           "title": "Un tooltip cerca del borde de la ventana",
           "goal": "Un tooltip no se sale de la ventana cerca de sus bordes.",
           "instructions": [
-            "Haz la ventana de config-digger baja y estrecha, de unos 600 × 400.",
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "Deja el ratón sobre el botón About, abajo en la barra de la izquierda.",
-            "Deja el ratón sobre la ubicación de una fila de la lista de Entries con una ruta larga."
+            "En el Inventario, elige Claude Code en Agents.",
+            "En Agent home, elige claude-code-home.",
+            "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items."
           ],
           "commands": [],
-          "expect": "Los dos tooltips quedan enteros dentro de la ventana: el de About sale encima del botón y pegado al borde izquierdo sin salirse, y una ruta larga se parte en varias líneas.",
+          "expect": "Los dos tooltips quedan enteros dentro de la ventana. El de About, en la esquina de abajo a la izquierda, sale encima del botón y no pasa del borde izquierdo. El de la fila muestra la ruta entera de la skill, partida en varias líneas.",
           "covers": ["#182"]
         }
       ]
@@ -375,7 +388,9 @@
           "goal": "Un Claude Desktop abierto no bloquea ni avisa al aparcar una Entry de un home añadido que no lee.",
           "instructions": [
             "Abre Claude Desktop y déjalo abierto.",
-            "En config-digger, ve a Projects & homes y pulsa Add Agent home.",
+            "En config-digger, ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
             "Elige Claude Desktop como Agent.",
             "En el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
             "Vuelve al Inventario y elige ese home.",
