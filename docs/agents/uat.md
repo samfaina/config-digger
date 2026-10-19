@@ -32,7 +32,7 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 4. Write one action per instruction line, and an `expect` the tester can check by looking: names, counts, the exact message.
 5. Use only throwaway data: `cd-throwaway-*` Entries and the fake Secret `not-a-real-secret`. When a step needs data the setup script does not create yet, add it to the script, and use `setup` when the step needs it fresh.
 6. List the issue in `covers`.
-7. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, and that no step id is used twice.
+7. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), and that a step opens the Agent homes tab before it presses Add Agent home.
 
 When a change to the app makes a step wrong, change the step's text and keep its id.
 
