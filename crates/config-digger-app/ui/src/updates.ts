@@ -7,3 +7,8 @@ import { operationTime } from "./history";
 export function lastCheckedText(lastChecked: string | null, now: Date): string {
   return `Last checked: ${lastChecked === null ? "never" : operationTime(lastChecked, now)}.`;
 }
+
+/** What About says when a check fails: the core's message is only the cause. */
+export function checkFailedText(cause: string): string {
+  return `The update check failed: ${cause}`;
+}

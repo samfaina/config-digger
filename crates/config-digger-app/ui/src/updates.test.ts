@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { lastCheckedText } from "./updates";
+import { checkFailedText, lastCheckedText } from "./updates";
 
 /** A time on the user's clock, as the core records it. */
 function at(year: number, month: number, day: number, hours: number, minutes: number): string {
@@ -16,5 +16,13 @@ describe("the last update check", () => {
   test("is when the latest check ran, on the user's clock", () => {
     expect(lastCheckedText(at(2026, 9, 10, 17, 47), now)).toBe("Last checked: Today 17:47.");
     expect(lastCheckedText(at(2026, 8, 30, 9, 12), now)).toBe("Last checked: Sep 30 09:12.");
+  });
+});
+
+describe("a failed update check", () => {
+  test("says it failed once, then why", () => {
+    expect(checkFailedText("Could not fetch a valid release JSON from the remote")).toBe(
+      "The update check failed: Could not fetch a valid release JSON from the remote",
+    );
   });
 });
