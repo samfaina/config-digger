@@ -27,7 +27,7 @@ export function HistoryScreen() {
   const { history, error, reload } = useHistory();
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
-  // An Undo of the selected Operation that the core refused, shown in its detail.
+  // An Undo of the selected Operation that the core refused, or that its detail already held refused, shown in its detail.
   const [refused, setRefused] = useState<{ operation: string; refusal: UndoRefusal } | null>(null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
   const dialog = useActionDialog({
@@ -198,7 +198,7 @@ type PaneProps = {
 function OperationPane({ summary, detail, detailError, time, refusal, onUndo, onDeleteBackup, onDismiss, notify }: PaneProps) {
   const row = operationRow(summary);
   const actions = operationActions(summary);
-  const press = undoPress(summary, detail);
+  const press = undoPress(summary, detailError ? "unread" : detail);
   return (
     <>
       <h2 className="panel-title">

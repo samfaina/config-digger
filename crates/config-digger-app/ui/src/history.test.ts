@@ -279,6 +279,16 @@ describe("pressing Undo", () => {
     expect(undoPress(refused, null)).toEqual({ kind: "reading" });
     expect(undoPress(summary(), null)).toEqual({ kind: "dialog" });
   });
+
+  test("opens the dialog when the detail couldn't be read, so that planning the Undo says why it is refused", () => {
+    expect(undoPress(refused, "unread")).toEqual({ kind: "dialog" });
+  });
+
+  test("opens the dialog when checking the Undo failed otherwise than by a refusal or a block", () => {
+    const unexpected = error({ code: "unexpected", message: "cannot read the manifest" });
+
+    expect(undoPress(refused, detail({ undo_refusal: unexpected }))).toEqual({ kind: "dialog" });
+  });
 });
 
 describe("the Operation the detail pane shows", () => {
