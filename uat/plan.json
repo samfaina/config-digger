@@ -400,7 +400,7 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "En el Inventario, elige All Agents en Agents.",
-            "En Agent home, abajo a la izquierda, busca la fila de Claude Code. Si no se ve, desplázate dentro del bloque Agent home.",
+            "En Agent home, abajo a la izquierda, desplázate dentro del bloque hasta la fila de Claude Code.",
             "Abre el desplegable de esa fila. Sale cuando Claude Code tiene dos homes o más: el tuyo y claude-code-home del paso 1.2.",
             "Pulsa Escape.",
             "Ve a Projects & homes.",
@@ -477,7 +477,8 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "Deja el ratón sobre el botón About, abajo en la barra de la izquierda.",
-            "En el Inventario, elige Claude Code en Agents. Si no se ve, desplázate dentro del bloque Agents.",
+            "En el Inventario, desplázate dentro del bloque Agents hasta Claude Code.",
+            "Elige Claude Code.",
             "En Agent home, elige claude-code-home.",
             "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items: la línea gris bajo su nombre."
           ],
@@ -584,9 +585,11 @@
           "instructions": [
             "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "En el Inventario, elige All Agents en Agents.",
-            "Desplázate hasta abajo dentro de cada bloque de la columna izquierda: Agents, Entries by State y Agent home.",
+            "Desplázate hasta abajo dentro del bloque Agents.",
+            "Desplázate hasta abajo dentro del bloque Entries by State.",
+            "Desplázate hasta abajo dentro del bloque Agent home.",
             "En Agents, elige Claude Code.",
-            "En Agent home, elige claude-code-many-home.",
+            "En Agent home, elige claude-code-many-home, el home que añade el paso 4.1.",
             "En el campo Project de la cabecera, elige E:\\cd-throwaway\\many\\project-01.",
             "Deja el ratón sobre el campo Project.",
             "Elige el servidor cd-throwaway-many-01 de la lista de Items.",
@@ -594,7 +597,7 @@
             "Deja el ratón sobre la ubicación de la fila cd-throwaway-many-01: la línea gris bajo su nombre."
           ],
           "commands": [],
-          "expect": "Agents, Entries by State y Agent home muestran cada uno su título y al menos una fila. El que no cabe entero se desplaza con su propia barra hasta su última fila, sin mover los otros bloques. Claude Code y claude-code-many-home se eligen con un clic. La lista de Items y el panel de la derecha se reparten el ancho: ni la lista se queda en una columna estrecha ni el panel ocupa casi toda la ventana. Ningún texto se monta sobre otro: en cada fila de Items, el nombre y debajo la ubicación van junto al icono, y el número de Entries y el State en otra línea, bajo ellos. La ubicación acaba en «…» y su tooltip muestra la ruta entera. El tooltip del campo Project muestra E:\\cd-throwaway\\many\\project-01 entero.",
+          "expect": "Agents muestra su título y al menos dos Agents; Entries by State y Agent home, su título y al menos una fila. Al desplazarte dentro de un bloque, llegas a su última fila y los otros dos bloques no se mueven. Claude Code y claude-code-many-home se eligen con un clic. La lista de Items y el panel de la derecha tienen más o menos el mismo ancho, y la columna de la izquierda es algo más estrecha que cada uno. Ningún texto se monta sobre otro: en cada fila de Items, el nombre y debajo la ubicación van junto al icono, y el número de Entries y el State en otra línea, bajo ellos. La ubicación acaba en «…» y su tooltip muestra la ruta entera. El tooltip del campo Project muestra E:\\cd-throwaway\\many\\project-01 entero.",
           "covers": ["#221"]
         }
       ]

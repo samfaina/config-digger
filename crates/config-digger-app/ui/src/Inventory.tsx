@@ -632,10 +632,12 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
           </span>
         </Tooltip>
       </span>
-      {effective.git_versioned && <span className="tag">git-versioned</span>}
-      {effective.link && <LinkTag link={effective.link} />}
-      <span className="item-count">{entries}</span>
-      <StatePill state={item.state} />
+      <span className="item-side">
+        {effective.git_versioned && <span className="tag">git-versioned</span>}
+        {effective.link && <LinkTag link={effective.link} />}
+        <span className="item-count">{entries}</span>
+        <StatePill state={item.state} />
+      </span>
     </button>
   );
 }
