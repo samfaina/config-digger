@@ -1381,19 +1381,14 @@ fn undo_dry_run_prints_the_plan_and_writes_nothing() {
     assert_eq!(read(&harness.path(".claude.json")), after_remove);
 }
 
-/// How many scans a run logged, each its `scan started` line followed by
-/// its `scan finished` line.
+/// How many scans a run logged, after checking that each `scan started`
+/// line is followed by its `scan finished` line.
 fn logged_scans(run: &Run) -> usize {
     let lines = scan_lines(run);
-    for pair in lines.chunks(2) {
-        assert!(
-            pair.len() == 2
-                && pair[0].contains("scan started")
-                && pair[1].contains("scan finished"),
-            "{}",
-            run.stderr
-        );
-    }
+    let paired = lines.chunks(2).all(|pair| {
+        matches!(pair, [started, finished] if started.contains("started") && finished.contains("finished"))
+    });
+    assert!(paired, "{}", run.stderr);
     lines.len() / 2
 }
 

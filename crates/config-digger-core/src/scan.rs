@@ -902,21 +902,21 @@ pub(crate) fn scan_as_if(
 ) -> Result<Snapshot, ScanError> {
     let started = Instant::now();
     tracing::info!("scan started");
-    let mut paths = 0;
+    let mut asked = 0;
     let snapshot = read_as_if(
         definitions,
         ports,
         extra_projects,
         written,
         folders,
-        &mut paths,
+        &mut asked,
     )?;
     let elapsed_ms = started.elapsed().as_millis();
-    tracing::info!(elapsed_ms, paths, "scan finished");
+    tracing::info!(elapsed_ms, paths = asked, "scan finished");
     Ok(snapshot)
 }
 
-/// The scan of [`scan_as_if`], counting in `paths` each path it asks the
+/// The scan of [`scan_as_if`], counting in `asked` each path it asks the
 /// git index about.
 fn read_as_if(
     definitions: &Definitions,
@@ -924,7 +924,7 @@ fn read_as_if(
     extra_projects: &[PathBuf],
     written: &[Written],
     folders: &[PlannedFolder],
-    paths: &mut usize,
+    asked: &mut usize,
 ) -> Result<Snapshot, ScanError> {
     let as_if = AsIf::new(ports.fs.as_ref(), folders);
     let read_at = ports.clock.now();
@@ -1175,7 +1175,7 @@ fn read_as_if(
         .iter()
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
-    let versioned = versioned(ports, locations.chain(switch_files), paths);
+    let versioned = versioned(ports, locations.chain(switch_files), asked);
     let last_ran: Vec<Option<String>> = found
         .iter()
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
