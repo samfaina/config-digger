@@ -13,6 +13,7 @@ import { commands, type Agent, type ListChange, type Pick, type Places, type Pro
 import { applyChange } from "./changing";
 import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
+import { Loading, ReadProgress } from "./Loading";
 import { Status, type Notice } from "./Notice";
 import {
   homeGroups,
@@ -27,7 +28,7 @@ import {
   type ShowInInventory,
 } from "./places";
 import { useActionDialog } from "./useActionDialog";
-import { reads } from "./reads";
+import { readCue, reads } from "./reads";
 import { Select } from "./Select";
 import { usePlaces } from "./usePlaces";
 import { useBusy } from "./useBusy";
@@ -48,7 +49,8 @@ type Props = {
  * reads, in two tabs that mirror `projects` and `homes` in the CLI.
  */
 export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
-  const { places, error, reload, change } = usePlaces();
+  const { places, error, reading, reload, change } = usePlaces();
+  const cue = readCue({ shown: places !== null, reading, failed: error !== null });
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
@@ -99,6 +101,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
           <Icon name="folder" small />
           {ADD_LABELS[tab]}
         </button>
+        {cue === "rereading" && <ReadProgress text="Reading the Projects and Agent homes again" />}
       </header>
 
       <div className="panes">
@@ -116,9 +119,9 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
             </div>
           )}
           <div className="scroll">
-            {places === null ? (
-              !error && <p className="empty">Reading the Projects and Agent homes…</p>
-            ) : tab === "projects" ? (
+            {cue === "loading" ? (
+              <Loading text="Reading the Projects and Agent homes…" rows={6} />
+            ) : places === null ? null : tab === "projects" ? (
               <ProjectsTab
                 places={places}
                 busy={busyRows}

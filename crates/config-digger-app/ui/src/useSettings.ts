@@ -7,6 +7,8 @@ export type SettingsState = {
   /** The settings, data folders and parked Entries, kept after a read fails. */
   read: SettingsRead | null;
   error: ApiError | null;
+  /** Whether a read of the settings runs. */
+  reading: boolean;
   /** Saves `settings`, which show as saved once the core returns them. */
   save: (settings: Settings) => Promise<CommandResult<Settings>>;
 };
@@ -18,6 +20,7 @@ export type SettingsState = {
 export function useSettings(): SettingsState {
   const [read, setRead] = useState<SettingsRead | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [reading, setReading] = useState(false);
   // A focus event during a read does not start a second one.
   const inFlight = useRef(false);
   // Counts the saves, so that a read started before one is dropped.
@@ -27,6 +30,7 @@ export function useSettings(): SettingsState {
     if (inFlight.current) return;
     inFlight.current = true;
     const before = saves.current;
+    setReading(true);
     try {
       const result = await reads.during(() => call(commands.readSettings));
       if (saves.current !== before) return;
@@ -38,6 +42,7 @@ export function useSettings(): SettingsState {
       }
     } finally {
       inFlight.current = false;
+      setReading(false);
     }
   }, []);
 
@@ -58,5 +63,5 @@ export function useSettings(): SettingsState {
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
 
-  return { read, error, save };
+  return { read, error, reading, save };
 }

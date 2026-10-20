@@ -7,6 +7,8 @@ export type PlacesRead = {
   /** Every Project and Agent home, kept while a new read runs or after one fails. */
   places: Places | null;
   error: ApiError | null;
+  /** Whether a read of the Projects and Agent homes runs. */
+  reading: boolean;
   /** Reads again, done once the screen has what it read. */
   reload: () => Promise<void>;
   /** Applies `change` to config-digger's lists, which are read again at once. */
@@ -20,6 +22,7 @@ export type PlacesRead = {
 export function usePlaces(): PlacesRead {
   const [places, setPlaces] = useState<Places | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [reading, setReading] = useState(false);
   // A reload during a read reads again once that one is done, as the disk may
   // have changed since it started, rather than running beside it.
   const inFlight = useRef<Promise<void> | null>(null);
@@ -28,7 +31,8 @@ export function usePlaces(): PlacesRead {
 
   const read = useCallback(async () => {
     const before = changes.current;
-    const result = await reads.during(() => call(commands.readPlaces));
+    setReading(true);
+    const result = await reads.during(() => call(commands.readPlaces)).finally(() => setReading(false));
     if (changes.current !== before) return;
     if (result.status === "ok") {
       setPlaces(result.data);
@@ -64,5 +68,5 @@ export function usePlaces(): PlacesRead {
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
 
-  return { places, error, reload, change };
+  return { places, error, reading, reload, change };
 }

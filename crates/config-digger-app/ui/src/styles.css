@@ -299,6 +299,8 @@ p {
 }
 
 .banner {
+  /* For the bar of a re-read, along its bottom edge. */
+  position: relative;
   flex-direction: row;
   align-items: center;
   gap: 30px;
@@ -1339,6 +1341,119 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 2.4s;
+  }
+}
+
+/* A screen's body until its first read is done: the busy indicator in the
+   body rather than floating at its bottom, over rows shaped like the ones the
+   read brings. */
+
+.loading {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+/* The Inventory's stands in for all its panes, as one panel. */
+.inventory > .loading {
+  background: var(--panel);
+  border-radius: 16px;
+}
+
+.loading .notice.busy {
+  position: static;
+  align-self: center;
+  transform: none;
+  box-shadow: none;
+}
+
+.placeholder-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.placeholder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  animation: pulse 0.9s infinite alternate;
+}
+
+.placeholder-row:nth-child(even) {
+  animation-delay: 0.3s;
+}
+
+.placeholder-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--tile-hover);
+}
+
+.placeholder-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.placeholder-line {
+  height: 10px;
+  width: 60%;
+  border-radius: 5px;
+  background: var(--tile-hover);
+}
+
+.placeholder-line.short {
+  width: 35%;
+  background: var(--tile);
+}
+
+/* While a screen reads again over what it shows: a thin bar sliding along
+   the bottom edge of its banner, which covers nothing. */
+
+.read-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.read-progress span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  background: var(--notice-information-edge);
+  animation: read-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes read-progress {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placeholder-row {
+    animation: none;
+  }
+
+  .read-progress span {
+    animation-duration: 3.6s;
   }
 }
 

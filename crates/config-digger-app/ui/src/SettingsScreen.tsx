@@ -2,8 +2,10 @@ import { useState } from "react";
 import { commands, type DataFolder } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
+import { Loading, ReadProgress } from "./Loading";
 import { Notice } from "./Notice";
 import type { InventoryStart } from "./places";
+import { readCue } from "./reads";
 import { dataFolderRows, parkedRows, type ParkedRow } from "./settings";
 import { useSettings } from "./useSettings";
 import { useTransient } from "./useTransient";
@@ -16,7 +18,8 @@ type Props = {
 
 /** The Settings screen: the update preference and the folders config-digger keeps its data in. */
 export function SettingsScreen({ onShow, onOpenAbout }: Props) {
-  const { read, error, save } = useSettings();
+  const { read, error, reading, save } = useSettings();
+  const cue = readCue({ shown: read !== null, reading, failed: error !== null });
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
 
@@ -49,6 +52,7 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
           config-digger reads by default and writes only through a previewed Operation. Nothing here changes Agent
           configuration.
         </p>
+        {cue === "rereading" && <ReadProgress text="Reading the settings again" />}
       </header>
 
       {error && (
@@ -94,9 +98,9 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
         <section className="panel settings-data">
           <h2 className="panel-title">Data on this computer</h2>
           <div className="scroll">
-            {read === null ? (
-              !error && <p className="empty">Reading where config-digger keeps its data…</p>
-            ) : (
+            {cue === "loading" ? (
+              <Loading text="Reading where config-digger keeps its data…" rows={3} />
+            ) : read === null ? null : (
               <>
                 {dataFolderRows(read).map((row) => (
                   <div key={row.folder} className="place-row">

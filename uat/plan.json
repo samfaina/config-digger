@@ -192,6 +192,57 @@
       ]
     },
     {
+      "id": "15",
+      "title": "Mientras la app lee",
+      "steps": [
+        {
+          "id": "15.1",
+          "title": "La primera lectura al abrir la app",
+          "goal": "Al abrir config-digger, el Inventario enseña que está leyendo hasta que tiene sus datos.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ábrelo desde el menú Inicio.",
+            "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
+          ],
+          "commands": [],
+          "expect": "Antes de que salgan los paneles, el cuerpo es un único panel con un aviso con una rueda que gira y el texto «Reading the inventory…», sobre filas grises que laten. Luego salen los paneles de Agents, Items y Details con tus datos.",
+          "covers": ["#180"]
+        },
+        {
+          "id": "15.2",
+          "title": "Leer otra vez sin tapar la pantalla",
+          "goal": "Cuando el Inventario lee otra vez sobre lo que ya enseña, una barra fina bajo la cabecera lo dice y la pantalla sigue usable.",
+          "instructions": [
+            "En el Inventario, pulsa Refresh.",
+            "Mira enseguida el borde de abajo de la cabecera y la lista de Items.",
+            "Mientras la barra corre, haz clic en un Item de la lista.",
+            "Haz clic en otra ventana, por ejemplo el Bloc de notas.",
+            "Haz clic otra vez en la ventana de config-digger.",
+            "Mira otra vez el borde de abajo de la cabecera."
+          ],
+          "commands": [],
+          "expect": "Con Refresh, el botón dice Reading y por el borde de abajo de la cabecera corre una barra fina de lado a lado hasta que acaba la lectura. Los Items siguen a la vista y el clic abre el Item en Details. Al volver a la ventana pasa lo mismo con la barra, sin el estado de carga de la primera lectura. La barra puede durar menos de un segundo; lo que cuenta es que sale mientras el botón dice Reading.",
+          "covers": ["#180"]
+        },
+        {
+          "id": "15.3",
+          "title": "La primera lectura de las otras pantallas",
+          "goal": "Projects & homes, History y Settings enseñan que están leyendo hasta que tienen sus datos.",
+          "instructions": [
+            "Abre Projects & homes en la barra de la izquierda.",
+            "Mira enseguida la lista, bajo la descripción de la pestaña.",
+            "Abre History.",
+            "Mira enseguida la lista Operations.",
+            "Abre Settings.",
+            "Mira enseguida el panel Data on this computer."
+          ],
+          "commands": [],
+          "expect": "Cada lista empieza con un aviso con una rueda que gira y filas grises que laten debajo: «Reading the Projects and Agent homes…» en Projects & homes, «Reading History…» en History y «Reading where config-digger keeps its data…» en Settings. Luego salen sus datos. La carga puede durar menos de un segundo; lo que cuenta es que no sale una línea de texto suelta.",
+          "covers": ["#180"]
+        }
+      ]
+    },
+    {
       "id": "10",
       "title": "Projects & homes",
       "steps": [
@@ -287,6 +338,19 @@
           "commands": [],
           "expect": "Se abre el Inventario con E:/cd-throwaway/project-gone en el campo Project, All Agents elegido y el filtro de State Unread. La lista de Items muestra cd-throwaway-leftover.",
           "covers": ["#75", "#176"]
+        },
+        {
+          "id": "10.14",
+          "title": "El estado de carga de Show leftovers",
+          "goal": "Show leftovers abre el Inventario con su estado de carga en el acto, sin dejar la pantalla vacía ni quieta mientras lee.",
+          "instructions": [
+            "Abre Projects & homes en la barra de la izquierda.",
+            "En la fila de E:/cd-throwaway/project-gone, pulsa Show leftovers.",
+            "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
+          ],
+          "commands": [],
+          "expect": "Nada más pulsar, el Inventario ocupa su cuerpo con un único panel: arriba, un aviso con una rueda que gira y el texto «Reading the inventory…»; debajo, filas grises que laten con la forma de las filas de Items. Bajo la cabecera no salen los paneles de Agents, Items y Details, ni vacíos ni con sus cuentas a 0. Al acabar la lectura, el panel deja sitio a los paneles con cd-throwaway-leftover en la lista de Items. La carga puede durar menos de un segundo; lo que cuenta es que sale antes de los paneles.",
+          "covers": ["#180"]
         },
         {
           "id": "10.7",

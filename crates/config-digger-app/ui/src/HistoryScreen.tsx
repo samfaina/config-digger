@@ -16,7 +16,9 @@ import {
   type UndoRefusal,
 } from "./history";
 import { Icon } from "./icons";
+import { Loading, ReadProgress } from "./Loading";
 import { Notice } from "./Notice";
+import { readCue } from "./reads";
 import { useActionDialog } from "./useActionDialog";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
@@ -24,7 +26,8 @@ import { Tooltip } from "./Tooltip";
 
 /** The History · Undo screen: every Operation, newest first, and the detail of the one selected. */
 export function HistoryScreen() {
-  const { history, error, reload } = useHistory();
+  const { history, error, reading, reload } = useHistory();
+  const cue = readCue({ shown: history !== null, reading, failed: error !== null });
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
   // An Undo of the selected Operation that the core refused, or that its detail already held refused, shown in its detail.
@@ -88,6 +91,7 @@ export function HistoryScreen() {
           Any Operation can be undone on its own, across restarts. Undo is refused when something it touched changed
           since.
         </p>
+        {cue === "rereading" && <ReadProgress text="Reading History again" />}
       </header>
 
       <div className="panes">
@@ -100,9 +104,9 @@ export function HistoryScreen() {
             </div>
           )}
           <div className="scroll">
-            {history === null ? (
-              <p className="empty">Reading History…</p>
-            ) : history.length === 0 ? (
+            {cue === "loading" ? (
+              <Loading text="Reading History…" rows={6} />
+            ) : history === null ? null : history.length === 0 ? (
               <p className="empty">No Operations yet. Disable, Enable or Remove an Entry and it is listed here.</p>
             ) : (
               history.map((operation) => (

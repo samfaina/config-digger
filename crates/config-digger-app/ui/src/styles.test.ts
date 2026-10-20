@@ -335,16 +335,21 @@ describe("the Projects & homes banner at the smallest window", () => {
   });
 });
 
+/** Expects every colour of the rules of `selectors` to be a `:root` token. */
+const expectTokenColours = (selectors: string[]) => {
+  for (const selector of selectors) {
+    const declarations = styled(selector);
+    expect(declarations.size, selector).toBeGreaterThan(0);
+    for (const value of declarations.values()) {
+      expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
+      for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
+    }
+  }
+};
+
 describe("the busy indicator", () => {
   test("takes every colour from the :root tokens", () => {
-    for (const selector of [".notice.busy", ".spinner"]) {
-      const declarations = styled(selector);
-      expect(declarations.size, selector).toBeGreaterThan(0);
-      for (const value of declarations.values()) {
-        expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
-        for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
-      }
-    }
+    expectTokenColours([".notice.busy", ".spinner"]);
   });
 
   test("is a notice of its own, with the background and accent edge of an information one", () => {
@@ -359,5 +364,45 @@ describe("the busy indicator", () => {
     expect(spinner.get("border-top-color")).toBe(styled(".notice.busy").get("border-left-color"));
     expect(css).toMatch(/@keyframes spin\s*\{\s*to\s*\{\s*transform:\s*rotate\(1turn\)/);
     expect(styled(".spinner", /prefers-reduced-motion: reduce/).get("animation-duration")).toBeDefined();
+  });
+});
+
+describe("the loading state of a first read", () => {
+  test("fills the body it stands in for", () => {
+    expect(styled(".loading").get("flex")).toBe("1");
+  });
+
+  test("shows its busy indicator in the body, above its placeholder rows, instead of floating at the bottom", () => {
+    const busy = styled(".loading .notice.busy");
+    expect(busy.get("position")).toBe("static");
+    expect(busy.get("transform")).toBe("none");
+  });
+
+  test("takes every colour of its placeholder rows from the :root tokens", () => {
+    expectTokenColours([".placeholder-icon", ".placeholder-line"]);
+  });
+
+  test("pulses its placeholder rows, but not when the user asks for less motion", () => {
+    expect(styled(".placeholder-row").get("animation")).toMatch(/\bpulse\b.*\binfinite\b/);
+    expect(styled(".placeholder-row", /prefers-reduced-motion: reduce/).get("animation")).toBe("none");
+  });
+});
+
+describe("the cue of a re-read", () => {
+  test("runs along the bottom edge of the banner, taking no room from the screen", () => {
+    expect(styled(".banner").get("position")).toBe("relative");
+    const bar = styled(".read-progress");
+    expect(bar.get("position")).toBe("absolute");
+    expect(bar.get("bottom")).toBe("0");
+  });
+
+  test("takes every colour from the :root tokens", () => {
+    expectTokenColours([".read-progress", ".read-progress span"]);
+  });
+
+  test("slides its bar along the track, more slowly when the user asks for less motion", () => {
+    expect(styled(".read-progress span").get("animation")).toMatch(/\bread-progress\b.*\binfinite\b/);
+    expect(css).toMatch(/@keyframes read-progress\s*\{/);
+    expect(styled(".read-progress span", /prefers-reduced-motion: reduce/).get("animation-duration")).toBeDefined();
   });
 });
