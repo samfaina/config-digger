@@ -335,16 +335,21 @@ describe("the Projects & homes banner at the smallest window", () => {
   });
 });
 
+/** Expects every colour of the rules of `selectors` to be a `:root` token. */
+const expectTokenColours = (selectors: string[]) => {
+  for (const selector of selectors) {
+    const declarations = styled(selector);
+    expect(declarations.size, selector).toBeGreaterThan(0);
+    for (const value of declarations.values()) {
+      expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
+      for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
+    }
+  }
+};
+
 describe("the busy indicator", () => {
   test("takes every colour from the :root tokens", () => {
-    for (const selector of [".notice.busy", ".spinner"]) {
-      const declarations = styled(selector);
-      expect(declarations.size, selector).toBeGreaterThan(0);
-      for (const value of declarations.values()) {
-        expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
-        for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
-      }
-    }
+    expectTokenColours([".notice.busy", ".spinner"]);
   });
 
   test("is a notice of its own, with the background and accent edge of an information one", () => {
@@ -361,18 +366,6 @@ describe("the busy indicator", () => {
     expect(styled(".spinner", /prefers-reduced-motion: reduce/).get("animation-duration")).toBeDefined();
   });
 });
-
-/** Expects every colour of the rules of `selectors` to be a `:root` token. */
-const expectTokenColours = (selectors: string[]) => {
-  for (const selector of selectors) {
-    const declarations = styled(selector);
-    expect(declarations.size, selector).toBeGreaterThan(0);
-    for (const value of declarations.values()) {
-      expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
-      for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
-    }
-  }
-};
 
 describe("the loading state of a first read", () => {
   test("fills the body it stands in for", () => {

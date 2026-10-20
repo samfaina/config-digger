@@ -9,9 +9,10 @@ export type InventoryRead = {
   /** The context's Project, `null` for no Project. */
   project: string | null;
   error: ApiError | null;
+  /** Whether a read runs, of the disk or of another Project. */
   reading: boolean;
   refresh: () => void;
-  /** Resolves the inventory for another Project, without reading the disk. */
+  /** Resolves the inventory for another Project, reading the disk only if it was never read. */
   selectProject: (project: string | null) => void;
 };
 
@@ -24,7 +25,8 @@ export function useInventory(initialProject: string | null = null): InventoryRea
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [project, setProject] = useState<string | null>(initialProject);
   const [error, setError] = useState<ApiError | null>(null);
-  const [reading, setReading] = useState(false);
+  // The reads running: a refresh and the Project switches since, which may each wait on a scan.
+  const [running, setRunning] = useState(0);
   // A focus event during a read does not start a second one.
   const inFlight = useRef(false);
   const projectRef = useRef<string | null>(initialProject);
@@ -41,25 +43,33 @@ export function useInventory(initialProject: string | null = null): InventoryRea
     }
   }, []);
 
+  /** Runs `read`, counted as running until it settles. */
+  const counted = useCallback(async (read: () => Promise<void>) => {
+    setRunning((count) => count + 1);
+    try {
+      await reads.during(read);
+    } finally {
+      setRunning((count) => count - 1);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    setReading(true);
     try {
-      await reads.during(() => load(projectRef.current, commands.readInventory));
+      await counted(() => load(projectRef.current, commands.readInventory));
     } finally {
       inFlight.current = false;
-      setReading(false);
     }
-  }, [load]);
+  }, [load, counted]);
 
   const selectProject = useCallback(
     (next: string | null) => {
       projectRef.current = next;
       setProject(next);
-      void load(next, commands.switchProject);
+      void counted(() => load(next, commands.switchProject));
     },
-    [load],
+    [load, counted],
   );
 
   useEffect(() => {
@@ -69,5 +79,5 @@ export function useInventory(initialProject: string | null = null): InventoryRea
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
-  return { inventory, project, error, reading, refresh: () => void refresh(), selectProject };
+  return { inventory, project, error, reading: running > 0, refresh: () => void refresh(), selectProject };
 }

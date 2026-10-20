@@ -3,7 +3,7 @@ import { Busy } from "./Notice";
 /** The body of a screen until its first read is done: the busy indicator naming what is read, over `rows` placeholder rows. */
 export function Loading({ text, rows }: { text: string; rows: number }) {
   return (
-    <div className="loading" aria-busy="true">
+    <div className="loading">
       <Busy action={{ text, row: null }} />
       <div className="placeholder-rows" aria-hidden="true">
         {Array.from({ length: rows }, (_, index) => (

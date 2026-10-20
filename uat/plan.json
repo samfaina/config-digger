@@ -205,7 +205,7 @@
             "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
           ],
           "commands": [],
-          "expect": "Antes de que salgan los paneles, el cuerpo es un único panel con un aviso con una rueda que gira y el texto «Reading the inventory…», sobre filas grises que laten. La línea suelta «Reading the inventory…» de antes ya no sale. Luego salen los paneles de Agents, Items y Details con tus datos.",
+          "expect": "Antes de que salgan los paneles, el cuerpo es un único panel con un aviso con una rueda que gira y el texto «Reading the inventory…», sobre filas grises que laten. Luego salen los paneles de Agents, Items y Details con tus datos.",
           "covers": ["#180"]
         },
         {
@@ -216,11 +216,12 @@
             "En el Inventario, pulsa Refresh.",
             "Mira enseguida el borde de abajo de la cabecera y la lista de Items.",
             "Mientras la barra corre, haz clic en un Item de la lista.",
-            "Cambia a otra ventana, por ejemplo el Bloc de notas, y vuelve a config-digger.",
+            "Haz clic en otra ventana, por ejemplo el Bloc de notas.",
+            "Haz clic otra vez en la ventana de config-digger.",
             "Mira otra vez el borde de abajo de la cabecera."
           ],
           "commands": [],
-          "expect": "Con Refresh, el botón dice Reading y por el borde de abajo de la cabecera corre una barra fina de lado a lado hasta que acaba la lectura. Los Items siguen a la vista y el clic abre el Item en Details. Al volver a la ventana pasa lo mismo con la barra, sin el estado de carga de la primera lectura. La barra puede durar menos de un segundo.",
+          "expect": "Con Refresh, el botón dice Reading y por el borde de abajo de la cabecera corre una barra fina de lado a lado hasta que acaba la lectura. Los Items siguen a la vista y el clic abre el Item en Details. Al volver a la ventana pasa lo mismo con la barra, sin el estado de carga de la primera lectura. La barra puede durar menos de un segundo; lo que cuenta es que sale mientras el botón dice Reading.",
           "covers": ["#180"]
         },
         {
@@ -348,7 +349,7 @@
             "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
           ],
           "commands": [],
-          "expect": "Nada más pulsar, el Inventario ocupa su cuerpo con un único panel: arriba, un aviso con una rueda que gira y el texto «Reading the inventory…»; debajo, filas grises que laten con la forma de las filas de Items. No salen los paneles de Agents, Items y Details vacíos ni con cuentas a 0. Al acabar la lectura, el panel deja sitio a los paneles con cd-throwaway-leftover en la lista de Items. La carga puede durar menos de un segundo; lo que cuenta es que sale antes de los paneles.",
+          "expect": "Nada más pulsar, el Inventario ocupa su cuerpo con un único panel: arriba, un aviso con una rueda que gira y el texto «Reading the inventory…»; debajo, filas grises que laten con la forma de las filas de Items. Bajo la cabecera no salen los paneles de Agents, Items y Details, ni vacíos ni con sus cuentas a 0. Al acabar la lectura, el panel deja sitio a los paneles con cd-throwaway-leftover en la lista de Items. La carga puede durar menos de un segundo; lo que cuenta es que sale antes de los paneles.",
           "covers": ["#180"]
         },
         {

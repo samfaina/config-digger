@@ -18,8 +18,9 @@ describe("the loading state of a screen's first read", () => {
     expect(markup).toMatch(/<div class="placeholder-rows" aria-hidden="true">/);
   });
 
-  test("marks what it fills as busy", () => {
-    expect(markup).toMatch(/^<div class="loading" aria-busy="true">/);
+  test("leaves its busy indicator out of any busy region, so that screen readers read it out", () => {
+    expect(markup).toMatch(/^<div class="loading">/);
+    expect(markup).not.toContain("aria-busy");
   });
 });
 
