@@ -306,8 +306,8 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, la fila de project-gone dice No leftovers y ofrece Hide.",
-          "covers": ["#75"]
+          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», con los botones de la fila de project-gone apagados, que puede durar menos de un segundo. Luego la fila de project-gone dice No leftovers y ofrece Hide.",
+          "covers": ["#75", "#179"]
         },
         {
           "id": "10.8",
@@ -322,6 +322,21 @@
           "commands": [],
           "expect": "Hide da el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.» y el Project sale de la lista principal. El grupo Hidden · 1 empieza cerrado y, abierto, muestra el Project en gris. Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.» y el Project vuelve a la lista principal.",
           "covers": ["#75"]
+        },
+        {
+          "id": "10.11",
+          "title": "El aviso de trabajo de Hide y Unhide",
+          "goal": "Desde que se pulsa Hide o Unhide hasta que la lista cambia, la pantalla dice qué hace y los botones de esa fila no responden.",
+          "instructions": [
+            "En la fila de E:\\cd-throwaway\\project-hide, pulsa Hide.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones de la fila.",
+            "Abre el grupo Hidden si está cerrado.",
+            "En la fila de project-hide, pulsa Unhide.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones de la fila."
+          ],
+          "commands": [],
+          "expect": "Nada más pulsar Hide sale abajo, donde salen los avisos, un aviso con una rueda que gira y el texto «Hiding E:\\cd-throwaway\\project-hide…», y los botones Open in Inventory y Hide de la fila se ven apagados. Sigue ahí hasta que el Project sale de la lista principal, y entonces lo sustituye el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.». Con Unhide pasa lo mismo, con «Unhiding E:\\cd-throwaway\\project-hide…» y luego «E:\\cd-throwaway\\project-hide is listed again.». El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la lista cambie.",
+          "covers": ["#179"]
         },
         {
           "id": "10.9",
@@ -340,6 +355,44 @@
           "commands": [],
           "expect": "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file». Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.», y su fila dice «Folder · Added by you», con los botones Open in Inventory y Remove from list.",
           "covers": ["#75"]
+        },
+        {
+          "id": "10.12",
+          "title": "El aviso de trabajo de Remove from list y Add Project",
+          "goal": "Remove from list y Add Project dicen qué hacen desde que se pulsan hasta que la lista cambia.",
+          "instructions": [
+            "En la fila de E:\\cd-throwaway\\project-extra, pulsa Remove from list.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones de la fila.",
+            "Pulsa Add Project.",
+            "Pulsa Choose folder….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\project-extra.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Mira enseguida la parte de abajo de la pantalla y el botón Add."
+          ],
+          "commands": [],
+          "expect": "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\project-extra from config-digger's list…», con los botones de la fila apagados, hasta que la fila desaparece y sale el aviso «Removed E:\\cd-throwaway\\project-extra from config-digger's list. Nothing on disk changed.». Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\project-extra…», con Add apagado, hasta que el diálogo se cierra y sale «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.». Al final project-extra vuelve a estar en la lista.",
+          "covers": ["#179"]
+        },
+        {
+          "id": "10.13",
+          "title": "El aviso de trabajo de un Agent home",
+          "goal": "Remove from list y Add Agent home dicen qué hacen desde que se pulsan hasta que la lista cambia.",
+          "instructions": [
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\codex-home, bajo Codex, pulsa Remove from list.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones de la fila.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Codex.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\codex-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Mira enseguida la parte de abajo de la pantalla y el botón Add."
+          ],
+          "commands": [],
+          "expect": "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\codex-home of Codex from config-digger's list…», con los botones de la fila apagados, hasta que la fila desaparece y sale el aviso «Removed E:\\cd-throwaway\\codex-home of Codex from config-digger's list. Nothing on disk changed.». Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\codex-home as an Agent home of Codex…», con Add apagado, hasta que el diálogo se cierra y sale «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.». Al final la fila de codex-home vuelve a estar bajo Codex.",
+          "covers": ["#179"]
         },
         {
           "id": "10.10",
