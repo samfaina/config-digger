@@ -340,3 +340,27 @@ fn the_undo_of_a_remove_in_a_versioned_file_warns_too() {
     let classes: Vec<WarningClass> = undo.warnings().iter().map(|w| w.class).collect();
     assert_eq!(classes, [WarningClass::GitVersioned]);
 }
+
+#[test]
+fn a_scan_asks_the_git_index_once_per_repository() {
+    // `~/.claude.json` in a dotfiles repo at the home folder, and the
+    // Project's files in its own.
+    let fs = fixture().with_file(settings_local(), "{}\n");
+    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let mut ports = fake::ports(fs, env);
+    let git = FakeGitIndex::default()
+        .with_repository(HOME)
+        .with_repository(PROJECT)
+        .with_versioned(mcp_json())
+        .with_versioned(claude_json());
+    ports.git = Box::new(git.clone());
+    let core = Core::new(ports).unwrap();
+
+    let inventory = inventory(&core, &in_project());
+
+    let mut asked = git.asked();
+    asked.sort();
+    assert_eq!(asked, [PathBuf::from(HOME), PathBuf::from(PROJECT)]);
+    assert!(entry(&inventory, "linear").git_versioned);
+    assert!(entry(&inventory, "notes").git_versioned);
+}

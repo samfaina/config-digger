@@ -3,7 +3,8 @@
 
 use config_digger_core::ports::GitIndex;
 use config_digger_core::ports::real::RealGitIndex;
-use std::path::Path;
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // The fixture's own git, which the test runs in its console.
@@ -48,20 +49,56 @@ fn only_a_file_in_the_index_is_versioned() {
     write(&root.path().join("outside.json"), "{}\n");
 
     let git = RealGitIndex;
+    let versioned = |path: &Path| match git.repository(path.parent().unwrap()) {
+        Some(repository) => git.versioned_in(&repository, &[path]).contains(path),
+        None => false,
+    };
 
-    assert!(git.is_versioned(&repo.join(".mcp.json")), "committed");
+    assert!(versioned(&repo.join(".mcp.json")), "committed");
+    assert!(versioned(&repo.join(".claude/settings.json")), "staged");
     assert!(
-        git.is_versioned(&repo.join(".claude/settings.json")),
-        "staged"
-    );
-    assert!(
-        !git.is_versioned(&repo.join(".claude/settings.local.json")),
+        !versioned(&repo.join(".claude/settings.local.json")),
         "ignored"
     );
-    assert!(!git.is_versioned(&repo.join("notes.json")), "untracked");
-    assert!(!git.is_versioned(&repo.join("missing.json")), "missing");
+    assert!(!versioned(&repo.join("notes.json")), "untracked");
+    assert!(!versioned(&repo.join("missing.json")), "missing");
     assert!(
-        !git.is_versioned(&root.path().join("outside.json")),
+        !versioned(&root.path().join("outside.json")),
         "outside any repo"
+    );
+}
+
+#[test]
+fn one_question_answers_for_every_path_in_the_repository() {
+    let root = tempfile::tempdir().unwrap();
+    let repo = root.path().join("repo");
+    std::fs::create_dir(&repo).unwrap();
+    git(&repo, &["init", "--quiet"]);
+    write(&repo.join(".mcp.json"), "{}\n");
+    write(&repo.join(".claude/skills/tracked/SKILL.md"), "# tracked\n");
+    write(
+        &repo.join(".claude/skills/untracked/SKILL.md"),
+        "# untracked\n",
+    );
+    write(&repo.join(".claude/skills/tracked-too/SKILL.md"), "# no\n");
+    git(&repo, &["add", ".mcp.json", ".claude/skills/tracked"]);
+    let skills = repo.join(".claude/skills");
+    let git = RealGitIndex;
+
+    assert_eq!(git.repository(&skills), Some(repo.clone()));
+    let asked = [
+        repo.join(".mcp.json"),
+        skills.join("tracked"),
+        skills.join("untracked"),
+        skills.join("tracked-too"),
+        skills.join("track"),
+    ];
+    let asked: Vec<&Path> = asked.iter().map(PathBuf::as_path).collect();
+    let versioned = git.versioned_in(&repo, &asked);
+
+    assert_eq!(
+        versioned,
+        BTreeSet::from([repo.join(".mcp.json"), skills.join("tracked")]),
+        "a folder is versioned when a file below it is"
     );
 }

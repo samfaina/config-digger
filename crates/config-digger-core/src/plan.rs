@@ -936,7 +936,7 @@ impl Targeted<'_> {
             path: origin.clone(),
             op,
             size,
-            git_versioned: self.ports.git.is_versioned(origin),
+            git_versioned: scan::is_versioned(self.ports, origin),
             readers: self.snapshot.readers_of_folder(origin),
         })
     }
@@ -1657,7 +1657,7 @@ pub(crate) fn undo_folders(
             )));
         }
         planned.push(PlannedFolder {
-            git_versioned: ports.git.is_versioned(path),
+            git_versioned: scan::is_versioned(ports, path),
             readers: Vec::new(),
             path: path.clone(),
             op,

@@ -4,6 +4,7 @@ use super::{
     Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Processes, RegistryData,
     RunningProcess,
 };
+use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -135,12 +136,13 @@ impl FileSystem for RealFileSystem {
         path.exists()
     }
 
-    /// Asks `Get-Acl` about the file and each folder above it, as Gemini
+    /// Asks `Get-Acl` about each file and each folder above it, as Gemini
     /// CLI does, the paths of the links resolved too: the crate forbids
-    /// the unsafe code that would read the permissions itself. The paths
-    /// reach PowerShell through the environment, never in the script.
+    /// the unsafe code that would read the permissions itself. One
+    /// PowerShell answers for every file. The paths reach it through the
+    /// environment, never in the script.
     #[cfg(windows)]
-    fn admin_owned(&self, path: &Path) -> bool {
+    fn admin_owned(&self, paths: &[&Path]) -> BTreeSet<PathBuf> {
         const SCRIPT: &str = r#"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $trusted = { param($sid) $sid -eq 'S-1-5-32-544' -or $sid -eq 'S-1-5-18' -or $sid -like 'S-1-5-80-*' -or $sid -eq 'S-1-3-0' -or $sid -eq 'S-1-3-1' }
@@ -157,45 +159,77 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
   } catch { 'UNSAFE' }
 }
 "#;
-        let mut paths: Vec<String> = Vec::new();
-        let real = self.real_path(path);
-        for found in acl_chain(path)
-            .into_iter()
-            .chain(real.iter().flat_map(|real| acl_chain(real)))
-        {
-            let found = found.display().to_string();
-            if !paths.iter().any(|known| known.eq_ignore_ascii_case(&found)) {
-                paths.push(found);
+        // Each file with the paths whose permissions it depends on, each
+        // path asked about once.
+        let mut asked: Vec<String> = Vec::new();
+        let mut chains: Vec<(&Path, Vec<usize>)> = Vec::new();
+        for &path in paths {
+            let real = self.real_path(path);
+            let mut chain = Vec::new();
+            for found in acl_chain(path)
+                .into_iter()
+                .chain(real.iter().flat_map(|real| acl_chain(real)))
+            {
+                let found = found.display().to_string();
+                let at = match asked
+                    .iter()
+                    .position(|known| known.eq_ignore_ascii_case(&found))
+                {
+                    Some(at) => at,
+                    None => {
+                        asked.push(found);
+                        asked.len() - 1
+                    }
+                };
+                chain.push(at);
             }
+            chains.push((path, chain));
+        }
+        if asked.is_empty() {
+            return BTreeSet::new();
         }
         let output = powershell(SCRIPT)
-            .env("CONFIG_DIGGER_ACL_PATHS", paths.join("\n"))
+            .env("CONFIG_DIGGER_ACL_PATHS", asked.join("\n"))
             .stderr(Stdio::null())
             .output();
         let Ok(output) = output else {
-            return false;
+            return BTreeSet::new();
         };
         // PowerShell can write progress records there too, as `#< CLIXML`.
-        let answers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        let safe: Vec<bool> = String::from_utf8_lossy(&output.stdout)
             .lines()
-            .map(|line| line.trim().to_owned())
-            .filter(|line| line == "SAFE" || line == "UNSAFE")
+            .map(str::trim)
+            .filter(|line| *line == "SAFE" || *line == "UNSAFE")
+            .map(|line| line == "SAFE")
             .collect();
-        answers.len() == paths.len() && answers.iter().all(|answer| answer == "SAFE")
+        if safe.len() != asked.len() {
+            return BTreeSet::new();
+        }
+        chains
+            .into_iter()
+            .filter(|(_, chain)| chain.iter().all(|&at| safe[at]))
+            .map(|(path, _)| path.to_path_buf())
+            .collect()
     }
 
     /// Gemini CLI wants the file and each folder above it to belong to root
     /// and be writable by no one else.
     #[cfg(unix)]
-    fn admin_owned(&self, path: &Path) -> bool {
+    fn admin_owned(&self, paths: &[&Path]) -> BTreeSet<PathBuf> {
         use std::os::unix::fs::MetadataExt;
 
-        path.ancestors()
-            .filter(|path| !path.as_os_str().is_empty())
-            .all(|path| {
-                std::fs::metadata(path)
-                    .is_ok_and(|found| found.uid() == 0 && found.mode() & 0o022 == 0)
+        paths
+            .iter()
+            .filter(|path| {
+                path.ancestors()
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .all(|path| {
+                        std::fs::metadata(path)
+                            .is_ok_and(|found| found.uid() == 0 && found.mode() & 0o022 == 0)
+                    })
             })
+            .map(|path| path.to_path_buf())
+            .collect()
     }
 
     /// `canonicalize` asks Windows through `GetFinalPathNameByHandle`, which
@@ -506,26 +540,71 @@ impl Processes for RealProcesses {
     }
 }
 
-/// Asks `git` whether the path is in the index of its containing repo. Any
+/// Asks `git` which paths are in the index of their containing repo. Any
 /// failure to ask, including git not being installed, counts as not versioned.
 pub struct RealGitIndex;
 
 impl GitIndex for RealGitIndex {
-    fn is_versioned(&self, path: &Path) -> bool {
-        let Some(parent) = path.parent() else {
-            return false;
-        };
-        background_command("git")
-            .arg("-C")
-            .arg(parent)
-            .args(["ls-files", "--error-unmatch", "--"])
-            .arg(path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
+    /// The folder at or above `folder` that holds `.git`, a folder or a
+    /// linked worktree's file, as git looks for it from there.
+    fn repository(&self, folder: &Path) -> Option<PathBuf> {
+        folder
+            .ancestors()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .find(|parent| parent.join(".git").exists())
+            .map(Path::to_path_buf)
     }
+
+    /// Lists the whole index once with `git ls-files`, whose paths are
+    /// relative to the folder it runs in and spelled as git keeps them.
+    fn versioned_in(&self, repository: &Path, paths: &[&Path]) -> BTreeSet<PathBuf> {
+        let output = background_command("git")
+            .arg("-C")
+            .arg(repository)
+            .args(["ls-files", "-z"])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output();
+        let Ok(output) = output else {
+            return BTreeSet::new();
+        };
+        if !output.status.success() {
+            return BTreeSet::new();
+        }
+        let index: BTreeSet<&[u8]> = output
+            .stdout
+            .split(|&byte| byte == 0)
+            .filter(|file| !file.is_empty())
+            .collect();
+        paths
+            .iter()
+            .filter(|path| {
+                let Some(relative) = path.strip_prefix(repository).ok().and_then(index_spelling)
+                else {
+                    return false;
+                };
+                // A folder is versioned when a file below it is.
+                let folder = format!("{relative}/");
+                index.contains(relative.as_bytes())
+                    || index
+                        .range(folder.as_bytes()..)
+                        .next()
+                        .is_some_and(|file| file.starts_with(folder.as_bytes()))
+            })
+            .map(|path| path.to_path_buf())
+            .collect()
+    }
+}
+
+/// `relative` as the index spells a path: its names joined by `/`. `None`
+/// for an empty path or one that is not Unicode.
+fn index_spelling(relative: &Path) -> Option<String> {
+    let names: Option<Vec<&str>> = relative
+        .components()
+        .map(|component| component.as_os_str().to_str())
+        .collect();
+    let names = names?;
+    (!names.is_empty()).then(|| names.join("/"))
 }
 
 pub struct RealEnvironment;

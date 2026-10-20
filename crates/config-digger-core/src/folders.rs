@@ -8,6 +8,7 @@ use crate::ports::{FileSystem, HeldLock};
 use crate::scan::LocationReader;
 use crate::{explain, paths, skill};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -241,11 +242,20 @@ impl FileSystem for AsIf<'_> {
         }
     }
 
-    fn admin_owned(&self, path: &Path) -> bool {
-        match self.seen(path) {
-            Seen::Gone => false,
-            Seen::At(at) => self.fs.admin_owned(&at),
-        }
+    fn admin_owned(&self, paths: &[&Path]) -> BTreeSet<PathBuf> {
+        let seen: Vec<(&Path, PathBuf)> = paths
+            .iter()
+            .filter_map(|path| match self.seen(path) {
+                Seen::Gone => None,
+                Seen::At(at) => Some((*path, at)),
+            })
+            .collect();
+        let at: Vec<&Path> = seen.iter().map(|(_, at)| at.as_path()).collect();
+        let owned = self.fs.admin_owned(&at);
+        seen.into_iter()
+            .filter(|(_, at)| owned.contains(at))
+            .map(|(path, _)| path.to_path_buf())
+            .collect()
     }
 
     fn real_path(&self, path: &Path) -> Option<PathBuf> {

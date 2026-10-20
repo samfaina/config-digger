@@ -438,14 +438,20 @@ impl FileSystem for FakeFileSystem {
         self.real_path(path).is_some()
     }
 
-    fn admin_owned(&self, path: &Path) -> bool {
+    fn admin_owned(&self, paths: &[&Path]) -> BTreeSet<PathBuf> {
         self.count_access();
         let files = self.files();
-        let path = files.follow(path);
-        !files
-            .not_admin_owned
+        paths
             .iter()
-            .any(|known| strip_prefix(&path, known).is_some())
+            .filter(|path| {
+                let path = files.follow(path);
+                !files
+                    .not_admin_owned
+                    .iter()
+                    .any(|known| strip_prefix(&path, known).is_some())
+            })
+            .map(|path| path.to_path_buf())
+            .collect()
     }
 
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
@@ -688,9 +694,15 @@ impl Processes for FakeProcesses {
     }
 }
 
+/// A git index holding the paths given to [`with_versioned`](Self::with_versioned).
+/// A folder in no repository given to [`with_repository`](Self::with_repository)
+/// is a repository of its own. Clones share one list of the repositories
+/// [`asked`](Self::asked).
 #[derive(Debug, Clone, Default)]
 pub struct FakeGitIndex {
     versioned: BTreeSet<PathBuf>,
+    repositories: BTreeSet<PathBuf>,
+    asked: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl FakeGitIndex {
@@ -698,11 +710,41 @@ impl FakeGitIndex {
         self.versioned.insert(path.into());
         self
     }
+
+    /// A repository whose root is `root`.
+    pub fn with_repository(mut self, root: impl Into<PathBuf>) -> Self {
+        self.repositories.insert(root.into());
+        self
+    }
+
+    /// The repository of each question to the index so far, in order.
+    pub fn asked(&self) -> Vec<PathBuf> {
+        self.asked
+            .lock()
+            .expect("no test panics while holding the fake git index")
+            .clone()
+    }
 }
 
 impl GitIndex for FakeGitIndex {
-    fn is_versioned(&self, path: &Path) -> bool {
-        self.versioned.contains(path)
+    fn repository(&self, folder: &Path) -> Option<PathBuf> {
+        let root = folder
+            .ancestors()
+            .find(|parent| self.repositories.contains(*parent))
+            .unwrap_or(folder);
+        Some(root.to_path_buf())
+    }
+
+    fn versioned_in(&self, repository: &Path, paths: &[&Path]) -> BTreeSet<PathBuf> {
+        self.asked
+            .lock()
+            .expect("no test panics while holding the fake git index")
+            .push(repository.to_path_buf());
+        paths
+            .iter()
+            .filter(|path| self.versioned.contains(**path))
+            .map(|path| path.to_path_buf())
+            .collect()
     }
 }
 
