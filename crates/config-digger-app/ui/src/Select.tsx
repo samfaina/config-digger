@@ -37,6 +37,12 @@ function groupRuns(options: DropdownOption[]): { group?: string; items: { option
   return all;
 }
 
+/** Passes the value `reaction` chooses, if any, to `onChange`, whether a key or a click chose it, and returns the dropdown's next state. */
+export function applyReaction(reaction: Reaction, onChange: (value: string) => void): DropdownState {
+  if (reaction.choose !== null) onChange(reaction.choose);
+  return reaction.state;
+}
+
 /**
  * The app's dropdown: a field and a panel of options drawn with the app's
  * look, where a native `<select>` would show the system's list. The field
@@ -51,10 +57,7 @@ export function Select({ value, options, onChange, label, tooltip, className }: 
   const optionId = (at: number) => `${id}-option-${at}`;
   const chosen = options.find((option) => option.value === value);
 
-  const apply = (reaction: Reaction) => {
-    setState(reaction.state);
-    if (reaction.choose !== null) onChange(reaction.choose);
-  };
+  const apply = (reaction: Reaction) => setState(applyReaction(reaction, onChange));
   const close = () => setState(CLOSED);
   // Options that change while the panel is open, as on an Inventory read, would leave it with the old list's size and active option.
   const optionsKey = JSON.stringify(options.map((option) => [option.value, option.label]));

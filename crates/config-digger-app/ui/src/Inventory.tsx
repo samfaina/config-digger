@@ -314,18 +314,38 @@ type BannerProps = {
   selectProject: (project: string | null) => void;
 };
 
-/** Items in use, the current Agent, the Project selector, the read time and Refresh. */
-function Banner({ inventory, project, agentName, stats, reading, rereading, refresh, selectProject }: BannerProps) {
+/**
+ * The Project field's value, its options and what a choice does: `selectProject`
+ * loads the chosen Project, or no Project, whether a click or a key chose it.
+ */
+export function projectField(
+  inventory: Inventory | null,
+  project: string | null,
+  selectProject: (project: string | null) => void,
+): { value: string; options: DropdownOption[]; onChange: (value: string) => void } {
   const projects = inventory?.projects ?? [];
-  const failuresOf = (path: string) => projectFailures(inventory?.read_failures ?? [], path);
   const option = (path: string, group?: string): DropdownOption => {
-    const failed = failuresOf(path);
+    const failed = projectFailures(inventory?.read_failures ?? [], path);
     return { value: path, label: failed > 0 ? `${path} · ${couldNotBeRead(failed)}` : path, group };
   };
   const present = projects.filter((p) => !p.missing).map((p) => p.path);
   const missing = projects.filter((p) => p.missing).map((p) => p.path);
   // A Project picked but no longer listed, such as one hidden since, stays selectable.
   if (project !== null && !projects.some((p) => samePath(p.path, project))) present.push(project);
+  return {
+    value: project ?? "",
+    options: [
+      { value: "", label: "No Project" },
+      ...present.map((path) => option(path)),
+      ...missing.map((path) => option(path, "Missing Projects")),
+    ],
+    onChange: (chosen) => selectProject(chosen === "" ? null : chosen),
+  };
+}
+
+/** Items in use, the current Agent, the Project selector, the read time and Refresh. */
+export function Banner({ inventory, project, agentName, stats, reading, rereading, refresh, selectProject }: BannerProps) {
+  const failuresOf = (path: string) => projectFailures(inventory?.read_failures ?? [], path);
 
   return (
     <header className="panel banner">
@@ -339,18 +359,7 @@ function Banner({ inventory, project, agentName, stats, reading, rereading, refr
           Project
           {project !== null && <FailureBadge count={failuresOf(project)} where="this Project" />}
         </div>
-        <Select
-          className="banner-select"
-          label="Project"
-          value={project ?? ""}
-          tooltip={project ?? undefined}
-          options={[
-            { value: "", label: "No Project" },
-            ...present.map((path) => option(path)),
-            ...missing.map((path) => option(path, "Missing Projects")),
-          ]}
-          onChange={(chosen) => selectProject(chosen === "" ? null : chosen)}
-        />
+        <Select className="banner-select" label="Project" tooltip={project ?? undefined} {...projectField(inventory, project, selectProject)} />
       </div>
       <div>
         <div className="caption">Inventory read</div>

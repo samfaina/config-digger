@@ -503,12 +503,14 @@
             "Pulsa Flecha abajo y Flecha arriba varias veces.",
             "Escribe deprisa la primera letra de otra opción.",
             "Pulsa Escape.",
-            "Pulsa Espacio, ve a otra opción con las flechas y pulsa Enter.",
-            "Con el panel cerrado, pulsa Flecha abajo."
+            "Pulsa Espacio, ve a E:\\cd-throwaway\\project con las flechas y pulsa Enter.",
+            "Con el panel cerrado, pulsa Flecha abajo.",
+            "Con el panel cerrado, pulsa Flecha arriba.",
+            "Mira la lista de Items."
           ],
           "commands": [],
-          "expect": "Alt+Flecha abajo abre el panel sobre el valor actual. Las flechas mueven la opción iluminada y la letra salta a la primera opción que empieza por ella. Escape cierra el panel sin cambiar el Project y el foco sigue en el campo. Enter elige la opción iluminada y cierra el panel. Con el panel cerrado, Flecha abajo pasa al Project siguiente sin abrirlo.",
-          "covers": ["#181"]
+          "expect": "Alt+Flecha abajo abre el panel sobre el valor actual. Las flechas mueven la opción iluminada y la letra salta a la primera opción que empieza por ella. Escape cierra el panel sin cambiar el Project y el foco sigue en el campo. Enter elige la opción iluminada y cierra el panel. Con el panel cerrado, Flecha abajo pasa al Project siguiente y Flecha arriba vuelve a E:\\cd-throwaway\\project, sin abrir el panel. Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra cd-throwaway-project.",
+          "covers": ["#181", "#219"]
         },
         {
           "id": "2.3",

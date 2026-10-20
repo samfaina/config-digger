@@ -1,8 +1,15 @@
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test } from "vitest";
-import type { Entry, Home, Item, Project, State } from "./bindings";
-import { StateBars } from "./Inventory";
+import { describe, expect, test, vi } from "vitest";
+import type { Entry, Home, Inventory, Item, Project, State } from "./bindings";
+import { CLOSED, onKey, onOptionClick } from "./dropdown";
+import { Banner, projectField, StateBars } from "./Inventory";
+import { ReadProgress } from "./Loading";
+import { applyReaction } from "./Select";
 import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
+
+// A tooltip portals into `document.body`, which a render to markup has not.
+vi.mock("./Tooltip", () => ({ Tooltip: ({ children }: { children: ReactElement }) => children }));
 
 function entry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -157,5 +164,76 @@ describe("choosing a Project", () => {
 
       expect(chosenHomes(both, after, [])).toEqual({ codex: codexHome, "claude-code": "default" });
     });
+  });
+});
+
+function inventory(overrides: Partial<Inventory> = {}): Inventory {
+  return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], agent_flags: [], ...overrides };
+}
+
+describe("a key on the closed Project field", () => {
+  const first = String.raw`E:\cd-throwaway\project-a`;
+  const second = String.raw`E:\cd-throwaway\project-b`;
+  const gone = String.raw`E:\cd-throwaway\project-gone`;
+  const read = inventory({ project: first, projects: [project(first), project(second), project(gone, true)] });
+
+  /** The Projects the field loads on `key`, pressed on it closed while it shows `shown`, and whether its panel opens. */
+  function press(key: string, shown: string | null) {
+    const loaded: (string | null)[] = [];
+    const field = projectField(read, shown, (next) => loaded.push(next));
+    const state = applyReaction(onKey(CLOSED, field.options, field.value, { key, altKey: false }, 0), field.onChange);
+    return { loaded, open: state.open };
+  }
+
+  test("Arrow down loads the next Project without opening the panel", () => {
+    expect(press("ArrowDown", first)).toEqual({ loaded: [second], open: false });
+  });
+
+  test("Arrow up loads the Project before without opening the panel", () => {
+    expect(press("ArrowUp", second)).toEqual({ loaded: [first], open: false });
+  });
+
+  test("loads the Project it moves to as a click on it does", () => {
+    const clicked: (string | null)[] = [];
+    const field = projectField(read, first, (next) => clicked.push(next));
+    const at = field.options.findIndex((option) => option.value === second);
+    applyReaction(onOptionClick({ ...CLOSED, open: true }, field.options, field.value, at), field.onChange);
+
+    expect(clicked).toEqual([second]);
+    expect(press("ArrowDown", first).loaded).toEqual(clicked);
+  });
+
+  test("Arrow up from the first Project loads no Project", () => {
+    expect(press("ArrowUp", first).loaded).toEqual([null]);
+  });
+
+  test("Arrow down from the last Project loads the first missing Project", () => {
+    expect(press("ArrowDown", second).loaded).toEqual([gone]);
+  });
+});
+
+describe("the banner while a newly chosen Project is read", () => {
+  const before = String.raw`E:\cd-throwaway\project-a`;
+  const chosen = String.raw`E:\cd-throwaway\project-b`;
+  const markup = renderToStaticMarkup(
+    <Banner
+      inventory={inventory({ project: before, projects: [project(before), project(chosen)] })}
+      project={chosen}
+      agentName="All Agents"
+      stats={{ items: 0, inUse: 0, noEffect: 0 }}
+      reading
+      rereading
+      refresh={() => {}}
+      selectProject={() => {}}
+    />,
+  );
+
+  test("shows the chosen Project in the field over the inventory read before", () => {
+    expect(markup).toContain(`<span class="select-value">${chosen}</span>`);
+  });
+
+  test("runs the reading bar and says Reading on Refresh", () => {
+    expect(markup).toContain(renderToStaticMarkup(<ReadProgress text="Reading the inventory again" />));
+    expect(markup).toMatch(/<button type="button" class="cta secondary" disabled="">.*Reading<\/button>/);
   });
 });
