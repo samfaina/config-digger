@@ -932,6 +932,41 @@
           "commands": [],
           "expect": "El diálogo se titula «Delete the backup of <id> \"Disable 1 Entry\"» y avisa de que el backup se borra para siempre y de que la Operation ya no se podrá deshacer. El resultado dice «Deleted the backup of <id>. It can no longer be undone.», con la línea «Operation <id> · backup deleted · can no longer be undone». La etiqueta pasa a Applied, backup deleted, not undoable. Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.» y el botón Delete backup ya no está.",
           "covers": ["#74", "#189"]
+        },
+        {
+          "id": "11.8",
+          "title": "El log de un arranque y de una preview",
+          "goal": "El log de la app escribe una pareja scan started / scan finished por cada escaneo: una sola al arrancar, y otras propias en la preview de una acción.",
+          "instructions": [
+            "Cierra config-digger.",
+            "Abre config-digger.",
+            "Espera a que el Inventario termine de leer, sin cambiar de ventana.",
+            "Cierra config-digger.",
+            "Ejecuta la orden y apunta lo que imprime.",
+            "Abre config-digger.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Pulsa Cancel.",
+            "Cierra config-digger.",
+            "Ejecuta otra vez la orden."
+          ],
+          "commands": [
+            {
+              "label": "Ver los escaneos desde el último arranque",
+              "shell": "powershell",
+              "text": "$log = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\logs\\config-digger-app.*.log\" | Sort-Object LastWriteTime | Select-Object -Last 1; $lines = @(Get-Content $log.FullName); $start = ($lines | Select-String 'app started' | Select-Object -Last 1).LineNumber; $lines[($start - 1)..($lines.Count - 1)] | Select-String 'app started|scan started|scan finished'"
+            }
+          ],
+          "expect": "La primera vez, la orden imprime tres líneas: «app started», «scan started» y «scan finished elapsed_ms=<n> paths=<n>», todas INFO. La segunda vez empieza igual, con las mismas tres líneas, y debajo salen más parejas, cada «scan started» seguido de su «scan finished elapsed_ms=<n> paths=<n>»: los escaneos de la preview de Disable.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#159"]
         }
       ]
     },

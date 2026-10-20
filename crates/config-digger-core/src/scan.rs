@@ -25,7 +25,7 @@ use crate::{mask, park, paths, skill, version};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 #[derive(Clone)]
 pub(crate) struct Snapshot {
@@ -900,6 +900,32 @@ pub(crate) fn scan_as_if(
     written: &[Written],
     folders: &[PlannedFolder],
 ) -> Result<Snapshot, ScanError> {
+    let started = Instant::now();
+    tracing::info!("scan started");
+    let mut paths = 0;
+    let snapshot = read_as_if(
+        definitions,
+        ports,
+        extra_projects,
+        written,
+        folders,
+        &mut paths,
+    )?;
+    let elapsed_ms = started.elapsed().as_millis();
+    tracing::info!(elapsed_ms, paths, "scan finished");
+    Ok(snapshot)
+}
+
+/// The scan of [`scan_as_if`], counting in `paths` each path it asks the
+/// git index about.
+fn read_as_if(
+    definitions: &Definitions,
+    ports: &Ports,
+    extra_projects: &[PathBuf],
+    written: &[Written],
+    folders: &[PlannedFolder],
+    paths: &mut usize,
+) -> Result<Snapshot, ScanError> {
     let as_if = AsIf::new(ports.fs.as_ref(), folders);
     let read_at = ports.clock.now();
     // Without the list, hidden homes and Projects would show again and added
@@ -1149,7 +1175,7 @@ pub(crate) fn scan_as_if(
         .iter()
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
-    let versioned = versioned(ports, locations.chain(switch_files));
+    let versioned = versioned(ports, locations.chain(switch_files), paths);
     let last_ran: Vec<Option<String>> = found
         .iter()
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
@@ -2054,9 +2080,15 @@ fn switch_files(
 }
 
 /// The files among `paths` that are in the index of their git repo, asking
-/// once per file. Ignored and untracked files are not.
-fn versioned<'a>(ports: &Ports, paths: impl Iterator<Item = &'a Path>) -> BTreeSet<PathBuf> {
+/// once per file and counting each ask in `asked`. Ignored and untracked
+/// files are not.
+fn versioned<'a>(
+    ports: &Ports,
+    paths: impl Iterator<Item = &'a Path>,
+    asked: &mut usize,
+) -> BTreeSet<PathBuf> {
     let paths: BTreeSet<&Path> = paths.collect();
+    *asked += paths.len();
     paths
         .into_iter()
         .filter(|path| ports.git.is_versioned(path))
