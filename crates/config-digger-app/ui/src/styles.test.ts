@@ -334,3 +334,30 @@ describe("the Projects & homes banner at the smallest window", () => {
     }
   });
 });
+
+describe("the busy indicator", () => {
+  test("takes every colour from the :root tokens", () => {
+    for (const selector of [".notice.busy", ".spinner"]) {
+      const declarations = styled(selector);
+      expect(declarations.size, selector).toBeGreaterThan(0);
+      for (const value of declarations.values()) {
+        expect(rawColours(value), `${selector}: ${value}`).toEqual([]);
+        for (const token of tokensUsed(value)) expect(tokens, `${selector}: ${value}`).toContain(token);
+      }
+    }
+  });
+
+  test("is a notice of its own, with the background and accent edge of an information one", () => {
+    for (const name of ["background", "border-left-color"]) {
+      expect(styled(".notice.busy").get(name), name).toBe(styled(".notice.information").get(name));
+    }
+  });
+
+  test("spins its spinner in the colour of its accent edge, more slowly when the user asks for less motion", () => {
+    const spinner = styled(".spinner");
+    expect(spinner.get("animation")).toMatch(/\bspin\b.*\binfinite\b/);
+    expect(spinner.get("border-top-color")).toBe(styled(".notice.busy").get("border-left-color"));
+    expect(css).toMatch(/@keyframes spin\s*\{\s*to\s*\{\s*transform:\s*rotate\(1turn\)/);
+    expect(styled(".spinner", /prefers-reduced-motion: reduce/).get("animation-duration")).toBeDefined();
+  });
+});

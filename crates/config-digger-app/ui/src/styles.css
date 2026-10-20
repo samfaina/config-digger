@@ -1312,6 +1312,36 @@ p {
   color: var(--notice-error-edge);
 }
 
+/* While an action runs: a notice with a spinner where the icon goes, which
+   the notice the action ends with replaces. */
+
+.notice.busy {
+  border-left-color: var(--notice-information-edge);
+  background: var(--notice-information);
+}
+
+.spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line);
+  border-top-color: var(--notice-information-edge);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
 .tile:focus-visible,
 .bar:focus-visible,
 .chip-button:focus-visible,

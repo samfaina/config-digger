@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { ProjectsScreen, type Tab } from "./ProjectsScreen";
+import type { Home, Places, Project } from "./bindings";
+import { rowOf } from "./places";
+import { HomesTab, ProjectsScreen, ProjectsTab, type Tab } from "./ProjectsScreen";
 
 const DESCRIPTIONS: Record<Tab, string> = {
   projects: "Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.",
@@ -23,4 +25,102 @@ describe("the Projects & homes screen", () => {
       expect(list.startsWith(`<section class="panel places-list"><p class="places-about dim">${escaped(DESCRIPTIONS[tab])}</p>`)).toBe(true);
     });
   }
+});
+
+function project(overrides: Partial<Project> = {}): Project {
+  return {
+    path: String.raw`E:\cd-throwaway\project-hide`,
+    missing: false,
+    workspace_file: false,
+    members: [],
+    registered_by: ["claude-code"],
+    added: false,
+    hidden: false,
+    entries: 0,
+    ...overrides,
+  };
+}
+
+function home(overrides: Partial<Home> = {}): Home {
+  return {
+    agent: "claude-code",
+    agent_name: "Claude Code",
+    home: "default",
+    folder: String.raw`C:\Users\me`,
+    source: { kind: "default" },
+    hidden: false,
+    not_read: null,
+    mirror: null,
+    no_configuration: null,
+    scopes: ["user"],
+    installations: [],
+    out_of_range: false,
+    last_ran: null,
+    entries: 0,
+    notes: [],
+    ...overrides,
+  };
+}
+
+const HIDE = String.raw`E:\cd-throwaway\project-hide`;
+const KEEP = String.raw`E:\cd-throwaway\project-keep`;
+const GONE = String.raw`E:\cd-throwaway\project-gone`;
+const PORTABLE = String.raw`D:\portable`;
+
+const places: Places = {
+  read_at: "2026-10-20T09:00:00Z",
+  projects: [project(), project({ path: KEEP }), project({ path: GONE, missing: true })],
+  leftovers: [],
+  agents: [
+    {
+      id: "claude-code",
+      name: "Claude Code",
+      built_in: true,
+      tested: null,
+      home_variables: [],
+      homes: [home(), home({ home: PORTABLE, folder: PORTABLE, source: { kind: "added" }, hidden: true })],
+    },
+  ],
+};
+
+/** The opening tag of each button of the row named `name`. */
+const buttonsOf = (markup: string, name: string) => {
+  const row = markup.split('<div class="place-row').find((each) => each.includes(`>${name}</div>`)) ?? "";
+  return row.match(/<button[^>]*>/g) ?? [];
+};
+
+/** Expects each named row's buttons to be disabled, or each to be enabled. */
+const expectDisabled = (markup: string, rows: [name: string, disabled: boolean][]) => {
+  for (const [name, disabled] of rows) {
+    const buttons = buttonsOf(markup, name);
+    expect(buttons.length, name).toBeGreaterThan(0);
+    for (const button of buttons) expect(button.includes("disabled"), `${name}: ${button}`).toBe(disabled);
+  }
+};
+
+describe("a row of the Projects tab", () => {
+  test("disables its buttons while an action runs on it, and only its own", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectsTab places={places} busy={[HIDE, GONE]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+    );
+
+    expectDisabled(markup, [
+      [HIDE, true],
+      [GONE, true],
+      [KEEP, false],
+    ]);
+  });
+});
+
+describe("a row of the Agent homes tab", () => {
+  test("disables its buttons while an action runs on it, and only its own", () => {
+    const markup = renderToStaticMarkup(
+      <HomesTab places={places} busy={[rowOf({ agent: "claude-code", home: PORTABLE })]} onShow={() => {}} onChange={() => {}} />,
+    );
+
+    expectDisabled(markup, [
+      [PORTABLE, true],
+      ["default", false],
+    ]);
+  });
 });

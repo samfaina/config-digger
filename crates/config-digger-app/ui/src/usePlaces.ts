@@ -7,7 +7,8 @@ export type PlacesRead = {
   /** Every Project and Agent home, kept while a new read runs or after one fails. */
   places: Places | null;
   error: ApiError | null;
-  reload: () => void;
+  /** Reads again, done once the screen has what it read. */
+  reload: () => Promise<void>;
   /** Applies `change` to config-digger's lists, which are read again at once. */
   change: (change: ListChange) => Promise<CommandResult<ListChanged>>;
 };
@@ -19,28 +20,31 @@ export type PlacesRead = {
 export function usePlaces(): PlacesRead {
   const [places, setPlaces] = useState<Places | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  // A focus event during a read does not start a second one.
-  const inFlight = useRef(false);
+  // A reload during a read reads again once that one is done, as the disk may
+  // have changed since it started, rather than running beside it.
+  const inFlight = useRef<Promise<void> | null>(null);
   // Counts the changes, so that a read started before one is dropped.
   const changes = useRef(0);
 
-  const reload = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+  const read = useCallback(async () => {
     const before = changes.current;
-    try {
-      const result = await reads.during(() => call(commands.readPlaces));
-      if (changes.current !== before) return;
-      if (result.status === "ok") {
-        setPlaces(result.data);
-        setError(null);
-      } else {
-        setError(result.error);
-      }
-    } finally {
-      inFlight.current = false;
+    const result = await reads.during(() => call(commands.readPlaces));
+    if (changes.current !== before) return;
+    if (result.status === "ok") {
+      setPlaces(result.data);
+      setError(null);
+    } else {
+      setError(result.error);
     }
   }, []);
+
+  const reload = useCallback(() => {
+    const reading: Promise<void> = (inFlight.current ?? Promise.resolve()).then(read, read).finally(() => {
+      if (inFlight.current === reading) inFlight.current = null;
+    });
+    inFlight.current = reading;
+    return reading;
+  }, [read]);
 
   const change = useCallback(async (change: ListChange) => {
     changes.current += 1;
@@ -53,11 +57,12 @@ export function usePlaces(): PlacesRead {
   }, []);
 
   useEffect(() => {
-    void reload();
+    // On start, a read already running is enough.
+    if (!inFlight.current) void reload();
     const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
 
-  return { places, error, reload: () => void reload(), change };
+  return { places, error, reload, change };
 }

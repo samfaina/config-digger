@@ -13,6 +13,7 @@ import type {
   Project,
   State,
 } from "./bindings";
+import type { BusyAction } from "./busy";
 import type { HomeChoice, ItemRef } from "./view";
 
 /** Hide, or Remove from list for what the user added and nothing discovers. */
@@ -282,4 +283,38 @@ export function changedSentence(change: ListChange, listed: Listed): string {
       return listed.home.no_configuration ? `${added} ${listed.home.no_configuration}.` : added;
     }
   }
+}
+
+/** What a row of the Projects & homes screen is known by, while an action runs on it. */
+export function rowOf(named: { agent: string; home: string } | { path: string }): string {
+  return "path" in named ? named.path : `${named.agent}\u0000${named.home}`;
+}
+
+/** What the busy indicator says while `change` runs, and the row it runs on; an Add runs on none. */
+export function changeBusy(change: ListChange, places: Places | null): BusyAction {
+  const agentName = (id: string) => places?.agents.find((agent) => agent.id === id)?.name ?? id;
+  const named = (home: { agent: string; home: string }) => `${home.home} of ${agentName(home.agent)}`;
+  switch (change.kind) {
+    case "add_project":
+      return { text: `Adding ${change.path}…`, row: null };
+    case "add_home":
+      return { text: `Adding ${change.folder} as an Agent home of ${agentName(change.agent)}…`, row: null };
+    case "hide_project":
+      return { text: `Hiding ${change.path}…`, row: rowOf(change) };
+    case "unhide_project":
+      return { text: `Unhiding ${change.path}…`, row: rowOf(change) };
+    case "forget_project":
+      return { text: `Removing ${change.path} from config-digger's list…`, row: rowOf(change) };
+    case "hide_home":
+      return { text: `Hiding ${named(change)}…`, row: rowOf(change) };
+    case "unhide_home":
+      return { text: `Unhiding ${named(change)}…`, row: rowOf(change) };
+    case "forget_home":
+      return { text: `Removing ${named(change)} from config-digger's list…`, row: rowOf(change) };
+  }
+}
+
+/** What the busy indicator says while the screen reads again after Remove leftovers on the missing Project at `path`. */
+export function rereading(path: string): BusyAction {
+  return { text: "Reading the Projects and Agent homes again…", row: path };
 }

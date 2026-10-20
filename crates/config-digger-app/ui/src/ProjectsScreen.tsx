@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ADD_LABELS,
   addHomeOffer,
@@ -10,13 +10,15 @@ import {
   type HomeToAdd,
 } from "./adding";
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
+import { applyChange } from "./changing";
 import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
-import { Notice } from "./Notice";
+import { Status, type Notice } from "./Notice";
 import {
-  changedSentence,
   homeGroups,
   projectSections,
+  rereading,
+  rowOf,
   type HiddenRow,
   type HomeGroup,
   type HomeRow,
@@ -28,6 +30,7 @@ import { useActionDialog } from "./useActionDialog";
 import { reads } from "./reads";
 import { Select } from "./Select";
 import { usePlaces } from "./usePlaces";
+import { useBusy } from "./useBusy";
 import { useTransient } from "./useTransient";
 
 export type Tab = "projects" | "homes";
@@ -49,16 +52,19 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const { actions, busy } = useBusy();
+  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
+  // The missing Project whose leftovers the dialog removes, whose row stays busy while the screen reads again.
+  const removing = useRef("");
   // Remove leftovers is an Operation, previewed like any other.
-  const dialog = useActionDialog({ onClosed: reload, onOpenHistory, notify: setNotice });
+  const dialog = useActionDialog({
+    onClosed: () => void busy.during(rereading(removing.current), reload),
+    onOpenHistory,
+    notify: setNotice,
+  });
 
   /** Applies a change to config-digger's lists and says what it did; returns why it was refused, if it was. */
-  const apply = async (request: ListChange): Promise<string | null> => {
-    const result = await change(request);
-    if (result.status === "error") return result.error.message;
-    setNotice({ kind: "success", text: changedSentence(request, result.data.listed) });
-    return null;
-  };
+  const apply = (request: ListChange) => applyChange(request, { change, busy, notify: setNotice, places });
   /** Applies a change from a row, whose refusal shows as a notice. */
   const act = (request: ListChange) =>
     void apply(request).then((refused) => {
@@ -115,12 +121,16 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
             ) : tab === "projects" ? (
               <ProjectsTab
                 places={places}
+                busy={busyRows}
                 onShow={onShow}
                 onChange={act}
-                onRemoveLeftovers={(path) => dialog.open({ kind: "leftovers", project: path })}
+                onRemoveLeftovers={(path) => {
+                  removing.current = path;
+                  dialog.open({ kind: "leftovers", project: path });
+                }}
               />
             ) : (
-              <HomesTab places={places} onShow={onShow} onChange={act} />
+              <HomesTab places={places} busy={busyRows} onShow={onShow} onChange={act} />
             )}
           </div>
         </section>
@@ -132,7 +142,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
 
-      {notice && <Notice notice={notice} />}
+      <Status notice={notice} actions={actions} />
 
       {dialog.view}
     </div>
@@ -141,13 +151,15 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
 
 type ProjectsTabProps = {
   places: Places;
+  /** The rows an action runs on, by {@link rowOf}. */
+  busy: string[];
   onShow: (show: ShowInInventory) => void;
   onChange: (change: ListChange) => void;
   onRemoveLeftovers: (path: string) => void;
 };
 
 /** The Projects, No Project, the missing Projects (open by default) and the hidden ones (collapsed). */
-function ProjectsTab({ places, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
+export function ProjectsTab({ places, busy, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
   const [missingOpen, setMissingOpen] = useState(true);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const { present, missing, hidden } = projectSections(places);
@@ -157,7 +169,7 @@ function ProjectsTab({ places, onShow, onChange, onRemoveLeftovers }: ProjectsTa
     <>
       <GroupTitle title="Projects" count={present.length} />
       {present.map((row) => (
-        <ProjectLine key={row.path} row={row} onShow={onShow} onHide={hide} onForget={forget} />
+        <ProjectLine key={row.path} row={row} busy={busy.includes(rowOf(row))} onShow={onShow} onHide={hide} onForget={forget} />
       ))}
       <div className="place-row informational">
         <span className="place-icon">
@@ -177,7 +189,14 @@ function ProjectsTab({ places, onShow, onChange, onRemoveLeftovers }: ProjectsTa
           <GroupTitle title="Missing" count={missing.length} open={missingOpen} onToggle={() => setMissingOpen(!missingOpen)} />
           {missingOpen &&
             missing.map((row) => (
-              <MissingLine key={row.path} row={row} onShow={onShow} onHide={hide} onRemoveLeftovers={onRemoveLeftovers} />
+              <MissingLine
+                key={row.path}
+                row={row}
+                busy={busy.includes(rowOf(row))}
+                onShow={onShow}
+                onHide={hide}
+                onRemoveLeftovers={onRemoveLeftovers}
+              />
             ))}
         </>
       )}
@@ -190,6 +209,7 @@ function ProjectsTab({ places, onShow, onChange, onRemoveLeftovers }: ProjectsTa
               <HiddenLine
                 key={row.path}
                 row={row}
+                busy={busy.includes(rowOf(row))}
                 onUnhide={(path) => onChange({ kind: "unhide_project", path })}
                 onForget={forget}
               />
@@ -222,6 +242,7 @@ function PlaceRow({
   icon,
   warn = false,
   dim = false,
+  busy = false,
   children,
   count,
   actions,
@@ -229,12 +250,14 @@ function PlaceRow({
   icon: "folder" | "doc" | "flag";
   warn?: boolean;
   dim?: boolean;
+  /** While an action runs on it. */
+  busy?: boolean;
   children: ReactNode;
   count?: string;
   actions: ReactNode;
 }) {
   return (
-    <div className={`place-row${dim ? " dimmed" : ""}`}>
+    <div className={`place-row${dim ? " dimmed" : ""}`} aria-busy={busy}>
       <span className={`place-icon${warn ? " warn" : ""}`}>
         <Icon name={icon} small />
       </span>
@@ -245,10 +268,20 @@ function PlaceRow({
   );
 }
 
-/** A small button on a row: secondary, or red for Remove leftovers. */
-function SmallButton({ label, danger = false, onClick }: { label: ReactNode; danger?: boolean; onClick: () => void }) {
+/** A small button on a row: secondary, or red for Remove leftovers; disabled while an action runs on the row. */
+function SmallButton({
+  label,
+  danger = false,
+  disabled,
+  onClick,
+}: {
+  label: ReactNode;
+  danger?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button type="button" className={`cta small ${danger ? "danger" : "secondary"}`} onClick={onClick}>
+    <button type="button" className={`cta small ${danger ? "danger" : "secondary"}`} disabled={disabled} onClick={onClick}>
       {label}
     </button>
   );
@@ -256,6 +289,7 @@ function SmallButton({ label, danger = false, onClick }: { label: ReactNode; dan
 
 type ProjectLineProps = {
   row: ProjectRow;
+  busy: boolean;
   onShow: (show: ShowInInventory) => void;
   onHide: (path: string) => void;
   onForget: (path: string) => void;
@@ -267,18 +301,19 @@ function projectIcon(project: Project): "doc" | "folder" {
 }
 
 /** A Project that exists: Open in Inventory, and Hide or Remove from list. */
-function ProjectLine({ row, onShow, onHide, onForget }: ProjectLineProps) {
+function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) {
   return (
     <PlaceRow
       icon={projectIcon(row.project)}
       count={row.entries}
+      busy={busy}
       actions={
         <>
-          <SmallButton label="Open in Inventory" onClick={() => onShow({ kind: "project", path: row.path })} />
+          <SmallButton label="Open in Inventory" disabled={busy} onClick={() => onShow({ kind: "project", path: row.path })} />
           {row.offer === "remove_from_list" ? (
-            <SmallButton label="Remove from list" onClick={() => onForget(row.path)} />
+            <SmallButton label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />
           ) : (
-            <SmallButton label="Hide" onClick={() => onHide(row.path)} />
+            <SmallButton label="Hide" disabled={busy} onClick={() => onHide(row.path)} />
           )}
         </>
       }
@@ -293,26 +328,29 @@ function ProjectLine({ row, onShow, onHide, onForget }: ProjectLineProps) {
 
 type MissingLineProps = {
   row: MissingRow;
+  busy: boolean;
   onShow: (show: ShowInInventory) => void;
   onHide: (path: string) => void;
   onRemoveLeftovers: (path: string) => void;
 };
 
 /** A missing Project with its leftovers: Show leftovers and Remove leftovers, or Hide when it has none. */
-function MissingLine({ row, onShow, onHide, onRemoveLeftovers }: MissingLineProps) {
+function MissingLine({ row, busy, onShow, onHide, onRemoveLeftovers }: MissingLineProps) {
   return (
     <PlaceRow
       icon="flag"
       warn
       count={row.count}
+      busy={busy}
       actions={
         row.hideOffered ? (
-          <SmallButton label="Hide" onClick={() => onHide(row.path)} />
+          <SmallButton label="Hide" disabled={busy} onClick={() => onHide(row.path)} />
         ) : (
           <>
-            <SmallButton label="Show leftovers" onClick={() => onShow({ kind: "leftovers", path: row.path })} />
+            <SmallButton label="Show leftovers" disabled={busy} onClick={() => onShow({ kind: "leftovers", path: row.path })} />
             <SmallButton
               danger
+              disabled={busy}
               label={
                 <>
                   <Icon name="trash" small />
@@ -339,15 +377,26 @@ function MissingLine({ row, onShow, onHide, onRemoveLeftovers }: MissingLineProp
 }
 
 /** A hidden Project, dimmed: Unhide, and Remove from list for the user's own. */
-function HiddenLine({ row, onUnhide, onForget }: { row: HiddenRow; onUnhide: (path: string) => void; onForget: (path: string) => void }) {
+function HiddenLine({
+  row,
+  busy,
+  onUnhide,
+  onForget,
+}: {
+  row: HiddenRow;
+  busy: boolean;
+  onUnhide: (path: string) => void;
+  onForget: (path: string) => void;
+}) {
   return (
     <PlaceRow
       icon={projectIcon(row.project)}
       dim
+      busy={busy}
       actions={
         <>
-          <SmallButton label="Unhide" onClick={() => onUnhide(row.path)} />
-          {row.removable && <SmallButton label="Remove from list" onClick={() => onForget(row.path)} />}
+          <SmallButton label="Unhide" disabled={busy} onClick={() => onUnhide(row.path)} />
+          {row.removable && <SmallButton label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />}
         </>
       }
     >
@@ -358,11 +407,22 @@ function HiddenLine({ row, onUnhide, onForget }: { row: HiddenRow; onUnhide: (pa
 }
 
 /** Every Agent's homes, each Agent headed by its Installations' versions. */
-function HomesTab({ places, onShow, onChange }: { places: Places; onShow: (show: ShowInInventory) => void; onChange: (change: ListChange) => void }) {
+export function HomesTab({
+  places,
+  busy,
+  onShow,
+  onChange,
+}: {
+  places: Places;
+  /** The rows an action runs on, by {@link rowOf}. */
+  busy: string[];
+  onShow: (show: ShowInInventory) => void;
+  onChange: (change: ListChange) => void;
+}) {
   return (
     <>
       {homeGroups(places).map((group) => (
-        <HomeGroupView key={group.agent} group={group} onShow={onShow} onChange={onChange} />
+        <HomeGroupView key={group.agent} group={group} busy={busy} onShow={onShow} onChange={onChange} />
       ))}
     </>
   );
@@ -371,10 +431,12 @@ function HomesTab({ places, onShow, onChange }: { places: Places; onShow: (show:
 /** One Agent's header, version notes and homes. */
 function HomeGroupView({
   group,
+  busy,
   onShow,
   onChange,
 }: {
   group: HomeGroup;
+  busy: string[];
   onShow: (show: ShowInInventory) => void;
   onChange: (change: ListChange) => void;
 }) {
@@ -395,25 +457,35 @@ function HomeGroupView({
       ))}
       {group.homes.length === 0 && <p className="empty">No Agent home found.</p>}
       {group.homes.map((row) => (
-        <HomeLine key={row.home.home} row={row} onShow={onShow} onChange={onChange} />
+        <HomeLine key={row.home.home} row={row} busy={busy.includes(rowOf(row.home))} onShow={onShow} onChange={onChange} />
       ))}
     </>
   );
 }
 
 /** One Agent home with its tags, notes and Entry count, and the actions it offers. */
-function HomeLine({ row, onShow, onChange }: { row: HomeRow; onShow: (show: ShowInInventory) => void; onChange: (change: ListChange) => void }) {
+function HomeLine({
+  row,
+  busy,
+  onShow,
+  onChange,
+}: {
+  row: HomeRow;
+  busy: boolean;
+  onShow: (show: ShowInInventory) => void;
+  onChange: (change: ListChange) => void;
+}) {
   const named = { agent: row.home.agent, home: row.home.home };
   const buttons = {
-    show: <SmallButton key="show" label="Show in Inventory" onClick={() => onShow({ kind: "home", home: row.home })} />,
-    hide: <SmallButton key="hide" label="Hide" onClick={() => onChange({ kind: "hide_home", ...named })} />,
-    unhide: <SmallButton key="unhide" label="Unhide" onClick={() => onChange({ kind: "unhide_home", ...named })} />,
+    show: <SmallButton key="show" label="Show in Inventory" disabled={busy} onClick={() => onShow({ kind: "home", home: row.home })} />,
+    hide: <SmallButton key="hide" label="Hide" disabled={busy} onClick={() => onChange({ kind: "hide_home", ...named })} />,
+    unhide: <SmallButton key="unhide" label="Unhide" disabled={busy} onClick={() => onChange({ kind: "unhide_home", ...named })} />,
     remove_from_list: (
-      <SmallButton key="forget" label="Remove from list" onClick={() => onChange({ kind: "forget_home", ...named })} />
+      <SmallButton key="forget" label="Remove from list" disabled={busy} onClick={() => onChange({ kind: "forget_home", ...named })} />
     ),
   };
   return (
-    <PlaceRow icon="folder" dim={row.hidden} count={row.entries} actions={row.actions.map((action) => buttons[action])}>
+    <PlaceRow icon="folder" dim={row.hidden} busy={busy} count={row.entries} actions={row.actions.map((action) => buttons[action])}>
       <div className="place-name">{row.label}</div>
       <div className="place-sub mono">{row.path}</div>
       <div className="tags">

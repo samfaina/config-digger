@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { Notice } from "./Notice";
+import { Busy, Notice, Status } from "./Notice";
+import type { BusyAction } from "./busy";
 
 describe("a notice", () => {
   test("of information shows its text with the information look, read out politely", () => {
@@ -45,5 +46,50 @@ describe("the app's notices", () => {
       .filter((file) => file.endsWith(".tsx") && !file.endsWith(".test.tsx"))
       .filter((file) => /className=\{?[`"]notice\b/.test(readFileSync(new URL(file, folder), "utf8")));
     expect(drawing).toEqual(["Notice.tsx"]);
+  });
+});
+
+const HIDING: BusyAction = { text: String.raw`Hiding E:\cd-throwaway\project-hide…`, row: String.raw`E:\cd-throwaway\project-hide` };
+const UNHIDING: BusyAction = { text: String.raw`Unhiding E:\cd-throwaway\project-old…`, row: String.raw`E:\cd-throwaway\project-old` };
+
+describe("the busy indicator", () => {
+  test("shows a spinner and names what runs, read out politely", () => {
+    const markup = renderToStaticMarkup(<Busy action={HIDING} />);
+
+    expect(markup).toMatch(/^<div class="notice busy" role="status">/);
+    expect(markup).toContain('<span class="spinner" aria-hidden="true"></span>');
+    expect(markup).toContain(`<span>${HIDING.text}</span>`);
+  });
+});
+
+describe("the bottom of a screen", () => {
+  test("shows the action last started while actions run", () => {
+    const markup = renderToStaticMarkup(<Status notice={null} actions={[HIDING, UNHIDING]} />);
+
+    expect(markup).toContain(UNHIDING.text);
+    expect(markup).not.toContain(HIDING.text);
+  });
+
+  test("shows the error notice instead of the busy indicator once an action fails", () => {
+    const markup = renderToStaticMarkup(<Status notice={{ kind: "error", text: "The list could not be changed." }} actions={[UNHIDING]} />);
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain("The list could not be changed.");
+    expect(markup).not.toContain("spinner");
+  });
+
+  test("keeps showing an action that runs over the success notice of another that ended", () => {
+    const markup = renderToStaticMarkup(<Status notice={{ kind: "success", text: "Hid it." }} actions={[UNHIDING]} />);
+
+    expect(markup).toContain(UNHIDING.text);
+    expect(markup).not.toContain("Hid it.");
+  });
+
+  test("shows a success notice once nothing runs", () => {
+    expect(renderToStaticMarkup(<Status notice={{ kind: "success", text: "Hid it." }} actions={[]} />)).toContain("Hid it.");
+  });
+
+  test("shows nothing when nothing runs and nothing is to tell", () => {
+    expect(renderToStaticMarkup(<Status notice={null} actions={[]} />)).toBe("");
   });
 });
