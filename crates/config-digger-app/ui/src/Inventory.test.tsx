@@ -5,6 +5,7 @@ import type { Entry, Home, Inventory, Item, Project, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
 import { Banner, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
+import { applyReaction } from "./Select";
 import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
 
 // A tooltip portals into `document.body`, which a render to markup has not.
@@ -166,27 +167,22 @@ describe("choosing a Project", () => {
   });
 });
 
+function inventory(overrides: Partial<Inventory> = {}): Inventory {
+  return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], agent_flags: [], ...overrides };
+}
+
 describe("a key on the closed Project field", () => {
   const first = String.raw`E:\cd-throwaway\project-a`;
   const second = String.raw`E:\cd-throwaway\project-b`;
   const gone = String.raw`E:\cd-throwaway\project-gone`;
-  const inventory: Inventory = {
-    read_at: "2026-10-20T09:30:00Z",
-    project: first,
-    projects: [project(first), project(second), project(gone, true)],
-    homes: [home()],
-    items: [],
-    read_failures: [],
-    agent_flags: [],
-  };
+  const read = inventory({ project: first, projects: [project(first), project(second), project(gone, true)] });
 
   /** The Projects the field loads on `key`, pressed on it closed while it shows `shown`, and whether its panel opens. */
   function press(key: string, shown: string | null) {
     const loaded: (string | null)[] = [];
-    const field = projectField(inventory, shown, (next) => loaded.push(next));
-    const reaction = onKey(CLOSED, field.options, field.value, { key, altKey: false }, 0);
-    if (reaction.choose !== null) field.onChange(reaction.choose);
-    return { loaded, open: reaction.state.open };
+    const field = projectField(read, shown, (next) => loaded.push(next));
+    const state = applyReaction(onKey(CLOSED, field.options, field.value, { key, altKey: false }, 0), field.onChange);
+    return { loaded, open: state.open };
   }
 
   test("Arrow down loads the next Project without opening the panel", () => {
@@ -199,10 +195,11 @@ describe("a key on the closed Project field", () => {
 
   test("loads the Project it moves to as a click on it does", () => {
     const clicked: (string | null)[] = [];
-    const field = projectField(inventory, first, (next) => clicked.push(next));
-    const choice = onOptionClick({ ...CLOSED, open: true }, field.options, field.value, 2).choose;
-    if (choice !== null) field.onChange(choice);
+    const field = projectField(read, first, (next) => clicked.push(next));
+    const at = field.options.findIndex((option) => option.value === second);
+    applyReaction(onOptionClick({ ...CLOSED, open: true }, field.options, field.value, at), field.onChange);
 
+    expect(clicked).toEqual([second]);
     expect(press("ArrowDown", first).loaded).toEqual(clicked);
   });
 
@@ -210,27 +207,18 @@ describe("a key on the closed Project field", () => {
     expect(press("ArrowUp", first).loaded).toEqual([null]);
   });
 
-  test("Arrow down from the last Project loads the first Missing Project", () => {
+  test("Arrow down from the last Project loads the first missing Project", () => {
     expect(press("ArrowDown", second).loaded).toEqual([gone]);
   });
 });
 
-describe("the banner while the Project a key moved to is read", () => {
+describe("the banner while a newly chosen Project is read", () => {
   const before = String.raw`E:\cd-throwaway\project-a`;
-  const moved = String.raw`E:\cd-throwaway\project-b`;
-  const inventory: Inventory = {
-    read_at: "2026-10-20T09:30:00Z",
-    project: before,
-    projects: [project(before), project(moved)],
-    homes: [home()],
-    items: [],
-    read_failures: [],
-    agent_flags: [],
-  };
+  const chosen = String.raw`E:\cd-throwaway\project-b`;
   const markup = renderToStaticMarkup(
     <Banner
-      inventory={inventory}
-      project={moved}
+      inventory={inventory({ project: before, projects: [project(before), project(chosen)] })}
+      project={chosen}
       agentName="All Agents"
       stats={{ items: 0, inUse: 0, noEffect: 0 }}
       reading
@@ -240,8 +228,8 @@ describe("the banner while the Project a key moved to is read", () => {
     />,
   );
 
-  test("shows the Project it moved to in the field", () => {
-    expect(markup).toContain(`<span class="select-value">${moved}</span>`);
+  test("shows the chosen Project in the field over the inventory read before", () => {
+    expect(markup).toContain(`<span class="select-value">${chosen}</span>`);
   });
 
   test("runs the reading bar and says Reading on Refresh", () => {
