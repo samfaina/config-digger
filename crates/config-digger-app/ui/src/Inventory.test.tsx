@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
 import type { Entry, Home, Inventory, Item, Project, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
+import { EntryCard } from "./EntryCard";
 import { Banner, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
 import { applyReaction } from "./Select";
@@ -235,5 +236,47 @@ describe("the banner while a newly chosen Project is read", () => {
   test("runs the reading bar and says Reading on Refresh", () => {
     expect(markup).toContain(renderToStaticMarkup(<ReadProgress text="Reading the inventory again" />));
     expect(markup).toMatch(/<button type="button" class="cta secondary" disabled="">.*Reading<\/button>/);
+  });
+});
+
+/** The opening tag of each action button of an Entry card, Disable or Enable then Remove. */
+const actionButtons = (busy: boolean) => {
+  const markup = renderToStaticMarkup(
+    <EntryCard
+      entry={entry()}
+      rank={1}
+      agentName="Claude Code"
+      flash={false}
+      busy={busy}
+      inItem={() => true}
+      onShowWinner={() => {}}
+      onReader={null}
+      onAction={() => {}}
+      notify={() => {}}
+    />,
+  );
+  const row = markup.slice(markup.indexOf('<div class="entry-actions">'));
+  return {
+    card: markup.match(/^<article[^>]*>/)?.[0] ?? "",
+    head: markup.match(/<header class="entry-head">[\s\S]*?<\/header>/)?.[0] ?? "",
+    buttons: row.match(/<button[^>]*class="cta[^>]*>/g) ?? [],
+  };
+};
+
+describe("an Entry card", () => {
+  test("disables Disable and Remove while its Entry is read again, and shows it is being read beside its State", () => {
+    const { card, head, buttons } = actionButtons(true);
+    expect(card).toMatch(/aria-busy="true"/);
+    expect(head).toContain('<span class="entry-reading"><span class="spinner" aria-hidden="true"></span>Reading…</span>');
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) expect(button).toMatch(/disabled=""/);
+  });
+
+  test("offers Disable and Remove while nothing runs on its Entry", () => {
+    const { card, head, buttons } = actionButtons(false);
+    expect(card).toMatch(/aria-busy="false"/);
+    expect(head).not.toContain("Reading…");
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) expect(button).not.toMatch(/disabled/);
   });
 });

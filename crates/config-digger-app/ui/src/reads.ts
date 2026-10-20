@@ -27,6 +27,33 @@ export function createReads(): Reads {
   };
 }
 
+/** One screen's reads of its data, each run once the one before it is done. */
+export type ReadQueue = {
+  /**
+   * Runs `read` once the read running is done, or at once when none is,
+   * rather than beside it, as the disk may have changed since that one
+   * started; done once `read` is.
+   */
+  next: (read: () => Promise<void>) => Promise<void>;
+  /** Whether a read runs or waits to. */
+  running: () => boolean;
+};
+
+/** A new queue of reads, none of them running. */
+export function createReadQueue(): ReadQueue {
+  let last: Promise<void> | null = null;
+  return {
+    next: (read) => {
+      const reading: Promise<void> = (last ? last.then(read, read) : read()).finally(() => {
+        if (last === reading) last = null;
+      });
+      last = reading;
+      return reading;
+    },
+    running: () => last !== null,
+  };
+}
+
 /** The app's reads, shared by every screen. */
 export const reads = createReads();
 

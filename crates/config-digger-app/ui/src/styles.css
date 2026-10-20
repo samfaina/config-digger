@@ -1068,6 +1068,20 @@ p {
   margin-left: auto;
 }
 
+/* While the Entry is read again, beside the State it may no longer have. */
+.entry-reading {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.entry-head .entry-reading + .state-pill {
+  margin-left: 0;
+}
+
 .rank {
   width: 22px;
   height: 22px;

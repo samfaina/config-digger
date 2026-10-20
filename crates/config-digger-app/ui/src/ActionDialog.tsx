@@ -26,6 +26,7 @@ import {
 } from "./dialog";
 import { undoRefusal, type UndoRefusal } from "./history";
 import { Icon } from "./icons";
+import { Loading } from "./Loading";
 import { StatePill } from "./StatePill";
 import { Tooltip } from "./Tooltip";
 
@@ -194,7 +195,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
           {planned && <p className="dialog-subtitle">{subtitle(planned.preview)}</p>}
         </header>
 
-        {phase.kind === "planning" && <p className="empty">Reading the files this action touches…</p>}
+        {phase.kind === "planning" && <Loading text="Reading the files this action touches…" rows={3} />}
 
         {phase.kind === "plan_failed" && (
           <>

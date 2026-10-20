@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createReads, readCue, whenIdle } from "./reads";
+import { createReadQueue, createReads, readCue, whenIdle } from "./reads";
 
 /** A read that settles when told to. */
 function pending() {
@@ -94,5 +94,65 @@ describe("what a screen shows while it reads its data", () => {
 
   test("is a cue over the error while it reads again after its first read failed", () => {
     expect(readCue({ shown: false, reading: true, failed: true })).toBe("rereading");
+  });
+});
+
+/** Reads that settle when the test tells them to, each logged as it starts. */
+function reads() {
+  const started: string[] = [];
+  const settles: Record<string, (ok: boolean) => void> = {};
+  const read = (name: string) => () => {
+    started.push(name);
+    return new Promise<void>((resolve, reject) => {
+      settles[name] = (ok) => (ok ? resolve() : reject(new Error("failed")));
+    });
+  };
+  return { started, read, settle: (name: string, ok = true) => settles[name](ok) };
+}
+
+/** Lets every promise the test already settled run on. */
+const settled = () => new Promise((resolve) => setTimeout(resolve));
+
+describe("a read asked for while another runs", () => {
+  test("starts at once when nothing is read", () => {
+    const { started, read } = reads();
+    const queue = createReadQueue();
+
+    void queue.next(read("first"));
+
+    expect(started).toEqual(["first"]);
+    expect(queue.running()).toBe(true);
+  });
+
+  test("starts once the read running is done, as the disk may have changed since it started", async () => {
+    const { started, read, settle } = reads();
+    const queue = createReadQueue();
+
+    void queue.next(read("focus"));
+    let done = false;
+    const after = queue.next(read("after an action")).then(() => (done = true));
+    await settled();
+    expect(started).toEqual(["focus"]);
+
+    settle("focus");
+    await settled();
+    expect(started).toEqual(["focus", "after an action"]);
+    expect(done).toBe(false);
+
+    settle("after an action");
+    await after;
+    expect(queue.running()).toBe(false);
+  });
+
+  test("starts even when the read running fails", async () => {
+    const { started, read, settle } = reads();
+    const queue = createReadQueue();
+
+    void queue.next(read("failing")).catch(() => {});
+    void queue.next(read("next"));
+    settle("failing", false);
+    await settled();
+
+    expect(started).toEqual(["failing", "next"]);
   });
 });

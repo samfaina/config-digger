@@ -313,8 +313,3 @@ export function changeBusy(change: ListChange, places: Places | null): BusyActio
       return { text: `Removing ${named(change)} from config-digger's list…`, row: rowOf(change) };
   }
 }
-
-/** What the busy indicator says while the screen reads again after Remove leftovers on the missing Project at `path`. */
-export function rereading(path: string): BusyAction {
-  return { text: "Reading the Projects and Agent homes again…", row: path };
-}

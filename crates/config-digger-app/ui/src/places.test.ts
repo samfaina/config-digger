@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Agent, Entry, Home, Item, Leftovers, Places, Project } from "./bindings";
-import { changedSentence, changeBusy, homeGroups, inventoryStart, projectSections, rereading, rowOf } from "./places";
+import { changedSentence, changeBusy, homeGroups, inventoryStart, projectSections, rowOf } from "./places";
 
 const CLAUDE_JSON = String.raw`C:\Users\me\.claude.json`;
 
@@ -364,11 +364,5 @@ describe("the busy indicator of a list change", () => {
 
   test("tells a home of one Agent from the same home of another", () => {
     expect(rowOf({ agent: "claude-code", home: "default" })).not.toBe(rowOf({ agent: "codex", home: "default" }));
-  });
-
-  test("of the read after Remove leftovers says the screen reads again, on the missing Project's row", () => {
-    const path = String.raw`E:\cd-throwaway\project-gone`;
-
-    expect(rereading(path)).toEqual({ text: "Reading the Projects and Agent homes again…", row: path });
   });
 });

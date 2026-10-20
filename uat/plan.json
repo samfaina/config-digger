@@ -1025,6 +1025,7 @@
             "Abre config-digger.",
             "En la barra roja del Inventario, pulsa Open History.",
             "Pulsa Dismiss.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones del detalle.",
             "Vuelve al Inventario."
           ],
           "commands": [
@@ -1034,8 +1035,8 @@
               "text": "notepad \"$env:LOCALAPPDATA\\config-digger\\backups\\ID\\manifest.json\""
             }
           ],
-          "expect": "El Inventario muestra una barra roja «An Operation needs manual recovery» con el botón Open History. En History, la Operation tiene la etiqueta Needs attention y un recuadro rojo «This Operation needs manual recovery». Dismiss da el aviso «Dismissed Operation <id>.» y la etiqueta pasa a Rollback incomplete, dismissed. La barra roja ya no está en el Inventario.",
-          "covers": ["#74"]
+          "expect": "El Inventario muestra una barra roja «An Operation needs manual recovery» con el botón Open History. En History, la Operation tiene la etiqueta Needs attention y un recuadro rojo «This Operation needs manual recovery». Nada más pulsar Dismiss sale abajo un aviso con una rueda que gira y el texto «Dismissing Operation <id>…», con los botones Dismiss y Delete backup del detalle apagados, que puede durar menos de un segundo. Luego sale el aviso «Dismissed Operation <id>.» y la etiqueta pasa a Rollback incomplete, dismissed. La barra roja ya no está en el Inventario.",
+          "covers": ["#74", "#223"]
         },
         {
           "id": "11.7",
@@ -1051,6 +1052,58 @@
           "commands": [],
           "expect": "El diálogo se titula «Delete the backup of <id> \"Disable 1 Entry\"» y avisa de que el backup se borra para siempre y de que la Operation ya no se podrá deshacer. El resultado dice «Deleted the backup of <id>. It can no longer be undone.», con la línea «Operation <id> · backup deleted · can no longer be undone». La etiqueta pasa a Applied, backup deleted, not undoable. Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.» y el botón Delete backup ya no está.",
           "covers": ["#74", "#189"]
+        },
+        {
+          "id": "11.8",
+          "title": "El aviso de trabajo de Disable y de Undo",
+          "goal": "Desde que se pulsa Disable o Undo hasta que la pantalla enseña el resultado, la pantalla dice qué hace y los botones que lo empezarían otra vez no responden.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Mira enseguida el diálogo.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones de la tarjeta de cd-throwaway-codex.",
+            "Ve a History.",
+            "Elige la fila de arriba, «Disable 1 Entry».",
+            "Pulsa Undo.",
+            "Si hay casillas de aviso, márcalas.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
+            "Mira enseguida la parte de abajo de la pantalla y los botones del detalle."
+          ],
+          "commands": [],
+          "expect": "Al pulsar Disable, el diálogo se titula «Preparing the preview…» y muestra un aviso con una rueda que gira y el texto «Reading the files this action touches…», sobre filas grises que laten, hasta que sale la vista previa. Tras Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». En la cabecera de la tarjeta, junto a su State, sale una rueda pequeña con «Reading…», y los botones Disable y Remove se ven apagados, hasta que la tarjeta dice Disabled y ofrece Enable. En History, tras Done sale abajo el aviso de la rueda con «Reading History again…», con los botones Delete backup y Undo del detalle apagados, hasta que la Operation dice Undone by <id nuevo> y muestra Can't undo. Cada aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la pantalla cambie.",
+          "covers": ["#223"]
+        },
+        {
+          "id": "11.9",
+          "title": "El aviso de trabajo de Undo desde el Inventario",
+          "goal": "Tras un Undo desde el aviso de abajo del Inventario, los botones de la Entry no responden hasta que la tarjeta enseña su State nuevo.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "En el aviso de abajo que empieza por «Disabled 1 Entry», pulsa Undo.",
+            "Si hay casillas de aviso, márcalas.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
+            "Mira enseguida la parte de abajo de la pantalla y la tarjeta de cd-throwaway-codex."
+          ],
+          "commands": [],
+          "expect": "Tras el último Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». La tarjeta tiene junto a su State una rueda pequeña con «Reading…», y sus botones Enable y Remove se ven apagados, hasta que la tarjeta dice Effective y ofrece Disable. El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la tarjeta cambie.",
+          "covers": ["#223"]
         }
       ]
     },
