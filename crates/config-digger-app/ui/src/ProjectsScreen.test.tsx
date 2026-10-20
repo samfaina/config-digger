@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import type { Home, Places, Project } from "./bindings";
 import { rowOf } from "./places";
+import { Loading } from "./Loading";
 import { HomesTab, ProjectsScreen, ProjectsTab, type Tab } from "./ProjectsScreen";
 
 const DESCRIPTIONS: Record<Tab, string> = {
@@ -23,6 +24,12 @@ describe("the Projects & homes screen", () => {
       expect(banner).toContain("Projects &amp; homes");
       expect(banner).not.toContain(escaped(DESCRIPTIONS[tab]));
       expect(list.startsWith(`<section class="panel places-list"><p class="places-about dim">${escaped(DESCRIPTIONS[tab])}</p>`)).toBe(true);
+    });
+
+    test(`fills the list of the ${tab} tab with the loading state until the first read is done`, () => {
+      const list = screen(tab).match(/<section class="panel places-list">[\s\S]*?<\/section>/)?.[0] ?? "";
+      expect(list).toContain(renderToStaticMarkup(<Loading text="Reading the Projects and Agent homes…" rows={6} />));
+      expect(list).not.toContain('<p class="empty">');
     });
   }
 });

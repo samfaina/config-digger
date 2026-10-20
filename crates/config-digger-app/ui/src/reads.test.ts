@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createReads, whenIdle } from "./reads";
+import { createReads, readCue, whenIdle } from "./reads";
 
 /** A read that settles when told to. */
 function pending() {
@@ -70,5 +70,29 @@ describe("a focus handler", () => {
     await running;
     onFocus();
     expect(reread).toBe(1);
+  });
+});
+
+describe("what a screen shows while it reads its data", () => {
+  test("is the loading state before its first read is done, even before that read starts", () => {
+    expect(readCue({ shown: false, reading: false, failed: false })).toBe("loading");
+    expect(readCue({ shown: false, reading: true, failed: false })).toBe("loading");
+  });
+
+  test("is a cue over the data already shown while it reads again", () => {
+    expect(readCue({ shown: true, reading: true, failed: false })).toBe("rereading");
+    expect(readCue({ shown: true, reading: true, failed: true })).toBe("rereading");
+  });
+
+  test("is nothing once its data is shown and nothing is read", () => {
+    expect(readCue({ shown: true, reading: false, failed: false })).toBeNull();
+  });
+
+  test("is nothing when its first read failed, so that the error shows instead", () => {
+    expect(readCue({ shown: false, reading: false, failed: true })).toBeNull();
+  });
+
+  test("is a cue over the error while it reads again after its first read failed", () => {
+    expect(readCue({ shown: false, reading: true, failed: true })).toBe("rereading");
   });
 });

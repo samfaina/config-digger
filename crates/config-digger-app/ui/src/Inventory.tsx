@@ -6,10 +6,12 @@ import { EmptyInventory } from "./EmptyInventory";
 import { EntryCard } from "./EntryCard";
 import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
+import { Loading, ReadProgress } from "./Loading";
 import { LinkTag } from "./Location";
 import { Notice } from "./Notice";
 import type { InventoryStart } from "./places";
 import { ReadFailureCard } from "./ReadFailureCard";
+import { readCue } from "./reads";
 import { Select } from "./Select";
 import { StatePill } from "./StatePill";
 import { STATE_LABELS } from "./states";
@@ -66,6 +68,7 @@ type InventoryProps = {
 /** The Inventory screen: the top banner over the Agents, Items and detail panes. */
 export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }: InventoryProps) {
   const { inventory, project, error, reading, refresh, selectProject } = useInventory(start?.project ?? null);
+  const cue = readCue({ shown: inventory !== null, reading, failed: error !== null });
   const { history, reload: reloadHistory } = useHistory();
   const [agent, setAgent] = useState(start?.agent ?? "all");
   const [homeChoice, setHomeChoice] = useState<HomeChoices>(homeChoices(start?.homes));
@@ -132,6 +135,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         agentName={agentName}
         stats={agentStats(shown)}
         reading={reading}
+        rereading={cue === "rereading"}
         refresh={refresh}
         selectProject={(next) => {
           selectProject(next);
@@ -151,7 +155,9 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         </div>
       )}
 
-      {inventory && inventory.homes.length === 0 ? (
+      {cue === "loading" ? (
+        <Loading text="Reading the inventory…" rows={8} />
+      ) : inventory && inventory.homes.length === 0 ? (
         <EmptyInventory
           readAt={inventory.read_at}
           reading={reading}
@@ -232,7 +238,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
               </div>
             ))}
             <div className="scroll">
-              {inventory ? (
+              {inventory && (
                 <ItemList
                   inventory={inventory}
                   items={filterItems(shown, filter)}
@@ -241,8 +247,6 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                   selected={selected}
                   onSelect={(item) => setDetail({ kind: "item", key: itemKey(item) })}
                 />
-              ) : (
-                !error && <p className="empty">Reading the inventory…</p>
               )}
             </div>
           </section>
@@ -304,12 +308,14 @@ type BannerProps = {
   agentName: string;
   stats: AgentStats;
   reading: boolean;
+  /** Whether it reads again over what the screen shows. */
+  rereading: boolean;
   refresh: () => void;
   selectProject: (project: string | null) => void;
 };
 
 /** Items in use, the current Agent, the Project selector, the read time and Refresh. */
-function Banner({ inventory, project, agentName, stats, reading, refresh, selectProject }: BannerProps) {
+function Banner({ inventory, project, agentName, stats, reading, rereading, refresh, selectProject }: BannerProps) {
   const projects = inventory?.projects ?? [];
   const failuresOf = (path: string) => projectFailures(inventory?.read_failures ?? [], path);
   const option = (path: string, group?: string): DropdownOption => {
@@ -360,6 +366,7 @@ function Banner({ inventory, project, agentName, stats, reading, refresh, select
         <Icon name="refresh" small />
         {reading ? "Reading" : "Refresh"}
       </button>
+      {rereading && <ReadProgress text="Reading the inventory again" />}
     </header>
   );
 }

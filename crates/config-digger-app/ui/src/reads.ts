@@ -36,3 +36,16 @@ export function whenIdle(running: Reads, reread: () => void): () => void {
     if (!running.busy()) reread();
   };
 }
+
+/**
+ * What a screen shows of a read of its data: the loading state until its
+ * first read is done, and a cue that does not block it while it reads again
+ * over what it shows, its data or the error of the last read.
+ */
+export type ReadCue = "loading" | "rereading" | null;
+
+/** The cue of a screen that `shown` its data or `failed` to read it, while `reading` it or not. */
+export function readCue({ shown, reading, failed }: { shown: boolean; reading: boolean; failed: boolean }): ReadCue {
+  if (!shown && !failed) return "loading";
+  return reading ? "rereading" : null;
+}
