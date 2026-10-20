@@ -692,6 +692,32 @@ fn verbose_logs_go_to_stderr_without_configuration_values() {
     }
 }
 
+/// The `scan started` and `scan finished` lines of a run's log, in order.
+fn scan_lines(run: &Run) -> Vec<&str> {
+    run.stderr
+        .lines()
+        .filter(|line| line.contains("scan started") || line.contains("scan finished"))
+        .collect()
+}
+
+#[test]
+fn list_verbose_logs_one_scan_with_its_time_and_the_paths_it_checked() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+
+    let run = harness.run(&["list", "--json", "-v"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let lines = scan_lines(&run);
+    assert_eq!(lines.len(), 2, "{}", run.stderr);
+    assert!(lines[0].contains(" INFO "), "{}", lines[0]);
+    assert!(lines[0].contains("scan started"), "{}", run.stderr);
+    assert!(lines[1].contains(" INFO "), "{}", lines[1]);
+    assert!(lines[1].contains("scan finished"), "{}", run.stderr);
+    assert!(lines[1].contains("elapsed_ms="), "{}", lines[1]);
+    // `.claude.json` is the one location of the home that exists.
+    assert!(lines[1].contains("paths=1"), "{}", lines[1]);
+}
+
 #[test]
 fn without_verbose_nothing_is_logged() {
     let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
@@ -1353,6 +1379,33 @@ fn undo_dry_run_prints_the_plan_and_writes_nothing() {
     assert_eq!(document["plan"]["changes"][0]["before"], "removed");
     assert_eq!(document["result"], Value::Null);
     assert_eq!(read(&harness.path(".claude.json")), after_remove);
+}
+
+/// How many scans a run logged, after checking that each `scan started`
+/// line is followed by its `scan finished` line.
+fn logged_scans(run: &Run) -> usize {
+    let lines = scan_lines(run);
+    let paired = lines.chunks(2).all(|pair| {
+        matches!(pair, [started, finished] if started.contains("started") && finished.contains("finished"))
+    });
+    assert!(paired, "{}", run.stderr);
+    lines.len() / 2
+}
+
+#[test]
+fn each_scan_of_a_preview_and_of_an_undo_logs_its_own_pair() {
+    // The scan that finds `notes`, then the one as if it were Disabled.
+    let preview =
+        with_three_gemini_projects().run(&["disable", "notes", "--no-project", "--dry-run", "-v"]);
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    let removed = harness.removed("linear");
+    // The scan of the files now, then the one as if they were put back.
+    let undo = harness.run(&["undo", &removed, "--dry-run", "-v"]);
+
+    assert_eq!(preview.code, 0, "{}", preview.stderr);
+    assert_eq!(logged_scans(&preview), 2, "{}", preview.stderr);
+    assert_eq!(undo.code, 0, "{}", undo.stderr);
+    assert_eq!(logged_scans(&undo), 2, "{}", undo.stderr);
 }
 
 #[test]

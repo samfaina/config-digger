@@ -936,6 +936,49 @@
       ]
     },
     {
+      "id": "14",
+      "title": "El log de la app",
+      "steps": [
+        {
+          "id": "14.1",
+          "title": "Los escaneos de un arranque y de una preview",
+          "goal": "El log de la app escribe una pareja scan started / scan finished por cada escaneo: una sola al arrancar, y dos propias en la preview de un Disable.",
+          "instructions": [
+            "Lee todas las instrucciones antes de empezar: entre abrir config-digger y cerrarlo, no cambies de ventana, porque al volver a ella la app lee otra vez el Inventario.",
+            "Cierra config-digger.",
+            "Abre config-digger.",
+            "Espera a que el Inventario termine de leer.",
+            "Cierra config-digger.",
+            "Ejecuta la orden.",
+            "Apunta lo que imprime.",
+            "Abre config-digger.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Pulsa Cancel.",
+            "Cierra config-digger.",
+            "Ejecuta otra vez la orden."
+          ],
+          "commands": [
+            {
+              "label": "Ver los escaneos desde el último arranque",
+              "shell": "powershell",
+              "text": "$log = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\logs\\config-digger-app.*.log\" | Sort-Object LastWriteTime | Select-Object -Last 1; $lines = @(Get-Content $log.FullName); $start = ($lines | Select-String 'app started' | Select-Object -Last 1).LineNumber; $lines[($start - 1)..($lines.Count - 1)] | Select-String 'app started|scan started|scan finished|inventory read'"
+            }
+          ],
+          "expect": "La primera vez, la orden imprime cuatro líneas INFO, en este orden: «app started», «scan started», «scan finished elapsed_ms=<n> paths=<n>» e «inventory read». La segunda vez empieza con esas cuatro líneas y sigue con exactamente dos parejas «scan started» / «scan finished elapsed_ms=<n> paths=<n>» sin «inventory read» detrás: los dos escaneos de la preview de Disable. Si sale alguna pareja más, la sigue un «inventory read»: es una lectura por volver a la ventana.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#159"]
+        }
+      ]
+    },
+    {
       "id": "12",
       "title": "Actualizar",
       "steps": [
