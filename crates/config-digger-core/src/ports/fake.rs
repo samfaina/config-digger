@@ -65,6 +65,9 @@ struct FakeFiles {
     /// The text values of each column of each other table of each SQLite
     /// store, by the store's path as spelled on disk, then table and column.
     sqlite_rows: BTreeMap<PathBuf, BTreeMap<(String, String), Vec<String>>>,
+    /// How many times each file was read, whole or in part, by its
+    /// lowercased path.
+    reads: BTreeMap<String, usize>,
 }
 
 impl FakeFileSystem {
@@ -215,7 +218,7 @@ impl FakeFileSystem {
     pub fn lock_elsewhere(&self, path: impl AsRef<Path>) {
         self.files()
             .locked_elsewhere
-            .insert(lock_key(path.as_ref()));
+            .insert(path_key(path.as_ref()));
     }
 
     /// The bytes of the file at `path`, `None` when there is none.
@@ -234,6 +237,13 @@ impl FakeFileSystem {
             .filter(|file| strip_prefix(file, folder.as_ref()).is_some_and(|rest| !rest.is_empty()))
             .cloned()
             .collect()
+    }
+
+    /// How many times the core has read the file at `path`, whole or in
+    /// part, across clones.
+    pub fn reads_of(&self, path: impl AsRef<Path>) -> usize {
+        let key = path_key(path.as_ref());
+        self.files().reads.get(&key).copied().unwrap_or(0)
     }
 
     /// How many times the core has touched this file system, across clones.
@@ -336,7 +346,8 @@ fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<Vec<std::path::Comp
     Some(components.collect())
 }
 
-fn lock_key(path: &Path) -> String {
+/// The key of `path` among paths looked up case-insensitively.
+fn path_key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
 }
 
@@ -357,7 +368,8 @@ impl Drop for FakeLock {
 impl FileSystem for FakeFileSystem {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         self.count_access();
-        let files = self.files();
+        let mut files = self.files();
+        *files.reads.entry(path_key(path)).or_default() += 1;
         let path = files.follow(path);
         if files
             .denied
@@ -652,7 +664,7 @@ impl FileSystem for FakeFileSystem {
     fn try_lock(&self, path: &Path) -> io::Result<Option<HeldLock>> {
         self.count_access();
         let mut files = self.files();
-        let key = lock_key(&files.follow(path));
+        let key = path_key(&files.follow(path));
         if files.locked_elsewhere.contains(&key) || !files.locked.insert(key.clone()) {
             return Ok(None);
         }

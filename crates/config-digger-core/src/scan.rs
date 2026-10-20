@@ -887,16 +887,40 @@ pub(crate) fn scan(
     ports: &Ports,
     extra_projects: &[PathBuf],
 ) -> Result<Snapshot, ScanError> {
-    scan_as_if(definitions, ports, extra_projects, &[], &[])
+    timed_scan(definitions, ports, extra_projects, None, &[], &[])
 }
 
 /// Scans as [`scan`] does, as if each location in `written` held what it
 /// will hold and `folders` were done, so that a plan can predict what a scan
-/// will read once it is done.
+/// will read once it is done. An Operation never writes an Installation's
+/// files, so the `installations` of the snapshot the plan was made from
+/// stand, and their versions are not read again.
 pub(crate) fn scan_as_if(
     definitions: &Definitions,
     ports: &Ports,
     extra_projects: &[PathBuf],
+    installations: &[ScannedInstallation],
+    written: &[Written],
+    folders: &[PlannedFolder],
+) -> Result<Snapshot, ScanError> {
+    timed_scan(
+        definitions,
+        ports,
+        extra_projects,
+        Some(installations),
+        written,
+        folders,
+    )
+}
+
+/// The scan of [`scan`] and [`scan_as_if`], with the Installations found
+/// again when `known_installations` is `None`, logged with how long it took
+/// and how many paths it asked the git index about.
+fn timed_scan(
+    definitions: &Definitions,
+    ports: &Ports,
+    extra_projects: &[PathBuf],
+    known_installations: Option<&[ScannedInstallation]>,
     written: &[Written],
     folders: &[PlannedFolder],
 ) -> Result<Snapshot, ScanError> {
@@ -907,6 +931,7 @@ pub(crate) fn scan_as_if(
         definitions,
         ports,
         extra_projects,
+        known_installations,
         written,
         folders,
         &mut asked,
@@ -916,12 +941,14 @@ pub(crate) fn scan_as_if(
     Ok(snapshot)
 }
 
-/// The scan of [`scan_as_if`], counting in `asked` each path it asks the
-/// git index about.
+/// The scan of [`timed_scan`], with the Installations found again when
+/// `known_installations` is `None`, counting in `asked` each path it asks
+/// the git index about.
 fn read_as_if(
     definitions: &Definitions,
     ports: &Ports,
     extra_projects: &[PathBuf],
+    known_installations: Option<&[ScannedInstallation]>,
     written: &[Written],
     folders: &[PlannedFolder],
     asked: &mut usize,
@@ -1208,7 +1235,10 @@ fn read_as_if(
     });
     Ok(Snapshot {
         read_at,
-        installations: installations::find(definitions, ports),
+        installations: match known_installations {
+            Some(known) => known.to_vec(),
+            None => installations::find(definitions, ports),
+        },
         homes: found
             .into_iter()
             .zip(last_ran)
