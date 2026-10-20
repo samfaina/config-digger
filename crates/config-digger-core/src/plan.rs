@@ -936,7 +936,8 @@ impl Targeted<'_> {
             path: origin.clone(),
             op,
             size,
-            git_versioned: scan::is_versioned(self.ports, origin),
+            git_versioned: !scan::versioned_paths(self.ports, std::iter::once(origin.as_path()))
+                .is_empty(),
             readers: self.snapshot.readers_of_folder(origin),
         })
     }
@@ -1657,12 +1658,17 @@ pub(crate) fn undo_folders(
             )));
         }
         planned.push(PlannedFolder {
-            git_versioned: scan::is_versioned(ports, path),
+            git_versioned: false,
             readers: Vec::new(),
             path: path.clone(),
             op,
             size,
         });
+    }
+    let versioned =
+        scan::versioned_paths(ports, planned.iter().map(|folder| folder.path.as_path()));
+    for folder in &mut planned {
+        folder.git_versioned = versioned.contains(&folder.path);
     }
     Ok(planned)
 }

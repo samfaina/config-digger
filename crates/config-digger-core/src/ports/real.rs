@@ -159,9 +159,9 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
   } catch { 'UNSAFE' }
 }
 "#;
-        // Each file with the paths whose permissions it depends on, each
-        // path asked about once.
-        let mut asked: Vec<String> = Vec::new();
+        // Each file with the indexes in `acl_paths` of the paths whose
+        // permissions it depends on, each path asked about once.
+        let mut acl_paths: Vec<String> = Vec::new();
         let mut chains: Vec<(&Path, Vec<usize>)> = Vec::new();
         for &path in paths {
             let real = self.real_path(path);
@@ -171,25 +171,21 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
                 .chain(real.iter().flat_map(|real| acl_chain(real)))
             {
                 let found = found.display().to_string();
-                let at = match asked
+                let known = acl_paths
                     .iter()
-                    .position(|known| known.eq_ignore_ascii_case(&found))
-                {
-                    Some(at) => at,
-                    None => {
-                        asked.push(found);
-                        asked.len() - 1
-                    }
-                };
-                chain.push(at);
+                    .position(|known| known.eq_ignore_ascii_case(&found));
+                chain.push(known.unwrap_or_else(|| {
+                    acl_paths.push(found);
+                    acl_paths.len() - 1
+                }));
             }
             chains.push((path, chain));
         }
-        if asked.is_empty() {
+        if acl_paths.is_empty() {
             return BTreeSet::new();
         }
         let output = powershell(SCRIPT)
-            .env("CONFIG_DIGGER_ACL_PATHS", asked.join("\n"))
+            .env("CONFIG_DIGGER_ACL_PATHS", acl_paths.join("\n"))
             .stderr(Stdio::null())
             .output();
         let Ok(output) = output else {
@@ -202,12 +198,12 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
             .filter(|line| *line == "SAFE" || *line == "UNSAFE")
             .map(|line| line == "SAFE")
             .collect();
-        if safe.len() != asked.len() {
+        if safe.len() != acl_paths.len() {
             return BTreeSet::new();
         }
         chains
             .into_iter()
-            .filter(|(_, chain)| chain.iter().all(|&at| safe[at]))
+            .filter(|(_, chain)| chain.iter().all(|&index| safe[index]))
             .map(|(path, _)| path.to_path_buf())
             .collect()
     }

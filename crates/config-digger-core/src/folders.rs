@@ -250,8 +250,8 @@ impl FileSystem for AsIf<'_> {
                 Seen::At(at) => Some((*path, at)),
             })
             .collect();
-        let at: Vec<&Path> = seen.iter().map(|(_, at)| at.as_path()).collect();
-        let owned = self.fs.admin_owned(&at);
+        let targets: Vec<&Path> = seen.iter().map(|(_, at)| at.as_path()).collect();
+        let owned = self.fs.admin_owned(&targets);
         seen.into_iter()
             .filter(|(_, at)| owned.contains(at))
             .map(|(path, _)| path.to_path_buf())

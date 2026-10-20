@@ -694,10 +694,11 @@ impl Processes for FakeProcesses {
     }
 }
 
-/// A git index holding the paths given to [`with_versioned`](Self::with_versioned).
-/// A folder in no repository given to [`with_repository`](Self::with_repository)
-/// is a repository of its own. Clones share one list of the repositories
-/// [`asked`](Self::asked).
+/// A git index holding the paths given to [`with_versioned`](Self::with_versioned),
+/// in the repositories given to [`with_repository`](Self::with_repository).
+/// Any other folder counts as the root of a repository, so that a test
+/// names only the versioned paths. Clones share one list of the
+/// repositories [`asked`](Self::asked).
 #[derive(Debug, Clone, Default)]
 pub struct FakeGitIndex {
     versioned: BTreeSet<PathBuf>,
@@ -719,10 +720,13 @@ impl FakeGitIndex {
 
     /// The repository of each question to the index so far, in order.
     pub fn asked(&self) -> Vec<PathBuf> {
+        self.asked_list().clone()
+    }
+
+    fn asked_list(&self) -> MutexGuard<'_, Vec<PathBuf>> {
         self.asked
             .lock()
             .expect("no test panics while holding the fake git index")
-            .clone()
     }
 }
 
@@ -736,10 +740,7 @@ impl GitIndex for FakeGitIndex {
     }
 
     fn versioned_in(&self, repository: &Path, paths: &[&Path]) -> BTreeSet<PathBuf> {
-        self.asked
-            .lock()
-            .expect("no test panics while holding the fake git index")
-            .push(repository.to_path_buf());
+        self.asked_list().push(repository.to_path_buf());
         paths
             .iter()
             .filter(|path| self.versioned.contains(**path))

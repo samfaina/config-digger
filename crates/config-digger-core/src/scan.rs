@@ -2119,9 +2119,13 @@ fn versioned<'a>(
         .collect()
 }
 
-/// Whether the file or folder at `path` is in the index of its git repo.
-pub(crate) fn is_versioned(ports: &Ports, path: &Path) -> bool {
-    !versioned(ports, std::iter::once(path), &mut 0).is_empty()
+/// The files and folders among `paths` that are in the index of their git
+/// repo, as a scan finds them, asking once per repo.
+pub(crate) fn versioned_paths<'a>(
+    ports: &Ports,
+    paths: impl Iterator<Item = &'a Path>,
+) -> BTreeSet<PathBuf> {
+    versioned(ports, paths, &mut 0)
 }
 
 fn find_homes(
