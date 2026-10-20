@@ -13,6 +13,8 @@ type Props = {
   agentName: string;
   /** Briefly marked, as after "show winner" pointed at it. */
   flash: boolean;
+  /** An action on it runs, until the screen shows what it did, so its actions are disabled. */
+  busy: boolean;
   /** Whether the Entry at a locator is one of this Item's, so "show winner" can point at it. */
   inItem: (locator: string) => boolean;
   onShowWinner: (locator: string) => void;
@@ -23,7 +25,7 @@ type Props = {
 };
 
 /** One Entry of an Item, with everything the core knows about it and its own actions. */
-export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner, onReader, onAction, notify }: Props) {
+export function EntryCard({ entry, rank, agentName, flash, busy, inItem, onShowWinner, onReader, onAction, notify }: Props) {
   const config = JSON.stringify(entry.config, null, 2);
   // "show winner" points at the Effective Entry that beats this one, or would.
   const showWinnerButton = (locator: string | null) =>
@@ -35,7 +37,7 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
     );
 
   return (
-    <article className={`entry-card state-${entry.state}${flash ? " flash" : ""}`}>
+    <article className={`entry-card state-${entry.state}${flash ? " flash" : ""}`} aria-busy={busy}>
       <header className="entry-head">
         <span className="rank">{rank}</span>
         <span className="entry-scope">{entry.scope}</span>
@@ -117,7 +119,7 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
         </div>
       )}
 
-      <EntryActionRow entry={entry} agentName={agentName} onAction={onAction} notify={notify} />
+      <EntryActionRow entry={entry} agentName={agentName} busy={busy} onAction={onAction} notify={notify} />
     </article>
   );
 }
@@ -125,16 +127,17 @@ export function EntryCard({ entry, rank, agentName, flash, inItem, onShowWinner,
 function EntryActionRow({
   entry,
   agentName,
+  busy,
   onAction,
   notify,
-}: Pick<Props, "entry" | "agentName" | "onAction" | "notify">) {
+}: Pick<Props, "entry" | "agentName" | "busy" | "onAction" | "notify">) {
   const { primary, remove, howToRemove } = entryActions(entry, agentName);
   return (
     <div className="entry-actions">
       <div className="row-buttons">
         {primary && (
           <Tooltip text={primary.offered ? undefined : primary.note}>
-            <button type="button" className="cta" disabled={!primary.offered} onClick={() => onAction(primary.verb, entry)}>
+            <button type="button" className="cta" disabled={!primary.offered || busy} onClick={() => onAction(primary.verb, entry)}>
               <Icon name={primary.verb === "disable" ? "pause" : "play"} small />
               {primary.verb === "disable" ? "Disable" : "Enable"}
             </button>
@@ -144,7 +147,7 @@ function EntryActionRow({
           <button
             type="button"
             className={`cta ${remove.danger ? "danger" : "secondary"}`}
-            disabled={!remove.offered}
+            disabled={!remove.offered || busy}
             onClick={() => onAction("remove", entry)}
           >
             <Icon name="trash" small />

@@ -8,14 +8,16 @@ import { recoveryBanner } from "./history";
 import { Icon } from "./icons";
 import { Loading, ReadProgress } from "./Loading";
 import { LinkTag } from "./Location";
-import { Notice } from "./Notice";
+import { Status, type Notice } from "./Notice";
 import type { InventoryStart } from "./places";
 import { ReadFailureCard } from "./ReadFailureCard";
 import { readCue } from "./reads";
 import { Select } from "./Select";
 import { StatePill } from "./StatePill";
 import { STATE_LABELS } from "./states";
+import { rereadAfter } from "./acting";
 import { useActionDialog } from "./useActionDialog";
+import { useBusy } from "./useBusy";
 import { useHistory } from "./useHistory";
 import { useInventory } from "./useInventory";
 import { useTransient } from "./useTransient";
@@ -76,11 +78,15 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
-  // Whatever the dialog did, the inventory and History are read again.
+  const { actions, busy } = useBusy();
+  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
+  // Whatever the dialog did, the inventory and History are read again. Until
+  // the inventory is, the Entry it acted on stays busy, so that its buttons
+  // can't start the action again before it shows its new State.
   const dialog = useActionDialog({
-    onClosed: () => {
-      refresh();
-      reloadHistory();
+    onClosed: (request) => {
+      void rereadAfter(request, { text: "Reading the inventory again…", reload: refresh, busy });
+      void reloadHistory();
     },
     onOpenHistory,
     notify: setNotice,
@@ -136,7 +142,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         stats={agentStats(shown)}
         reading={reading}
         rereading={cue === "rereading"}
-        refresh={refresh}
+        refresh={() => void refresh()}
         selectProject={(next) => {
           selectProject(next);
           setHomeChoice((choices) => withProjectChosen(choices, inventory?.projects ?? [], next));
@@ -161,7 +167,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         <EmptyInventory
           readAt={inventory.read_at}
           reading={reading}
-          refresh={refresh}
+          refresh={() => void refresh()}
           onAddHome={onAddHome}
           onOpenHomes={onOpenHomes}
         />
@@ -267,6 +273,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 inventory={inventory}
                 item={selected}
                 flash={flash}
+                busy={busyRows}
                 onShowWinner={showWinner}
                 onReader={openReader}
                 onAction={onAction}
@@ -282,7 +289,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         </div>
       )}
 
-      {notice && <Notice notice={notice} />}
+      <Status notice={notice} actions={actions} />
 
       {dialog.view}
     </div>
@@ -662,6 +669,8 @@ type ItemDetailProps = {
   inventory: Inventory;
   item: Item;
   flash: string | null;
+  /** The locators of the Entries an action runs on. */
+  busy: string[];
   onShowWinner: (locator: string) => void;
   onReader: (reader: AlsoReadBy, locator: string) => void;
   onAction: (verb: Verb, entry: Entry) => void;
@@ -669,7 +678,7 @@ type ItemDetailProps = {
 };
 
 /** An Item's Entries in precedence order, highest first and numbered. */
-function ItemDetail({ inventory, item, flash, onShowWinner, onReader, onAction, notify }: ItemDetailProps) {
+function ItemDetail({ inventory, item, flash, busy, onShowWinner, onReader, onAction, notify }: ItemDetailProps) {
   const agentName = inventory.homes.find((home) => home.agent === item.agent)?.agent_name ?? item.agent;
   const project = inventory.project ?? "No Project";
   const inItem = (locator: string) => item.entries.some((entry) => entry.locator === locator);
@@ -698,6 +707,7 @@ function ItemDetail({ inventory, item, flash, onShowWinner, onReader, onAction, 
               rank={index + 1}
               agentName={agentName}
               flash={flash === entry.locator}
+              busy={busy.includes(entry.locator)}
               inItem={inItem}
               onShowWinner={onShowWinner}
               onReader={(reader) => onReader(reader, entry.locator)}

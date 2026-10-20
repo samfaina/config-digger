@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { dismissOperation, rereadAfter } from "./acting";
 import { BackupDiffs, BackupPath, Changes, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
 import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
 import { call, NOTICE_MS, type Notify } from "./desktop";
@@ -17,9 +18,10 @@ import {
 } from "./history";
 import { Icon } from "./icons";
 import { Loading, ReadProgress } from "./Loading";
-import { Notice } from "./Notice";
+import { Status, type Notice } from "./Notice";
 import { readCue } from "./reads";
 import { useActionDialog } from "./useActionDialog";
+import { useBusy } from "./useBusy";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
 import { Tooltip } from "./Tooltip";
@@ -33,8 +35,11 @@ export function HistoryScreen() {
   // An Undo of the selected Operation that the core refused, or that its detail already held refused, shown in its detail.
   const [refused, setRefused] = useState<{ operation: string; refusal: UndoRefusal } | null>(null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const { actions, busy } = useBusy();
+  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
+  // Until History is read again, the Operation the dialog acted on stays busy, so that its buttons can't start the action again.
   const dialog = useActionDialog({
-    onClosed: reload,
+    onClosed: (request) => void rereadAfter(request, { text: "Reading History again…", reload, busy }),
     // History is the screen already open.
     onOpenHistory: () => {},
     notify: setNotice,
@@ -66,16 +71,6 @@ export function HistoryScreen() {
   const select = (operation: string) => {
     setSelected(operation);
     setRefused(null);
-  };
-
-  const dismiss = async (operation: string) => {
-    const result = await commands.dismissOperation(operation);
-    setNotice(
-      result.status === "ok"
-        ? { kind: "success", text: `Dismissed Operation ${operation}.` }
-        : { kind: "error", text: `It couldn't be dismissed: ${result.error.message}` },
-    );
-    reload();
   };
 
   const now = new Date();
@@ -135,6 +130,7 @@ export function HistoryScreen() {
               detailError={detail && "error" in detail ? detail.error : null}
               time={operationTime(summary.created_at, now)}
               refusal={refused?.operation === summary.id ? refused.refusal : null}
+              busy={busyRows.includes(summary.id)}
               onUndo={(press) => {
                 // A refusal the detail already holds shows at once, without a preview.
                 if (press.kind === "refused") {
@@ -145,14 +141,21 @@ export function HistoryScreen() {
                 dialog.open({ kind: "undo", operation: summary.id });
               }}
               onDeleteBackup={() => dialog.open({ kind: "delete_backup", operation: summary.id })}
-              onDismiss={() => void dismiss(summary.id)}
+              onDismiss={() =>
+                void dismissOperation(summary.id, {
+                  dismiss: (operation) => call(() => commands.dismissOperation(operation)),
+                  reload,
+                  busy,
+                  notify: setNotice,
+                })
+              }
               notify={setNotice}
             />
           )}
         </section>
       </div>
 
-      {notice && <Notice notice={notice} />}
+      <Status notice={notice} actions={actions} />
 
       {dialog.view}
     </div>
@@ -192,6 +195,8 @@ type PaneProps = {
   detailError: ApiError | null;
   time: string;
   refusal: UndoRefusal | null;
+  /** An action on it runs, until the screen shows what it did, so its actions are disabled. */
+  busy: boolean;
   onUndo: (press: UndoPress) => void;
   onDeleteBackup: () => void;
   onDismiss: () => void;
@@ -199,7 +204,7 @@ type PaneProps = {
 };
 
 /** What one Operation changed: its States, files with masked diffs and backup, then what can be done to it. */
-function OperationPane({ summary, detail, detailError, time, refusal, onUndo, onDeleteBackup, onDismiss, notify }: PaneProps) {
+export function OperationPane({ summary, detail, detailError, time, refusal, busy, onUndo, onDeleteBackup, onDismiss, notify }: PaneProps) {
   const row = operationRow(summary);
   const actions = operationActions(summary);
   const press = undoPress(summary, detailError ? "unread" : detail);
@@ -250,25 +255,25 @@ function OperationPane({ summary, detail, detailError, time, refusal, onUndo, on
 
       <footer className="dialog-foot">
         {actions.dismiss && (
-          <button type="button" className="cta secondary" onClick={onDismiss}>
+          <button type="button" className="cta secondary" disabled={busy} onClick={onDismiss}>
             Dismiss
           </button>
         )}
         {actions.deleteBackup && (
-          <button type="button" className="cta secondary" onClick={onDeleteBackup}>
+          <button type="button" className="cta secondary" disabled={busy} onClick={onDeleteBackup}>
             <Icon name="trash" small />
             Delete backup
           </button>
         )}
         <span className="grow" />
-        <UndoButton undo={actions.undo} reading={press.kind === "reading"} onUndo={() => onUndo(press)} />
+        <UndoButton undo={actions.undo} disabled={busy || press.kind === "reading"} onUndo={() => onUndo(press)} />
       </footer>
     </>
   );
 }
 
-/** Undo, or in its place why the Operation cannot be undone. While `reading`, it waits for the detail. */
-function UndoButton({ undo, reading, onUndo }: { undo: UndoAction; reading: boolean; onUndo: () => void }) {
+/** Undo, or in its place why the Operation cannot be undone. It is `disabled` while it waits for the detail, or while an action on the Operation runs. */
+function UndoButton({ undo, disabled, onUndo }: { undo: UndoAction; disabled: boolean; onUndo: () => void }) {
   if (!undo.offered) {
     return (
       <Tooltip text={undo.why}>
@@ -280,7 +285,7 @@ function UndoButton({ undo, reading, onUndo }: { undo: UndoAction; reading: bool
     );
   }
   return (
-    <button type="button" className="cta" disabled={reading} onClick={onUndo}>
+    <button type="button" className="cta" disabled={disabled} onClick={onUndo}>
       <Icon name="history" small />
       Undo
     </button>

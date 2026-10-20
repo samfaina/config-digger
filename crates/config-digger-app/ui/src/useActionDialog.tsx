@@ -10,8 +10,8 @@ import { Tooltip } from "./Tooltip";
 const SNACKBAR_MS = 10_000;
 
 type Options = {
-  /** Runs whenever the dialog closes, whatever it did, so that the screen reads again. */
-  onClosed: () => void;
+  /** Runs whenever the dialog on `request` closes, whatever it did, so that the screen reads again. */
+  onClosed: (request: ActionRequest) => void;
   onOpenHistory: () => void;
   notify: Notify;
   /** Shows a refused Undo on the screen instead of in the dialog, which then closes. */
@@ -30,9 +30,9 @@ export function useActionDialog({ onClosed, onOpenHistory, notify, onRefused }: 
     setSnackbar(null);
     setDialog((current) => ({ request, key: (current?.key ?? 0) + 1 }));
   };
-  const close = () => {
+  const close = (request: ActionRequest) => {
     setDialog(null);
-    onClosed();
+    onClosed(request);
   };
 
   const view = (
@@ -56,21 +56,21 @@ export function useActionDialog({ onClosed, onOpenHistory, notify, onRefused }: 
           key={dialog.key}
           request={dialog.request}
           onClose={(applied) => {
-            close();
+            close(dialog.request);
             setSnackbar(applied);
           }}
           onUndo={(operation) => {
-            onClosed();
+            onClosed(dialog.request);
             open({ kind: "undo", operation });
           }}
           onOpenHistory={() => {
-            close();
+            close(dialog.request);
             onOpenHistory();
           }}
           onRefused={
             onRefused &&
             ((operation, refusal) => {
-              close();
+              close(dialog.request);
               onRefused(operation, refusal);
             })
           }
