@@ -10,12 +10,11 @@ import {
   type HomeToAdd,
 } from "./adding";
 import { commands, type Agent, type ListChange, type Pick, type Places, type Project } from "./bindings";
+import { applyChange } from "./changing";
 import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import { Status, type Notice } from "./Notice";
 import {
-  changedSentence,
-  changeRunning,
   homeGroups,
   projectSections,
   rereading,
@@ -31,7 +30,7 @@ import { useActionDialog } from "./useActionDialog";
 import { reads } from "./reads";
 import { Select } from "./Select";
 import { usePlaces } from "./usePlaces";
-import { useRunning } from "./useRunning";
+import { useBusy } from "./useBusy";
 import { useTransient } from "./useTransient";
 
 export type Tab = "projects" | "homes";
@@ -53,26 +52,19 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
-  const { running, during } = useRunning();
-  const busy = running.flatMap((each) => (each.row === null ? [] : [each.row]));
+  const { actions, busy } = useBusy();
+  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
   // The missing Project whose leftovers the dialog removes, whose row stays busy while the screen reads again.
   const removing = useRef("");
   // Remove leftovers is an Operation, previewed like any other.
   const dialog = useActionDialog({
-    onClosed: () => void during(rereading(removing.current), reload),
+    onClosed: () => void busy.during(rereading(removing.current), reload),
     onOpenHistory,
     notify: setNotice,
   });
 
   /** Applies a change to config-digger's lists and says what it did; returns why it was refused, if it was. */
-  const apply = async (request: ListChange): Promise<string | null> => {
-    // The busy indicator shows where the last notice was.
-    setNotice(null);
-    const result = await during(changeRunning(request, places), () => change(request));
-    if (result.status === "error") return result.error.message;
-    setNotice({ kind: "success", text: changedSentence(request, result.data.listed) });
-    return null;
-  };
+  const apply = (request: ListChange) => applyChange(request, { change, busy, notify: setNotice, places });
   /** Applies a change from a row, whose refusal shows as a notice. */
   const act = (request: ListChange) =>
     void apply(request).then((refused) => {
@@ -129,7 +121,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
             ) : tab === "projects" ? (
               <ProjectsTab
                 places={places}
-                busy={busy}
+                busy={busyRows}
                 onShow={onShow}
                 onChange={act}
                 onRemoveLeftovers={(path) => {
@@ -138,7 +130,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
                 }}
               />
             ) : (
-              <HomesTab places={places} busy={busy} onShow={onShow} onChange={act} />
+              <HomesTab places={places} busy={busyRows} onShow={onShow} onChange={act} />
             )}
           </div>
         </section>
@@ -150,7 +142,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
 
-      <Status notice={notice} running={running} />
+      <Status notice={notice} actions={actions} />
 
       {dialog.view}
     </div>
@@ -201,7 +193,10 @@ export function ProjectsTab({ places, busy, onShow, onChange, onRemoveLeftovers 
                 key={row.path}
                 row={row}
                 busy={busy.includes(rowOf(row))}
-                onShow={onShow} onHide={hide} onRemoveLeftovers={onRemoveLeftovers} />
+                onShow={onShow}
+                onHide={hide}
+                onRemoveLeftovers={onRemoveLeftovers}
+              />
             ))}
         </>
       )}

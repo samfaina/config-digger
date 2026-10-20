@@ -1,5 +1,5 @@
 import { Icon, type IconName } from "./icons";
-import type { Running } from "./running";
+import type { BusyAction } from "./busy";
 
 /** What a notice tells the user: information, a success or an error. */
 export type NoticeKind = "information" | "success" | "error";
@@ -20,18 +20,21 @@ export function Notice({ notice }: { notice: Notice }) {
 }
 
 /** The one look of every busy indicator: a notice with a spinner and what runs. */
-export function Busy({ running }: { running: Running }) {
+export function Busy({ action }: { action: BusyAction }) {
   return (
     <div className="notice busy" role="status">
       <span className="spinner" aria-hidden="true" />
-      <span>{running.text}</span>
+      <span>{action.text}</span>
     </div>
   );
 }
 
-/** The bottom of a screen: its notice, which replaces the busy indicator, or else the action last started. */
-export function Status({ notice, running }: { notice: Notice | null; running: Running[] }) {
-  if (notice) return <Notice notice={notice} />;
-  const last = running.at(-1);
-  return last ? <Busy running={last} /> : null;
+/**
+ * The bottom of a screen: an error notice, which replaces the busy indicator;
+ * else the action last started, until every action has ended; else the notice.
+ */
+export function Status({ notice, actions }: { notice: Notice | null; actions: BusyAction[] }) {
+  const last = actions.at(-1);
+  if (last && notice?.kind !== "error") return <Busy action={last} />;
+  return notice ? <Notice notice={notice} /> : null;
 }

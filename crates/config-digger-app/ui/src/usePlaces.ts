@@ -20,7 +20,8 @@ export type PlacesRead = {
 export function usePlaces(): PlacesRead {
   const [places, setPlaces] = useState<Places | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  // A reload during a read waits for that one rather than starting a second.
+  // A reload during a read reads again once that one is done, as the disk may
+  // have changed since it started, rather than running beside it.
   const inFlight = useRef<Promise<void> | null>(null);
   // Counts the changes, so that a read started before one is dropped.
   const changes = useRef(0);
@@ -38,10 +39,11 @@ export function usePlaces(): PlacesRead {
   }, []);
 
   const reload = useCallback(() => {
-    inFlight.current ??= read().finally(() => {
-      inFlight.current = null;
+    const reading: Promise<void> = (inFlight.current ?? Promise.resolve()).then(read, read).finally(() => {
+      if (inFlight.current === reading) inFlight.current = null;
     });
-    return inFlight.current;
+    inFlight.current = reading;
+    return reading;
   }, [read]);
 
   const change = useCallback(async (change: ListChange) => {
@@ -55,7 +57,8 @@ export function usePlaces(): PlacesRead {
   }, []);
 
   useEffect(() => {
-    void reload();
+    // On start, a read already running is enough.
+    if (!inFlight.current) void reload();
     const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

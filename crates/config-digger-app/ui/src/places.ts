@@ -13,7 +13,7 @@ import type {
   Project,
   State,
 } from "./bindings";
-import type { Running } from "./running";
+import type { BusyAction } from "./busy";
 import type { HomeChoice, ItemRef } from "./view";
 
 /** Hide, or Remove from list for what the user added and nothing discovers. */
@@ -291,7 +291,7 @@ export function rowOf(named: { agent: string; home: string } | { path: string })
 }
 
 /** What the busy indicator says while `change` runs, and the row it runs on; an Add runs on none. */
-export function changeRunning(change: ListChange, places: Places | null): Running {
+export function changeBusy(change: ListChange, places: Places | null): BusyAction {
   const agentName = (id: string) => places?.agents.find((agent) => agent.id === id)?.name ?? id;
   const named = (home: { agent: string; home: string }) => `${home.home} of ${agentName(home.agent)}`;
   switch (change.kind) {
@@ -315,6 +315,6 @@ export function changeRunning(change: ListChange, places: Places | null): Runnin
 }
 
 /** What the busy indicator says while the screen reads again after Remove leftovers on the missing Project at `path`. */
-export function rereading(path: string): Running {
+export function rereading(path: string): BusyAction {
   return { text: "Reading the Projects and Agent homes again…", row: path };
 }

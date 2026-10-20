@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Agent, Entry, Home, Item, Leftovers, Places, Project } from "./bindings";
-import { changedSentence, changeRunning, homeGroups, inventoryStart, projectSections, rereading, rowOf } from "./places";
+import { changedSentence, changeBusy, homeGroups, inventoryStart, projectSections, rereading, rowOf } from "./places";
 
 const CLAUDE_JSON = String.raw`C:\Users\me\.claude.json`;
 
@@ -323,41 +323,43 @@ describe("the notice after a list change", () => {
   });
 });
 
+const PORTABLE = String.raw`D:\portable`;
+
 describe("the busy indicator of a list change", () => {
   test("names what runs, and the row it runs on, from the moment it starts", () => {
     const path = String.raw`E:\cd-throwaway\project-hide`;
-    const listed = places({ agents: [agent({ homes: [home(), home({ home: "D:\portable", folder: "D:\portable", source: { kind: "added" } })] })] });
+    const listed = places({ agents: [agent({ homes: [home(), home({ home: PORTABLE, folder: PORTABLE, source: { kind: "added" } })] })] });
     const homeRow = (home: string) => rowOf({ agent: "claude-code", home });
 
-    expect(changeRunning({ kind: "hide_project", path }, listed)).toEqual({ text: `Hiding ${path}…`, row: path });
-    expect(changeRunning({ kind: "unhide_project", path }, listed)).toEqual({ text: `Unhiding ${path}…`, row: path });
-    expect(changeRunning({ kind: "forget_project", path }, listed)).toEqual({ text: `Removing ${path} from config-digger's list…`, row: path });
-    expect(changeRunning({ kind: "hide_home", agent: "claude-code", home: "default" }, listed)).toEqual({
+    expect(changeBusy({ kind: "hide_project", path }, listed)).toEqual({ text: `Hiding ${path}…`, row: path });
+    expect(changeBusy({ kind: "unhide_project", path }, listed)).toEqual({ text: `Unhiding ${path}…`, row: path });
+    expect(changeBusy({ kind: "forget_project", path }, listed)).toEqual({ text: `Removing ${path} from config-digger's list…`, row: path });
+    expect(changeBusy({ kind: "hide_home", agent: "claude-code", home: "default" }, listed)).toEqual({
       text: "Hiding default of Claude Code…",
       row: homeRow("default"),
     });
-    expect(changeRunning({ kind: "unhide_home", agent: "claude-code", home: "default" }, listed)).toEqual({
+    expect(changeBusy({ kind: "unhide_home", agent: "claude-code", home: "default" }, listed)).toEqual({
       text: "Unhiding default of Claude Code…",
       row: homeRow("default"),
     });
-    expect(changeRunning({ kind: "forget_home", agent: "claude-code", home: "D:\portable" }, listed)).toEqual({
-      text: "Removing D:\portable of Claude Code from config-digger's list…",
-      row: homeRow("D:\portable"),
+    expect(changeBusy({ kind: "forget_home", agent: "claude-code", home: PORTABLE }, listed)).toEqual({
+      text: `Removing ${PORTABLE} of Claude Code from config-digger's list…`,
+      row: homeRow(PORTABLE),
     });
   });
 
   test("of an Add names what is added, on no row", () => {
     const path = String.raw`E:\cd-throwaway\project-new`;
 
-    expect(changeRunning({ kind: "add_project", path }, places())).toEqual({ text: `Adding ${path}…`, row: null });
-    expect(changeRunning({ kind: "add_home", folder: "D:\portable", agent: "claude-code" }, places())).toEqual({
-      text: "Adding D:\portable as an Agent home of Claude Code…",
+    expect(changeBusy({ kind: "add_project", path }, places())).toEqual({ text: `Adding ${path}…`, row: null });
+    expect(changeBusy({ kind: "add_home", folder: PORTABLE, agent: "claude-code" }, places())).toEqual({
+      text: `Adding ${PORTABLE} as an Agent home of Claude Code…`,
       row: null,
     });
   });
 
   test("names an Agent the screen has not read by its id", () => {
-    expect(changeRunning({ kind: "hide_home", agent: "codex", home: "default" }, null).text).toBe("Hiding default of codex…");
+    expect(changeBusy({ kind: "hide_home", agent: "codex", home: "default" }, null).text).toBe("Hiding default of codex…");
   });
 
   test("tells a home of one Agent from the same home of another", () => {
