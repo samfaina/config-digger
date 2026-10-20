@@ -975,6 +975,39 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#159"]
+        },
+        {
+          "id": "14.2",
+          "title": "Un escaneo completo tarda unos pocos segundos",
+          "goal": "Con todos tus Agent homes y Projects reales, cada escaneo completo, el del arranque, los de la preview de un Disable y el de después de Done, lee en menos de 5 s.",
+          "instructions": [
+            "Cierra config-digger.",
+            "Abre config-digger.",
+            "Espera a que el Inventario termine de leer.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "Cierra config-digger.",
+            "Ejecuta la orden.",
+            "Apunta lo que imprime."
+          ],
+          "commands": [
+            {
+              "label": "Ver cuánto tardó cada escaneo desde el último arranque",
+              "shell": "powershell",
+              "text": "$log = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\logs\\config-digger-app.*.log\" | Sort-Object LastWriteTime | Select-Object -Last 1; $lines = @(Get-Content $log.FullName); $start = ($lines | Select-String 'app started' | Select-Object -Last 1).LineNumber; $lines[($start - 1)..($lines.Count - 1)] | Select-String 'scan finished'"
+            }
+          ],
+          "expect": "La orden imprime al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»: la del arranque y las dos de la preview del Disable. En cada una, elapsed_ms es menor que 5000.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#178"]
         }
       ]
     },

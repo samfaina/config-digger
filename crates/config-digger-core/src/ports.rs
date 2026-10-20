@@ -1,6 +1,7 @@
 //! The core's I/O ports. The core ships the real implementations in [`real`];
 //! tests swap in the fakes from [`fake`].
 
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -50,13 +51,13 @@ pub trait FileSystem: Send + Sync {
     /// Whether a file or folder exists at `path`.
     fn exists(&self, path: &Path) -> bool;
 
-    /// Whether only an administrator can change the existing file at
-    /// `path`, as Gemini CLI checks its system settings before it reads
-    /// them: the file and each folder above it, but a drive's root, belong
-    /// to Administrators, SYSTEM, a service or the creator owner, and let
-    /// no one else write, delete or change permissions. A file whose
-    /// permissions cannot be read is not.
-    fn admin_owned(&self, path: &Path) -> bool;
+    /// The existing files among `paths` that only an administrator can
+    /// change, all checked in one go, as Gemini CLI checks its system
+    /// settings before it reads them: the file and each folder above it,
+    /// but a drive's root, belong to Administrators, SYSTEM, a service or
+    /// the creator owner, and let no one else write, delete or change
+    /// permissions. A file whose permissions cannot be read is not.
+    fn admin_owned(&self, paths: &[&Path]) -> BTreeSet<PathBuf>;
 
     /// The real path of an existing file or folder, with every link and
     /// junction resolved and each name spelled as on disk; `None` when nothing
@@ -123,9 +124,18 @@ pub trait Processes: Send + Sync {
     fn running(&self) -> Vec<RunningProcess>;
 }
 
-/// Whether a file or folder is git-versioned: it is in the index of its containing repo.
+/// Whether files and folders are git-versioned: in the index of their
+/// containing repo.
 pub trait GitIndex: Send + Sync {
-    fn is_versioned(&self, path: &Path) -> bool;
+    /// The root of the repository that holds what is in `folder`: the folder
+    /// at or above it that holds `.git`, found without asking git; `None`
+    /// outside any repository.
+    fn repository(&self, folder: &Path) -> Option<PathBuf>;
+
+    /// Which of `paths`, each below `repository`, are in its index: a file
+    /// in it, or a folder with a file below it in it. One question to git
+    /// for all of them; any failure to ask counts as none versioned.
+    fn versioned_in(&self, repository: &Path, paths: &[&Path]) -> BTreeSet<PathBuf>;
 }
 
 /// A Windows registry hive.

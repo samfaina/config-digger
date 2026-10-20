@@ -1378,14 +1378,28 @@ fn find_not_admin_owned(
     fs: &dyn FileSystem,
 ) -> NotAdminOwned {
     let agents: BTreeSet<usize> = found.iter().map(|home| home.agent_index).collect();
-    let files = agents.into_iter().flat_map(|agent_index| {
-        definitions[agent_index]
-            .admin_owned_files(ports.env.as_ref())
+    let files: Vec<(usize, PathBuf)> = agents
+        .into_iter()
+        .flat_map(|agent_index| {
+            definitions[agent_index]
+                .admin_owned_files(ports.env.as_ref())
+                .into_iter()
+                .filter(|path| fs.exists(path))
+                .map(move |path| (agent_index, path))
+        })
+        .collect();
+    if files.is_empty() {
+        return NotAdminOwned::default();
+    }
+    // One check for every file: the real one starts a process.
+    let paths: BTreeSet<&Path> = files.iter().map(|(_, path)| path.as_path()).collect();
+    let owned = fs.admin_owned(&paths.into_iter().collect::<Vec<_>>());
+    NotAdminOwned(
+        files
             .into_iter()
-            .filter(|path| fs.exists(path) && !fs.admin_owned(path))
-            .map(move |path| (agent_index, path))
-    });
-    NotAdminOwned(files.collect())
+            .filter(|(_, path)| !owned.contains(path))
+            .collect(),
+    )
 }
 
 /// The files each Agent, by its index, skips without reading them, since
@@ -2080,8 +2094,8 @@ fn switch_files(
 }
 
 /// The files among `paths` that are in the index of their git repo, asking
-/// once per file and counting each ask in `asked`. Ignored and untracked
-/// files are not.
+/// once per repo and counting each path asked about in `asked`. Ignored and
+/// untracked files are not, nor is a path outside any repo.
 fn versioned<'a>(
     ports: &Ports,
     paths: impl Iterator<Item = &'a Path>,
@@ -2089,11 +2103,29 @@ fn versioned<'a>(
 ) -> BTreeSet<PathBuf> {
     let paths: BTreeSet<&Path> = paths.collect();
     *asked += paths.len();
-    paths
-        .into_iter()
-        .filter(|path| ports.git.is_versioned(path))
-        .map(Path::to_path_buf)
+    // The repo of a path is the one its folder is in, as `git -C` finds it.
+    let mut repositories: BTreeMap<PathBuf, Vec<&Path>> = BTreeMap::new();
+    for path in paths {
+        if let Some(repository) = path
+            .parent()
+            .and_then(|folder| ports.git.repository(folder))
+        {
+            repositories.entry(repository).or_default().push(path);
+        }
+    }
+    repositories
+        .iter()
+        .flat_map(|(repository, paths)| ports.git.versioned_in(repository, paths))
         .collect()
+}
+
+/// The files and folders among `paths` that are in the index of their git
+/// repo, as a scan finds them, asking once per repo.
+pub(crate) fn versioned_paths<'a>(
+    ports: &Ports,
+    paths: impl Iterator<Item = &'a Path>,
+) -> BTreeSet<PathBuf> {
+    versioned(ports, paths, &mut 0)
 }
 
 fn find_homes(
