@@ -1,6 +1,9 @@
 //! Installations: the launchable copies of each Agent, found from their
 //! definitions at every scan, each with the version read from its files.
-//! A version is never read by running the Agent, and never cached.
+//! A version is never read by running the Agent, and never kept from one
+//! scan to the next, except that the scans a plan predicts with reuse the
+//! Installations of the snapshot it was made from: an Operation never
+//! writes an Installation's files.
 
 pub(crate) mod pe;
 

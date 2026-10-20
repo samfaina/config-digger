@@ -1,8 +1,8 @@
 //! Installations and tested version ranges through the core `api`, with fake
 //! version files: each Installation that reads an Agent home and its
-//! version, read from files at every scan, and the Agent notes when a
-//! version is outside the definition's tested range, cannot be read, or
-//! there is nothing to compare.
+//! version, read from files at every scan and once per plan, and the Agent
+//! notes when a version is outside the definition's tested range, cannot be
+//! read, or there is nothing to compare.
 
 use config_digger_core::api::{
     Action, Agent, AgentNoteCode, Context, Core, Home, InfoCode, Plan, ScanOptions, Targets,
@@ -307,6 +307,81 @@ fn an_undo_of_an_operation_on_the_agent_gets_the_line_too() {
 
     let codes: Vec<InfoCode> = undo.preview().info.iter().map(|info| info.code).collect();
     assert_eq!(codes, [InfoCode::VersionOutsideTestedRange]);
+}
+
+/// How many times `fs` reads the native executable while `run` runs.
+fn executable_reads(fs: &FakeFileSystem, run: impl FnOnce()) -> usize {
+    let before = fs.reads_of(native_claude());
+    run();
+    fs.reads_of(native_claude()) - before
+}
+
+#[test]
+fn an_undo_reads_the_versions_once_though_it_scans_twice() {
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 286, 0])));
+    let core = core(&fs);
+    let one_scan = executable_reads(&fs, || {
+        core.scan(&ScanOptions::default()).unwrap();
+    });
+    let outcome = core.execute(remove_notes(&core), &[]).unwrap();
+
+    let undo = executable_reads(&fs, || {
+        core.plan_undo(&outcome.operation).unwrap();
+    });
+
+    assert!(one_scan > 0);
+    assert_eq!(undo, one_scan);
+}
+
+#[test]
+fn a_plan_predicting_with_another_scan_reads_no_version_again() {
+    let project = PathBuf::from(r"E:\projects\app");
+    let fs = FakeFileSystem::new()
+        .with_file(
+            PathBuf::from(HOME).join(".claude.json"),
+            r#"{
+  "mcpServers": { "notes": { "command": "notes-mcp" } },
+  "projects": { "E:/projects/app": {} }
+}
+"#,
+        )
+        .with_folder(&project)
+        .with_file(native_claude(), fake::executable(Some([2, 1, 286, 0])));
+    let core = core(&fs);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![project.clone()],
+        })
+        .unwrap();
+    let context = Context {
+        project: Some(project),
+    };
+    let targets = Targets {
+        selectors: vec!["notes".to_owned()],
+        all: false,
+    };
+
+    let reads = executable_reads(&fs, || {
+        core.plan(&snapshot, &context, Action::Disable, &targets)
+            .unwrap();
+    });
+
+    assert_eq!(reads, 0);
+}
+
+#[test]
+fn each_of_two_scans_reads_the_versions() {
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 286, 0])));
+    let core = core(&fs);
+    let scan = || {
+        core.scan(&ScanOptions::default()).unwrap();
+    };
+    let first = executable_reads(&fs, scan);
+
+    let second = executable_reads(&fs, scan);
+
+    assert!(first > 0);
+    assert_eq!(second, first);
 }
 
 /// Claude Code's session file naming the native CLI's PID, and the CLI

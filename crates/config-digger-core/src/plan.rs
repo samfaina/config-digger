@@ -393,6 +393,7 @@ impl Targeted<'_> {
                 self.definitions,
                 self.ports,
                 &self.scan_options.projects,
+                &self.snapshot.installations,
                 &written,
                 &planned_folders,
             )
@@ -668,6 +669,7 @@ impl Targeted<'_> {
             self.definitions,
             self.ports,
             &self.scan_options.projects,
+            &self.snapshot.installations,
             &written,
             &planned_folders,
         )
@@ -1216,11 +1218,8 @@ pub(crate) fn plan_undo(
     let context = Context {
         project: manifest.project.clone(),
     };
-    let scan = |written: &[Written], folders: &[PlannedFolder]| {
-        scan::scan_as_if(definitions, ports, &scan_options.projects, written, folders)
-            .map_err(Error::unexpected)
-    };
-    let snapshot = scan(&[], &[])?;
+    let snapshot =
+        scan::scan(definitions, ports, &scan_options.projects).map_err(Error::unexpected)?;
     let mut files = undo_files(ports, manifest)
         .map_err(|blocked| blocked.into_error(definitions, &snapshot))?;
     let mut folders = undo_folders(ports, manifest)?;
@@ -1235,7 +1234,15 @@ pub(crate) fn plan_undo(
 
     let before = resolve::resolve(definitions, &snapshot, &context);
     let written: Vec<Written> = files.iter().map(PlannedFile::written).collect();
-    let after_snapshot = scan(&written, &folders)?;
+    let after_snapshot = scan::scan_as_if(
+        definitions,
+        ports,
+        &scan_options.projects,
+        &snapshot.installations,
+        &written,
+        &folders,
+    )
+    .map_err(Error::unexpected)?;
     let after = resolve::resolve(definitions, &after_snapshot, &context);
     let title = explain::undo_title(id, &manifest.title);
     let (mut changes, effective) = predict(&before, &after);
