@@ -256,20 +256,26 @@ const actionButtons = (busy: boolean) => {
     />,
   );
   const row = markup.slice(markup.indexOf('<div class="entry-actions">'));
-  return { card: markup.match(/^<article[^>]*>/)?.[0] ?? "", buttons: row.match(/<button[^>]*class="cta[^>]*>/g) ?? [] };
+  return {
+    card: markup.match(/^<article[^>]*>/)?.[0] ?? "",
+    head: markup.match(/<header class="entry-head">[\s\S]*?<\/header>/)?.[0] ?? "",
+    buttons: row.match(/<button[^>]*class="cta[^>]*>/g) ?? [],
+  };
 };
 
 describe("an Entry card", () => {
-  test("disables Disable and Remove while an action on its Entry runs, and says it is busy", () => {
-    const { card, buttons } = actionButtons(true);
+  test("disables Disable and Remove while its Entry is read again, and shows it is being read beside its State", () => {
+    const { card, head, buttons } = actionButtons(true);
     expect(card).toMatch(/aria-busy="true"/);
+    expect(head).toContain('<span class="entry-reading"><span class="spinner" aria-hidden="true"></span>Reading…</span>');
     expect(buttons).toHaveLength(2);
     for (const button of buttons) expect(button).toMatch(/disabled=""/);
   });
 
   test("offers Disable and Remove while nothing runs on its Entry", () => {
-    const { card, buttons } = actionButtons(false);
+    const { card, head, buttons } = actionButtons(false);
     expect(card).toMatch(/aria-busy="false"/);
+    expect(head).not.toContain("Reading…");
     expect(buttons).toHaveLength(2);
     for (const button of buttons) expect(button).not.toMatch(/disabled/);
   });

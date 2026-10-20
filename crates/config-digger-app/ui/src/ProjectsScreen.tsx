@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { rereadAfter } from "./acting";
 import {
   ADD_LABELS,
   addHomeOffer,
@@ -18,7 +19,6 @@ import { Status, type Notice } from "./Notice";
 import {
   homeGroups,
   projectSections,
-  rereading,
   rowOf,
   type HiddenRow,
   type HomeGroup,
@@ -54,13 +54,12 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
-  const { actions, busy } = useBusy();
-  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
-  // The missing Project whose leftovers the dialog removes, whose row stays busy while the screen reads again.
-  const removing = useRef("");
-  // Remove leftovers is an Operation, previewed like any other.
+  const { actions, rows: busyRows, busy } = useBusy();
+  // Remove leftovers is an Operation, previewed like any other. The missing
+  // Project's row stays busy while the screen reads again.
   const dialog = useActionDialog({
-    onClosed: () => void busy.during(rereading(removing.current), reload),
+    onClosed: (request) =>
+      void rereadAfter(request, { text: "Reading the Projects and Agent homes again…", reload, busy, notify: setNotice }),
     onOpenHistory,
     notify: setNotice,
   });
@@ -127,10 +126,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
                 busy={busyRows}
                 onShow={onShow}
                 onChange={act}
-                onRemoveLeftovers={(path) => {
-                  removing.current = path;
-                  dialog.open({ kind: "leftovers", project: path });
-                }}
+                onRemoveLeftovers={(path) => dialog.open({ kind: "leftovers", project: path })}
               />
             ) : (
               <HomesTab places={places} busy={busyRows} onShow={onShow} onChange={act} />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { rereadAfter } from "./acting";
 import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
 import { NOTICE_MS, type Notify } from "./desktop";
 import type { DropdownOption } from "./dropdown";
@@ -15,7 +16,6 @@ import { readCue } from "./reads";
 import { Select } from "./Select";
 import { StatePill } from "./StatePill";
 import { STATE_LABELS } from "./states";
-import { rereadAfter } from "./acting";
 import { useActionDialog } from "./useActionDialog";
 import { useBusy } from "./useBusy";
 import { useHistory } from "./useHistory";
@@ -79,13 +79,14 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
   const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
   const { actions, busy } = useBusy();
-  const busyRows = actions.flatMap((each) => (each.row === null ? [] : [each.row]));
-  // Whatever the dialog did, the inventory and History are read again. Until
-  // the inventory is, the Entry it acted on stays busy, so that its buttons
-  // can't start the action again before it shows its new State.
+  // While an action runs or the inventory is read, the States shown may be
+  // old: an action reaches every Agent that shares its mechanism, and an Undo
+  // names no Entry. So no Entry's action can be started until the read is done.
+  const entriesBusy = actions.length > 0 || reading;
+  // Whatever the dialog did, the inventory and History are read again.
   const dialog = useActionDialog({
     onClosed: (request) => {
-      void rereadAfter(request, { text: "Reading the inventory again…", reload: refresh, busy });
+      void rereadAfter(request, { text: "Reading the inventory again…", reload: refresh, busy, notify: setNotice });
       void reloadHistory();
     },
     onOpenHistory,
@@ -273,7 +274,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 inventory={inventory}
                 item={selected}
                 flash={flash}
-                busy={busyRows}
+                busy={entriesBusy}
                 onShowWinner={showWinner}
                 onReader={openReader}
                 onAction={onAction}
@@ -669,8 +670,8 @@ type ItemDetailProps = {
   inventory: Inventory;
   item: Item;
   flash: string | null;
-  /** The locators of the Entries an action runs on. */
-  busy: string[];
+  /** Its Entries are read again, as after an action, so their actions are disabled. */
+  busy: boolean;
   onShowWinner: (locator: string) => void;
   onReader: (reader: AlsoReadBy, locator: string) => void;
   onAction: (verb: Verb, entry: Entry) => void;
@@ -707,7 +708,7 @@ function ItemDetail({ inventory, item, flash, busy, onShowWinner, onReader, onAc
               rank={index + 1}
               agentName={agentName}
               flash={flash === entry.locator}
-              busy={busy.includes(entry.locator)}
+              busy={busy}
               inItem={inItem}
               onShowWinner={onShowWinner}
               onReader={(reader) => onReader(reader, entry.locator)}

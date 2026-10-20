@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { commands, type Error as ApiError, type OperationSummary } from "./bindings";
 import { call } from "./desktop";
+import { createReadQueue } from "./reads";
 
 export type HistoryRead = {
   /** Every Operation, newest first, kept while a new read runs or after one fails. */
@@ -17,9 +18,8 @@ export function useHistory(): HistoryRead {
   const [history, setHistory] = useState<OperationSummary[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [reading, setReading] = useState(false);
-  // A reload during a read reads again once that one is done, as an action
-  // may have changed History since it started, rather than running beside it.
-  const inFlight = useRef<Promise<void> | null>(null);
+  // A reload during a read reads again once that one is done, as after an action.
+  const [queue] = useState(createReadQueue);
 
   const read = useCallback(async () => {
     setReading(true);
@@ -32,20 +32,15 @@ export function useHistory(): HistoryRead {
     }
   }, []);
 
-  const reload = useCallback(() => {
-    const reading: Promise<void> = (inFlight.current ?? Promise.resolve()).then(read, read).finally(() => {
-      if (inFlight.current === reading) inFlight.current = null;
-    });
-    inFlight.current = reading;
-    return reading;
-  }, [read]);
+  const reload = useCallback(() => queue.next(read), [queue, read]);
 
   useEffect(() => {
     // On start, a read already running is enough.
-    if (!inFlight.current) void reload();
-    // A focus event during a read does not start a second one.
+    if (!queue.running()) void reload();
+    // A focus event during a read does not start a second one. A read of
+    // History is not one of the app's reads, which other screens wait on.
     const onFocus = () => {
-      if (!inFlight.current) void reload();
+      if (!queue.running()) void reload();
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

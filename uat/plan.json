@@ -1078,7 +1078,31 @@
             "Mira enseguida la parte de abajo de la pantalla y los botones del detalle."
           ],
           "commands": [],
-          "expect": "Al pulsar Disable, el diálogo se titula «Preparing the preview…» y muestra un aviso con una rueda que gira y el texto «Reading the files this action touches…», sobre filas grises que laten, hasta que sale la vista previa. Tras Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…», y los botones Disable y Remove de la tarjeta se ven apagados hasta que la tarjeta dice Disabled y ofrece Enable. En History, tras Done sale abajo el aviso de la rueda con «Reading History again…», con los botones Delete backup y Undo del detalle apagados, hasta que la Operation dice Undone by <id nuevo> y muestra Can't undo. Cada aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la pantalla cambie.",
+          "expect": "Al pulsar Disable, el diálogo se titula «Preparing the preview…» y muestra un aviso con una rueda que gira y el texto «Reading the files this action touches…», sobre filas grises que laten, hasta que sale la vista previa. Tras Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». En la cabecera de la tarjeta, junto a su State, sale una rueda pequeña con «Reading…», y los botones Disable y Remove se ven apagados, hasta que la tarjeta dice Disabled y ofrece Enable. En History, tras Done sale abajo el aviso de la rueda con «Reading History again…», con los botones Delete backup y Undo del detalle apagados, hasta que la Operation dice Undone by <id nuevo> y muestra Can't undo. Cada aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la pantalla cambie.",
+          "covers": ["#223"]
+        },
+        {
+          "id": "11.9",
+          "title": "El aviso de trabajo de Undo desde el Inventario",
+          "goal": "Tras un Undo desde el aviso de abajo del Inventario, los botones de la Entry no responden hasta que la tarjeta enseña su State nuevo.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "En el aviso de abajo que empieza por «Disabled 1 Entry», pulsa Undo.",
+            "Si hay casillas de aviso, márcalas.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
+            "Mira enseguida la parte de abajo de la pantalla y la tarjeta de cd-throwaway-codex."
+          ],
+          "commands": [],
+          "expect": "Tras el último Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». La tarjeta tiene junto a su State una rueda pequeña con «Reading…», y sus botones Enable y Remove se ven apagados, hasta que la tarjeta dice Effective y ofrece Disable. El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la tarjeta cambie.",
           "covers": ["#223"]
         }
       ]

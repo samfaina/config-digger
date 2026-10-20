@@ -13,7 +13,7 @@ type Props = {
   agentName: string;
   /** Briefly marked, as after "show winner" pointed at it. */
   flash: boolean;
-  /** An action on it runs, until the screen shows what it did, so its actions are disabled. */
+  /** It is read again, as after an action, so the State it shows may be old and its actions are disabled. */
   busy: boolean;
   /** Whether the Entry at a locator is one of this Item's, so "show winner" can point at it. */
   inItem: (locator: string) => boolean;
@@ -41,6 +41,12 @@ export function EntryCard({ entry, rank, agentName, flash, busy, inItem, onShowW
       <header className="entry-head">
         <span className="rank">{rank}</span>
         <span className="entry-scope">{entry.scope}</span>
+        {busy && (
+          <span className="entry-reading">
+            <span className="spinner" aria-hidden="true" />
+            Reading…
+          </span>
+        )}
         <StatePill state={entry.state} small />
       </header>
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type ListChange, type ListChanged, type Places } from "./bindings";
 import { call, type CommandResult } from "./desktop";
-import { reads, whenIdle } from "./reads";
+import { createReadQueue, reads, whenIdle } from "./reads";
 
 export type PlacesRead = {
   /** Every Project and Agent home, kept while a new read runs or after one fails. */
@@ -23,9 +23,8 @@ export function usePlaces(): PlacesRead {
   const [places, setPlaces] = useState<Places | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [reading, setReading] = useState(false);
-  // A reload during a read reads again once that one is done, as the disk may
-  // have changed since it started, rather than running beside it.
-  const inFlight = useRef<Promise<void> | null>(null);
+  // A reload during a read reads again once that one is done.
+  const [queue] = useState(createReadQueue);
   // Counts the changes, so that a read started before one is dropped.
   const changes = useRef(0);
 
@@ -42,13 +41,7 @@ export function usePlaces(): PlacesRead {
     }
   }, []);
 
-  const reload = useCallback(() => {
-    const reading: Promise<void> = (inFlight.current ?? Promise.resolve()).then(read, read).finally(() => {
-      if (inFlight.current === reading) inFlight.current = null;
-    });
-    inFlight.current = reading;
-    return reading;
-  }, [read]);
+  const reload = useCallback(() => queue.next(read), [queue, read]);
 
   const change = useCallback(async (change: ListChange) => {
     changes.current += 1;
@@ -62,7 +55,7 @@ export function usePlaces(): PlacesRead {
 
   useEffect(() => {
     // On start, a read already running is enough.
-    if (!inFlight.current) void reload();
+    if (!queue.running()) void reload();
     const onFocus = whenIdle(reads, () => void reload());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

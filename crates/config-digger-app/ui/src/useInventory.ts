@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type Error as ApiError, type Inventory } from "./bindings";
 import { call, type CommandResult } from "./desktop";
-import { reads, whenIdle } from "./reads";
+import { createReadQueue, reads, whenIdle } from "./reads";
 
 export type InventoryRead = {
   /** The last inventory read, kept while a new read runs or after one fails. */
@@ -28,9 +28,8 @@ export function useInventory(initialProject: string | null = null): InventoryRea
   const [error, setError] = useState<ApiError | null>(null);
   // The reads running: a refresh and the Project switches since, which may each wait on a scan.
   const [running, setRunning] = useState(0);
-  // A refresh during a read reads again once that one is done, as an action
-  // may have changed the disk since it started, rather than running beside it.
-  const inFlight = useRef<Promise<void> | null>(null);
+  // A refresh during a read reads again once that one is done, as after an action.
+  const [queue] = useState(createReadQueue);
   const projectRef = useRef<string | null>(initialProject);
 
   /** Runs `read` for `project`, dropping what it returns when another Project was selected meanwhile. */
@@ -55,14 +54,10 @@ export function useInventory(initialProject: string | null = null): InventoryRea
     }
   }, []);
 
-  const refresh = useCallback(() => {
-    const read = () => counted(() => load(projectRef.current, commands.readInventory));
-    const reading: Promise<void> = (inFlight.current ?? Promise.resolve()).then(read, read).finally(() => {
-      if (inFlight.current === reading) inFlight.current = null;
-    });
-    inFlight.current = reading;
-    return reading;
-  }, [load, counted]);
+  const refresh = useCallback(
+    () => queue.next(() => counted(() => load(projectRef.current, commands.readInventory))),
+    [queue, load, counted],
+  );
 
   const selectProject = useCallback(
     (next: string | null) => {
@@ -75,7 +70,7 @@ export function useInventory(initialProject: string | null = null): InventoryRea
 
   useEffect(() => {
     // On start, a read already running is enough.
-    if (!inFlight.current) void refresh();
+    if (!queue.running()) void refresh();
     const onFocus = whenIdle(reads, () => void refresh());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

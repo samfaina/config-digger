@@ -10,6 +10,7 @@ export type Rereading = {
   /** Reads again, done once the screen has what it read. */
   reload: () => Promise<void>;
   busy: BusyActions;
+  notify: (notice: Notice | null) => void;
 };
 
 /** The row an action runs on: the Entry's locator, the missing Project, or the Operation. */
@@ -30,7 +31,9 @@ function rowOfRequest(request: ActionRequest): string {
  * until the screen has what it read, so that the row's buttons stay disabled
  * until it shows what the action did.
  */
-export async function rereadAfter(request: ActionRequest, { text, reload, busy }: Rereading): Promise<void> {
+export async function rereadAfter(request: ActionRequest, { text, reload, busy, notify }: Rereading): Promise<void> {
+  // An error notice left over would hide the busy indicator.
+  notify(null);
   await busy.during({ text, row: rowOfRequest(request) }, reload);
 }
 

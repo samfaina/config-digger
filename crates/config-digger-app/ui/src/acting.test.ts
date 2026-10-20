@@ -6,6 +6,7 @@ import type { Notice } from "./Notice";
 import { dismissOperation, rereadAfter } from "./acting";
 
 const LOCATOR = String.raw`C:\Users\me\.claude.json#mcpServers.cd-throwaway-notes`;
+const OPERATION = "20261002-095812-a3f";
 const DISABLE: ActionRequest = { kind: "entry", verb: "disable", locator: LOCATOR, project: null };
 
 /** A screen whose reads answer when the test tells them to, with what it showed busy. */
@@ -13,6 +14,7 @@ function screen() {
   let answer: () => void = () => {};
   let reads = 0;
   const shown: BusyAction[][] = [];
+  const notices: (Notice | null)[] = [];
   const reading = {
     text: "Reading the inventory again…",
     reload: () => {
@@ -20,18 +22,20 @@ function screen() {
       return new Promise<void>((resolve) => (answer = resolve));
     },
     busy: createBusy((now) => shown.push(now)),
+    notify: (notice: Notice | null) => notices.push(notice),
   };
-  return { reading, reads: () => reads, busy: () => shown.at(-1) ?? [], answer: () => answer() };
+  return { reading, notices, reads: () => reads, busy: () => shown.at(-1) ?? [], answer: () => answer() };
 }
 
 describe("the read after an Inventory action's dialog closes", () => {
-  test("shows as busy on the Entry it acted on as soon as it starts", () => {
-    const { reading, reads, busy } = screen();
+  test("shows as busy on the Entry it acted on, with no notice left over, as soon as it starts", () => {
+    const { reading, notices, reads, busy } = screen();
 
     void rereadAfter(DISABLE, reading);
 
     expect(reads()).toBe(1);
     expect(busy()).toEqual([{ text: "Reading the inventory again…", row: LOCATOR }]);
+    expect(notices).toEqual([null]);
   });
 
   test("stays busy until the screen has what it read", async () => {
@@ -44,6 +48,17 @@ describe("the read after an Inventory action's dialog closes", () => {
     answer();
     await done;
     expect(busy()).toEqual([]);
+  });
+});
+
+describe("the read after Remove leftovers' dialog closes", () => {
+  test("shows as busy on the missing Project's row", () => {
+    const { reading, busy } = screen();
+    const path = String.raw`E:\cd-throwaway\project-gone`;
+
+    void rereadAfter({ kind: "leftovers", project: path }, { ...reading, text: "Reading the Projects and Agent homes again…" });
+
+    expect(busy()).toEqual([{ text: "Reading the Projects and Agent homes again…", row: path }]);
   });
 });
 
@@ -60,7 +75,6 @@ describe("the read after a History action's dialog closes", () => {
   });
 });
 
-const OPERATION = "20261002-095812-a3f";
 
 const dismissed: OperationSummary = {
   id: OPERATION,
