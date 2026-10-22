@@ -31,6 +31,9 @@
   --notice-error-edge: #ffaba5;
   --snackbar: #523f9e;
   --snackbar-edge: #d4c9ff;
+  --danger: #b93a35;
+  --danger-hover: #d0453f;
+  --danger-glow: #f8514933;
   --shadow: #00000066;
 
   --mono: "Cascadia Mono", Consolas, monospace;
@@ -679,13 +682,14 @@ p {
   height: 22px;
 }
 
+/* Every button that deletes, and the button of its dialog that confirms it. */
 .cta.danger {
-  background: #b93a35;
-  box-shadow: 0 4px 14px #f8514933;
+  background: var(--danger);
+  box-shadow: 0 4px 14px var(--danger-glow);
 }
 
 .cta.danger:hover {
-  background: #d0453f;
+  background: var(--danger-hover);
 }
 
 .cta.danger:disabled {

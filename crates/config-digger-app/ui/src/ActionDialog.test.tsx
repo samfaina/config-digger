@@ -158,4 +158,10 @@ describe("the preview of an action with many changes", () => {
     await openPreview();
     for (const region of screen.getAllByRole("region")) expect(region.tabIndex).toBe(0);
   });
+
+  test("confirms a Remove with a button in the style of a button that deletes, beside a Cancel that is not", async () => {
+    await openPreview();
+    expect(screen.getByRole("button", { name: "Remove" }).className).toBe("cta danger");
+    expect(screen.getByRole("button", { name: "Cancel" }).className).toBe("cta secondary");
+  });
 });

@@ -279,4 +279,9 @@ describe("an Entry card", () => {
     expect(buttons).toHaveLength(2);
     for (const button of buttons) expect(button).not.toMatch(/disabled/);
   });
+
+  test("draws Remove in the style of a button that deletes, beside Disable too", () => {
+    const { buttons } = actionButtons(false);
+    expect(buttons.map((button) => button.match(/class="([^"]*)"/)?.[1])).toEqual(["cta", "cta danger"]);
+  });
 });

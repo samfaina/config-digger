@@ -64,4 +64,9 @@ describe("the pane of an Operation", () => {
     expect(buttons).toHaveLength(3);
     for (const button of buttons) expect(button).not.toMatch(/disabled/);
   });
+
+  test("draws Delete backup in the style of a button that deletes, and Dismiss and Undo not", () => {
+    const classes = footerButtons(false).map((button) => button.match(/class="([^"]*)"/)?.[1]);
+    expect(classes).toEqual(["cta secondary", "cta danger", "cta"]);
+  });
 });

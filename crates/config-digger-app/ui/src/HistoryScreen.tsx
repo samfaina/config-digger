@@ -307,7 +307,7 @@ export function OperationPane({ summary, detail, detailError, time, refusal, bus
           </button>
         )}
         {actions.deleteBackup && (
-          <button type="button" className="cta secondary" disabled={busy} onClick={onDeleteBackup}>
+          <button type="button" className="cta danger" disabled={busy} onClick={onDeleteBackup}>
             <Icon name="trash" small />
             Delete backup
           </button>

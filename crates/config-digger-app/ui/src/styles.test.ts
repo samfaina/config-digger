@@ -97,11 +97,14 @@ const colour = (value: string | undefined) => {
   return hex as string;
 };
 
+/** The red, green and blue of a `#rrggbb` colour, each 0 to 255. */
+const channels = (hex: string) => [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+
 /** The WCAG 2 contrast ratio of two `#rrggbb` colours. */
 const contrast = (one: string, other: string) => {
   const luminance = (hex: string) => {
-    const [r, g, b] = [1, 3, 5].map((at) => {
-      const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+    const [r, g, b] = channels(hex).map((value) => {
+      const channel = value / 255;
       return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -549,6 +552,33 @@ describe("a notice and the Undo snackbar coming and going", () => {
       expect(name, selector).toBeDefined();
       expect(keyframes(name as string), selector).toMatch(/opacity/);
       expect(keyframes(name as string), selector).not.toMatch(/translate|transform/);
+    }
+  });
+});
+
+describe("a button that deletes", () => {
+  test("is red, from :root tokens of its own, and redder when hovered", () => {
+    for (const [selector, token] of [
+      [".cta.danger", "--danger"],
+      [".cta.danger:hover", "--danger-hover"],
+    ]) {
+      expect(styled(selector).get("background"), selector).toBe(`var(${token})`);
+      const [r, g, b] = channels(colour(`var(${token})`));
+      expect(r, `${token} is red`).toBeGreaterThan(2 * Math.max(g, b));
+    }
+    expectTokenColours([".cta.danger", ".cta.danger:hover"]);
+  });
+
+  test("has white text that meets WCAG AA on it, hovered or not", () => {
+    const text = colour(styled(".cta").get("color"));
+    for (const selector of [".cta.danger", ".cta.danger:hover"]) {
+      expect(contrast(text, colour(styled(selector).get("background"))), selector).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test("looks like any other button when disabled, as it deletes nothing then", () => {
+    for (const name of ["background", "box-shadow"]) {
+      expect(styled(".cta.danger:disabled").get(name), name).toBe(styled(".cta:disabled").get(name));
     }
   });
 });

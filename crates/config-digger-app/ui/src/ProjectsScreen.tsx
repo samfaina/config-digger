@@ -285,7 +285,7 @@ function PlaceRow({
   );
 }
 
-/** A small button on a row: secondary, or red for Remove leftovers; disabled while an action runs on the row. */
+/** A small button on a row: secondary, or red for one that deletes; disabled while an action runs on the row. */
 function SmallButton({
   label,
   danger = false,
@@ -328,7 +328,7 @@ function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) 
         <>
           <SmallButton label="Open in Inventory" disabled={busy} onClick={() => onShow({ kind: "project", path: row.path })} />
           {row.offer === "remove_from_list" ? (
-            <SmallButton label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />
+            <SmallButton danger label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />
           ) : (
             <SmallButton label="Hide" disabled={busy} onClick={() => onHide(row.path)} />
           )}
@@ -413,7 +413,7 @@ function HiddenLine({
       actions={
         <>
           <SmallButton label="Unhide" disabled={busy} onClick={() => onUnhide(row.path)} />
-          {row.removable && <SmallButton label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />}
+          {row.removable && <SmallButton danger label="Remove from list" disabled={busy} onClick={() => onForget(row.path)} />}
         </>
       }
     >
@@ -498,7 +498,7 @@ function HomeLine({
     hide: <SmallButton key="hide" label="Hide" disabled={busy} onClick={() => onChange({ kind: "hide_home", ...named })} />,
     unhide: <SmallButton key="unhide" label="Unhide" disabled={busy} onClick={() => onChange({ kind: "unhide_home", ...named })} />,
     remove_from_list: (
-      <SmallButton key="forget" label="Remove from list" disabled={busy} onClick={() => onChange({ kind: "forget_home", ...named })} />
+      <SmallButton key="forget" danger label="Remove from list" disabled={busy} onClick={() => onChange({ kind: "forget_home", ...named })} />
     ),
   };
   return (

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import type { Home, Places, Project } from "./bindings";
+import type { Entry, Home, Item, Places, Project } from "./bindings";
 import { rowOf } from "./places";
 import { Loading } from "./Loading";
 import { HomesTab, ProjectsScreen, ProjectsTab, type Tab } from "./ProjectsScreen";
@@ -96,6 +96,12 @@ const buttonsOf = (markup: string, name: string) => {
   return row.match(/<button[^>]*>/g) ?? [];
 };
 
+/** Each button of the row named `name`, as [its label, its class]. */
+const classesOf = (markup: string, name: string) => {
+  const row = markup.split('<div class="place-row').find((each) => each.includes(`>${name}</div>`)) ?? "";
+  return [...row.matchAll(/<button[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/button>/g)].map(([, classes, label]) => [label.replace(/<[^>]*>/g, ""), classes]);
+};
+
 /** Expects each named row's buttons to be disabled, or each to be enabled. */
 const expectDisabled = (markup: string, rows: [name: string, disabled: boolean][]) => {
   for (const [name, disabled] of rows) {
@@ -115,6 +121,45 @@ describe("a row of the Projects tab", () => {
       [HIDE, true],
       [GONE, true],
       [KEEP, false],
+    ]);
+  });
+
+  test("draws Remove leftovers of a missing Project in the style of a button that deletes, and Show leftovers not", () => {
+    const claudeJson = String.raw`C:\Users\me\.claude.json`;
+    const entry = { path: claudeJson, locator: `${claudeJson}#projects.${GONE}.mcpServers.old` } as Entry;
+    const leftover = { agent: "claude-code", home: "default", kind: "mcp", name: "old", state: "unread", entries: [entry], built: null } as Item;
+    const markup = renderToStaticMarkup(
+      <ProjectsTab
+        places={{ ...places, leftovers: [{ project: GONE, items: [leftover] }] }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+      />,
+    );
+
+    expect(classesOf(markup, GONE)).toEqual([
+      ["Show leftovers", "cta small secondary"],
+      ["Remove leftovers", "cta small danger"],
+    ]);
+  });
+
+  test("draws Remove from list of a Project the user added in the style of a button that deletes, and Open in Inventory not", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectsTab
+        places={{ ...places, projects: [project({ path: KEEP, registered_by: [], added: true })] }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+      />,
+    );
+
+    expect(classesOf(markup, KEEP)).toEqual([
+      ["Open in Inventory", "cta small secondary"],
+      ["Remove from list", "cta small danger"],
     ]);
   });
 });
@@ -155,5 +200,13 @@ describe("a row of the Agent homes tab", () => {
       [PORTABLE, true],
       ["default", false],
     ]);
+  });
+
+  test("draws Remove from list of a home the user added in the style of a button that deletes, and Unhide not", () => {
+    const markup = renderToStaticMarkup(<HomesTab places={places} busy={[]} onShow={() => {}} onChange={() => {}} />);
+    for (const [label, classes] of classesOf(markup, PORTABLE)) {
+      expect(classes, label).toBe(label === "Remove from list" ? "cta small danger" : "cta small secondary");
+    }
+    expect(classesOf(markup, PORTABLE).map(([label]) => label)).toContain("Remove from list");
   });
 });
