@@ -119,10 +119,13 @@ Write-TestFile "$Root\claude-desktop-home\claude_desktop_config.json" @"
 "@
 
 # A second Claude Code home with 30 user servers and 30 Projects, so that the
-# Items, the Projects and the Project dropdown scroll in the smallest window.
+# Items, the Projects and the Project dropdown scroll in the smallest window,
+# and a missing Project with 12 leftovers, so that the What changes of their
+# Remove leftovers scrolls in the action dialog.
 $many = 1..30 | ForEach-Object { "{0:D2}" -f $_ }
 $manyServers = ($many | ForEach-Object { "    `"cd-throwaway-many-$_`": { `"command`": `"npx`", `"args`": [`"-y`", `"cd-throwaway-many-$_`"] }" }) -join ",`n"
-$manyProjects = ($many | ForEach-Object { "    `"$slash/many/project-$_`": {}" }) -join ",`n"
+$goneServers = (1..12 | ForEach-Object { "{0:D2}" -f $_ } | ForEach-Object { "        `"cd-throwaway-gone-$_`": { `"command`": `"npx`", `"args`": [`"-y`", `"cd-throwaway-gone-$_`"] }" }) -join ",`n"
+$manyProjects = (($many | ForEach-Object { "    `"$slash/many/project-$_`": {}" }) + "    `"$slash/many/project-gone`": {`n      `"mcpServers`": {`n$goneServers`n      }`n    }") -join ",`n"
 $many | ForEach-Object { New-Item -ItemType Directory -Force "$Root\many\project-$_" | Out-Null }
 Write-TestFile "$Root\claude-code-many-home\.claude.json" @"
 {

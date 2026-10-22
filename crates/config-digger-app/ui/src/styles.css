@@ -1501,7 +1501,8 @@ p {
 .icon-button:focus-visible,
 .link:focus-visible,
 .reader:focus-visible,
-.segmented button:focus-visible {
+.segmented button:focus-visible,
+.dialog-section-body:focus-visible {
   outline: 2px solid var(--primary-hover);
   outline-offset: 2px;
 }
@@ -1566,6 +1567,35 @@ p {
   flex: 1;
   height: 1px;
   background: var(--line);
+}
+
+/* The action dialog keeps its title, Before you apply and its buttons in
+   view: only the blocks that scroll, What changes and Files, give up height. */
+
+.dialog.action {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Shrinking takes height in proportion to each block's own, so each keeps a
+   fifth of the window, or all of its height when shorter. `min-height: 0` is
+   for a WebView2 before Chromium 129, which has no calc-size(). */
+.dialog-section.scrolls {
+  flex: 0 1 auto;
+  min-height: 0;
+  min-height: calc-size(max-content, min(size, 20vh));
+  display: flex;
+  flex-direction: column;
+}
+
+/* The padding, taken back by the margin, leaves room for the focus rings at its edges. */
+.dialog-section-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: -4px;
+  padding: 4px;
+  overflow-y: auto;
+  border-radius: 6px;
 }
 
 /* What changes: each Project, then each file in it, then each change to

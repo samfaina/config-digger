@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   commands,
   type ActionPreview,
@@ -187,7 +187,7 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
   const planned = "planned" in phase ? phase.planned : null;
   return (
     <div className="dialog-backdrop" onClick={(event) => event.target === event.currentTarget && close()}>
-      <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <section className="dialog action" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
         <header className="dialog-head">
           <h1 id="dialog-title" className="dialog-title">
             {planned ? planned.preview.title : "Preparing the preview…"}
@@ -296,7 +296,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
         </div>
       )}
 
-      <DialogSection title="What changes">
+      <DialogSection title="What changes" scrolls>
         <Changes changes={preview.changes} notify={notify} />
         {preview.effective.map((effective) => (
           <p key={`${effective.agent}|${effective.home}|${effective.item}`} className="effective-change">
@@ -346,7 +346,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
         </DialogSection>
       )}
 
-      <DialogSection title={`Files · ${preview.files.length + preview.folders.length}`}>
+      <DialogSection title={`Files · ${preview.files.length + preview.folders.length}`} scrolls>
         {locations(preview).map((location, index) => (
           <LocationBlock key={`${location.path}|${index}`} location={location} />
         ))}
@@ -367,15 +367,26 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
   );
 }
 
-/** A titled section of the dialog, its title ruled to the edge. */
-export function DialogSection({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * A titled section of the dialog, its title ruled to the edge. One that
+ * `scrolls` scrolls what it holds under its title, which stays in view, in a
+ * region the keyboard can reach.
+ */
+export function DialogSection({ title, scrolls = false, children }: { title: string; scrolls?: boolean; children: React.ReactNode }) {
+  const titleId = useId();
   return (
-    <section className="dialog-section">
-      <h2 className="dialog-section-title">
+    <section className={`dialog-section${scrolls ? " scrolls" : ""}`}>
+      <h2 id={titleId} className="dialog-section-title">
         {title}
         <span className="rule" />
       </h2>
-      {children}
+      {scrolls ? (
+        <div className="dialog-section-body" role="region" aria-labelledby={titleId} tabIndex={0}>
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </section>
   );
 }

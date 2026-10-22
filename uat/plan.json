@@ -948,6 +948,34 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#189"]
+        },
+        {
+          "id": "7.4",
+          "title": "El diálogo de una acción con muchos cambios",
+          "goal": "Con muchos cambios, solo What changes y Files se desplazan, cada uno dentro de su bloque, y el título, Before you apply y los botones del diálogo no se mueven.",
+          "instructions": [
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "Elige Claude Code como Agent.",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-many-home.",
+            "Abre la pestaña Projects.",
+            "En la sección Missing, pulsa Remove leftovers en la fila de E:/cd-throwaway/many/project-gone.",
+            "Con el ratón sobre el bloque What changes, desplázate hasta abajo con la rueda.",
+            "Con el ratón sobre el bloque Files, desplázate hasta abajo con la rueda.",
+            "Pulsa Tab hasta que el bloque What changes tenga el anillo de foco.",
+            "Pulsa la flecha abajo varias veces.",
+            "Pulsa Cancel."
+          ],
+          "commands": [],
+          "expect": "El diálogo cabe en la ventana. What changes y Files enseñan cada uno su título y parte de lo que tienen, y al desplazarte dentro de uno, solo se mueve su contenido, bajo su título, hasta llegar abajo: en What changes, al cambio de cd-throwaway-gone-12. El título Remove 12 Entries, la línea gris del backup y los botones Cancel y Remove 12 leftovers se quedan quietos y siempre a la vista, y también el bloque Before you apply cuando sale, entre What changes y Files. Con el foco del teclado, el bloque What changes tiene un anillo violeta y se desplaza con la flecha abajo.",
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#227"]
         }
       ]
     },

@@ -16,8 +16,10 @@ import { createServer } from "vite";
 const UI = fileURLToPath(new URL("..", import.meta.url));
 const OUT = join(UI, "screenshots");
 /** The app's window, as `tauri.conf.json` opens it. */
-const { width, height } = JSON.parse(readFileSync(join(UI, "..", "tauri.conf.json"), "utf8")).app.windows[0];
+const { width, height, minWidth, minHeight } = JSON.parse(readFileSync(join(UI, "..", "tauri.conf.json"), "utf8")).app.windows[0];
 const WINDOW: { width: number; height: number } = { width, height };
+/** The smallest window the app allows. */
+const SMALLEST: { width: number; height: number } = { width: minWidth, height: minHeight };
 
 type Shot = {
   /** The PNG's name, without its extension. */
@@ -65,6 +67,15 @@ const SHOTS: Shot[] = [
       await selectItem(page, "cd-throwaway-user");
       await page.locator(".entry-card").first().getByRole("button", { name: "Remove" }).click();
       await page.getByRole("dialog").getByText("What changes").waitFor();
+    },
+  },
+  {
+    name: "action-dialog-many-changes",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "Projects & homes");
+      await page.locator(".place-row", { hasText: "many/project-gone" }).getByRole("button", { name: "Remove leftovers" }).click();
+      await page.getByRole("region", { name: "What changes" }).waitFor();
     },
   },
   {
