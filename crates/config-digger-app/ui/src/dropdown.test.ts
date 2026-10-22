@@ -4,9 +4,11 @@ import {
   PANEL_EDGE,
   TYPING_PAUSE_MS,
   onFieldClick,
+  onFilterKey,
   onKey,
   onOptionClick,
   onOptionHover,
+  onQuery,
   placePanel,
   type DropdownOption,
   type DropdownState,
@@ -137,6 +139,61 @@ describe("typing on a dropdown", () => {
   test("never lands on a disabled option", () => {
     // "c" goes on to Codex; "ch" matches only the "Choose an Agent…" prompt, so it stays there.
     expect(type(open(1), "claude", "ch").state.active).toBe(2);
+  });
+});
+
+describe("the text box of a dropdown's panel", () => {
+  const projects: DropdownOption[] = [
+    { value: "", label: "No Project" },
+    { value: "shop", label: String.raw`E:\code\shop` },
+    { value: "billing", label: String.raw`E:\work\billing` },
+    { value: "admin", label: String.raw`E:\code\Shop-admin` },
+    { value: "legacy", label: String.raw`E:\old\shop-legacy`, group: "Missing Projects" },
+  ];
+
+  test("moves the active option to the first one holding the text, anywhere in it and in any case", () => {
+    expect(onQuery(open(0), projects, "SHOP")).toEqual({ ...open(1), query: "SHOP" });
+    expect(onQuery(open(0), projects, "work")).toEqual({ ...open(2), query: "work" });
+  });
+
+  test("keeps the active option while it still holds the text", () => {
+    expect(onQuery(open(3), projects, "shop").active).toBe(3);
+  });
+
+  test("leaves no option active when none holds the text", () => {
+    expect(onQuery(open(1), projects, "nothing")).toEqual({ ...open(-1), query: "nothing" });
+  });
+
+  const narrowed = (text: string) => onQuery(open(0), projects, text);
+
+  test("the arrows, Home and End move only among the options holding the text", () => {
+    const shop = narrowed("shop");
+    expect(onFilterKey(shop, projects, "", key("ArrowDown"), 0).state.active).toBe(3);
+    expect(onFilterKey({ ...shop, active: 3 }, projects, "", key("ArrowDown"), 0).state.active).toBe(4);
+    expect(onFilterKey({ ...shop, active: 4 }, projects, "", key("ArrowDown"), 0).state.active).toBe(4);
+    expect(onFilterKey({ ...shop, active: 3 }, projects, "", key("ArrowUp"), 0).state.active).toBe(1);
+    expect(onFilterKey(shop, projects, "", key("End"), 0).state.active).toBe(4);
+    expect(onFilterKey({ ...shop, active: 4 }, projects, "", key("Home"), 0).state.active).toBe(1);
+  });
+
+  test("Enter chooses the active option, or closes choosing nothing when no option holds the text", () => {
+    expect(onFilterKey(narrowed("billing"), projects, "", key("Enter"), 0)).toEqual({ state: CLOSED, choose: "billing", handled: true });
+    expect(onFilterKey(narrowed("nothing"), projects, "", key("Enter"), 0)).toEqual({ state: CLOSED, choose: null, handled: true });
+  });
+
+  test("Escape closes without choosing, and Tab chooses and lets the focus move on", () => {
+    expect(onFilterKey(narrowed("billing"), projects, "", key("Escape"), 0)).toEqual({ state: CLOSED, choose: null, handled: true });
+    expect(onFilterKey(narrowed("billing"), projects, "", key("Tab"), 0)).toEqual({ state: CLOSED, choose: "billing", handled: false });
+  });
+
+  test("letters, and a space after some text, are the text box's to type", () => {
+    const shop = narrowed("shop");
+    expect(onFilterKey(shop, projects, "", key("a"), 0)).toEqual({ state: shop, choose: null, handled: false });
+    expect(onFilterKey(shop, projects, "", key(" "), 0)).toEqual({ state: shop, choose: null, handled: false });
+  });
+
+  test("a space with no text yet chooses the active option, as on a dropdown without a text box", () => {
+    expect(onFilterKey(open(2), projects, "", key(" "), 0)).toEqual({ state: CLOSED, choose: "billing", handled: true });
   });
 });
 

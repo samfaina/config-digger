@@ -57,8 +57,11 @@ export function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/** The Projects tab: the Projects, then the missing ones, then the hidden ones. */
-export function projectSections(places: Places): ProjectSections {
+/**
+ * The Projects tab: the Projects, then the missing ones, then the hidden ones,
+ * each narrowed to the Projects whose path holds `search`, in any case.
+ */
+export function projectSections(places: Places, search = ""): ProjectSections {
   const agentName = (id: string) => places.agents.find((agent) => agent.id === id)?.name ?? id;
   const source = (project: Project) => projectSource(project, project.registered_by.map(agentName));
   const row = (project: Project): ProjectRow => ({
@@ -88,11 +91,12 @@ export function projectSections(places: Places): ProjectSections {
     source: project.missing ? `Missing · ${source(project)}` : source(project),
     removable: removableProject(project),
   });
-  const shown = places.projects.filter((project) => !project.hidden);
+  const found = places.projects.filter((project) => project.path.toLowerCase().includes(search.toLowerCase()));
+  const shown = found.filter((project) => !project.hidden);
   return {
     present: shown.filter((project) => !project.missing).map(row),
     missing: shown.filter((project) => project.missing).map(missingRow),
-    hidden: places.projects.filter((project) => project.hidden).map(hiddenRow),
+    hidden: found.filter((project) => project.hidden).map(hiddenRow),
   };
 }
 

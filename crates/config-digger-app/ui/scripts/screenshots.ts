@@ -46,6 +46,13 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "inventory-project-dropdown-search",
+    steps: async (page) => {
+      await page.getByRole("combobox", { name: "Project" }).click();
+      await page.getByRole("textbox", { name: "Search Projects" }).fill("project");
+    },
+  },
+  {
     name: "tooltip",
     steps: async (page) => {
       await page.getByRole("button", { name: "History · Undo", exact: true }).hover();
@@ -65,6 +72,13 @@ const SHOTS: Shot[] = [
     steps: async (page) => {
       await rail(page, "Projects & homes");
       await page.getByRole("tab", { name: "Projects" }).waitFor();
+    },
+  },
+  {
+    name: "projects-search",
+    steps: async (page) => {
+      await rail(page, "Projects & homes");
+      await page.getByRole("textbox", { name: "Search Projects" }).fill("hide");
     },
   },
   {

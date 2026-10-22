@@ -108,7 +108,7 @@ const expectDisabled = (markup: string, rows: [name: string, disabled: boolean][
 describe("a row of the Projects tab", () => {
   test("disables its buttons while an action runs on it, and only its own", () => {
     const markup = renderToStaticMarkup(
-      <ProjectsTab places={places} busy={[HIDE, GONE]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+      <ProjectsTab places={places} search="" busy={[HIDE, GONE]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
     );
 
     expectDisabled(markup, [
@@ -116,6 +116,32 @@ describe("a row of the Projects tab", () => {
       [GONE, true],
       [KEEP, false],
     ]);
+  });
+});
+
+describe("the search of the Projects tab", () => {
+  const tab = (search: string) =>
+    renderToStaticMarkup(
+      <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+    );
+
+  test("is a box at the top of the Projects tab only, outside the rows that scroll", () => {
+    const box = '<input aria-label="Search Projects" placeholder="Search Projects…"';
+    const list = screen("projects").match(/<section class="panel places-list">[\s\S]*?<div class="scroll">/)?.[0] ?? "";
+    expect(list).toContain(box);
+    expect(screen("homes")).not.toContain(box);
+  });
+
+  test("narrows the rows to the Projects whose path holds it, and leaves out No Project", () => {
+    const markup = tab("KEEP");
+    expect(markup).toContain(`>${KEEP}</div>`);
+    expect(markup).not.toContain(`>${HIDE}</div>`);
+    expect(markup).not.toContain(`>${GONE}</div>`);
+    expect(markup).not.toContain(">No Project</div>");
+  });
+
+  test("says when no Project holds it", () => {
+    expect(tab("nothing")).toContain('<p class="empty">No Project path holds “nothing”.</p>');
   });
 });
 

@@ -796,6 +796,26 @@ p {
   box-shadow: 0 8px 24px #00000066;
   color: var(--white);
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Its text box stays at the top while the options under it scroll. */
+.select-search {
+  flex: none;
+  margin: 0 0 4px;
+  background: var(--panel);
+}
+
+.select-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.select-empty {
+  padding: 6px 10px;
+  color: var(--grey);
 }
 
 .select-option {

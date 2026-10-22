@@ -6,12 +6,13 @@
 export type DropdownOption = { value: string; label: string; disabled?: boolean; group?: string };
 
 /**
- * Whether the panel is open, the option the keyboard or the pointer is on, and
- * the letters typed so far with the time of the last one.
+ * Whether the panel is open, the option the keyboard or the pointer is on, the
+ * letters typed so far with the time of the last one, and the text in the
+ * panel's text box, which narrows its options.
  */
-export type DropdownState = { open: boolean; active: number; typed: string; typedAt: number };
+export type DropdownState = { open: boolean; active: number; typed: string; typedAt: number; query: string };
 
-export const CLOSED: DropdownState = { open: false, active: -1, typed: "", typedAt: 0 };
+export const CLOSED: DropdownState = { open: false, active: -1, typed: "", typedAt: 0, query: "" };
 
 /** A pause this long between letters starts a new search. */
 export const TYPING_PAUSE_MS = 500;
@@ -121,6 +122,38 @@ export function onKey(state: DropdownState, options: DropdownOption[], value: st
   const to = moveFrom(options, state.active, key.key);
   if (to !== null) return { state: { ...state, active: to }, choose: null, handled: true };
   return ignored(state);
+}
+
+/** Whether `option` shows for `query`: it holds the text anywhere, in any case. A disabled one shows only with no text. */
+export function matches(option: DropdownOption, query: string): boolean {
+  if (query === "") return true;
+  return !option.disabled && option.label.toLowerCase().includes(query.toLowerCase());
+}
+
+/** `options` with those that `query` hides made disabled, at the same indexes, so that nothing can move to or choose them. */
+function narrowed(options: DropdownOption[], query: string): DropdownOption[] {
+  return options.map((option) => (matches(option, query) ? option : { ...option, disabled: true }));
+}
+
+/**
+ * Text typed in the panel's text box narrows the options to those it matches.
+ * The active option stays while it matches, or moves to the first one that does.
+ */
+export function onQuery(state: DropdownState, options: DropdownOption[], query: string): DropdownState {
+  const shown = narrowed(options, query);
+  const active = shown[state.active] && !shown[state.active].disabled ? state.active : next(shown, -1, 1);
+  return { ...state, active, query };
+}
+
+/**
+ * A key pressed in the panel's text box, which has the focus while the panel is
+ * open. The keys work as on the field, among the options the text matches,
+ * but letters, and a space after some text, are left to the text box.
+ */
+export function onFilterKey(state: DropdownState, options: DropdownOption[], value: string, key: DropdownKey, now: number): Reaction {
+  const typing = key.key.length === 1 && !key.altKey && (key.key !== " " || state.query !== "");
+  if (typing) return ignored(state);
+  return onKey(state, narrowed(options, state.query), value, key, now);
 }
 
 /** A click on the field opens the panel, or closes it without choosing. */
