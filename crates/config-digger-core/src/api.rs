@@ -1341,6 +1341,9 @@ pub struct OperationSummary {
     pub backup_deletable: bool,
     /// The names of the Agents whose States it changed.
     pub agents: Vec<String>,
+    /// The names of the Entries whose States it changed: the names of
+    /// their Items.
+    pub entries: Vec<String>,
     /// The files it touched.
     pub locations: Vec<PathBuf>,
     pub undoable: bool,

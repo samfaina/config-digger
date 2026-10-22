@@ -1220,6 +1220,36 @@
           "commands": [],
           "expect": "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora. Su fondo morado destaca, más claro que el panel y las tarjetas, con un borde lila claro a la izquierda y el texto blanco. Undo es un botón con borde y letras lila claro, y ✕ es lila claro sin fondo; con el ratón encima, los dos se rellenan de lila con letras moradas. Con el teclado, el foco en Undo y en ✕ se ve con un anillo blanco. Entra subiendo un poco mientras aparece, en un instante. Con el ratón encima no se va. Unos 10 segundos después de apartar el ratón se va bajando un poco mientras se desvanece. Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe.",
           "covers": ["#208"]
+        },
+        {
+          "id": "11.11",
+          "title": "Filtrar History",
+          "goal": "History filtra sus Operations por verbo, por estado y por texto en los nombres de sus Entries, y dice cuántas deja de cuántas.",
+          "instructions": [
+            "Ve a History.",
+            "Apunta el número N del título «N Operations».",
+            "En el desplegable Any verb, encima de la lista, elige Enable.",
+            "Mira el título y la lista.",
+            "En el mismo desplegable, elige Undo.",
+            "Mira la lista.",
+            "En el mismo desplegable, elige Any verb.",
+            "En el desplegable Any status, elige Undone.",
+            "Mira la lista.",
+            "En el mismo desplegable, elige Failed.",
+            "Mira la lista.",
+            "En el mismo desplegable, elige Needs attention.",
+            "Mira la lista.",
+            "En el mismo desplegable, elige Any status.",
+            "En la caja Search Entry names, escribe CODEX.",
+            "Elige varias filas, una tras otra.",
+            "Mira States changed en el detalle de cada una.",
+            "Borra la caja.",
+            "Escribe cd-throwaway-nada en la caja.",
+            "Pulsa Clear filter."
+          ],
+          "commands": [],
+          "expect": "Con Enable, el título dice «M of N Operations», con M menor que N, y solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10. Con Undo, solo salen filas cuyo título empieza por Undo, con la etiqueta Undo of <id>. Con Undone, solo filas cuya etiqueta incluye «undone by <id>», con mayúscula o sin ella. Con Failed, solo filas con la etiqueta Failed, rolled back o Rollback incomplete, dismissed, entre ellas la del paso 11.5. Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó. Con CODEX, cada fila elegida tiene ENTRY cd-throwaway-codex en States changed, y no sale el Disable de cd-throwaway-user del paso 7.3. Con cd-throwaway-nada, la lista dice «No Operation matches the filter.» con el botón Clear filter, y el título «0 of N Operations». Tras Clear filter, la caja está vacía, los desplegables dicen Any verb y Any status, y el título vuelve a «N Operations».",
+          "covers": ["#228"]
         }
       ]
     },

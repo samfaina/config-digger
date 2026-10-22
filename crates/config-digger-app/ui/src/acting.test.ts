@@ -90,6 +90,7 @@ const dismissed: OperationSummary = {
   backup_deleted: false,
   backup_deletable: true,
   agents: ["Claude Code"],
+  entries: ["notes"],
   locations: [String.raw`C:\Users\me\.claude.json`],
   undoable: false,
   not_undoable: "It failed, so nothing of it was kept.",

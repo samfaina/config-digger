@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { dismissOperation, rereadAfter } from "./acting";
 import { BackupDiffs, BackupPath, Changes, DialogSection, Diff, ROLLBACK_LABELS } from "./ActionDialog";
-import { commands, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
+import { commands, type Action, type Error as ApiError, type OperationDetail, type OperationLocation, type OperationSummary } from "./bindings";
 import { call, NOTICE_MS, type Notify } from "./desktop";
 import {
   agentNames,
+  FILTER_STATUSES,
+  FILTER_VERBS,
+  filterOperations,
+  NO_FILTER,
   operationActions,
   operationCount,
   operationRow,
   operationTime,
   selectedOperation,
   undoPress,
+  type FilterStatus,
+  type OperationFilter,
   type OperationRow,
   type UndoAction,
   type UndoPress,
@@ -20,16 +26,18 @@ import { Icon } from "./icons";
 import { Loading, ReadProgress } from "./Loading";
 import { Status, type Notice } from "./Notice";
 import { readCue } from "./reads";
+import { Select } from "./Select";
 import { useActionDialog } from "./useActionDialog";
 import { useBusy } from "./useBusy";
 import { useHistory } from "./useHistory";
 import { useTransient } from "./useTransient";
 import { Tooltip } from "./Tooltip";
 
-/** The History · Undo screen: every Operation, newest first, and the detail of the one selected. */
+/** The History · Undo screen: every Operation the filter keeps, newest first, and the detail of the one selected. */
 export function HistoryScreen() {
   const { history, error, reading, reload } = useHistory();
   const cue = readCue({ shown: history !== null, reading, failed: error !== null });
+  const [filter, setFilter] = useState<OperationFilter>(NO_FILTER);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
   // An Undo of the selected Operation that the core refused, or that its detail already held refused, shown in its detail.
@@ -44,12 +52,15 @@ export function HistoryScreen() {
     notify: setNotice,
     // A refused Undo shows in the detail of its Operation, even one started from the snackbar.
     onRefused: (operation, refusal) => {
+      // The filter is cleared when it hides that Operation, so that its refusal shows.
+      setFilter((now) => (history && filterOperations(history, now).some((each) => each.id === operation) ? now : NO_FILTER));
       setSelected(operation);
       setRefused({ operation, refusal });
     },
   });
 
-  const summary = history ? selectedOperation(history, selected) : null;
+  const listed = history ? filterOperations(history, filter) : null;
+  const summary = listed ? selectedOperation(listed, selected) : null;
   const id = summary?.id ?? null;
 
   // The detail is read again whenever History is, since an Undo or a Dismiss changes it.
@@ -71,6 +82,11 @@ export function HistoryScreen() {
     setSelected(operation);
     setRefused(null);
   };
+  // A refusal shown before the filter changed is not shown again when the filter brings its Operation back.
+  const refilter = (change: (filter: OperationFilter) => OperationFilter) => {
+    setFilter(change);
+    setRefused(null);
+  };
 
   const now = new Date();
   const shown = detail && "detail" in detail && detail.detail.summary.id === id ? detail.detail : null;
@@ -79,7 +95,7 @@ export function HistoryScreen() {
       <header className="panel banner">
         <div>
           <div className="caption">History · Undo</div>
-          <div className="banner-title">{operationCount(history?.length ?? 0)}</div>
+          <div className="banner-title">{operationCount(listed?.length ?? 0, history?.length ?? 0)}</div>
         </div>
         <p className="history-about dim">
           Any Operation can be undone on its own, across restarts. Undo is refused when something it touched changed
@@ -91,6 +107,31 @@ export function HistoryScreen() {
       <div className="panes">
         <section className="panel history-list">
           <h2 className="panel-title">Operations</h2>
+          <div className="history-filter">
+            <label className="search">
+              <Icon name="search" small />
+              <input
+                aria-label="Search Entry names"
+                placeholder="Search Entry names…"
+                value={filter.text}
+                onChange={(event) => refilter((now) => ({ ...now, text: event.target.value }))}
+              />
+            </label>
+            <Select
+              className="history-filter-select"
+              label="Verb"
+              value={filter.verb}
+              options={FILTER_VERBS}
+              onChange={(verb) => refilter((now) => ({ ...now, verb: verb as Action | "" }))}
+            />
+            <Select
+              className="history-filter-select"
+              label="Status"
+              value={filter.status}
+              options={FILTER_STATUSES}
+              onChange={(status) => refilter((now) => ({ ...now, status: status as FilterStatus | "" }))}
+            />
+          </div>
           {error && (
             <div className="alert" role="alert">
               <Icon name="flag" small />
@@ -100,10 +141,17 @@ export function HistoryScreen() {
           <div className="scroll">
             {cue === "loading" ? (
               <Loading text="Reading History…" rows={6} />
-            ) : history === null ? null : history.length === 0 ? (
+            ) : history === null || listed === null ? null : history.length === 0 ? (
               <p className="empty">No Operations yet. Disable, Enable or Remove an Entry and it is listed here.</p>
+            ) : listed.length === 0 ? (
+              <div className="empty filtered-out">
+                <p>No Operation matches the filter.</p>
+                <button type="button" className="cta small secondary" onClick={() => refilter(() => NO_FILTER)}>
+                  Clear filter
+                </button>
+              </div>
             ) : (
-              history.map((operation) => (
+              listed.map((operation) => (
                 <OperationRowButton
                   key={operation.id}
                   row={operationRow(operation)}
