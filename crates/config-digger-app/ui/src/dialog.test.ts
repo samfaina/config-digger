@@ -436,7 +436,10 @@ describe("the What changes block", () => {
       change({ agent: "vscode", agent_name: "VS Code", project: String.raw`E:\app` }),
     ]);
 
-    expect(groups.map((group) => group.title)).toEqual(["3 contexts", String.raw`E:\app`]);
+    expect(groups.map((group) => [group.label, group.title])).toEqual([
+      [null, "3 contexts"],
+      ["Project", String.raw`E:\app`],
+    ]);
     expect(groups[0].files[0].changes.map((line) => line.change.agent_name)).toEqual(["Claude Code"]);
     expect(groups[1].files[0].changes.map((line) => line.change.agent_name)).toEqual(["VS Code"]);
   });
@@ -457,7 +460,7 @@ describe("the What changes block", () => {
     const folder = String.raw`C:\Users\me\.claude\skills\pdf`;
     const [group] = changeGroups([change({ item: "pdf", path: folder, locator: folder })]);
 
-    expect(group.files[0].name).toBe("pdf");
+    expect([group.files[0].label, group.files[0].name]).toEqual(["Folder", "pdf"]);
     expect(group.files[0].changes[0].keyPieces).toEqual([]);
   });
 });

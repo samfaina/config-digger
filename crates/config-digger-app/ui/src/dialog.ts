@@ -72,14 +72,18 @@ function leftoverCount(preview: Preview): string {
  */
 export type ChangeLine = { change: Change; keyPieces: string[] };
 
-/** The changes to one file, under the file's name, with its full path for hover and copy. */
-export type FileGroup = { path: string; name: string; changes: ChangeLine[] };
+/**
+ * The changes to one file, under the file's name, with its full path for
+ * hover and copy, labelled "Folder" for a skill folder.
+ */
+export type FileGroup = { label: "File" | "Folder"; path: string; name: string; changes: ChangeLine[] };
 
 /**
- * The changes in one context, file by file, under its Project or "No
- * Project", or under how many contexts they reach, such as "3 contexts".
+ * The changes in one context, file by file, under its Project, labelled
+ * "Project", or under "No Project" or how many contexts they reach, such as
+ * "3 contexts", which say what they are.
  */
-export type ContextGroup = { title: string; files: FileGroup[] };
+export type ContextGroup = { label: "Project" | null; title: string; files: FileGroup[] };
 
 /**
  * The changes under their context, then under their file, each group where
@@ -95,18 +99,22 @@ export function changeGroups(changes: Change[]): ContextGroup[] {
     else byEntry.push([change]);
   }
   const groups: ContextGroup[] = [];
-  const add = (title: string, change: Change) => {
-    let group = groups.find((group) => group.title === title);
-    if (!group) groups.push((group = { title, files: [] }));
+  const add = (label: ContextGroup["label"], title: string, change: Change) => {
+    let group = groups.find((group) => group.label === label && group.title === title);
+    if (!group) groups.push((group = { label, title, files: [] }));
+    const keyPieces = wrapPoints(locatorKey(change));
     let file = group.files.find((file) => file.path === change.path);
-    if (!file) group.files.push((file = { path: change.path, name: fileName(change.path), changes: [] }));
-    file.changes.push({ change, keyPieces: wrapPoints(locatorKey(change)) });
+    if (!file) {
+      const label = keyPieces.length > 0 ? "File" : "Folder";
+      group.files.push((file = { label, path: change.path, name: fileName(change.path), changes: [] }));
+    }
+    file.changes.push({ change, keyPieces });
   };
   for (const ofEntry of byEntry) {
     const [first] = ofEntry;
     const sameWay = ofEntry.every((change) => change.before === first.before && change.after === first.after);
-    if (ofEntry.length > 1 && sameWay) add(`${ofEntry.length} contexts`, first);
-    else for (const change of ofEntry) add(change.project ?? "No Project", change);
+    if (ofEntry.length > 1 && sameWay) add(null, `${ofEntry.length} contexts`, first);
+    else for (const change of ofEntry) change.project === null ? add(null, "No Project", change) : add("Project", change.project, change);
   }
   return groups;
 }

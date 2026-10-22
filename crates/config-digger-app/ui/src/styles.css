@@ -1590,6 +1590,16 @@ p {
   overflow-wrap: anywhere;
 }
 
+/* The short label of a part of a change that does not say what it is,
+   such as Project, File or Key. */
+.change-label {
+  color: var(--grey);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .change-file {
   display: flex;
   flex-direction: column;
@@ -1606,13 +1616,32 @@ p {
   min-width: 0;
 }
 
+.change-file-name {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* Each part of a change on a line of its own, its label in a column
+   before it. */
 .change-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
   padding: 10px 14px;
   border-radius: 12px;
   background: var(--tile);
+}
+
+.change-part {
+  display: contents;
+}
+
+.change-part dd {
+  margin: 0;
+  min-width: 0;
 }
 
 .change-item {
@@ -1632,7 +1661,6 @@ p {
 }
 
 .change-states {
-  margin-top: 2px;
   display: flex;
   align-items: center;
   gap: 6px;
