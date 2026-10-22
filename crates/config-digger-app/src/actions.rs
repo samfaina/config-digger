@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// What the webview asks to plan.
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ActionRequest {
     /// One action on one Entry, in the context of `project`, or of no Project.
@@ -34,7 +34,7 @@ pub enum ActionRequest {
 }
 
 /// What the dialog does to one Entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Verb {
     /// Makes the Entry stop taking effect while keeping it.

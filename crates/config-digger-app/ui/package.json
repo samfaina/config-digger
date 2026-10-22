@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:fake": "vite --mode fake",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "screenshots": "node scripts/screenshots.ts",
     "tauri": "cd .. && tauri"
   },
   "dependencies": {
@@ -26,6 +28,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "happy-dom": "21.0.4",
+    "playwright-core": "1.64.0",
     "typescript": "7.0.2",
     "vite": "8.3.2",
     "vitest": "5.0.3"

@@ -3,11 +3,14 @@
 //! commands in [`commands`], granted by the single `main` capability.
 //!
 //! The React/TypeScript UI lives in `ui/`. Run the app with `npm run tauri dev`
-//! from there; after changing a command or an api DTO, run `cargo xtask bindings`.
+//! from there; after changing a command or an api DTO, run `cargo xtask bindings`,
+//! then `cargo xtask fake-backend` to record the fixtures of the fake backend
+//! the UI runs on in a browser (see `docs/agents/screenshots.md`).
 
 mod about;
 mod actions;
 mod commands;
+pub mod fake_backend;
 mod lists;
 mod logging;
 mod session;
