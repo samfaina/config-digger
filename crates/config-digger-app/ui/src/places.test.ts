@@ -158,6 +158,31 @@ describe("the Projects tab", () => {
       { path: GONE, source: "Missing · Added by you", removable: true },
     ]);
   });
+
+  test("narrows every section, Missing and Hidden included, to the Projects whose path holds the search, in any case", () => {
+    const sections = projectSections(
+      places({
+        projects: [
+          project({ path: String.raw`E:\code\shop` }),
+          project({ path: String.raw`E:\code\billing` }),
+          project({ path: String.raw`E:\old\Shop-legacy`, missing: true }),
+          project({ path: String.raw`E:\old\gone`, missing: true }),
+          project({ path: String.raw`E:\code\shop-admin`, hidden: true }),
+          project({ path: String.raw`E:\code\notes`, hidden: true }),
+        ],
+      }),
+      "SHOP",
+    );
+
+    expect(sections.present.map((row) => row.path)).toEqual([String.raw`E:\code\shop`]);
+    expect(sections.missing.map((row) => row.path)).toEqual([String.raw`E:\old\Shop-legacy`]);
+    expect(sections.hidden.map((row) => row.path)).toEqual([String.raw`E:\code\shop-admin`]);
+  });
+
+  test("lists every Project with an empty search", () => {
+    const all = places({ projects: [project(), project({ path: GONE, missing: true }), project({ path: String.raw`E:\x`, hidden: true })] });
+    expect(projectSections(all, "")).toEqual(projectSections(all));
+  });
 });
 
 describe("the Agent homes tab", () => {

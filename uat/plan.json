@@ -473,6 +473,27 @@
           "commands": [],
           "expect": "En las dos pestañas, el título Projects & homes, cada pestaña (Projects · N y Agent homes · N) y el botón Add Project o Add Agent home ocupan una línea cada uno. La descripción no está en la cabecera: sale encima de la lista, «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.» en Projects y «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.» en Agent homes.",
           "covers": ["#221"]
+        },
+        {
+          "id": "10.15",
+          "title": "Buscar en la pestaña Projects",
+          "goal": "La caja de búsqueda de la pestaña Projects deja las filas cuya ruta contiene lo escrito, también en Missing y Hidden.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "En la fila de E:\\cd-throwaway\\project-hide, pulsa Hide.",
+            "Haz clic en la caja «Search Projects…», encima de la lista.",
+            "Escribe HIDE, en mayúsculas.",
+            "Abre el grupo Hidden · 1 si está cerrado.",
+            "Borra lo escrito y escribe gone.",
+            "Borra lo escrito y escribe zz.",
+            "Borra lo escrito.",
+            "En la fila de project-hide, bajo Hidden, pulsa Unhide.",
+            "Abre la pestaña Agent homes."
+          ],
+          "commands": [],
+          "expect": "Con HIDE, el grupo Projects dice Projects · 0, la fila No Project no sale y el grupo Hidden · 1 muestra E:\\cd-throwaway\\project-hide. Con gone, el grupo Projects dice Projects · 0, Hidden no sale y el grupo Missing · 1 muestra solo E:/cd-throwaway/project-gone. Con zz la lista dice «No Project path holds “zz”.». Al borrar vuelven todas las filas y No Project. Unhide devuelve project-hide a la lista principal. La pestaña Agent homes no tiene caja de búsqueda.",
+          "covers": ["#224"]
         }
       ]
     },
@@ -501,7 +522,7 @@
             "Pulsa Tab hasta que el campo Project tenga el foco (borde morado).",
             "Pulsa Alt+Flecha abajo.",
             "Pulsa Flecha abajo y Flecha arriba varias veces.",
-            "Escribe deprisa la primera letra de otra opción.",
+            "Escribe hide.",
             "Pulsa Escape.",
             "Pulsa Espacio, ve a E:\\cd-throwaway\\project con las flechas y pulsa Enter.",
             "Con el panel cerrado, pulsa Flecha abajo.",
@@ -509,8 +530,26 @@
             "Mira la lista de Items."
           ],
           "commands": [],
-          "expect": "Alt+Flecha abajo abre el panel sobre el valor actual. Las flechas mueven la opción iluminada y la letra salta a la primera opción que empieza por ella. Escape cierra el panel sin cambiar el Project y el foco sigue en el campo. Enter elige la opción iluminada y cierra el panel. Con el panel cerrado, Flecha abajo pasa al Project siguiente y Flecha arriba vuelve a E:\\cd-throwaway\\project, sin abrir el panel. Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra cd-throwaway-project.",
-          "covers": ["#181", "#219"]
+          "expect": "Alt+Flecha abajo abre el panel sobre el valor actual. Las flechas mueven la opción iluminada. Lo que escribes sale en la caja «Search Projects…» de arriba del panel, que deja solo E:\\cd-throwaway\\project-hide, iluminado. Escape cierra el panel sin cambiar el Project y el foco sigue en el campo. Enter elige la opción iluminada y cierra el panel. Con el panel cerrado, Flecha abajo pasa al Project siguiente y Flecha arriba vuelve a E:\\cd-throwaway\\project, sin abrir el panel. Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra cd-throwaway-project.",
+          "covers": ["#181", "#219", "#224"]
+        },
+        {
+          "id": "2.5",
+          "title": "Buscar un Project en el desplegable",
+          "goal": "La caja de búsqueda del panel de Project deja las opciones que contienen lo escrito, en cualquier parte de la ruta, y el teclado sigue eligiendo como en un desplegable.",
+          "instructions": [
+            "En el Inventario, haz clic en el campo Project de la cabecera.",
+            "Escribe EXTRA, en mayúsculas.",
+            "Borra lo escrito con Retroceso.",
+            "Escribe throwaway.",
+            "Pulsa Flecha abajo y pulsa Enter.",
+            "Abre el panel otra vez con un clic en el campo.",
+            "Escribe zz.",
+            "Pulsa Escape."
+          ],
+          "commands": [],
+          "expect": "El panel se abre con la caja «Search Projects…» arriba, vacía y con el cursor dentro, y todas las opciones debajo. Con EXTRA queda solo E:\\cd-throwaway\\project-extra, iluminado. Al borrar vuelven todas. Con throwaway quedan los Projects de E:\\cd-throwaway, los que faltan bajo MISSING PROJECTS, y No Project no sale. E:\\cd-throwaway\\project-extra sigue iluminado. Flecha abajo ilumina el Project de debajo y Enter lo elige: el panel se cierra, el campo lo muestra y el foco vuelve al campo (borde morado). Al abrir otra vez, la caja está vacía. Con zz el panel dice «No match». Escape lo cierra sin cambiar el Project.",
+          "covers": ["#224"]
         },
         {
           "id": "2.3",

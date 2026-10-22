@@ -15,13 +15,24 @@ const PROJECTS: DropdownOption[] = [
 ];
 
 /** A Select whose `onChange` feeds its `value`, as the Inventory's Project field does. */
-function ProjectField({ options, initial, onChange }: { options: DropdownOption[]; initial: string; onChange: (value: string) => void }) {
+function ProjectField({
+  options,
+  initial,
+  onChange,
+  searchLabel,
+}: {
+  options: DropdownOption[];
+  initial: string;
+  onChange: (value: string) => void;
+  searchLabel?: string;
+}) {
   const [value, setValue] = useState(initial);
   return (
     <Select
       value={value}
       options={options}
       label="Project"
+      searchLabel={searchLabel}
       onChange={(next) => {
         onChange(next);
         setValue(next);
@@ -31,10 +42,10 @@ function ProjectField({ options, initial, onChange }: { options: DropdownOption[
 }
 
 /** Renders a Project field on `initial`, with the values it chooses in `chosen`. */
-function renderField({ options = PROJECTS, initial = "alpha" }: { options?: DropdownOption[]; initial?: string } = {}) {
+function renderField({ options = PROJECTS, initial = "alpha", searchLabel }: { options?: DropdownOption[]; initial?: string; searchLabel?: string } = {}) {
   const user = userEvent.setup();
   const chosen: string[] = [];
-  const { container } = render(<ProjectField options={options} initial={initial} onChange={(value) => chosen.push(value)} />);
+  const { container } = render(<ProjectField options={options} initial={initial} searchLabel={searchLabel} onChange={(value) => chosen.push(value)} />);
   return { user, chosen, container, field: screen.getByRole("combobox", { name: "Project" }) };
 }
 
@@ -72,8 +83,8 @@ describe("a Select in a DOM", () => {
   test("portals its panel to document.body", async () => {
     const { user, field, container } = renderField();
     await user.click(field);
-    const panel = screen.getByRole("listbox", { name: "Project" });
-    expect(panel.parentElement).toBe(document.body);
+    const panel = screen.getByRole("listbox", { name: "Project" }).closest(".select-panel");
+    expect(panel?.parentElement).toBe(document.body);
     expect(container.contains(panel)).toBe(false);
   });
 
@@ -139,5 +150,100 @@ describe("a Select in a DOM", () => {
     expect(names(screen.getByRole("group", { name: "Recent" }))).toEqual(["Alpha", "Beta"]);
     expect(names(screen.getByRole("group", { name: "Others" }))).toEqual(["Gamma"]);
     expect(screen.getByRole("option", { name: "Choose…" }).closest("[role=group]")).toBeNull();
+  });
+});
+
+describe("a Select with a text box in its panel", () => {
+  const shown = () => screen.getAllByRole("option").map((option) => option.textContent);
+
+  test("puts the focus in the text box when it opens, and narrows the options as the user types", async () => {
+    const { user, field } = renderField({ searchLabel: "Find a Project" });
+    await user.click(field);
+    const box = screen.getByRole("textbox", { name: "Find a Project" });
+    expect(document.activeElement).toBe(box);
+    expect(shown()).toEqual(["Alpha", "Beta", "Gamma"]);
+    await user.keyboard("MM");
+    expect(shown()).toEqual(["Gamma"]);
+    expect(box.getAttribute("aria-activedescendant")).toBe(optionId("Gamma"));
+  });
+
+  test("chooses the active option with Enter and gives the focus back to the field", async () => {
+    const { user, field, chosen } = renderField({ searchLabel: "Find a Project" });
+    await user.tab();
+    await user.keyboard("{Enter}");
+    await user.keyboard("a{ArrowDown}{Enter}");
+    expect(chosen).toEqual(["beta"]);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(field);
+  });
+
+  test("closes on Escape without choosing, and opens again with an empty text box", async () => {
+    const { user, field, chosen } = renderField({ searchLabel: "Find a Project" });
+    await user.click(field);
+    await user.keyboard("gam{Escape}");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(chosen).toEqual([]);
+    expect(document.activeElement).toBe(field);
+    await user.keyboard("{Enter}");
+    expect((screen.getByRole("textbox", { name: "Find a Project" }) as HTMLInputElement).value).toBe("");
+    expect(shown()).toEqual(["Alpha", "Beta", "Gamma"]);
+  });
+
+  test("chooses an option clicked among those left and gives the focus back to the field", async () => {
+    const { user, field, chosen } = renderField({ searchLabel: "Find a Project" });
+    await user.click(field);
+    await user.keyboard("ta");
+    await user.click(screen.getByRole("option", { name: "Beta" }));
+    expect(chosen).toEqual(["beta"]);
+    expect(document.activeElement).toBe(field);
+  });
+
+  test("says so when no option holds the text", async () => {
+    const { user, field } = renderField({ searchLabel: "Find a Project" });
+    await user.click(field);
+    await user.keyboard("zz");
+    expect(screen.queryAllByRole("option")).toEqual([]);
+    expect(screen.getByRole("listbox").textContent).toContain("No match");
+  });
+
+  test("drops the heading of a group none of whose options holds the text", async () => {
+    const options: DropdownOption[] = [
+      { value: "alpha", label: "Alpha" },
+      { value: "gamma", label: "Gamma", group: "Missing Projects" },
+    ];
+    const { user, field } = renderField({ options, searchLabel: "Find a Project" });
+    await user.click(field);
+    await user.keyboard("alp");
+    expect(screen.queryByRole("group", { name: "Missing Projects" })).toBeNull();
+  });
+
+  test("chooses the active option on Tab and moves the focus on from the field", async () => {
+    const user = userEvent.setup();
+    const chosen: string[] = [];
+    render(
+      <>
+        <ProjectField options={PROJECTS} initial="alpha" searchLabel="Find a Project" onChange={(next) => chosen.push(next)} />
+        <button type="button">Next</button>
+      </>,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Project" }));
+    await user.keyboard("gam{Tab}");
+    expect(chosen).toEqual(["gamma"]);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Next" }));
+  });
+
+  test("stays open while the focus moves from the field to its text box, and closes when it leaves both", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <ProjectField options={PROJECTS} initial="alpha" searchLabel="Find a Project" onChange={() => {}} />
+        <button type="button">Elsewhere</button>
+      </>,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Project" }));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Elsewhere" }));
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });

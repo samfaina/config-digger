@@ -367,7 +367,13 @@ export function Banner({ inventory, project, agentName, stats, reading, rereadin
           Project
           {project !== null && <FailureBadge count={failuresOf(project)} where="this Project" />}
         </div>
-        <Select className="banner-select" label="Project" tooltip={project ?? undefined} {...projectField(inventory, project, selectProject)} />
+        <Select
+          className="banner-select"
+          label="Project"
+          tooltip={project ?? undefined}
+          searchLabel="Search Projects"
+          {...projectField(inventory, project, selectProject)}
+        />
       </div>
       <div>
         <div className="caption">Inventory read</div>

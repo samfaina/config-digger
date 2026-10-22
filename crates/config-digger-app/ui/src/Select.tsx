@@ -1,11 +1,14 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   CLOSED,
+  matches,
   onFieldClick,
+  onFilterKey,
   onKey,
   onOptionClick,
   onOptionHover,
+  onQuery,
   placePanel,
   type DropdownOption,
   type DropdownState,
@@ -23,17 +26,22 @@ type SelectProps = {
   label?: string;
   /** Shown on the field in a Tooltip. */
   tooltip?: string;
+  /** The name of a text box at the top of the panel that narrows its options, for a long list. */
+  searchLabel?: string;
   className?: string;
 };
 
-/** Runs of options next to each other with the same group, with each option's index. */
-function groupRuns(options: DropdownOption[]): { group?: string; items: { option: DropdownOption; at: number }[] }[] {
-  const all: { group?: string; items: { option: DropdownOption; at: number }[] }[] = [];
-  options.forEach((option, at) => {
+/** An option the panel shows, with its index among all the options. */
+type Shown = { option: DropdownOption; at: number };
+
+/** Runs of shown options next to each other with the same group. */
+function groupRuns(shown: Shown[]): { group?: string; items: Shown[] }[] {
+  const all: { group?: string; items: Shown[] }[] = [];
+  for (const each of shown) {
     const last = all.at(-1);
-    if (last && last.group === option.group) last.items.push({ option, at });
-    else all.push({ group: option.group, items: [{ option, at }] });
-  });
+    if (last && last.group === each.option.group) last.items.push(each);
+    else all.push({ group: each.option.group, items: [each] });
+  }
   return all;
 }
 
@@ -46,19 +54,43 @@ export function applyReaction(reaction: Reaction, onChange: (value: string) => v
 /**
  * The app's dropdown: a field and a panel of options drawn with the app's
  * look, where a native `<select>` would show the system's list. The field
- * keeps the focus while the panel is open, so Escape leaves it there.
+ * keeps the focus while the panel is open, so Escape leaves it there, unless
+ * the panel has a text box: the box takes the focus and gives it back on close.
  */
-export function Select({ value, options, onChange, label, tooltip, className }: SelectProps) {
+export function Select({ value, options, onChange, label, tooltip, searchLabel, className }: SelectProps) {
   const id = useId();
   const [state, setState] = useState<DropdownState>(CLOSED);
-  const [placement, setPlacement] = useState<Placement | null>(null);
+  // With the height it opened at, kept while the text box narrows the options, so that the panel stays by its field.
+  const [placement, setPlacement] = useState<(Placement & { height: number }) | null>(null);
   const field = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const searchBox = useRef<HTMLInputElement>(null);
   const optionId = (at: number) => `${id}-option-${at}`;
   const chosen = options.find((option) => option.value === value);
+  const shown = options.map((option, at) => ({ option, at })).filter(({ option }) => matches(option, state.query));
+  const activeId = state.open && state.active >= 0 ? optionId(state.active) : undefined;
 
-  const apply = (reaction: Reaction) => setState(applyReaction(reaction, onChange));
+  const apply = (reaction: Reaction) => {
+    // Closed from its text box, the panel gives the focus back to the field, as Escape on the field keeps it there.
+    if (!reaction.state.open && panel.current?.contains(document.activeElement)) field.current?.focus();
+    setState(applyReaction(reaction, onChange));
+  };
+  /** Handles a key on the field, or in the text box, with `react`. */
+  const keyDown = (react: typeof onKey) => (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey) return;
+    const reaction = react(state, options, value, { key: event.key, altKey: event.altKey }, event.timeStamp);
+    if (reaction.handled) {
+      // An Escape that closes the panel is not one for a dialog around it.
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    apply(reaction);
+  };
   const close = () => setState(CLOSED);
+  /** Closes the panel when the focus leaves for somewhere other than the field or its panel. */
+  const closeUnlessWithin = (to: EventTarget | null) => {
+    if (!(to instanceof Node && (field.current?.contains(to) || panel.current?.contains(to)))) close();
+  };
   // Options that change while the panel is open, as on an Inventory read, would leave it with the old list's size and active option.
   const optionsKey = JSON.stringify(options.map((option) => [option.value, option.label]));
   useEffect(close, [optionsKey]);
@@ -74,7 +106,9 @@ export function Select({ value, options, onChange, label, tooltip, className }: 
     // Rounded up, borders included: a size rounded down would bring up a scrollbar the content does not need.
     const size = panel.current.getBoundingClientRect();
     const content = { width: Math.ceil(size.width), height: Math.ceil(size.height) };
-    setPlacement(placePanel(box, content, { width: window.innerWidth, height: window.innerHeight }));
+    const placed = placePanel(box, content, { width: window.innerWidth, height: window.innerHeight });
+    setPlacement({ ...placed, height: Math.min(content.height, placed.maxHeight) });
+    searchBox.current?.focus();
   }, [state.open]);
 
   // A resize or a scroll under the panel would leave it away from its field, so it closes, as a native select does.
@@ -114,19 +148,10 @@ export function Select({ value, options, onChange, label, tooltip, className }: 
           aria-haspopup="listbox"
           aria-expanded={state.open}
           aria-controls={state.open ? `${id}-list` : undefined}
-          aria-activedescendant={state.open && state.active >= 0 ? optionId(state.active) : undefined}
+          aria-activedescendant={activeId}
           onClick={() => setState(onFieldClick(state, options, value))}
-          onKeyDown={(event) => {
-            if (event.ctrlKey || event.metaKey) return;
-            const reaction = onKey(state, options, value, { key: event.key, altKey: event.altKey }, event.timeStamp);
-            if (reaction.handled) {
-              // An Escape that closes the panel is not one for a dialog around it.
-              event.preventDefault();
-              event.stopPropagation();
-            }
-            apply(reaction);
-          }}
-          onBlur={close}
+          onKeyDown={keyDown(onKey)}
+          onBlur={(event) => closeUnlessWithin(event.relatedTarget)}
         >
           <span className="select-value">{chosen?.label ?? ""}</span>
           <Icon name="chevron" small />
@@ -136,42 +161,64 @@ export function Select({ value, options, onChange, label, tooltip, className }: 
         createPortal(
           <div
             ref={panel}
-            id={`${id}-list`}
             className="select-panel"
-            role="listbox"
-            aria-label={label}
             style={style}
-            // The focus stays on the field, so a click in the panel does not blur it.
-            onMouseDown={(event) => event.preventDefault()}
+            // The focus stays on the field, or in the text box, so a click elsewhere in the panel does not blur it.
+            onMouseDown={(event) => {
+              if (event.target !== searchBox.current) event.preventDefault();
+            }}
           >
-            {groupRuns(options).map((run, index) => {
-              const items = run.items.map(({ option, at }) => (
-                <div
-                  key={at}
-                  id={optionId(at)}
-                  data-index={at}
-                  className={`select-option${at === state.active ? " active" : ""}${option.value === value && !option.disabled ? " chosen" : ""}`}
-                  role="option"
-                  aria-selected={at === state.active}
-                  aria-disabled={option.disabled || undefined}
-                  onMouseMove={() => {
-                    if (at !== state.active) setState(onOptionHover(state, options, at));
-                  }}
-                  onClick={() => apply(onOptionClick(state, options, value, at))}
-                >
-                  {option.label}
-                </div>
-              ));
-              if (run.group === undefined) return items;
-              return (
-                <div key={`group-${index}`} role="group" aria-labelledby={`${id}-group-${index}`}>
-                  <div id={`${id}-group-${index}`} className="select-group" role="presentation">
-                    {run.group}
+            {searchLabel !== undefined && (
+              <label className="search select-search">
+                <Icon name="search" small />
+                <input
+                  ref={searchBox}
+                  type="text"
+                  aria-label={searchLabel}
+                  placeholder={`${searchLabel}…`}
+                  aria-controls={`${id}-list`}
+                  aria-autocomplete="list"
+                  aria-activedescendant={activeId}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={state.query}
+                  onChange={(event) => setState(onQuery(state, options, event.target.value))}
+                  onKeyDown={keyDown(onFilterKey)}
+                  onBlur={(event) => closeUnlessWithin(event.relatedTarget)}
+                />
+              </label>
+            )}
+            <div id={`${id}-list`} className="select-list" role="listbox" aria-label={label}>
+              {shown.length === 0 && <div className="select-empty">No match</div>}
+              {groupRuns(shown).map((run, index) => {
+                const items = run.items.map(({ option, at }) => (
+                  <div
+                    key={at}
+                    id={optionId(at)}
+                    data-index={at}
+                    className={`select-option${at === state.active ? " active" : ""}${option.value === value && !option.disabled ? " chosen" : ""}`}
+                    role="option"
+                    aria-selected={at === state.active}
+                    aria-disabled={option.disabled || undefined}
+                    onMouseMove={() => {
+                      if (at !== state.active) setState(onOptionHover(state, options, at));
+                    }}
+                    onClick={() => apply(onOptionClick(state, options, value, at))}
+                  >
+                    {option.label}
                   </div>
-                  {items}
-                </div>
-              );
-            })}
+                ));
+                if (run.group === undefined) return items;
+                return (
+                  <div key={`group-${index}`} role="group" aria-labelledby={`${id}-group-${index}`}>
+                    <div id={`${id}-group-${index}`} className="select-group" role="presentation">
+                      {run.group}
+                    </div>
+                    {items}
+                  </div>
+                );
+              })}
+            </div>
           </div>,
           document.body,
         )}

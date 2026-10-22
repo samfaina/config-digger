@@ -53,6 +53,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const cue = readCue({ shown: places !== null, reading, failed: error !== null });
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
+  const [search, setSearch] = useState("");
   const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
   const { actions, rows: busyRows, busy } = useBusy();
   // Remove leftovers is an Operation, previewed like any other. The missing
@@ -111,6 +112,12 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
               ? "Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk."
               : "Each Agent reads its user configuration from one or more homes. Entries in different homes never compete."}
           </p>
+          {tab === "projects" && (
+            <label className="search">
+              <Icon name="search" small />
+              <input aria-label="Search Projects" placeholder="Search Projects…" value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+          )}
           {error && (
             <div className="alert" role="alert">
               <Icon name="flag" small />
@@ -123,6 +130,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
             ) : places === null ? null : tab === "projects" ? (
               <ProjectsTab
                 places={places}
+                search={search}
                 busy={busyRows}
                 onShow={onShow}
                 onChange={act}
@@ -150,6 +158,8 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
 
 type ProjectsTabProps = {
   places: Places;
+  /** Narrows the rows to the Projects whose path holds it. */
+  search: string;
   /** The rows an action runs on, by {@link rowOf}. */
   busy: string[];
   onShow: (show: ShowInInventory) => void;
@@ -157,31 +167,39 @@ type ProjectsTabProps = {
   onRemoveLeftovers: (path: string) => void;
 };
 
-/** The Projects, No Project, the missing Projects (open by default) and the hidden ones (collapsed). */
-export function ProjectsTab({ places, busy, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
+/**
+ * The Projects, No Project, the missing Projects (open by default) and the
+ * hidden ones (collapsed), narrowed to the search; No Project shows without one.
+ */
+export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
   const [missingOpen, setMissingOpen] = useState(true);
   const [hiddenOpen, setHiddenOpen] = useState(false);
-  const { present, missing, hidden } = projectSections(places);
+  const { present, missing, hidden } = projectSections(places, search);
   const hide = (path: string) => onChange({ kind: "hide_project", path });
   const forget = (path: string) => onChange({ kind: "forget_project", path });
+  if (search !== "" && present.length + missing.length + hidden.length === 0) {
+    return <p className="empty">No Project path holds “{search}”.</p>;
+  }
   return (
     <>
       <GroupTitle title="Projects" count={present.length} />
       {present.map((row) => (
         <ProjectLine key={row.path} row={row} busy={busy.includes(rowOf(row))} onShow={onShow} onHide={hide} onForget={forget} />
       ))}
-      <div className="place-row informational">
-        <span className="place-icon">
-          <Icon name="users" small />
-        </span>
-        <div className="place-text">
-          <div className="place-name">No Project</div>
-          <div className="place-sub">
-            Always available in the Inventory: an Agent started outside any Project, where only user, managed, plugin and
-            connector Scopes compete.
+      {search === "" && (
+        <div className="place-row informational">
+          <span className="place-icon">
+            <Icon name="users" small />
+          </span>
+          <div className="place-text">
+            <div className="place-name">No Project</div>
+            <div className="place-sub">
+              Always available in the Inventory: an Agent started outside any Project, where only user, managed, plugin and
+              connector Scopes compete.
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {missing.length > 0 && (
         <>
