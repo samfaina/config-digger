@@ -232,6 +232,31 @@ describe("a change in the What changes block", () => {
   });
 });
 
+describe("the action dialog", () => {
+  test("stacks its parts in a column no taller than the window, so that a block that scrolls gives up the height the rest needs", () => {
+    const dialog = styled(".dialog.action");
+    expect(dialog.get("display")).toBe("flex");
+    expect(dialog.get("flex-direction")).toBe("column");
+    expect(styled(".dialog").get("max-height")).toMatch(/vh$/);
+  });
+
+  test("scrolls the body of What changes and of Files inside the block, under its title", () => {
+    const block = styled(".dialog-section.scrolls");
+    expect(block.get("display")).toBe("flex");
+    expect(block.get("flex-direction")).toBe("column");
+    expect(shrinks(".dialog-section.scrolls")).toBe(true);
+    const body = styled(".dialog-section-body");
+    expect(body.get("overflow") ?? body.get("overflow-y")).toBe("auto");
+    expect(body.get("min-height")).toBe("0");
+  });
+
+  test("keeps each block that scrolls a fifth of the window high, or its whole height when it is shorter, so a long one never squeezes the other out", () => {
+    // Shrinking takes height from each block in proportion to its own, which
+    // left Files a bare title under a long What changes.
+    expect(styled(".dialog-section.scrolls").get("min-height")).toBe("calc-size(max-content, min(size, 20vh))");
+  });
+});
+
 const smallestWindow = JSON.parse(readFileSync(new URL("../../tauri.conf.json", import.meta.url), "utf8")).app.windows[0] as { minWidth: number; minHeight: number };
 
 /** A length in pixels, such as `10px`. */

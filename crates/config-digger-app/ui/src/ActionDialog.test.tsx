@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ActionDialog, Changes } from "./ActionDialog";
-import type { Change } from "./bindings";
+import { commands, type ActionPreview, type Change } from "./bindings";
 import { Loading } from "./Loading";
+
+vi.mock("./bindings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./bindings")>();
+  return { ...actual, commands: { ...actual.commands, planAction: vi.fn(), cancelPlan: vi.fn(async () => ({ status: "ok", data: null })) } };
+});
 
 afterEach(cleanup);
 
@@ -72,5 +77,84 @@ describe("the What changes block", () => {
       ["Agent", "Claude Code"],
       ["State", "Effective → Disabled"],
     ]);
+  });
+});
+
+describe("the preview of an action with many changes", () => {
+  const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
+  const changes: Change[] = Array.from({ length: 40 }, (_, index) => ({
+    agent: "claude-code",
+    agent_name: "Claude Code",
+    home: "default",
+    item: `cd-throwaway-server-${index}`,
+    path: claudeJson,
+    locator: `${claudeJson}#mcpServers.cd-throwaway-server-${index}`,
+    project: null,
+    before: "effective",
+    after: "removed",
+  }));
+  const planned: ActionPreview = {
+    plan_id: "plan-1",
+    preview: {
+      action: "remove",
+      title: "Remove 40 Entries",
+      undo_of: null,
+      backup_of: null,
+      project: null,
+      changes,
+      effective: [],
+      info: [],
+      files: [
+        {
+          path: claudeJson,
+          git_versioned: true,
+          store_class: "plain",
+          edits: [],
+          diff: "@@ -1,2 +1,1 @@\n {\n-  \"mcpServers\": {}",
+          diff_unavailable: null,
+          diff_note: null,
+          changed_lines: 1,
+        },
+      ],
+      folders: [],
+      deleted: [],
+      backup_folder: String.raw`E:\cd-throwaway\backups\1`,
+      backup_note: String.raw`Each file is copied to E:\cd-throwaway\backups\1 first.`,
+    },
+    warnings: [{ class: "git-versioned", sentence: ".claude.json is in a git repo, so every clone gets this change." }],
+    blocks: [],
+  };
+
+  test("scrolls only What changes and Files, each under its title, keeping the title, Before you apply and the buttons in view", async () => {
+    vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: planned });
+    render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: changes[0].locator, project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
+
+    const whatChanges = await screen.findByRole("region", { name: "What changes" });
+    const files = screen.getByRole("region", { name: "Files · 1" });
+    expect(screen.getAllByRole("region")).toEqual([whatChanges, files]);
+    // Its Entry and the last piece of its key name each change.
+    for (const change of changes) expect(within(whatChanges).getAllByText(change.item)).toHaveLength(2);
+    expect(within(files).getByText(claudeJson)).toBeTruthy();
+    // Each scrolls under its title, which stays in view.
+    expect(within(whatChanges).queryByRole("heading", { name: "What changes" })).toBeNull();
+    expect(within(files).queryByRole("heading", { name: "Files · 1" })).toBeNull();
+
+    const inView = [
+      screen.getByRole("heading", { level: 1, name: "Remove 40 Entries" }),
+      screen.getByRole("heading", { name: "Before you apply" }),
+      screen.getByRole("checkbox"),
+      screen.getByRole("button", { name: "Cancel" }),
+      screen.getByText("Tick 1 warning to apply"),
+      screen.getByRole("button", { name: "Remove" }),
+    ];
+    for (const element of inView) expect(element.closest("[role=region]"), element.textContent ?? "").toBeNull();
+  });
+
+  test("lets the keyboard reach each scrolling block, to scroll it", async () => {
+    vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: planned });
+    render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: changes[0].locator, project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
+
+    await screen.findByRole("region", { name: "What changes" });
+    for (const region of screen.getAllByRole("region")) expect(region.tabIndex).toBe(0);
   });
 });

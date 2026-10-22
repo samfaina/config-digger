@@ -371,6 +371,18 @@ export const fixtures: Fixtures = {
             "entries": 0
           },
           {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -523,7 +535,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 33,
+            "entries": 45,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -2682,6 +2694,18 @@ export const fixtures: Fixtures = {
             "entries": 0
           },
           {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -2834,7 +2858,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 33,
+            "entries": 45,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -5257,6 +5281,18 @@ export const fixtures: Fixtures = {
             "entries": 0
           },
           {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -5409,7 +5445,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 33,
+            "entries": 45,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -7686,6 +7722,18 @@ export const fixtures: Fixtures = {
         "entries": 0
       },
       {
+        "path": "E:\\cd-throwaway\\many\\project-gone",
+        "missing": true,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 12
+      },
+      {
         "path": "E:\\cd-throwaway\\project",
         "missing": false,
         "workspace_file": false,
@@ -7733,6 +7781,707 @@ export const fixtures: Fixtures = {
       }
     ],
     "leftovers": [
+      {
+        "project": "E:\\cd-throwaway\\many\\project-gone",
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-01",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-01",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-02",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-02",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-03",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-03",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-04",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-04",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-05",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-05",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-06",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-06",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-07",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-07",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-08",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-08",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-09",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-09",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-10",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-10",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-11",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-11",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-gone-12",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "projects",
+                  "E:/cd-throwaway/many/project-gone",
+                  "mcpServers",
+                  "cd-throwaway-gone-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-12",
+                "scope": "local",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "project_missing",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-gone-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ]
+      },
       {
         "project": "E:\\cd-throwaway\\project-gone",
         "items": [
@@ -7861,7 +8610,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 33,
+            "entries": 45,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -8381,6 +9130,18 @@ export const fixtures: Fixtures = {
           "entries": 0
         },
         {
+          "path": "E:\\cd-throwaway\\many\\project-gone",
+          "missing": true,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 12
+        },
+        {
           "path": "E:\\cd-throwaway\\project",
           "missing": false,
           "workspace_file": false,
@@ -8428,6 +9189,707 @@ export const fixtures: Fixtures = {
         }
       ],
       "leftovers": [
+        {
+          "project": "E:\\cd-throwaway\\many\\project-gone",
+          "items": [
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-01",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-01"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-01",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-01"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-02",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-02"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-02",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-02"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-03",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-03"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-03",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-03"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-04",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-04"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-04",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-04"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-05",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-05"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-05",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-05"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-06",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-06"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-06",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-06"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-07",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-07"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-07",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-07"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-08",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-08"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-08",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-08"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-09",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-09"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-09",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-09"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-10",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-10"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-10",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-10"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-11",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-11"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-11",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-11"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "kind": "mcp",
+              "name": "cd-throwaway-gone-12",
+              "state": "unread",
+              "entries": [
+                {
+                  "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-12"
+                  ],
+                  "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-12",
+                  "scope": "local",
+                  "provenance": "file",
+                  "skill_manager": null,
+                  "plugin": null,
+                  "git_versioned": false,
+                  "link": null,
+                  "parked": null,
+                  "state": "unread",
+                  "reason": {
+                    "code": "project_missing",
+                    "effective": null,
+                    "switch": null,
+                    "sentence": "Claude Code never reads it: it is keyed to the Project E:\\cd-throwaway\\many\\project-gone, whose folder no longer exists. It can only be Removed."
+                  },
+                  "secondary": [],
+                  "what_if": null,
+                  "notes": [],
+                  "config": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "cd-throwaway-gone-12"
+                    ]
+                  },
+                  "masked": [],
+                  "disable": {
+                    "status": "not_offered",
+                    "code": "unread",
+                    "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                  },
+                  "enable": null,
+                  "remove": {
+                    "status": "offered"
+                  },
+                  "caveats": [],
+                  "also_read_by": [],
+                  "copied_from": null
+                }
+              ],
+              "built": null,
+              "caveats": []
+            }
+          ]
+        },
         {
           "project": "E:\\cd-throwaway\\project-gone",
           "items": [
@@ -8556,7 +10018,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 33,
+              "entries": 45,
               "notes": [
                 {
                   "code": "no_installation_found",
@@ -8717,7 +10179,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-a11",
+      "id": "20261001-120000-4db",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -8740,7 +10202,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-ce4",
+      "id": "20261001-120000-b97",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -8765,7 +10227,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-a11",
+        "id": "20261001-120000-4db",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -9137,6 +10599,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-desktop",
           "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
           "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\many\\project-gone",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project",
           "before": "effective",
           "after": "disabled"
@@ -9178,7 +10651,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a11\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4db\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -9216,7 +10689,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a11",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4db",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -9225,7 +10698,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-ce4",
+        "id": "20261001-120000-b97",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -9596,6 +11069,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-codex",
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
           "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\many\\project-gone",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
           "project": "E:\\cd-throwaway\\project",
           "before": "effective",
           "after": "disabled"
@@ -9637,7 +11121,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -9657,7 +11141,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -9677,10 +11161,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-ce4",
+          "operation": "20261001-120000-b97",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97\\1-config.toml"
         }
       ]
     }
@@ -12121,6 +13605,17 @@ export const fixtures: Fixtures = {
               "item": "cd-throwaway-desktop",
               "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
               "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project",
               "before": "disabled",
               "after": "effective"
@@ -13000,10 +14495,295 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "leftovers",
-        "project": "E:\\cd-throwaway\\project-gone"
+        "project": "E:\\cd-throwaway\\many\\project-gone"
       },
       "preview": {
         "plan_id": "plan-46",
+        "preview": {
+          "action": "remove",
+          "title": "Remove 12 Entries",
+          "undo_of": null,
+          "backup_of": null,
+          "project": "E:\\cd-throwaway\\many\\project-gone",
+          "changes": [
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-01",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-01",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-02",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-02",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-03",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-03",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-04",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-04",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-05",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-05",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-06",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-06",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-07",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-07",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-08",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-08",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-09",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-09",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-10",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-10",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-11",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-11",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-gone-12",
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#projects.E:/cd-throwaway/many/project-gone.mcpServers.cd-throwaway-gone-12",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "unread",
+              "after": "removed"
+            }
+          ],
+          "effective": [],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\claude-code-many-home",
+              "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+              "git_versioned": false,
+              "store_class": "rewritten-while-running",
+              "edits": [
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-01"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-02"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-03"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-04"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-05"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-06"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-07"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-08"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-09"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-10"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-11"
+                  ]
+                },
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "projects",
+                    "E:/cd-throwaway/many/project-gone",
+                    "mcpServers",
+                    "cd-throwaway-gone-12"
+                  ]
+                }
+              ],
+              "diff": "--- a/E:\\cd-throwaway\\claude-code-many-home\\.claude.json\n+++ b/E:\\cd-throwaway\\claude-code-many-home\\.claude.json\n@@ -63,20 +63,7 @@\n     \"E:/cd-throwaway/many/project-29\": {},\n     \"E:/cd-throwaway/many/project-30\": {},\n     \"E:/cd-throwaway/many/project-gone\": {\n-      \"mcpServers\": {\n-        \"cd-throwaway-gone-01\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-01\"] },\n-        \"cd-throwaway-gone-02\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-02\"] },\n-        \"cd-throwaway-gone-03\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-03\"] },\n-        \"cd-throwaway-gone-04\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-04\"] },\n-        \"cd-throwaway-gone-05\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-05\"] },\n-        \"cd-throwaway-gone-06\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-06\"] },\n-        \"cd-throwaway-gone-07\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-07\"] },\n-        \"cd-throwaway-gone-08\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-08\"] },\n-        \"cd-throwaway-gone-09\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-09\"] },\n-        \"cd-throwaway-gone-10\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-10\"] },\n-        \"cd-throwaway-gone-11\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-11\"] },\n-        \"cd-throwaway-gone-12\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-gone-12\"] }\n-      }\n+      \"mcpServers\": {}\n     }\n   }\n }\n\\ No newline at end of file\n",
+              "diff_unavailable": null,
+              "diff_note": null,
+              "changed_lines": 14
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "leftovers",
+        "project": "E:\\cd-throwaway\\project-gone"
+      },
+      "preview": {
+        "plan_id": "plan-47",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13065,14 +14845,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-a11"
+        "operation": "20261001-120000-4db"
       },
       "preview": {
-        "plan_id": "plan-47",
+        "plan_id": "plan-48",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-a11 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-a11",
+          "title": "Undo 20261001-120000-4db \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-4db",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -13424,6 +15204,17 @@ export const fixtures: Fixtures = {
               "item": "cd-throwaway-desktop",
               "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
               "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project",
               "before": "disabled",
               "after": "effective"
@@ -13530,15 +15321,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-a11"
+        "operation": "20261001-120000-4db"
       },
       "preview": {
-        "plan_id": "plan-48",
+        "plan_id": "plan-49",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-a11 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-4db \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-a11",
+          "backup_of": "20261001-120000-4db",
           "project": null,
           "changes": [],
           "effective": [],
@@ -13546,10 +15337,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a11\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4db\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a11",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a11 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4db",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-4db can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -13558,15 +15349,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-ce4"
+        "operation": "20261001-120000-b97"
       },
       "preview": {
-        "plan_id": "plan-49",
+        "plan_id": "plan-50",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-ce4 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-b97 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-ce4",
+          "backup_of": "20261001-120000-b97",
           "project": null,
           "changes": [],
           "effective": [],
@@ -13574,10 +15365,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-ce4 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-b97 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -13587,11 +15378,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-ce4",
+      "operation": "20261001-120000-b97",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ce4",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-ce4: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b97",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-b97: verified.",
       "hints": []
     }
   },
@@ -13639,7 +15430,7 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.2",
-    "commit": "703740f",
+    "commit": "38e4b1a",
     "date": "2026-10-22",
     "platform": "Windows x64",
     "pages": [
