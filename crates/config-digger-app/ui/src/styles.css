@@ -29,6 +29,9 @@
   --notice-success-edge: #6ee07f;
   --notice-error: #8a2f36;
   --notice-error-edge: #ffaba5;
+  --snackbar: #523f9e;
+  --snackbar-edge: #d4c9ff;
+  --shadow: #00000066;
 
   --mono: "Cascadia Mono", Consolas, monospace;
 
@@ -1295,10 +1298,11 @@ p {
   border-left-width: 4px;
   border-left-style: solid;
   border-radius: 14px;
-  box-shadow: 0 8px 24px #00000066;
+  box-shadow: 0 8px 24px var(--shadow);
   color: var(--white);
   font-size: 12.5px;
   line-height: 1.4;
+  animation: float-in 160ms ease-out;
 }
 
 .notice.information {
@@ -1916,7 +1920,8 @@ p {
   text-transform: uppercase;
 }
 
-/* The Undo snackbar, for about 10 seconds after an Operation */
+/* The Undo snackbar, for about 10 seconds after an Operation: a card like a
+   notice, in the app's purple, whose Undo is an outlined button. */
 
 .snackbar {
   position: fixed;
@@ -1926,18 +1931,25 @@ p {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 10px 8px 18px;
+  padding: 8px 10px 8px 14px;
   transform: translateX(-50%);
-  border-radius: 999px;
-  background: #2c2d35;
-  box-shadow: 0 8px 30px #000a;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--snackbar-edge);
+  border-radius: 14px;
+  background: var(--snackbar);
+  box-shadow: 0 8px 24px var(--shadow);
+  color: var(--white);
+  font-size: 12.5px;
+  animation: float-in 160ms ease-out;
 }
 
 .snackbar-action {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #c9bcf5;
+  padding: 4px 10px;
+  border: 1px solid var(--snackbar-edge);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--snackbar-edge);
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1945,10 +1957,62 @@ p {
   cursor: pointer;
 }
 
+.snackbar-action:hover {
+  background: var(--snackbar-edge);
+  color: var(--snackbar);
+}
+
 .file-head:focus-visible,
 .snackbar-action:focus-visible {
   outline: 2px solid var(--primary-hover);
   outline-offset: 2px;
+}
+
+/* A notice and the Undo snackbar slide and fade in, and out while leaving,
+   for as long as LEAVE_MS in Notice.tsx; they only fade for less motion.
+   They slide by translate, as their transform centres them. */
+
+.notice.leaving,
+.snackbar.leaving {
+  animation: float-out 160ms ease-in forwards;
+}
+
+@keyframes float-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes float-out {
+  to {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice,
+  .snackbar {
+    animation-name: fade-in;
+  }
+
+  .notice.leaving,
+  .snackbar.leaving {
+    animation-name: fade-out;
+  }
 }
 
 /* The banner while an Operation needs manual recovery, until it is dismissed */

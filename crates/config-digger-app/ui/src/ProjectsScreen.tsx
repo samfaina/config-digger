@@ -53,7 +53,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
   const cue = readCue({ shown: places !== null, reading, failed: error !== null });
   const [tab, setTab] = useState<Tab>(start?.tab ?? "projects");
   const [adding, setAdding] = useState<Tab | null>(start?.adding ? start.tab : null);
-  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
   const { actions, rows: busyRows, busy } = useBusy();
   // Remove leftovers is an Operation, previewed like any other. The missing
   // Project's row stays busy while the screen reads again.
@@ -141,7 +141,7 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
         <AddHomeDialog agents={places?.agents ?? []} onAdd={apply} onClose={() => setAdding(null)} notify={setNotice} />
       )}
 
-      <Status notice={notice} actions={actions} />
+      <Status notice={notice} actions={actions} onHold={holdNotice} />
 
       {dialog.view}
     </div>

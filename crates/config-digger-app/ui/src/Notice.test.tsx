@@ -1,8 +1,13 @@
+// @vitest-environment happy-dom
 import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test } from "vitest";
-import { Busy, Notice, Status } from "./Notice";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { NOTICE_MS } from "./desktop";
+import { Busy, LEAVE_MS, Notice, Status } from "./Notice";
 import type { BusyAction } from "./busy";
+import { useTransient } from "./useTransient";
 
 describe("a notice", () => {
   test("of information shows its text with the information look, read out politely", () => {
@@ -41,10 +46,10 @@ describe("a notice", () => {
 
 describe("the app's notices", () => {
   test("are all rendered by Notice, as no other component draws a .notice of its own", () => {
-    const folder = new URL("./", import.meta.url);
+    const folder = import.meta.dirname;
     const drawing = readdirSync(folder)
       .filter((file) => file.endsWith(".tsx") && !file.endsWith(".test.tsx"))
-      .filter((file) => /className=\{?[`"]notice\b/.test(readFileSync(new URL(file, folder), "utf8")));
+      .filter((file) => /className=\{?[`"]notice\b/.test(readFileSync(join(folder, file), "utf8")));
     expect(drawing).toEqual(["Notice.tsx"]);
   });
 });
@@ -91,5 +96,71 @@ describe("the bottom of a screen", () => {
 
   test("shows nothing when nothing runs and nothing is to tell", () => {
     expect(renderToStaticMarkup(<Status notice={null} actions={[]} />)).toBe("");
+  });
+});
+
+/** A screen that notifies on Copy, as the Inventory does after a copy. */
+function CopyingScreen() {
+  const [notice, setNotice, hold] = useTransient<Notice>(NOTICE_MS);
+  return (
+    <>
+      <button type="button" onClick={() => setNotice({ kind: "success", text: "Copied the path." })}>
+        Copy
+      </button>
+      <Status notice={notice} actions={[]} onHold={hold} />
+    </>
+  );
+}
+
+/** Renders the screen and copies. */
+function copied() {
+  render(<CopyingScreen />);
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+}
+
+/** Lets `ms` go by in steps, so that a timer an effect sets on the way runs too. */
+const wait = (ms: number) => {
+  for (let left = ms; left > 0; left -= 100) act(() => vi.advanceTimersByTime(Math.min(left, 100)));
+};
+
+describe("a screen's notice", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  test("stays about 4 seconds, then is gone", () => {
+    copied();
+
+    wait(3_800);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+
+    wait(600);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("stays while the pointer is over it, and for its time again once the pointer leaves", () => {
+    copied();
+
+    fireEvent.pointerEnter(screen.getByRole("status"));
+    wait(20_000);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+
+    fireEvent.pointerLeave(screen.getByRole("status"));
+    wait(3_800);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+    wait(600);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("leaves with a look of its own, then is gone", () => {
+    copied();
+
+    wait(NOTICE_MS);
+    expect(screen.getByRole("status").className).toBe("notice success leaving");
+
+    wait(LEAVE_MS);
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
