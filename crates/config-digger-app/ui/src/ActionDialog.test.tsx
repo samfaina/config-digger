@@ -40,15 +40,14 @@ describe("the What changes block", () => {
     after: "removed",
   };
 
-  /** Each labelled part of `term`'s list, as [label, what it says]. */
-  const partsOf = (term: HTMLElement) =>
-    within(term.closest("dl")!)
-      .getAllByRole("term")
-      .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
-
   /** Each labelled part of the change to the Entry `item`, as [label, what it says]. */
-  const parts = (item: string) =>
-    partsOf(screen.getAllByRole("term").find((term) => term.textContent === "Entry" && term.nextElementSibling?.textContent === item)!);
+  const parts = (item: string) => {
+    const entry = screen.getAllByRole("term").find((term) => term.textContent === "Entry" && term.nextElementSibling?.textContent === item);
+    if (!entry) throw new Error(`No change to the Entry ${item}`);
+    return within(entry.closest("dl")!)
+      .getAllByRole("term")
+      .map((label) => [label.textContent, label.nextElementSibling?.textContent]);
+  };
 
   test("labels each part of a change: its Entry, its Agent, its key and its change of State", () => {
     render(<Changes changes={[leftover]} notify={() => {}} />);

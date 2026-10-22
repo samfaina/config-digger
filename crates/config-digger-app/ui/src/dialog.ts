@@ -99,24 +99,32 @@ export function changeGroups(changes: Change[]): ContextGroup[] {
     else byEntry.push([change]);
   }
   const groups: ContextGroup[] = [];
-  const add = (label: ContextGroup["label"], title: string, change: Change) => {
+  const add = ({ label, title }: ContextHeading, change: Change) => {
     let group = groups.find((group) => group.label === label && group.title === title);
     if (!group) groups.push((group = { label, title, files: [] }));
-    const keyPieces = wrapPoints(locatorKey(change));
     let file = group.files.find((file) => file.path === change.path);
     if (!file) {
-      const label = keyPieces.length > 0 ? "File" : "Folder";
-      group.files.push((file = { label, path: change.path, name: fileName(change.path), changes: [] }));
+      // An Entry with no key, whose locator is its path alone, is a skill folder.
+      const kind = change.locator === change.path ? "Folder" : "File";
+      group.files.push((file = { label: kind, path: change.path, name: fileName(change.path), changes: [] }));
     }
-    file.changes.push({ change, keyPieces });
+    file.changes.push({ change, keyPieces: wrapPoints(locatorKey(change)) });
   };
   for (const ofEntry of byEntry) {
     const [first] = ofEntry;
     const sameWay = ofEntry.every((change) => change.before === first.before && change.after === first.after);
-    if (ofEntry.length > 1 && sameWay) add(null, `${ofEntry.length} contexts`, first);
-    else for (const change of ofEntry) change.project === null ? add(null, "No Project", change) : add("Project", change.project, change);
+    if (ofEntry.length > 1 && sameWay) add({ label: null, title: `${ofEntry.length} contexts` }, first);
+    else for (const change of ofEntry) add(ownContext(change), change);
   }
   return groups;
+}
+
+/** The heading of a context group: its label and its title. */
+type ContextHeading = Pick<ContextGroup, "label" | "title">;
+
+/** The heading of the one context a change is in: its Project, or No Project. */
+function ownContext({ project }: Change): ContextHeading {
+  return project === null ? { label: null, title: "No Project" } : { label: "Project", title: project };
 }
 
 /** The locator past its file, such as `mcpServers.notes`, or all of it when it does not start with the file. */

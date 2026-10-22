@@ -1569,7 +1569,8 @@ p {
 }
 
 /* What changes: each Project, then each file in it, then each change to
-   that file, the Entry's name first and every other part on a line of its own. */
+   that file, the Entry's name first and every other part on a line of its
+   own, each under a short label that says what it is. */
 
 .changes {
   display: flex;
