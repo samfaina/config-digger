@@ -1,7 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
 import {
+  filterOperations,
+  NO_FILTER,
+  FILTER_STATUSES,
+  FILTER_VERBS,
   operationActions,
+  operationCount,
+  type OperationFilter,
   operationRow,
   operationTime,
   recoveryBanner,
@@ -25,6 +31,7 @@ function summary(overrides: Partial<OperationSummary> = {}): OperationSummary {
     backup_deleted: false,
     backup_deletable: true,
     agents: ["Claude Code"],
+    entries: ["notes"],
     locations: [String.raw`C:\Users\me\.claude.json`],
     undoable: true,
     not_undoable: null,
@@ -303,5 +310,107 @@ describe("the Operation the detail pane shows", () => {
     expect(selectedOperation([newest, older], null)).toBe(newest);
     expect(selectedOperation([newest, older], "20260901-000000-0aa")).toBe(newest);
     expect(selectedOperation([], null)).toBeNull();
+  });
+});
+
+describe("filtering History", () => {
+  const disabled = summary({ id: "20261002-101500-b10", action: "disable", title: "Disable 1 Entry" });
+  const removed = summary({ id: "20261002-095812-a3f", action: "remove" });
+  const undo = summary({ id: "20261002-110000-d30", action: "undo", undo_of: "20261002-101500-b10" });
+  const ids = (operations: OperationSummary[]) => operations.map((operation) => operation.id);
+
+  test("lists every Operation with no filter", () => {
+    expect(ids(filterOperations([undo, disabled, removed], NO_FILTER))).toEqual([
+      "20261002-110000-d30",
+      "20261002-101500-b10",
+      "20261002-095812-a3f",
+    ]);
+  });
+
+  test("by verb lists only the Operations of that verb", () => {
+    expect(ids(filterOperations([undo, disabled, removed], { ...NO_FILTER, verb: "disable" }))).toEqual([
+      "20261002-101500-b10",
+    ]);
+    expect(ids(filterOperations([undo, disabled, removed], { ...NO_FILTER, verb: "undo" }))).toEqual([
+      "20261002-110000-d30",
+    ]);
+  });
+
+  test("by status lists only the Operations with that status, an applied Undo among the applied ones", () => {
+    const undone = summary({ id: "20261002-101500-b10", undone_by: "20261002-110000-d30", status_text: "Undone by 20261002-110000-d30" });
+    const failed = summary({ id: "20261001-090000-e40", status: "failed", status_text: "Failed, rolled back" });
+    const interrupted = summary({ id: "20261001-080000-f50", status: "in_progress", status_text: "Incomplete" });
+    const attention = summary({ id: "20261001-070000-a60", status: "needs_attention", needs_attention: true, status_text: "Needs attention" });
+    const dismissed = summary({
+      id: "20261001-060000-b70",
+      status: "needs_attention",
+      needs_attention: false,
+      status_text: "Rollback incomplete, dismissed",
+    });
+    const all = [undo, undone, removed, failed, interrupted, attention, dismissed];
+    const by = (status: OperationFilter["status"]) => ids(filterOperations(all, { ...NO_FILTER, status }));
+
+    expect(by("applied")).toEqual(["20261002-110000-d30", "20261002-095812-a3f"]);
+    expect(by("undone")).toEqual(["20261002-101500-b10"]);
+    expect(by("failed")).toEqual(["20261001-090000-e40", "20261001-080000-f50", "20261001-060000-b70"]);
+    expect(by("attention")).toEqual(["20261001-070000-a60"]);
+  });
+
+  test("by text lists only the Operations that changed an Entry whose name holds it, in any case", () => {
+    const linear = summary({ id: "20261002-101500-b10", entries: ["cd-throwaway-linear", "cd-throwaway-notes"] });
+    const deploy = summary({ id: "20261002-095812-a3f", entries: ["cd-throwaway-deploy"] });
+    const backup = summary({ id: "20261002-090000-c20", action: "delete_backup", entries: [] });
+    const by = (text: string) => ids(filterOperations([linear, deploy, backup], { ...NO_FILTER, text }));
+
+    expect(by("NOTES")).toEqual(["20261002-101500-b10"]);
+    expect(by("throwaway")).toEqual(["20261002-101500-b10", "20261002-095812-a3f"]);
+    expect(by("  deploy ")).toEqual(["20261002-095812-a3f"]);
+    expect(by("missing")).toEqual([]);
+  });
+
+  test("keeps only the Operations every part of the filter keeps", () => {
+    const linear = summary({ id: "20261002-101500-b10", action: "disable", entries: ["cd-throwaway-linear"] });
+    const notes = summary({ id: "20261002-095812-a3f", action: "disable", entries: ["cd-throwaway-notes"] });
+    const removed = summary({ id: "20261002-090000-c20", action: "remove", entries: ["cd-throwaway-linear"] });
+    const undone = summary({ ...linear, id: "20261002-080000-d30", undone_by: "20261002-110000-e40" });
+
+    expect(
+      ids(filterOperations([linear, notes, removed, undone], { verb: "disable", status: "applied", text: "linear" })),
+    ).toEqual(["20261002-101500-b10"]);
+  });
+});
+
+describe("the count of Operations", () => {
+  test("is the number History holds", () => {
+    expect(operationCount(1)).toBe("1 Operation");
+    expect(operationCount(40, 40)).toBe("40 Operations");
+  });
+
+  test("says how many of them the filter keeps", () => {
+    expect(operationCount(3, 40)).toBe("3 of 40 Operations");
+    expect(operationCount(0, 1)).toBe("0 of 1 Operation");
+  });
+});
+
+describe("the filter's choices", () => {
+  test("are any verb or each verb of an Operation", () => {
+    expect(FILTER_VERBS).toEqual([
+      { value: "", label: "Any verb" },
+      { value: "disable", label: "Disable" },
+      { value: "enable", label: "Enable" },
+      { value: "remove", label: "Remove" },
+      { value: "undo", label: "Undo" },
+      { value: "delete_backup", label: "Delete backup" },
+    ]);
+  });
+
+  test("are any status or each status History shows", () => {
+    expect(FILTER_STATUSES).toEqual([
+      { value: "", label: "Any status" },
+      { value: "applied", label: "Applied" },
+      { value: "undone", label: "Undone" },
+      { value: "failed", label: "Failed" },
+      { value: "attention", label: "Needs attention" },
+    ]);
   });
 });

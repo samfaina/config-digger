@@ -27,6 +27,7 @@ const summary: OperationSummary = {
   backup_deleted: false,
   backup_deletable: true,
   agents: ["Claude Code"],
+  entries: ["notes"],
   locations: [String.raw`C:\Users\me\.claude.json`],
   undoable: true,
   not_undoable: null,

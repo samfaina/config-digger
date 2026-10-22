@@ -1193,6 +1193,11 @@ export type OperationSummary = {
 	backup_deletable: boolean,
 	/**  The names of the Agents whose States it changed. */
 	agents: string[],
+	/**
+	 *  The names of the Entries whose States it changed: the names of
+	 *  their Items.
+	 */
+	entries: string[],
 	/**  The files it touched. */
 	locations: string[],
 	undoable: boolean,

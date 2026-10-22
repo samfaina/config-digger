@@ -372,9 +372,13 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
             })
     });
     let mut agents: Vec<String> = Vec::new();
+    let mut entries: Vec<String> = Vec::new();
     for change in &manifest.changes {
         if !agents.contains(&change.agent_name) {
             agents.push(change.agent_name.clone());
+        }
+        if !entries.contains(&change.item) {
+            entries.push(change.item.clone());
         }
     }
     OperationSummary {
@@ -397,6 +401,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
         backup_deleted: manifest.backup_deleted_at.is_some(),
         backup_deletable: backup_deletable(ports, manifest),
         agents,
+        entries,
         locations: manifest
             .locations
             .iter()

@@ -19,7 +19,8 @@ import type {
   WarningClass,
 } from "./bindings";
 
-const ACTION_LABELS: Record<Action, string> = {
+/** Each verb, as a button or a filter names it. */
+export const ACTION_LABELS: Record<Action, string> = {
   disable: "Disable",
   enable: "Enable",
   remove: "Remove",

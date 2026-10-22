@@ -107,6 +107,24 @@ const SHOTS: Shot[] = [
       await page.getByText("Backup folder").first().waitFor();
     },
   },
+  {
+    name: "history-filter",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "History · Undo");
+      await page.getByRole("textbox", { name: "Search Entry names" }).fill("codex");
+      await page.getByRole("combobox", { name: "Status" }).click();
+      await page.getByRole("listbox").waitFor();
+    },
+  },
+  {
+    name: "history-filter-none",
+    steps: async (page) => {
+      await rail(page, "History · Undo");
+      await page.getByRole("textbox", { name: "Search Entry names" }).fill("missing");
+      await page.getByText("No Operation matches the filter.").waitFor();
+    },
+  },
   { name: "settings", steps: (page) => rail(page, "Settings") },
   {
     name: "about",

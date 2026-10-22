@@ -2146,6 +2146,31 @@ p {
   flex: 1;
 }
 
+/* Wraps its dropdowns under the search when the list is narrow, at the smallest window */
+.history-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.history-filter .search {
+  flex: 1 1 180px;
+  margin-bottom: 0;
+}
+
+.filter-select {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.filtered-out .cta {
+  margin-top: 10px;
+}
+
 .history-detail {
   width: 560px;
 }

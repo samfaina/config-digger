@@ -82,6 +82,18 @@ fn history_lists_operations_newest_first() {
     assert_eq!(history[0].not_undoable, None);
 }
 
+#[test]
+fn history_names_the_entries_each_operation_changed() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    let removed = remove(&fs, "linear");
+    undo_with(&core(&fs), &removed.operation).unwrap();
+
+    let history = core(&fs).history().unwrap();
+
+    assert_eq!(history[0].entries, ["linear"]);
+    assert_eq!(history[1].entries, ["linear"]);
+}
+
 fn undo_with(core: &Core, operation: &str) -> Result<Outcome, Error> {
     let plan = core.plan_undo(operation)?;
     core.execute(plan, &[])

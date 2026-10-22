@@ -1,7 +1,9 @@
 // What the History · Undo screen shows, worked out from the Operations the
 // core lists and details. Nothing here calls the core or renders.
 
-import type { Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
+import type { Action, Error as ApiError, FileDiff, OperationDetail, OperationSummary } from "./bindings";
+import { ACTION_LABELS } from "./dialog";
+import type { DropdownOption } from "./dropdown";
 
 /** How a status reads at a glance. */
 export type StatusTone = "applied" | "undone" | "undo" | "failed" | "attention";
@@ -20,9 +22,10 @@ export function agentNames(summary: OperationSummary): string {
   return summary.agents.length > 0 ? summary.agents.join(", ") : "No Agent";
 }
 
-/** "1 Operation", "3 Operations". */
-export function operationCount(count: number): string {
-  return `${count} ${count === 1 ? "Operation" : "Operations"}`;
+/** "1 Operation", "3 Operations", or with the `total` History holds when a filter keeps fewer: "3 of 40 Operations". */
+export function operationCount(count: number, total = count): string {
+  const noun = total === 1 ? "Operation" : "Operations";
+  return count === total ? `${count} ${noun}` : `${count} of ${total} ${noun}`;
 }
 
 /** An Operation's row in the list. */
@@ -81,6 +84,51 @@ export function operationActions(summary: OperationSummary): OperationActions {
     ? { offered: true, refusal: summary.undoable ? null : summary.not_undoable }
     : { offered: false, why: summary.not_undoable ?? "It cannot be undone." };
   return { undo, deleteBackup: summary.backup_deletable, dismiss: summary.needs_attention };
+}
+
+/** What became of an Operation, as History filters by it: an applied Undo is applied, and an Operation that did not complete failed. */
+export type FilterStatus = "applied" | "undone" | "failed" | "attention";
+
+/**
+ * What History's list is narrowed to: an Operation's verb and status, each
+ * `""` for any, and text that one of the names of the Entries it changed
+ * holds, in any case.
+ */
+export type OperationFilter = { verb: Action | ""; status: FilterStatus | ""; text: string };
+
+export const NO_FILTER: OperationFilter = { verb: "", status: "", text: "" };
+
+const VERBS: Action[] = ["disable", "enable", "remove", "undo", "delete_backup"];
+
+/** The choices of the filter's verb. */
+export const FILTER_VERBS: DropdownOption[] = [
+  { value: "", label: "Any verb" },
+  ...VERBS.map((verb) => ({ value: verb, label: ACTION_LABELS[verb] })),
+];
+
+/** The choices of the filter's status. */
+export const FILTER_STATUSES: DropdownOption[] = [
+  { value: "", label: "Any status" },
+  { value: "applied", label: "Applied" },
+  { value: "undone", label: "Undone" },
+  { value: "failed", label: "Failed" },
+  { value: "attention", label: "Needs attention" },
+];
+
+/** The Operations of `history` that `filter` keeps, in their order. */
+export function filterOperations(history: OperationSummary[], filter: OperationFilter): OperationSummary[] {
+  const text = filter.text.trim().toLowerCase();
+  return history.filter(
+    (summary) =>
+      (filter.verb === "" || summary.action === filter.verb) &&
+      (filter.status === "" || filterStatus(summary) === filter.status) &&
+      (text === "" || summary.entries.some((entry) => entry.toLowerCase().includes(text))),
+  );
+}
+
+function filterStatus(summary: OperationSummary): FilterStatus {
+  const tone = statusTone(summary);
+  return tone === "undo" ? "applied" : tone;
 }
 
 /** The Operation the detail pane shows: the one selected while History lists it, else the newest. */
