@@ -380,22 +380,26 @@ export function DialogSection({ title, children }: { title: string; children: Re
   );
 }
 
-/** The States an Operation changes, under each context, then under each file. */
+/** The States an Operation changes, under each context, then under each file, each part labelled where it does not say what it is. */
 export function Changes({ changes, notify }: { changes: Change[]; notify: Notify }) {
   if (changes.length === 0) return <p className="dim">No State changes in any Agent.</p>;
   return (
     <div className="changes">
       {changeGroups(changes).map((group) => (
-        <section key={group.title} className="change-project">
-          <h3 className="change-project-name">{group.title}</h3>
+        <section key={`${group.label}|${group.title}`} className="change-project">
+          <h3 className="change-project-name">
+            {group.label && <><span className="change-label">{group.label}</span>{" "}</>}
+            {group.title}
+          </h3>
           {group.files.map((file) => (
             <div key={file.path} className="change-file">
-              <div className="change-file-name">
+              <h4 className="change-file-name">
+                <span className="change-label">{file.label}</span>{" "}
                 <Tooltip text={file.path}>
                   <span className="mono">{file.name}</span>
                 </Tooltip>
                 <CopyButton text={file.path} what="path" notify={notify} />
-              </div>
+              </h4>
               {file.changes.map((line) => (
                 <ChangeRow key={`${line.change.agent}|${line.change.home}|${line.change.locator}`} line={line} notify={notify} />
               ))}
@@ -407,17 +411,22 @@ export function Changes({ changes, notify }: { changes: Change[]; notify: Notify
   );
 }
 
-/** One (Agent, Entry, Project) whose State the Operation changes: the Entry, its Agent, its key, then before → after. */
+/**
+ * One (Agent, Entry, Project) whose State the Operation changes, each part
+ * under its label: the Entry, its Agent, its key, then before → after.
+ */
 function ChangeRow({ line: { change, keyPieces }, notify }: { line: ChangeLine; notify: Notify }) {
   return (
-    <div className="change-row">
-      <b className="change-item">{change.item}</b>
-      <div className="dim">
+    <dl className="change-row">
+      <ChangePart label="Entry">
+        <b className="change-item">{change.item}</b>
+      </ChangePart>
+      <ChangePart label="Agent">
         {change.agent_name}
         {change.home !== "default" && ` (${change.home})`}
-      </div>
+      </ChangePart>
       {keyPieces.length > 0 && (
-        <div className="change-locator">
+        <ChangePart label="Key" className="change-locator">
           <Tooltip text={change.locator}>
             <span className="mono dim change-key">
               {keyPieces.map((piece, index) => (
@@ -429,13 +438,21 @@ function ChangeRow({ line: { change, keyPieces }, notify }: { line: ChangeLine; 
             </span>
           </Tooltip>
           <CopyButton text={change.locator} what="locator" notify={notify} />
-        </div>
+        </ChangePart>
       )}
-      <div className="change-states">
-        <StateAfterPill state={change.before} />
-        <span className="dim">→</span>
-        <StateAfterPill state={change.after} />
-      </div>
+      <ChangePart label="State" className="change-states">
+        <StateAfterPill state={change.before} /> <span className="dim">→</span> <StateAfterPill state={change.after} />
+      </ChangePart>
+    </dl>
+  );
+}
+
+/** One part of a change, its short label beside what it says. */
+function ChangePart({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className="change-part">
+      <dt className="change-label">{label}</dt>
+      <dd className={className}>{children}</dd>
     </div>
   );
 }

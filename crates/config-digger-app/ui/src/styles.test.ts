@@ -212,11 +212,15 @@ describe("a selected filter row of Entries by State", () => {
 });
 
 describe("a change in the What changes block", () => {
-  test("puts each of its lines under the last, with space between them", () => {
+  test("puts each of its parts on a line under the last, its label in a column before it, with space between them", () => {
     const row = styled(".change-row");
-    expect(row.get("display")).toBe("flex");
-    expect(row.get("flex-direction")).toBe("column");
-    expect(parseFloat(row.get("gap") ?? "0")).toBeGreaterThan(0);
+    expect(row.get("display")).toBe("grid");
+    expect(row.get("grid-template-columns")).toBe("max-content minmax(0, 1fr)");
+    const [rowGap, columnGap = rowGap] = (row.get("gap") ?? "0").split(/\s+/).map(parseFloat);
+    expect(rowGap).toBeGreaterThan(0);
+    expect(columnGap).toBeGreaterThan(0);
+    // Each label and what it says are cells of the row's grid.
+    expect(styled(".change-part").get("display")).toBe("contents");
   });
 
   test("wraps its key only where a path or key separator lets it, never mid-word", () => {
