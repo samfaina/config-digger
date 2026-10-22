@@ -1,8 +1,15 @@
+// @vitest-environment happy-dom
 import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { Busy, Notice, Status } from "./Notice";
+import { NOTICE_MS } from "./desktop";
+import { onAFakeClock, wait } from "./fakeClock";
+import { Busy, LEAVE_MS, Notice, Status } from "./Notice";
 import type { BusyAction } from "./busy";
+import { useTransient } from "./useTransient";
 
 describe("a notice", () => {
   test("of information shows its text with the information look, read out politely", () => {
@@ -41,10 +48,10 @@ describe("a notice", () => {
 
 describe("the app's notices", () => {
   test("are all rendered by Notice, as no other component draws a .notice of its own", () => {
-    const folder = new URL("./", import.meta.url);
+    const folder = import.meta.dirname;
     const drawing = readdirSync(folder)
       .filter((file) => file.endsWith(".tsx") && !file.endsWith(".test.tsx"))
-      .filter((file) => /className=\{?[`"]notice\b/.test(readFileSync(new URL(file, folder), "utf8")));
+      .filter((file) => /className=\{?[`"]notice\b/.test(readFileSync(join(folder, file), "utf8")));
     expect(drawing).toEqual(["Notice.tsx"]);
   });
 });
@@ -91,5 +98,88 @@ describe("the bottom of a screen", () => {
 
   test("shows nothing when nothing runs and nothing is to tell", () => {
     expect(renderToStaticMarkup(<Status notice={null} actions={[]} />)).toBe("");
+  });
+});
+
+/** A screen that notifies on Copy, as the Inventory does after a copy, and runs an action on Hide until End. */
+function CopyingScreen() {
+  const [notice, setNotice, hold] = useTransient<Notice>(NOTICE_MS);
+  const [actions, setActions] = useState<BusyAction[]>([]);
+  return (
+    <>
+      <button type="button" onClick={() => setNotice({ kind: "success", text: "Copied the path." })}>
+        Copy
+      </button>
+      <button type="button" onClick={() => setActions([HIDING])}>
+        Hide
+      </button>
+      <button type="button" onClick={() => setActions([])}>
+        End
+      </button>
+      <Status notice={notice} actions={actions} onHold={hold} />
+    </>
+  );
+}
+
+/** Renders the screen and copies. */
+function copyOnAScreen() {
+  render(<CopyingScreen />);
+  press("Copy");
+}
+const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+
+describe("a screen's notice", () => {
+  onAFakeClock();
+
+  test("stays about 4 seconds, then is gone", () => {
+    copyOnAScreen();
+
+    wait(3_800);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+
+    wait(600);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("stays while the pointer is over it, and for its time again once the pointer leaves", () => {
+    copyOnAScreen();
+
+    fireEvent.pointerEnter(screen.getByRole("status"));
+    wait(20_000);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+
+    fireEvent.pointerLeave(screen.getByRole("status"));
+    wait(3_800);
+    expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
+    wait(600);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("is not held for good once the busy indicator of an action covers it under the pointer", () => {
+    copyOnAScreen();
+    fireEvent.pointerEnter(screen.getByRole("status"));
+
+    press("Hide");
+    press("End");
+    wait(NOTICE_MS + LEAVE_MS);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("comes in afresh when another replaces it, so that it slides in again", () => {
+    copyOnAScreen();
+    const first = screen.getByRole("status");
+
+    press("Copy");
+    expect(screen.getByRole("status")).not.toBe(first);
+  });
+
+  test("leaves with a look of its own, then is gone", () => {
+    copyOnAScreen();
+
+    wait(NOTICE_MS);
+    expect(screen.getByRole("status").className).toBe("notice success leaving");
+
+    wait(LEAVE_MS);
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

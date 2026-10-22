@@ -5,7 +5,7 @@ import type { Notice } from "./Notice";
 export type Notify = (notice: Notice) => void;
 
 /** How long a notice stays. */
-export const NOTICE_MS = 2500;
+export const NOTICE_MS = 4000;
 
 /** What a command returns. */
 export type CommandResult<T> = { status: "ok"; data: T } | { status: "error"; error: ApiError };

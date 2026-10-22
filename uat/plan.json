@@ -728,15 +728,17 @@
         {
           "id": "5.1",
           "title": "Un aviso de éxito",
-          "goal": "Los avisos se ven como tarjetas de la app, no como píldoras, y uno de éxito es verde.",
+          "goal": "Los avisos se ven como tarjetas de la app, no como píldoras, y uno de éxito es verde. Entran y se van con suavidad, se quedan unos 4 segundos y no se van mientras el ratón está encima.",
           "instructions": [
             "Con el home de Claude Code de prueba elegido en el Inventario (paso 1.2), elige el servidor cd-throwaway-user.",
             "En su Entry, pulsa Copy path.",
-            "Mira el aviso que sale abajo, en el centro."
+            "Mira el aviso que sale abajo, en el centro, sin llevar el ratón hasta él, y cuenta los segundos hasta que se vaya.",
+            "Pulsa Copy path otra vez y deja el ratón sobre el aviso unos 10 segundos.",
+            "Aparta el ratón del aviso y cuenta los segundos hasta que se vaya."
           ],
           "commands": [],
-          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde y destaca, más claro que el panel y las tarjetas. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Se va solo a los pocos segundos.",
-          "covers": ["#184"]
+          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde y destaca, más claro que el panel y las tarjetas. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Entra subiendo un poco mientras aparece, en un instante y sin saltos. Se queda unos 4 segundos y se va bajando un poco mientras se desvanece. Con el ratón encima no se va; unos 4 segundos después de apartarlo, se va igual.",
+          "covers": ["#184", "#208"]
         },
         {
           "id": "5.2",
@@ -755,8 +757,8 @@
               "text": "([ordered]@{ 'Backups and Operation history' = \"$env:LOCALAPPDATA\\config-digger\\backups\"; 'Parked Entries' = \"$env:LOCALAPPDATA\\config-digger\\parked\"; 'Logs' = \"$env:LOCALAPPDATA\\config-digger\\logs\"; 'Your lists and settings' = \"$env:APPDATA\\config-digger\" }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
             }
           ],
-          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
-          "covers": ["#184"]
+          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Entra, se queda unos 4 segundos y se va como el del paso 5.1. Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
+          "covers": ["#184", "#208"]
         },
         {
           "id": "5.3",
@@ -782,8 +784,30 @@
               "text": "Set-ItemProperty \"$env:APPDATA\\config-digger\\settings.json\" -Name IsReadOnly -Value $false"
             }
           ],
-          "expect": "Sale un recuadro con la forma del paso 5.1, de fondo rojo, con un borde rosa claro a la izquierda, un icono «!» rosa claro y el texto blanco «The setting couldn't be saved: cannot write …», que acaba en un error de acceso denegado. El interruptor vuelve a como estaba.",
-          "covers": ["#184"]
+          "expect": "Sale un recuadro con la forma del paso 5.1, de fondo rojo, con un borde rosa claro a la izquierda, un icono «!» rosa claro y el texto blanco «The setting couldn't be saved: cannot write …», que acaba en un error de acceso denegado. Entra, se queda unos 4 segundos y se va como el del paso 5.1. El interruptor vuelve a como estaba.",
+          "covers": ["#184", "#208"]
+        },
+        {
+          "id": "5.4",
+          "title": "Avisos sin movimiento",
+          "goal": "Con las animaciones de Windows apagadas, un aviso aparece y se va sin moverse.",
+          "instructions": [
+            "Ejecuta la orden en PowerShell, que abre Accesibilidad > Efectos visuales en Configuración de Windows.",
+            "Apaga Efectos de animación.",
+            "Vuelve a config-digger. Con el home de Claude Code de prueba elegido en el Inventario, elige el servidor cd-throwaway-user.",
+            "En su Entry, pulsa Copy path.",
+            "Mira cómo sale el aviso de abajo y cómo se va.",
+            "En Configuración de Windows, vuelve a encender Efectos de animación."
+          ],
+          "commands": [
+            {
+              "label": "Abrir Efectos visuales",
+              "shell": "powershell",
+              "text": "Start-Process ms-settings:easeofaccess-visualeffects"
+            }
+          ],
+          "expect": "El aviso «Copied the path.» aparece y se va con un fundido, en el mismo sitio, sin subir ni bajar.",
+          "covers": ["#208"]
         }
       ]
     },
@@ -1104,6 +1128,31 @@
           "commands": [],
           "expect": "Tras el último Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». La tarjeta tiene junto a su State una rueda pequeña con «Reading…», y sus botones Enable y Remove se ven apagados, hasta que la tarjeta dice Effective y ofrece Disable. El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la tarjeta cambie.",
           "covers": ["#223"]
+        },
+        {
+          "id": "11.10",
+          "title": "El aviso de Undo",
+          "goal": "El aviso con Undo que deja una Operation se ve como los otros avisos, su Undo se ve como un botón, y entra y se va con suavidad.",
+          "instructions": [
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "Mira cómo entra el aviso de abajo que empieza por «Disabled 1 Entry».",
+            "Deja el ratón sobre el aviso unos 15 segundos y pásalo por encima de Undo y de ✕.",
+            "Pulsa Tab hasta que el foco llegue a Undo, y otra vez para llegar a ✕.",
+            "Aparta el ratón del aviso y espera sin tocar nada hasta que se vaya.",
+            "En la tarjeta de cd-throwaway-codex, pulsa Enable, márcalo todo si hay casillas de aviso, pulsa Enable y luego Done.",
+            "En el aviso de abajo que empieza por «Enabled 1 Entry», pulsa ✕."
+          ],
+          "commands": [],
+          "expect": "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora. Su fondo morado destaca, más claro que el panel y las tarjetas, con un borde lila claro a la izquierda y el texto blanco. Undo es un botón con borde y letras lila claro, y ✕ es lila claro sin fondo; con el ratón encima, los dos se rellenan de lila con letras moradas. Con el teclado, el foco en Undo y en ✕ se ve con un anillo blanco. Entra subiendo un poco mientras aparece, en un instante. Con el ratón encima no se va. Unos 10 segundos después de apartar el ratón se va bajando un poco mientras se desvanece. Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe.",
+          "covers": ["#208"]
         }
       ]
     },

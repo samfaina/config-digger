@@ -3,11 +3,8 @@ import { ActionDialog, type Applied } from "./ActionDialog";
 import type { ActionRequest } from "./bindings";
 import type { Notify } from "./desktop";
 import type { UndoRefusal } from "./history";
+import { Snackbar, SNACKBAR_MS } from "./Snackbar";
 import { useTransient } from "./useTransient";
-import { Tooltip } from "./Tooltip";
-
-/** How long the Undo snackbar stays after an Operation. */
-const SNACKBAR_MS = 10_000;
 
 type Options = {
   /** Runs whenever the dialog on `request` closes, whatever it did, so that the screen reads again. */
@@ -25,7 +22,7 @@ export function useActionDialog({ onClosed, onOpenHistory, notify, onRefused }: 
 } {
   // The action open in the dialog, numbered so that each one opens afresh.
   const [dialog, setDialog] = useState<{ request: ActionRequest; key: number } | null>(null);
-  const [snackbar, setSnackbar] = useTransient<Applied>(SNACKBAR_MS);
+  const [snackbar, setSnackbar, holdSnackbar] = useTransient<Applied>(SNACKBAR_MS);
   const open = (request: ActionRequest) => {
     setSnackbar(null);
     setDialog((current) => ({ request, key: (current?.key ?? 0) + 1 }));
@@ -37,19 +34,12 @@ export function useActionDialog({ onClosed, onOpenHistory, notify, onRefused }: 
 
   const view = (
     <>
-      {snackbar && !dialog && (
-        <div className="snackbar" role="status">
-          {snackbar.sentence}
-          <button type="button" className="snackbar-action" onClick={() => open({ kind: "undo", operation: snackbar.operation })}>
-            Undo
-          </button>
-          <Tooltip text="Dismiss">
-            <button type="button" className="icon-button" aria-label="Dismiss" onClick={() => setSnackbar(null)}>
-              ✕
-            </button>
-          </Tooltip>
-        </div>
-      )}
+      <Snackbar
+        applied={dialog ? null : snackbar}
+        onUndo={(operation) => open({ kind: "undo", operation })}
+        onDismiss={() => setSnackbar(null)}
+        onHold={holdSnackbar}
+      />
 
       {dialog && (
         <ActionDialog

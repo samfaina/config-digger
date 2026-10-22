@@ -3,7 +3,7 @@ import type { ThirdPartyLicenses } from "../build/licenses";
 import { commands, type About, type Page } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
-import { Notice } from "./Notice";
+import { Status, type Notice } from "./Notice";
 import { UpdateBanner } from "./UpdateBanner";
 import { lastCheckedText } from "./updates";
 import type { Updates } from "./useUpdates";
@@ -20,7 +20,7 @@ const PAGE_TITLES: Record<Page, string> = {
 export function AboutScreen({ updates }: { updates: Updates }) {
   const [about, setAbout] = useState<About | null>(null);
   const [licensesOpen, setLicensesOpen] = useState(false);
-  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
 
   useEffect(() => {
     void call(commands.readAbout).then((result) => {
@@ -150,7 +150,7 @@ export function AboutScreen({ updates }: { updates: Updates }) {
 
       {licensesOpen && <LicensesDialog onClose={() => setLicensesOpen(false)} />}
 
-      {notice && <Notice notice={notice} />}
+      <Status notice={notice} onHold={holdNotice} />
     </div>
   );
 }

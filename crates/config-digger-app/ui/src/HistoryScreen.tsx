@@ -34,7 +34,7 @@ export function HistoryScreen() {
   const [detail, setDetail] = useState<{ detail: OperationDetail } | { error: ApiError } | null>(null);
   // An Undo of the selected Operation that the core refused, or that its detail already held refused, shown in its detail.
   const [refused, setRefused] = useState<{ operation: string; refusal: UndoRefusal } | null>(null);
-  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
   const { actions, rows: busyRows, busy } = useBusy();
   // Until History is read again, the Operation the dialog acted on stays busy, so that its buttons can't start the action again.
   const dialog = useActionDialog({
@@ -154,7 +154,7 @@ export function HistoryScreen() {
         </section>
       </div>
 
-      <Status notice={notice} actions={actions} />
+      <Status notice={notice} actions={actions} onHold={holdNotice} />
 
       {dialog.view}
     </div>

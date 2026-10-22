@@ -77,7 +77,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const [filter, setFilter] = useState<ItemFilter>({ kind: "all", text: "", state: start?.state ?? null });
   const [detail, setDetail] = useState<Detail>(null);
   const [flash, setFlash] = useTransient<string>(FLASH_MS);
-  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
   const { actions, busy } = useBusy();
   // While an action runs or the inventory is read, the States shown may be
   // old: an action reaches every Agent that shares its mechanism, and an Undo
@@ -290,7 +290,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
         </div>
       )}
 
-      <Status notice={notice} actions={actions} />
+      <Status notice={notice} actions={actions} onHold={holdNotice} />
 
       {dialog.view}
     </div>

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { LEAVE_MS } from "./Notice";
 
 const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
@@ -404,5 +405,121 @@ describe("the cue of a re-read", () => {
     expect(styled(".read-progress span").get("animation")).toMatch(/\bread-progress\b.*\binfinite\b/);
     expect(css).toMatch(/@keyframes read-progress\s*\{/);
     expect(styled(".read-progress span", /prefers-reduced-motion: reduce/).get("animation-duration")).toBeDefined();
+  });
+});
+
+const SURFACES = ["--background", "--rail", "--panel", "--tile", "--tile-hover", "--button"];
+
+describe("the Undo snackbar", () => {
+  test("has the corner radius of the notices, cards and dialogs, not a pill's", () => {
+    const radius = styled(".snackbar").get("border-radius");
+    expect(radius).toBe(styled(".notice").get("border-radius"));
+    expect(radius).toBe(styled(".entry-card").get("border-radius"));
+    expect(px(radius)).toBeLessThanOrEqual(px(styled(".dialog").get("border-radius")));
+  });
+
+  test("takes every colour from the :root tokens", () => {
+    expectTokenColours([".snackbar", ".snackbar-action", ".snackbar-action:hover"]);
+  });
+
+  test("stands out from every surface of the app as a notice does, with an accent edge", () => {
+    const snackbar = styled(".snackbar");
+    const background = colour(snackbar.get("background"));
+    const edge = colour(snackbar.get("border-left-color"));
+    expect(snackbar.get("border-left-width")).toBe(styled(".notice").get("border-left-width"));
+    for (const surface of SURFACES.map((token) => colour(`var(${token})`))) {
+      expect(contrast(background, surface), surface).toBeGreaterThanOrEqual(1.6);
+      expect(contrast(edge, surface), `edge on ${surface}`).toBeGreaterThanOrEqual(3);
+    }
+    expect(contrast(edge, background), "edge on the snackbar").toBeGreaterThanOrEqual(3);
+  });
+
+  test("has text and an Undo action that meet WCAG AA on its background", () => {
+    const background = colour(styled(".snackbar").get("background"));
+    expect(contrast(colour(styled(".snackbar").get("color")), background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colour(styled(".snackbar-action").get("color")), background)).toBeGreaterThanOrEqual(4.5);
+    // Hovered, the action is filled with what was its text colour.
+    const hovered = styled(".snackbar-action:hover");
+    expect(contrast(colour(hovered.get("color")), colour(hovered.get("background")))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("draws its Undo action as a button, with an outline the eye can find", () => {
+    const action = styled(".snackbar-action");
+    const [width, style, outline] = (action.get("border") ?? "").split(/\s+/);
+    expect(px(width)).toBeGreaterThanOrEqual(1);
+    expect(style).toBe("solid");
+    expect(contrast(colour(outline), colour(styled(".snackbar").get("background")))).toBeGreaterThanOrEqual(3);
+    expect(padding(".snackbar-action", "left")).toBeGreaterThan(0);
+    expect(px(action.get("border-radius"))).toBeGreaterThan(0);
+    expect(action.get("cursor")).toBe("pointer");
+  });
+
+  test("has a Dismiss button and a focus ring that are seen on its background", () => {
+    const background = colour(styled(".snackbar").get("background"));
+    const dismiss = styled(".snackbar .icon-button");
+    expect(dismiss.get("background")).toBe("transparent");
+    expect(contrast(colour(dismiss.get("color")), background)).toBeGreaterThanOrEqual(4.5);
+    const hovered = styled(".snackbar .icon-button:hover");
+    expect(contrast(colour(hovered.get("color")), colour(hovered.get("background")))).toBeGreaterThanOrEqual(4.5);
+    // A focus ring is a graphic that has to be seen: WCAG asks 3:1 of it.
+    expect(contrast(colour(styled(".snackbar :focus-visible").get("outline-color")), background)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+/** The keyframes name and the duration in ms of an `animation` shorthand, such as `float-in 160ms ease-out`. */
+const animation = (value: string | undefined) => {
+  const [name, duration] = (value ?? "").split(/\s+/);
+  expect(duration, `${value} gives a duration in ms`).toMatch(/^\d+ms$/);
+  return { name, ms: parseInt(duration, 10) };
+};
+/** The body of `@keyframes name`. */
+const keyframes = (name: string) => {
+  const body = css.match(new RegExp(String.raw`@keyframes ${name}\s*\{([\s\S]*?\})\s*\}`))?.[1];
+  expect(body, `@keyframes ${name}`).toBeDefined();
+  return body as string;
+};
+const FLOATING = [".notice", ".snackbar"];
+
+describe("a notice and the Undo snackbar coming and going", () => {
+  test("fade and slide in, in under 200 ms", () => {
+    for (const selector of FLOATING) {
+      const { name, ms } = animation(styled(selector).get("animation"));
+      expect(ms, selector).toBeLessThan(200);
+      expect(keyframes(name), selector).toMatch(/from\s*\{[^}]*opacity:\s*0[^}]*translate:/);
+    }
+  });
+
+  test("fade and slide out while leaving, in the time the app gives them to leave", () => {
+    expect(LEAVE_MS).toBeLessThan(200);
+    for (const selector of FLOATING) {
+      const value = styled(`${selector}.leaving`).get("animation");
+      const { name, ms } = animation(value);
+      expect(ms, selector).toBe(LEAVE_MS);
+      expect(value, `${selector} stays gone at the end`).toMatch(/\bforwards\b/);
+      expect(keyframes(name), selector).toMatch(/to\s*\{[^}]*opacity:\s*0[^}]*translate:/);
+    }
+  });
+
+  test("let the pointer through while leaving, so that nothing on them is pressed or held as they go", () => {
+    for (const selector of FLOATING) expect(styled(`${selector}.leaving`).get("pointer-events"), selector).toBe("none");
+  });
+
+  test("slide by translate, keeping the transform that centres them", () => {
+    for (const selector of FLOATING) {
+      expect(styled(selector).get("transform"), selector).toBe("translateX(-50%)");
+      for (const leaving of ["", ".leaving"]) {
+        expect(keyframes(animation(styled(`${selector}${leaving}`).get("animation")).name)).not.toMatch(/transform/);
+      }
+    }
+  });
+
+  test("only fade when the user asks for less motion", () => {
+    const reduced = /prefers-reduced-motion: reduce/;
+    for (const selector of FLOATING.flatMap((floating) => [floating, `${floating}.leaving`])) {
+      const name = styled(selector, reduced).get("animation-name");
+      expect(name, selector).toBeDefined();
+      expect(keyframes(name as string), selector).toMatch(/opacity/);
+      expect(keyframes(name as string), selector).not.toMatch(/translate|transform/);
+    }
   });
 });

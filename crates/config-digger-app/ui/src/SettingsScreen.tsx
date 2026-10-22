@@ -3,7 +3,7 @@ import { commands, type DataFolder } from "./bindings";
 import { call, NOTICE_MS } from "./desktop";
 import { Icon } from "./icons";
 import { Loading, ReadProgress } from "./Loading";
-import { Notice } from "./Notice";
+import { Status, type Notice } from "./Notice";
 import type { InventoryStart } from "./places";
 import { readCue } from "./reads";
 import { dataFolderRows, parkedRows, type ParkedRow } from "./settings";
@@ -21,7 +21,7 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
   const { read, error, reading, save } = useSettings();
   const cue = readCue({ shown: read !== null, reading, failed: error !== null });
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useTransient<Notice>(NOTICE_MS);
+  const [notice, setNotice, holdNotice] = useTransient<Notice>(NOTICE_MS);
 
   const toggleUpdates = async () => {
     if (!read) return;
@@ -131,7 +131,7 @@ export function SettingsScreen({ onShow, onOpenAbout }: Props) {
         </section>
       </div>
 
-      {notice && <Notice notice={notice} />}
+      <Status notice={notice} onHold={holdNotice} />
     </div>
   );
 }
