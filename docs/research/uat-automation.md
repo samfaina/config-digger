@@ -1,18 +1,18 @@
 # Research: automating the UAT walk
 
-Issue: #236. Researched 2026-10-22 against `uat/plan.json` at commit `ffc08ac`, which has 69 steps in 15 sections. Tried on the maintainer's machine, Windows 11 Pro build 26300, with Tauri 2.12 (`tauri-cli` 2.12.1, `tauri-plugin-updater` 2.13.2), `tauri-driver` 2.1.0, WebView2 and `msedgedriver` 155.0.4283.62, NSIS 3.11 and Windows Sandbox. Terms in **bold** come from `CONTEXT.md`.
+Issue: #236. Researched 2026-10-22 against `uat/plan.json` at commit `ffc08ac`, which has 69 steps in 15 sections. Tried on the maintainer's machine, Windows 11 Pro build 26300, with Tauri 2.12 (`tauri-cli` 2.12.1, `tauri-plugin-updater` 2.13.2), `tauri-driver` 2.1.0, WebView2 and `msedgedriver` 155.0.4283.62, NSIS 3.11 and Windows Sandbox. Domain terms, such as Entry, Agent home and Operation, are used as `CONTEXT.md` defines them.
 
 ## Summary and recommendations
 
-1. **The manual walk can shrink from 69 steps to 2.** The two that stay are the motion halves of 5.1 and 11.10: whether a notice and the Undo snackbar slide in and out without a jump. Tests already prove their durations, properties and the reduced-motion fade, but no tool here judges how motion looks over time. Besides those two steps, a person reviews each KO of the agent judge and approves each changed visual reference. Every other step goes to one of six tools, listed per step in [section 8](#8-every-step).
+1. **The manual walk can shrink from 69 steps to parts of 3.** The motion halves of 5.1 and 11.10 stay: whether a notice and the Undo snackbar slide in and out without a jump. Tests already prove their durations, properties and the reduced-motion fade, but no tool here judges how motion looks over time. SmartScreen's "Windows protegió su PC" in 9.2 also stays, until the app is signed. Besides those, a person reviews each KO of the agent judge and approves each changed visual reference. Every other check goes to the tools the issue names (fake-backend UI tests, WebDriver on the real app, the Sandbox script, CLI tests, visual regression, the agent judge) or to the local script, step by step in [section 8](#8-every-step).
 2. **WebDriver works on the real app.** `tauri-driver` with the `msedgedriver` that matches WebView2 opened a session on the release build in 0.3 s. It found the rail's buttons and the Inventory's Item rows, switched tabs and resized the window to 1100 × 640. I did not try it on `windows-latest`; the first follow-up starts there.
 3. **The real app runs on the throwaway data alone.** Launch `tauri-driver` with `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` pointing into `cd-throwaway`. The core reads every Agent home and writes its own data through those variables, and Windows resolves its known folders from `USERPROFILE`, so `USERPROFILE` must hold `AppData\Local` and `AppData\Roaming` too. Otherwise Tauri cannot find the app's data folder and WebDriver cannot open a session.
 4. **Windows Sandbox runs the installer, the update and the uninstaller unattended.** A `.wsb` file maps the installers, the scripts and a results folder, and its logon command runs a PowerShell script. Silent installs and uninstalls passed every check: install folder, user `PATH` in `HKCU\Environment`, the remembered PATH choice, and both data folders.
-5. **Check the installer's PATH page through UI Automation, not command-line options.** Windows PowerShell 5.1 inside the Sandbox drove the welcome page, the directory page, Already Installed, Finish and the uninstaller's Delete config-digger data warning, with nothing to install. The uninstaller needs it anyway: Tauri's NSIS script has no command-line switch for that box, and steps 13.3 and 13.4 depend on it. Steps 9.2, 9.3, 9.4, 13.3 and 13.4 all passed this way.
-6. **Check the update against a local endpoint, signed with a key made for the run.** Build installer A and installer B of the release candidate's commit with a test public key and `http://127.0.0.1:8765/latest.json`. Then serve B's signed `latest.json` inside the Sandbox. The updater found B, downloaded it, accepted its signature, installed it in passive mode and restarted on B's executable, keeping the PATH and the data. The key lives only for that run, and the release key never leaves its GitHub secret.
-7. **A bug found on the way: the installer leaves config-digger off the PATH on a Windows without the VC++ runtime.** `config-digger.exe` links `vcruntime140.dll` dynamically. A clean Windows lacks it, so the CLI exits with `0xC0000135`, which means the DLL was not found. The installer's `add-to-path` runs that CLI, and so does the uninstaller's list of parked Entries. The app is unaffected, because `tauri-build` links the CRT statically. Filed as its own issue.
+5. **Check the installer's PATH page through UI Automation, not command-line options.** Windows PowerShell 5.1 inside the Sandbox drove the welcome page, the directory page, Already Installed, Finish and the uninstaller's Delete config-digger data warning, with nothing to install. The uninstaller needs it anyway: Tauri's NSIS script has no command-line switch for that box, and steps 13.3 and 13.4 depend on it. Steps 9.2, 9.3, 9.4 and 13.4 passed this way, and 13.3 passed except for its parked lines, since the run had no parked Entry.
+6. **Check the update against a local endpoint, signed with a key made for the run.** Build installer A and installer B of the release candidate's commit with a test public key and `http://127.0.0.1:8765/latest.json`. Then serve B's signed `latest.json` inside the Sandbox. The updater found B, downloaded it, accepted its signature, installed it in passive mode and restarted on B's executable, keeping the PATH and the data. B's CLI still reported A's version, because I raised only Tauri's version, so B must be built with the workspace version raised. The key lives only for that run, and the release key never leaves its GitHub secret.
+7. **A bug found on the way: the installer leaves config-digger off the PATH on a Windows without the VC++ runtime.** `config-digger.exe` links `vcruntime140.dll` dynamically. A clean Windows lacks it, so the CLI exits with `0xC0000135`, which means the DLL was not found. The installer's `add-to-path` runs that CLI, and so does the uninstaller's list of parked Entries. The app is unaffected, because `tauri-build` links the CRT statically. It is a follow-up of its own.
 8. **Commit the visual references, as an exception to the screenshot rule, if the maintainer agrees.** They are shots of the fake backend, whose fixtures a test already holds to `cd-throwaway-*` Entries, fake Secrets and paths under `E:\cd-throwaway`. [Section 5](#5-the-look) proposes the rule change word for word. Without it, the references stay local and ignored, and only the local script compares them.
-9. **Run the agent judge locally, in a Claude Code session.** It reads a step's `expect` and the screenshots the tools took, and writes OK or KO into the run's `results` with `by: "agent-judge"`. A person reviews its KOs in the runner. Screenshots never leave the machine.
+9. **Run the agent judge locally, in a Claude Code session.** It reads a step's `expect` and the screenshots the tools took, and writes OK or KO with `by: "agent-judge"`, which reach the run's `results` with the other verdicts. A person reviews its KOs in the runner. The screenshots are never committed, attached or uploaded: only the session's model reads them, as an agent reads its own screenshots today.
 10. **Automated verdicts keep the runner's shape.** They go in as `{ id, status, notes, time, version }` documents with two more fields, `by` and `evidence`, which the runner ignores today. A step gets an `automation` field listing the tools that check it, and a `manual` field when a person must still look.
 
 ## 1. What exists today
@@ -64,7 +64,7 @@ Tauri's WebDriver guide supports `tauri-driver` on Windows and Linux only. Its W
 - The Windows folder picker is a native dialog, outside the webview. Both Add dialogs have a text field (`aria-label="Folder"` and `"Path"`), so the tests type the path and check the picker separately. UI Automation can drive the common file dialog. I did not try it.
 - Files the steps edit by hand in Notepad (11.4, 11.6) are edited by the tests directly, with the app closed when the step closes it.
 - Plan text spells paths as `E:\cd-throwaway`. A runner has no `E:` drive, so the CI job runs `subst E: <workspace>\uat-drive` (no admin rights needed) before the setup script, and the assertions keep the plan's own text.
-- Process detection reads the real processes. On CI no Agent runs. On the tester's machine, the local script runs Claude Desktop on purpose for 7.2.
+- Process detection reads the real processes. On CI no Agent is running. On the tester's machine, the local script runs Claude Desktop on purpose for 7.2.
 
 ### Where it runs
 
@@ -128,7 +128,7 @@ The first Sandbox run installed both executables, but the PATH stayed unset and 
 | | Command-line options | UI Automation on the NSIS window |
 |---|---|---|
 | What it changes | `hooks.nsh` parses a new switch, such as `/PATH=0`, with `GetOptions` and sets `$KeepPathAlone` | Nothing in the installer |
-| What it checks | The hook's logic, which `cli/tests/installer.rs` and the silent runs already cover | What the tester sees: the box's label, its starting state, Already Installed, the directory page's text and its disabled Next |
+| What it checks | The hook's logic, which `crates/config-digger-cli/tests/installer.rs` and the silent runs already cover | What the tester sees: the box's label, its starting state, Already Installed, the directory page's text and its disabled Next |
 | The page itself | Still needs another check: a silent install skips it | Checked |
 | The uninstaller | No switch exists for Delete config-digger data, so 13.3 and 13.4 still need the window | The same code drives it |
 | Tools needed | None | `System.Windows.Automation` in Windows PowerShell 5.1, already in Windows. FlaUI or pywinauto would need .NET or Python inside the Sandbox |
@@ -193,7 +193,7 @@ Where the references live:
 
 | | A. Committed | B. Local and ignored | C. A private store |
 |---|---|---|---|
-| Where | `crates/config-digger-app/ui/visual/*.png`, shot on `windows-latest` | `ui/screenshots/reference/`, per machine | A private repo, or a claude.ai Artifact's asset store |
+| Where | `crates/config-digger-app/ui/visual/*.png`, shot on `windows-latest` | `ui/screenshots/reference/`, per machine | A private repo |
 | CI compares on every PR | Yes | No | Only with a token secret, which PRs from forks don't get |
 | A change to the look | Shows in the PR as changed PNGs, which the maintainer approves | Needs a person to re-approve each machine's baseline | Updated outside the PR, so the PR doesn't show it |
 | Rule change | Needed | None | None, but a second place to keep in step |
@@ -227,9 +227,9 @@ A Claude Code session on the tester's machine, run by the local script after the
   ```
 
   `ok` when every part of `expect` it can see holds, `ko` naming the part that doesn't, `blocked` when a screenshot is missing.
-- **How it reaches the results.** The same session writes each result with `ArtifactData` (`action: "batch"`, `set results/<id>`) into the run's Artifact. It skips a step that already has a result whose `by` is missing or `"tester"`, so it never overwrites a person.
-- **How a person reviews it.** The runner gets a "Revisar" view that lists `ko` results with `by: "agent-judge"`, with their notes and the local path of the screenshot. The reviewer opens the PNG on their own machine or walks the step. Then they save their own verdict, which replaces the judge's and has no `by`. A judge's `ok` stands. For the first two release candidates, the reviewer also walks the judge's OK steps, to see how often it agrees, and the walk's issue records the result.
-- **Telling verdicts apart.** `by` is `"ci"`, `"local"`, `"sandbox"` or `"agent-judge"` for a machine, and absent for a tester. The runner shows a chip with it, and Export adds a column.
+- **How it reaches the results.** The judge writes its results to the same local `uat-results.json` as the local script, and they reach the run with the others, as section 6 says.
+- **How a person reviews it.** The runner gets a "Revisar" view that lists `ko` results with `by: "agent-judge"`, with their notes and the local path of the screenshot. The reviewer opens the PNG on their own machine or walks the step. Then they save their own verdict, which has no `by`. The runner copies the judge's `status` and `notes` into a `judged` field of that document, so the record of a disagreement stays. A judge's `ok` stands. For the first two release candidates, the reviewer also walks the judge's OK steps, to see how often it agrees, and the walk's issue records the result.
+- **Telling verdicts apart.** `by` names what wrote the verdict: `"ci"` for the CI job, `"local"` for the local script and the Sandbox script it runs, `"agent-judge"` for the judge, and nothing for a tester. The runner shows a chip with it, and Export adds a column.
 
 The judge doesn't run on CI. It would need a model key as a secret and would send screenshots off the machine.
 
@@ -238,10 +238,10 @@ The judge doesn't run on CI. It would need a model key as a secret and would sen
 Every tool writes the runner's documents, `{ id, status, notes, time, version }`, plus `by` and `evidence`. `status` is `ok`, `ko` or `blocked`. A failed assertion gives `ko` with the assertion's message as notes. A failure before the step's own checks, such as a setup error or an earlier step it depends on, gives `blocked`. `version` is the workspace version under test. `evidence` is a CI run URL, a test name or a local path, never an image.
 
 - The CI job uploads `uat-results.json`, verdicts only and no screenshot, as an Actions artifact of the release candidate's commit.
-- The local script and the Sandbox script write the same file locally.
-- When an agent publishes a run, as `docs/agents/uat.md` describes, it downloads the commit's CI results with `gh run download`. It adds the local ones and writes them all with one `ArtifactData` batch, before giving the tester the link. It writes a result only for a step id in the plan at that commit.
+- The local script, the Sandbox script it runs and the agent judge write the same file locally.
+- When an agent publishes a run, as `docs/agents/uat.md` describes, it downloads the commit's CI results with `gh run download`. It adds the local ones and writes them all with one `ArtifactData` batch (`set results/<id>`), before giving the tester the link. It writes a result only for a step id in the plan at that commit, and skips a step that already has a tester's result, one with no `by`. This is the only way automated verdicts reach the database.
 
-The runner already reads only `status` and `notes`, so the extra fields break nothing. A follow-up teaches it to show `by`, to skip automated steps in the walk's queue, and to offer the review view.
+The runner reads `status`, `notes`, `time` and `version` and ignores other fields, so the extra ones break nothing. A follow-up teaches it to show `by`, to skip automated steps in the walk's queue, and to offer the review view.
 
 ## 7. New plan fields
 
@@ -255,7 +255,7 @@ Two optional fields on a step, in `plan.schema.json`:
 "manual": "Whether the snackbar's slide looks smooth: tests check its duration and properties, not how it looks moving."
 ```
 
-- `tool` is one of `fake-ui`, `webdriver`, `sandbox`, `local`, `visual`, `agent-judge`, `vitest` or `cargo-test`. `where` is `ci` or `local`. `test` names the test, the shot or the script check that covers the step.
+- `tool` is one of `fake-ui`, `webdriver`, `sandbox`, `local`, `cli`, `visual` or `agent-judge`. `where` is `ci` or `local`. `test` names the test, the shot or the script check that covers the step.
 - `manual` says what a person still checks and why no tool can. A step with `automation` and no `manual` drops out of the manual walk.
 - `uat_plan` checks that every `test` exists: a test named after the step id in the named file, a shot in `SHOTS`, or a check id in the Sandbox script. Step ids stay as they are.
 
@@ -265,11 +265,11 @@ Two optional fields on a step, in `plan.schema.json`:
 
 | Step | Covered today | Tool | Where | Why |
 |---|---|---|---|---|
-| 8.1 | — | Sandbox | local | A new Sandbox is a PC that never had config-digger. The script runs the step's first command and expects four False |
+| 8.1 | None | Sandbox | local | A new Sandbox is a PC that never had config-digger. The script runs the step's first command and expects four False |
 | 9.1 | `release.yml` runs `cargo xtask assets` | Local script | local | `gh release download <tag> --pattern '*-setup.exe'` checks the asset's name has the version, and puts it in the Sandbox's installers folder |
-| 9.2 | `installer.rs` add-to-path tests, `cargo xtask installer` | Sandbox with UI Automation | local | Tried, all checks passed. "New terminal" is read from `HKCU\Environment` |
+| 9.2 | `installer.rs` add-to-path tests, `cargo xtask installer` | Sandbox with UI Automation, **manual for SmartScreen** | local, manual | Tried, all checks passed. "New terminal" is read from `HKCU\Environment`. SmartScreen's prompt stays manual until the app is signed, see section 9 |
 | 9.3 | `installer.rs` remove-from-path tests | Sandbox with UI Automation | local | Tried, passed |
-| 9.4 | — | Sandbox with UI Automation | local | Tried, passed |
+| 9.4 | None | Sandbox with UI Automation | local | Tried, passed |
 | 1.1 | `uat_data.rs` | WebDriver, setup | ci | The tests run the script and check its last line and file list before the session |
 | 1.2 | `adding.test.ts`, `secret_masking.rs` | WebDriver, UI Automation for the picker | ci | Types the folder, checks the notice, the row's tags, the Items and the masked Secret. The picker check is untried |
 | 15.1 | `Loading.test.tsx`, `reads.test.ts` | Fake UI with `?delay=read_inventory`, visual | ci | The delay holds the loading state long enough to assert and shoot |
@@ -300,7 +300,7 @@ Two optional fields on a step, in `plan.schema.json`:
 | 3.3 | `tooltips.test.ts` | Fake UI at 1100 × 640, visual | ci | The tooltip's box inside the viewport |
 | 4.1 | `styles.test.ts` | Fake UI, visual, agent judge on a real-window shot | ci, local | The fake UI scrolls to `cd-throwaway-many-30`. WebView2's own scrollbar is seen only in the real window |
 | 4.2 | `styles.test.ts` | Fake UI, visual | ci | `styles.test.ts` proves one scrollbar rule for every element |
-| 4.3 | `styles.test.ts` | WebDriver | ci | The fixtures have two Operations. Twelve real Disables, then 12 rows and an overflowing list. The look is 4.1's rule |
+| 4.3 | `styles.test.ts` | WebDriver, agent judge on a real-window shot | ci, local | The fixtures have two Operations. On CI, twelve real Disables, then 12 rows and an overflowing list. The scrollbar's look and hover need a picture, so the local WebDriver run shoots it for the judge |
 | 4.4 | `styles.test.ts` | Fake UI, visual | ci | Overflow of both lists in the licenses dialog |
 | 4.5 | `styles.test.ts` | Fake UI, visual | ci | Overflow of the panel |
 | 4.6 | `styles.test.ts` | Fake UI at 1100 × 640, visual | ci | Boxes don't overlap, each block scrolls inside itself |
@@ -325,24 +325,25 @@ Two optional fields on a step, in `plan.schema.json`:
 | 11.9 | `acting.test.ts` | Fake UI with a delay | ci | A busy state |
 | 11.10 | `styles.test.ts`, `Snackbar.test.tsx` | Fake UI with `page.clock`, visual, **manual for the motion** | ci, manual | The 10 s, hover, focus ring and colours are automated. See section 9 |
 | 11.11 | `history.test.ts` | WebDriver | ci | Uses the History the earlier WebDriver steps built |
-| 14.1 | — | WebDriver | ci | Reads the log in the throwaway `LOCALAPPDATA` between sessions. The tests never move the focus |
-| 14.2 | — | Local script | local | Needs the tester's real homes, which CI doesn't have. It times `config-digger list --json -v`, which only reads, three times, and checks each `scan finished elapsed_ms` is under 5000. Untried |
+| 14.1 | None | WebDriver | ci | Reads the log in the throwaway `LOCALAPPDATA` between sessions. The tests never move the focus |
+| 14.2 | None | CLI test, run by the local script | local | Needs the tester's real homes, which CI doesn't have. `config-digger list -v` runs the startup's scan and `config-digger disable --dry-run -v cd-throwaway-codex` the preview's two, with `CODEX_HOME` set to the throwaway Codex home for that process only. Neither writes. Each `scan finished elapsed_ms` must be under 5000. Untried |
 | 12.1 | `updates.test.ts`, `update_checks.rs`, `updater_config.rs` | WebDriver | ci | The runner reaches GitHub, so Check now gives the release candidate's real answer |
-| 12.2 | `updater_config.rs` | Sandbox with a local endpoint | local | Tried, see section 4. B needs the workspace version raised |
-| 13.1 | `park.rs` | WebDriver, plus the CLI inside the Sandbox | ci, local | WebDriver for the step. The Sandbox parks one with the CLI for 13.3's warning |
-| 13.2 | `installer.rs` | Sandbox | local | Tried: app gone, off the PATH, data and choice kept. `config-digger history --json` after the reinstall counts the Operations |
-| 13.3 | `installer.rs` parked tests | Sandbox with UI Automation | local | Tried, passed without parked lines |
-| 13.4 | — | Sandbox with UI Automation | local | Tried, passed |
-| 13.5 | — | Teardown of every run | ci, local | Deletes the root and checks it is gone |
+| 12.2 | `updater_config.rs` | Sandbox with a local endpoint | local | Tried, see section 4. The check of B's CLI version failed only because B kept A's workspace version. B needs it raised |
+| 13.1 | `park.rs` | WebDriver, local script with Claude Desktop open, CLI test inside the Sandbox | ci, local | WebDriver on CI, with no Agent running. The local script repeats it with Claude Desktop open, as the step says either way must work. The Sandbox parks one with the CLI for 13.3's warning |
+| 13.2 | `installer.rs` | Sandbox, CLI test | local | Tried: app gone, off the PATH, data and choice kept. `config-digger history --json` after the reinstall counts the Operations |
+| 13.3 | `installer.rs` parked tests | Sandbox with UI Automation | local | Tried, passed except the parked lines: the run had no parked Entry, and those lines also need the VC++ runtime fix |
+| 13.4 | None | Sandbox with UI Automation | local | Tried, passed |
+| 13.5 | None | WebDriver and Sandbox, teardown | ci, local | Each run deletes its root and checks it is gone |
 
-By tool: WebDriver checks 23 steps on CI and one more locally, the fake UI 35, the Sandbox 9, the local script 3, visual regression 25 and the agent judge 3. Most steps use two tools. The fake UI alone covers 12 steps, which have no look to check beyond what their tests assert.
+By tool: WebDriver checks 23 steps on CI and 7.2 locally, and tears down 13.5. The fake UI checks 35 steps, 12 of them with no other tool, because they have no look to check beyond what their tests assert. The Sandbox checks 9, the local script 4, CLI tests 3, visual regression 25 and the agent judge 4. 34 steps use two tools or more.
 
 ## 9. The manual walk that remains
 
-**Target: 2 steps, about 5 minutes**, plus the review of the agent judge's KOs and of changed references in PRs. Today's walk has 69 steps and took hours for rc.2.
+**Target: parts of 3 steps, about 10 minutes**, plus the review of the agent judge's KOs and of changed references in PRs. Today's walk has 69 steps and took hours for rc.2.
 
 | Step | What a person still checks | Why no tool here removes it |
 |---|---|---|
+| 9.2 | That Windows shows "Windows protegió su PC" for the installer downloaded with a browser, and that Más información and Ejecutar de todas formas get past it | The Sandbox's installer comes from a mapped folder with no Mark of the Web, so SmartScreen never shows there. The issue keeps it manual until the app is signed |
 | 5.1 | That the notice slides in and out without a jump | Tests prove the duration, the transform and the fade. Smoothness is how motion looks over time on the real GPU, and stills can't show it to visual regression or the judge |
 | 11.10 | That the Undo snackbar slides in and out without a jump | Same as 5.1 |
 
@@ -350,15 +351,15 @@ Neither step needs the rest of the walk first: both work on the throwaway data i
 
 ## 10. Follow-ups
 
-Filed with Parent #38, in this order: the first cuts the most steps from the walk.
+Filed with Parent #38. They are ordered by how many steps each takes out of the walk. The second cuts none by itself: it is what lets the runner skip an automated step, so every other cut reaches the tester only once it lands, and it should land with the first.
 
-1. The real app through WebDriver on CI: 23 steps. It starts by opening a session on `windows-latest`.
-2. Automated verdicts in the runner: `automation` and `manual` in the plan, `by` and `evidence` in results, the import, and the review view. The cuts reach the tester through this one.
+1. The real app through WebDriver on CI: 23 steps, 1.2, 10.2 to 10.9, 11.1 to 11.7 among them. It starts by opening a session on `windows-latest`.
+2. Automated verdicts in the runner: `automation` and `manual` in the plan, `by` and `evidence` in results, the import when publishing a run, and the review view.
 3. The UI on the fake backend: Playwright assertions and `?delay=`. 35 steps, 12 of them with no other tool.
 4. The installer, the update and the uninstaller in Windows Sandbox: 9 steps, already tried.
-5. Visual regression, once the maintainer decides where references live.
-6. The agent judge.
-7. The local pre-release-candidate script: 7.2, 9.1, 14.2.
+5. Visual regression of the fake backend's screens: the look in 25 steps, once the maintainer decides where the references live.
+6. The agent judge: the look the fake backend can't show in 4.1, 4.3, 2.1 and 7.5, the judge's review of new references, and the review view's first users.
+7. The local pre-release-candidate script: 7.2, 9.1, 13.1 with Claude Desktop open, and 14.2.
 8. Bug: the installer leaves config-digger off the PATH without the VC++ runtime.
 9. The release workflow checks the updater signature against the app's public key.
 
