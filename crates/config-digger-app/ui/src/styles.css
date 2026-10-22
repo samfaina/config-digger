@@ -1578,7 +1578,8 @@ p {
 }
 
 /* Shrinking takes height in proportion to each block's own, so each keeps a
-   fifth of the window, or all of its height when shorter. */
+   fifth of the window, or all of its height when shorter. `min-height: 0` is
+   for a WebView2 before Chromium 129, which has no calc-size(). */
 .dialog-section.scrolls {
   flex: 0 1 auto;
   min-height: 0;

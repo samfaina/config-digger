@@ -125,11 +125,15 @@ describe("the preview of an action with many changes", () => {
     blocks: [],
   };
 
-  test("scrolls only What changes and Files, each under its title, keeping the title, Before you apply and the buttons in view", async () => {
+  /** Opens the dialog on the preview `planned`, once its What changes shows. */
+  const openPreview = async () => {
     vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: planned });
     render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: changes[0].locator, project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
+    return screen.findByRole("region", { name: "What changes" });
+  };
 
-    const whatChanges = await screen.findByRole("region", { name: "What changes" });
+  test("scrolls only What changes and Files, each under its title, keeping the title, Before you apply and the buttons in view", async () => {
+    const whatChanges = await openPreview();
     const files = screen.getByRole("region", { name: "Files · 1" });
     expect(screen.getAllByRole("region")).toEqual([whatChanges, files]);
     // Its Entry and the last piece of its key name each change.
@@ -151,10 +155,7 @@ describe("the preview of an action with many changes", () => {
   });
 
   test("lets the keyboard reach each scrolling block, to scroll it", async () => {
-    vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: planned });
-    render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: changes[0].locator, project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
-
-    await screen.findByRole("region", { name: "What changes" });
+    await openPreview();
     for (const region of screen.getAllByRole("region")) expect(region.tabIndex).toBe(0);
   });
 });
