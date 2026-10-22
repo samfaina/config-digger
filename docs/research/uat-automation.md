@@ -10,7 +10,7 @@ Issue: #236. Researched 2026-10-22 against `uat/plan.json` at commit `ffc08ac`, 
 4. **Windows Sandbox runs the installer, the update and the uninstaller unattended.** A `.wsb` file maps the installers, the scripts and a results folder, and its logon command runs a PowerShell script. Silent installs and uninstalls passed every check: install folder, user `PATH` in `HKCU\Environment`, the remembered PATH choice, and both data folders.
 5. **Check the installer's PATH page through UI Automation, not command-line options.** Windows PowerShell 5.1 inside the Sandbox drove the welcome page, the directory page, Already Installed, Finish and the uninstaller's Delete config-digger data warning, with nothing to install. The uninstaller needs it anyway: Tauri's NSIS script has no command-line switch for that box, and steps 13.3 and 13.4 depend on it. Steps 9.2, 9.3, 9.4 and 13.4 passed this way, and 13.3 passed except for its parked lines, since the run had no parked Entry.
 6. **Check the update against a local endpoint, signed with a key made for the run.** Build installer A and installer B of the release candidate's commit with a test public key and `http://127.0.0.1:8765/latest.json`. Then serve B's signed `latest.json` inside the Sandbox. The updater found B, downloaded it, accepted its signature, installed it in passive mode and restarted on B's executable, keeping the PATH and the data. B's CLI still reported A's version, because I raised only Tauri's version, so B must be built with the workspace version raised. The key lives only for that run, and the release key never leaves its GitHub secret.
-7. **A bug found on the way: the installer leaves config-digger off the PATH on a Windows without the VC++ runtime.** `config-digger.exe` links `vcruntime140.dll` dynamically. A clean Windows lacks it, so the CLI exits with `0xC0000135`, which means the DLL was not found. The installer's `add-to-path` runs that CLI, and so does the uninstaller's list of parked Entries. The app is unaffected, because `tauri-build` links the CRT statically. It is a follow-up of its own.
+7. **A bug found on the way: the installer leaves config-digger off the PATH on a Windows without the VC++ runtime.** `config-digger.exe` links `vcruntime140.dll` dynamically. A clean Windows lacks it, so the CLI exits with `0xC0000135`, which means the DLL was not found. The installer's `add-to-path` runs that CLI, and so does the uninstaller's list of parked Entries. The app is unaffected, because `tauri-build` links the CRT statically. It is #270.
 8. **Commit the visual references, as an exception to the screenshot rule, if the maintainer agrees.** They are shots of the fake backend, whose fixtures a test already holds to `cd-throwaway-*` Entries, fake Secrets and paths under `E:\cd-throwaway`. [Section 5](#5-the-look) proposes the rule change word for word. Without it, the references stay local and ignored, and only the local script compares them.
 9. **Run the agent judge locally, in a Claude Code session.** It reads a step's `expect` and the screenshots the tools took, and writes OK or KO with `by: "agent-judge"`, which reach the run's `results` with the other verdicts. A person reviews its KOs in the runner. The screenshots are never committed, attached or uploaded: only the session's model reads them, as an agent reads its own screenshots today.
 10. **Automated verdicts keep the runner's shape.** They go in as `{ id, status, notes, time, version }` documents with two more fields, `by` and `evidence`, which the runner ignores today. A step gets an `automation` field listing the tools that check it, and a `manual` field when a person must still look.
@@ -353,15 +353,15 @@ Neither step needs the rest of the walk first: both work on the throwaway data i
 
 Filed with Parent #38. They are ordered by how many steps each takes out of the walk. The second cuts none by itself: it is what lets the runner skip an automated step, so every other cut reaches the tester only once it lands, and it should land with the first.
 
-1. The real app through WebDriver on CI: 23 steps, 1.2, 10.2 to 10.9, 11.1 to 11.7 among them. It starts by opening a session on `windows-latest`.
-2. Automated verdicts in the runner: `automation` and `manual` in the plan, `by` and `evidence` in results, the import when publishing a run, and the review view.
-3. The UI on the fake backend: Playwright assertions and `?delay=`. 35 steps, 12 of them with no other tool.
-4. The installer, the update and the uninstaller in Windows Sandbox: 9 steps, already tried.
-5. Visual regression of the fake backend's screens: the look in 25 steps, once the maintainer decides where the references live.
-6. The agent judge: the look the fake backend can't show in 4.1, 4.3, 2.1 and 7.5, the judge's review of new references, and the review view's first users.
-7. The local pre-release-candidate script: 7.2, 9.1, 13.1 with Claude Desktop open, and 14.2.
-8. Bug: the installer leaves config-digger off the PATH without the VC++ runtime.
-9. The release workflow checks the updater signature against the app's public key.
+1. #263, the real app through WebDriver on CI: 23 steps, among them 1.2, 10.2 to 10.4, 10.7 to 10.9 and 11.1 to 11.7. It starts by opening a session on `windows-latest`.
+2. #264, automated verdicts in the runner: `automation` and `manual` in the plan, `by` and `evidence` in results, the import when publishing a run, and the review view.
+3. #265, the UI on the fake backend: Playwright assertions and `?delay=`. 35 steps, 12 of them with no other tool.
+4. #266, the installer, the update and the uninstaller in Windows Sandbox: 9 steps, already tried.
+5. #267, visual regression of the fake backend's screens: the look in 25 steps, once the maintainer decides where the references live.
+6. #268, the agent judge: the look in 2.1, 4.1, 4.3 and 7.5, and each new visual reference.
+7. #269, the local pre-release-candidate script: 7.2, 9.1, 13.1 with Claude Desktop open, and 14.2.
+8. #270, a bug: the installer leaves config-digger off the PATH without the VC++ runtime.
+9. #271, the release workflow checks the updater signature against the app's public key.
 
 ## Sources
 
