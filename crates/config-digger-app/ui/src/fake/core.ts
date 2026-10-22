@@ -80,8 +80,8 @@ const ANSWERS: Record<string, (args: Args) => unknown> = {
   change_list: () => fixtures.listChanged,
   check_home: () => fixtures.homeCheck,
   check_project: () => fixtures.projectCheck,
-  // As when the picker is cancelled.
-  pick_location: () => null,
+  // The folder whose check is recorded.
+  pick_location: () => fixtures.projectCheck.path,
   read_settings: () => fixtures.settings,
   save_settings: ({ settings }) => settings,
   open_data_folder: ({ folder }) => fixtures.dataFolders[folder as DataFolder],

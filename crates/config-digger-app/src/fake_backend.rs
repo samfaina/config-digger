@@ -14,10 +14,10 @@
 use crate::about::About;
 use crate::actions::{ActionRequest, Actions, Executed, Verb};
 use crate::commands::{self, DataFolder};
-use crate::lists::{self, ListChange};
+use crate::lists::{self, ListChange, ListChanged};
 use crate::session::{Scans, Session, SessionState};
 use crate::updates::UpdateStatus;
-use config_digger_core::api::{Core, Error, Inventory, WarningClass};
+use config_digger_core::api::{Core, Error, Inventory, Leftovers, OperationSummary, WarningClass};
 use config_digger_core::ports::Ports;
 use config_digger_core::ports::fake::{FakeClock, FakeEnvironment, FakeGitIndex, FakeProcesses};
 use config_digger_core::ports::real::RealFileSystem;
@@ -35,54 +35,15 @@ const HEADER: &str =
 /// Records the fake backend's fixtures over the throwaway data in `root`,
 /// which it changes as the UAT does.
 pub fn record(root: &Path) -> Result<Value, Error> {
-    let root = real(root)?;
+    let root = canonical(root)?;
     let core = || Core::new(ports(&root));
 
     let home_check = core()?.check_home(&root.join("claude-desktop-home"), "claude-desktop")?;
     let project_check = core()?.check_project(&root.join("project-extra"))?;
-    let kept = SessionState::default();
-    let scanned = root.clone();
-    let scans = Scans::new(move || Session::scan(Core::new(ports(&scanned))?));
-    let changes = [
-        ListChange::AddHome {
-            folder: root.join("claude-desktop-home"),
-            agent: "claude-desktop".to_owned(),
-        },
-        ListChange::AddHome {
-            folder: root.join("claude-code-many-home"),
-            agent: "claude-code".to_owned(),
-        },
-        ListChange::AddProject {
-            path: root.join("project-extra"),
-        },
-        ListChange::HideProject {
-            path: root.join("project-hide"),
-        },
-    ];
-    let mut list_changed = None;
-    for change in &changes {
-        list_changed = Some(lists::change_list(&kept, change, &scans)?);
-    }
-
+    let list_changed = change_lists(&root)?;
     core()?.record_update_check()?;
     let mut actions = Actions::new(core()?);
-    let inventory = Session::scan(core()?)?.resolve(None);
-    let mut executed = None;
-    for name in ["cd-throwaway-codex", "cd-throwaway-desktop"] {
-        let request = ActionRequest::Entry {
-            verb: Verb::Disable,
-            locator: locator(&inventory, name)?,
-            project: None,
-        };
-        let preview = actions.plan(&request)?;
-        let acknowledged: Vec<WarningClass> = preview
-            .warnings
-            .iter()
-            .map(|warning| warning.class)
-            .collect();
-        let done = actions.execute(&preview.plan_id, &acknowledged)?;
-        executed.get_or_insert(done);
-    }
+    let executed = disable_servers(&mut actions, &Session::scan(core()?)?.resolve(None))?;
 
     let mut session = Session::scan(core()?)?;
     let places = session.places();
@@ -95,45 +56,12 @@ pub fn record(root: &Path) -> Result<Value, Error> {
         .into_iter()
         .map(|project| session.resolve(project))
         .collect();
-
     let history = actions.history()?;
     let details = history
         .iter()
         .map(|operation| actions.detail(&operation.id))
         .collect::<Result<Vec<_>, _>>()?;
-    // Each Entry once, in the first context that lists it: its actions
-    // differ little from one context to another.
-    let mut requests: Vec<ActionRequest> = Vec::new();
-    let mut planned = HashSet::new();
-    for inventory in &inventories {
-        let entries = inventory.items.iter().flat_map(|item| &item.entries);
-        for entry in entries.filter(|entry| planned.insert(entry.locator.clone())) {
-            for verb in [Verb::Disable, Verb::Enable, Verb::Remove] {
-                requests.push(ActionRequest::Entry {
-                    verb,
-                    locator: entry.locator.clone(),
-                    project: inventory.project.clone(),
-                });
-            }
-        }
-    }
-    requests.extend(
-        places
-            .leftovers
-            .iter()
-            .map(|leftovers| ActionRequest::Leftovers {
-                project: leftovers.project.clone(),
-            }),
-    );
-    for operation in &history {
-        requests.push(ActionRequest::Undo {
-            operation: operation.id.clone(),
-        });
-        requests.push(ActionRequest::DeleteBackup {
-            operation: operation.id.clone(),
-        });
-    }
-    let previews: Vec<Value> = requests
+    let previews: Vec<Value> = requests(&inventories, &places.leftovers, &history)
         .iter()
         // An action the Entry does not offer is not planned.
         .filter_map(|request| {
@@ -142,29 +70,13 @@ pub fn record(root: &Path) -> Result<Value, Error> {
             Some(json!({ "request": request, "preview": preview }))
         })
         .collect();
-
-    let mut paths: Vec<PathBuf> = inventories
-        .iter()
-        .flat_map(|inventory| &inventory.items)
-        .flat_map(|item| &item.entries)
-        .map(|entry| entry.path.clone())
-        .collect();
-    paths.sort();
-    paths.dedup();
-    let mut backups = Vec::new();
-    for path in paths {
-        let of = session.backups_of(&path)?;
-        if !of.is_empty() {
-            backups.push(json!({ "path": path, "backups": of }));
-        }
-    }
-
+    let backups = backups(&mut session, &inventories)?;
     let folders = core()?.data_folders()?;
     let data_folders: serde_json::Map<String, Value> = DataFolder::ALL
         .into_iter()
         .map(|folder| {
-            let kept = folder.path(folders.clone()).is_dir();
-            (key(&folder), Value::Bool(kept))
+            let kept = folder.path(&folders).is_dir();
+            (serialized(&folder), Value::Bool(kept))
         })
         .collect();
     let update_status = UpdateStatus {
@@ -185,16 +97,119 @@ pub fn record(root: &Path) -> Result<Value, Error> {
         "details": details,
         "backups": backups,
         "previews": previews,
-        "executed": executed.map(|executed| match executed {
-            Executed::Applied { .. } => json!(executed),
-            Executed::Replanned { .. } => Value::Null,
-        }),
+        "executed": executed,
         "settings": commands::settings_read(core()?)?,
         "dataFolders": data_folders,
         "about": About::this_build(),
         "updateStatus": update_status,
     });
     Ok(under_uat_root(fixtures, &root))
+}
+
+/// Adds the Claude Desktop home, the second Claude Code home and the extra
+/// Project, then hides a Project, as the UAT does: what the last change did.
+fn change_lists(root: &Path) -> Result<ListChanged, Error> {
+    let kept = SessionState::default();
+    let scanned = root.to_path_buf();
+    let scans = Scans::new(move || Session::scan(Core::new(ports(&scanned))?));
+    let added = [
+        ListChange::AddHome {
+            folder: root.join("claude-desktop-home"),
+            agent: "claude-desktop".to_owned(),
+        },
+        ListChange::AddHome {
+            folder: root.join("claude-code-many-home"),
+            agent: "claude-code".to_owned(),
+        },
+        ListChange::AddProject {
+            path: root.join("project-extra"),
+        },
+    ];
+    for change in &added {
+        lists::change_list(&kept, change, &scans)?;
+    }
+    let hidden = ListChange::HideProject {
+        path: root.join("project-hide"),
+    };
+    lists::change_list(&kept, &hidden, &scans)
+}
+
+/// Disables the Codex server, which writes its file, then the Claude Desktop
+/// one, which parks it, every warning acknowledged: what the first did.
+fn disable_servers(actions: &mut Actions, inventory: &Inventory) -> Result<Executed, Error> {
+    let mut executed = Vec::new();
+    for name in ["cd-throwaway-codex", "cd-throwaway-desktop"] {
+        let request = ActionRequest::Entry {
+            verb: Verb::Disable,
+            locator: locator(inventory, name)?,
+            project: None,
+        };
+        let preview = actions.plan(&request)?;
+        let acknowledged: Vec<WarningClass> = preview
+            .warnings
+            .iter()
+            .map(|warning| warning.class)
+            .collect();
+        executed.push(actions.execute(&preview.plan_id, &acknowledged)?);
+    }
+    Ok(executed.swap_remove(0))
+}
+
+/// Every action to preview: each verb on each Entry, once, in the first
+/// context that lists it, since its preview differs little from one context
+/// to another; the Remove of each missing Project's leftovers; and the Undo
+/// and Delete backup of each Operation.
+fn requests(
+    inventories: &[Inventory],
+    leftovers: &[Leftovers],
+    history: &[OperationSummary],
+) -> Vec<ActionRequest> {
+    let mut requests = Vec::new();
+    let mut listed = HashSet::new();
+    for inventory in inventories {
+        let entries = inventory.items.iter().flat_map(|item| &item.entries);
+        for entry in entries.filter(|entry| listed.insert(entry.locator.clone())) {
+            for verb in [Verb::Disable, Verb::Enable, Verb::Remove] {
+                requests.push(ActionRequest::Entry {
+                    verb,
+                    locator: entry.locator.clone(),
+                    project: inventory.project.clone(),
+                });
+            }
+        }
+    }
+    requests.extend(leftovers.iter().map(|leftovers| ActionRequest::Leftovers {
+        project: leftovers.project.clone(),
+    }));
+    for operation in history {
+        requests.push(ActionRequest::Undo {
+            operation: operation.id.clone(),
+        });
+        requests.push(ActionRequest::DeleteBackup {
+            operation: operation.id.clone(),
+        });
+    }
+    requests
+}
+
+/// The backups of each location of an Entry in `inventories` that has any.
+fn backups(session: &mut Session, inventories: &[Inventory]) -> Result<Vec<Value>, Error> {
+    let mut paths: Vec<PathBuf> = inventories
+        .iter()
+        .flat_map(|inventory| &inventory.items)
+        .flat_map(|item| &item.entries)
+        .map(|entry| entry.path.clone())
+        .collect();
+    paths.sort();
+    paths.dedup();
+    let mut backups = Vec::new();
+    for path in paths {
+        let of = session.backups_of(&path)?;
+        if !of.is_empty() {
+            backups.push(json!({ "path": path, "backups": of }));
+        }
+    }
+    Ok(backups)
 }
 
 /// The fixtures as the TypeScript module the fake backend imports, typed by
@@ -224,10 +239,10 @@ fn ports(root: &Path) -> Ports {
 }
 
 /// `root` as the core spells it: long names, no `\\?\` prefix.
-fn real(root: &Path) -> Result<PathBuf, Error> {
-    let real = std::fs::canonicalize(root)
+fn canonical(root: &Path) -> Result<PathBuf, Error> {
+    let canonical = std::fs::canonicalize(root)
         .map_err(|error| Error::unexpected(format!("cannot read {}: {error}", root.display())))?;
-    let text = real.display().to_string();
+    let text = canonical.display().to_string();
     Ok(PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text)))
 }
 
@@ -243,7 +258,7 @@ fn locator(inventory: &Inventory, name: &str) -> Result<String, Error> {
 }
 
 /// How `value` serializes as a string, such as a key.
-fn key(value: &impl serde::Serialize) -> String {
+fn serialized(value: &impl serde::Serialize) -> String {
     match json!(value) {
         Value::String(text) => text,
         other => other.to_string(),
@@ -261,9 +276,9 @@ fn under_uat_root(value: Value, root: &Path) -> Value {
         (root.replace('\\', r"\\"), UAT_ROOT.replace('\\', r"\\")),
     ];
     map_strings(value, &|text| {
-        forms
-            .iter()
-            .fold(text.to_owned(), |text, (from, to)| replace(&text, from, to))
+        forms.iter().fold(text.to_owned(), |text, (from, to)| {
+            replace_ignoring_case(&text, from, to)
+        })
     })
 }
 
@@ -288,10 +303,10 @@ fn map_strings(value: Value, map: &impl Fn(&str) -> String) -> Value {
 }
 
 /// `text` with every `from`, in any ASCII letter case, replaced by `to`.
-fn replace(text: &str, from: &str, to: &str) -> String {
+fn replace_ignoring_case(text: &str, from: &str, to: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(at) = find(rest, from) {
+    while let Some(at) = find_ignoring_case(rest, from) {
         out.push_str(&rest[..at]);
         out.push_str(to);
         rest = &rest[at + from.len()..];
@@ -300,7 +315,8 @@ fn replace(text: &str, from: &str, to: &str) -> String {
     out
 }
 
-fn find(text: &str, needle: &str) -> Option<usize> {
+/// Where `needle` first is in `text`, in any ASCII letter case.
+fn find_ignoring_case(text: &str, needle: &str) -> Option<usize> {
     if needle.is_empty() {
         return None;
     }

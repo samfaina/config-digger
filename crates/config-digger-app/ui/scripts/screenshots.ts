@@ -7,7 +7,7 @@
  * The screenshots stay on this machine: the repo is public, so none is
  * committed or attached to a PR (see `docs/agents/screenshots.md`).
  */
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type Page } from "playwright-core";
@@ -16,7 +16,8 @@ import { createServer } from "vite";
 const UI = fileURLToPath(new URL("..", import.meta.url));
 const OUT = join(UI, "screenshots");
 /** The app's window, as `tauri.conf.json` opens it. */
-const WINDOW = { width: 1440, height: 900 };
+const { width, height } = JSON.parse(readFileSync(join(UI, "..", "tauri.conf.json"), "utf8")).app.windows[0];
+const WINDOW: { width: number; height: number } = { width, height };
 
 type Shot = {
   /** The PNG's name, without its extension. */
@@ -86,7 +87,7 @@ const SHOTS: Shot[] = [
     name: "about",
     steps: async (page) => {
       await rail(page, "About");
-      await page.getByText("0.1.0", { exact: false }).first().waitFor();
+      await page.getByRole("heading", { name: "Links" }).waitFor();
     },
   },
   {

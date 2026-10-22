@@ -27,8 +27,10 @@ async function bundle(mode: string): Promise<string> {
   }
 }
 
-// Every fixture names the throwaway data, and nothing the app ships does.
+// Every fixture names the throwaway data, and the fake `invoke` names
+// itself in its errors; nothing the app ships says either.
 const FIXTURE = "cd-throwaway";
+const FAKE_INVOKE = "The fake backend";
 
 describe("the fake backend", () => {
   test("is in no production bundle", async () => {
@@ -36,9 +38,13 @@ describe("the fake backend", () => {
 
     expect(shipped).toContain("read_inventory");
     expect(shipped).not.toContain(FIXTURE);
+    expect(shipped).not.toContain(FAKE_INVOKE);
   }, 120_000);
 
   test("answers the UI in the fake mode", async () => {
-    expect(await bundle("fake")).toContain(FIXTURE);
+    const fake = await bundle("fake");
+
+    expect(fake).toContain(FIXTURE);
+    expect(fake).toContain(FAKE_INVOKE);
   }, 120_000);
 });

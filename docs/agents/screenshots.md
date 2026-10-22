@@ -6,7 +6,7 @@ The app's UI only runs inside the Tauri window, which an agent can't drive. To s
 
 The UI reaches the app only through `ui/src/bindings.ts`, which calls `invoke` from `@tauri-apps/api/core`. In Vite's `fake` mode, that module is aliased to `ui/src/fake/core.ts`, whose `invoke` answers each command from `ui/src/fake/fixtures.ts`. `bindings.ts` stays generated and untouched, and no production bundle holds the fake backend (`ui/build/fakeBackend.test.ts` checks it).
 
-Write commands, such as `plan_action`, `execute_plan` or `save_settings`, answer with a plausible fixture and change nothing: the next read answers as before. `pick_location` answers as when the picker is cancelled.
+Write commands, such as `plan_action`, `execute_plan` or `save_settings`, answer with a plausible fixture and change nothing: the next read answers as before. `pick_location` picks the throwaway data's extra Project, whose check is recorded.
 
 `?fail=open_location,read_about` in the page's address makes the commands it names answer an error, to see how a screen reports one.
 
@@ -19,7 +19,7 @@ From `crates/config-digger-app/ui`:
 | `npm run dev:fake` | Serves the UI on the fake backend, at the address Vite prints (port 1430, or the next free one). |
 | `npm run screenshots` | Writes a PNG of each screen and state to `crates/config-digger-app/ui/screenshots/`, which git ignores. |
 
-`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's (1440 × 900). It shoots the Inventory with and without an Item selected, the open Project dropdown, a tooltip, the action dialog with What changes, Projects & homes on both tabs, History with an Operation open, Settings, About, and a notice of each kind. To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
+`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's, as `tauri.conf.json` sets it. It shoots the Inventory with and without an Item selected, the open Project dropdown, a tooltip, the action dialog with What changes, Projects & homes on both tabs, History with an Operation open, Settings, About, and a notice of each kind. To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
 
 ## Screenshots stay local
 

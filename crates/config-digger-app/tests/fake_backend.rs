@@ -64,6 +64,25 @@ fn normalized(path: &str) -> String {
         .to_owned()
 }
 
+/// Each Windows path in `text`, as [`normalized`] spells it, from its drive
+/// letter on, such as `c:/program files/app`; a URL's `https://` is none.
+fn absolute_paths(text: &str) -> Vec<&str> {
+    let bytes = text.as_bytes();
+    (0..bytes.len().saturating_sub(2))
+        .filter(|&at| {
+            bytes[at].is_ascii_alphabetic()
+                && (at == 0 || !bytes[at - 1].is_ascii_alphanumeric())
+                && bytes[at + 1] == b':'
+                && bytes[at + 2] == b'/'
+        })
+        .map(|at| {
+            let path = &text[at..];
+            let end = path.find(['"', '\n', '#']).unwrap_or(path.len());
+            &path[..end]
+        })
+        .collect()
+}
+
 /// Every string in `value`, object keys included.
 fn strings(value: &Value) -> Vec<&str> {
     match value {
@@ -112,6 +131,15 @@ fn paths_are_under_the_uat_root_and_name_no_folder_of_this_machine() {
         let text = normalized(text);
         for path in &machine {
             assert!(!text.contains(path.as_str()), "{text} names {path}");
+        }
+    }
+    for text in strings(fixtures) {
+        let text = normalized(text);
+        for path in absolute_paths(&text) {
+            assert!(
+                path.starts_with("e:/cd-throwaway/") || path == "e:/cd-throwaway",
+                "{path} in {text}"
+            );
         }
     }
     let codex = r"E:\cd-throwaway\codex-home\config.toml";

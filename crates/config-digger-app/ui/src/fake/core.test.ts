@@ -93,6 +93,13 @@ describe("the fake backend", () => {
     expect(ok(await commands.readHistory())).toEqual(before);
   });
 
+  test("picks the throwaway data's extra Project, which the Add dialog then checks", async () => {
+    const picked = ok(await commands.pickLocation("folder"));
+
+    expect(picked).toBe(String.raw`E:\cd-throwaway\project-extra`);
+    expect(ok(await commands.checkProject(picked!))).toEqual(fixtures.projectCheck);
+  });
+
   test("says a data folder holds nothing yet as the throwaway data has it", async () => {
     expect(ok(await commands.openDataFolder("backups"))).toBe(true);
     expect(ok(await commands.openDataFolder("logs"))).toBe(false);

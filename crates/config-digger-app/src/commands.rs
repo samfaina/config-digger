@@ -396,6 +396,7 @@ pub enum DataFolder {
 }
 
 impl DataFolder {
+    /// Every data folder, in the order Settings lists them.
     pub(crate) const ALL: [DataFolder; 4] = [
         DataFolder::Backups,
         DataFolder::Parked,
@@ -404,12 +405,12 @@ impl DataFolder {
     ];
 
     /// Where this folder is among `folders`.
-    pub(crate) fn path(self, folders: DataFolders) -> PathBuf {
+    pub(crate) fn path(self, folders: &DataFolders) -> &Path {
         match self {
-            DataFolder::Backups => folders.backups,
-            DataFolder::Parked => folders.parked,
-            DataFolder::Logs => folders.logs,
-            DataFolder::Lists => folders.lists,
+            DataFolder::Backups => &folders.backups,
+            DataFolder::Parked => &folders.parked,
+            DataFolder::Logs => &folders.logs,
+            DataFolder::Lists => &folders.lists,
         }
     }
 }
@@ -421,11 +422,12 @@ impl DataFolder {
 #[specta::specta]
 pub async fn open_data_folder(folder: DataFolder) -> Result<bool, api::Error> {
     blocking(move || {
-        let path = folder.path(Core::new(Ports::real())?.data_folders()?);
+        let folders = Core::new(Ports::real())?.data_folders()?;
+        let path = folder.path(&folders);
         if !path.is_dir() {
             return Ok(false);
         }
-        open_in_windows(&path).map(|()| true)
+        open_in_windows(path).map(|()| true)
     })
     .await
 }
