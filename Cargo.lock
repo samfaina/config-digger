@@ -505,6 +505,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-updater",
  "tauri-specta",
+ "tempfile",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

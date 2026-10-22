@@ -19,3 +19,7 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 ### Manual UATs
 
 The UAT kit in `uat/`: the plan, the runner page and the results. Add steps when a feature lands, publish a run, and turn its results into tickets as `docs/agents/uat.md` says.
+
+### Screenshots
+
+To see a screen of the UI, run it in a browser on the fake backend and take screenshots with `npm run screenshots`. They stay local, never in a commit or a PR. See `docs/agents/screenshots.md`.

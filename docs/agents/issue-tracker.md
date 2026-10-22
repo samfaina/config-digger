@@ -19,6 +19,8 @@ The repo is public, and screenshots of the app show paths from the developer's m
 
 When a ticket's acceptance criterion is something a person must see (a colour, a layout, how a panel sits near the window's edge), the criterion asks for a UAT step that walks it, as `docs/agents/uat.md` says. The UAT walk is where the look is signed off.
 
+An agent checks its own change by eye on screenshots it takes locally, with the UI on a fake backend, as `docs/agents/screenshots.md` says. Those screenshots stay on its machine.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

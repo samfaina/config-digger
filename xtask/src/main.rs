@@ -15,6 +15,11 @@
 //! - `fixtures`: checks that git ignores no file under a
 //!   `crates/*/tests/fixtures` folder, the contributor's global excludes
 //!   included. It writes nothing.
+//! - `fake-backend`: records the fixtures of the UI's fake backend, which
+//!   `npm run dev:fake` serves the UI on, into
+//!   `crates/config-digger-app/ui/src/fake/fixtures.ts`: the UAT's throwaway
+//!   data is created in a temporary folder and read through the app's
+//!   commands, with an environment that names nothing of this machine.
 //! - `release <tag>`: checks that the tag is `v` and the workspace version,
 //!   and prints `version=` and `prerelease=` lines for `$GITHUB_OUTPUT`.
 //! - `checksums <dir>`: writes `<dir>/SHA256SUMS` for every other file in it.
@@ -77,6 +82,7 @@ fn main() -> ExitCode {
         ["unverified"] => return list_unverified(),
         ["installer"] => return check_installer(),
         ["fixtures"] => return check_fixtures(),
+        ["fake-backend"] => return record_fake_backend(),
         ["release", tag] => return print_release(tag),
         ["checksums", dir] => return write_checksums(Path::new(dir)),
         ["winget", tag, installer, dir] => {
@@ -86,7 +92,7 @@ fn main() -> ExitCode {
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         _ => {
             eprintln!(
-                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures>\n       \
+                "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures|fake-backend>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
                         cargo xtask updater <tag> <dir> | assets <tag> <dir>"
             );
@@ -172,6 +178,76 @@ fn check_fixtures() -> ExitCode {
             eprintln!("{error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The fake backend's fixtures, generated from the app's commands.
+const FAKE_BACKEND: &str = "crates/config-digger-app/ui/src/fake/fixtures.ts";
+
+/// Records the fake backend's fixtures over the UAT's throwaway data, made
+/// by its script in a temporary `cd-throwaway` folder, deleted afterwards.
+fn record_fake_backend() -> ExitCode {
+    let temp =
+        std::env::temp_dir().join(format!("config-digger-fake-backend-{}", std::process::id()));
+    let root = temp.join("cd-throwaway");
+    let recorded = std::fs::create_dir_all(&temp)
+        .map_err(|error| format!("cannot create {}: {error}", temp.display()))
+        .and_then(|()| {
+            run(
+                Command::new("powershell")
+                    .args([
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                    ])
+                    .arg(repo_file("uat/data/cd-throwaway-setup.ps1"))
+                    .arg("-Root")
+                    .arg(&root),
+                "the throwaway data script",
+            )
+        })
+        .and_then(|()| {
+            let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+            run(
+                Command::new(cargo)
+                    .args([
+                        "run",
+                        "--quiet",
+                        "--package",
+                        "config-digger-app",
+                        "--example",
+                        "record_fake_backend",
+                        "--",
+                    ])
+                    .arg(&root)
+                    .arg(repo_file(FAKE_BACKEND)),
+                "the record_fake_backend example",
+            )
+        });
+    let _ = std::fs::remove_dir_all(&temp);
+    match recorded {
+        Ok(()) => {
+            println!("wrote {FAKE_BACKEND}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Runs `command`, named `what` in its error, and fails when it does.
+fn run(command: &mut Command, what: &str) -> Result<(), String> {
+    let status = command
+        .status()
+        .map_err(|error| format!("cannot run {what}: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{what} failed ({status})"))
     }
 }
 

@@ -346,22 +346,23 @@ pub struct SettingsRead {
 #[tauri::command]
 #[specta::specta]
 pub async fn read_settings() -> Result<SettingsRead, api::Error> {
-    blocking(move || {
-        let core = Core::new(Ports::real())?;
-        let settings = core.settings()?;
-        let folders = core.data_folders()?;
-        let operations = u32::try_from(core.history()?.len()).unwrap_or(u32::MAX);
-        let retention = core.retention();
-        let parked = Session::scan(core)?.parked();
-        Ok(SettingsRead {
-            settings,
-            folders,
-            operations,
-            retention,
-            parked,
-        })
+    blocking(move || settings_read(Core::new(Ports::real())?)).await
+}
+
+/// What the Settings screen shows, read through `core`.
+pub(crate) fn settings_read(core: Core) -> Result<SettingsRead, api::Error> {
+    let settings = core.settings()?;
+    let folders = core.data_folders()?;
+    let operations = u32::try_from(core.history()?.len()).unwrap_or(u32::MAX);
+    let retention = core.retention();
+    let parked = Session::scan(core)?.parked();
+    Ok(SettingsRead {
+        settings,
+        folders,
+        operations,
+        retention,
+        parked,
     })
-    .await
 }
 
 /// Saves the app's settings, and returns them as saved.
@@ -385,13 +386,32 @@ pub async fn save_settings(settings: Settings) -> Result<Settings, api::Error> {
 }
 
 /// A folder config-digger keeps its own data in.
-#[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum DataFolder {
     Backups,
     Parked,
     Logs,
     Lists,
+}
+
+impl DataFolder {
+    pub(crate) const ALL: [DataFolder; 4] = [
+        DataFolder::Backups,
+        DataFolder::Parked,
+        DataFolder::Logs,
+        DataFolder::Lists,
+    ];
+
+    /// Where this folder is among `folders`.
+    pub(crate) fn path(self, folders: DataFolders) -> PathBuf {
+        match self {
+            DataFolder::Backups => folders.backups,
+            DataFolder::Parked => folders.parked,
+            DataFolder::Logs => folders.logs,
+            DataFolder::Lists => folders.lists,
+        }
+    }
 }
 
 /// Opens one of config-digger's data folders in Explorer, and says whether
@@ -401,13 +421,7 @@ pub enum DataFolder {
 #[specta::specta]
 pub async fn open_data_folder(folder: DataFolder) -> Result<bool, api::Error> {
     blocking(move || {
-        let folders = Core::new(Ports::real())?.data_folders()?;
-        let path = match folder {
-            DataFolder::Backups => folders.backups,
-            DataFolder::Parked => folders.parked,
-            DataFolder::Logs => folders.logs,
-            DataFolder::Lists => folders.lists,
-        };
+        let path = folder.path(Core::new(Ports::real())?.data_folders()?);
         if !path.is_dir() {
             return Ok(false);
         }
