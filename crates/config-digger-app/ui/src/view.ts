@@ -233,7 +233,7 @@ export function couldNotBeRead(count: number): string {
 }
 
 export type PrimaryAction = { verb: Exclude<Verb, "remove">; offered: boolean; note: string };
-export type RemoveAction = { offered: boolean; danger: boolean; note: string };
+export type RemoveAction = { offered: boolean; note: string };
 export type EntryActions = {
   /** Disable, or Enable for a Disabled Entry. None for an Entry that can only be Removed. */
   primary: PrimaryAction | null;
@@ -257,8 +257,8 @@ export function entryActions(entry: Entry, agentName: string): EntryActions {
 
   const remove: RemoveAction =
     entry.remove.status === "offered"
-      ? { offered: true, danger: primary === null, note: removeReach(entry, agentName) }
-      : { offered: false, danger: false, note: entry.remove.sentence };
+      ? { offered: true, note: removeReach(entry, agentName) }
+      : { offered: false, note: entry.remove.sentence };
   const howToRemove = entry.remove.status === "not_offered" ? entry.remove.how_to_remove : null;
   return { primary, remove, howToRemove };
 }

@@ -391,7 +391,6 @@ describe("entry actions", () => {
     });
     expect(actions.remove).toEqual({
       offered: true,
-      danger: false,
       note: "Remove reaches Claude Code, VS Code.",
     });
     expect(actions.howToRemove).toBeNull();
@@ -429,17 +428,16 @@ describe("entry actions", () => {
     );
 
     expect(actions.primary).toEqual({ verb: "disable", offered: false, note: "Disable is not offered: git." });
-    expect(actions.remove.danger).toBe(false);
   });
 
-  test("make Remove the danger action when it is the only one, as for an Unread Entry", () => {
+  test("offer Remove alone for an Unread Entry", () => {
     const actions = entryActions(
       entry({ state: "unread", disable: { status: "not_offered", code: "unread", sentence: "Disable is not offered." } }),
       "Claude Code",
     );
 
     expect(actions.primary).toBeNull();
-    expect(actions.remove.danger).toBe(true);
+    expect(actions.remove.offered).toBe(true);
   });
 
   test("say how to remove what config-digger does not Remove", () => {
@@ -452,7 +450,7 @@ describe("entry actions", () => {
       "Claude Code",
     );
 
-    expect(actions.remove).toEqual({ offered: false, danger: false, note: "Not in v0.1: uninstall the plugin." });
+    expect(actions.remove).toEqual({ offered: false, note: "Not in v0.1: uninstall the plugin." });
     expect(actions.howToRemove).toEqual(how);
   });
 });

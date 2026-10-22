@@ -152,7 +152,7 @@ function EntryActionRow({
         <Tooltip text={remove.offered ? undefined : remove.note}>
           <button
             type="button"
-            className={`cta ${remove.danger ? "danger" : "secondary"}`}
+            className="cta danger"
             disabled={!remove.offered || busy}
             onClick={() => onAction("remove", entry)}
           >

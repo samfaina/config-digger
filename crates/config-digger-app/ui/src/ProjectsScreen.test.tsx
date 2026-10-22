@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import type { Home, Places, Project } from "./bindings";
+import type { Entry, Home, Item, Places, Project } from "./bindings";
 import { rowOf } from "./places";
 import { Loading } from "./Loading";
 import { HomesTab, ProjectsScreen, ProjectsTab, type Tab } from "./ProjectsScreen";
@@ -116,6 +116,25 @@ describe("a row of the Projects tab", () => {
       [GONE, true],
       [KEEP, false],
     ]);
+  });
+
+  test("draws Remove leftovers of a missing Project in the style of a button that deletes, and Show leftovers not", () => {
+    const claudeJson = String.raw`C:\Users\me\.claude.json`;
+    const entry = { path: claudeJson, locator: `${claudeJson}#projects.${GONE}.mcpServers.old` } as Entry;
+    const leftover = { agent: "claude-code", home: "default", kind: "mcp", name: "old", state: "unread", entries: [entry], built: null } as Item;
+    const markup = renderToStaticMarkup(
+      <ProjectsTab
+        places={{ ...places, leftovers: [{ project: GONE, items: [leftover] }] }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+      />,
+    );
+
+    const classes = buttonsOf(markup, GONE).map((button) => button.match(/class="([^"]*)"/)?.[1]);
+    expect(classes).toEqual(["cta small secondary", "cta small danger"]);
   });
 });
 
