@@ -96,6 +96,12 @@ const buttonsOf = (markup: string, name: string) => {
   return row.match(/<button[^>]*>/g) ?? [];
 };
 
+/** Each button of the row named `name`, as [its label, its class]. */
+const classesOf = (markup: string, name: string) => {
+  const row = markup.split('<div class="place-row').find((each) => each.includes(`>${name}</div>`)) ?? "";
+  return [...row.matchAll(/<button[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/button>/g)].map(([, classes, label]) => [label.replace(/<[^>]*>/g, ""), classes]);
+};
+
 /** Expects each named row's buttons to be disabled, or each to be enabled. */
 const expectDisabled = (markup: string, rows: [name: string, disabled: boolean][]) => {
   for (const [name, disabled] of rows) {
@@ -133,8 +139,28 @@ describe("a row of the Projects tab", () => {
       />,
     );
 
-    const classes = buttonsOf(markup, GONE).map((button) => button.match(/class="([^"]*)"/)?.[1]);
-    expect(classes).toEqual(["cta small secondary", "cta small danger"]);
+    expect(classesOf(markup, GONE)).toEqual([
+      ["Show leftovers", "cta small secondary"],
+      ["Remove leftovers", "cta small danger"],
+    ]);
+  });
+
+  test("draws Remove from list of a Project the user added in the style of a button that deletes, and Open in Inventory not", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectsTab
+        places={{ ...places, projects: [project({ path: KEEP, registered_by: [], added: true })] }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+      />,
+    );
+
+    expect(classesOf(markup, KEEP)).toEqual([
+      ["Open in Inventory", "cta small secondary"],
+      ["Remove from list", "cta small danger"],
+    ]);
   });
 });
 
@@ -174,5 +200,13 @@ describe("a row of the Agent homes tab", () => {
       [PORTABLE, true],
       ["default", false],
     ]);
+  });
+
+  test("draws Remove from list of a home the user added in the style of a button that deletes, and Unhide not", () => {
+    const markup = renderToStaticMarkup(<HomesTab places={places} busy={[]} onShow={() => {}} onChange={() => {}} />);
+    for (const [label, classes] of classesOf(markup, PORTABLE)) {
+      expect(classes, label).toBe(label === "Remove from list" ? "cta small danger" : "cta small secondary");
+    }
+    expect(classesOf(markup, PORTABLE).map(([label]) => label)).toContain("Remove from list");
   });
 });
