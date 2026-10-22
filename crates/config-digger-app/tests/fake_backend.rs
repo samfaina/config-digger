@@ -39,13 +39,18 @@ fn throwaway() -> (tempfile::TempDir, PathBuf) {
 }
 
 /// The fixtures, recorded once for every test, and the temporary folder
-/// they were recorded in, deleted since.
-fn recorded() -> &'static (PathBuf, Value) {
-    static RECORDED: OnceLock<(PathBuf, Value)> = OnceLock::new();
+/// they were recorded in, deleted since, both as given, such as with a short
+/// name like `RUNNER~1`, and canonical, with long names.
+fn recorded() -> &'static ([PathBuf; 2], Value) {
+    static RECORDED: OnceLock<([PathBuf; 2], Value)> = OnceLock::new();
     RECORDED.get_or_init(|| {
         let (temp, root) = throwaway();
         let fixtures = config_digger_app::fake_backend::record(&root).unwrap();
-        (std::fs::canonicalize(temp.path()).unwrap(), fixtures)
+        let temps = [
+            temp.path().to_path_buf(),
+            std::fs::canonicalize(temp.path()).unwrap(),
+        ];
+        (temps, fixtures)
     })
 }
 
@@ -121,12 +126,13 @@ fn every_item_is_a_throwaway_one() {
 
 #[test]
 fn paths_are_under_the_uat_root_and_name_no_folder_of_this_machine() {
-    let (temp, fixtures) = recorded();
+    let (temps, fixtures) = recorded();
 
-    let machine = [
-        normalized(&temp.display().to_string()),
-        normalized(&std::env::var("USERPROFILE").unwrap()),
-    ];
+    let mut machine: Vec<String> = temps
+        .iter()
+        .map(|temp| normalized(&temp.display().to_string()))
+        .collect();
+    machine.push(normalized(&std::env::var("USERPROFILE").unwrap()));
     for text in strings(fixtures) {
         let text = normalized(text);
         for path in &machine {

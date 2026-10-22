@@ -35,6 +35,7 @@ const HEADER: &str =
 /// Records the fake backend's fixtures over the throwaway data in `root`,
 /// which it changes as the UAT does.
 pub fn record(root: &Path) -> Result<Value, Error> {
+    let given = root;
     let root = canonical(root)?;
     let core = || Core::new(ports(&root));
 
@@ -103,7 +104,7 @@ pub fn record(root: &Path) -> Result<Value, Error> {
         "about": About::this_build(),
         "updateStatus": update_status,
     });
-    Ok(under_uat_root(fixtures, &root))
+    Ok(under_uat_root(fixtures, &[given, &root]))
 }
 
 /// Adds the Claude Desktop home, the second Claude Code home and the extra
@@ -265,16 +266,24 @@ fn serialized(value: &impl serde::Serialize) -> String {
     }
 }
 
-/// `value` with `root` written as [`UAT_ROOT`] in every string and key,
-/// with either slash, escaped or not, and in any letter case.
-fn under_uat_root(value: Value, root: &Path) -> Value {
-    let root = root.display().to_string();
-    let forms = [
-        (root.clone(), UAT_ROOT.to_owned()),
-        (root.replace('\\', "/"), UAT_ROOT.replace('\\', "/")),
-        // As a JSON file's text has it, such as in a diff.
-        (root.replace('\\', r"\\"), UAT_ROOT.replace('\\', r"\\")),
-    ];
+/// `value` with each of `roots` written as [`UAT_ROOT`] in every string and
+/// key, with either slash, escaped or not, and in any letter case. The roots
+/// are one folder spelled two ways: as given, which is how the throwaway
+/// data names it, such as with a short name like `RUNNER~1` in a temporary
+/// folder, and canonical, which is how the core does.
+fn under_uat_root(value: Value, roots: &[&Path]) -> Value {
+    let forms: Vec<(String, String)> = roots
+        .iter()
+        .map(|root| root.display().to_string())
+        .flat_map(|root| {
+            [
+                (root.clone(), UAT_ROOT.to_owned()),
+                (root.replace('\\', "/"), UAT_ROOT.replace('\\', "/")),
+                // As a JSON file's text has it, such as in a diff.
+                (root.replace('\\', r"\\"), UAT_ROOT.replace('\\', r"\\")),
+            ]
+        })
+        .collect();
     map_strings(value, &|text| {
         forms.iter().fold(text.to_owned(), |text, (from, to)| {
             replace_ignoring_case(&text, from, to)
