@@ -1241,12 +1241,14 @@
             "Mira la lista.",
             "En el mismo desplegable, elige Any status.",
             "En la caja Search Entry names, escribe CODEX.",
-            "Elige varias filas, una tras otra, y mira States changed en el detalle de cada una.",
-            "Borra la caja y escribe cd-throwaway-nada.",
+            "Elige varias filas, una tras otra.",
+            "Mira States changed en el detalle de cada una.",
+            "Borra la caja.",
+            "Escribe cd-throwaway-nada en la caja.",
             "Pulsa Clear filter."
           ],
           "commands": [],
-          "expect": "Con Enable, el título dice «M of N Operations», con M menor que N, y solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10. Con Undo, solo salen filas cuyo título empieza por Undo, con la etiqueta Undo of <id>. Con Undone, solo filas con la etiqueta Undone by <id>. Con Failed, solo filas con la etiqueta Failed, rolled back o Rollback incomplete, dismissed, entre ellas la del paso 11.5. Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó. Con CODEX, cada fila elegida tiene ENTRY cd-throwaway-codex en States changed, y no sale el Disable de cd-throwaway-user del paso 7.3. Con cd-throwaway-nada, la lista dice «No Operation matches the filter.» con el botón Clear filter, y el título «0 of N Operations». Tras Clear filter, la caja está vacía, los desplegables dicen Any verb y Any status, y el título vuelve a «N Operations».",
+          "expect": "Con Enable, el título dice «M of N Operations», con M menor que N, y solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10. Con Undo, solo salen filas cuyo título empieza por Undo, con la etiqueta Undo of <id>. Con Undone, solo filas cuya etiqueta incluye «undone by <id>», con mayúscula o sin ella. Con Failed, solo filas con la etiqueta Failed, rolled back o Rollback incomplete, dismissed, entre ellas la del paso 11.5. Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó. Con CODEX, cada fila elegida tiene ENTRY cd-throwaway-codex en States changed, y no sale el Disable de cd-throwaway-user del paso 7.3. Con cd-throwaway-nada, la lista dice «No Operation matches the filter.» con el botón Clear filter, y el título «0 of N Operations». Tras Clear filter, la caja está vacía, los desplegables dicen Any verb y Any status, y el título vuelve a «N Operations».",
           "covers": ["#228"]
         }
       ]

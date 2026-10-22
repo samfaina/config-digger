@@ -87,7 +87,7 @@ export function operationActions(summary: OperationSummary): OperationActions {
 }
 
 /** What became of an Operation, as History filters by it: an applied Undo is applied, and an Operation that did not complete failed. */
-export type FilterStatus = "applied" | "undone" | "failed" | "attention";
+export type FilterStatus = Exclude<StatusTone, "undo">;
 
 /**
  * What History's list is narrowed to: an Operation's verb and status, each
@@ -98,7 +98,8 @@ export type OperationFilter = { verb: Action | ""; status: FilterStatus | ""; te
 
 export const NO_FILTER: OperationFilter = { verb: "", status: "", text: "" };
 
-const VERBS: Action[] = ["disable", "enable", "remove", "undo", "delete_backup"];
+// Delete backup records no Operation of its own: it marks the backup of the one it deletes.
+const VERBS: Action[] = ["disable", "enable", "remove", "undo"];
 
 /** The choices of the filter's verb. */
 export const FILTER_VERBS: DropdownOption[] = [

@@ -82,6 +82,11 @@ export function HistoryScreen() {
     setSelected(operation);
     setRefused(null);
   };
+  // A refusal shown before the filter changed is not shown again when the filter brings its Operation back.
+  const refilter = (change: (filter: OperationFilter) => OperationFilter) => {
+    setFilter(change);
+    setRefused(null);
+  };
 
   const now = new Date();
   const shown = detail && "detail" in detail && detail.detail.summary.id === id ? detail.detail : null;
@@ -109,22 +114,22 @@ export function HistoryScreen() {
                 aria-label="Search Entry names"
                 placeholder="Search Entry names…"
                 value={filter.text}
-                onChange={(event) => setFilter({ ...filter, text: event.target.value })}
+                onChange={(event) => refilter((now) => ({ ...now, text: event.target.value }))}
               />
             </label>
             <Select
-              className="filter-select"
+              className="history-filter-select"
               label="Verb"
               value={filter.verb}
               options={FILTER_VERBS}
-              onChange={(verb) => setFilter({ ...filter, verb: verb as Action | "" })}
+              onChange={(verb) => refilter((now) => ({ ...now, verb: verb as Action | "" }))}
             />
             <Select
-              className="filter-select"
+              className="history-filter-select"
               label="Status"
               value={filter.status}
               options={FILTER_STATUSES}
-              onChange={(status) => setFilter({ ...filter, status: status as FilterStatus | "" })}
+              onChange={(status) => refilter((now) => ({ ...now, status: status as FilterStatus | "" }))}
             />
           </div>
           {error && (
@@ -141,7 +146,7 @@ export function HistoryScreen() {
             ) : listed.length === 0 ? (
               <div className="empty filtered-out">
                 <p>No Operation matches the filter.</p>
-                <button type="button" className="cta small secondary" onClick={() => setFilter(NO_FILTER)}>
+                <button type="button" className="cta small secondary" onClick={() => refilter(() => NO_FILTER)}>
                   Clear filter
                 </button>
               </div>

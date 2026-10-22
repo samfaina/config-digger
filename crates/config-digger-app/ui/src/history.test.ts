@@ -393,14 +393,13 @@ describe("the count of Operations", () => {
 });
 
 describe("the filter's choices", () => {
-  test("are any verb or each verb of an Operation", () => {
+  test("are any verb or each verb History records an Operation of, which Delete backup is not", () => {
     expect(FILTER_VERBS).toEqual([
       { value: "", label: "Any verb" },
       { value: "disable", label: "Disable" },
       { value: "enable", label: "Enable" },
       { value: "remove", label: "Remove" },
       { value: "undo", label: "Undo" },
-      { value: "delete_backup", label: "Delete backup" },
     ]);
   });
 
