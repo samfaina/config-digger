@@ -1968,12 +1968,30 @@ p {
   outline-offset: 2px;
 }
 
+/* On the snackbar's purple, its Dismiss is drawn as its Undo is, and its
+   focus ring is white, as the app's ring would hardly show. */
+
+.snackbar .icon-button {
+  background: transparent;
+  color: var(--snackbar-edge);
+}
+
+.snackbar .icon-button:hover {
+  background: var(--snackbar-edge);
+  color: var(--snackbar);
+}
+
+.snackbar :focus-visible {
+  outline-color: var(--white);
+}
+
 /* A notice and the Undo snackbar slide and fade in, and out while leaving,
    for as long as LEAVE_MS in Notice.tsx; they only fade for less motion.
    They slide by translate, as their transform centres them. */
 
 .notice.leaving,
 .snackbar.leaving {
+  pointer-events: none;
   animation: float-out 160ms ease-in forwards;
 }
 

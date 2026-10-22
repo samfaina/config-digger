@@ -1144,13 +1144,14 @@
             "Pulsa Disable.",
             "Pulsa Done.",
             "Mira cómo entra el aviso de abajo que empieza por «Disabled 1 Entry».",
-            "Deja el ratón sobre el aviso unos 15 segundos y pásalo por encima de Undo.",
+            "Deja el ratón sobre el aviso unos 15 segundos y pásalo por encima de Undo y de ✕.",
+            "Pulsa Tab hasta que el foco llegue a Undo, y otra vez para llegar a ✕.",
             "Aparta el ratón del aviso y espera sin tocar nada hasta que se vaya.",
             "En la tarjeta de cd-throwaway-codex, pulsa Enable, márcalo todo si hay casillas de aviso, pulsa Enable y luego Done.",
             "En el aviso de abajo que empieza por «Enabled 1 Entry», pulsa ✕."
           ],
           "commands": [],
-          "expect": "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora. Su fondo morado destaca, más claro que el panel y las tarjetas, con un borde lila claro a la izquierda y el texto blanco. Undo es un botón con borde y letras lila claro; con el ratón encima se rellena de lila con letras moradas. Entra subiendo un poco mientras aparece, en un instante. Con el ratón encima no se va. Unos 10 segundos después de apartar el ratón se va bajando un poco mientras se desvanece. Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe.",
+          "expect": "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora. Su fondo morado destaca, más claro que el panel y las tarjetas, con un borde lila claro a la izquierda y el texto blanco. Undo es un botón con borde y letras lila claro, y ✕ es lila claro sin fondo; con el ratón encima, los dos se rellenan de lila con letras moradas. Con el teclado, el foco en Undo y en ✕ se ve con un anillo blanco. Entra subiendo un poco mientras aparece, en un instante. Con el ratón encima no se va. Unos 10 segundos después de apartar el ratón se va bajando un poco mientras se desvanece. Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe.",
           "covers": ["#208"]
         }
       ]

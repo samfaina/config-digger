@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { NOTICE_MS } from "./desktop";
+import { onAFakeClock, wait } from "./fakeClock";
 import { Busy, LEAVE_MS, Notice, Status } from "./Notice";
 import type { BusyAction } from "./busy";
 import { useTransient } from "./useTransient";
@@ -99,39 +101,38 @@ describe("the bottom of a screen", () => {
   });
 });
 
-/** A screen that notifies on Copy, as the Inventory does after a copy. */
+/** A screen that notifies on Copy, as the Inventory does after a copy, and runs an action on Hide until End. */
 function CopyingScreen() {
   const [notice, setNotice, hold] = useTransient<Notice>(NOTICE_MS);
+  const [actions, setActions] = useState<BusyAction[]>([]);
   return (
     <>
       <button type="button" onClick={() => setNotice({ kind: "success", text: "Copied the path." })}>
         Copy
       </button>
-      <Status notice={notice} actions={[]} onHold={hold} />
+      <button type="button" onClick={() => setActions([HIDING])}>
+        Hide
+      </button>
+      <button type="button" onClick={() => setActions([])}>
+        End
+      </button>
+      <Status notice={notice} actions={actions} onHold={hold} />
     </>
   );
 }
 
 /** Renders the screen and copies. */
-function copied() {
+function copyOnAScreen() {
   render(<CopyingScreen />);
-  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  press("Copy");
 }
-
-/** Lets `ms` go by in steps, so that a timer an effect sets on the way runs too. */
-const wait = (ms: number) => {
-  for (let left = ms; left > 0; left -= 100) act(() => vi.advanceTimersByTime(Math.min(left, 100)));
-};
+const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("a screen's notice", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-  });
+  onAFakeClock();
 
   test("stays about 4 seconds, then is gone", () => {
-    copied();
+    copyOnAScreen();
 
     wait(3_800);
     expect(screen.getByRole("status")).toHaveProperty("textContent", "Copied the path.");
@@ -141,7 +142,7 @@ describe("a screen's notice", () => {
   });
 
   test("stays while the pointer is over it, and for its time again once the pointer leaves", () => {
-    copied();
+    copyOnAScreen();
 
     fireEvent.pointerEnter(screen.getByRole("status"));
     wait(20_000);
@@ -154,8 +155,26 @@ describe("a screen's notice", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  test("is not held for good once the busy indicator of an action covers it under the pointer", () => {
+    copyOnAScreen();
+    fireEvent.pointerEnter(screen.getByRole("status"));
+
+    press("Hide");
+    press("End");
+    wait(NOTICE_MS + LEAVE_MS);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("comes in afresh when another replaces it, so that it slides in again", () => {
+    copyOnAScreen();
+    const first = screen.getByRole("status");
+
+    press("Copy");
+    expect(screen.getByRole("status")).not.toBe(first);
+  });
+
   test("leaves with a look of its own, then is gone", () => {
-    copied();
+    copyOnAScreen();
 
     wait(NOTICE_MS);
     expect(screen.getByRole("status").className).toBe("notice success leaving");

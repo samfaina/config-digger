@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+
+/** Holds a transient value while the pointer is over what shows it, so that it stays. */
+export type Hold = (held: boolean) => void;
 
 /**
  * A value that clears itself `ms` after it is set, but not while it is held,
  * such as while the pointer is over it; once let go, it stays `ms` again.
  */
-export function useTransient<T>(ms: number): [T | null, (value: T | null) => void, (held: boolean) => void] {
+export function useTransient<T>(ms: number): [T | null, (value: T | null) => void, Hold] {
   const [value, setValue] = useState<T | null>(null);
   const [held, setHeld] = useState(false);
   useEffect(() => {
@@ -12,10 +15,15 @@ export function useTransient<T>(ms: number): [T | null, (value: T | null) => voi
     const timer = window.setTimeout(() => setValue(null), ms);
     return () => window.clearTimeout(timer);
   }, [value, held, ms]);
-  // A new value is not held, as the pointer may have left the last one by its going.
-  const set = useCallback((next: T | null) => {
-    setHeld(false);
-    setValue(next);
-  }, []);
-  return [value, set, setHeld];
+  return [value, setValue, setHeld];
+}
+
+/**
+ * The pointer handlers that hold a transient value while the pointer is over
+ * what shows it. That lets go once it is no longer shown, as the pointer then
+ * leaves it without a pointerleave.
+ */
+export function useHold(onHold: Hold | undefined) {
+  useEffect(() => () => onHold?.(false), [onHold]);
+  return { onPointerEnter: () => onHold?.(true), onPointerLeave: () => onHold?.(false) };
 }

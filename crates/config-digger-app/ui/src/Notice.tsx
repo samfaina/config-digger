@@ -1,6 +1,7 @@
 import { Icon, type IconName } from "./icons";
 import type { BusyAction } from "./busy";
 import { useLeaving } from "./useLeaving";
+import { useHold, type Hold } from "./useTransient";
 
 /** What a notice tells the user: information, a success or an error. */
 export type NoticeKind = "information" | "success" | "error";
@@ -13,18 +14,11 @@ export const LEAVE_MS = 160;
 
 const ICON: Record<NoticeKind, IconName> = { information: "info", success: "done", error: "warning" };
 
-/** Holds a notice while the pointer is over it, so that it stays. */
-export type Hold = (held: boolean) => void;
-
 /** The one look of every notice, floating at the bottom of the screen. An error is read out at once. */
 export function Notice({ notice, leaving = false, onHold }: { notice: Notice; leaving?: boolean; onHold?: Hold }) {
+  const hold = useHold(onHold);
   return (
-    <div
-      className={`notice ${notice.kind}${leaving ? " leaving" : ""}`}
-      role={notice.kind === "error" ? "alert" : "status"}
-      onPointerEnter={() => onHold?.(true)}
-      onPointerLeave={() => onHold?.(false)}
-    >
+    <div className={`notice ${notice.kind}${leaving ? " leaving" : ""}`} role={notice.kind === "error" ? "alert" : "status"} {...hold}>
       <Icon name={ICON[notice.kind]} small />
       <span>{notice.text}</span>
     </div>
@@ -48,7 +42,8 @@ export function Busy({ action, leaving = false }: { action: BusyAction; leaving?
  */
 export function Status({ notice, actions = [], onHold }: { notice: Notice | null; actions?: BusyAction[]; onHold?: Hold }) {
   const last = actions.at(-1);
-  const { shown, leaving } = useLeaving<Notice | BusyAction>(last && notice?.kind !== "error" ? last : notice, LEAVE_MS);
+  const { shown, leaving, key } = useLeaving<Notice | BusyAction>(last && notice?.kind !== "error" ? last : notice, LEAVE_MS);
   if (shown === null) return null;
-  return "kind" in shown ? <Notice notice={shown} leaving={leaving} onHold={onHold} /> : <Busy action={shown} leaving={leaving} />;
+  if ("kind" in shown) return <Notice key={key} notice={shown} leaving={leaving} onHold={onHold} />;
+  return <Busy key={key} action={shown} leaving={leaving} />;
 }

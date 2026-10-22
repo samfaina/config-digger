@@ -453,9 +453,20 @@ describe("the Undo snackbar", () => {
     expect(px(action.get("border-radius"))).toBeGreaterThan(0);
     expect(action.get("cursor")).toBe("pointer");
   });
+
+  test("has a Dismiss button and a focus ring that are seen on its background", () => {
+    const background = colour(styled(".snackbar").get("background"));
+    const dismiss = styled(".snackbar .icon-button");
+    expect(dismiss.get("background")).toBe("transparent");
+    expect(contrast(colour(dismiss.get("color")), background)).toBeGreaterThanOrEqual(4.5);
+    const hovered = styled(".snackbar .icon-button:hover");
+    expect(contrast(colour(hovered.get("color")), colour(hovered.get("background")))).toBeGreaterThanOrEqual(4.5);
+    // A focus ring is a graphic that has to be seen: WCAG asks 3:1 of it.
+    expect(contrast(colour(styled(".snackbar :focus-visible").get("outline-color")), background)).toBeGreaterThanOrEqual(3);
+  });
 });
 
-/** The keyframes name and the duration in ms of an `animation` shorthand, such as `notice-in 160ms ease-out`. */
+/** The keyframes name and the duration in ms of an `animation` shorthand, such as `float-in 160ms ease-out`. */
 const animation = (value: string | undefined) => {
   const [name, duration] = (value ?? "").split(/\s+/);
   expect(duration, `${value} gives a duration in ms`).toMatch(/^\d+ms$/);
@@ -487,6 +498,10 @@ describe("a notice and the Undo snackbar coming and going", () => {
       expect(value, `${selector} stays gone at the end`).toMatch(/\bforwards\b/);
       expect(keyframes(name), selector).toMatch(/to\s*\{[^}]*opacity:\s*0[^}]*translate:/);
     }
+  });
+
+  test("let the pointer through while leaving, so that nothing on them is pressed or held as they go", () => {
+    for (const selector of FLOATING) expect(styled(`${selector}.leaving`).get("pointer-events"), selector).toBe("none");
   });
 
   test("slide by translate, keeping the transform that centres them", () => {
