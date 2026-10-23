@@ -156,6 +156,21 @@ fn a_classic_install_lists_the_servers_of_its_user_file() {
 }
 
 #[test]
+fn the_classic_installer_s_app_reads_the_classic_home_with_the_version_of_its_launcher() {
+    let launcher = PathBuf::from(LOCAL_APP_DATA).join(r"AnthropicClaude\claude.exe");
+    let fs = classic().with_file(&launcher, fake::executable(Some([3, 6556, 2, 0])));
+
+    let inventory = inventory(&fs);
+
+    let installed: Vec<(&str, Option<&str>)> = home(&inventory, "classic")
+        .installations
+        .iter()
+        .map(|installation| (installation.id.as_str(), installation.version.as_deref()))
+        .collect();
+    assert_eq!(installed, [("classic", Some("3.6556.2"))]);
+}
+
+#[test]
 fn a_store_package_keeps_its_data_folder_in_its_local_cache() {
     let inventory = inventory(&store());
 

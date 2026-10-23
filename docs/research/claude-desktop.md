@@ -80,7 +80,9 @@ The resolution order, as coded [bundle]. On Windows, the first-party data folder
 
 The first one that exists wins, with a fallback to `%APPDATA%\Claude`. config-digger, which is unpackaged, should probe the same list and add the `AnthropicPBC.Claude_fnn82j28hfe8t` LocalCache path.
 
-**Caveat (inference, not verified):** if a user has both a classic install and an MSIX install, both `%APPDATA%\Claude` and `LocalCache\Roaming\Claude` can exist. Microsoft says a packaged app reads "from the per-user, per-package location first", so the MSIX app would see its LocalCache copy. Each folder should be reported as a separate Entry location with its own install attribution.
+**Caveat (inference, since tested: see below):** if a user has both a classic install and an MSIX install, both `%APPDATA%\Claude` and `LocalCache\Roaming\Claude` can exist. Microsoft says a packaged app reads "from the per-user, per-package location first", so the MSIX app would see its LocalCache copy. Each folder should be reported as a separate Entry location with its own install attribution.
+
+**Tested on 3.6556.2 in Windows Sandbox** (release gate, #80; [`release-gate.md`](release-gate.md)) [test]. The classic installer claude.ai serves (`claude.ai/api/desktop/win32/x64/exe/latest/redirect`) is Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude` (a launcher `claude.exe`, `Update.exe`, `app-<version>\claude.exe`), with the uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AnthropicClaude`, and the classic app reads `%APPDATA%\Claude`. The packaged app's data folder is `%APPDATA%\Claude` too, as its `--user-data-dir` shows, with the package's `LocalCache` laid over it file by file, as Microsoft says: beside a classic folder it reads the classic files and creates no `LocalCache`, and a file its `LocalCache` holds wins over the classic one. Neither app starts an MCP server before someone signs in. On the reference machine, 3.6556.2 has moved the package's data to `%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc` (#305).
 
 ### 1.2 MCP sources per Scope
 

@@ -1,8 +1,10 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Claude Code. Facts from docs/research/claude-code.md, and those tagged
-# [test] from the release gate's probe, uat/agents/claude-code.mjs
-# (docs/research/release-gate.md). The probe passes on 2.1.299 to 2.1.309;
-# 2.1.286 reads plain-string lists and skill names as before 2.1.299.
+# [test] from the release gate's probes, uat/agents/claude-code.mjs and,
+# for `%ProgramFiles%` and the policy values, claude-code-machine.mjs in
+# Windows Sandbox (docs/research/release-gate.md). They pass on 2.1.299 to
+# 2.1.309; 2.1.286 reads plain-string lists and skill names as before
+# 2.1.299.
 
 format_version = 1
 verified = { min = "2.1.299", max = "2.1.309" }
@@ -77,8 +79,10 @@ plugins = ".claude/plugins"
 # The settings an organisation deploys, highest first [docs]. The cache of
 # server-managed settings, which claude.ai or a gateway delivers, ranks
 # above them all [docs]. Claude Code reads them only from the first source
-# that holds a setting, a key other than the two control keys [docs]. When
-# the highest source that holds a control key or a setting sets
+# that holds a setting, a key other than the two control keys [docs, test].
+# An admin source it cannot parse stops it; an HKCU value it cannot parse
+# it skips [docs, test]. When the highest source that holds a control key
+# or a setting sets
 # `managedSourcesBehavior = "merge"`, it merges that source with every
 # admin source below it that holds a setting: a higher source's value
 # wins, and lists combine [docs]. The HKCU value is user-writable: it
@@ -90,9 +94,9 @@ control_keys = ["managedSourcesBehavior", "wslInheritsWindowsSettings"]
 merge = { key = "managedSourcesBehavior", value = "merge" }
 sources = [
   { block = "files", path = "~/.claude/remote-settings.json" },
-  { block = "registry-value", hive = "local-machine", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings" },
-  { block = "files", path = "%ProgramFiles%/ClaudeCode/managed-settings.json", drop_ins = "%ProgramFiles%/ClaudeCode/managed-settings.d" },
-  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings", user_writable = true },
+  { block = "registry-value", hive = "local-machine", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings", on_read_failure = "stops_agent" },
+  { block = "files", path = "%ProgramFiles%/ClaudeCode/managed-settings.json", drop_ins = "%ProgramFiles%/ClaudeCode/managed-settings.d", on_read_failure = "stops_agent" },
+  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\ClaudeCode', value = "Settings", user_writable = true, on_read_failure = "ignores_file" },
 ]
 
 [[scopes]]
@@ -136,10 +140,11 @@ id_separator = "@"
 uninstall = "claude plugin uninstall {id} --scope {scope}"
 
 # Servers an administrator deploys to the machine [docs]. config-digger
-# only reads them.
+# only reads them. Claude Code skips a `managed-mcp.json` it cannot parse,
+# `claude mcp list` reports it, and the file keeps its exclusive control:
+# only the servers of `managedMcpServers` load [test].
 [[locations]]
 id = "managed-mcp"
-unverified = "What Claude Code does with a `managed-mcp.json` it cannot parse is not known."
 anchor = { block = "machine", path = "%ProgramFiles%/ClaudeCode/managed-mcp.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -148,13 +153,20 @@ scope = "managed"
 provenance = "managed"
 store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-" }
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
-# Servers the managed settings declare in `managedMcpServers` [docs].
+# Servers the managed settings declare in `managedMcpServers` [docs]. An
+# HKLM value, `managed-settings.json` or drop-in that Claude Code cannot
+# parse stops it, even beside a source that parses; an HKCU value it cannot
+# parse is skipped [test]. Each source says so. Claude Code never reads
+# `managedMcpServers` from the HKCU value [docs, test], which config-digger
+# still reads (#303). It drops an entry with a command or at an `http://`
+# URL, loading only remote servers at an `https://` URL [docs, test], which
+# this shape does not check (#304).
 [[locations]]
 id = "managed-settings-mcp"
-unverified = "What Claude Code does with a managed settings file it cannot parse is not known."
+unverified = "What Claude Code does with a `remote-settings.json` it cannot parse is not known."
 anchor = { block = "settings", settings = "managed" }
 format = { block = "json", dialect = "strict" }
 root = ["managedMcpServers"]

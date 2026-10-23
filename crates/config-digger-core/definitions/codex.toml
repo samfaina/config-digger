@@ -1,9 +1,9 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Codex, the CLI, which its desktop app and IDE extension share their
 # configuration with on Windows [docs]. Facts from docs/research/codex.md,
-# and those tagged [test] from the release gate's probe,
-# uat/agents/codex.mjs (docs/research/release-gate.md), which passes on
-# 0.159.3.
+# and those tagged [test] from the release gate's probes,
+# uat/agents/codex.mjs and, for `%ProgramData%`, codex-machine.mjs in
+# Windows Sandbox (docs/research/release-gate.md), which pass on 0.159.3.
 
 format_version = 1
 verified = { min = "0.159.3", max = "0.159.3" }
@@ -326,9 +326,16 @@ trusted = "trusted"
 
 # An organisation allows MCP servers in `requirements.toml`, which adds no
 # server of its own [source]: `[mcp_servers.<name>] identity = { command =
-# "…" }` or `{ url = "…" }` allows the server of that name with that
-# command or URL. Once it lists any, Codex turns off every other server,
-# checking the server it built from its layers [source]. The machine's
+# "…" }` allows the server of that name with that command, whatever its
+# args, and `{ url = "…" }` with that URL [source, test]. `identity =
+# { command = { executable = "…", args = [<matcher>, …] } }` also needs as
+# many args, each matching its matcher, and `identity = { url = <matcher> }`
+# a matching URL: `{ match = "exact" | "prefix", value = "…" }` or
+# `{ match = "regex", expression = "…" }` on the whole value; a regex that
+# does not compile stops Codex [source, test]. config-digger reads neither
+# form and takes such a server to meet its requirement (#141). Once it
+# lists any, Codex turns off every other server [source, test], checking
+# the server it built from its layers [source]. The machine's
 # `%ProgramData%\OpenAI\Codex\requirements.toml` is the lowest source and
 # the cloud bundle's `requirements_toml` fragments rank above it, merged
 # name by name [source]. A requirement turns the server off by
@@ -336,7 +343,6 @@ trusted = "trusted"
 # of the same name [source].
 [[items.mcp.rules]]
 block = "identity-allowlist"
-unverified = "A requirement that matches a command's args, or a URL by prefix or pattern, is not read: its server is taken to meet it."
 identity = "identity"
 locations = ["project-mcp", "user-mcp", "cloud-mcp", "system-mcp"]
 sources = [

@@ -1401,10 +1401,25 @@ fn reaction(
         .filter(|reader| reader.agent_index == failure.agent_index && reader.home == failure.home)
         .map(|reader| definition.location(&reader.location))
         .collect();
+    // A source of settings can say what the Agent does about its own files.
+    let reaction_to_failure = |location: &LocationDefinition| {
+        location
+            .anchor
+            .settings()
+            .and_then(|id| {
+                let scanned = snapshot.settings_of(failure.agent_index, id);
+                let source = scanned
+                    .sources
+                    .iter()
+                    .position(|files| files.contains(&failure.path))?;
+                definition.declared_settings(id).ok()?.sources[source].on_read_failure()
+            })
+            .unwrap_or(location.on_read_failure)
+    };
     Reaction {
         strongest: locations
             .iter()
-            .map(|location| location.on_read_failure)
+            .map(|location| reaction_to_failure(location))
             .max()
             .unwrap_or(ReadFailureReaction::IgnoresFile),
         risks: locations
