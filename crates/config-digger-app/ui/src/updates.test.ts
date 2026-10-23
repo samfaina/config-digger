@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { checkFailedText, lastCheckedText } from "./updates";
+import { checkFailedText, installFailedText, lastCheckedText } from "./updates";
 
 /** A time on the user's clock, as the core records it. */
 function at(year: number, month: number, day: number, hours: number, minutes: number): string {
@@ -24,5 +24,22 @@ describe("a failed update check", () => {
     expect(checkFailedText("Could not fetch a valid release JSON from the remote")).toBe(
       "The update check failed: Could not fetch a valid release JSON from the remote",
     );
+  });
+});
+
+describe("an update that was not installed", () => {
+  test("says it was not installed once, then why", () => {
+    expect(installFailedText("Download request failed with status: 404 Not Found")).toBe(
+      "The update was not installed: Download request failed with status: 404 Not Found",
+    );
+  });
+
+  test("reads the same when no update was found or the CLI runs", () => {
+    expect(installFailedText("no update was found: check for updates first")).toBe(
+      "The update was not installed: no update was found: check for updates first",
+    );
+    const cliRunning =
+      "the config-digger CLI is running (C:\\Programs\\config-digger\\config-digger.exe), and the update cannot replace it while it runs: let it finish or close it, then try again";
+    expect(installFailedText(cliRunning)).toBe(`The update was not installed: ${cliRunning}`);
   });
 });

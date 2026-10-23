@@ -1866,6 +1866,7 @@
             "Ve a About.",
             "Pulsa Check now.",
             "En el aviso «config-digger <versión> is available.», pulsa Install and restart.",
+            "Si sale un error en vez de reiniciarse, marca KO, copia el texto exacto en las notas y apunta si «The update was not installed:» sale más de una vez.",
             "Cuando config-digger vuelva a abrirse, mira la versión en About.",
             "Abre una ventana nueva de PowerShell.",
             "Ejecuta la orden.",

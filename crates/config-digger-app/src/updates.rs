@@ -154,9 +154,7 @@ impl UpdatesState {
         tracing::info!(version = %update.version, "update installing");
         let installed = update.download_and_install(|_, _| {}, || {}).await;
         drop(lock);
-        installed.map_err(|error| {
-            api::Error::unexpected(format!("the update could not be installed: {error}"))
-        })
+        installed.map_err(failed_install)
     }
 }
 
@@ -165,6 +163,12 @@ const CLI_EXE: &str = "config-digger.exe";
 
 /// A check that failed, with only its cause: About says the check failed.
 fn failed_check(error: tauri_plugin_updater::Error) -> api::Error {
+    api::Error::unexpected(error)
+}
+
+/// A download or install that failed, with only its cause: About says the
+/// update was not installed.
+fn failed_install(error: tauri_plugin_updater::Error) -> api::Error {
     api::Error::unexpected(error)
 }
 
@@ -194,5 +198,12 @@ mod tests {
             error.message,
             "Could not fetch a valid release JSON from the remote"
         );
+    }
+
+    #[test]
+    fn a_failed_install_carries_only_its_cause() {
+        let error = failed_install(tauri_plugin_updater::Error::InvalidUpdaterFormat);
+
+        assert_eq!(error.message, "invalid updater binary format");
     }
 }
