@@ -7,7 +7,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 | `uat/plan.json` | The walk: ordered sections of steps, from a PC without config-digger through install, every screen, update and uninstall. |
 | `uat/plan.schema.json` | The plan's JSON Schema. |
 | `uat/runner.html` | The runner page, published as a private claude.ai Artifact for each run. |
-| `uat/runner.test.mjs` | Tests of the runner's logic. Run them with `node --test uat/runner.test.mjs`. |
+| `uat/runner.test.mjs` | Tests of the runner's logic and the words of its page. Run them with `node --test uat/runner.test.mjs`. |
 | `uat/data/cd-throwaway-setup.ps1` | Creates the throwaway Agent homes and Projects the steps use. |
 
 ## The plan
@@ -68,7 +68,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`, and give the tester the link. Post it on the walk's issue too.
 
-The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. The Export button copies the KO and Blocked rows as a Markdown table.
+The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too and go in before OK is pressed: pressing OK saves them, and pressing it again saves notes added after. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
 
 ## Turning a run's results into tickets
 
@@ -80,7 +80,9 @@ The tester works in the page. Each saved verdict writes `results/<step id>` at o
 
    `status` is `ok`, `ko` or `blocked`: the tester's verdict on the step. It is not an Entry's State, so a ticket says "KO" or "Blocked", never "status". Match each `id` to its step in `uat/plan.json` at the commit the run was published from.
 
-2. For each `ko` and `blocked` result, check for a duplicate first, as `CLAUDE.md` asks for any reported bug:
+2. Read every result with notes: each `ko` and `blocked` one, and each `ok` one whose `notes` are not empty. Notes on an OK step are findings as often as not: the step passed, but the tester saw something worth fixing on the way. Each finding, whatever the step's verdict, goes through steps 3 and 4. A note that reports nothing to fix, such as "todo bien", needs neither a ticket nor a comment.
+
+3. For each finding, check for a duplicate first, as `CLAUDE.md` asks for any reported bug:
 
    ```sh
    gh issue list --state open --search "<words from the notes>"
@@ -89,7 +91,7 @@ The tester works in the page. Each saved verdict writes `results/<step id>` at o
 
    A finding already filed gets a comment on that issue instead: the step, the notes and the run.
 
-3. File one issue per finding, in the format of `docs/agents/issue-tracker.md` and the vocabulary of `CONTEXT.md`. Start the body with the Parent of the walk's issue, then the line naming the run and step. For the 0.1 walk (#154) the Parent is #38:
+4. File one issue per finding, in the format of `docs/agents/issue-tracker.md` and the vocabulary of `CONTEXT.md`. Start the body with the Parent of the walk's issue, then the line naming the run and step. For the 0.1 walk (#154) the Parent is #38:
 
    ```markdown
    ## Parent
@@ -102,6 +104,6 @@ The tester works in the page. Each saved verdict writes `results/<step id>` at o
    …
    ```
 
-   Say what the tester saw (the notes), what the step expected, and what the step's `covers` point at. A Blocked step is filed only when the blocker is a bug. When another step blocked it, say so in that step's issue.
+   Say what the tester saw (the notes), what the step expected, and what the step's `covers` point at. For a note on an OK step, say the step passed and the note is what is left to fix. A Blocked step is filed only when the blocker is a bug. When another step blocked it, say so in that step's issue.
 
-4. Comment on the walk's issue with the list of new issues, grouped by kind (blocks the walk, behaviour, look and feel, and so on), as on #154.
+5. Comment on the walk's issue with the list of new issues, grouped by kind (blocks the walk, behaviour, look and feel, and so on), as on #154.

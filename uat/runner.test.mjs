@@ -1,6 +1,6 @@
-// The runner's logic, the `uat-logic` script inside runner.html, run by
-// `node --test uat/runner.test.mjs`. The page itself stays one
-// self-contained file.
+// The runner's logic, the `uat-logic` script inside runner.html, and the
+// words of its page, run by `node --test uat/runner.test.mjs`. The page
+// itself stays one self-contained file.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -32,6 +32,10 @@ test("an OK is stored with its id, notes, time and app version", () => {
     time: "2026-10-18T09:30:00.000Z",
     version: "0.1.0-rc.2",
   });
+});
+
+test("an OK keeps its notes", () => {
+  assert.equal(Uat.result("1.1", "ok", " El título se corta\n", "0.1.0-rc.2", NOW).notes, "El título se corta");
 });
 
 test("KO or Blocked without notes waits as the step's pending verdict", () => {
@@ -96,10 +100,10 @@ test("progress counts the plan's steps that have a result, by status", () => {
   });
 });
 
-test("the export is a Markdown table of the KO and Blocked steps, in plan order", () => {
+test("the export is a Markdown table of every step with notes, whatever its verdict, in plan order", () => {
   const done = results(
     Uat.result("2.1", "blocked", "Espera a #175", "0.1.0-rc.2", NOW),
-    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("1.1", "ok", "Funciona, pero el título se corta", "0.1.0-rc.2", NOW),
     Uat.result("1.2", "ko", "Sale vacío | sin servidores\nNi skills", "0.1.0-rc.2", NOW),
   );
   assert.equal(
@@ -107,15 +111,52 @@ test("the export is a Markdown table of the KO and Blocked steps, in plan order"
     [
       "| Paso | Título | Estado | Notas |",
       "| --- | --- | --- | --- |",
+      "| 1.1 | Abrir la app | OK | Funciona, pero el título se corta |",
       "| 1.2 | Añadir el home | KO | Sale vacío \\| sin servidores<br>Ni skills |",
       "| 2.1 | Deshacer | Bloqueado | Espera a #175 |",
     ].join("\n"),
   );
 });
 
-test("the export says so when no step is KO or Blocked", () => {
+test("the export leaves out an OK without notes", () => {
+  const done = results(
+    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "ok", "El atajo no sale en el menú", "0.1.0-rc.2", NOW),
+  );
+  assert.equal(
+    Uat.exportMarkdown(PLAN, done),
+    [
+      "| Paso | Título | Estado | Notas |",
+      "| --- | --- | --- | --- |",
+      "| 2.1 | Deshacer | OK | El atajo no sale en el menú |",
+    ].join("\n"),
+  );
+});
+
+test("the export says so when no step has notes", () => {
   const done = results(Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW));
-  assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso en KO ni bloqueado.");
+  assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso con notas.");
+});
+
+/** The words of the page's element with this id, as its markup or the
+ * render script's `el(tag, { …, id }, words)` writes them. */
+function pageText(id) {
+  const found =
+    html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`)) ??
+    html.match(new RegExp(`id: "${id}" }, "([^"]*)"`));
+  assert.ok(found, `runner.html has no element with id "${id}" and words of its own`);
+  return found[1];
+}
+
+test("the notes hint says notes on an OK step are read too", () => {
+  assert.equal(
+    pageText("notes-hint"),
+    "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK.",
+  );
+});
+
+test("the Export button is named for the steps with notes it copies", () => {
+  assert.equal(pageText("export"), "Exportar pasos con notas");
 });
 
 test("after a result the runner moves on to the next step without one", () => {
