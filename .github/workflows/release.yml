@@ -54,6 +54,10 @@ jobs:
         run: |
           npm ci
           npm run tauri -- build --config tauri.bundle.conf.json
+      # The CLI the installer and the zip ship, which the installer's hooks
+      # run on a Windows that may have no VC++ runtime.
+      - name: The CLI imports no VC++ runtime
+        run: cargo xtask vcruntime target/release/config-digger.exe
       - name: Collect the installer, its updater signature and the CLI zip
         shell: pwsh
         env:

@@ -30,12 +30,16 @@
 //!   fails when the signature is missing or empty.
 //! - `assets <tag> <dir>`: fails unless `<dir>` holds every asset the tag's
 //!   release publishes, the updater's signature and manifest included.
+//! - `vcruntime <exe>`: fails when the executable imports a DLL of the VC++
+//!   runtime, which a Windows without it lacks: the CLI must run there, for
+//!   the installer's hooks run it.
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
 mod fixtures;
 mod installer;
 mod release;
+mod vcruntime;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -90,11 +94,12 @@ fn main() -> ExitCode {
         }
         ["updater", tag, dir] => return write_updater_manifest(tag, Path::new(dir)),
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
+        ["vcruntime", exe] => return check_vcruntime(Path::new(exe)),
         _ => {
             eprintln!(
                 "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures|fake-backend>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
-                        cargo xtask updater <tag> <dir> | assets <tag> <dir>"
+                        cargo xtask updater <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
             );
             return ExitCode::from(2);
         }
@@ -387,6 +392,23 @@ fn check_assets(tag: &str, dir: &Path) -> ExitCode {
         eprintln!("the release of {tag} lacks {asset} in {}", dir.display());
     }
     ExitCode::FAILURE
+}
+
+/// The executable at `exe`, as CI and the release check the CLI.
+fn check_vcruntime(exe: &Path) -> ExitCode {
+    match std::fs::read(exe) {
+        Ok(bytes) => report(
+            &vcruntime::problems(&bytes)
+                .iter()
+                .map(|problem| format!("{}: {problem}", exe.display()))
+                .collect::<Vec<_>>(),
+            &format!("{} imports no VC++ runtime DLL", exe.display()),
+        ),
+        Err(error) => {
+            eprintln!("cannot read {}: {error}", exe.display());
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn repo_file(path: &str) -> PathBuf {

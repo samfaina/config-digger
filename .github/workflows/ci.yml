@@ -26,6 +26,15 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --locked
+      - name: Release CLI
+        run: cargo build --release --package config-digger-cli --locked
+      # The installer's hooks run the CLI, on a Windows that may have no
+      # VC++ runtime. The tests built the debug CLI.
+      - name: The CLI imports no VC++ runtime
+        shell: bash
+        run: |
+          cargo xtask vcruntime target/debug/config-digger.exe
+          cargo xtask vcruntime target/release/config-digger.exe
       - name: JSON Schema is current
         run: cargo xtask schema --check
       - name: Built-in definitions are valid
