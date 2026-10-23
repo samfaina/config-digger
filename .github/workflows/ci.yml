@@ -44,8 +44,8 @@ jobs:
         run: cargo xtask fixtures
       - name: TypeScript bindings are current
         run: cargo xtask bindings --check
-      - name: UAT runner logic
-        run: node --test uat/runner.test.mjs
+      - name: UAT runner and walk logic
+        run: node --test uat/runner.test.mjs uat/auto/webdriver/walk.test.mjs
       - name: UI typecheck, tests and build
         working-directory: crates/config-digger-app/ui
         run: |

@@ -9,6 +9,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 | `uat/runner.html` | The runner page, published as a private claude.ai Artifact for each run. |
 | `uat/runner.test.mjs` | Tests of the runner's logic and the words of its page. Run them with `node --test uat/runner.test.mjs`. |
 | `uat/data/cd-throwaway-setup.ps1` | Creates the throwaway Agent homes and Projects the steps use. |
+| `uat/auto/` | The tools that walk most steps without a tester, before a run is published (see [Automated steps](#automated-steps)). |
 
 ## The plan
 
@@ -46,6 +47,23 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 The script refuses any `-Root` not named `cd-throwaway`, so `-Reset` can never delete another folder. It refuses an existing folder without `-Reset`. `cargo test -p xtask --test uat_data` checks both, on Windows.
 
+## Automated steps
+
+Most steps run without a tester, from `uat/auto/`, before the run is published. Each tool writes JSON results in the runner's shape (see below), with two more fields the runner ignores: `by`, which names what wrote the verdict (`local` for these tools, `agent-judge` for the agent that judged screenshots), and `evidence`. The WebDriver walk's results also carry `checks`, `looks` and `manual`, which stay on the machine: only the runner's fields, `by` and `evidence` reach a run. Screenshots stay on the machine that took them (`docs/agents/screenshots.md`). `docs/research/uat-automation.md` is the research behind them.
+
+| Tool | Steps | Run |
+| --- | --- | --- |
+| `uat/auto/webdriver/` | The app's screens: sections 1, 15, 10, 2, 3, 4, 5, 6, 7, 11 and 14, 12.1, 13.1 and 13.5 | `.\uat\auto\webdriver\run.ps1 -App <config-digger-app.exe>` |
+| `uat/auto/sandbox/` | A clean PC, install, update and uninstall in Windows Sandbox: 8.1, 9.1 to 9.5, 12.2, 13.2 to 13.4. SmartScreen in 9.2 stays with a person: a file from a mapped folder has no mark of the web. Needs Windows Sandbox, so Windows Pro, Enterprise or Education | `.\uat\auto\sandbox\build-update.ps1 -Commit v<version>`, then `.\uat\auto\sandbox\run.ps1 -Version <version>` |
+
+The WebDriver walk drives the release build through `tauri-driver` and the `msedgedriver` of the installed WebView2, which `run.ps1` downloads. It runs the app on a throwaway Windows profile, a folder named `cd-throwaway-profile` that stands for `USERPROFILE`, `APPDATA` and `LOCALAPPDATA`, so the app never sees the tester's Agent homes or data, and on the throwaway data of `uat/data/cd-throwaway-setup.ps1`. It walks the steps in the plan's order, one module per section in `uat/auto/webdriver/steps/`, and answers the Windows folder picker with UI Automation (`picker.ps1`). Steps 7.2 and 13.1 open Claude Desktop, and close it again if it was closed; without Claude Desktop installed they are Blocked. Step 14.2 measures the scans of the tester's own homes with the CLI next to the app, `list -v` and `disable --dry-run -v`, which write nothing. Step 5.4 emulates Windows' animation effects turned off with `prefers-reduced-motion`, the setting WebView2 takes from them, and never changes the tester's setting. At the end the walk checks that config-digger's real data folders and the real Codex and Claude Desktop configuration are byte for byte as before, and exits with 2 when one changed. To see a busy state that lasts less than a frame, a step holds a command's answer: Tauri's `invoke` can't be wrapped, so `driver.mjs` holds the `fetch` it sends to `http://ipc.localhost/<command>`.
+
+Each step's checks are the plan's `expect`, one by one. What a style can't show, such as a colour seen as a whole or a shadow, is listed in `looks`, and in the result's notes under "A juzgar en capturas", with the screenshot to look at. The walk's `ok` then covers its checks only: before the step reaches a run, the agent that ran the walk reads those screenshots and sets the step's verdict, `ko` with what it saw when a picture breaks the `expect`, and `by: "agent-judge"`. A step whose `manual` field in `steps/` says what a person must still see, such as how a notice moves, stays in the tester's walk. A step that fails before any of its own checks, on its setup or on what an earlier step left, is `blocked`.
+
+When a step leaves the window blank, the walk notes what the page logged and its last commands, opens the app again and runs the step once more.
+
+When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, and the parts of the walk that need no app.
+
 ## Publishing a run
 
 A run is one private Artifact, with its own database of results. Publish a new one for each release candidate walked.
@@ -66,7 +84,11 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
    A publish without `url` makes a new Artifact. To fix the page or the plan of the same run, publish again to its `url`, so its results stay.
 
-3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`, and give the tester the link. Post it on the walk's issue too.
+3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`.
+
+4. Write the automated results with one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. Leave out the steps that still need a person (`manual`), unless their automated verdict is already KO, which a ticket fixes first; and leave out any step that already has a tester's result, one with no `by`: a tester's verdict is never overwritten. The runner shows each step with a result as done and starts the tester on the first step without one, so the automated steps drop out of the walk.
+
+5. Give the tester the link, and post it on the walk's issue with the steps left to walk.
 
 The tester works in the page. The checks under "Resultado esperado" have boxes to tick while looking; a tick only guides the eye, is never stored and is gone when the step changes. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too and go in before OK is pressed: pressing OK saves them, and pressing it again saves notes added after. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
 
