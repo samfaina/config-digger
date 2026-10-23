@@ -8,6 +8,8 @@
   --white: #ffffff;
   --grey: #8b8c8f;
   --faint: #5e5f66;
+  /* A hint in a dialog, lighter than --grey so it reads on every tile. */
+  --hint: #b4b5ba;
   --rail: #1b1c21;
   --panel: #1d1e23;
   --tile: #24252b;
@@ -29,6 +31,9 @@
   --notice-success-edge: #6ee07f;
   --notice-error: #8a2f36;
   --notice-error-edge: #ffaba5;
+  --notice-warning: #614a14;
+  --notice-warning-edge: #ffc861;
+  --git-versioned: #a78bfa;
   --snackbar: #523f9e;
   --snackbar-edge: #d4c9ff;
   --danger: #b93a35;
@@ -1548,7 +1553,7 @@ p {
 
 .dialog-subtitle {
   margin-top: 4px;
-  color: var(--grey);
+  color: var(--hint);
 }
 
 .dialog-section {
@@ -1709,7 +1714,7 @@ p {
 
 .effective-change {
   margin-top: 6px;
-  color: var(--grey);
+  color: var(--hint);
 }
 
 .check {
@@ -1718,18 +1723,35 @@ p {
   gap: 10px;
   margin-bottom: 6px;
   padding: 10px 12px;
+  border-left-width: 4px;
+  border-left-style: solid;
   border-radius: 12px;
-  background: var(--tile);
+  color: var(--white);
   line-height: 1.45;
 }
 
+.check > .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
 .check.block {
-  background: #f8717114;
-  color: #fecaca;
+  border-left-color: var(--notice-error-edge);
+  background: var(--notice-error);
+}
+
+.check.block > .icon {
+  color: var(--notice-error-edge);
 }
 
 .check.warning {
+  border-left-color: var(--notice-warning-edge);
+  background: var(--notice-warning);
   cursor: pointer;
+}
+
+.check.warning > .icon {
+  color: var(--notice-warning-edge);
 }
 
 .check.warning input {
@@ -1743,12 +1765,28 @@ p {
 
 /* A Remove in a git-versioned file reaches every clone: its checkbox stands apart. */
 .check.git {
-  border: 1px solid #a78bfa55;
-  background: #a78bfa1a;
+  box-shadow: inset 0 0 0 2px var(--git-versioned);
 }
 
 .check.info {
-  color: var(--grey);
+  border-left-color: var(--notice-information-edge);
+  background: var(--notice-information);
+}
+
+.check.info > .icon {
+  color: var(--notice-information-edge);
+}
+
+.check-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* What to do, the first line of a warning or block. */
+.check-todo {
+  font-weight: 600;
 }
 
 .check-kind {
@@ -1757,6 +1795,13 @@ p {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.check-path {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .check-fix {
@@ -1794,7 +1839,7 @@ p {
 
 .file-note {
   padding: 8px 12px 12px;
-  color: var(--grey);
+  color: var(--hint);
 }
 
 .diff {
@@ -1843,13 +1888,13 @@ p {
 
 .dialog-backup {
   flex-basis: 100%;
-  color: var(--faint);
-  font-size: 11.5px;
+  color: var(--hint);
+  font-size: 12.5px;
 }
 
 .apply-why {
-  color: var(--faint);
-  font-size: 12px;
+  color: var(--hint);
+  font-size: 12.5px;
 }
 
 .dialog-callout {
@@ -1865,6 +1910,12 @@ p {
 .callout-title {
   font-size: 14px;
   font-weight: 600;
+}
+
+/* A result's hints, such as to restart an Agent, and its note. */
+.callout-hint {
+  margin-top: 4px;
+  color: var(--hint);
 }
 
 .dialog-callout.fresh {
@@ -1886,12 +1937,6 @@ p {
   background: #f8514926;
 }
 
-.faint {
-  margin-top: 4px;
-  color: var(--faint);
-  font-size: 11.5px;
-}
-
 .steps {
   display: flex;
   flex-direction: column;
@@ -1905,7 +1950,7 @@ p {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--faint);
+  color: var(--hint);
 }
 
 .step-dot {
@@ -2502,6 +2547,16 @@ p {
   color: var(--grey);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.dialog .side-note {
+  color: var(--hint);
+  font-size: 12.5px;
+}
+
+.dialog .dim,
+.dialog .empty {
+  color: var(--hint);
 }
 
 .dialog.small {

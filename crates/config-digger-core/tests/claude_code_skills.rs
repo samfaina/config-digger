@@ -4,8 +4,8 @@
 //! through `skillOverrides`.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Item, Plan,
-    ScanOptions, Targets, WarningClass,
+    Action, Advice, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Item,
+    Plan, ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -837,6 +837,30 @@ fn disable_of_a_skill_without_a_project_is_not_offered() {
     let entry = entry_json(&skill(&inventory, "deploy").entries[0]);
     assert_eq!(entry["disable"]["status"], "not_offered");
     assert_eq!(entry["disable"]["code"], "no_mechanism");
+}
+
+#[test]
+fn the_wide_reach_warning_says_first_to_check_what_it_reaches() {
+    let fs = deploy_in_project("{}");
+    let fs = with_skill(fs, project_skill("deploy"), &skill_md("deploy"));
+    let core = core(&fs);
+    let user_skill = in_home(r".claude\skills\deploy").display().to_string();
+
+    let plan = plan(&core, &in_project(), Action::Disable, &[&user_skill]).unwrap();
+
+    let warning = plan
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::WideReach)
+        .expect("a wide-reach warning");
+    assert_eq!(
+        warning.advice,
+        [Advice {
+            todo: "Check that everything it reaches should change.".to_owned(),
+            why: "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.".to_owned(),
+            paths: vec![project_skill("deploy").display().to_string()],
+        }]
+    );
 }
 
 #[test]

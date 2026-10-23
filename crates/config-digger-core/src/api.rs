@@ -863,6 +863,8 @@ pub struct Block {
     pub code: BlockCode,
     /// The cause and what to do about it, as a sentence rendered by the core.
     pub sentence: String,
+    /// The same block laid out for the app.
+    pub advice: Vec<Advice>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -1204,6 +1206,23 @@ pub struct Warning {
     pub class: WarningClass,
     /// The risk as a sentence, rendered by the core.
     pub sentence: String,
+    /// The same risk laid out for the app, one per cause it covers.
+    pub advice: Vec<Advice>,
+}
+
+/// A warning or block laid out for the app's action dialog, rendered by the
+/// core: what to do on a line of its own, then why, then the paths it is
+/// about, each on a line of its own.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Advice {
+    /// What to do, such as "Close Claude Code first to be safe."
+    pub todo: String,
+    /// Why, the paths left out, such as "Claude Code is running and
+    /// rewrites this location while it runs: …".
+    pub why: String,
+    /// What `why` is about, each in full on a line of its own: the path of
+    /// a location, or an Entry's locator with where it applies.
+    pub paths: Vec<String>,
 }
 
 /// Each class of warning is acknowledged on its own.

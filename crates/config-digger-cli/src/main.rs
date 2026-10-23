@@ -859,9 +859,26 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
 #[derive(Serialize)]
 struct WriteBody<'a> {
     plan: &'a api::Preview,
-    blocks: &'a [api::Block],
+    blocks: Vec<BlockBody<'a>>,
     warnings: Vec<WarningBody<'a>>,
     result: Option<&'a api::Outcome>,
+}
+
+/// A block as the JSON document gives it: the app's advice left out.
+#[derive(Serialize)]
+struct BlockBody<'a> {
+    code: api::BlockCode,
+    sentence: &'a str,
+}
+
+fn block_bodies(blocks: &[api::Block]) -> Vec<BlockBody<'_>> {
+    blocks
+        .iter()
+        .map(|block| BlockBody {
+            code: block.code,
+            sentence: &block.sentence,
+        })
+        .collect()
 }
 
 #[derive(Serialize)]
@@ -909,7 +926,7 @@ fn confirm_and_execute(
         if cli.json {
             print_json(&WriteBody {
                 plan: &preview,
-                blocks: &blocks,
+                blocks: block_bodies(&blocks),
                 warnings: warning_bodies(&warnings, &acknowledged),
                 result: None,
             });
@@ -934,7 +951,7 @@ fn confirm_and_execute(
     if cli.json {
         print_json(&WriteBody {
             plan: &preview,
-            blocks: &blocks,
+            blocks: block_bodies(&blocks),
             warnings: warning_bodies(&warnings, &acknowledged),
             result: Some(&outcome),
         });

@@ -582,3 +582,101 @@ describe("a button that deletes", () => {
     }
   });
 });
+
+/** Each kind of Before you apply item, with the notice kind whose tokens it takes. */
+const CHECKS = [
+  [".check.block", "error"],
+  [".check.warning", "warning"],
+  [".check.info", "information"],
+] as const;
+
+describe("a Before you apply item", () => {
+  test("of each kind is a card tinted by its kind, with an accent edge, from the notices' :root tokens", () => {
+    expect(styled(".check").get("border-left-width")).toBe(styled(".notice").get("border-left-width"));
+    expect(styled(".check").get("border-left-style")).toBe("solid");
+    for (const [selector, kind] of CHECKS) {
+      const declarations = styled(selector);
+      expect(declarations.get("background"), selector).toBe(`var(--notice-${kind})`);
+      expect(declarations.get("border-left-color"), selector).toBe(`var(--notice-${kind}-edge)`);
+    }
+  });
+
+  test("that informs takes the style of an information notice, not grey text", () => {
+    for (const name of ["background", "border-left-color"]) {
+      expect(styled(".check.info").get(name), name).toBe(styled(".notice.information").get(name));
+    }
+    expect(styled(".check.info").get("color")).toBeUndefined();
+  });
+
+  test("that warns is in the warning colour, an amber apart from the other kinds", () => {
+    const edge = colour(styled(".check.warning").get("border-left-color"));
+    const [r, g, b] = channels(edge);
+    expect(r, "red").toBeGreaterThan(2 * b);
+    expect(g, "green").toBeGreaterThan(1.5 * b);
+    for (const [selector] of CHECKS.filter(([selector]) => selector !== ".check.warning")) {
+      expect(colour(styled(selector).get("border-left-color")), selector).not.toBe(edge);
+    }
+  });
+
+  test("of each kind stands out from the dialog, its text meeting WCAG AA and its icon in the colour of its accent edge", () => {
+    const text = colour(styled(".check").get("color"));
+    for (const [selector] of CHECKS) {
+      const background = colour(styled(selector).get("background"));
+      const edge = styled(selector).get("border-left-color");
+      expect(contrast(background, colour("var(--panel)")), `${selector} on the dialog`).toBeGreaterThanOrEqual(1.6);
+      expect(contrast(text, background), selector).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colour(edge), background), `${selector} edge`).toBeGreaterThanOrEqual(3);
+      expect(styled(`${selector} > .icon`).get("color"), selector).toBe(edge);
+    }
+  });
+
+  test("puts what to do first, in bold, and each path on a line of its own in monospace", () => {
+    expect(Number(styled(".check-todo").get("font-weight"))).toBeGreaterThanOrEqual(600);
+    const path = styled(".check-path");
+    expect(path.get("display")).toBe("block");
+    expect(path.get("font-family")).toBe("var(--mono)");
+    // A long path wraps inside the item instead of running over its edge.
+    expect(path.get("overflow-wrap")).toBe("anywhere");
+  });
+
+  test("takes every colour from the :root tokens", () => {
+    expectTokenColours([".check", ...CHECKS.map(([selector]) => selector), ".check.git"]);
+  });
+});
+
+/**
+ * The hints of the dialogs: the line under a title, the backup note, why
+ * Apply is off, a result's hints and notes, a step yet to run, and what
+ * stands in for a list while it loads or when it is empty.
+ */
+const HINTS = [
+  ".dialog-subtitle",
+  ".dialog-backup",
+  ".apply-why",
+  ".effective-change",
+  ".file-note",
+  ".callout-hint",
+  ".step",
+  ".dialog .dim",
+  ".dialog .empty",
+  ".dialog .side-note",
+];
+
+describe("a hint in a dialog", () => {
+  test("meets WCAG AA on the dialog and on its tiles", () => {
+    for (const selector of HINTS) {
+      const text = colour(styled(selector).get("color"));
+      for (const surface of ["--panel", "--tile"]) {
+        expect(contrast(text, colour(`var(${surface})`)), `${selector} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  test("is at a readable size, no smaller than 12.5px", () => {
+    for (const selector of HINTS) {
+      const size = styled(selector).get("font-size");
+      // A hint without a size of its own takes the app's 13px.
+      if (size !== undefined) expect(px(size), selector).toBeGreaterThanOrEqual(12.5);
+    }
+  });
+});

@@ -5,8 +5,8 @@
 //! each back.
 
 use config_digger_core::api::{
-    Action, Context, Core, Entry, Error, Inventory, Item, Outcome, Plan, ScanOptions, Targets,
-    WarningClass,
+    Action, Advice, Context, Core, Entry, Error, Inventory, Item, Outcome, Plan, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -286,6 +286,23 @@ fn remove_of_a_linked_entry_removes_the_link_and_never_its_target() {
     assert_eq!(
         code(skill(&after, "agents-reader", "deploy").state),
         "effective"
+    );
+}
+
+#[test]
+fn the_broken_links_warning_says_first_to_remove_the_link_and_gives_it_apart() {
+    let fs = junctioned_deploy();
+    let core = core(&fs);
+
+    let plan = remove(&core, &agents_skill("deploy").display().to_string());
+
+    assert_eq!(
+        plan.warnings()[0].advice,
+        [Advice {
+            todo: "Remove the link too, once this is applied.".to_owned(),
+            why: "Removing the folder deploy leaves this link into it pointing to nothing, as Unread.".to_owned(),
+            paths: vec![claude_skill("deploy").display().to_string()],
+        }]
     );
 }
 

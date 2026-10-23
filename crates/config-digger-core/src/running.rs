@@ -4,7 +4,7 @@
 //! location or switch: a block, a warning, and hints for the result.
 //! Detection is best-effort and never closes an Agent.
 
-use crate::api::{Block, BlockCode, Warning, WarningClass};
+use crate::api::{Advice, Block, BlockCode, Warning, WarningClass};
 use crate::definitions::blocks::{Sessions, StoreClass};
 use crate::definitions::{AgentDefinition, ProcessDefinition};
 use crate::explain;
@@ -187,21 +187,26 @@ pub(crate) fn check<'a>(
     }
 
     let mut blocks = Vec::new();
-    let mut sentences = Vec::new();
+    // Each cause of the `running-agent` warning, as its sentence and advice.
+    let mut causes = Vec::new();
     let mut hints = Vec::new();
     for reader in readers.values() {
         let sqlite = reader.paths(StoreClass::Sqlite);
         if !sqlite.is_empty() {
+            let (sentence, advice) = explain::running_agent_sqlite(reader.agent_name, &sqlite);
             blocks.push(Block {
                 code: BlockCode::RunningAgentSqlite,
-                sentence: explain::running_agent_sqlite(reader.agent_name, &sqlite),
+                sentence,
+                advice: vec![advice],
             });
         }
         if !reader.parking.is_empty() {
             let parking: Vec<&Path> = reader.parking.iter().map(PathBuf::as_path).collect();
+            let (sentence, advice) = explain::running_agent_parking(reader.agent_name, &parking);
             blocks.push(Block {
                 code: BlockCode::RunningAgentParking,
-                sentence: explain::running_agent_parking(reader.agent_name, &parking),
+                sentence,
+                advice: vec![advice],
             });
         }
         if !reader.installed {
@@ -209,14 +214,14 @@ pub(crate) fn check<'a>(
         }
         let rewritten = reader.paths(StoreClass::RewrittenWhileRunning);
         if !rewritten.is_empty() {
-            sentences.push(explain::running_agent_rewrites(
+            causes.push(explain::running_agent_rewrites(
                 reader.agent_name,
                 &rewritten,
             ));
         }
         let plain = reader.paths(StoreClass::Plain);
         if !plain.is_empty() {
-            sentences.push(explain::running_agent_reads(reader.agent_name, &plain));
+            causes.push(explain::running_agent_reads(reader.agent_name, &plain));
         }
         hints.push(explain::restart_hint(reader.agent_name));
         for path in rewritten {
@@ -230,9 +235,13 @@ pub(crate) fn check<'a>(
             .map(|reader| reader.agent_name.to_owned())
             .collect(),
         blocks,
-        warning: (!sentences.is_empty()).then(|| Warning {
-            class: WarningClass::RunningAgent,
-            sentence: sentences.join(" "),
+        warning: (!causes.is_empty()).then(|| {
+            let (sentences, advice): (Vec<String>, Vec<Advice>) = causes.into_iter().unzip();
+            Warning {
+                class: WarningClass::RunningAgent,
+                sentence: sentences.join(" "),
+                advice,
+            }
         }),
         hints,
     }

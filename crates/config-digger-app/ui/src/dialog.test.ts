@@ -35,8 +35,8 @@ function planned(overrides: Partial<ActionPreview> = {}): ActionPreview {
   return { plan_id: "plan-1", preview: preview(), warnings: [], blocks: [], ...overrides };
 }
 
-const gitWarning: Warning = { class: "git-versioned", sentence: "The edit shows in the git diff." };
-const runningWarning: Warning = { class: "running-agent", sentence: "Claude Code is running." };
+const gitWarning: Warning = { class: "git-versioned", sentence: "The edit shows in the git diff.", advice: [] };
+const runningWarning: Warning = { class: "running-agent", sentence: "Claude Code is running.", advice: [] };
 
 describe("the Apply button", () => {
   test("is named by the verb, in the danger style for Remove", () => {
@@ -80,7 +80,7 @@ describe("the Apply button", () => {
   test("stays disabled while a block stands, whatever is ticked", () => {
     const plan = planned({
       warnings: [runningWarning],
-      blocks: [{ code: "running_agent_sqlite", sentence: "VS Code holds state.vscdb open. Close VS Code and retry." }],
+      blocks: [{ code: "running_agent_sqlite", sentence: "VS Code holds state.vscdb open. Close VS Code and retry.", advice: [] }],
     });
 
     expect(applyButton(plan, new Set(["running-agent"]))).toMatchObject({
@@ -355,7 +355,7 @@ describe("the result", () => {
 
 describe("checking again", () => {
   test("keeps a tick only for a warning that says the same as before", () => {
-    const vsCode: Warning = { class: "running-agent", sentence: "Claude Code and VS Code are running." };
+    const vsCode: Warning = { class: "running-agent", sentence: "Claude Code and VS Code are running.", advice: [] };
 
     expect([...keptAcknowledgements([gitWarning, runningWarning], new Set(["git-versioned", "running-agent"]), [gitWarning, vsCode])]).toEqual([
       "git-versioned",

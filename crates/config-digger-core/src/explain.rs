@@ -2,8 +2,8 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{
-    Action, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
-    State, Verify,
+    Action, Advice, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode,
+    RiskCode, State, Verify,
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
@@ -307,38 +307,66 @@ pub(crate) fn backup_note(folder: &Path) -> String {
 }
 
 /// The warning of a plan that edits the git-versioned `files`.
-pub(crate) fn git_versioned(files: &[&Path]) -> String {
-    let verb = if files.len() == 1 { "is" } else { "are" };
-    format!(
-        "{} {verb} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it.",
-        path_list(files)
+pub(crate) fn git_versioned(files: &[&Path]) -> (String, Advice) {
+    let (verb, these) = if files.len() == 1 {
+        ("is", "This location")
+    } else {
+        ("are", "These locations")
+    };
+    laid_out(
+        path_lines(files),
+        these,
+        |what| {
+            format!(
+                "{what} {verb} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it."
+            )
+        },
+        Todo::First("Check the git diff before you commit.".to_owned()),
     )
 }
 
 /// The block of a plan that writes the SQLite stores `files` while
 /// `agent_name`, which holds them open, runs.
-pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> String {
-    format!(
-        "{agent_name} is running and holds {} open in SQLite, so nothing can be written there while it runs. Close {agent_name} and retry.",
-        path_list(files)
+pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> (String, Advice) {
+    laid_out(
+        path_lines(files),
+        these_locations(files),
+        |what| {
+            format!(
+                "{agent_name} is running and holds {what} open in SQLite, so nothing can be written there while it runs."
+            )
+        },
+        Todo::Last(format!("Close {agent_name} and retry.")),
     )
 }
 
 /// The strong warning of a plan that writes `files`, which `agent_name`
 /// rewrites while it runs.
-pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> String {
-    format!(
-        "{agent_name} is running and rewrites {} while it runs: it may overwrite what this Operation writes. Close {agent_name} first to be safe.",
-        path_list(files)
+pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> (String, Advice) {
+    laid_out(
+        path_lines(files),
+        these_locations(files),
+        |what| {
+            format!(
+                "{agent_name} is running and rewrites {what} while it runs: it may overwrite what this Operation writes."
+            )
+        },
+        Todo::Last(format!("Close {agent_name} first to be safe.")),
     )
 }
 
 /// The warning of a plan that writes `files`, which the running
 /// `agent_name` reads.
-pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> String {
-    format!(
-        "{agent_name} is running and reads {}: it may not see what this Operation writes until it restarts.",
-        path_list(files)
+pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> (String, Advice) {
+    laid_out(
+        path_lines(files),
+        these_locations(files),
+        |what| {
+            format!(
+                "{agent_name} is running and reads {what}: it may not see what this Operation writes until it restarts."
+            )
+        },
+        Todo::First(format!("Restart {agent_name} once this is applied.")),
     )
 }
 
@@ -655,10 +683,16 @@ pub(crate) fn unpark_folder_gone(locator: &str, origin: &Path) -> String {
 
 /// The block of a plan that parks an Entry out of, or puts one back into,
 /// `files`, which the running `agent_name` rewrites from memory.
-pub(crate) fn running_agent_parking(agent_name: &str, files: &[&Path]) -> String {
-    format!(
-        "{agent_name} is running and rewrites {} from memory, which would undo moving an Entry in or out of it. Close {agent_name} and retry.",
-        path_list(files)
+pub(crate) fn running_agent_parking(agent_name: &str, files: &[&Path]) -> (String, Advice) {
+    laid_out(
+        path_lines(files),
+        these_locations(files),
+        |what| {
+            format!(
+                "{agent_name} is running and rewrites {what} from memory, which would undo moving an Entry in or out of it."
+            )
+        },
+        Todo::Last(format!("Close {agent_name} and retry.")),
     )
 }
 
@@ -926,7 +960,11 @@ pub(crate) enum Reached {
 /// The warning of a plan whose switches reach the Entries `others` beyond
 /// those it targets, or hold the names `by_name` in every context, so that
 /// they reach every Entry of those names wherever it is.
-pub(crate) fn wide_reach(action: Action, others: &[Reached], by_name: &[String]) -> String {
+pub(crate) fn wide_reach(
+    action: Action,
+    others: &[Reached],
+    by_name: &[String],
+) -> (String, Advice) {
     let verb = match action {
         Action::Enable => "Enable",
         _ => "Disable",
@@ -949,18 +987,25 @@ pub(crate) fn wide_reach(action: Action, others: &[Reached], by_name: &[String])
             }
         })
         .collect();
+    let these = if rows.len() == 1 {
+        "this Entry"
+    } else {
+        "these Entries"
+    };
     let reaches = format!("This {verb} reaches more than what it targets");
-    match (rows.is_empty(), by_name.is_empty()) {
-        (_, true) => format!(
-            "{reaches}: what it writes also changes the State of {}.",
-            rows.join(", ")
-        ),
-        (true, false) => format!("{reaches}: what it writes applies to {everywhere}."),
-        (false, false) => format!(
-            "{reaches}: what it writes applies to {everywhere}, and changes the State of {} now.",
-            rows.join(", ")
-        ),
-    }
+    let only_by_name = rows.is_empty();
+    laid_out(
+        rows,
+        these,
+        |what| match (only_by_name, by_name.is_empty()) {
+            (_, true) => format!("{reaches}: what it writes also changes the State of {what}."),
+            (true, false) => format!("{reaches}: what it writes applies to {everywhere}."),
+            (false, false) => format!(
+                "{reaches}: what it writes applies to {everywhere}, and changes the State of {what} now."
+            ),
+        },
+        Todo::First("Check that everything it reaches should change.".to_owned()),
+    )
 }
 
 /// Why Disable is refused for an Entry it is not offered for: `sentence`.
@@ -1096,6 +1141,54 @@ pub(crate) fn disable_needs_folder(agent_name: &str) -> String {
     )
 }
 
+/// Where the sentence of a warning or block says what to do.
+enum Todo {
+    /// Not at all: the app's advice says it first, on its own.
+    First(String),
+    /// At its end, as the advice says it first.
+    Last(String),
+}
+
+/// A warning or block as its sentence, for the CLI, and as the app's
+/// advice, from one wording. `why` names what it is about by the text it
+/// is given: the `lines` listed inline in the sentence, `these` in the
+/// advice, which gives each of the lines apart.
+fn laid_out(
+    lines: Vec<String>,
+    these: &str,
+    why: impl Fn(&str) -> String,
+    todo: Todo,
+) -> (String, Advice) {
+    let inline = why(&lines.join(", "));
+    let (sentence, todo) = match todo {
+        Todo::First(todo) => (inline, todo),
+        Todo::Last(todo) => (format!("{inline} {todo}"), todo),
+    };
+    let advice = Advice {
+        todo,
+        why: why(these),
+        paths: lines,
+    };
+    (sentence, advice)
+}
+
+/// What an advice's `why` calls the `paths` it gives apart.
+fn these_locations(paths: &[&Path]) -> &'static str {
+    if paths.len() == 1 {
+        "this location"
+    } else {
+        "these locations"
+    }
+}
+
+/// Each of `paths`, as an advice gives it on a line of its own.
+fn path_lines(paths: &[&Path]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect()
+}
+
 /// Paths as a sentence lists them, separated by commas.
 fn path_list(paths: &[&Path]) -> String {
     let names: Vec<String> = paths
@@ -1129,9 +1222,16 @@ pub(crate) fn edits_do_not_apply(path: &Path) -> String {
 }
 
 /// The check a Delete backup adds when its Operation needs attention.
-pub(crate) fn only_copy_for_recovery(operation: &str) -> String {
-    format!(
-        "Operation {operation} needs attention: this backup is the only copy for manual recovery of the files its Rollback could not restore. Deleting it also dismisses the Operation."
+pub(crate) fn only_copy_for_recovery(operation: &str) -> (String, Advice) {
+    laid_out(
+        Vec::new(),
+        "",
+        |_| {
+            format!(
+                "Operation {operation} needs attention: this backup is the only copy for manual recovery of the files its Rollback could not restore. Deleting it also dismisses the Operation."
+            )
+        },
+        Todo::First("Copy what you need from this backup before deleting it.".to_owned()),
     )
 }
 
@@ -1834,40 +1934,53 @@ pub(crate) fn folder_size(size: FolderSize) -> String {
 
 /// The `breaks-links` warning: each folder moved into the backup leaves
 /// the Linked Entries that point into it broken. Each pair is a link and
-/// the folder it points into.
-pub(crate) fn breaks_links(broken: &[(&Path, &Path)]) -> String {
-    let mut folders: Vec<&Path> = Vec::new();
-    for (_, folder) in broken {
-        if !folders.contains(folder) {
-            folders.push(folder);
-        }
-    }
-    let sentences: Vec<String> = folders
-        .iter()
-        .map(|folder| {
-            let links: Vec<&Path> = broken
-                .iter()
-                .filter(|(_, into)| into == folder)
-                .map(|(link, _)| *link)
-                .collect();
-            let (noun, rest) = match links.len() {
+/// the folder it points into. The app's advice is one per folder, naming
+/// it, with the links into it apart.
+pub(crate) fn breaks_links(broken: &[(&Path, &Path)]) -> (String, Vec<Advice>) {
+    let (sentences, advice): (Vec<String>, Vec<Advice>) = links_by_folder(broken)
+        .into_iter()
+        .map(|(folder, links)| {
+            let (noun, rest, these, todo) = match links.len() {
                 1 => (
                     "link",
                     "It stays, as an Unread Entry, until it is Removed on its own.",
+                    "this link",
+                    "Remove the link too, once this is applied.",
                 ),
                 _ => (
                     "links",
                     "They stay, as Unread Entries, until each is Removed on its own.",
+                    "these links",
+                    "Remove the links too, once this is applied.",
                 ),
             };
-            format!(
+            let sentence = format!(
                 "Removing {} leaves the {noun} {} pointing to nothing. {rest}",
                 folder.display(),
                 path_list(&links)
-            )
+            );
+            let name = folder.file_name().map_or_else(|| folder.display(), |name| Path::new(name).display());
+            let advice = Advice {
+                todo: todo.to_owned(),
+                why: format!("Removing the folder {name} leaves {these} into it pointing to nothing, as Unread."),
+                paths: path_lines(&links),
+            };
+            (sentence, advice)
         })
-        .collect();
-    sentences.join(" ")
+        .unzip();
+    (sentences.join(" "), advice)
+}
+
+/// Each folder of `broken`, in order, with the links into it.
+fn links_by_folder<'p>(broken: &[(&'p Path, &'p Path)]) -> Vec<(&'p Path, Vec<&'p Path>)> {
+    let mut folders: Vec<(&Path, Vec<&Path>)> = Vec::new();
+    for &(link, folder) in broken {
+        match folders.iter_mut().find(|(into, _)| *into == folder) {
+            Some((_, links)) => links.push(link),
+            None => folders.push((folder, vec![link])),
+        }
+    }
+    folders
 }
 
 /// Why an Operation could not do `op` at the skill folder's location `path`.
