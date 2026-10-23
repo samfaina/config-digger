@@ -1026,6 +1026,17 @@
               "type": "boolean",
               "default": false
             },
+            "on_read_failure": {
+              "description": "What the Agent does when it cannot parse the value, where that\ndiffers from what the locations reading it say, such as Claude Code,\nwhich refuses to start over an `HKLM` policy and skips an `HKCU` one.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReadFailureReaction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "registry-value"
@@ -1088,6 +1099,17 @@
               "type": "boolean",
               "default": false
             },
+            "on_read_failure": {
+              "description": "What the Agent does when it cannot read or parse one of the files,\nwhere that differs from what the locations reading them say.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReadFailureReaction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "files"
@@ -1101,6 +1123,31 @@
             "block",
             "path"
           ]
+        }
+      ]
+    },
+    "ReadFailureReaction": {
+      "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
+      "oneOf": [
+        {
+          "description": "It starts without the location's Entries.",
+          "type": "string",
+          "const": "ignores_file"
+        },
+        {
+          "description": "It asks the user at startup what to do with the file, and otherwise\nstarts without its Entries.",
+          "type": "string",
+          "const": "asks_user"
+        },
+        {
+          "description": "What it does is not known: every Item in the contexts the location\nreaches gets a caveat.",
+          "type": "string",
+          "const": "unknown"
+        },
+        {
+          "description": "It refuses to start in the contexts the location reaches.",
+          "type": "string",
+          "const": "stops_agent"
         }
       ]
     },
@@ -2474,31 +2521,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "ReadFailureReaction": {
-      "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
-      "oneOf": [
-        {
-          "description": "It starts without the location's Entries.",
-          "type": "string",
-          "const": "ignores_file"
-        },
-        {
-          "description": "It asks the user at startup what to do with the file, and otherwise\nstarts without its Entries.",
-          "type": "string",
-          "const": "asks_user"
-        },
-        {
-          "description": "What it does is not known: every Item in the contexts the location\nreaches gets a caveat.",
-          "type": "string",
-          "const": "unknown"
-        },
-        {
-          "description": "It refuses to start in the contexts the location reaches.",
-          "type": "string",
-          "const": "stops_agent"
-        }
-      ]
     },
     "RiskCode": {
       "description": "How an Agent's own recovery from a Read failure can lose configuration.",

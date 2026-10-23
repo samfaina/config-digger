@@ -1,19 +1,22 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Claude Desktop. Facts from docs/research/claude-desktop.md
-# (verified against 2.16120.0.0).
+# (verified against 2.16120.0.0), and those tagged [test] from the release
+# gate's probe, uat/agents/claude-desktop.mjs in Windows Sandbox
+# (docs/research/release-gate.md), run on 3.6556.2. 3.x keeps a package's
+# data elsewhere (#305), so `verified` stays at 2.16120.
 
 format_version = 1
 verified = { min = "2.16120", max = "2.16120" }
-unverified = [
-  "A classic `%APPDATA%\\Claude` beside a package's `LocalCache` takes precedence for the packaged app too.",
-  "Where the classic installer puts the app is not known.",
-]
 
 # The data folder Claude Desktop reads, `<userData>`, is the first of these
 # that exists [bundle]. `CLAUDE_USER_DATA_DIR` sets it outright [bundle].
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
 # share [bundle]. Each package's app ends with its own `LocalCache`, which
-# no other app sees [docs].
+# no other app sees [docs]. A package's app sees `%APPDATA%\Claude` with its
+# `LocalCache` laid over it file by file: beside a classic folder it reads
+# the classic files and creates no `LocalCache`, but a file its `LocalCache`
+# holds wins [test]. A lookup order picks a whole folder, the classic one
+# here (#306).
 lookup_orders = [
   ["user-data-dir", "claude-data", "classic", "msix"],
   ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc"],
@@ -43,14 +46,28 @@ executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
 homes = ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc", "third-party"]
 
-# The app runs as `claude.exe` from its package [disk], as the Claude Code
-# CLI does from `~/.local/bin` and from the copy Claude Desktop downloads
-# into its data folder [disk]: only the path tells them apart.
+# The classic installer, which claude.ai serves beside the MSIX package, is
+# Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude`,
+# a launcher `claude.exe` with the app's version beside `Update.exe` and one
+# `app-<version>` folder per version, which runs the app [test]. It uninstalls
+# with `Update.exe --uninstall`, from the user's `AnthropicClaude` key [test].
+[[installations]]
+id = "classic"
+folder = "%LOCALAPPDATA%/AnthropicClaude"
+executable = "claude.exe"
+versions = [{ block = "exe-version" }]
+homes = ["user-data-dir", "claude-data", "classic", "third-party"]
+
+# The app runs as `claude.exe` from its package [disk] or from its classic
+# `app-<version>` folder [test], as the Claude Code CLI does from
+# `~/.local/bin` and from the copy Claude Desktop downloads into its data
+# folder [disk]: only the path tells them apart.
 [process]
 images = ["claude.exe"]
 paths = [
   "%ProgramFiles%/WindowsApps/Claude_*/app/claude.exe",
   "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*/app/claude.exe",
+  "%LOCALAPPDATA%/AnthropicClaude/app-*/claude.exe",
 ]
 
 [[homes]]

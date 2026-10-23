@@ -2,7 +2,7 @@
 
 Issue: [#80](https://github.com/samfaina/config-digger/issues/80). Terms follow [`CONTEXT.md`](../../CONTEXT.md).
 
-Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23. Claude Desktop, Cursor and VS Code, which need their windows driven, come next.
+Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23, and the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer. Cursor, VS Code and the rest of Claude Desktop, which need their windows driven, come next.
 
 ## The probes
 
@@ -32,13 +32,32 @@ How each probe reads what the Agent loaded:
 | Codex | `codex mcp list`, `codex debug prompt-input` (the skills its model gets), the files `codex exec` and `codex archive` write |
 | Gemini CLI | `gemini extensions list` (`Enabled (Workspace)` for the folder it starts in), `gemini mcp list`, `gemini -p` |
 
+### In Windows Sandbox
+
+Three probes write what only an administrator or an installer writes: `claude-code-machine.mjs` (`%ProgramFiles%\ClaudeCode`, `HKLM` and `HKCU\SOFTWARE\Policies\ClaudeCode`), `codex-machine.mjs` (`%ProgramData%\OpenAI\Codex\requirements.toml`) and `claude-desktop.mjs` (the classic installer and the MSIX package claude.ai serves). Each refuses to run outside Windows Sandbox, whose only user is `WDAGUtilityAccount`, so nothing reaches the reference machine. `uat/agents/sandbox.ps1` runs them there:
+
+```powershell
+.\uat\agents\sandbox.ps1                                  # the three probes
+.\uat\agents\sandbox.ps1 -Probes claude-code-machine -Claude <claude.exe>, <claude.exe>
+.\uat\agents\sandbox.ps1 -Probes claude-desktop -KeepOpen # leaves the Sandbox open
+```
+
+It maps into the Sandbox, read-only, the probes, this machine's Node (Volta's image, not its shim), a copy of each Claude Code binary `-Claude` names (`~\.local\share\claude\versions\<version>` included), Codex's `codex.exe` from its npm package, and the Claude Desktop installers, which it downloads from `claude.ai/api/desktop/win32/x64/{exe,msix}/latest/redirect`. The Sandbox's logon command, `in-sandbox.ps1`, runs each probe with `CD_PROBE_VERBOSE`, `claude-code-machine.mjs` once per Claude Code binary, writes `<probe>.log` and `<probe>.json` to `%TEMP%\cd-agents-sandbox\results`, and shuts the Sandbox down.
+
+| Probe | Oracle |
+|---|---|
+| `claude-code-machine.mjs` | `claude mcp list` (servers, parse diagnostics) and whether `claude -p` answers the local model stand-in |
+| `codex-machine.mjs` | `codex mcp list`: `enabled`, or `disabled: requirements (<file>)` |
+| `claude-desktop.mjs` | The files the installers write, and the servers the app starts: each `claude_desktop_config.json` declares a server whose command writes a marker file named after its folder |
+
 ## Versions
 
 | Agent | Versions every check passes on | `verified` |
 |---|---|---|
-| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309 | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
-| Codex | 0.159.3 | unchanged |
+| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
+| Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
+| Claude Desktop | 3.6556.2, `claude-desktop.mjs` only | unchanged, 2.16120: 3.x keeps a package's data elsewhere ([#305](https://github.com/samfaina/config-digger/issues/305)) |
 
 Claude Code 2.1.286 fails 7 checks, all on what 2.1.299 changed: a plain-string `enabledMcpjsonServers` or `disabledMcpjsonServers` voids its settings file, there is no name rule, and the skill listing gives no alias. The definition describes 2.1.299 and later, so the range starts there.
 
@@ -58,8 +77,8 @@ Outcomes:
 | Mark | What the probe saw | Outcome |
 |---|---|---|
 | `:86` `settings[managed]`: `remote-settings.json` is one JSON object | With an API key, Claude Code does not read `remote-settings.json` at all | Pending: needs an account with server-managed settings |
-| `:140` `locations[managed-mcp]`: unparsable `managed-mcp.json` | Not tested: the file sits in `%ProgramFiles%` | Pending: Windows Sandbox |
-| `:155` `locations[managed-settings-mcp]`: unparsable managed settings | Not tested: the file sits in `%ProgramFiles%`, the registry values in `HKLM` or in the user's `HKCU` | Pending: Windows Sandbox |
+| `:140` `locations[managed-mcp]`: unparsable `managed-mcp.json` | Skipped; `claude mcp list` reports "[Failed to parse] Enterprise config"; the file keeps its exclusive control, so only `managedMcpServers` load, and Claude Code starts | Corrected: `ignores_file`; the exclusive gate already counts a file whatever it holds |
+| `:155` `locations[managed-settings-mcp]`: unparsable managed settings | An HKLM value, `managed-settings.json` or drop-in that does not parse stops Claude Code ("Managed settings document could not be parsed as a JSON object"), even beside a source that parses; an HKCU value that does not parse is skipped. `remote-settings.json` not tested | Corrected: each source of `settings[managed]` now says what Claude Code does about it (`on_read_failure` on a source, new in the format). The mark stays for `remote-settings.json`: Pending, needs an account with server-managed settings |
 | `:189` `locations[project-mcp]`: parent folders | `.mcp.json` is read in every folder above the Project, past the repo root and outside a repo; of same-named servers the nearest folder's wins | Ticket [#292](https://github.com/samfaina/config-digger/issues/292) |
 | `:190` `locations[project-mcp]`: unparsable `.mcp.json` | Skipped; the other servers load; `claude mcp list` reports "[Failed to parse] Project config" | Corrected: `ignores_file` |
 | `:226` `locations[plugin-mcp]`: unparsable plugin `.mcp.json` | The plugin loads without those servers | Corrected: `ignores_file` |
@@ -94,7 +113,7 @@ The name rule, on 2.1.299 to 2.1.309 with `tengu_slate_wicket` at its default:
 | `:272` `items.mcp.disable[0]`: Codex starts with a table holding `enabled` alone | It stops with "invalid transport" in every folder where no other layer declares the server. Disable's fallback wrote such a table in the user's `config.toml` for a git-versioned Project layer's server, which stopped Codex in every other folder | Corrected: the fallback is gone, so such a server has no Disable; ticket [#297](https://github.com/samfaina/config-digger/issues/297) to give one back |
 | `:287` `items.mcp.disable[1]`: an account plugin honours its servers' switch | Not tested | Pending: needs an account with remote plugins |
 | `:302` `items.mcp.disable[2]`: a plugin missing from `config.toml` is on | It is off, with its servers and skills | Corrected: `default_value = false` |
-| `:341` `items.mcp.rules[0]`: requirements on args or URL patterns | Not tested: `requirements.toml` sits in `%ProgramData%` | Pending: Windows Sandbox |
+| `:341` `items.mcp.rules[0]`: requirements on args or URL patterns | Codex reads `identity = { command = { executable, args = [<matcher>] } }` and `identity = { url = <matcher> }`, a matcher being exact, prefix or a regex of the whole value; a regex that does not compile stops Codex. The plain `{ command }` form ignores args | Ticket [#141](https://github.com/samfaina/config-digger/issues/141) (point 3), with the probe's evidence |
 | `:384` `locations[project-agents-skills]`: trust does not apply | `.agents\skills` is read in an untrusted Project | Confirmed |
 | `:474` `items.skill`: skills at any depth | Skill folders are found up to 6 folders below a root, not 7 | Ticket [#298](https://github.com/samfaina/config-digger/issues/298) |
 | `:475` `items.skill`: an unreadable `SKILL.md` is skipped | A `SKILL.md` that is not UTF-8 or cannot be opened is skipped | Confirmed |
@@ -109,9 +128,19 @@ The name rule, on 2.1.299 to 2.1.309 with `tengu_slate_wicket` at its default:
 | `:278` `items.mcp.disable[1]`: the drive letter is upper case | Gemini CLI spells it as the folder it starts in is spelled: upper case from PowerShell, lower case after `cd /d e:\…` in cmd, and compares with regard to case | Corrected: the comment says so; config-digger keeps upper case, PowerShell's spelling |
 | `:279` `items.mcp.disable[1]`: a rule on another drive reaches the folders below | Confirmed for a folder and for the drive's root | Confirmed |
 
-### Claude Desktop, Cursor and VS Code
+### Claude Desktop
 
-Pending: these 41 marks need the apps' windows driven, on throwaway profiles. Claude Desktop `:8`, `:9`, `:234`, `:280`; Cursor `:109`, `:110`, `:145`, `:146`, `:170`, `:194`, `:211`, `:234`, `:235`, `:254`, `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:90`, `:142`, `:160`, `:161`, `:177`, `:201`, `:221`, `:239`, `:240`, `:258`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
+Tested on 3.6556.2, the version claude.ai served on 2026-10-23, in Windows Sandbox. Nobody signs in, and the app starts no MCP server before someone does, so the probe reads which `claude_desktop_config.json` the app read from the dialog naming the entries it skips.
+
+| Mark | What the probe saw | Outcome |
+|---|---|---|
+| `:8` (top): a classic `%APPDATA%\Claude` beside a package's `LocalCache` takes precedence for the packaged app too | The packaged app's data folder is `%APPDATA%\Claude`, with its `LocalCache` laid over it file by file. Started beside a classic folder, it reads the classic files and creates no `LocalCache`; once its `LocalCache` holds a `claude_desktop_config.json`, it reads that one and not the classic file | Ticket [#306](https://github.com/samfaina/config-digger/issues/306): a lookup order picks a whole folder. It keeps picking the classic one, which is right until the package holds a file of its own |
+| `:9` (top): where the classic installer puts the app | Squirrel installs for the user in `%LOCALAPPDATA%\AnthropicClaude`: a launcher `claude.exe` with the app's version, `Update.exe`, and `app-<version>\claude.exe`, which runs the app. The uninstall key is `HKCU\…\Uninstall\AnthropicClaude`. The classic app reads `%APPDATA%\Claude` | Corrected: a `classic` Installation, and its process path |
+| `:234`, `:280` | Not tested | Pending: `:234` needs a deployment for a third-party provider; `:280` needs the app's windows driven, signed in |
+
+### Cursor and VS Code
+
+Pending: these 37 marks need the apps' windows driven, on throwaway profiles. Cursor `:109`, `:110`, `:145`, `:146`, `:170`, `:194`, `:211`, `:234`, `:235`, `:254`, `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:90`, `:142`, `:160`, `:161`, `:177`, `:201`, `:221`, `:239`, `:240`, `:258`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
 
 ## Found beside the marks
 
@@ -121,13 +150,17 @@ Pending: these 41 marks need the apps' windows driven, on throwaway profiles. Cl
 - **Codex reads a frontmatter that is not YAML line by line**: `name: [unclosed` names a skill `[unclosed`. config-digger skips such a skill, for Codex and Gemini CLI alike: ticket [#299](https://github.com/samfaina/config-digger/issues/299).
 - **Codex has `codex plugin remove <id>`** in 0.159.3, which takes out the plugin's cache folder and its table in `config.toml`. The definition said Codex had no such command. Corrected: it is the plugin's `uninstall` command.
 - **`gemini mcp list` lists the servers of an extension that is off** in the folder it runs in. Only `gemini extensions list` says whether it is on.
+- **Claude Code never reads `managedMcpServers` from the HKCU policy**, though it applies the value's other settings when no admin source holds any. config-digger lists such a server as Effective: ticket [#303](https://github.com/samfaina/config-digger/issues/303).
+- **Claude Code drops a `managedMcpServers` entry with a command, or at an `http://` URL**, and loads the others: only remote servers at an `https://` URL load. The definition's shape cannot say so: ticket [#304](https://github.com/samfaina/config-digger/issues/304).
+- **Claude Desktop 3.x keeps its MSIX package's data in `%LOCALAPPDATA%\Claude-Data\<family>`**, leaving a `.user-data-left.<family>` marker in the package's `LocalCache`. On the reference machine, with 3.6556.2.0, config-digger finds no Claude Desktop home at all. A fresh install in Windows Sandbox did not move over several launches, so when it moves is not known yet: ticket [#305](https://github.com/samfaina/config-digger/issues/305).
+- **Claude Desktop starts no MCP server before someone signs in**, but reads `claude_desktop_config.json` at start: an entry it cannot use is named in a dialog, "Some MCP servers couldn't be loaded", which is what `claude-desktop.mjs` reads.
 
 ## What is left
 
 | Needs | Marks |
 |---|---|
-| Windows Sandbox, for files under `%ProgramFiles%` and `%ProgramData%` | Claude Code `:140`, `:155`; Codex `:341` |
-| A claude.ai account, with server-managed settings for `:86` | Claude Code `:86`, `:536`, `:537`, `:695`, and the new `locations[synced-skills]` mark that a synced skill is named by its folder |
+| A claude.ai account, with server-managed settings for `:86` and `:155` | Claude Code `:86`, `:155` (a `remote-settings.json` that does not parse), `:536`, `:537`, `:695`, and the new `locations[synced-skills]` mark that a synced skill is named by its folder |
 | A Codex enterprise account, with remote plugins | Codex `:175`, `:176`, `:233`, `:287` |
 | Orca | Codex `:63` |
-| The apps' windows | The 41 marks of Claude Desktop, Cursor and VS Code |
+| A deployment of Claude Desktop for a third-party provider | Claude Desktop `:234` |
+| The apps' windows | Claude Desktop `:280`, and the 37 marks of Cursor and VS Code |

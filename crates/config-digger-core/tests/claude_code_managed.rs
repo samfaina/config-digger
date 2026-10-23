@@ -331,6 +331,92 @@ fn a_registry_policy_that_does_not_parse_is_a_read_failure() {
     assert_eq!(failure[0]["kind"], "parse");
 }
 
+/// The reaction of each Read failure, and the codes of the Agent flags.
+fn reactions(inventory: &Inventory) -> (Vec<String>, Vec<String>) {
+    let inventory = serde_json::to_value(inventory).unwrap();
+    let strings = |list: &Value, field: &str| {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value[field].as_str().unwrap().to_owned())
+            .collect()
+    };
+    (
+        strings(&inventory["read_failures"], "reaction"),
+        strings(&inventory["agent_flags"], "code"),
+    )
+}
+
+#[test]
+fn a_managed_mcp_json_that_does_not_parse_is_skipped_and_keeps_exclusive_control() {
+    let fs = claude_home(&json!({ "mcpServers": { "notes": { "command": "notes-mcp" } } }))
+        .with_file(
+            in_program_files(r"ClaudeCode\managed-mcp.json"),
+            "{ not json",
+        )
+        .with_file(
+            in_program_files(r"ClaudeCode\managed-settings.json"),
+            managed_server("wiki", "https://mcp.corp.example/wiki"),
+        );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        reactions(&inventory),
+        (vec!["ignores_file".to_owned()], vec![])
+    );
+    assert_eq!(
+        entry_json(&server(&inventory, "notes").entries[0])["state"],
+        "blocked"
+    );
+    assert_eq!(
+        entry_json(&server(&inventory, "wiki").entries[0])["state"],
+        "effective"
+    );
+}
+
+#[test]
+fn an_admin_managed_settings_source_that_does_not_parse_stops_claude_code() {
+    let unparsable = || {
+        claude_home(&json!({})).with_file(
+            in_program_files(r"ClaudeCode\managed-settings.json"),
+            "{ not json",
+        )
+    };
+    let drop_in = claude_home(&json!({})).with_file(
+        in_program_files(r"ClaudeCode\managed-settings.d\10-corp.json"),
+        "{ not json",
+    );
+    let hklm = env().with_registry_value(Hive::LocalMachine, POLICIES, "Settings", "{ not json");
+
+    let stopped = (
+        vec!["stops_agent".to_owned()],
+        vec!["cannot_start".to_owned()],
+    );
+    assert_eq!(reactions(&inventory(&unparsable())), stopped);
+    assert_eq!(reactions(&inventory(&drop_in)), stopped);
+    assert_eq!(
+        reactions(&inventory_with(
+            &claude_home(&json!({})),
+            hklm,
+            &Context::default()
+        )),
+        stopped
+    );
+}
+
+#[test]
+fn a_user_registry_policy_that_does_not_parse_is_skipped() {
+    let env = env().with_registry_value(Hive::CurrentUser, POLICIES, "Settings", "{ not json");
+
+    let inventory = inventory_with(&claude_home(&json!({})), env, &Context::default());
+
+    assert_eq!(
+        reactions(&inventory),
+        (vec!["ignores_file".to_owned()], vec![])
+    );
+}
+
 /// A Claude Code home with the user servers `notes`, a stdio server, and
 /// `linear`, a remote one.
 fn servers_home() -> FakeFileSystem {

@@ -5,6 +5,7 @@
 //! new block is added in one place and the compiler points at every `match`
 //! that must handle it.
 
+use super::ReadFailureReaction;
 use crate::edit::{Edit, Syntax};
 use crate::installations::pe;
 use crate::paths;
@@ -1067,6 +1068,16 @@ impl SettingsSource {
             SettingsSource::Files(block) => block.user_writable,
         }
     }
+
+    /// What the Agent does when it cannot read the source, where the source
+    /// says so: it overrides the reaction of the locations reading it.
+    pub fn on_read_failure(&self) -> Option<ReadFailureReaction> {
+        match self {
+            SettingsSource::RegistryValue(block) => block.on_read_failure,
+            SettingsSource::RegistryKey(_) => None,
+            SettingsSource::Files(block) => block.on_read_failure,
+        }
+    }
 }
 
 /// The values of a key in the Windows registry, each one setting, such as
@@ -1141,6 +1152,10 @@ pub(crate) struct RegistryValueSource {
     /// with another source.
     #[serde(default)]
     pub user_writable: bool,
+    /// What the Agent does when it cannot parse the value, where that
+    /// differs from what the locations reading it say, such as Claude Code,
+    /// which refuses to start over an `HKLM` policy and skips an `HKCU` one.
+    pub on_read_failure: Option<ReadFailureReaction>,
 }
 
 impl Validate for RegistryValueSource {
@@ -1204,6 +1219,9 @@ pub(crate) struct FilesSource {
     /// with another source.
     #[serde(default)]
     pub user_writable: bool,
+    /// What the Agent does when it cannot read or parse one of the files,
+    /// where that differs from what the locations reading them say.
+    pub on_read_failure: Option<ReadFailureReaction>,
 }
 
 impl Validate for FilesSource {

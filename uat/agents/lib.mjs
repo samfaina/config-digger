@@ -2,13 +2,15 @@
 // stand-in for a model API, and the checks a probe reports.
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
 // The folder every probe writes under. Its name must start with
-// `cd-throwaway`, so a probe can never delete another folder. It sits outside
-// the user's home folder, since Claude Code and Codex read files in every
-// folder above the one they start in.
+// `cd-throwaway`, so `fresh` can never delete another folder; the probes
+// that write machine-wide paths run only in Windows Sandbox (`sandboxOnly`).
+// It sits outside the user's home folder, since Claude Code and Codex read
+// files in every folder above the one they start in.
 export const root = path.resolve(process.env.CD_PROBE_ROOT ?? "E:\\cd-throwaway-agents");
 if (!path.basename(root).startsWith("cd-throwaway")) {
   throw new Error(`CD_PROBE_ROOT must be a folder named cd-throwaway*, not ${root}`);
@@ -67,6 +69,24 @@ export function run(command, args, { cwd, env = {}, input, timeout = 120_000 } =
     });
     child.stdin.end(input ?? "");
   });
+}
+
+// Stops a probe that writes machine-wide paths, `%ProgramFiles%`,
+// `%ProgramData%` or `HKLM`, unless it runs in Windows Sandbox, whose only
+// user is WDAGUtilityAccount. `uat/agents/sandbox.ps1` runs it there.
+export function sandboxOnly() {
+  if (os.userInfo().username !== "WDAGUtilityAccount") {
+    throw new Error("this probe writes machine-wide paths: run it in Windows Sandbox with uat/agents/sandbox.ps1");
+  }
+}
+
+// Sets the registry value `name` of `key`, such as
+// `HKLM\SOFTWARE\Policies\ClaudeCode`, to the string `data`, or deletes it
+// when `data` is null.
+export async function registry(key, name, data) {
+  const args = data === null ? ["delete", key, "/v", name, "/f"] : ["add", key, "/v", name, "/t", "REG_SZ", "/d", data, "/f"];
+  const { code, stderr } = await run("reg.exe", args);
+  if (code !== 0 && data !== null) throw new Error(`reg ${args.join(" ")} failed: ${stderr}`);
 }
 
 // A local server that answers every request with `reply` and keeps each

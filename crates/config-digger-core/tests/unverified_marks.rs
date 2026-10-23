@@ -262,11 +262,15 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
     // Facts of the built-in definitions no test has reached yet, by file,
     // table and a word of each.
     for (file, location, word) in [
-        ("claude-desktop.toml", "", "LocalCache"),
+        (
+            "claude-desktop.toml",
+            "items.mcp.rules[1]",
+            "third-party provider",
+        ),
         (
             "claude-code.toml",
-            "locations[managed-mcp]",
-            "managed-mcp.json",
+            "locations[managed-settings-mcp]",
+            "remote-settings.json",
         ),
         ("claude-code.toml", "locations[synced-skills]", "sync gate"),
         (

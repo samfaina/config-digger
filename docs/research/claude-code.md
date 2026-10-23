@@ -274,6 +274,7 @@ The release gate (#80) ran Claude Code on throwaway homes with `uat/agents/claud
 - **Approvals in a Project's own files need trust**: the Project's state, `.claude/settings.json` and `.claude/settings.local.json` approve only while the state, under the Project's path with forward slashes, holds `hasTrustDialogAccepted: true`. A key with backslashes is not read (open question 3, for approvals).
 - **A plain-string list** approves or skips that one server in a settings file, and approves nothing in the Project's state.
 - **A plugin no settings file names is off.** Of two plugins' servers with one endpoint, the plugin first in the merged `enabledPlugins` wins. A plugin whose `plugin.json` does not parse fails to load whole; one whose `.mcp.json` does not parse loads without those servers. A plugin of a `directory` marketplace is read from the marketplace's folder, not from the cache.
+- **Managed configuration**, tested in Windows Sandbox with `uat/agents/claude-code-machine.mjs`: a `managed-mcp.json` that does not parse is skipped, `claude mcp list` reports it, and it keeps its exclusive control, so only `managedMcpServers` load. An HKLM value, `managed-settings.json` or `managed-settings.d` file that does not parse stops Claude Code ("Managed settings document could not be parsed as a JSON object"), even beside a source that parses; an HKCU value that does not parse is skipped. Of HKLM and the file, only HKLM's settings are read. `managedMcpServers` is never read from HKCU, and an entry with a command or at an `http://` URL is dropped.
 
 ## Sources
 
