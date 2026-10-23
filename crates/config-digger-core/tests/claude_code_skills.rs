@@ -363,18 +363,28 @@ fn a_personal_skill_shadows_a_project_skill_of_the_same_name() {
 }
 
 #[test]
-fn skills_compete_by_the_name_claude_code_gives_them_not_by_folder() {
+fn skills_compete_by_their_folder_not_by_their_frontmatter_name() {
     let fs = with_skill(
         claude_home().with_folder(PROJECT),
         in_home(r".claude\skills\ship-it"),
         &skill_md("deploy"),
     );
+    let fs = with_skill(fs, in_home(r".claude\skills\release"), &skill_md("mine"));
     let fs = with_skill(fs, project_skill("deploy"), &skill_md("deploy"));
+    let fs = with_skill(fs, project_skill("release"), &skill_md("theirs"));
 
     let inventory = inventory(&core(&fs), &in_project());
 
     assert_eq!(
+        states(&inventory, "ship-it"),
+        pairs(&[("user", "effective")])
+    );
+    assert_eq!(
         states(&inventory, "deploy"),
+        pairs(&[("project", "effective")])
+    );
+    assert_eq!(
+        states(&inventory, "release"),
         pairs(&[("user", "effective"), ("project", "shadowed")])
     );
 }
@@ -429,10 +439,10 @@ fn a_skill_in_a_folder_claude_code_reserves_is_invalid_and_does_not_compete() {
     let inventory = inventory(&core(&fs), &in_project());
 
     assert_eq!(
-        states(&inventory, "tools"),
-        pairs(&[("user", "invalid"), ("project", "effective")])
+        states(&inventory, "Anthropic-Skills"),
+        pairs(&[("user", "invalid")])
     );
-    let reason = skill(&inventory, "tools").entries[0]
+    let reason = skill(&inventory, "Anthropic-Skills").entries[0]
         .reason
         .clone()
         .unwrap();
@@ -441,7 +451,10 @@ fn a_skill_in_a_folder_claude_code_reserves_is_invalid_and_does_not_compete() {
         reason.sentence,
         "Claude Code skips this skill: Claude Code keeps its folder's name for itself."
     );
-    assert_eq!(code(skill(&inventory, "tools").state), "effective");
+    assert_eq!(
+        states(&inventory, "tools"),
+        pairs(&[("project", "effective")])
+    );
 }
 
 #[test]
@@ -522,12 +535,12 @@ fn a_quoted_value_may_hold_a_colon_and_space() {
 
     let inventory = no_project(&fs);
 
-    let ship = skill(&inventory, "ship");
+    let deploy = skill(&inventory, "deploy");
     assert_eq!(
-        ship.entries[0].config,
+        deploy.entries[0].config,
         json!({ "name": "ship", "description": "Use when: shipping" })
     );
-    assert_eq!(ship.entries[0].notes, []);
+    assert_eq!(deploy.entries[0].notes, []);
 }
 
 #[test]
@@ -540,16 +553,16 @@ fn a_frontmatter_may_nest_a_mapping_or_continue_a_value_on_the_next_lines() {
 
     let inventory = no_project(&fs);
 
-    let ship = skill(&inventory, "ship");
+    let deploy = skill(&inventory, "deploy");
     assert_eq!(
-        ship.entries[0].config,
+        deploy.entries[0].config,
         json!({ "name": "ship", "description": "Ships the app to staging." })
     );
-    assert_eq!(ship.entries[0].notes, []);
+    assert_eq!(deploy.entries[0].notes, []);
 }
 
 #[test]
-fn a_frontmatter_without_a_name_loads_under_the_folder_name_with_a_note() {
+fn a_frontmatter_without_a_name_loads_under_the_folder_name_as_any_skill_does() {
     let fs = with_skill(
         claude_home(),
         in_home(r".claude\skills\deploy"),
@@ -564,13 +577,7 @@ fn a_frontmatter_without_a_name_loads_under_the_folder_name_with_a_note() {
         deploy.entries[0].config,
         json!({ "description": "Ships it." })
     );
-    assert!(
-        deploy.entries[0].notes[0]
-            .sentence
-            .ends_with("its SKILL.md frontmatter has no `name`."),
-        "{}",
-        deploy.entries[0].notes[0].sentence
-    );
+    assert_eq!(deploy.entries[0].notes, []);
 }
 
 /// An Agent that names skills by folder, sanitised, reads `~/.test/skills`
@@ -739,6 +746,27 @@ fn disable_writes_skill_overrides_off_in_the_projects_local_settings() {
         reason.switch.as_deref(),
         Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.deploy")
     );
+}
+
+#[test]
+fn disable_writes_the_skill_s_folder_name_not_its_frontmatter_name() {
+    let fs = with_skill(
+        claude_home().with_folder(PROJECT),
+        in_home(r".claude\skills\ship-it"),
+        &skill_md("deploy"),
+    )
+    .with_file(settings_local(), "{}");
+    let core = core(&fs);
+
+    let plan = plan(&core, &in_project(), Action::Disable, &["ship-it"]).unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, settings_local()),
+        json!({ "skillOverrides": { "ship-it": "off" } })
+    );
+    let after = inventory(&core, &in_project());
+    assert_eq!(code(skill(&after, "ship-it").entries[0].state), "disabled");
 }
 
 #[test]

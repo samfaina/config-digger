@@ -225,32 +225,32 @@ fn disable_is_not_offered_below_a_layer_that_sets_enabled_and_is_offered_there()
     assert_eq!(code(item(&docs, "docs").state), "disabled");
 }
 
+// A table holding `enabled` alone in the user's `config.toml` would stop
+// Codex in every folder whose layers do not declare the server, so a server
+// of a git-versioned layer has no Disable.
 #[test]
-fn a_server_of_a_git_versioned_layer_is_disabled_in_the_user_config_toml() {
+fn a_server_of_a_git_versioned_layer_has_no_disable() {
     let fs = app("", "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n");
     let core = core_versioning(&fs, &[layer("app")]);
 
-    let plan = plan(
+    let inventory = inventory(&core, &in_app());
+    let disable = json_of(&item(&inventory, "docs").entries[0].disable);
+    assert_eq!(disable["status"], "not_offered", "{disable}");
+    assert_eq!(disable["code"], "git_versioned", "{disable}");
+
+    let Err(error) = plan(
         &core,
         &in_app(),
         Action::Disable,
         &[&server(&layer("app"), "docs")],
-    )
-    .unwrap();
-    assert_eq!(plan.preview().files[0].path, user_config());
-    core.execute(plan, &[WarningClass::WideReach]).unwrap();
-
-    let user = text(&fs, &user_config());
+    ) else {
+        panic!("a Disable of a git-versioned layer's server is planned");
+    };
+    assert!(error.message.contains("git"), "{}", error.message);
     assert_eq!(
-        user,
-        "\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n\n[mcp_servers.docs]\nenabled = false\n"
+        text(&fs, &user_config()),
+        "\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n"
     );
-    assert_eq!(
-        text(&fs, &layer("app")),
-        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n"
-    );
-    let after = inventory(&core, &in_app());
-    assert_eq!(code(item(&after, "docs").state), "disabled");
 }
 
 #[test]
@@ -266,10 +266,6 @@ fn disable_is_not_offered_when_a_git_versioned_project_layer_sets_enabled_true()
         let disable = json_of(&entry.disable);
         assert_eq!(disable["status"], "not_offered", "{disable}");
         assert_eq!(disable["code"], "git_versioned", "{disable}");
-        assert!(
-            disable["sentence"].as_str().unwrap().contains("`enabled`"),
-            "{disable}"
-        );
     }
 
     let Err(error) = plan(

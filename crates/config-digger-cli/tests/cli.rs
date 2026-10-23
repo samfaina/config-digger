@@ -55,7 +55,7 @@ impl Harness {
     fn with_native_claude_code(self) -> Self {
         let native = self.path(".local/bin/claude.exe");
         std::fs::create_dir_all(native.parent().unwrap()).unwrap();
-        std::fs::write(native, executable(Some([2, 1, 286, 0]))).unwrap();
+        std::fs::write(native, executable(Some([2, 1, 299, 0]))).unwrap();
         self
     }
 
@@ -2234,8 +2234,8 @@ fn list_and_show_print_read_failures_with_their_position_to_stderr_and_exit_0() 
     assert_eq!(failure["project"], json!(harness.cwd()));
     assert_eq!(failure["kind"], "parse");
     assert_eq!(failure["position"], json!({ "line": 2, "column": 18 }));
-    // Every Item in the context could be beaten by a server in the file.
-    assert!(show.stdout.contains("couldn't be read"), "{}", show.stdout);
+    // Claude Code skips the file, so it changes no State shown.
+    assert!(!show.stdout.contains("couldn't be read"), "{}", show.stdout);
 }
 
 #[test]
@@ -2600,7 +2600,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     let agent = &json.document()["agents"][0];
     assert_eq!(
         agent["tested"],
-        json!({ "min": "2.1.286", "max": "2.1.302" })
+        json!({ "min": "2.1.299", "max": "2.1.309" })
     );
     let home = &agent["homes"][0];
     assert_eq!(home["installations"][0]["version"], "2.1.310");
@@ -2620,7 +2620,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
             "definition",
             "default",
             "2.1.310!",
-            "2.1.286-2.1.302"
+            "2.1.299-2.1.309"
         ]
     );
     assert!(
@@ -2630,7 +2630,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     );
     assert!(
         text.stdout.contains(
-            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.286 to 2.1.302)."
+            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.299 to 2.1.309)."
         ),
         "{}",
         text.stdout
@@ -2658,7 +2658,7 @@ fn agents_says_when_no_installation_is_found_and_still_exits_0() {
             "definition",
             "default",
             "none",
-            "2.1.286-2.1.302"
+            "2.1.299-2.1.309"
         ]
     );
     assert!(
@@ -3031,9 +3031,13 @@ fn remove_of_a_skill_folder_moves_it_into_the_backup_and_undo_moves_it_back() {
 }
 
 /// A Claude Code home with the plugin `supabase@claude-plugins-official`
-/// installed for the user, carrying the skill `supabase-postgres`.
+/// installed and turned on for the user, carrying the skill
+/// `supabase-postgres`.
 fn with_supabase_plugin() -> Harness {
-    let harness = Harness::new().with_file(".claude.json", "{}");
+    let harness = Harness::new().with_file(".claude.json", "{}").with_file(
+        ".claude/settings.json",
+        r#"{"enabledPlugins": {"supabase@claude-plugins-official": true}}"#,
+    );
     let folder = harness.path(".claude/plugins/cache/claude-plugins-official/supabase/0.1.4");
     let installed = json!({
         "version": 2,
@@ -3093,13 +3097,14 @@ fn show_of_a_plugin_entry_says_how_to_remove_it_and_offers_disable_instead() {
 #[test]
 fn show_names_the_other_agents_that_read_an_entry_with_their_state() {
     let harness = Harness::new()
+        .with_file(".codex/config.toml", "")
         .with_file(
-            ".claude/skills/review/SKILL.md",
+            ".agents/skills/review/SKILL.md",
             "---\nname: code-review\ndescription: Reviews a change.\n---\n",
         )
         .with_cwd_file("AppData/Roaming/Code/User/settings.json", "{}");
 
-    // Claude Code names the skill by its frontmatter, VS Code by its folder.
+    // Codex names the skill by its frontmatter, VS Code by its folder.
     let run = harness.run(&["show", "code-review"]);
 
     assert_eq!(run.code, 0, "{}", run.stderr);

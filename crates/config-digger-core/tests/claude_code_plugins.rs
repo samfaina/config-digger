@@ -302,6 +302,29 @@ fn a_plugin_turned_off_in_enabled_plugins_is_disabled_with_everything_it_carries
     );
 }
 
+#[test]
+fn a_plugin_no_settings_file_names_is_off_with_everything_it_carries() {
+    let fs = fixture();
+    let mut settings = json_of(&fs, user_settings());
+    settings["enabledPlugins"]
+        .as_object_mut()
+        .unwrap()
+        .remove("supabase@claude-plugins-official");
+    fs.put_file(user_settings(), settings.to_string());
+
+    let inventory = no_project(&fs);
+
+    let supabase = item(&inventory, "supabase:supabase-postgres");
+    assert_eq!(code(supabase.state), "disabled");
+    let reason = supabase.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "plugin_disabled");
+    assert!(
+        reason.sentence.contains("is missing in") && reason.sentence.contains("counts as false"),
+        "{}",
+        reason.sentence
+    );
+}
+
 fn user_settings() -> PathBuf {
     PathBuf::from(HOME).join(r".claude\settings.json")
 }

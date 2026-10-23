@@ -185,6 +185,14 @@ fn an_untrusted_project_s_skills_still_load() {
 
 /// The folder of the version `version` of the plugin `name` Codex installed
 /// from the marketplace `marketplace`.
+/// The user's `config.toml` tables that turn on the plugins `ids`, as Codex
+/// writes them when it installs a plugin: one missing from it is off.
+fn on(ids: &[&str]) -> String {
+    ids.iter()
+        .map(|id| format!("\n[plugins.\"{id}\"]\nenabled = true\n"))
+        .collect()
+}
+
 fn plugin(marketplace: &str, name: &str, version: &str) -> PathBuf {
     Path::new(CODEX)
         .join(r"plugins\cache")
@@ -203,7 +211,7 @@ fn an_installed_plugin_s_highest_version_brings_its_servers_and_skills() {
     let old = plugin("openai-curated", "linear", "1.2.0");
     let new = plugin("openai-curated", "linear", "1.10.0");
     let fs = FakeFileSystem::new()
-        .with_file(user_config(), "")
+        .with_file(user_config(), on(&["linear@openai-curated"]))
         .with_file(
             old.join(".mcp.json"),
             mcp_json("linear", "https://old.example/mcp"),
@@ -227,6 +235,10 @@ fn an_installed_plugin_s_highest_version_brings_its_servers_and_skills() {
     assert_eq!(entry["plugin"]["id"], "linear@openai-curated");
     assert_eq!(entry["plugin"]["version"], "1.10.0");
     assert_eq!(entry["remove"]["code"], "plugin");
+    assert_eq!(
+        entry["remove"]["how_to_remove"]["command"],
+        "codex plugin remove linear@openai-curated"
+    );
 
     let triage = item(&inventory, "linear:triage");
     assert_eq!(states(triage), ["effective"]);
@@ -239,6 +251,30 @@ fn an_installed_plugin_s_highest_version_brings_its_servers_and_skills() {
 }
 
 #[test]
+fn a_plugin_missing_from_config_toml_is_off_with_its_servers_and_skills() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), "")
+        .with_file(
+            linear.join(".mcp.json"),
+            mcp_json("linear", "https://linear.example/mcp"),
+        )
+        .with_file(skill(&linear.join("skills"), "triage"), skill_md("triage"));
+
+    let inventory = inventory(&fs);
+
+    for name in ["linear", "linear:triage"] {
+        let item = item(&inventory, name);
+        assert_eq!(states(item), ["disabled"], "{name}");
+        assert_eq!(
+            code(item.entries[0].reason.as_ref().unwrap().code),
+            "plugin_disabled",
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn an_mcp_servers_entry_shadows_a_same_named_plugin_server_whole() {
     let linear = plugin("openai-curated", "linear", "1.0.0");
     let fs = FakeFileSystem::new()
@@ -247,7 +283,13 @@ fn an_mcp_servers_entry_shadows_a_same_named_plugin_server_whole() {
             Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\config.toml"),
             "[mcp_servers.linear]\ncommand = \"linear-mcp\"\n",
         )
-        .with_file(user_config(), "[mcp_servers.linear]\nargs = [\"--user\"]\n")
+        .with_file(
+            user_config(),
+            format!(
+                "[mcp_servers.linear]\nargs = [\"--user\"]\n{}",
+                on(&["linear@openai-curated"])
+            ),
+        )
         .with_file(
             linear.join(".mcp.json"),
             mcp_json("linear", "https://linear.example/mcp"),
@@ -269,7 +311,7 @@ fn an_mcp_servers_entry_shadows_a_same_named_plugin_server_whole() {
 #[test]
 fn of_two_plugins_with_a_same_named_server_the_first_by_id_wins() {
     let fs = FakeFileSystem::new()
-        .with_file(user_config(), "")
+        .with_file(user_config(), on(&["docs@zeta", "docs@alpha"]))
         .with_file(
             plugin("zeta", "docs", "1.0.0").join(".mcp.json"),
             mcp_json("docs", "https://zeta.example/mcp"),
@@ -508,7 +550,7 @@ fn plugin_servers_meet_only_the_requirements_of_their_plugin() {
             requirements(),
             "[mcp_servers.docs.identity]\ncommand = \"docs-mcp\"\n\n[plugins.\"linear@openai-curated\".mcp_servers.linear.identity]\nurl = \"https://linear.example/mcp\"\n",
         )
-        .with_file(user_config(), "")
+        .with_file(user_config(), on(&["linear@openai-curated", "wiki@alpha"]))
         .with_file(
             plugin("openai-curated", "linear", "1.0.0").join(".mcp.json"),
             mcp_json("linear", "https://linear.example/mcp"),
@@ -536,7 +578,7 @@ fn plugin_servers_are_left_alone_while_no_plugin_has_requirements() {
             requirements(),
             "[mcp_servers.docs.identity]\ncommand = \"docs-mcp\"\n",
         )
-        .with_file(user_config(), "")
+        .with_file(user_config(), on(&["wiki@alpha"]))
         .with_file(
             plugin("alpha", "wiki", "1.0.0").join(".mcp.json"),
             mcp_json("wiki", "https://wiki.example/mcp"),
@@ -556,7 +598,10 @@ fn a_server_a_requirement_turns_off_still_shadows_a_same_named_plugin_server() {
         )
         .with_file(
             user_config(),
-            "[mcp_servers.linear]\ncommand = \"linear-local\"\n",
+            format!(
+                "[mcp_servers.linear]\ncommand = \"linear-local\"\n{}",
+                on(&["linear@openai-curated"])
+            ),
         )
         .with_file(
             plugin("openai-curated", "linear", "1.0.0").join(".mcp.json"),

@@ -264,6 +264,17 @@ Issue: [#101](https://github.com/samfaina/config-digger/issues/101). On 2026-10-
 
 Nothing else in the range touches a location, format, Disable switch or skill rule the definition reads. Other changes include `disableClaudeAiConnectors` and `allowedMcpServers` URL rules now applying to `.mcp.json` and plugin servers (2.1.290), which the definition already assumed, and plugin installs at project or local Scope no longer adding a second record when only the drive letter's case differs (2.1.295). `verified` is raised to `2.1.286`–`2.1.302`.
 
+## 11. Release gate tests (2.1.299 to 2.1.309)
+
+The release gate (#80) ran Claude Code on throwaway homes with `uat/agents/claude-code.mjs`; [`release-gate.md`](release-gate.md) has the method and every result. What it changes here [test]:
+
+- **Skills are named by their folder**, as written, and compete by it. The frontmatter `name` is an alias the skill also runs by, unless the 2.1.299 name rule refuses it. `skillOverrides` names the folder. A plugin's skill is `<plugin>:<folder>`. This replaces §3's and §4's naming by frontmatter, and answers #105: names are not rewritten, and of same-named skills along the walk to the repo root the nearest folder's wins.
+- **`.mcp.json` is read in every folder above the launch folder**, past the repo root, the nearest winning by name (open question 4).
+- **`CLAUDE_CONFIG_DIR` moves `.claude.json`** into that folder: user servers are read from `<CLAUDE_CONFIG_DIR>\.claude.json` (open question 1).
+- **Approvals in a Project's own files need trust**: the Project's state, `.claude/settings.json` and `.claude/settings.local.json` approve only while the state, under the Project's path with forward slashes, holds `hasTrustDialogAccepted: true`. A key with backslashes is not read (open question 3, for approvals).
+- **A plain-string list** approves or skips that one server in a settings file, and approves nothing in the Project's state.
+- **A plugin no settings file names is off.** Of two plugins' servers with one endpoint, the plugin first in the merged `enabledPlugins` wins. A plugin whose `plugin.json` does not parse fails to load whole; one whose `.mcp.json` does not parse loads without those servers. A plugin of a `directory` marketplace is read from the marketplace's folder, not from the cache.
+
 ## Sources
 
 - MCP: https://code.claude.com/docs/en/mcp
