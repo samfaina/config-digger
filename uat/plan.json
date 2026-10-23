@@ -34,7 +34,9 @@
               "text": "Remove-Item \"$env:LOCALAPPDATA\\config-digger\", \"$env:APPDATA\\config-digger\", HKCU:\\Software\\samfaina\\config-digger -Recurse -Force -ErrorAction SilentlyContinue"
             }
           ],
-          "expect": "La última vez, las cuatro líneas de la primera orden salen con False.",
+          "expect": [
+            "La última vez, las cuatro líneas de la primera orden salen con «False»."
+          ],
           "covers": ["#154"]
         }
       ]
@@ -54,7 +56,10 @@
             "Haz clic en config-digger_<versión>_x64-setup.exe para guardarlo en Descargas."
           ],
           "commands": [],
-          "expect": "El instalador queda en Descargas, con la versión del título de esta página en su nombre.",
+          "expect": [
+            "El instalador queda en Descargas.",
+            "Su nombre lleva la versión del título de esta página."
+          ],
           "covers": ["#78"]
         },
         {
@@ -81,7 +86,14 @@
               "text": "Get-Command config-digger | Select-Object Source"
             }
           ],
-          "expect": "La casilla de PATH empieza marcada. La página de carpeta propone C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger y dice «It can't be config-digger's data folder, %LOCALAPPDATA%\\config-digger or %APPDATA%\\config-digger, nor a folder inside or above one.». Con la carpeta de datos, el botón para seguir se pone gris, y se activa otra vez con la ruta propuesta. La orden imprime C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe.",
+          "expect": [
+            "La casilla de PATH empieza marcada.",
+            "La página de carpeta propone «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger».",
+            "La página de carpeta dice «It can't be config-digger's data folder, %LOCALAPPDATA%\\config-digger or %APPDATA%\\config-digger, nor a folder inside or above one.».",
+            "Con la carpeta de datos, el botón para seguir se pone gris.",
+            "Con la ruta propuesta otra vez, el botón para seguir se activa.",
+            "La orden imprime «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe»."
+          ],
           "covers": ["#78", "#152"]
         },
         {
@@ -110,7 +122,11 @@
               "text": "Get-ItemProperty HKCU:\\Software\\samfaina\\config-digger | Select-Object KeepPathAlone"
             }
           ],
-          "expect": "La casilla de PATH empieza marcada. La primera orden da un error en rojo: config-digger no se reconoce. La segunda imprime KeepPathAlone con el valor 1, que quiere decir sin PATH.",
+          "expect": [
+            "La casilla de PATH empieza marcada.",
+            "La primera orden da un error en rojo: config-digger no se reconoce.",
+            "La segunda imprime «KeepPathAlone» con el valor «1», que quiere decir sin PATH."
+          ],
           "covers": ["#78"]
         },
         {
@@ -134,7 +150,10 @@
               "text": "Get-Command config-digger | Select-Object Source"
             }
           ],
-          "expect": "La casilla de PATH empieza desmarcada, porque recuerda la elección del paso 9.3. La orden imprime otra vez C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe. El PATH queda puesto para la sección Desinstalar.",
+          "expect": [
+            "La casilla de PATH empieza desmarcada: recuerda la elección del paso 9.3.",
+            "La orden imprime otra vez «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe»: el PATH queda puesto para la sección Desinstalar."
+          ],
           "covers": ["#78"]
         }
       ]
@@ -159,7 +178,10 @@
               "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
             }
           ],
-          "expect": "El script termina con «Created the throwaway homes and Projects in E:\\cd-throwaway» y lista claude-code-home\\.claude.json, codex-home\\config.toml y claude-desktop-home\\claude_desktop_config.json, entre otros.",
+          "expect": [
+            "El script termina con «Created the throwaway homes and Projects in E:\\cd-throwaway».",
+            "Entre otros, lista «claude-code-home\\.claude.json», «codex-home\\config.toml» y «claude-desktop-home\\claude_desktop_config.json»."
+          ],
           "covers": ["#190"]
         },
         {
@@ -181,7 +203,13 @@
             "Elige ese home."
           ],
           "commands": [],
-          "expect": "Sale el aviso «Added E:\\cd-throwaway\\claude-code-home as an Agent home of Claude Code.». La fila de E:\\cd-throwaway\\claude-code-home está bajo el grupo Claude Code, con las etiquetas Claude Code y added by you. El Inventario de ese home muestra el servidor cd-throwaway-user y la skill cd-throwaway-user-skill. El Secret de cd-throwaway-user sale enmascarado, nunca como ghp_not-a-real-secret.",
+          "expect": [
+            "Sale el aviso «Added E:\\cd-throwaway\\claude-code-home as an Agent home of Claude Code.».",
+            "La fila de «E:\\cd-throwaway\\claude-code-home» está bajo el grupo «Claude Code».",
+            "La fila tiene las etiquetas «Claude Code» y «added by you».",
+            "El Inventario de ese home muestra el servidor «cd-throwaway-user» y la skill «cd-throwaway-user-skill».",
+            "El Secret de cd-throwaway-user sale enmascarado, nunca como «ghp_not-a-real-secret»."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -205,7 +233,12 @@
             "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
           ],
           "commands": [],
-          "expect": "Antes de que salgan los paneles, el cuerpo es un único panel con un aviso con una rueda que gira y el texto «Reading the inventory…», sobre filas grises que laten. Luego salen los paneles de Agents, Items y Details con tus datos.",
+          "expect": [
+            "Antes de que salgan los paneles, el cuerpo es un único panel.",
+            "En ese panel, un aviso con una rueda que gira dice «Reading the inventory…».",
+            "Bajo el aviso laten filas grises.",
+            "Luego salen los paneles de «Agents», «Items» y «Details» con tus datos."
+          ],
           "covers": ["#180"]
         },
         {
@@ -221,7 +254,13 @@
             "Mira otra vez el borde de abajo de la cabecera."
           ],
           "commands": [],
-          "expect": "Con Refresh, el botón dice Reading y por el borde de abajo de la cabecera corre una barra fina de lado a lado hasta que acaba la lectura. Los Items siguen a la vista y el clic abre el Item en Details. Al volver a la ventana pasa lo mismo con la barra, sin el estado de carga de la primera lectura. La barra puede durar menos de un segundo; lo que cuenta es que sale mientras el botón dice Reading.",
+          "expect": [
+            "Con Refresh, el botón dice «Reading».",
+            "Mientras el botón dice «Reading», por el borde de abajo de la cabecera corre una barra fina de lado a lado, aunque dure menos de un segundo.",
+            "Los Items siguen a la vista y el clic abre el Item en Details.",
+            "Al volver a la ventana sale la misma barra.",
+            "Al volver a la ventana no sale el estado de carga de la primera lectura."
+          ],
           "covers": ["#180"]
         },
         {
@@ -237,7 +276,14 @@
             "Mira enseguida el panel Data on this computer."
           ],
           "commands": [],
-          "expect": "Cada lista empieza con un aviso con una rueda que gira y filas grises que laten debajo: «Reading the Projects and Agent homes…» en Projects & homes, «Reading History…» en History y «Reading where config-digger keeps its data…» en Settings. Luego salen sus datos. La carga puede durar menos de un segundo; lo que cuenta es que no sale una línea de texto suelta.",
+          "expect": [
+            "Cada lista empieza con un aviso con una rueda que gira y filas grises que laten debajo, aunque dure menos de un segundo.",
+            "En Projects & homes, el aviso dice «Reading the Projects and Agent homes…».",
+            "En History, el aviso dice «Reading History…».",
+            "En Settings, el aviso dice «Reading where config-digger keeps its data…».",
+            "Luego salen sus datos.",
+            "En ningún momento sale una línea de texto suelta en lugar del aviso."
+          ],
           "covers": ["#180"]
         }
       ]
@@ -255,7 +301,11 @@
             "Haz clic en él."
           ],
           "commands": [],
-          "expect": "El tooltip dice «Projects & homes». La pantalla muestra arriba las pestañas Projects · N y Agent homes · N y el botón Add Project o Add Agent home, según la pestaña abierta.",
+          "expect": [
+            "El tooltip dice «Projects & homes».",
+            "Arriba salen las pestañas «Projects · N» y «Agent homes · N».",
+            "El botón de arriba es «Add Project» o «Add Agent home», según la pestaña abierta."
+          ],
           "covers": ["#75"]
         },
         {
@@ -274,7 +324,12 @@
             "Busca la fila nueva en la lista de Agent homes."
           ],
           "commands": [],
-          "expect": "Sale el aviso «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.». La fila de E:\\cd-throwaway\\codex-home está bajo el grupo Codex, con las etiquetas Codex y added by you. No sale ninguna fila de codex-home bajo Claude Code.",
+          "expect": [
+            "Sale el aviso «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.».",
+            "La fila de «E:\\cd-throwaway\\codex-home» está bajo el grupo «Codex».",
+            "La fila tiene las etiquetas «Codex» y «added by you».",
+            "No sale ninguna fila de codex-home bajo «Claude Code»."
+          ],
           "covers": ["#75", "#175"]
         },
         {
@@ -293,7 +348,12 @@
             "Busca la fila nueva en la lista de Agent homes."
           ],
           "commands": [],
-          "expect": "Sale el aviso «Added E:\\cd-throwaway\\claude-desktop-home as an Agent home of Claude Desktop.». La fila de E:\\cd-throwaway\\claude-desktop-home está bajo el grupo Claude Desktop, con las etiquetas Claude Desktop y added by you. No sale ninguna fila de claude-desktop-home bajo Claude Code.",
+          "expect": [
+            "Sale el aviso «Added E:\\cd-throwaway\\claude-desktop-home as an Agent home of Claude Desktop.».",
+            "La fila de «E:\\cd-throwaway\\claude-desktop-home» está bajo el grupo «Claude Desktop».",
+            "La fila tiene las etiquetas «Claude Desktop» y «added by you».",
+            "No sale ninguna fila de claude-desktop-home bajo «Claude Code»."
+          ],
           "covers": ["#75", "#175"]
         },
         {
@@ -311,7 +371,12 @@
               "text": "(Get-Content \"$env:APPDATA\\config-digger\\homes-and-projects.json\" -Raw | ConvertFrom-Json).homes | Format-Table agent, folder"
             }
           ],
-          "expect": "La tabla tiene estas tres filas, cada una con su Agent: claude-code E:\\cd-throwaway\\claude-code-home, codex E:\\cd-throwaway\\codex-home y claude-desktop E:\\cd-throwaway\\claude-desktop-home. Ninguna de esas carpetas sale con otro Agent.",
+          "expect": [
+            "Una fila de la tabla dice «claude-code» con «E:\\cd-throwaway\\claude-code-home».",
+            "Una fila dice «codex» con «E:\\cd-throwaway\\codex-home».",
+            "Una fila dice «claude-desktop» con «E:\\cd-throwaway\\claude-desktop-home».",
+            "Ninguna de esas carpetas sale con otro Agent."
+          ],
           "covers": ["#175"]
         },
         {
@@ -324,7 +389,12 @@
             "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home."
           ],
           "commands": [],
-          "expect": "Cada una de esas tres filas tiene dos etiquetas: el nombre de su Agent (Claude Code, Codex o Claude Desktop) y added by you. Cada etiqueta es una píldora rellena de gris, con un borde gris claro alrededor y el texto casi blanco, no un texto gris sobre el fondo de la fila.",
+          "expect": [
+            "Cada una de las tres filas tiene dos etiquetas: su Agent («Claude Code», «Codex» o «Claude Desktop») y «added by you».",
+            "Cada etiqueta es una píldora rellena de gris, no un texto gris sobre el fondo de la fila.",
+            "Cada etiqueta tiene un borde gris claro alrededor.",
+            "El texto de cada etiqueta es casi blanco."
+          ],
           "covers": ["#232"]
         },
         {
@@ -337,7 +407,13 @@
             "Mira el grupo Missing."
           ],
           "commands": [],
-          "expect": "Salen E:\\cd-throwaway\\project y E:\\cd-throwaway\\project-hide, cada uno con la línea «Folder · Known to Claude Code». E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home no salen como Projects. El grupo ▾ Missing · 1 está abierto, con E:/cd-throwaway/project-gone, la línea «The folder no longer exists · known to Claude Code» y «1 leftover».",
+          "expect": [
+            "Salen «E:\\cd-throwaway\\project» y «E:\\cd-throwaway\\project-hide».",
+            "Cada uno tiene la línea «Folder · Known to Claude Code».",
+            "«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\claude-desktop-home» no salen como Projects.",
+            "El grupo «▾ Missing · 1» está abierto.",
+            "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover»."
+          ],
           "covers": ["#75"]
         },
         {
@@ -349,7 +425,13 @@
             "Mira la cabecera, los filtros y la lista de Items."
           ],
           "commands": [],
-          "expect": "Se abre el Inventario con E:/cd-throwaway/project-gone en el campo Project, All Agents elegido y el filtro de State Unread. La lista de Items muestra cd-throwaway-leftover.",
+          "expect": [
+            "Se abre el Inventario.",
+            "El campo Project dice «E:/cd-throwaway/project-gone».",
+            "Está elegido «All Agents».",
+            "El filtro de State es «Unread».",
+            "La lista de Items muestra «cd-throwaway-leftover»."
+          ],
           "covers": ["#75", "#176"]
         },
         {
@@ -362,7 +444,13 @@
             "Mira enseguida el cuerpo del Inventario, bajo la cabecera."
           ],
           "commands": [],
-          "expect": "Nada más pulsar, el Inventario ocupa su cuerpo con un único panel: arriba, un aviso con una rueda que gira y el texto «Reading the inventory…»; debajo, filas grises que laten con la forma de las filas de Items. Bajo la cabecera no salen los paneles de Agents, Items y Details, ni vacíos ni con sus cuentas a 0. Al acabar la lectura, el panel deja sitio a los paneles con cd-throwaway-leftover en la lista de Items. La carga puede durar menos de un segundo; lo que cuenta es que sale antes de los paneles.",
+          "expect": [
+            "Nada más pulsar, antes que los paneles, el Inventario ocupa su cuerpo con un único panel, aunque dure menos de un segundo.",
+            "Arriba del panel, un aviso con una rueda que gira dice «Reading the inventory…».",
+            "Debajo laten filas grises con la forma de las filas de Items.",
+            "Bajo la cabecera no salen los paneles de Agents, Items y Details, ni vacíos ni con sus cuentas a 0.",
+            "Al acabar la lectura, el panel deja sitio a los paneles, con «cd-throwaway-leftover» en la lista de Items."
+          ],
           "covers": ["#180"]
         },
         {
@@ -386,7 +474,22 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. Si Before you apply tiene un aviso, es un bloque propio, en ámbar, con un borde ámbar a la izquierda y el icono de aviso junto a su casilla: su primera línea, en negrita, dice qué hacer, como «Close Claude Code first to be safe.», y cada ruta va sola en su línea, en monospace, nunca dentro de la frase. Si tiene una nota, como la de una versión de Claude Code fuera de su Tested range, va en un bloque azul con borde azul claro y el icono de información, como los avisos de información de abajo de la pantalla, no en texto gris. La nota «Each touched file is copied to … before anything is written.» del pie va en gris claro, casi blanco, casi del tamaño del texto de las casillas; no en gris oscuro ni en letra más pequeña. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», con los botones de la fila de project-gone apagados, que puede durar menos de un segundo. Luego la fila de project-gone dice No leftovers y ofrece Hide.",
+          "expect": [
+            "El diálogo se titula «Remove 1 Entry».",
+            "El diff de «Files · 1» marca en rojo las líneas de «cd-throwaway-leftover» en «E:\\cd-throwaway\\claude-code-home\\.claude.json».",
+            "Si «Before you apply» tiene un aviso, es un bloque propio, en ámbar, con un borde ámbar a la izquierda.",
+            "Si hay aviso, su icono de aviso va junto a su casilla.",
+            "Si hay aviso, su primera línea, en negrita, dice qué hacer, como «Close Claude Code first to be safe.».",
+            "Si hay aviso, cada una de sus rutas va sola en su línea, en monospace, nunca dentro de la frase.",
+            "Si hay una nota, como la de una versión de Claude Code fuera de su Tested range, va en un bloque azul con borde azul claro.",
+            "Si hay nota, lleva el icono de información, como los avisos de información de abajo de la pantalla, no en texto gris.",
+            "La nota del pie, «Each touched file is copied to … before anything is written.», va en gris claro, casi blanco, no en gris oscuro.",
+            "La nota del pie tiene casi el tamaño del texto de las casillas, no una letra más pequeña.",
+            "El resultado dice «Removed 1 Entry. Operation <id>: verified.».",
+            "Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», aunque dure menos de un segundo.",
+            "Mientras sale ese aviso, los botones de la fila de project-gone están apagados.",
+            "Luego la fila de project-gone dice «No leftovers» y ofrece «Hide»."
+          ],
           "covers": ["#75", "#179", "#230"]
         },
         {
@@ -400,7 +503,14 @@
             "En la fila de project-hide, pulsa Unhide."
           ],
           "commands": [],
-          "expect": "Hide da el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.» y el Project sale de la lista principal. El grupo Hidden · 1 empieza cerrado y, abierto, muestra el Project en gris. Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.» y el Project vuelve a la lista principal.",
+          "expect": [
+            "Hide da el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.».",
+            "El Project sale de la lista principal.",
+            "El grupo «Hidden · 1» empieza cerrado.",
+            "Abierto, el grupo muestra el Project en gris.",
+            "Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.».",
+            "El Project vuelve a la lista principal."
+          ],
           "covers": ["#75"]
         },
         {
@@ -415,7 +525,16 @@
             "Mira enseguida la parte de abajo de la pantalla y los botones de la fila."
           ],
           "commands": [],
-          "expect": "Nada más pulsar Hide sale abajo, donde salen los avisos, un aviso con una rueda que gira y el texto «Hiding E:\\cd-throwaway\\project-hide…», y los botones Open in Inventory y Hide de la fila se ven apagados. Sigue ahí hasta que el Project sale de la lista principal, y entonces lo sustituye el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.». Con Unhide pasa lo mismo, con «Unhiding E:\\cd-throwaway\\project-hide…» y luego «E:\\cd-throwaway\\project-hide is listed again.». El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la lista cambie.",
+          "expect": [
+            "Nada más pulsar Hide sale abajo, donde salen los avisos, un aviso con una rueda que gira y el texto «Hiding E:\\cd-throwaway\\project-hide…», aunque dure menos de un segundo.",
+            "Mientras, los botones «Open in Inventory» y «Hide» de la fila se ven apagados.",
+            "El aviso de la rueda sigue ahí hasta que el Project sale de la lista principal.",
+            "Entonces lo sustituye el aviso «Hid E:\\cd-throwaway\\project-hide. Picking it in the Inventory still evaluates it.».",
+            "Nada más pulsar Unhide sale abajo el aviso de la rueda con «Unhiding E:\\cd-throwaway\\project-hide…», aunque dure menos de un segundo.",
+            "Mientras, los botones de la fila se ven apagados.",
+            "El aviso de la rueda sigue ahí hasta que el Project vuelve a la lista principal.",
+            "Entonces lo sustituye el aviso «E:\\cd-throwaway\\project-hide is listed again.»."
+          ],
           "covers": ["#179"]
         },
         {
@@ -433,7 +552,12 @@
             "Pulsa Add."
           ],
           "commands": [],
-          "expect": "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file». Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.», y su fila dice «Folder · Added by you», con los botones Open in Inventory y Remove from list.",
+          "expect": [
+            "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file».",
+            "Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.».",
+            "La fila de project-extra dice «Folder · Added by you».",
+            "La fila tiene los botones «Open in Inventory» y «Remove from list»."
+          ],
           "covers": ["#75"]
         },
         {
@@ -451,7 +575,15 @@
             "Mira enseguida la parte de abajo de la pantalla y el botón Add."
           ],
           "commands": [],
-          "expect": "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\project-extra from config-digger's list…», con los botones de la fila apagados, hasta que la fila desaparece y sale el aviso «Removed E:\\cd-throwaway\\project-extra from config-digger's list. Nothing on disk changed.». Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\project-extra…», con Add apagado, hasta que el diálogo se cierra y sale «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.». Al final project-extra vuelve a estar en la lista.",
+          "expect": [
+            "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\project-extra from config-digger's list…».",
+            "Mientras, los botones de la fila se ven apagados.",
+            "Cuando la fila desaparece, sale el aviso «Removed E:\\cd-throwaway\\project-extra from config-digger's list. Nothing on disk changed.».",
+            "Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\project-extra…».",
+            "Mientras, Add se ve apagado.",
+            "Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.».",
+            "Al final, project-extra vuelve a estar en la lista."
+          ],
           "covers": ["#179"]
         },
         {
@@ -471,7 +603,15 @@
             "Mira enseguida la parte de abajo de la pantalla y el botón Add."
           ],
           "commands": [],
-          "expect": "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\codex-home of Codex from config-digger's list…», con los botones de la fila apagados, hasta que la fila desaparece y sale el aviso «Removed E:\\cd-throwaway\\codex-home of Codex from config-digger's list. Nothing on disk changed.». Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\codex-home as an Agent home of Codex…», con Add apagado, hasta que el diálogo se cierra y sale «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.». Al final la fila de codex-home vuelve a estar bajo Codex.",
+          "expect": [
+            "Remove from list saca abajo un aviso con una rueda que gira y el texto «Removing E:\\cd-throwaway\\codex-home of Codex from config-digger's list…».",
+            "Mientras, los botones de la fila se ven apagados.",
+            "Cuando la fila desaparece, sale el aviso «Removed E:\\cd-throwaway\\codex-home of Codex from config-digger's list. Nothing on disk changed.».",
+            "Add saca, por encima del diálogo, el aviso de la rueda con «Adding E:\\cd-throwaway\\codex-home as an Agent home of Codex…».",
+            "Mientras, Add se ve apagado.",
+            "Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.».",
+            "Al final, la fila de codex-home vuelve a estar bajo Codex."
+          ],
           "covers": ["#179"]
         },
         {
@@ -487,7 +627,14 @@
             "Mira la cabecera y el principio de la lista."
           ],
           "commands": [],
-          "expect": "En las dos pestañas, el título Projects & homes, cada pestaña (Projects · N y Agent homes · N) y el botón Add Project o Add Agent home ocupan una línea cada uno. La descripción no está en la cabecera: sale encima de la lista, «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.» en Projects y «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.» en Agent homes.",
+          "expect": [
+            "En las dos pestañas, el título «Projects & homes» ocupa una línea.",
+            "Cada pestaña, «Projects · N» y «Agent homes · N», ocupa una línea.",
+            "El botón «Add Project» o «Add Agent home» ocupa una línea.",
+            "La descripción sale encima de la lista, no en la cabecera.",
+            "En Projects, la descripción dice «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.».",
+            "En Agent homes, la descripción dice «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.»."
+          ],
           "covers": ["#221"]
         },
         {
@@ -508,7 +655,18 @@
             "Abre la pestaña Agent homes."
           ],
           "commands": [],
-          "expect": "Con HIDE, el grupo Projects dice Projects · 0, la fila No Project no sale y el grupo Hidden · 1 muestra E:\\cd-throwaway\\project-hide. Con gone, el grupo Projects dice Projects · 0, Hidden no sale y el grupo Missing · 1 muestra solo E:/cd-throwaway/project-gone. Con zz la lista dice «No Project path holds “zz”.». Al borrar vuelven todas las filas y No Project. Unhide devuelve project-hide a la lista principal. La pestaña Agent homes no tiene caja de búsqueda.",
+          "expect": [
+            "Con HIDE, el grupo de Projects dice «Projects · 0».",
+            "Con HIDE, la fila «No Project» no sale.",
+            "Con HIDE, el grupo «Hidden · 1» muestra «E:\\cd-throwaway\\project-hide».",
+            "Con gone, el grupo de Projects dice «Projects · 0».",
+            "Con gone, el grupo «Hidden» no sale.",
+            "Con gone, el grupo «Missing · 1» muestra solo «E:/cd-throwaway/project-gone».",
+            "Con zz, la lista dice «No Project path holds “zz”.».",
+            "Al borrar, vuelven todas las filas y «No Project».",
+            "Unhide devuelve project-hide a la lista principal.",
+            "La pestaña Agent homes no tiene caja de búsqueda."
+          ],
           "covers": ["#224"]
         }
       ]
@@ -527,7 +685,14 @@
             "Pasa el ratón por las opciones y haz clic en un Project cd-throwaway que no sea el actual."
           ],
           "commands": [],
-          "expect": "El panel es oscuro, con esquinas redondeadas y sombra, como los paneles de la app. El valor actual sale en morado y la opción bajo el ratón se ilumina. Los Projects que faltan salen bajo el título MISSING PROJECTS. Al hacer clic, el panel se cierra y el campo muestra el Project elegido.",
+          "expect": [
+            "El panel es oscuro, como los paneles de la app.",
+            "El panel tiene esquinas redondeadas y sombra.",
+            "El valor actual sale en morado.",
+            "La opción bajo el ratón se ilumina.",
+            "Los Projects que faltan salen bajo el título «MISSING PROJECTS».",
+            "Al hacer clic, el panel se cierra y el campo muestra el Project elegido."
+          ],
           "covers": ["#181"]
         },
         {
@@ -546,7 +711,17 @@
             "Mira la lista de Items."
           ],
           "commands": [],
-          "expect": "Alt+Flecha abajo abre el panel sobre el valor actual. Las flechas mueven la opción iluminada. Lo que escribes sale en la caja «Search Projects…» de arriba del panel, que deja solo E:\\cd-throwaway\\project-hide, iluminado. Escape cierra el panel sin cambiar el Project y el foco sigue en el campo. Enter elige la opción iluminada y cierra el panel. Con el panel cerrado, Flecha abajo pasa al Project siguiente y Flecha arriba vuelve a E:\\cd-throwaway\\project, sin abrir el panel. Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra cd-throwaway-project.",
+          "expect": [
+            "Alt+Flecha abajo abre el panel sobre el valor actual.",
+            "Las flechas mueven la opción iluminada.",
+            "Lo que escribes sale en la caja «Search Projects…» de arriba del panel.",
+            "La caja deja solo «E:\\cd-throwaway\\project-hide», iluminado.",
+            "Escape cierra el panel sin cambiar el Project, y el foco sigue en el campo.",
+            "Enter elige la opción iluminada y cierra el panel.",
+            "Con el panel cerrado, Flecha abajo pasa al Project siguiente sin abrir el panel.",
+            "Flecha arriba vuelve a «E:\\cd-throwaway\\project» sin abrir el panel.",
+            "Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra «cd-throwaway-project»."
+          ],
           "covers": ["#181", "#219", "#224"]
         },
         {
@@ -564,7 +739,22 @@
             "Pulsa Escape."
           ],
           "commands": [],
-          "expect": "El panel se abre con la caja «Search Projects…» arriba, vacía y con el cursor dentro, y todas las opciones debajo. Con EXTRA queda solo E:\\cd-throwaway\\project-extra, iluminado. Al borrar vuelven todas. Con throwaway quedan los Projects de E:\\cd-throwaway, los que faltan bajo MISSING PROJECTS, y No Project no sale. E:\\cd-throwaway\\project-extra sigue iluminado. Flecha abajo ilumina el Project de debajo y Enter lo elige: el panel se cierra, el campo lo muestra y el foco vuelve al campo (borde morado). Al abrir otra vez, la caja está vacía. Con zz el panel dice «No match». Escape lo cierra sin cambiar el Project.",
+          "expect": [
+            "El panel se abre con la caja «Search Projects…» arriba, vacía y con el cursor dentro.",
+            "Bajo la caja salen todas las opciones.",
+            "Con EXTRA queda solo «E:\\cd-throwaway\\project-extra», iluminado.",
+            "Al borrar vuelven todas las opciones.",
+            "Con throwaway quedan los Projects de «E:\\cd-throwaway», con los que faltan bajo «MISSING PROJECTS».",
+            "Con throwaway, «No Project» no sale.",
+            "Con throwaway, «E:\\cd-throwaway\\project-extra» sigue iluminado.",
+            "Flecha abajo ilumina el Project de debajo.",
+            "Enter lo elige y el panel se cierra.",
+            "El campo muestra el Project elegido.",
+            "El foco vuelve al campo, con borde morado.",
+            "Al abrir otra vez, la caja está vacía.",
+            "Con zz, el panel dice «No match».",
+            "Escape cierra el panel sin cambiar el Project."
+          ],
           "covers": ["#224"]
         },
         {
@@ -585,7 +775,11 @@
             "Pulsa Cancel."
           ],
           "commands": [],
-          "expect": "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo, entero y sin pasar de ese borde. El panel de Agent se abre entero debajo de su campo.",
+          "expect": [
+            "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo.",
+            "Ese panel sale entero, sin pasar del borde de la ventana.",
+            "El panel de Agent se abre entero debajo de su campo."
+          ],
           "covers": ["#181", "#221"]
         },
         {
@@ -601,7 +795,11 @@
             "Haz clic en Codex."
           ],
           "commands": [],
-          "expect": "El campo empieza en «Choose an Agent…», en gris dentro del panel. El clic en esa opción no hace nada y el panel sigue abierto. El clic en Codex cierra el panel y el campo muestra Codex.",
+          "expect": [
+            "El campo empieza en «Choose an Agent…», en gris dentro del panel.",
+            "El clic en esa opción no hace nada y el panel sigue abierto.",
+            "El clic en «Codex» cierra el panel y el campo muestra «Codex»."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -627,7 +825,14 @@
             "Deja el ratón sobre la ubicación de una fila de la lista de Entries."
           ],
           "commands": [],
-          "expect": "Tras medio segundo sale un recuadro oscuro, con esquinas redondeadas, borde fino y sombra, como los paneles de la app, con el texto «Inventory». Desaparece al apartar el ratón. El botón de copiar muestra «Copy the configuration, with every Secret masked» y la fila muestra su ruta entera. No sale en ningún momento la etiqueta amarilla o blanca del sistema.",
+          "expect": [
+            "Tras medio segundo sale un recuadro oscuro con el texto «Inventory».",
+            "El recuadro tiene esquinas redondeadas, borde fino y sombra, como los paneles de la app.",
+            "El recuadro desaparece al apartar el ratón.",
+            "El botón de copiar muestra «Copy the configuration, with every Secret masked».",
+            "La fila muestra su ruta entera.",
+            "No sale en ningún momento la etiqueta amarilla o blanca del sistema."
+          ],
           "covers": ["#182"]
         },
         {
@@ -641,7 +846,11 @@
             "Pulsa Tab una vez más."
           ],
           "commands": [],
-          "expect": "El tooltip «Inventory» sale en cuanto el botón recibe el foco, sin pausa. Escape lo oculta y el foco sigue en el botón. Con Tab sale el tooltip «History · Undo» del botón siguiente.",
+          "expect": [
+            "El tooltip «Inventory» sale en cuanto el botón recibe el foco, sin pausa.",
+            "Escape lo oculta y el foco sigue en el botón.",
+            "Con Tab sale el tooltip «History · Undo» del botón siguiente."
+          ],
           "covers": ["#182"]
         },
         {
@@ -657,7 +866,11 @@
             "Deja el ratón sobre la ubicación de la fila cd-throwaway-user-skill de la lista de Items: la línea gris bajo su nombre."
           ],
           "commands": [],
-          "expect": "Los dos tooltips quedan enteros dentro de la ventana. El de About, en la esquina de abajo a la izquierda, sale encima del botón y no pasa del borde izquierdo. El de la fila muestra la ruta entera de la skill, partida en varias líneas.",
+          "expect": [
+            "Los dos tooltips quedan enteros dentro de la ventana.",
+            "El de About, en la esquina de abajo a la izquierda, sale encima del botón, sin pasar del borde izquierdo.",
+            "El de la fila muestra la ruta entera de la skill, partida en varias líneas."
+          ],
           "covers": ["#182", "#221"]
         }
       ]
@@ -683,7 +896,13 @@
             "Arrastra el tirador hasta abajo."
           ],
           "commands": [],
-          "expect": "La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Al final de la lista sale cd-throwaway-many-30.",
+          "expect": [
+            "La barra es fina, sin el carril gris claro del sistema.",
+            "El tirador es gris tenue.",
+            "Bajo el ratón, el tirador se aclara.",
+            "El tirador se arrastra con normalidad.",
+            "Al final de la lista sale «cd-throwaway-many-30»."
+          ],
           "covers": ["#183"]
         },
         {
@@ -697,7 +916,14 @@
             "Pasa el ratón por encima del tirador."
           ],
           "commands": [],
-          "expect": "La lista tiene los 30 Projects de E:\\cd-throwaway\\many y no cabe entera. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
+          "expect": [
+            "La lista tiene los 30 Projects de «E:\\cd-throwaway\\many» y no cabe entera.",
+            "La barra es fina, sin el carril gris claro del sistema.",
+            "El tirador es gris tenue.",
+            "Bajo el ratón, el tirador se aclara.",
+            "El tirador se arrastra con normalidad.",
+            "La barra es igual a la de la lista de Items del Inventario."
+          ],
           "covers": ["#183"]
         },
         {
@@ -717,7 +943,14 @@
             "Pasa el ratón por encima del tirador."
           ],
           "commands": [],
-          "expect": "La lista tiene 12 Operations Disable y no cabe entera. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
+          "expect": [
+            "La lista tiene 12 Operations «Disable» y no cabe entera.",
+            "La barra es fina, sin el carril gris claro del sistema.",
+            "El tirador es gris tenue.",
+            "Bajo el ratón, el tirador se aclara.",
+            "El tirador se arrastra con normalidad.",
+            "La barra es igual a la de la lista de Items del Inventario."
+          ],
           "covers": ["#183", "#218"]
         },
         {
@@ -734,7 +967,14 @@
             "Pulsa Close."
           ],
           "commands": [],
-          "expect": "La lista de licencias y el texto de la licencia se desplazan cada uno con su barra. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Las dos son iguales a la de la lista de Items del Inventario.",
+          "expect": [
+            "La lista de licencias y el texto de la licencia se desplazan cada uno con su barra.",
+            "Cada barra es fina, sin el carril gris claro del sistema.",
+            "El tirador es gris tenue.",
+            "Bajo el ratón, el tirador se aclara.",
+            "El tirador se arrastra con normalidad.",
+            "Las dos barras son iguales a la de la lista de Items del Inventario."
+          ],
           "covers": ["#183"]
         },
         {
@@ -749,7 +989,14 @@
             "Pulsa Escape."
           ],
           "commands": [],
-          "expect": "El panel no cabe entero en la ventana y se desplaza con su propia barra. La barra es fina, sin el carril gris claro del sistema. El tirador es gris tenue, se aclara bajo el ratón y se arrastra con normalidad. Es igual a la de la lista de Items del Inventario.",
+          "expect": [
+            "El panel no cabe entero en la ventana y se desplaza con su propia barra.",
+            "La barra es fina, sin el carril gris claro del sistema.",
+            "El tirador es gris tenue.",
+            "Bajo el ratón, el tirador se aclara.",
+            "El tirador se arrastra con normalidad.",
+            "La barra es igual a la de la lista de Items del Inventario."
+          ],
           "covers": ["#183"]
         },
         {
@@ -771,7 +1018,19 @@
             "Deja el ratón sobre la ubicación de la fila cd-throwaway-many-01: la línea gris bajo su nombre."
           ],
           "commands": [],
-          "expect": "Agents muestra su título y al menos dos Agents; Entries by State y Agent home, su título y al menos una fila. Al desplazarte dentro de un bloque, llegas a su última fila y los otros dos bloques no se mueven. Claude Code y claude-code-many-home se eligen con un clic. La lista de Items y el panel de la derecha tienen más o menos el mismo ancho, y la columna de la izquierda es algo más estrecha que cada uno. Ningún texto se monta sobre otro: en cada fila de Items, el nombre y debajo la ubicación van junto al icono, y el número de Entries y el State en otra línea, bajo ellos. La ubicación acaba en «…» y su tooltip muestra la ruta entera. El tooltip del campo Project muestra E:\\cd-throwaway\\many\\project-01 entero.",
+          "expect": [
+            "«Agents» muestra su título y al menos dos Agents.",
+            "«Entries by State» y «Agent home» muestran cada uno su título y al menos una fila.",
+            "Al desplazarte dentro de un bloque llegas a su última fila, y los otros dos bloques no se mueven.",
+            "«Claude Code» y «claude-code-many-home» se eligen con un clic.",
+            "La lista de Items y el panel de la derecha tienen más o menos el mismo ancho.",
+            "La columna de la izquierda es algo más estrecha que cada uno de ellos.",
+            "Ningún texto se monta sobre otro.",
+            "En cada fila de Items, el nombre y, debajo, la ubicación van junto al icono.",
+            "El número de Entries y el State van en otra línea, bajo el nombre y la ubicación.",
+            "La ubicación acaba en «…» y su tooltip muestra la ruta entera.",
+            "El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero."
+          ],
           "covers": ["#221"]
         }
       ]
@@ -792,7 +1051,16 @@
             "Aparta el ratón del aviso y cuenta los segundos hasta que se vaya."
           ],
           "commands": [],
-          "expect": "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora. Su fondo es verde y destaca, más claro que el panel y las tarjetas. Tiene un borde verde a la izquierda, un icono verde de visto y el texto blanco «Copied the path.». Entra subiendo un poco mientras aparece, en un instante y sin saltos. Se queda unos 4 segundos y se va bajando un poco mientras se desvanece. Con el ratón encima no se va; unos 4 segundos después de apartarlo, se va igual.",
+          "expect": [
+            "Sale un recuadro con las esquinas redondeadas de las tarjetas de Entry, no una píldora.",
+            "Su fondo es verde y destaca, más claro que el panel y las tarjetas.",
+            "Tiene un borde verde a la izquierda y un icono verde de visto.",
+            "Su texto, en blanco, dice «Copied the path.».",
+            "Entra subiendo un poco mientras aparece, en un instante y sin saltos.",
+            "Se queda unos 4 segundos y se va bajando un poco mientras se desvanece.",
+            "Con el ratón encima no se va.",
+            "Unos 4 segundos después de apartar el ratón, se va igual."
+          ],
           "covers": ["#184", "#208"]
         },
         {
@@ -801,6 +1069,7 @@
           "goal": "Un aviso de información tiene la misma forma que uno de éxito y su propio color.",
           "instructions": [
             "Ejecuta la orden en PowerShell y apunta una carpeta que salga con False.",
+            "Si las cuatro carpetas salen con True, para y marca el paso Bloqueado.",
             "Ve a Settings.",
             "En Data on this computer, pulsa Open folder en la fila de esa carpeta.",
             "Mira el aviso que sale abajo, en el centro."
@@ -812,7 +1081,13 @@
               "text": "([ordered]@{ 'Backups and Operation history' = \"$env:LOCALAPPDATA\\config-digger\\backups\"; 'Parked Entries' = \"$env:LOCALAPPDATA\\config-digger\\parked\"; 'Logs' = \"$env:LOCALAPPDATA\\config-digger\\logs\"; 'Your lists and settings' = \"$env:APPDATA\\config-digger\" }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
             }
           ],
-          "expect": "No se abre el Explorador. Sale un recuadro con la forma del paso 5.1, de fondo azul, con un borde lila claro a la izquierda, un icono «i» lila claro y el texto blanco «config-digger has kept nothing there yet.». Entra, se queda unos 4 segundos y se va como el del paso 5.1. Si las cuatro carpetas salen con True, el paso queda Bloqueado.",
+          "expect": [
+            "No se abre el Explorador.",
+            "Sale un recuadro con la forma del paso 5.1, de fondo azul.",
+            "Tiene un borde lila claro a la izquierda y un icono «i» lila claro.",
+            "Su texto, en blanco, dice «config-digger has kept nothing there yet.».",
+            "Entra, se queda unos 4 segundos y se va como el del paso 5.1."
+          ],
           "covers": ["#184", "#208"]
         },
         {
@@ -839,7 +1114,13 @@
               "text": "Set-ItemProperty \"$env:APPDATA\\config-digger\\settings.json\" -Name IsReadOnly -Value $false"
             }
           ],
-          "expect": "Sale un recuadro con la forma del paso 5.1, de fondo rojo, con un borde rosa claro a la izquierda, un icono «!» rosa claro y el texto blanco «The setting couldn't be saved: cannot write …», que acaba en un error de acceso denegado. Entra, se queda unos 4 segundos y se va como el del paso 5.1. El interruptor vuelve a como estaba.",
+          "expect": [
+            "Sale un recuadro con la forma del paso 5.1, de fondo rojo.",
+            "Tiene un borde rosa claro a la izquierda y un icono «!» rosa claro.",
+            "Su texto, en blanco, dice «The setting couldn't be saved: cannot write …» y acaba en un error de acceso denegado.",
+            "Entra, se queda unos 4 segundos y se va como el del paso 5.1.",
+            "El interruptor vuelve a como estaba."
+          ],
           "covers": ["#184", "#208"]
         },
         {
@@ -861,7 +1142,10 @@
               "text": "Start-Process ms-settings:easeofaccess-visualeffects"
             }
           ],
-          "expect": "El aviso «Copied the path.» aparece y se va con un fundido, en el mismo sitio, sin subir ni bajar.",
+          "expect": [
+            "El aviso «Copied the path.» aparece y se va con un fundido.",
+            "El aviso se queda en el mismo sitio, sin subir ni bajar."
+          ],
           "covers": ["#208"]
         }
       ]
@@ -882,7 +1166,16 @@
             "Pulsa clear, arriba a la derecha del panel."
           ],
           "commands": [],
-          "expect": "Bajo el ratón, la fila solo toma un fondo gris un poco más claro. Al pulsarla toma el mismo degradado lila con halo que la tarjeta All Agents, y lo conserva al apartar el ratón. Su carril se oscurece y la barra de color y la cuenta se leen bien sobre el degradado. La lista de Items solo muestra los de ese State. Con clear, la fila vuelve a no tener fondo y la lista muestra otra vez todos los Items.",
+          "expect": [
+            "Bajo el ratón, la fila solo toma un fondo gris un poco más claro.",
+            "Al pulsarla, toma el mismo degradado lila con halo que la tarjeta «All Agents».",
+            "La fila conserva el degradado al apartar el ratón.",
+            "Su carril se oscurece.",
+            "La barra de color y la cuenta se leen bien sobre el degradado.",
+            "La lista de Items solo muestra los de ese State.",
+            "Con clear, la fila vuelve a no tener fondo.",
+            "Con clear, la lista muestra otra vez todos los Items."
+          ],
           "covers": ["#185"]
         }
       ]
@@ -905,7 +1198,19 @@
             "Pulsa Cancel."
           ],
           "commands": [],
-          "expect": "Arriba sale PROJECT E:/cd-throwaway/project-gone en su línea, debajo FILE .claude.json y, debajo, el cambio en su recuadro, cada línea con su etiqueta gris en mayúsculas a la izquierda, en una columna: ENTRY cd-throwaway-leftover en negrita, AGENT Claude Code, KEY projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover en gris y monoespaciada, y STATE Unread → Removed al final, con espacio entre las líneas. Sobre la clave sale un tooltip con el locator entero, que empieza por E:\\cd-throwaway\\claude-code-home\\.claude.json#. Al copiarlo sale el aviso «Copied the locator.». Con la ventana estrecha, la clave pasa a la línea siguiente tras un punto o una barra, nunca en medio de una palabra.",
+          "expect": [
+            "Arriba sale «PROJECT E:/cd-throwaway/project-gone» en su línea.",
+            "Debajo sale «FILE .claude.json».",
+            "Debajo, el cambio sale en su recuadro, con una etiqueta gris en mayúsculas a la izquierda de cada línea, en una columna.",
+            "La primera línea del cambio es «ENTRY cd-throwaway-leftover», en negrita.",
+            "Luego sale «AGENT Claude Code».",
+            "Luego sale «KEY projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover», con la clave en gris y monoespaciada.",
+            "Al final sale «STATE Unread → Removed».",
+            "Hay espacio entre las líneas.",
+            "Sobre la clave sale un tooltip con el locator entero, que empieza por «E:\\cd-throwaway\\claude-code-home\\.claude.json#».",
+            "Al copiarlo sale el aviso «Copied the locator.».",
+            "Con la ventana estrecha, la clave pasa a la línea siguiente tras un punto o una barra, nunca en medio de una palabra."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -932,7 +1237,11 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "El diálogo no tiene ninguna frase que empiece por «Claude Desktop is running», ni como bloqueo ni como aviso, y su botón Disable se puede pulsar. Tras Done, cd-throwaway-desktop sale como Disabled en ese home.",
+          "expect": [
+            "El diálogo no tiene ninguna frase que empiece por «Claude Desktop is running», ni como bloqueo ni como aviso.",
+            "Su botón «Disable» se puede pulsar.",
+            "Tras Done, «cd-throwaway-desktop» sale como «Disabled» en ese home."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -957,7 +1266,14 @@
             "Lee el resultado."
           ],
           "commands": [],
-          "expect": "Tras Disable, la línea gris dice «Operation <id> · backup kept». Tras Delete backup, el resultado dice «Deleted the backup of <id>. It can no longer be undone.» y, debajo, la línea gris «Operation <id> · backup deleted · can no longer be undone», con el mismo id apuntado. No sale «backup kept», ni «Operation  ·» sin id, ni botón Undo.",
+          "expect": [
+            "Tras Disable, la línea gris dice «Operation <id> · backup kept».",
+            "Tras Delete backup, el resultado dice «Deleted the backup of <id>. It can no longer be undone.».",
+            "Debajo, la línea gris dice «Operation <id> · backup deleted · can no longer be undone», con el mismo id apuntado.",
+            "No sale «backup kept».",
+            "No sale «Operation  ·» sin id.",
+            "No sale el botón «Undo»."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -985,7 +1301,16 @@
             "Pulsa Cancel."
           ],
           "commands": [],
-          "expect": "El diálogo cabe en la ventana. What changes y Files enseñan cada uno su título y parte de lo que tienen, y al desplazarte dentro de uno, solo se mueve su contenido, bajo su título, hasta llegar abajo: en What changes, al cambio de cd-throwaway-gone-12. El título Remove 12 Entries, la línea gris del backup y los botones Cancel y Remove 12 leftovers se quedan quietos y siempre a la vista, y también el bloque Before you apply cuando sale, entre What changes y Files. Con el foco del teclado, el bloque What changes tiene un anillo violeta y se desplaza con la flecha abajo.",
+          "expect": [
+            "El diálogo cabe en la ventana.",
+            "«What changes» y «Files» enseñan cada uno su título y parte de lo que tienen.",
+            "Al desplazarte dentro de uno, solo se mueve su contenido, bajo su título.",
+            "«What changes» llega abajo, al cambio de «cd-throwaway-gone-12».",
+            "El título «Remove 12 Entries», la línea gris del backup y los botones «Cancel» y «Remove 12 leftovers» se quedan quietos y siempre a la vista.",
+            "Cuando sale, el bloque «Before you apply» también se queda quieto y a la vista, entre «What changes» y «Files».",
+            "Con el foco del teclado, el bloque «What changes» tiene un anillo violeta.",
+            "Con el foco, «What changes» se desplaza con la flecha abajo."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -1022,7 +1347,15 @@
             "Mira los botones de la fila de E:\\cd-throwaway\\claude-code-home, sin pulsarlos."
           ],
           "commands": [],
-          "expect": "Remove, Delete backup, Remove leftovers y Remove from list son rojos, con el texto blanco y fácil de leer, y el mismo rojo en los cuatro; con el ratón encima se aclaran. En cada diálogo, el botón que confirma (Remove, Delete backup, Remove 1 leftover) es de ese mismo rojo, y Cancel es gris. Disable y Undo siguen violetas, y Show leftovers y los demás botones de la fila de claude-code-home, grises.",
+          "expect": [
+            "«Remove», «Delete backup», «Remove leftovers» y «Remove from list» son rojos, con el texto blanco y fácil de leer.",
+            "Los cuatro tienen el mismo rojo.",
+            "Con el ratón encima, se aclaran.",
+            "En cada diálogo, el botón que confirma («Remove», «Delete backup», «Remove 1 leftover») es de ese mismo rojo.",
+            "En cada diálogo, «Cancel» es gris.",
+            "«Disable» y «Undo» siguen violetas.",
+            "«Show leftovers» y los demás botones de la fila de claude-code-home son grises."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -1053,7 +1386,17 @@
             "Pulsa Disable."
           ],
           "commands": [],
-          "expect": "Sobre la tarjeta, la línea dice «MCP server · Codex · …» y la Entry sale Effective. El diálogo se titula «Disable 1 Entry». El diff añade enabled = false y, en args, el valor tras --api-key sale como ••••; not-a-real-secret no sale en ninguna parte. Pasan Back up, Write y Verify, y el resultado dice «Disabled 1 Entry. Operation <id>: verified.», con los botones Undo, Open History y Done.",
+          "expect": [
+            "Sobre la tarjeta, la línea dice «MCP server · Codex · …».",
+            "La Entry sale «Effective».",
+            "El diálogo se titula «Disable 1 Entry».",
+            "El diff añade «enabled = false».",
+            "En args, el valor tras «--api-key» sale como «••••».",
+            "«not-a-real-secret» no sale en ninguna parte.",
+            "Pasan «Back up», «Write» y «Verify».",
+            "El resultado dice «Disabled 1 Entry. Operation <id>: verified.».",
+            "El resultado tiene los botones «Undo», «Open History» y «Done»."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -1073,7 +1416,14 @@
             "Cierra el Explorador."
           ],
           "commands": [],
-          "expect": "History se titula «N Operations». La fila de arriba, «Disable 1 Entry», tiene la etiqueta Applied y está elegida. El detalle tiene States changed (Effective → Disabled), Files · 1 con el mismo diff y ••••, y Backup con la ruta de la copia. El Explorador abre esa carpeta, con manifest.json y una copia de config.toml cuyo nombre empieza por 1-.",
+          "expect": [
+            "History se titula «N Operations».",
+            "La fila de arriba, «Disable 1 Entry», tiene la etiqueta «Applied» y está elegida.",
+            "El detalle tiene «States changed», con «Effective → Disabled».",
+            "El detalle tiene «Files · 1», con el mismo diff y «••••».",
+            "El detalle tiene «Backup», con la ruta de la copia.",
+            "El Explorador abre esa carpeta, con «manifest.json» y una copia de «config.toml» cuyo nombre empieza por «1-»."
+          ],
           "covers": ["#74"]
         },
         {
@@ -1088,7 +1438,14 @@
             "En la Operation original, deja el ratón sobre Can't undo."
           ],
           "commands": [],
-          "expect": "La vista previa se titula «Undo <id> \"Disable 1 Entry\"». El resultado dice «Undid <id>. Operation <id nuevo>: verified.». La lista tiene una fila nueva con la etiqueta Undo of <id>. La original dice Undone by <id nuevo> y muestra Can't undo, con el tooltip «It was undone by <id nuevo>; undo that Operation to apply it again.».",
+          "expect": [
+            "La vista previa se titula «Undo <id> \"Disable 1 Entry\"».",
+            "El resultado dice «Undid <id>. Operation <id nuevo>: verified.».",
+            "La lista tiene una fila nueva con la etiqueta «Undo of <id>».",
+            "La fila original dice «Undone by <id nuevo>».",
+            "La fila original muestra «Can't undo».",
+            "El tooltip de «Can't undo» dice «It was undone by <id nuevo>; undo that Operation to apply it again.»."
+          ],
           "covers": ["#74"]
         },
         {
@@ -1120,7 +1477,17 @@
               "text": "notepad E:\\cd-throwaway\\codex-home\\config.toml"
             }
           ],
-          "expect": "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo, y en States changed cada cambio sale una sola vez: uno que cambia igual en varios contextos sale bajo un título como «3 contexts». Al pulsar Undo no se abre ningún diálogo: en el acto, arriba del detalle y a la vista, sale un recuadro rojo Can't undo que dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …». Debajo salen la sección Backup → now con la diferencia y los botones Open backup folder y Copy path. No hay ningún botón para restaurar a la fuerza.",
+          "expect": [
+            "Antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo.",
+            "En «States changed», cada cambio sale una sola vez.",
+            "Un cambio igual en varios contextos sale bajo un título como «3 contexts».",
+            "Al pulsar Undo no se abre ningún diálogo.",
+            "En el acto, arriba del detalle y a la vista, sale un recuadro rojo «Can't undo».",
+            "El recuadro dice «mcp_servers.cd-throwaway-codex.enabled in E:\\cd-throwaway\\codex-home\\config.toml changed since the Operation, so the Undo is refused; …».",
+            "Debajo sale la sección «Backup → now», con la diferencia.",
+            "Debajo salen los botones «Open backup folder» y «Copy path».",
+            "No hay ningún botón para restaurar a la fuerza."
+          ],
           "covers": ["#74", "#218", "#220"]
         },
         {
@@ -1153,7 +1520,15 @@
               "text": "attrib -r E:\\cd-throwaway\\codex-home\\config.toml"
             }
           ],
-          "expect": "cd-throwaway-codex sale Effective por el cambio a mano del paso 11.4. El diálogo muestra Back up ✓, Write failed ✗ y Rollback ✓, un recuadro rojo «Nothing of this Operation was kept» y la causa «cannot write E:\\cd-throwaway\\codex-home\\config.toml: Acceso denegado. (os error 5)». En History, la Operation tiene la etiqueta Failed, rolled back, una sección Rollback con el archivo como never written, y Can't undo.",
+          "expect": [
+            "«cd-throwaway-codex» sale «Effective», por el cambio a mano del paso 11.4.",
+            "El diálogo muestra «Back up ✓», «Write failed ✗» y «Rollback ✓».",
+            "El diálogo muestra un recuadro rojo «Nothing of this Operation was kept».",
+            "La causa dice «cannot write E:\\cd-throwaway\\codex-home\\config.toml: Acceso denegado. (os error 5)».",
+            "En History, la Operation tiene la etiqueta «Failed, rolled back».",
+            "La Operation tiene una sección «Rollback» con el archivo como «never written».",
+            "La Operation muestra «Can't undo»."
+          ],
           "covers": ["#74"]
         },
         {
@@ -1179,7 +1554,16 @@
               "text": "notepad \"$env:LOCALAPPDATA\\config-digger\\backups\\ID\\manifest.json\""
             }
           ],
-          "expect": "El Inventario muestra una barra roja «An Operation needs manual recovery» con el botón Open History. En History, la Operation tiene la etiqueta Needs attention y un recuadro rojo «This Operation needs manual recovery». Nada más pulsar Dismiss sale abajo un aviso con una rueda que gira y el texto «Dismissing Operation <id>…», con los botones Dismiss y Delete backup del detalle apagados, que puede durar menos de un segundo. Luego sale el aviso «Dismissed Operation <id>.» y la etiqueta pasa a Rollback incomplete, dismissed. La barra roja ya no está en el Inventario.",
+          "expect": [
+            "El Inventario muestra una barra roja «An Operation needs manual recovery» con el botón «Open History».",
+            "En History, la Operation tiene la etiqueta «Needs attention».",
+            "La Operation tiene un recuadro rojo «This Operation needs manual recovery».",
+            "Nada más pulsar Dismiss sale abajo un aviso con una rueda que gira y el texto «Dismissing Operation <id>…», aunque dure menos de un segundo.",
+            "Mientras, los botones «Dismiss» y «Delete backup» del detalle están apagados.",
+            "Luego sale el aviso «Dismissed Operation <id>.».",
+            "La etiqueta pasa a «Rollback incomplete, dismissed».",
+            "La barra roja ya no está en el Inventario."
+          ],
           "covers": ["#74", "#223"]
         },
         {
@@ -1194,7 +1578,15 @@
             "Lee el resultado y el detalle de la Operation."
           ],
           "commands": [],
-          "expect": "El diálogo se titula «Delete the backup of <id> \"Disable 1 Entry\"» y avisa de que el backup se borra para siempre y de que la Operation ya no se podrá deshacer. El resultado dice «Deleted the backup of <id>. It can no longer be undone.», con la línea «Operation <id> · backup deleted · can no longer be undone». La etiqueta pasa a Applied, backup deleted, not undoable. Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.» y el botón Delete backup ya no está.",
+          "expect": [
+            "El diálogo se titula «Delete the backup of <id> \"Disable 1 Entry\"».",
+            "El diálogo avisa de que el backup se borra para siempre y de que la Operation ya no se podrá deshacer.",
+            "El resultado dice «Deleted the backup of <id>. It can no longer be undone.».",
+            "Debajo sale la línea «Operation <id> · backup deleted · can no longer be undone».",
+            "La etiqueta pasa a «Applied, backup deleted, not undoable».",
+            "Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.».",
+            "El botón «Delete backup» ya no está."
+          ],
           "covers": ["#74", "#189"]
         },
         {
@@ -1222,7 +1614,17 @@
             "Mira enseguida la parte de abajo de la pantalla y los botones del detalle."
           ],
           "commands": [],
-          "expect": "Al pulsar Disable, el diálogo se titula «Preparing the preview…» y muestra un aviso con una rueda que gira y el texto «Reading the files this action touches…», sobre filas grises que laten, hasta que sale la vista previa. Tras Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». En la cabecera de la tarjeta, junto a su State, sale una rueda pequeña con «Reading…», y los botones Disable y Remove se ven apagados, hasta que la tarjeta dice Disabled y ofrece Enable. En History, tras Done sale abajo el aviso de la rueda con «Reading History again…», con los botones Delete backup y Undo del detalle apagados, hasta que la Operation dice Undone by <id nuevo> y muestra Can't undo. Cada aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la pantalla cambie.",
+          "expect": [
+            "Al pulsar Disable, el diálogo se titula «Preparing the preview…», aunque dure menos de un segundo.",
+            "El diálogo muestra un aviso con una rueda que gira y el texto «Reading the files this action touches…», sobre filas grises que laten, hasta que sale la vista previa.",
+            "Tras Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…», aunque dure menos de un segundo.",
+            "En la cabecera de la tarjeta, junto a su State, sale una rueda pequeña con «Reading…».",
+            "Mientras, los botones «Disable» y «Remove» de la tarjeta se ven apagados.",
+            "Luego la tarjeta dice «Disabled» y ofrece «Enable».",
+            "En History, tras Done sale abajo el aviso de la rueda con «Reading History again…», aunque dure menos de un segundo.",
+            "Mientras, los botones «Delete backup» y «Undo» del detalle se ven apagados.",
+            "Luego la Operation dice «Undone by <id nuevo>» y muestra «Can't undo»."
+          ],
           "covers": ["#223"]
         },
         {
@@ -1246,7 +1648,12 @@
             "Mira enseguida la parte de abajo de la pantalla y la tarjeta de cd-throwaway-codex."
           ],
           "commands": [],
-          "expect": "Tras el último Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…». La tarjeta tiene junto a su State una rueda pequeña con «Reading…», y sus botones Enable y Remove se ven apagados, hasta que la tarjeta dice Effective y ofrece Disable. El aviso de la rueda puede durar menos de un segundo; lo que cuenta es que sale antes de que la tarjeta cambie.",
+          "expect": [
+            "Tras el último Done sale abajo un aviso con una rueda que gira y el texto «Reading the inventory again…», aunque dure menos de un segundo.",
+            "La tarjeta tiene junto a su State una rueda pequeña con «Reading…».",
+            "Mientras, sus botones «Enable» y «Remove» se ven apagados.",
+            "Luego la tarjeta dice «Effective» y ofrece «Disable»."
+          ],
           "covers": ["#223"]
         },
         {
@@ -1271,7 +1678,20 @@
             "En el aviso de abajo que empieza por «Enabled 1 Entry», pulsa ✕."
           ],
           "commands": [],
-          "expect": "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora. Su fondo morado destaca, más claro que el panel y las tarjetas, con un borde lila claro a la izquierda y el texto blanco. Undo es un botón con borde y letras lila claro, y ✕ es lila claro sin fondo; con el ratón encima, los dos se rellenan de lila con letras moradas. Con el teclado, el foco en Undo y en ✕ se ve con un anillo blanco. Entra subiendo un poco mientras aparece, en un instante. Con el ratón encima no se va. Unos 10 segundos después de apartar el ratón se va bajando un poco mientras se desvanece. Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe.",
+          "expect": [
+            "El aviso tiene las esquinas redondeadas de los avisos del paso 5.1, no de píldora.",
+            "Su fondo morado destaca, más claro que el panel y las tarjetas.",
+            "Tiene un borde lila claro a la izquierda.",
+            "Su texto es blanco.",
+            "«Undo» es un botón con borde y letras lila claro.",
+            "«✕» es lila claro, sin fondo.",
+            "Con el ratón encima, «Undo» y «✕» se rellenan de lila con letras moradas.",
+            "Con el teclado, el foco en «Undo» y en «✕» se ve con un anillo blanco.",
+            "Entra subiendo un poco mientras aparece, en un instante.",
+            "Con el ratón encima no se va.",
+            "Unos 10 segundos después de apartar el ratón, se va bajando un poco mientras se desvanece.",
+            "Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe."
+          ],
           "covers": ["#208"]
         },
         {
@@ -1301,7 +1721,20 @@
             "Pulsa Clear filter."
           ],
           "commands": [],
-          "expect": "Con Enable, el título dice «M of N Operations», con M menor que N, y solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10. Con Undo, solo salen filas cuyo título empieza por Undo, con la etiqueta Undo of <id>. Con Undone, solo filas cuya etiqueta incluye «undone by <id>», con mayúscula o sin ella. Con Failed, solo filas con la etiqueta Failed, rolled back o Rollback incomplete, dismissed, entre ellas la del paso 11.5. Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó. Con CODEX, cada fila elegida tiene ENTRY cd-throwaway-codex en States changed, y no sale el Disable de cd-throwaway-user del paso 7.3. Con cd-throwaway-nada, la lista dice «No Operation matches the filter.» con el botón Clear filter, y el título «0 of N Operations». Tras Clear filter, la caja está vacía, los desplegables dicen Any verb y Any status, y el título vuelve a «N Operations».",
+          "expect": [
+            "Con Enable, el título dice «M of N Operations», con M menor que N.",
+            "Con Enable, solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10.",
+            "Con Undo, solo salen filas cuyo título empieza por «Undo», con la etiqueta «Undo of <id>».",
+            "Con Undone, solo salen filas cuya etiqueta incluye «undone by <id>», con mayúscula o sin ella.",
+            "Con Failed, solo salen filas con la etiqueta «Failed, rolled back» o «Rollback incomplete, dismissed», entre ellas la del paso 11.5.",
+            "Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó.",
+            "Con CODEX, cada fila elegida tiene «ENTRY cd-throwaway-codex» en «States changed».",
+            "Con CODEX, no sale el Disable de cd-throwaway-user del paso 7.3.",
+            "Con cd-throwaway-nada, la lista dice «No Operation matches the filter.», con el botón «Clear filter».",
+            "Con cd-throwaway-nada, el título dice «0 of N Operations».",
+            "Tras Clear filter, la caja está vacía y los desplegables dicen «Any verb» y «Any status».",
+            "Tras Clear filter, el título vuelve a «N Operations»."
+          ],
           "covers": ["#228"]
         }
       ]
@@ -1339,7 +1772,12 @@
               "text": "$log = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\logs\\config-digger-app.*.log\" | Sort-Object LastWriteTime | Select-Object -Last 1; $lines = @(Get-Content $log.FullName); $start = ($lines | Select-String 'app started' | Select-Object -Last 1).LineNumber; $lines[($start - 1)..($lines.Count - 1)] | Select-String 'app started|scan started|scan finished|inventory read'"
             }
           ],
-          "expect": "La primera vez, la orden imprime cuatro líneas INFO, en este orden: «app started», «scan started», «scan finished elapsed_ms=<n> paths=<n>» e «inventory read». La segunda vez empieza con esas cuatro líneas y sigue con exactamente dos parejas «scan started» / «scan finished elapsed_ms=<n> paths=<n>» sin «inventory read» detrás: los dos escaneos de la preview de Disable. Si sale alguna pareja más, la sigue un «inventory read»: es una lectura por volver a la ventana.",
+          "expect": [
+            "La primera vez, la orden imprime cuatro líneas INFO, en este orden: «app started», «scan started», «scan finished elapsed_ms=<n> paths=<n>» e «inventory read».",
+            "La segunda vez empieza con esas cuatro líneas.",
+            "Después siguen exactamente dos parejas «scan started» / «scan finished elapsed_ms=<n> paths=<n>» sin «inventory read» detrás: los dos escaneos de la preview de Disable.",
+            "Si sale alguna pareja más, la sigue un «inventory read»: es una lectura por volver a la ventana."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -1372,7 +1810,10 @@
               "text": "$log = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\logs\\config-digger-app.*.log\" | Sort-Object LastWriteTime | Select-Object -Last 1; $lines = @(Get-Content $log.FullName); $start = ($lines | Select-String 'app started' | Select-Object -Last 1).LineNumber; $lines[($start - 1)..($lines.Count - 1)] | Select-String 'scan finished'"
             }
           ],
-          "expect": "La orden imprime al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»: la del arranque y las dos de la preview del Disable. En cada una, elapsed_ms es menor que 5000.",
+          "expect": [
+            "La orden imprime al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»: la del arranque y las dos de la preview del Disable.",
+            "En cada una, «elapsed_ms» es menor que 5000."
+          ],
           "setup": {
             "label": "Restablecer los datos de prueba",
             "shell": "powershell",
@@ -1396,10 +1837,19 @@
             "Pulsa el enlace Version and Check now are in About →.",
             "Mira la versión y la línea Last checked.",
             "Pulsa Check now.",
-            "Lee el mensaje que sale en Updates."
+            "Lee el mensaje que sale en Updates.",
+            "Si el mensaje no es ninguno de los del resultado esperado, marca KO y copia el texto exacto en las notas."
           ],
           "commands": [],
-          "expect": "El interruptor Check for updates on startup está apagado, con el texto «Off by default. While it is off, config-digger makes no network call unless you click Check now in About.». About muestra la versión del título de esta página y «Last checked: never.». Con una release candidate, Check now muestra un error que empieza por «The update check failed:», con esas palabras una sola vez, y sigue con la causa. Con la versión final dice «config-digger <versión> is the latest version.». Si sale otra cosa, marca KO y copia el texto exacto en las notas.",
+          "expect": [
+            "El interruptor «Check for updates on startup» está apagado.",
+            "Junto al interruptor sale «Off by default. While it is off, config-digger makes no network call unless you click Check now in About.».",
+            "About muestra la versión del título de esta página.",
+            "About dice «Last checked: never.».",
+            "Con una release candidate, Check now muestra un error que empieza por «The update check failed:» y sigue con la causa.",
+            "Esas palabras salen una sola vez.",
+            "Con la versión final, Check now dice «config-digger <versión> is the latest version.»."
+          ],
           "covers": ["#79"]
         },
         {
@@ -1428,7 +1878,11 @@
               "text": "config-digger --version; Get-Command config-digger | Select-Object Source"
             }
           ],
-          "expect": "Con una release candidate, el paso queda Bloqueado con su motivo. Con la versión final, About muestra la versión del título tras reiniciar. La orden imprime «config-digger <esa versión>» y C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe. History conserva las Operations de este recorrido.",
+          "expect": [
+            "Con la versión final, About muestra la versión del título tras reiniciar.",
+            "La orden imprime «config-digger <esa versión>» y «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe».",
+            "History conserva las Operations de este recorrido."
+          ],
           "covers": ["#79"]
         }
       ]
@@ -1452,7 +1906,11 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "Da igual que Claude Desktop esté abierto: el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running». El resultado dice «Disabled 1 Entry. Operation <id>: verified.». Tras Done, esa cd-throwaway-desktop sale como Disabled, porque está aparcada.",
+          "expect": [
+            "Esté o no abierto Claude Desktop, el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running».",
+            "El resultado dice «Disabled 1 Entry. Operation <id>: verified.».",
+            "Tras Done, cd-throwaway-desktop sale como «Disabled», porque está aparcada."
+          ],
           "covers": ["#78", "#188"]
         },
         {
@@ -1485,7 +1943,14 @@
               "text": "Get-Command config-digger | Select-Object Source"
             }
           ],
-          "expect": "La primera orden imprime False (la app ya no está), True (la Entry aparcada sigue) y un número mayor que 0 (los backups siguen). La segunda da un error en rojo: config-digger no se reconoce, porque el desinstalador lo quitó del PATH. Tras reinstalar, History tiene todas las Operations del recorrido y cd-throwaway-desktop sigue Disabled.",
+          "expect": [
+            "La primera línea de la primera orden dice «False»: la app ya no está.",
+            "La segunda línea dice «True»: la Entry aparcada sigue.",
+            "La tercera línea es un número mayor que 0: los backups siguen.",
+            "La segunda da un error en rojo: config-digger no se reconoce, porque el desinstalador lo quitó del PATH.",
+            "Tras reinstalar, History tiene todas las Operations del recorrido.",
+            "Tras reinstalar, cd-throwaway-desktop sigue «Disabled»."
+          ],
           "covers": ["#78"]
         },
         {
@@ -1509,7 +1974,15 @@
               "text": "Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; Test-Path \"$env:LOCALAPPDATA\\config-digger\\parked\\manifest.json\"; (Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\backups\").Count"
             }
           ],
-          "expect": "El aviso dice «Deleting config-digger data deletes every backup, and with them the Undo history.» y luego «It also deletes these parked Entries, which the uninstaller never restores. To keep one, cancel and Enable it in config-digger first:», con una línea cd-throwaway-desktop (Claude Desktop) por cada vez que lo aparcaste: dos si hiciste el paso 7.2. Acaba con «Click OK to delete the data, or Cancel to keep it and uninstall only the app.», y Cancelar es el botón por defecto. La desinstalación termina igual, y la orden imprime False, True y un número mayor que 0.",
+          "expect": [
+            "El aviso dice «Deleting config-digger data deletes every backup, and with them the Undo history.».",
+            "Luego dice «It also deletes these parked Entries, which the uninstaller never restores. To keep one, cancel and Enable it in config-digger first:».",
+            "Sale una línea «cd-throwaway-desktop (Claude Desktop)» por cada vez que lo aparcaste: dos si hiciste el paso 7.2.",
+            "El aviso acaba con «Click OK to delete the data, or Cancel to keep it and uninstall only the app.».",
+            "Cancelar es el botón por defecto.",
+            "La desinstalación termina igual.",
+            "La orden imprime otra vez lo mismo que en el paso 13.2: «False», «True» y un número mayor que 0."
+          ],
           "covers": ["#78"]
         },
         {
@@ -1532,7 +2005,9 @@
               "text": "([ordered]@{ 'La app' = \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; 'Backups, History y Entries aparcados' = \"$env:LOCALAPPDATA\\config-digger\"; 'Listas y ajustes' = \"$env:APPDATA\\config-digger\"; 'Elección de PATH' = 'HKCU:\\Software\\samfaina\\config-digger' }).GetEnumerator() | ForEach-Object { '{0}: {1}' -f $_.Key, (Test-Path $_.Value) }"
             }
           ],
-          "expect": "Las cuatro líneas salen con False: la app, las dos carpetas de datos y la elección de PATH ya no están.",
+          "expect": [
+            "Las cuatro líneas salen con «False»: la app, las dos carpetas de datos y la elección de PATH ya no están."
+          ],
           "covers": ["#78"]
         },
         {
@@ -1555,7 +2030,9 @@
               "text": "Test-Path E:\\cd-throwaway"
             }
           ],
-          "expect": "La segunda orden imprime False.",
+          "expect": [
+            "La segunda orden imprime «False»."
+          ],
           "covers": ["#190"]
         }
       ]

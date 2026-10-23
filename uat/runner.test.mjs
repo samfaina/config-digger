@@ -138,6 +138,22 @@ test("the export says so when no step has notes", () => {
   assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso con notas.");
 });
 
+test("a check sets its exact UI text apart from the words around it", () => {
+  assert.deepEqual(Uat.checkParts("Sale el aviso «Copied the path.» y luego «Done»."), [
+    { text: "Sale el aviso ", ui: false },
+    { text: "Copied the path.", ui: true },
+    { text: " y luego ", ui: false },
+    { text: "Done", ui: true },
+    { text: ".", ui: false },
+  ]);
+});
+
+test("a check without exact UI text is one plain part", () => {
+  assert.deepEqual(Uat.checkParts("El diálogo cabe en la ventana."), [
+    { text: "El diálogo cabe en la ventana.", ui: false },
+  ]);
+});
+
 /** The words of the page's element with this id, as its markup or the
  * render script's `el(tag, { …, id }, words)` writes them. */
 function pageText(id) {
@@ -153,6 +169,10 @@ test("the notes hint says notes on an OK step are read too", () => {
     pageText("notes-hint"),
     "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK.",
   );
+});
+
+test("the checklist says its ticks are only a guide", () => {
+  assert.equal(pageText("checks-hint"), "Marca cada punto en cuanto lo veas. Las marcas solo te guían: no se guardan.");
 });
 
 test("the Export button is named for the steps with notes it copies", () => {

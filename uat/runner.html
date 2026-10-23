@@ -69,7 +69,7 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
-button:focus-visible, textarea:focus-visible, .step-link:focus-visible {
+button:focus-visible, textarea:focus-visible, input:focus-visible, .step-link:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -131,6 +131,20 @@ pre {
 }
 .setup { border-left: 3px solid var(--blocked); padding-left: 12px; }
 .expect { border-left: 3px solid var(--accent); padding-left: 12px; }
+/* The checks: a box to tick and one thing to see each. A ticked check
+   dims, so the ones left stand out. */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.checks input { margin: 0; width: 16px; height: 16px; accent-color: var(--ok); cursor: pointer; }
+.checks label { font-weight: 400; cursor: pointer; }
+.checks input:checked + label { color: var(--muted); }
+/* Exact UI text: what the tester must read on screen, word for word. */
+samp {
+  font: 0.85em/1.5 var(--font-mono); background: var(--code-bg); border-radius: 4px;
+  /* The outline sets the box apart where --code-bg sits close to the
+     surface, as in dark. */
+  box-shadow: inset 0 0 0 1px var(--line); padding: 1px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+}
 .verdict { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
 .verdict-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .verdict-buttons button { min-width: 96px; font-weight: 600; }
@@ -264,7 +278,17 @@ const Uat = (() => {
     return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
   }
 
-  return { STATUSES, result, choose, look, steps, progress, nextStep, exportMarkdown };
+  /** A check of a step's `expect` in parts, each `{ text, ui }`: `ui` is
+   * true for the exact UI text the plan writes between « and », false for
+   * the words around it. */
+  function checkParts(check) {
+    return check
+      .split(/«([^»]*)»/)
+      .map((text, i) => ({ text, ui: i % 2 === 1 }))
+      .filter((part) => part.ui || part.text);
+  }
+
+  return { STATUSES, result, choose, look, steps, progress, nextStep, exportMarkdown, checkParts };
 })();
 </script>
 <script>
@@ -282,6 +306,8 @@ const Uat = (() => {
     // A KO or Blocked picked on the current step before its notes: chosen,
     // not stored yet.
     pending: null,
+    // The checks of the current step ticked so far, by their place.
+    ticked: new Set(),
   };
 
   // The step on screen, so a reload comes back to it. A convenience only:
@@ -434,6 +460,19 @@ const Uat = (() => {
       else button.disabled = true;
       return button;
     };
+    // One thing to see per check, its exact UI text set apart. A tick only
+    // guides the eye: it lasts while the step is on screen.
+    const check = (text, i) => {
+      const box = el("input", { type: "checkbox", id: `check-${i}` });
+      box.checked = state.ticked.has(i);
+      box.addEventListener("change", () => {
+        if (box.checked) state.ticked.add(i);
+        else state.ticked.delete(i);
+      });
+      return el("li", {}, box,
+        el("label", { for: `check-${i}` }, ...Uat.checkParts(text).map((part) =>
+          part.ui ? el("samp", {}, part.text) : part.text)));
+    };
     const savedLine = saved
       ? `Guardado: ${Uat.STATUSES[saved.status].label} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
       : "Sin resultado todavía.";
@@ -451,7 +490,9 @@ const Uat = (() => {
       step.commands.length
         ? el("div", { class: "block" }, el("h3", {}, "Comandos"), ...step.commands.map(commandBlock))
         : null,
-      el("div", { class: "block expect" }, el("h3", {}, "Resultado esperado"), el("p", {}, step.expect)),
+      el("div", { class: "block expect" }, el("h3", {}, "Resultado esperado"),
+        el("ul", { class: "checks" }, ...step.expect.map(check)),
+        el("p", { class: "hint", id: "checks-hint" }, "Marca cada punto en cuanto lo veas. Las marcas solo te guían: no se guardan.")),
       el("div", { class: "verdict" },
         el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
         el("label", { for: "notes" }, "Notas"),
@@ -480,6 +521,7 @@ const Uat = (() => {
     state.current = id;
     state.problem = "";
     state.pending = null;
+    state.ticked = new Set();
     remember(id);
     render();
     $("step").scrollIntoView({ block: "nearest" });
