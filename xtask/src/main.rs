@@ -28,6 +28,12 @@
 //! - `updater <tag> <dir>`: writes the updater manifest `<dir>/latest.json`
 //!   from the signature of the tag's installer, `<dir>/<installer>.sig`, and
 //!   fails when the signature is missing or empty.
+//! - `signature <tag> <dir>`: checks the updater's signature of the tag's
+//!   installer, both `<dir>/<installer>.sig` and the one in
+//!   `<dir>/latest.json`, as the app's updater checks it: against the
+//!   `pubkey` of the app's `tauri.conf.json`, and, when its trusted comment
+//!   carries a version, for the version `latest.json` announces. It writes
+//!   nothing.
 //! - `assets <tag> <dir>`: fails unless `<dir>` holds every asset the tag's
 //!   release publishes, the updater's signature and manifest included.
 //! - `vcruntime <exe>`: checks that the executable imports no DLL of the
@@ -38,6 +44,7 @@
 mod fixtures;
 mod installer;
 mod release;
+mod signature;
 mod vcruntime;
 
 use std::path::{Path, PathBuf};
@@ -92,13 +99,14 @@ fn main() -> ExitCode {
             return write_winget(tag, Path::new(installer), Path::new(dir));
         }
         ["updater", tag, dir] => return write_updater_manifest(tag, Path::new(dir)),
+        ["signature", tag, dir] => return check_signature(tag, Path::new(dir)),
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         ["vcruntime", exe] => return check_vcruntime(Path::new(exe)),
         _ => {
             eprintln!(
                 "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures|fake-backend>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
-                        cargo xtask updater <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
+                        cargo xtask updater <tag> <dir> | signature <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
             );
             return ExitCode::from(2);
         }
@@ -149,6 +157,9 @@ fn list_unverified() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The app's Tauri config, relative to the repository root.
+const TAURI_CONF: &str = "crates/config-digger-app/tauri.conf.json";
+
 /// The installer's install folder, as CI checks it.
 fn check_installer() -> ExitCode {
     let read = |path: &str| {
@@ -158,7 +169,7 @@ fn check_installer() -> ExitCode {
         })
     };
     let files = read("crates/config-digger-app/installer/hooks.nsh")
-        .and_then(|hooks| Ok((hooks, read("crates/config-digger-app/tauri.conf.json")?)));
+        .and_then(|hooks| Ok((hooks, read(TAURI_CONF)?)));
     match files {
         Ok((hooks, tauri_conf)) => report(
             &installer::problems(&hooks, &tauri_conf),
@@ -362,6 +373,39 @@ fn write_updater_manifest(tag: &str, dir: &Path) -> ExitCode {
             eprintln!("{error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The updater's signature of the tag's installer in `dir`, as the release
+/// checks it before the release exists.
+fn check_signature(tag: &str, dir: &Path) -> ExitCode {
+    let release = match checked_release(tag) {
+        Ok(release) => release,
+        Err(code) => return code,
+    };
+    let failed = |path: &Path, error: std::io::Error| {
+        eprintln!("cannot read {}: {error}", path.display());
+        ExitCode::FAILURE
+    };
+    let text = |path: &Path| std::fs::read_to_string(path).map_err(|error| failed(path, error));
+    let installer = dir.join(release::installer_name(&release.version));
+    let files = text(&repo_file(TAURI_CONF)).and_then(|conf| {
+        Ok((
+            conf,
+            std::fs::read(&installer).map_err(|error| failed(&installer, error))?,
+            text(&dir.join(release::signature_name(&release.version)))?,
+            text(&dir.join(release::UPDATER_MANIFEST))?,
+        ))
+    });
+    match files {
+        Ok((tauri_conf, bytes, sig, manifest)) => report(
+            &signature::problems(&tauri_conf, &bytes, &sig, &manifest),
+            &format!(
+                "the updater's signature of {} verifies against the app's public key",
+                installer.display()
+            ),
+        ),
+        Err(code) => code,
     }
 }
 
