@@ -5,7 +5,9 @@
 //! - no step asks for a window smaller than the app's smallest, the
 //!   `minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`;
 //! - a step opens the Agent homes tab before it presses Add Agent home, which
-//!   is only there.
+//!   is only there;
+//! - each check of a step's `expect` is one sentence, and its exact UI text
+//!   is between a « and a » that pair up.
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -59,9 +61,37 @@ fn window_sizes(line: &str) -> Vec<(u64, u64)> {
         .collect()
 }
 
+/// Whether `check` holds more than one sentence. Exact UI text, between «
+/// and », is one thing to see whatever its stops.
+fn more_than_one_sentence(check: &str) -> bool {
+    let mut quoted = false;
+    let mut chars = check.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '«' => quoted = true,
+            '»' => quoted = false,
+            '.' | ';' | '?' | '!' if !quoted => {
+                if chars.peek().is_some_and(|next| next.is_whitespace()) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Whether each « in `check` is closed by a », with no » before its « and
+/// no « inside another: the runner sets apart the text between them.
+fn ui_text_pairs_up(check: &str) -> bool {
+    let marks: Vec<char> = check.chars().filter(|c| matches!(c, '«' | '»')).collect();
+    marks.chunks(2).all(|pair| pair == ['«', '»'])
+}
+
 /// What is wrong with `plan`: the schema's errors, each with its place in
-/// the plan, then every step id used twice, then every window too small and
-/// every Add Agent home pressed outside the Agent homes tab.
+/// the plan, then every step id used twice, then every window too small,
+/// every Add Agent home pressed outside the Agent homes tab, and every check
+/// whose « and » do not pair up or that holds more than one sentence.
 fn problems(plan: &Value) -> Vec<String> {
     let schema = read_json("uat/plan.schema.json");
     let validator = jsonschema::validator_for(&schema).unwrap();
@@ -96,6 +126,20 @@ fn problems(plan: &Value) -> Vec<String> {
                     ));
                 }
             }
+            // One thing to see per check, so the tester ticks it at a glance.
+            for check in step["expect"].as_array().into_iter().flatten() {
+                let check = check.as_str().unwrap_or("");
+                if !ui_text_pairs_up(check) {
+                    problems.push(format!(
+                        "step {id} has a check whose « and » do not pair up: {check:?}"
+                    ));
+                }
+                if more_than_one_sentence(check) {
+                    problems.push(format!(
+                        "step {id} has a check of more than one sentence: {check:?}"
+                    ));
+                }
+            }
         }
     }
     problems
@@ -119,6 +163,48 @@ fn a_step_without_what_to_expect_fails() {
         [format!(
             r#"/sections/{at}/steps/0: "expect" is a required property"#
         )]
+    );
+}
+
+#[test]
+fn what_to_expect_written_as_a_paragraph_fails() {
+    let mut plan = plan();
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]["expect"] =
+        "El script termina sin errores. Lista los homes.".into();
+    assert_eq!(
+        problems(&plan),
+        [format!(
+            r#"/sections/{at}/steps/0/expect: "El script termina sin errores. Lista los homes." is not of type "array""#
+        )]
+    );
+}
+
+#[test]
+fn a_check_of_two_sentences_fails() {
+    let mut plan = plan();
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]["expect"]
+        .as_array_mut()
+        .unwrap()
+        .push("Sale el aviso «Hid it. Picking it still evaluates it.». El Project se va.".into());
+    assert_eq!(
+        problems(&plan),
+        [r#"step 1.1 has a check of more than one sentence: "Sale el aviso «Hid it. Picking it still evaluates it.». El Project se va.""#]
+    );
+}
+
+#[test]
+fn exact_ui_text_left_open_fails() {
+    let mut plan = plan();
+    let at = section_1(&plan);
+    plan["sections"][at]["steps"][0]["expect"]
+        .as_array_mut()
+        .unwrap()
+        .push("Sale el aviso «Copied the path.".into());
+    assert_eq!(
+        problems(&plan),
+        [r#"step 1.1 has a check whose « and » do not pair up: "Sale el aviso «Copied the path.""#]
     );
 }
 

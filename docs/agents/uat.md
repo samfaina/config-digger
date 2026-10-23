@@ -18,7 +18,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 - `title` and `goal`. The goal says what the step proves.
 - `instructions`: one action per line.
 - `commands`: `{label, shell, text}`, where `shell` is `powershell`, `cmd` or `bash` and `text` is pasted as is. It may be empty.
-- `expect`: what the tester must see for OK.
+- `expect`: what the tester must see for OK, as a list of short checks: one thing to see per check, in one sentence. Exact UI text, such as a message, a title, a label or a path, goes between « and », as in `Sale el aviso «Copied the path.».` The runner shows the checks as a checklist, with that text set apart.
 - `setup` (optional): a command, `{label, shell, text}`, that resets the data before the step. The runner shows it first, under "Antes de empezar".
 - `covers`: the issues or spec sections the step checks, such as `"#75"` or `"#38 story 12"`.
 
@@ -29,10 +29,10 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 1. Add a step for each acceptance criterion a person must see in the running app or installer. Code that tests already cover needs no step. The look of a UI change is checked only here, never by screenshots in the PR (see `docs/agents/issue-tracker.md`).
 2. Put it in the section of the screen or flow it walks. Start a new section when none fits.
 3. Give it the next free number in its section. **Never renumber a step.** Results and tickets point at step ids, so a step keeps its id when steps are added, moved or removed around it. A removed step's id is not reused. The order of the steps in the file is the order of the walk, so `3.7` may come before `3.4`. Sections work the same way: a new section takes the next free number wherever it goes in the walk, so section 9 (Instalar) comes before section 1 (Datos de prueba).
-4. Write one action per instruction line, and an `expect` the tester can check by looking: names, counts, the exact message.
+4. Write one action per instruction line, and an `expect` the tester can check by looking: names, counts, the exact message. Give each thing to see a check of its own, and put the exact UI text between « and ».
 5. Use only throwaway data: `cd-throwaway-*` Entries and the fake Secret `not-a-real-secret`. When a step needs data the setup script does not create yet, add it to the script, and use `setup` when the step needs it fresh.
 6. List the issue in `covers`.
-7. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), and that a step opens the Agent homes tab before it presses Add Agent home.
+7. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), that a step opens the Agent homes tab before it presses Add Agent home, and that each check is one sentence whose « and » pair up.
 
 When a change to the app makes a step wrong, change the step's text and keep its id.
 
@@ -68,7 +68,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`, and give the tester the link. Post it on the walk's issue too.
 
-The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too and go in before OK is pressed: pressing OK saves them, and pressing it again saves notes added after. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
+The tester works in the page. The checks under "Resultado esperado" have boxes to tick while looking; a tick only guides the eye, is never stored and is gone when the step changes. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too and go in before OK is pressed: pressing OK saves them, and pressing it again saves notes added after. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
 
 ## Turning a run's results into tickets
 
