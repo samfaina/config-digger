@@ -189,6 +189,23 @@ locator: string; project: string | null } |
 /**  The deletion of the backup of the Operation `operation` in History. */
 { kind: "delete_backup"; operation: string };
 
+/**
+ *  A warning or block laid out for the app's action dialog, rendered by the
+ *  core: what to do on a line of its own, then why, then the paths it is
+ *  about, each on a line of its own.
+ */
+export type Advice = {
+	/**  What to do, such as "Close Claude Code first to be safe." */
+	todo: string,
+	/**
+	 *  Why, the paths left out, such as "Claude Code is running and
+	 *  rewrites this location while it runs: …".
+	 */
+	why: string,
+	/**  The locations `why` is about. */
+	paths: string[],
+};
+
 /**  A loaded Agent definition and the Agent homes listed for it. */
 export type Agent = {
 	id: string,
@@ -296,6 +313,8 @@ export type Block = {
 	code: BlockCode,
 	/**  The cause and what to do about it, as a sentence rendered by the core. */
 	sentence: string,
+	/**  The same block laid out for the app. */
+	advice: Advice[],
 };
 
 export type BlockCode = 
@@ -1808,6 +1827,8 @@ export type Warning = {
 	class: WarningClass,
 	/**  The risk as a sentence, rendered by the core. */
 	sentence: string,
+	/**  The same risk laid out for the app, one per cause it covers. */
+	advice: Advice[],
 };
 
 /**  Each class of warning is acknowledged on its own. */

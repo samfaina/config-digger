@@ -4,8 +4,8 @@
 //! recovery.
 
 use config_digger_core::api::{
-    Action, Context, Core, DiffUnavailable, Error, ErrorCode, Outcome, ScanOptions, Targets,
-    WarningClass,
+    Action, Advice, Context, Core, DiffUnavailable, Error, ErrorCode, Outcome, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use std::path::PathBuf;
@@ -329,6 +329,24 @@ fn deleting_a_backup_while_another_operation_writes_fails() {
 }
 
 // The backup of an Operation that needs attention.
+
+#[test]
+fn the_needs_attention_warning_says_first_to_copy_from_the_backup() {
+    let fs = rollback_incomplete();
+    let operation = needs_attention(&fs);
+
+    let plan = core(&fs).plan_delete_backup(&operation).unwrap();
+
+    let warning = &plan.warnings()[0];
+    assert_eq!(
+        warning.advice,
+        [Advice {
+            todo: "Copy what you need from this backup before deleting it.".to_owned(),
+            why: warning.sentence.clone(),
+            paths: Vec::new(),
+        }]
+    );
+}
 
 #[test]
 fn the_backup_of_an_operation_that_needs_attention_needs_its_own_check() {

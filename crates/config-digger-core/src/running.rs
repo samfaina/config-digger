@@ -188,6 +188,7 @@ pub(crate) fn check<'a>(
 
     let mut blocks = Vec::new();
     let mut sentences = Vec::new();
+    let mut advice = Vec::new();
     let mut hints = Vec::new();
     for reader in readers.values() {
         let sqlite = reader.paths(StoreClass::Sqlite);
@@ -195,6 +196,10 @@ pub(crate) fn check<'a>(
             blocks.push(Block {
                 code: BlockCode::RunningAgentSqlite,
                 sentence: explain::running_agent_sqlite(reader.agent_name, &sqlite),
+                advice: vec![explain::running_agent_sqlite_advice(
+                    reader.agent_name,
+                    &sqlite,
+                )],
             });
         }
         if !reader.parking.is_empty() {
@@ -202,6 +207,10 @@ pub(crate) fn check<'a>(
             blocks.push(Block {
                 code: BlockCode::RunningAgentParking,
                 sentence: explain::running_agent_parking(reader.agent_name, &parking),
+                advice: vec![explain::running_agent_parking_advice(
+                    reader.agent_name,
+                    &parking,
+                )],
             });
         }
         if !reader.installed {
@@ -213,10 +222,18 @@ pub(crate) fn check<'a>(
                 reader.agent_name,
                 &rewritten,
             ));
+            advice.push(explain::running_agent_rewrites_advice(
+                reader.agent_name,
+                &rewritten,
+            ));
         }
         let plain = reader.paths(StoreClass::Plain);
         if !plain.is_empty() {
             sentences.push(explain::running_agent_reads(reader.agent_name, &plain));
+            advice.push(explain::running_agent_reads_advice(
+                reader.agent_name,
+                &plain,
+            ));
         }
         hints.push(explain::restart_hint(reader.agent_name));
         for path in rewritten {
@@ -233,6 +250,7 @@ pub(crate) fn check<'a>(
         warning: (!sentences.is_empty()).then(|| Warning {
             class: WarningClass::RunningAgent,
             sentence: sentences.join(" "),
+            advice,
         }),
         hints,
     }

@@ -3,8 +3,8 @@
 //! and the Disable mechanism a versioned target rules out.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, Entry, ErrorCode, Inventory, ScanOptions, Targets,
-    WarningClass,
+    Action, Advice, Context, Core, DisableOption, Entry, ErrorCode, Inventory, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeGitIndex};
 use std::path::PathBuf;
@@ -147,6 +147,35 @@ fn a_remove_in_a_versioned_file_warns_that_it_shows_in_the_git_diff() {
     );
     assert!(sentence.contains("git diff"), "{sentence}");
     assert!(plan.preview().files[0].git_versioned);
+}
+
+#[test]
+fn the_git_versioned_warning_says_first_to_check_the_git_diff_and_gives_the_file_apart() {
+    let fs = fixture();
+    let core = core(&fs, &[mcp_json()]);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+
+    let plan = core
+        .plan(
+            &snapshot,
+            &in_project(),
+            Action::Remove,
+            &targets(&["linear"]),
+        )
+        .unwrap();
+
+    assert_eq!(
+        plan.warnings()[0].advice,
+        [Advice {
+            todo: "Check the git diff before you commit.".to_owned(),
+            why: "This location is git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it.".to_owned(),
+            paths: vec![mcp_json()],
+        }]
+    );
 }
 
 #[test]

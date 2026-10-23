@@ -3,6 +3,7 @@ import {
   commands,
   type ActionPreview,
   type ActionRequest,
+  type Advice,
   type Error as ApiError,
   type Change,
   type FileDiff,
@@ -310,9 +311,8 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
           {blocks.map((block, index) => (
             <div key={`block-${index}`} className="check block">
               <Icon name="flag" small />
-              <div>
-                <span className="check-kind">Blocked</span>
-                {block.sentence}
+              <div className="check-body">
+                <AdviceLines kind="Blocked" advice={block.advice} />
                 <div className="check-fix">
                   <button type="button" className="cta secondary" onClick={onCheckAgain}>
                     <Icon name="refresh" small />
@@ -328,9 +328,9 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
             return (
               <label key={warning.class} className={`check warning${git ? " git" : ""}`}>
                 <input type="checkbox" checked={ticked} onChange={() => onToggle(warning.class)} />
-                <div>
-                  <span className="check-kind">{git ? "Git-versioned" : "Warning"}</span>
-                  {warning.sentence}
+                <Icon name="warning" small />
+                <div className="check-body">
+                  <AdviceLines kind={git ? "Git-versioned" : "Warning"} advice={warning.advice} />
                 </div>
               </label>
             );
@@ -365,6 +365,27 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
       </footer>
     </>
   );
+}
+
+/**
+ * A warning or block, each cause what to do first, the first under the
+ * item's `kind`, then why, then each path on a line of its own.
+ */
+function AdviceLines({ kind, advice }: { kind: string; advice: Advice[] }) {
+  return advice.map(({ todo, why, paths }, index) => (
+    <Fragment key={index}>
+      <div className="check-todo">
+        {index === 0 && <span className="check-kind">{kind}</span>}
+        {todo}
+      </div>
+      <div className="check-why">{why}</div>
+      {paths.map((path) => (
+        <span key={path} className="check-path">
+          {path}
+        </span>
+      ))}
+    </Fragment>
+  ));
 }
 
 /**
@@ -639,11 +660,11 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
             <div>
               <div className="callout-title">{result.sentence}</div>
               {result.hints.map((hint) => (
-                <div key={hint} className="dim">
+                <div key={hint} className="callout-hint">
                   {hint}
                 </div>
               ))}
-              <div className="faint">{result.note}</div>
+              <div className="callout-hint">{result.note}</div>
             </div>
           </div>
           {result.differences.length > 0 && (

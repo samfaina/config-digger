@@ -2,8 +2,8 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{
-    Action, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
-    State, Verify,
+    Action, Advice, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode,
+    RiskCode, State, Verify,
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
@@ -315,6 +315,22 @@ pub(crate) fn git_versioned(files: &[&Path]) -> String {
     )
 }
 
+/// The warning of [`git_versioned`], laid out for the app.
+pub(crate) fn git_versioned_advice(files: &[&Path]) -> Advice {
+    let these = if files.len() == 1 {
+        "This location is"
+    } else {
+        "These locations are"
+    };
+    Advice {
+        todo: "Check the git diff before you commit.".to_owned(),
+        why: format!(
+            "{these} git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it."
+        ),
+        paths: owned(files),
+    }
+}
+
 /// The block of a plan that writes the SQLite stores `files` while
 /// `agent_name`, which holds them open, runs.
 pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> String {
@@ -322,6 +338,18 @@ pub(crate) fn running_agent_sqlite(agent_name: &str, files: &[&Path]) -> String 
         "{agent_name} is running and holds {} open in SQLite, so nothing can be written there while it runs. Close {agent_name} and retry.",
         path_list(files)
     )
+}
+
+/// The block of [`running_agent_sqlite`], laid out for the app.
+pub(crate) fn running_agent_sqlite_advice(agent_name: &str, files: &[&Path]) -> Advice {
+    Advice {
+        todo: format!("Close {agent_name} and retry."),
+        why: format!(
+            "{agent_name} is running and holds {} open in SQLite, so nothing can be written there while it runs.",
+            these_locations(files)
+        ),
+        paths: owned(files),
+    }
 }
 
 /// The strong warning of a plan that writes `files`, which `agent_name`
@@ -333,6 +361,18 @@ pub(crate) fn running_agent_rewrites(agent_name: &str, files: &[&Path]) -> Strin
     )
 }
 
+/// The strong warning of [`running_agent_rewrites`], laid out for the app.
+pub(crate) fn running_agent_rewrites_advice(agent_name: &str, files: &[&Path]) -> Advice {
+    Advice {
+        todo: format!("Close {agent_name} first to be safe."),
+        why: format!(
+            "{agent_name} is running and rewrites {} while it runs: it may overwrite what this Operation writes.",
+            these_locations(files)
+        ),
+        paths: owned(files),
+    }
+}
+
 /// The warning of a plan that writes `files`, which the running
 /// `agent_name` reads.
 pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> String {
@@ -340,6 +380,18 @@ pub(crate) fn running_agent_reads(agent_name: &str, files: &[&Path]) -> String {
         "{agent_name} is running and reads {}: it may not see what this Operation writes until it restarts.",
         path_list(files)
     )
+}
+
+/// The warning of [`running_agent_reads`], laid out for the app.
+pub(crate) fn running_agent_reads_advice(agent_name: &str, files: &[&Path]) -> Advice {
+    Advice {
+        todo: format!("Restart {agent_name} once this is applied."),
+        why: format!(
+            "{agent_name} is running and reads {}: it may not see what this Operation writes until it restarts.",
+            these_locations(files)
+        ),
+        paths: owned(files),
+    }
 }
 
 /// Why an Operation needs a fresh preview when the Agents `agent_names`,
@@ -662,6 +714,18 @@ pub(crate) fn running_agent_parking(agent_name: &str, files: &[&Path]) -> String
     )
 }
 
+/// The block of [`running_agent_parking`], laid out for the app.
+pub(crate) fn running_agent_parking_advice(agent_name: &str, files: &[&Path]) -> Advice {
+    Advice {
+        todo: format!("Close {agent_name} and retry."),
+        why: format!(
+            "{agent_name} is running and rewrites {} from memory, which would undo moving an Entry in or out of it.",
+            these_locations(files)
+        ),
+        paths: owned(files),
+    }
+}
+
 /// The note on an Entry part of which the partial switch `holds` limits.
 pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
     format!(
@@ -963,6 +1027,15 @@ pub(crate) fn wide_reach(action: Action, others: &[Reached], by_name: &[String])
     }
 }
 
+/// The warning of [`wide_reach`], laid out for the app, its sentence `why`.
+pub(crate) fn wide_reach_advice(why: &str) -> Advice {
+    Advice {
+        todo: "Check that everything it reaches should change.".to_owned(),
+        why: why.to_owned(),
+        paths: Vec::new(),
+    }
+}
+
 /// Why Disable is refused for an Entry it is not offered for: `sentence`.
 pub(crate) fn disable_not_offered(locator: &str, sentence: &str) -> String {
     format!("cannot Disable {locator}: {sentence}")
@@ -1096,6 +1169,19 @@ pub(crate) fn disable_needs_folder(agent_name: &str) -> String {
     )
 }
 
+/// What an Advice's `why` calls the paths it gives apart.
+fn these_locations(paths: &[&Path]) -> &'static str {
+    if paths.len() == 1 {
+        "this location"
+    } else {
+        "these locations"
+    }
+}
+
+fn owned(paths: &[&Path]) -> Vec<PathBuf> {
+    paths.iter().map(|path| path.to_path_buf()).collect()
+}
+
 /// Paths as a sentence lists them, separated by commas.
 fn path_list(paths: &[&Path]) -> String {
     let names: Vec<String> = paths
@@ -1133,6 +1219,16 @@ pub(crate) fn only_copy_for_recovery(operation: &str) -> String {
     format!(
         "Operation {operation} needs attention: this backup is the only copy for manual recovery of the files its Rollback could not restore. Deleting it also dismisses the Operation."
     )
+}
+
+/// The check of [`only_copy_for_recovery`], laid out for the app, its
+/// sentence `why`.
+pub(crate) fn only_copy_for_recovery_advice(why: &str) -> Advice {
+    Advice {
+        todo: "Copy what you need from this backup before deleting it.".to_owned(),
+        why: why.to_owned(),
+        paths: Vec::new(),
+    }
 }
 
 /// What an executed Operation did: "Removed 2 Entries. Operation
@@ -1836,20 +1932,9 @@ pub(crate) fn folder_size(size: FolderSize) -> String {
 /// the Linked Entries that point into it broken. Each pair is a link and
 /// the folder it points into.
 pub(crate) fn breaks_links(broken: &[(&Path, &Path)]) -> String {
-    let mut folders: Vec<&Path> = Vec::new();
-    for (_, folder) in broken {
-        if !folders.contains(folder) {
-            folders.push(folder);
-        }
-    }
-    let sentences: Vec<String> = folders
+    let sentences: Vec<String> = links_by_folder(broken)
         .iter()
-        .map(|folder| {
-            let links: Vec<&Path> = broken
-                .iter()
-                .filter(|(_, into)| into == folder)
-                .map(|(link, _)| *link)
-                .collect();
+        .map(|(folder, links)| {
             let (noun, rest) = match links.len() {
                 1 => (
                     "link",
@@ -1863,11 +1948,48 @@ pub(crate) fn breaks_links(broken: &[(&Path, &Path)]) -> String {
             format!(
                 "Removing {} leaves the {noun} {} pointing to nothing. {rest}",
                 folder.display(),
-                path_list(&links)
+                path_list(links)
             )
         })
         .collect();
     sentences.join(" ")
+}
+
+/// The warning of [`breaks_links`], laid out for the app: one per folder,
+/// its paths the folder then the links into it.
+pub(crate) fn breaks_links_advice(broken: &[(&Path, &Path)]) -> Vec<Advice> {
+    links_by_folder(broken)
+        .into_iter()
+        .map(|(folder, links)| {
+            let (todo, why) = match links.len() {
+                1 => (
+                    "Remove the link on its own once this is applied.",
+                    "Removing the first location below leaves the link to it pointing to nothing, as an Unread Entry.",
+                ),
+                _ => (
+                    "Remove each link on its own once this is applied.",
+                    "Removing the first location below leaves the links to it pointing to nothing, as Unread Entries.",
+                ),
+            };
+            Advice {
+                todo: todo.to_owned(),
+                why: why.to_owned(),
+                paths: [folder].into_iter().chain(links).map(Path::to_path_buf).collect(),
+            }
+        })
+        .collect()
+}
+
+/// Each folder of `broken`, in order, with the links into it.
+fn links_by_folder<'p>(broken: &[(&'p Path, &'p Path)]) -> Vec<(&'p Path, Vec<&'p Path>)> {
+    let mut folders: Vec<(&Path, Vec<&Path>)> = Vec::new();
+    for &(link, folder) in broken {
+        match folders.iter_mut().find(|(into, _)| *into == folder) {
+            Some((_, links)) => links.push(link),
+            None => folders.push((folder, vec![link])),
+        }
+    }
+    folders
 }
 
 /// Why an Operation could not do `op` at the skill folder's location `path`.

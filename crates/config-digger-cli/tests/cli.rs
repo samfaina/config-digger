@@ -3211,6 +3211,20 @@ fn disable_of_a_vs_code_server_while_code_runs_is_blocked_whatever_is_acknowledg
 }
 
 #[test]
+fn a_dry_run_while_code_runs_gives_each_block_as_its_code_and_sentence_only() {
+    let vscode = VsCode::new().running();
+
+    let run = vscode
+        .harness
+        .run(&["disable", "fetch", "--no-project", "--dry-run", "--json"]);
+
+    let blocks = &run.document()["blocks"];
+    assert_eq!(blocks.as_array().map(Vec::len), Some(1), "{}", run.stdout);
+    let keys: Vec<&String> = blocks[0].as_object().unwrap().keys().collect();
+    assert_eq!(keys, ["code", "sentence"]);
+}
+
+#[test]
 fn disable_of_a_vs_code_server_while_code_is_closed_writes_its_sqlite_store() {
     let vscode = VsCode::new();
 

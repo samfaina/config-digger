@@ -5,8 +5,8 @@
 //! Extension servers use their own `isEnabled` switch instead.
 
 use config_digger_core::api::{
-    Action, Context, Core, Error, ErrorCode, Inventory, Item, Outcome, Plan, ScanOptions, Targets,
-    WarningClass,
+    Action, Advice, Context, Core, Error, ErrorCode, Inventory, Item, Outcome, Plan, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::RunningProcess;
 use config_digger_core::ports::fake::{
@@ -507,6 +507,23 @@ fn parking_is_blocked_while_claude_desktop_runs() {
     assert_eq!(error.code, ErrorCode::Blocked);
     assert_eq!(text(&fs, config()), fixture_config());
     assert_eq!(fs.contents(store()), None);
+}
+
+#[test]
+fn the_parking_block_says_first_to_close_claude_desktop_and_gives_its_file_apart() {
+    let fs = desktop();
+    let core = core_while_desktop_runs(&fs);
+
+    let plan = plan_with(&core, Action::Disable, "notes").unwrap();
+
+    assert_eq!(
+        plan.blocks()[0].advice,
+        [Advice {
+            todo: "Close Claude Desktop and retry.".to_owned(),
+            why: "Claude Desktop is running and rewrites this location from memory, which would undo moving an Entry in or out of it.".to_owned(),
+            paths: vec![config()],
+        }]
+    );
 }
 
 #[test]

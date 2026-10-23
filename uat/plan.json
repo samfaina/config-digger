@@ -363,6 +363,9 @@
             "Abre la sección Files · 1.",
             "Mira el diff.",
             "Lee las casillas de Before you apply, si las hay.",
+            "Si hay un aviso, mira su color, su icono, su primera línea y sus rutas.",
+            "Si hay una nota, como que la versión de Claude Code es más nueva, mira su estilo.",
+            "Lee la nota de backup del pie, sobre Cancel.",
             "Si alguna nombra una ruta fuera de E:\\cd-throwaway, para y marca el paso KO.",
             "Marca las casillas.",
             "Pulsa Remove 1 leftover.",
@@ -370,8 +373,8 @@
             "Pulsa Done."
           ],
           "commands": [],
-          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», con los botones de la fila de project-gone apagados, que puede durar menos de un segundo. Luego la fila de project-gone dice No leftovers y ofrece Hide.",
-          "covers": ["#75", "#179"]
+          "expect": "El diálogo se titula «Remove 1 Entry». El diff de Files · 1 marca en rojo las líneas de cd-throwaway-leftover en E:\\cd-throwaway\\claude-code-home\\.claude.json. En Before you apply, cada aviso es un bloque propio, en ámbar, con el icono de aviso junto a su casilla: su primera línea, en negrita, dice qué hacer, como «Close Claude Code first to be safe.», y cada ruta va en su propia línea, en monospace. Una nota, como la de una versión de Claude Code más nueva, va en el azul de los avisos de información, con su icono, no en texto gris. La nota «Each touched file is copied to … before anything is written.» se lee sin esfuerzo, en gris claro y a un tamaño legible, como el resto de pistas del diálogo. El resultado dice «Removed 1 Entry. Operation <id>: verified.». Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», con los botones de la fila de project-gone apagados, que puede durar menos de un segundo. Luego la fila de project-gone dice No leftovers y ofrece Hide.",
+          "covers": ["#75", "#179", "#230"]
         },
         {
           "id": "10.8",

@@ -4,7 +4,7 @@
 //! its result adds.
 
 use config_digger_core::api::{
-    Action, BlockCode, Context, Core, ErrorCode, Plan, ScanOptions, StoreClass, Targets,
+    Action, Advice, BlockCode, Context, Core, ErrorCode, Plan, ScanOptions, StoreClass, Targets,
     WarningClass,
 };
 use config_digger_core::ports::RunningProcess;
@@ -151,6 +151,28 @@ fn a_write_to_a_file_the_running_agent_rewrites_gets_a_strong_warning() {
 }
 
 #[test]
+fn the_strong_warning_says_first_to_close_the_agent_and_gives_the_file_apart() {
+    let fs = fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, "notes");
+
+    let warning = plan
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::RunningAgent)
+        .expect("a running-agent warning");
+    assert_eq!(
+        warning.advice,
+        [Advice {
+            todo: "Close Claude Code first to be safe.".to_owned(),
+            why: "Claude Code is running and rewrites this location while it runs: it may overwrite what this Operation writes.".to_owned(),
+            paths: vec![claude_json()],
+        }]
+    );
+}
+
+#[test]
 fn claude_desktop_is_not_claude_code_though_both_are_claude_exe() {
     let fs = fixture();
     let core = core(&fs, &[claude_desktop()]);
@@ -200,6 +222,28 @@ fn a_write_to_a_plain_file_the_running_agent_reads_gets_a_warning() {
     assert!(sentence.contains("until it restarts"), "{sentence}");
     assert!(!sentence.contains("overwrite"), "{sentence}");
     assert!(plan.blocks().is_empty());
+}
+
+#[test]
+fn the_warning_of_a_plain_file_says_first_to_restart_the_agent_and_gives_the_file_apart() {
+    let fs = fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, "linear");
+
+    let warning = plan
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::RunningAgent)
+        .expect("a running-agent warning");
+    assert_eq!(
+        warning.advice,
+        [Advice {
+            todo: "Restart Claude Code once this is applied.".to_owned(),
+            why: "Claude Code is running and reads this location: it may not see what this Operation writes until it restarts.".to_owned(),
+            paths: vec![mcp_json()],
+        }]
+    );
 }
 
 #[test]
@@ -360,6 +404,27 @@ fn a_write_to_a_sqlite_store_while_its_agent_runs_is_blocked_whatever_is_acknowl
         error.message
     );
     assert_eq!(fs.contents(store()).unwrap(), STORE.as_bytes());
+}
+
+#[test]
+fn the_sqlite_block_says_first_to_close_the_agent_and_gives_the_store_apart() {
+    let fs = store_fs();
+    let processes = FakeProcesses::default().with_process(store_agent());
+    let core = core_with(&fs, SQLITE_AGENT, &processes);
+
+    let plan = remove(&core, "search");
+
+    let [block] = plan.blocks() else {
+        panic!("one block: {:?}", plan.blocks());
+    };
+    assert_eq!(
+        block.advice,
+        [Advice {
+            todo: "Close Store Agent and retry.".to_owned(),
+            why: "Store Agent is running and holds this location open in SQLite, so nothing can be written there while it runs.".to_owned(),
+            paths: vec![store()],
+        }]
+    );
 }
 
 /// The store class of each file the plan writes, as its preview tags it.

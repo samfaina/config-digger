@@ -918,6 +918,7 @@ mod tests {
             plan.0.warnings.push(Warning {
                 class,
                 sentence: String::new(),
+                advice: Vec::new(),
             });
         }
         (core, plan)
