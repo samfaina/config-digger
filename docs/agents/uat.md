@@ -7,7 +7,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 | `uat/plan.json` | The walk: ordered sections of steps, from a PC without config-digger through install, every screen, update and uninstall. |
 | `uat/plan.schema.json` | The plan's JSON Schema. |
 | `uat/runner.html` | The runner page, published as a private claude.ai Artifact for each run. |
-| `uat/runner.test.mjs` | Tests of the runner's logic. Run them with `node --test uat/runner.test.mjs`. |
+| `uat/runner.test.mjs` | Tests of the runner's logic and the words of its page. Run them with `node --test uat/runner.test.mjs`. |
 | `uat/data/cd-throwaway-setup.ps1` | Creates the throwaway Agent homes and Projects the steps use. |
 
 ## The plan
@@ -68,7 +68,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`, and give the tester the link. Post it on the walk's issue too.
 
-The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
+The tester works in the page. Each saved verdict writes `results/<step id>` at once, so a reload loses nothing. KO and Blocked need notes. A KO or Blocked clicked before the notes are written is the step's pending verdict: its button is outlined, nothing is stored, and a "Guardar KO" or "Guardar bloqueado" button saves it once the notes have text. Clicking OK or leaving the step drops it. Notes on an OK step are optional, and the notes box says they are read too and go in before OK is pressed: pressing OK saves them, and pressing it again saves notes added after. The Export button ("Exportar pasos con notas") copies every step with notes as a Markdown table, whatever its verdict.
 
 ## Turning a run's results into tickets
 

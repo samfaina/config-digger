@@ -459,7 +459,7 @@ const Uat = (() => {
         saveButton
           ? el("div", { class: "pending-save" }, saveButton, missing)
           : missing,
-        el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales, y también se leen: anota lo que te llame la atención."),
+        el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK."),
         state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
         el("p", { class: "saved" }, savedLine)),
       el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])),

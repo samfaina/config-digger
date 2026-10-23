@@ -1,6 +1,6 @@
-// The runner's logic, the `uat-logic` script inside runner.html, run by
-// `node --test uat/runner.test.mjs`. The page itself stays one
-// self-contained file.
+// The runner's logic, the `uat-logic` script inside runner.html, and the
+// words of its page, run by `node --test uat/runner.test.mjs`. The page
+// itself stays one self-contained file.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -32,6 +32,10 @@ test("an OK is stored with its id, notes, time and app version", () => {
     time: "2026-10-18T09:30:00.000Z",
     version: "0.1.0-rc.2",
   });
+});
+
+test("an OK keeps its notes", () => {
+  assert.equal(Uat.result("1.1", "ok", " El título se corta\n", "0.1.0-rc.2", NOW).notes, "El título se corta");
 });
 
 test("KO or Blocked without notes waits as the step's pending verdict", () => {
@@ -134,22 +138,25 @@ test("the export says so when no step has notes", () => {
   assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso con notas.");
 });
 
-/** The text of the page's element with this id, as the markup or the
- * render script writes it. */
-function text(id) {
+/** The words of the page's element with this id, as its markup or the
+ * render script's `el(tag, { …, id }, words)` writes them. */
+function pageText(id) {
   const found =
     html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`)) ??
     html.match(new RegExp(`id: "${id}" }, "([^"]*)"`));
+  assert.ok(found, `runner.html has no element with id "${id}" and words of its own`);
   return found[1];
 }
 
 test("the notes hint says notes on an OK step are read too", () => {
-  assert.match(text("notes-hint"), /OK/);
-  assert.match(text("notes-hint"), /se leen/);
+  assert.equal(
+    pageText("notes-hint"),
+    "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK.",
+  );
 });
 
 test("the Export button is named for the steps with notes it copies", () => {
-  assert.equal(text("export"), "Exportar pasos con notas");
+  assert.equal(pageText("export"), "Exportar pasos con notas");
 });
 
 test("after a result the runner moves on to the next step without one", () => {
