@@ -28,6 +28,9 @@ rusqlite.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 
+[build-dependencies]
+static_vcruntime.workspace = true
+
 [target.'cfg(windows)'.dependencies]
 winreg.workspace = true
 

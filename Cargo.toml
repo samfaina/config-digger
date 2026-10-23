@@ -33,6 +33,9 @@ sha2 = "0.10"
 similar = "3.2"
 specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
 specta-typescript = "=0.0.12"
+# The CLI's VC++ runtime, linked statically as `tauri-build` links the
+# app's.
+static_vcruntime = "3.0"
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 tauri = "2.12"
 tauri-build = "2.7"
