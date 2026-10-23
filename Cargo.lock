@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-app"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 dependencies = [
  "config-digger-core",
  "rfd",
@@ -513,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-cli"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 dependencies = [
  "anstream",
  "anstyle",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "config-digger-core"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 dependencies = [
  "humantime",
  "jsonc-parser",
@@ -5735,7 +5735,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 dependencies = [
  "base64 0.22.1",
  "config-digger-core",
