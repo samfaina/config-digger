@@ -12,3 +12,8 @@ export function lastCheckedText(lastChecked: string | null, now: Date): string {
 export function checkFailedText(cause: string): string {
   return `The update check failed: ${cause}`;
 }
+
+/** What About says when an install fails: the core's message is only the cause. */
+export function installFailedText(cause: string): string {
+  return `The update was not installed: ${cause}`;
+}

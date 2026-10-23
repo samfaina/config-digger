@@ -1866,6 +1866,7 @@
             "Ve a About.",
             "Pulsa Check now.",
             "En el aviso «config-digger <versión> is available.», pulsa Install and restart.",
+            "Si sale un error en vez de reiniciarse, marca KO y copia el texto exacto en las notas.",
             "Cuando config-digger vuelva a abrirse, mira la versión en About.",
             "Abre una ventana nueva de PowerShell.",
             "Ejecuta la orden.",
@@ -1879,6 +1880,8 @@
             }
           ],
           "expect": [
+            "Si la instalación falla, el error empieza por «The update was not installed:» y sigue con la causa.",
+            "Esas palabras salen una sola vez.",
             "Con la versión final, About muestra la versión del título tras reiniciar.",
             "La orden imprime «config-digger <esa versión>» y «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe».",
             "History conserva las Operations de este recorrido."

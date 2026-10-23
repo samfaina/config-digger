@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { commands, type UpdateStatus } from "./bindings";
 import { call } from "./desktop";
-import { checkFailedText } from "./updates";
+import { checkFailedText, installFailedText } from "./updates";
 
 export type Updates = {
   /** What the app knows of updates, `null` until it was read. */
@@ -69,7 +69,7 @@ export function useUpdates(): Updates {
     try {
       // On success the app exits and the installer restarts it.
       const result = await call(commands.installUpdate);
-      if (result.status === "error") setError(`The update was not installed: ${result.error.message}`);
+      if (result.status === "error") setError(installFailedText(result.error.message));
     } finally {
       setInstalling(false);
     }
