@@ -96,10 +96,10 @@ test("progress counts the plan's steps that have a result, by status", () => {
   });
 });
 
-test("the export is a Markdown table of the KO and Blocked steps, in plan order", () => {
+test("the export is a Markdown table of every step with notes, whatever its verdict, in plan order", () => {
   const done = results(
     Uat.result("2.1", "blocked", "Espera a #175", "0.1.0-rc.2", NOW),
-    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("1.1", "ok", "Funciona, pero el título se corta", "0.1.0-rc.2", NOW),
     Uat.result("1.2", "ko", "Sale vacío | sin servidores\nNi skills", "0.1.0-rc.2", NOW),
   );
   assert.equal(
@@ -107,15 +107,49 @@ test("the export is a Markdown table of the KO and Blocked steps, in plan order"
     [
       "| Paso | Título | Estado | Notas |",
       "| --- | --- | --- | --- |",
+      "| 1.1 | Abrir la app | OK | Funciona, pero el título se corta |",
       "| 1.2 | Añadir el home | KO | Sale vacío \\| sin servidores<br>Ni skills |",
       "| 2.1 | Deshacer | Bloqueado | Espera a #175 |",
     ].join("\n"),
   );
 });
 
-test("the export says so when no step is KO or Blocked", () => {
+test("the export leaves out an OK without notes", () => {
+  const done = results(
+    Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW),
+    Uat.result("2.1", "ok", "El atajo no sale en el menú", "0.1.0-rc.2", NOW),
+  );
+  assert.equal(
+    Uat.exportMarkdown(PLAN, done),
+    [
+      "| Paso | Título | Estado | Notas |",
+      "| --- | --- | --- | --- |",
+      "| 2.1 | Deshacer | OK | El atajo no sale en el menú |",
+    ].join("\n"),
+  );
+});
+
+test("the export says so when no step has notes", () => {
   const done = results(Uat.result("1.1", "ok", "", "0.1.0-rc.2", NOW));
-  assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso en KO ni bloqueado.");
+  assert.equal(Uat.exportMarkdown(PLAN, done), "Ningún paso con notas.");
+});
+
+/** The text of the page's element with this id, as the markup or the
+ * render script writes it. */
+function text(id) {
+  const found =
+    html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`)) ??
+    html.match(new RegExp(`id: "${id}" }, "([^"]*)"`));
+  return found[1];
+}
+
+test("the notes hint says notes on an OK step are read too", () => {
+  assert.match(text("notes-hint"), /OK/);
+  assert.match(text("notes-hint"), /se leen/);
+});
+
+test("the Export button is named for the steps with notes it copies", () => {
+  assert.equal(text("export"), "Exportar pasos con notas");
 });
 
 test("after a result the runner moves on to the next step without one", () => {

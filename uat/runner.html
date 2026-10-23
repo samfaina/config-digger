@@ -165,7 +165,7 @@ textarea {
         <h1 id="run-name">UAT de config-digger</h1>
         <p class="run-meta" id="run-meta">Cargando el plan…</p>
       </div>
-      <button type="button" id="export" class="primary" disabled>Exportar KO y bloqueados</button>
+      <button type="button" id="export" class="primary" disabled>Exportar pasos con notas</button>
     </div>
     <div class="bar" role="progressbar" id="bar" aria-label="Progreso del recorrido" aria-valuemin="0" aria-valuenow="0" aria-valuemax="0">
       <span class="ok" id="bar-ok" style="width:0"></span>
@@ -175,7 +175,7 @@ textarea {
     <div class="counts" id="counts"></div>
     <div class="export" id="export-panel" hidden>
       <p id="export-status" role="status"></p>
-      <textarea id="export-text" readonly aria-label="Tabla Markdown de los KO y bloqueados"></textarea>
+      <textarea id="export-text" readonly aria-label="Tabla Markdown de los pasos con notas"></textarea>
     </div>
     <p class="notice" id="notice" hidden></p>
   </header>
@@ -252,14 +252,15 @@ const Uat = (() => {
     return text.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
   }
 
-  /** The KO and Blocked steps as a Markdown table, in plan order. */
+  /** The steps with notes as a Markdown table, in plan order, whatever
+   * their verdict: a note on an OK step may be a finding too. */
   function exportMarkdown(plan, results) {
     const rows = steps(plan)
       .map((step) => [step, results[step.id]])
-      .filter(([, result]) => result && result.status !== "ok")
+      .filter(([, result]) => result?.notes)
       .map(([step, result]) =>
         `| ${step.id} | ${cell(step.title)} | ${STATUSES[result.status].label} | ${cell(result.notes)} |`);
-    if (!rows.length) return "Ningún paso en KO ni bloqueado.";
+    if (!rows.length) return "Ningún paso con notas.";
     return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
   }
 
@@ -458,7 +459,7 @@ const Uat = (() => {
         saveButton
           ? el("div", { class: "pending-save" }, saveButton, missing)
           : missing,
-        el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas."),
+        el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales, y también se leen: anota lo que te llame la atención."),
         state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
         el("p", { class: "saved" }, savedLine)),
       el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])),
