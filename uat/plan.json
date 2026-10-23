@@ -315,6 +315,20 @@
           "covers": ["#175"]
         },
         {
+          "id": "10.16",
+          "title": "Las etiquetas de un Agent home",
+          "goal": "Las etiquetas de una fila, como «added by you», se leen de un vistazo y tienen un color por lo que dicen.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home.",
+            "Si alguna fila tiene una etiqueta que dice read-only, mírala también."
+          ],
+          "commands": [],
+          "expect": "Cada una de esas filas tiene sus etiquetas, como el nombre de su Agent y «added by you», en una píldora rellena de gris, con un borde gris claro y el texto casi blanco: se leen sin esfuerzo sobre la fila, no son un texto gris tenue. Una etiqueta read-only, si sale, es naranja: fondo marrón, borde naranja y texto naranja claro.",
+          "covers": ["#232"]
+        },
+        {
           "id": "10.5",
           "title": "La pestaña Projects",
           "goal": "La pestaña Projects lista los Projects que conoce Claude Code y, aparte, los que faltan con sus leftovers.",
