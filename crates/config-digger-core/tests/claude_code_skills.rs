@@ -857,8 +857,8 @@ fn the_wide_reach_warning_says_first_to_check_what_it_reaches() {
         warning.advice,
         [Advice {
             todo: "Check that everything it reaches should change.".to_owned(),
-            why: warning.sentence.clone(),
-            paths: Vec::new(),
+            why: "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.".to_owned(),
+            paths: vec![project_skill("deploy").display().to_string()],
         }]
     );
 }

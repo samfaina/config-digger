@@ -521,7 +521,7 @@ fn the_parking_block_says_first_to_close_claude_desktop_and_gives_its_file_apart
         [Advice {
             todo: "Close Claude Desktop and retry.".to_owned(),
             why: "Claude Desktop is running and rewrites this location from memory, which would undo moving an Entry in or out of it.".to_owned(),
-            paths: vec![config()],
+            paths: vec![config().display().to_string()],
         }]
     );
 }

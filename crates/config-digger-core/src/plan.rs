@@ -504,10 +504,13 @@ impl Targeted<'_> {
                 }
             }
         }
-        (!broken.is_empty()).then(|| Warning {
-            class: WarningClass::BreaksLinks,
-            sentence: explain::breaks_links(&broken),
-            advice: explain::breaks_links_advice(&broken),
+        (!broken.is_empty()).then(|| {
+            let (sentence, advice) = explain::breaks_links(&broken);
+            Warning {
+                class: WarningClass::BreaksLinks,
+                sentence,
+                advice,
+            }
         })
     }
 
@@ -1019,11 +1022,11 @@ impl Targeted<'_> {
             })
             .collect();
         (!others.is_empty() || !by_name.is_empty()).then(|| {
-            let sentence = explain::wide_reach(self.action, &others, by_name);
+            let (sentence, advice) = explain::wide_reach(self.action, &others, by_name);
             Warning {
                 class: WarningClass::WideReach,
-                advice: vec![explain::wide_reach_advice(&sentence)],
                 sentence,
+                advice: vec![advice],
             }
         })
     }
@@ -1314,11 +1317,11 @@ pub(crate) fn plan_delete_backup(ports: &Ports, id: &str) -> Result<Planned, Err
     }
     let mut warnings = Vec::new();
     if manifest.needs_attention() {
-        let sentence = explain::only_copy_for_recovery(id);
+        let (sentence, advice) = explain::only_copy_for_recovery(id);
         warnings.push(Warning {
             class: WarningClass::NeedsAttention,
-            advice: vec![explain::only_copy_for_recovery_advice(&sentence)],
             sentence,
+            advice: vec![advice],
         });
     }
     let preview = Preview {
@@ -2042,10 +2045,13 @@ fn warnings(
                 .map(|folder| folder.path.as_path()),
         )
         .collect();
-    let versioned = (!versioned.is_empty()).then(|| Warning {
-        class: WarningClass::GitVersioned,
-        sentence: explain::git_versioned(&versioned),
-        advice: vec![explain::git_versioned_advice(&versioned)],
+    let versioned = (!versioned.is_empty()).then(|| {
+        let (sentence, advice) = explain::git_versioned(&versioned);
+        Warning {
+            class: WarningClass::GitVersioned,
+            sentence,
+            advice: vec![advice],
+        }
     });
     versioned.into_iter().chain(running).collect()
 }

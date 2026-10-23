@@ -167,7 +167,7 @@ fn the_strong_warning_says_first_to_close_the_agent_and_gives_the_file_apart() {
         [Advice {
             todo: "Close Claude Code first to be safe.".to_owned(),
             why: "Claude Code is running and rewrites this location while it runs: it may overwrite what this Operation writes.".to_owned(),
-            paths: vec![claude_json()],
+            paths: vec![claude_json().display().to_string()],
         }]
     );
 }
@@ -241,7 +241,7 @@ fn the_warning_of_a_plain_file_says_first_to_restart_the_agent_and_gives_the_fil
         [Advice {
             todo: "Restart Claude Code once this is applied.".to_owned(),
             why: "Claude Code is running and reads this location: it may not see what this Operation writes until it restarts.".to_owned(),
-            paths: vec![mcp_json()],
+            paths: vec![mcp_json().display().to_string()],
         }]
     );
 }
@@ -422,7 +422,7 @@ fn the_sqlite_block_says_first_to_close_the_agent_and_gives_the_store_apart() {
         [Advice {
             todo: "Close Store Agent and retry.".to_owned(),
             why: "Store Agent is running and holds this location open in SQLite, so nothing can be written there while it runs.".to_owned(),
-            paths: vec![store()],
+            paths: vec![store().display().to_string()],
         }]
     );
 }

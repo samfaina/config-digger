@@ -202,7 +202,10 @@ export type Advice = {
 	 *  rewrites this location while it runs: …".
 	 */
 	why: string,
-	/**  The locations `why` is about. */
+	/**
+	 *  What `why` is about, each in full on a line of its own: the path of
+	 *  a location, or an Entry's locator with where it applies.
+	 */
 	paths: string[],
 };
 

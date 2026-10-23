@@ -173,7 +173,7 @@ fn the_git_versioned_warning_says_first_to_check_the_git_diff_and_gives_the_file
         [Advice {
             todo: "Check the git diff before you commit.".to_owned(),
             why: "This location is git-versioned: this change will show in the git diff, and reaches every clone once committed. config-digger never stages or commits it.".to_owned(),
-            paths: vec![mcp_json()],
+            paths: vec![mcp_json().display().to_string()],
         }]
     );
 }

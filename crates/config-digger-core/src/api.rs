@@ -1220,8 +1220,9 @@ pub struct Advice {
     /// Why, the paths left out, such as "Claude Code is running and
     /// rewrites this location while it runs: …".
     pub why: String,
-    /// The locations `why` is about.
-    pub paths: Vec<PathBuf>,
+    /// What `why` is about, each in full on a line of its own: the path of
+    /// a location, or an Entry's locator with where it applies.
+    pub paths: Vec<String>,
 }
 
 /// Each class of warning is acknowledged on its own.

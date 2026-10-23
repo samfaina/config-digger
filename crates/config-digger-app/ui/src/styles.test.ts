@@ -644,8 +644,23 @@ describe("a Before you apply item", () => {
   });
 });
 
-/** The hints of the dialogs: the line under a title, the backup note, why Apply is off, a result's hints and notes. */
-const HINTS = [".dialog-subtitle", ".dialog-backup", ".apply-why", ".effective-change", ".file-note", ".callout-hint", ".dialog .side-note"];
+/**
+ * The hints of the dialogs: the line under a title, the backup note, why
+ * Apply is off, a result's hints and notes, a step yet to run, and what
+ * stands in for a list while it loads or when it is empty.
+ */
+const HINTS = [
+  ".dialog-subtitle",
+  ".dialog-backup",
+  ".apply-why",
+  ".effective-change",
+  ".file-note",
+  ".callout-hint",
+  ".step",
+  ".dialog .dim",
+  ".dialog .empty",
+  ".dialog .side-note",
+];
 
 describe("a hint in a dialog", () => {
   test("meets WCAG AA on the dialog and on its tiles", () => {

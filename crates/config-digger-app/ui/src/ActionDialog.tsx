@@ -312,7 +312,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
             <div key={`block-${index}`} className="check block">
               <Icon name="flag" small />
               <div className="check-body">
-                <AdviceLines kind="Blocked" advice={block.advice} />
+                <AdviceLines kind="Blocked" advice={block.advice} sentence={block.sentence} />
                 <div className="check-fix">
                   <button type="button" className="cta secondary" onClick={onCheckAgain}>
                     <Icon name="refresh" small />
@@ -330,7 +330,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
                 <input type="checkbox" checked={ticked} onChange={() => onToggle(warning.class)} />
                 <Icon name="warning" small />
                 <div className="check-body">
-                  <AdviceLines kind={git ? "Git-versioned" : "Warning"} advice={warning.advice} />
+                  <AdviceLines kind={git ? "Git-versioned" : "Warning"} advice={warning.advice} sentence={warning.sentence} />
                 </div>
               </label>
             );
@@ -368,10 +368,19 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
 }
 
 /**
- * A warning or block, each cause what to do first, the first under the
- * item's `kind`, then why, then each path on a line of its own.
+ * The lines of a warning or block, for each of its causes: what to do,
+ * the first under the item's `kind`, then why, then each path. One without
+ * advice shows its `sentence` instead.
  */
-function AdviceLines({ kind, advice }: { kind: string; advice: Advice[] }) {
+function AdviceLines({ kind, advice, sentence }: { kind: string; advice: Advice[]; sentence: string }) {
+  if (advice.length === 0) {
+    return (
+      <div className="check-why">
+        <span className="check-kind">{kind}</span>
+        {sentence}
+      </div>
+    );
+  }
   return advice.map(({ todo, why, paths }, index) => (
     <Fragment key={index}>
       <div className="check-todo">
@@ -379,8 +388,8 @@ function AdviceLines({ kind, advice }: { kind: string; advice: Advice[] }) {
         {todo}
       </div>
       <div className="check-why">{why}</div>
-      {paths.map((path) => (
-        <span key={path} className="check-path">
+      {paths.map((path, line) => (
+        <span key={line} className="check-path">
           {path}
         </span>
       ))}

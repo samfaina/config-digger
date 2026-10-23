@@ -266,7 +266,7 @@ describe("Before you apply", () => {
     ]);
   });
 
-  test("gives a block a block of its own, what to do on its first line, its path apart, then Check again", async () => {
+  test("gives a block that stops Apply an item of its own, what to do on its first line, its path apart, then Check again", async () => {
     await openPreview();
     const item = screen.getByRole("button", { name: "Check again" }).closest(".check")!;
 
@@ -280,7 +280,16 @@ describe("Before you apply", () => {
     ]);
   });
 
-  test("shows a note, such as a newer Agent version, as information, with its icon", async () => {
+  test("shows the sentence of a warning that comes without advice", async () => {
+    const sentence = "Claude Code is running and reads the file.";
+    vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: { ...planned, warnings: [{ class: "running-agent", sentence, advice: [] }] } });
+    render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: "x", project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
+
+    const item = (await screen.findByRole("checkbox")).closest(".check")!;
+    expect(lines(item)).toEqual([["check-why", `Warning${sentence}`]]);
+  });
+
+  test("shows a note, such as an Installation outside its Tested range, as information, with its icon", async () => {
     await openPreview();
     const item = screen.getByText(/is newer than the versions/).closest(".check")!;
 

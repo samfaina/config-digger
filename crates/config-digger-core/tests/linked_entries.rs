@@ -290,7 +290,7 @@ fn remove_of_a_linked_entry_removes_the_link_and_never_its_target() {
 }
 
 #[test]
-fn the_broken_links_warning_says_first_to_remove_the_link_and_gives_the_folder_and_link_apart() {
+fn the_broken_links_warning_says_first_to_remove_the_link_and_gives_it_apart() {
     let fs = junctioned_deploy();
     let core = core(&fs);
 
@@ -299,9 +299,9 @@ fn the_broken_links_warning_says_first_to_remove_the_link_and_gives_the_folder_a
     assert_eq!(
         plan.warnings()[0].advice,
         [Advice {
-            todo: "Remove the link on its own once this is applied.".to_owned(),
-            why: "Removing the first location below leaves the link to it pointing to nothing, as an Unread Entry.".to_owned(),
-            paths: vec![agents_skill("deploy"), claude_skill("deploy")],
+            todo: "Remove the link too, once this is applied.".to_owned(),
+            why: "Removing the folder deploy leaves this link into it pointing to nothing, as Unread.".to_owned(),
+            paths: vec![claude_skill("deploy").display().to_string()],
         }]
     );
 }
