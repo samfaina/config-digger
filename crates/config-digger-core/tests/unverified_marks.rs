@@ -259,14 +259,14 @@ fn both_schemas_give_every_table_a_mark_of_sentences() {
 fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
     let marks = config_digger_core::definitions::unverified_marks().unwrap();
 
-    // Inferred facts of the built-in definitions, by file, table and a
-    // word of each.
+    // Facts of the built-in definitions no test has reached yet, by file,
+    // table and a word of each.
     for (file, location, word) in [
         ("claude-desktop.toml", "", "LocalCache"),
         (
             "claude-code.toml",
-            "items.mcp.gates[0]",
-            "enableAllProjectMcpServers",
+            "locations[managed-mcp]",
+            "managed-mcp.json",
         ),
         ("claude-code.toml", "locations[synced-skills]", "sync gate"),
         (

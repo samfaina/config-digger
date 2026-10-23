@@ -1,6 +1,8 @@
 #:schema ../../../schema/agent-definition.schema.json
-# Gemini CLI, installed from npm. Facts from docs/research/gemini-cli.md
-# (verified against 0.62.0).
+# Gemini CLI, installed from npm. Facts from docs/research/gemini-cli.md,
+# and those tagged [test] from the release gate's probe,
+# uat/agents/gemini-cli.mjs (docs/research/release-gate.md), which passes
+# on 0.62.0.
 
 format_version = 1
 verified = { min = "0.62.0", max = "0.62.0" }
@@ -85,12 +87,13 @@ id = "system"
 # `type` says how it was installed: copied from git, a release or a local
 # folder, which the folder then holds, or `link`, which reads the extension's
 # files from the folder `source` names [source, disk]. An extension is named
-# by its manifest's `name`, and Gemini CLI stops loading extensions with an
-# error when two manifests give one `name` [source]. Extensions are the
-# user's alone: no Project has its own [source].
+# by its manifest's `name`. When two manifests give one `name`, Gemini CLI
+# does not start at all, with "Extension with name … already was loaded"
+# [source, test]; config-digger shows both extensions as Invalid
+# (#300). Extensions are the user's alone: no Project has its
+# own [source].
 [[plugins]]
 id = "extensions"
-unverified = "Of two extensions whose manifests give one `name`, both are taken to be refused; what becomes of the other extensions is not known."
 registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = ".gemini-extension-install.json", linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }
 name = { file = "gemini-extension.json", key_path = ["name"] }
 uninstall = "gemini extensions uninstall {id}"
@@ -186,10 +189,10 @@ on_read_failure = "stops_agent"
 # An extension's servers, in `mcpServers` of its `gemini-extension.json`,
 # where `${extensionPath}`, `${workspacePath}` and `${/}` stand for its
 # folder, the Project's and the path separator [source, disk]. Gemini CLI
-# drops a `trust` it finds there [source].
+# drops a `trust` it finds there [source]. It skips an extension whose
+# manifest does not parse, with a warning, and loads the others [test].
 [[locations]]
 id = "extension-mcp"
-unverified = "What Gemini CLI does with an extension manifest it cannot parse is not known."
 anchor = { block = "plugin", plugins = "extensions", path = "gemini-extension.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -199,7 +202,7 @@ provenance = "extension"
 store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-", bare = true }
 secrets = { fields = [["oauth", "clientSecret"]], urls = [["httpUrl"]] }
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
 # Settings files fold `mcpServers` name by name: of same-named servers, the
 # one in the highest file wins whole, system override first, then the
@@ -268,16 +271,15 @@ reason = "disabled_by_name"
 # the Project instead, spelled `/E:/proj/*`, and Enable takes the Project's
 # own rules out, adding one that turns the extension on when another still
 # turns it off there; a rule for a Project or a drive's root reaches every
-# Project below it. With no Project there is no folder to read the rules
-# for. Gemini CLI compares the folders as written, with regard to case
-# [source], and config-digger does too but for the drive letter, which it
-# takes in upper case.
+# Project below it, on any drive [test]. With no Project there is no folder
+# to read the rules for. Gemini CLI compares the folders as written, with
+# regard to case, the drive letter included [source, test]. It spells the
+# drive letter as the folder it starts in is spelled: upper case from
+# PowerShell, lower case after `cd /d e:\…` in cmd [test]. config-digger
+# compares as Gemini CLI does but for the drive letter, which it takes in
+# upper case, as PowerShell spells it.
 [[items.mcp.disable]]
 block = "json-path-rules"
-unverified = [
-  "Gemini CLI spells a folder's drive letter in upper case, as config-digger takes it.",
-  "A rule for a drive other than the home folder's reaches the folders below it as one for the home folder's drive does.",
-]
 switch = { anchor = { block = "home", root = "extension_enablement" }, key_path = ["{plugin_id}", "overrides"], store_class = "plain" }
 reason = "plugin_disabled"
 locations = ["extension-mcp"]

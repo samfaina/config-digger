@@ -1,7 +1,9 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Codex, the CLI, which its desktop app and IDE extension share their
-# configuration with on Windows [docs]. Facts from docs/research/codex.md
-# (verified against 0.159.3).
+# configuration with on Windows [docs]. Facts from docs/research/codex.md,
+# and those tagged [test] from the release gate's probe,
+# uat/agents/codex.mjs (docs/research/release-gate.md), which passes on
+# 0.159.3.
 
 format_version = 1
 verified = { min = "0.159.3", max = "0.159.3" }
@@ -86,12 +88,12 @@ id = "plugin"
 # folders its trust prompt answered for, lower-cased keys of `projects` in
 # `config.toml`; the folder each session started in, `cwd` in the
 # `session_meta` line that opens its `sessions\YYYY\MM\DD\rollout-*.jsonl`,
-# or once archived, its `archived_sessions\rollout-*.jsonl`; and in
+# or once archived, its `archived_sessions\rollout-*.jsonl`, not kept by
+# date [test]; and in
 # `state_5.sqlite`, the `cwd` of each thread and the `path` of each root of
 # the projects the app lists. The `5` of `state_5.sqlite` is a schema
 # generation, which changes with the version.
 [projects]
-unverified = "That archived sessions are not kept by date comes from Codex's source, not from disk."
 registries = [
   { block = "toml-keys", anchor = { block = "home", root = "config" }, root = ["projects"] },
   { block = "jsonl-heads", anchor = { block = "home", root = "sessions" }, files = "*/*/*/rollout-*.jsonl", fields = [["payload", "cwd"]] },
@@ -105,11 +107,12 @@ registries = [
 # highest version being the one it loads [source]. Codex knows each by
 # `<plugin>@<marketplace>`, and names it by its folder [source]. Its own
 # switch, `[plugins."<id>"] enabled`, is with the Disable mechanisms below.
-# Codex has no command that uninstalls a plugin: `/plugins` in its TUI does
-# [docs].
+# `codex plugin remove <id>` uninstalls it, taking out its folder in the
+# cache and its table in `config.toml` [test].
 [[plugins]]
 id = "installed"
 registry = { block = "plugin-cache", anchor = { block = "home", root = "plugins", path = "cache" }, separator = "@", excludes = ".codex-remote-plugin-install.json" }
+uninstall = "codex plugin remove {id}"
 
 # Plugins the account installed from its catalog, marked by
 # `.codex-remote-plugin-install.json` beside their versions [source, disk].
@@ -213,10 +216,10 @@ on_read_failure = "stops_agent"
 # A plugin's servers, from its `.mcp.json` [source]. The servers its
 # manifest declares in `mcpServers`, which Codex reads instead when there
 # are any, are not read yet. The plugin owns their transport: `config.toml`
-# can only switch them [source].
+# can only switch them [source]. Codex starts without the servers of a
+# plugin's `.mcp.json` it cannot parse, and keeps the plugin's skills [test].
 [[locations]]
 id = "plugin-mcp"
-unverified = "What Codex does with a plugin's `.mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = "installed", path = ".mcp.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -225,7 +228,7 @@ scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
 secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
 # The servers of a plugin the account installed, read only.
 [[locations]]
@@ -245,9 +248,8 @@ on_read_failure = "unknown"
 # sandbox]: a Project's `[mcp_servers.docs] args = [...]` replaces only the
 # `args` of the user's `docs`, and `enabled = false` alone turns it off.
 # Codex refuses to start on a server with both `command` and `url`
-# [sandbox]. That a higher layer's `enabled = true` turns on again a server
-# a lower one turned off follows from the merge [source], not observed.
-# The server built from the layers beats a plugin's server of the same name
+# [sandbox]. A higher layer's `enabled = true` turns on again a server a
+# lower one turned off [test]. The server built from the layers beats a plugin's server of the same name
 # whole, even when it is off, and of two plugins with such a server the
 # first by id wins [source].
 [items.mcp]
@@ -259,21 +261,16 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # Codex's own switch for a server is `enabled = false` in its table, in
 # any layer [docs, source]: the field merges with the others, so it turns
 # off the server built from every layer, and the highest layer that sets it
-# decides. Disable writes it in the Entry's own table, and is not offered
-# below a layer that sets it; for an Entry of a git-versioned Project layer,
-# it writes a table holding `enabled` alone in the user's `config.toml`,
-# unless a layer above that sets it. That a lower layer's `enabled = false`
-# holds while no higher one sets it follows from the merge [source,
-# sandbox].
+# decides [source, sandbox, test]. Disable writes it in the Entry's own
+# table, and is not offered below a layer that sets it. A table holding
+# `enabled` alone, where no other layer declares the server, stops Codex
+# with "invalid transport" [test]: one in the user's `config.toml` for a
+# Project layer's server stops it in every other folder. So an Entry of a
+# git-versioned Project layer has no Disable (#297).
 [[items.mcp.disable]]
 block = "merged-field"
-unverified = [
-  "A higher layer's `enabled = true` wins over a lower layer's `enabled = false`.",
-  "Codex starts with a table holding `enabled` alone where no other layer has the server.",
-]
 locations = ["project-mcp", "user-mcp"]
 requires_unset_above = true
-fallback = "user-mcp"
 
 # A plugin's server has its own switch, `enabled = false` under
 # `[plugins."<id>".mcp_servers.<name>]`, the only key `config.toml` can set
@@ -295,17 +292,18 @@ locations = ["plugin-mcp", "remote-plugin-mcp"]
 
 # A plugin is on or off with every server and skill it carries by
 # `[plugins."<id>"] enabled`, which Codex writes `true` when it installs the
-# plugin and its `/plugins` turns `false` and back [source, docs]. These
-# switches are repeated for skills below.
+# plugin and its `/plugins` turns `false` and back [source, docs]. A plugin
+# missing from `config.toml` is off, with its servers and skills [test].
+# These switches are repeated for skills below.
 [[items.mcp.disable]]
 block = "json-field"
-unverified = "A plugin missing from `config.toml` is taken to be on."
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "plugin"
 context = "all"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
+default_value = false
 reason = "plugin_disabled"
 locations = ["plugin-mcp"]
 
@@ -378,10 +376,9 @@ store_class = "plain"
 on_read_failure = "ignores_file"
 
 # `.agents\skills` in each folder from the repo root down to the Project
-# [source, docs].
+# [source, docs], read even in a Project Codex does not trust [test].
 [[locations]]
 id = "project-agents-skills"
-unverified = 'Whether trust applies to `.agents\skills` is not known: it is taken not to, as for `.codex\skills`.'
 anchor = { block = "project", path = ".agents/skills", walk = "up-to-repo-root" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
 kind = "skill"
@@ -468,12 +465,12 @@ on_read_failure = "ignores_file"
 
 # Codex lists every skill it finds, by the path of its `SKILL.md`, so two
 # skills with one name are both used [source, docs]. Trust keeps out no
-# skill.
+# skill. It finds skill folders up to 6 folders below a root [test], where
+# config-digger reads any depth (#298). It skips a `SKILL.md`
+# that is not UTF-8 or cannot be opened [test]. It reads a frontmatter that
+# is not YAML line by line, so `name: [unclosed` names a skill `[unclosed`
+# [test], where config-digger skips the skill (#299).
 [items.skill]
-unverified = [
-  "How deep Codex looks for skills is not known: skills are taken to be found at any depth.",
-  "What Codex does with a `SKILL.md` it cannot read is not known: it is taken to be skipped.",
-]
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
 checks = ["frontmatter", "disable", "precedence"]
@@ -484,13 +481,13 @@ checks = ["frontmatter", "disable", "precedence"]
 # of that name, with `enabled = false`, the later rule winning [source].
 # Disable adds a rule by path, which reaches the one skill, written as an
 # absolute path with the links of its folders resolved, since Codex
-# canonicalises the paths of rules before it compares them [source]. Enable
-# takes the rule out. Of several
+# canonicalises the paths of rules before it compares them [source]: a
+# rule's path matches the `SKILL.md` in any case, with either slash, and
+# with or without `\\?\` [test]. Enable takes the rule out. Of several
 # rules by path, or by name, for one skill the later counts, but a rule by
 # path and one by name are each read on their own.
 [[items.skill.disable]]
 block = "json-item-list"
-unverified = 'How Codex spells a canonical path on Windows, with or without `\\?\`, is not known.'
 switch = { anchor = { block = "home", root = "config" }, key_path = ["skills", "config", "{name}"], named_by = "path", later_wins = true, store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"
@@ -522,5 +519,6 @@ context = "all"
 enable_action = "set"
 enabled_value = true
 disabled_value = false
+default_value = false
 reason = "plugin_disabled"
 locations = ["plugin-skills"]

@@ -10,6 +10,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
 | `uat/runner.test.mjs` | Tests of the runner's logic and the words of its page. Run them with `node --test uat/runner.test.mjs`. |
 | `uat/data/cd-throwaway-setup.ps1` | Creates the throwaway Agent homes and Projects the steps use. |
 | `uat/auto/` | The tools that walk most steps without a tester, before a run is published (see [Automated steps](#automated-steps)). |
+| `uat/agents/` | Probes that test the built-in definitions' facts against the real Agents, for the release gate. They test the Agents, not config-digger: see `docs/research/release-gate.md`. |
 
 ## The plan
 

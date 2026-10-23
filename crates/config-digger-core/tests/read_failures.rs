@@ -495,28 +495,72 @@ fn entries_keep_their_states_when_another_file_stops_the_agent() {
 
 #[test]
 fn a_location_whose_reaction_is_unknown_gives_every_item_in_its_contexts_a_caveat() {
+    let definition = user_agent("agent.json", STRICT, "ignores_file")
+        .replace(
+            "[[locations]]",
+            "[[scopes]]\nid = \"project\"\n\n[[locations]]\nid = \"project-mcp\"\nanchor = { block = \"project\", path = \".mcp.json\" }\nformat = { block = \"json\", dialect = \"strict\" }\nroot = [\"mcpServers\"]\nkind = \"mcp\"\nscope = \"project\"\nprovenance = \"file\"\nstore_class = \"plain\"\non_read_failure = \"unknown\"\n\n[[locations]]",
+        )
+        .replace(
+            r#"precedence = ["user-mcp"]"#,
+            r#"precedence = ["project-mcp", "user-mcp"]"#,
+        );
     let fs = || {
         FakeFileSystem::new()
             .with_file(
-                in_home(".claude.json"),
-                r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}}"#,
+                in_home("agent.json"),
+                r#"{"servers": {"a": {"command": "a"}}}"#,
             )
             .with_file(mcp_json(), UNPARSABLE_JSON)
     };
-    let in_project = inventory_in(fs(), &[], Some(PROJECT));
-    let without_project = inventory_in(fs(), &[], None);
+    let definitions = [("user-agent.toml", definition.as_str())];
+    let in_project = inventory_in(fs(), &definitions, Some(PROJECT));
+    let without_project = inventory_in(fs(), &definitions, None);
 
-    assert_eq!(in_project["read_failures"][0]["reaction"], "unknown");
+    let caveats = |inventory: &Value| {
+        inventory["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["agent"] == "user-agent")
+            .unwrap()["caveats"]
+            .clone()
+    };
+    let failure = in_project["read_failures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|failure| failure["agent"] == "user-agent")
+        .unwrap();
+    assert_eq!(failure["reaction"], "unknown");
     assert_eq!(
-        in_project["items"][0]["caveats"],
+        caveats(&in_project),
         json!([{
             "code": "read_failure",
             "path": mcp_json(),
-            "sentence": r"A location that could take part couldn't be read: E:\work\app\.mcp.json, so the State shown may not be the one Claude Code has."
+            "sentence": r"A location that could take part couldn't be read: E:\work\app\.mcp.json, so the State shown may not be the one User Agent has."
         }])
     );
-    assert_eq!(without_project["items"][0]["caveats"], json!([]));
+    assert_eq!(caveats(&without_project), json!([]));
     assert_eq!(in_project["agent_flags"], json!([]));
+}
+
+#[test]
+fn claude_code_skips_a_mcp_json_it_cannot_parse_and_loads_its_other_servers() {
+    let fs = FakeFileSystem::new()
+        .with_file(
+            in_home(".claude.json"),
+            r#"{"mcpServers": {"linear": {"url": "https://mcp.linear.app/mcp"}}}"#,
+        )
+        .with_file(mcp_json(), UNPARSABLE_JSON);
+    let inventory = inventory_in(fs, &[], Some(PROJECT));
+
+    assert_eq!(inventory["read_failures"][0]["reaction"], "ignores_file");
+    assert_eq!(
+        items(&inventory),
+        [item("claude-code", "linear", "effective")]
+    );
+    assert_eq!(inventory["items"][0]["caveats"], json!([]));
+    assert_eq!(inventory["agent_flags"], json!([]));
 }
 
 #[test]

@@ -574,9 +574,16 @@ fn skills_rank_the_workspace_s_folders_above_the_personal_ones() {
 fn vs_code_names_a_skill_by_its_folder() {
     let inventory = inventory(&with_home(vscode()));
 
-    // Claude Code names the same folder by its frontmatter.
+    // Claude Code names the same folder by its folder too, not by its
+    // frontmatter `code-review`.
     assert!(
         inventory
+            .items
+            .iter()
+            .any(|item| item.agent == "claude-code" && item.name == "review")
+    );
+    assert!(
+        !inventory
             .items
             .iter()
             .any(|item| item.agent == "claude-code" && item.name == "code-review")
@@ -681,7 +688,7 @@ fn a_skill_folder_two_agents_read_names_each_one_s_state() {
     let claude = inventory
         .items
         .iter()
-        .find(|item| item.agent == "claude-code" && item.name == "code-review")
+        .find(|item| item.agent == "claude-code" && item.name == "review")
         .unwrap();
     let readers: Vec<(&str, &str)> = claude.entries[0]
         .also_read_by
