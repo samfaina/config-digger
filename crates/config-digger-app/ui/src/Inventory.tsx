@@ -515,7 +515,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const mirrored = (home: Home) =>
     home.mirror && (
       <Tooltip text={home.mirror.sentence}>
-        <span className="tag">{home.mirror.label}</span>
+        <span className="tag read-only">{home.mirror.label}</span>
       </Tooltip>
     );
   const notRead = (home: Home) =>
@@ -663,7 +663,7 @@ function ItemRow({ item, selected, onSelect }: { item: Item; selected: boolean; 
         </Tooltip>
       </span>
       <span className="item-side">
-        {effective.git_versioned && <span className="tag">git-versioned</span>}
+        {effective.git_versioned && <span className="tag git">git-versioned</span>}
         {effective.link && <LinkTag link={effective.link} />}
         <span className="item-count">{entries}</span>
         <StatePill state={item.state} />

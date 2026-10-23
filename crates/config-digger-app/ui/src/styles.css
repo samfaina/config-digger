@@ -34,6 +34,18 @@
   --notice-warning: #614a14;
   --notice-warning-edge: #ffc861;
   --git-versioned: #a78bfa;
+  /* A tag on a row, filled and outlined, one tone per what it tells. */
+  --tag: #33343c;
+  --tag-text: #d4d5da;
+  --tag-edge: #7a7c86;
+  --tag-git: #352c5c;
+  --tag-git-text: #d4c9ff;
+  --tag-link: #173f43;
+  --tag-link-text: #a5eef2;
+  --tag-link-edge: #39c5cf;
+  --tag-read-only: #4d3015;
+  --tag-read-only-text: #fed7aa;
+  --tag-read-only-edge: #f0883e;
   --snackbar: #523f9e;
   --snackbar-edge: #d4c9ff;
   --danger: #b93a35;
@@ -560,16 +572,39 @@ p {
   }
 }
 
-/* A tag on the Effective Entry, such as git-versioned */
+/* A tag on a row, such as Added by you or git-versioned: plain, or in the tone of what it tells */
 
 .tag {
   flex: none;
   padding: 3px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--tag-edge);
   border-radius: 999px;
-  color: var(--grey);
+  background: var(--tag);
+  color: var(--tag-text);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.tag.git {
+  /* The colour of the ring on a git-versioned Remove in a dialog. */
+  border-color: var(--git-versioned);
+  background: var(--tag-git);
+  color: var(--tag-git-text);
+}
+
+.tag.junction {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: var(--tag-link-edge);
+  background: var(--tag-link);
+  color: var(--tag-link-text);
+}
+
+.tag.read-only {
+  border-color: var(--tag-read-only-edge);
+  background: var(--tag-read-only);
+  color: var(--tag-read-only-text);
 }
 
 /* State pills: one colour per State */
@@ -1137,24 +1172,11 @@ p {
   gap: 5px;
 }
 
-.tag.git {
-  border-color: #d2992266;
-  color: #e9c46a;
-}
-
 /* A long tag is cut at the row's width; its tooltip holds the full path. */
 .tags .tag {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tag.junction {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-color: #39c5cf55;
-  color: #8be0e6;
 }
 
 .entry-location {
@@ -2515,11 +2537,6 @@ p {
 .cta.small {
   padding: 6px 12px;
   font-size: 10.5px;
-}
-
-.tag.read-only {
-  border-color: #fb923c;
-  color: #fdba74;
 }
 
 .side-row {
