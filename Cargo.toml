@@ -31,12 +31,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 sha2 = "0.10"
 similar = "3.2"
-# The CLI's VC++ runtime, linked statically as `tauri-build` links the
-# app's, with the UCRT left to Windows: a Windows without the VC++ runtime
-# runs it.
-static_vcruntime = "3.0"
 specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
 specta-typescript = "=0.0.12"
+# The CLI's VC++ runtime, linked statically as `tauri-build` links the
+# app's.
+static_vcruntime = "3.0"
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 tauri = "2.12"
 tauri-build = "2.7"

@@ -63,6 +63,50 @@
           "covers": ["#78"]
         },
         {
+          "id": "9.5",
+          "title": "Sin el runtime de VC++, en Windows Sandbox",
+          "goal": "En un Windows sin el runtime de VC++, el CLI del zip arranca y el instalador pone config-digger en el PATH.",
+          "instructions": [
+            "Si tu Windows no tiene Windows Sandbox, o no está activado, marca el paso Bloqueado.",
+            "En la release de la versión de esta página, haz clic en config-digger_<versión>_x64-cli.zip para guardarlo en Descargas, junto al instalador.",
+            "En PowerShell, ejecuta la orden Abrir Windows Sandbox con Descargas: abre un Windows limpio que ve tu carpeta Descargas como C:\\Descargas, solo para leer.",
+            "Dentro del Sandbox, abre PowerShell desde el menú Inicio.",
+            "Ejecuta allí la orden Buscar el runtime de VC++.",
+            "Ejecuta allí la orden Probar el CLI del zip.",
+            "Ejecuta allí la orden Instalar sin preguntas y leer el PATH.",
+            "Cierra el Sandbox: lo que se instaló dentro se borra."
+          ],
+          "commands": [
+            {
+              "label": "Abrir Windows Sandbox con Descargas",
+              "shell": "powershell",
+              "text": "$wsb = \"$env:TEMP\\cd-throwaway-sandbox.wsb\"; Set-Content $wsb \"<Configuration><MappedFolders><MappedFolder><HostFolder>$env:USERPROFILE\\Downloads</HostFolder><SandboxFolder>C:\\Descargas</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder></MappedFolders></Configuration>\"; Start-Process $wsb"
+            },
+            {
+              "label": "Buscar el runtime de VC++",
+              "shell": "powershell",
+              "text": "'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll' | ForEach-Object { Test-Path \"$env:WINDIR\\System32\\$_\" }"
+            },
+            {
+              "label": "Probar el CLI del zip",
+              "shell": "powershell",
+              "text": "Expand-Archive (Get-ChildItem C:\\Descargas\\config-digger_*_x64-cli.zip | Sort-Object LastWriteTime | Select-Object -Last 1).FullName C:\\cli; C:\\cli\\config-digger.exe --version"
+            },
+            {
+              "label": "Instalar sin preguntas y leer el PATH",
+              "shell": "powershell",
+              "text": "Start-Process (Get-ChildItem C:\\Descargas\\config-digger_*_x64-setup.exe | Sort-Object LastWriteTime | Select-Object -Last 1).FullName /S -Wait; (Get-ItemProperty HKCU:\\Environment).Path -split ';'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\" --version"
+            }
+          ],
+          "expect": [
+            "Buscar el runtime de VC++ imprime tres líneas «False».",
+            "Probar el CLI del zip imprime «config-digger <versión>», con la versión del título de esta página.",
+            "Entre las líneas del PATH está «C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\Programs\\config-digger».",
+            "Instalar sin preguntas y leer el PATH acaba con la línea «config-digger <versión>»."
+          ],
+          "covers": ["#270"]
+        },
+        {
           "id": "9.2",
           "title": "Primera instalación, con PATH",
           "goal": "El instalador instala en su propia carpeta, no deja usar la carpeta de datos y, con la casilla de PATH marcada, una terminal nueva encuentra config-digger.",

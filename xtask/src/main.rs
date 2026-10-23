@@ -30,9 +30,8 @@
 //!   fails when the signature is missing or empty.
 //! - `assets <tag> <dir>`: fails unless `<dir>` holds every asset the tag's
 //!   release publishes, the updater's signature and manifest included.
-//! - `vcruntime <exe>`: fails when the executable imports a DLL of the VC++
-//!   runtime, which a Windows without it lacks: the CLI must run there, for
-//!   the installer's hooks run it.
+//! - `vcruntime <exe>`: checks that the executable imports no DLL of the
+//!   VC++ runtime, which a Windows without it lacks. It writes nothing.
 //!
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 

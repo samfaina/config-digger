@@ -28,8 +28,7 @@ jobs:
         run: cargo test --workspace --locked
       - name: Release CLI
         run: cargo build --release --package config-digger-cli --locked
-      # The installer's hooks run the CLI, on a Windows that may have no
-      # VC++ runtime. The tests built the debug CLI.
+      # The tests built the debug CLI.
       - name: The CLI imports no VC++ runtime
         shell: bash
         run: |

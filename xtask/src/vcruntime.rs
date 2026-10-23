@@ -19,62 +19,90 @@ pub fn problems(exe: &[u8]) -> Vec<String> {
     }
 }
 
+// Where the PE format puts what the check reads, as offsets from the start
+// of the file, of the PE signature, of the optional header, of a section
+// header and of an import descriptor.
+const PE_OFFSET: usize = 0x3C;
+const SECTION_COUNT: usize = 6;
+const OPTIONAL_HEADER_SIZE: usize = 20;
+const OPTIONAL_HEADER: usize = 24;
+/// PE32+, the optional header of a 64-bit executable.
+const PE32_PLUS: u16 = 0x20B;
+const DIRECTORY_COUNT: usize = 108;
+const IMPORT_DIRECTORY: usize = 120;
+const SECTION_HEADER_SIZE: usize = 40;
+const SECTION_ADDRESS: usize = 12;
+const SECTION_DATA_SIZE: usize = 16;
+const SECTION_DATA: usize = 20;
+const DESCRIPTOR_SIZE: usize = 20;
+const DESCRIPTOR_NAME: usize = 12;
+
 /// The DLLs the import table of `exe` names, in its order.
 fn imports(exe: &[u8]) -> Result<Vec<String>, String> {
     if exe.get(..2) != Some(b"MZ") {
         return Err("no MZ header".to_owned());
     }
-    let pe = u32_at(exe, 0x3C)? as usize;
+    let pe = u32_at(exe, PE_OFFSET)? as usize;
     if exe.get(pe..pe + 4) != Some(b"PE\0\0") {
         return Err("no PE signature".to_owned());
     }
-    let sections = u16_at(exe, pe + 6)? as usize;
-    let optional = pe + 24;
-    let optional_size = u16_at(exe, pe + 20)? as usize;
-    // The data directories follow the optional header's fields, which PE32+
-    // makes 16 bytes longer than PE32.
-    let directories = match u16_at(exe, optional)? {
-        0x10B => optional + 96,
-        0x20B => optional + 112,
-        magic => return Err(format!("unknown optional header magic {magic:#x}")),
-    };
-    if u32_at(exe, directories - 4)? < 2 {
+    let optional_header = pe + OPTIONAL_HEADER;
+    match u16_at(exe, optional_header)? {
+        PE32_PLUS => {}
+        magic => return Err(format!("the optional header {magic:#x} is not PE32+'s")),
+    }
+    // The import table is the second data directory.
+    if u32_at(exe, optional_header + DIRECTORY_COUNT)? < 2 {
         return Ok(Vec::new());
     }
-    let table = u32_at(exe, directories + 8)?;
-    if table == 0 {
+    let import_table = u32_at(exe, optional_header + IMPORT_DIRECTORY)?;
+    if import_table == 0 {
         return Ok(Vec::new());
     }
-    let headers = optional + optional_size;
-    let offset = |rva: u32| -> Result<usize, String> {
-        (0..sections)
-            .map(|index| headers + 40 * index)
-            .find_map(|header| {
-                let size = u32_at(exe, header + 8)
-                    .ok()?
-                    .max(u32_at(exe, header + 16).ok()?);
-                let start = u32_at(exe, header + 12).ok()?;
-                let raw = u32_at(exe, header + 20).ok()?;
-                (start..start.checked_add(size)?)
-                    .contains(&rva)
-                    .then(|| (rva - start) as usize + raw as usize)
-            })
-            .ok_or_else(|| format!("no section holds the address {rva:#x}"))
+    let sections = Sections {
+        exe,
+        headers: optional_header + u16_at(exe, pe + OPTIONAL_HEADER_SIZE)? as usize,
+        count: u16_at(exe, pe + SECTION_COUNT)? as usize,
     };
     let mut dlls = Vec::new();
-    let mut descriptor = offset(table)?;
+    let mut descriptor = sections.file_offset(import_table)?;
     loop {
-        let name = u32_at(exe, descriptor + 12)?;
-        if name == 0 {
+        let name_address = u32_at(exe, descriptor + DESCRIPTOR_NAME)?;
+        if name_address == 0 {
             return Ok(dlls);
         }
-        let start = offset(name)?;
-        let length = exe[start..]
-            .iter()
-            .position(|&byte| byte == 0)
-            .ok_or("a DLL name runs past the end")?;
-        dlls.push(String::from_utf8_lossy(&exe[start..start + length]).into_owned());
-        descriptor += 20;
+        let name = sections.file_offset(name_address)?;
+        let length = exe
+            .get(name..)
+            .and_then(|rest| rest.iter().position(|&byte| byte == 0))
+            .ok_or_else(|| format!("the file ends before the DLL name at {name:#x}"))?;
+        dlls.push(String::from_utf8_lossy(&exe[name..name + length]).into_owned());
+        descriptor += DESCRIPTOR_SIZE;
+    }
+}
+
+/// The section headers of an executable.
+struct Sections<'a> {
+    exe: &'a [u8],
+    /// Where the first one starts in the file.
+    headers: usize,
+    count: usize,
+}
+
+impl Sections<'_> {
+    /// Where the address `rva` lies in the file: in the data of the section
+    /// that holds it.
+    fn file_offset(&self, rva: u32) -> Result<usize, String> {
+        for index in 0..self.count {
+            let header = self.headers + SECTION_HEADER_SIZE * index;
+            let address = u32_at(self.exe, header + SECTION_ADDRESS)?;
+            let size = u32_at(self.exe, header + SECTION_DATA_SIZE)?;
+            let data = u32_at(self.exe, header + SECTION_DATA)?;
+            if rva >= address && rva - address < size {
+                return Ok(data as usize + (rva - address) as usize);
+            }
+        }
+        Err(format!("no section holds the address {rva:#x} in the file"))
     }
 }
 
@@ -187,12 +215,35 @@ mod tests {
     }
 
     #[test]
-    fn a_truncated_executable_is_a_problem() {
+    fn an_executable_cut_in_its_section_headers_is_a_problem() {
         let exe = importing(&["VCRUNTIME140.dll"]);
 
         assert_eq!(
-            problems(&exe[..0x100]),
-            vec!["it is no PE executable: no section holds the address 0x1000"]
+            problems(&exe[..0x150]),
+            vec!["it is no PE executable: the file ends before the offset 0x154"]
+        );
+    }
+
+    #[test]
+    fn an_executable_cut_before_a_dll_name_is_a_problem() {
+        let exe = importing(&["VCRUNTIME140.dll"]);
+
+        assert_eq!(
+            problems(&exe[..0x214]),
+            vec!["it is no PE executable: the file ends before the DLL name at 0x228"]
+        );
+    }
+
+    #[test]
+    fn an_address_past_its_section_data_in_the_file_is_a_problem() {
+        let mut exe = importing(&["VCRUNTIME140.dll"]);
+        // The section's data in the file holds the descriptors only: the
+        // name lies in the part the loader fills with zeros.
+        exe[0x148 + 16..0x148 + 20].copy_from_slice(&40u32.to_le_bytes());
+
+        assert_eq!(
+            problems(&exe),
+            vec!["it is no PE executable: no section holds the address 0x1028 in the file"]
         );
     }
 }
