@@ -5,7 +5,12 @@ name: Release
 # `latest.json`, the CLI-only zip, `SHA256SUMS` and GitHub artifact
 # attestations. No release ships without the updater's signature and
 # manifest: the run fails before the release is created. The installer is
-# signed with the minisign key in the `TAURI_SIGNING_PRIVATE_KEY` secret.
+# signed with the minisign key in the `TAURI_SIGNING_PRIVATE_KEY` secret,
+# and the run fails before the release is created unless that signature,
+# the `.sig` and the one in `latest.json`, verifies the installer against
+# the `pubkey` in the app's `tauri.conf.json` and, when it carries a
+# version, was made for the version `latest.json` announces: the release
+# is one the installed app accepts.
 # `vX.Y.Z-rc.N` tags are published as prereleases, never marked latest, so
 # the app's updater, which reads `releases/latest`, never sees them. The tag
 # must be the workspace version, which is the one version of every crate.
@@ -69,6 +74,9 @@ jobs:
       - name: Updater manifest
         shell: bash
         run: cargo xtask updater "$GITHUB_REF_NAME" dist
+      - name: The updater signature verifies against the app's public key
+        shell: bash
+        run: cargo xtask signature "$GITHUB_REF_NAME" dist
       - name: Checksums
         run: cargo xtask checksums dist
       - name: Every asset is there

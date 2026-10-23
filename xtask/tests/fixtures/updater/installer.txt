@@ -1,0 +1,1 @@
+A stand-in for the installer, signed with a throwaway key pair.

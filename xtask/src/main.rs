@@ -28,6 +28,12 @@
 //! - `updater <tag> <dir>`: writes the updater manifest `<dir>/latest.json`
 //!   from the signature of the tag's installer, `<dir>/<installer>.sig`, and
 //!   fails when the signature is missing or empty.
+//! - `signature <tag> <dir>`: checks the updater's signature of the tag's
+//!   installer, both `<dir>/<installer>.sig` and the one in
+//!   `<dir>/latest.json`, as the app's updater checks it: against the
+//!   `pubkey` of the app's `tauri.conf.json`, and, when its trusted comment
+//!   carries a version, for the version `latest.json` announces. It writes
+//!   nothing.
 //! - `assets <tag> <dir>`: fails unless `<dir>` holds every asset the tag's
 //!   release publishes, the updater's signature and manifest included.
 //! - `vcruntime <exe>`: checks that the executable imports no DLL of the
@@ -38,6 +44,7 @@
 mod fixtures;
 mod installer;
 mod release;
+mod signature;
 mod vcruntime;
 
 use std::path::{Path, PathBuf};
@@ -92,13 +99,14 @@ fn main() -> ExitCode {
             return write_winget(tag, Path::new(installer), Path::new(dir));
         }
         ["updater", tag, dir] => return write_updater_manifest(tag, Path::new(dir)),
+        ["signature", tag, dir] => return check_signature(tag, Path::new(dir)),
         ["assets", tag, dir] => return check_assets(tag, Path::new(dir)),
         ["vcruntime", exe] => return check_vcruntime(Path::new(exe)),
         _ => {
             eprintln!(
                 "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures|fake-backend>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
-                        cargo xtask updater <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
+                        cargo xtask updater <tag> <dir> | signature <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
             );
             return ExitCode::from(2);
         }
@@ -362,6 +370,51 @@ fn write_updater_manifest(tag: &str, dir: &Path) -> ExitCode {
             eprintln!("{error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The updater's signature of the tag's installer in `dir`, as the release
+/// checks it before the release exists.
+fn check_signature(tag: &str, dir: &Path) -> ExitCode {
+    let release = match checked_release(tag) {
+        Ok(release) => release,
+        Err(code) => return code,
+    };
+    let read = |path: &Path| {
+        std::fs::read(path).map_err(|error| {
+            eprintln!("cannot read {}: {error}", path.display());
+            ExitCode::FAILURE
+        })
+    };
+    let text = |path: &Path| {
+        read(path).and_then(|bytes| {
+            String::from_utf8(bytes).map_err(|error| {
+                eprintln!("{} is no UTF-8 text: {error}", path.display());
+                ExitCode::FAILURE
+            })
+        })
+    };
+    let installer = dir.join(release::installer_name(&release.version));
+    let files = text(&repo_file("crates/config-digger-app/tauri.conf.json")).and_then(|conf| {
+        Ok((
+            conf,
+            read(&installer)?,
+            text(&dir.join(release::signature_name(&release.version)))?,
+            text(&dir.join(release::UPDATER_MANIFEST))?,
+        ))
+    });
+    match files {
+        Ok((tauri_conf, bytes, sig, manifest)) => report(
+            &signature::problems(&tauri_conf, &bytes, &sig, &manifest)
+                .iter()
+                .map(|problem| format!("{}: {problem}", installer.display()))
+                .collect::<Vec<_>>(),
+            &format!(
+                "the updater's signature of {} verifies against the app's public key",
+                installer.display()
+            ),
+        ),
+        Err(code) => code,
     }
 }
 

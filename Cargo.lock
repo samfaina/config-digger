@@ -5737,8 +5737,11 @@ dependencies = [
 name = "xtask"
 version = "0.1.0-rc.2"
 dependencies = [
+ "base64 0.22.1",
  "config-digger-core",
  "jsonschema",
+ "minisign-verify",
+ "semver",
  "serde_json",
  "sha2",
  "tempfile",
