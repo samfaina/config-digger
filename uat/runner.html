@@ -141,7 +141,9 @@ pre {
 /* Exact UI text: what the tester must read on screen, word for word. */
 samp {
   font: 0.85em/1.5 var(--font-mono); background: var(--code-bg); border-radius: 4px;
-  padding: 1px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  /* The outline sets the box apart where --code-bg sits close to the
+     surface, as in dark. */
+  box-shadow: inset 0 0 0 1px var(--line); padding: 1px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone;
 }
 .verdict { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
 .verdict-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -276,13 +278,14 @@ const Uat = (() => {
     return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
   }
 
-  /** A check of a step's `expect` in parts: `{ ui }` for the exact UI text
-   * the plan writes between « and », `{ text }` for the words around it. */
+  /** A check of a step's `expect` in parts, each `{ text, ui }`: `ui` is
+   * true for the exact UI text the plan writes between « and », false for
+   * the words around it. */
   function checkParts(check) {
     return check
       .split(/«([^»]*)»/)
-      .map((part, i) => (i % 2 ? { ui: part } : { text: part }))
-      .filter((part) => part.ui !== undefined || part.text);
+      .map((text, i) => ({ text, ui: i % 2 === 1 }))
+      .filter((part) => part.ui || part.text);
   }
 
   return { STATUSES, result, choose, look, steps, progress, nextStep, exportMarkdown, checkParts };
@@ -468,7 +471,7 @@ const Uat = (() => {
       });
       return el("li", {}, box,
         el("label", { for: `check-${i}` }, ...Uat.checkParts(text).map((part) =>
-          part.ui === undefined ? part.text : el("samp", {}, part.ui))));
+          part.ui ? el("samp", {}, part.text) : part.text)));
     };
     const savedLine = saved
       ? `Guardado: ${Uat.STATUSES[saved.status].label} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`

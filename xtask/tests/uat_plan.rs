@@ -70,10 +70,10 @@ fn more_than_one_sentence(check: &str) -> bool {
         match c {
             '«' => quoted = true,
             '»' => quoted = false,
-            '.' | ';' | '?' | '!' if !quoted => {
-                if chars.peek().is_some_and(|next| next.is_whitespace()) {
-                    return true;
-                }
+            '.' | ';' | '?' | '!'
+                if !quoted && chars.peek().is_some_and(|next| next.is_whitespace()) =>
+            {
+                return true;
             }
             _ => {}
         }
@@ -190,7 +190,9 @@ fn a_check_of_two_sentences_fails() {
         .push("Sale el aviso «Hid it. Picking it still evaluates it.». El Project se va.".into());
     assert_eq!(
         problems(&plan),
-        [r#"step 1.1 has a check of more than one sentence: "Sale el aviso «Hid it. Picking it still evaluates it.». El Project se va.""#]
+        [
+            r#"step 1.1 has a check of more than one sentence: "Sale el aviso «Hid it. Picking it still evaluates it.». El Project se va.""#
+        ]
     );
 }
 

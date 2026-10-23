@@ -140,16 +140,18 @@ test("the export says so when no step has notes", () => {
 
 test("a check sets its exact UI text apart from the words around it", () => {
   assert.deepEqual(Uat.checkParts("Sale el aviso «Copied the path.» y luego «Done»."), [
-    { text: "Sale el aviso " },
-    { ui: "Copied the path." },
-    { text: " y luego " },
-    { ui: "Done" },
-    { text: "." },
+    { text: "Sale el aviso ", ui: false },
+    { text: "Copied the path.", ui: true },
+    { text: " y luego ", ui: false },
+    { text: "Done", ui: true },
+    { text: ".", ui: false },
   ]);
 });
 
 test("a check without exact UI text is one plain part", () => {
-  assert.deepEqual(Uat.checkParts("El diálogo cabe en la ventana."), [{ text: "El diálogo cabe en la ventana." }]);
+  assert.deepEqual(Uat.checkParts("El diálogo cabe en la ventana."), [
+    { text: "El diálogo cabe en la ventana.", ui: false },
+  ]);
 });
 
 /** The words of the page's element with this id, as its markup or the
