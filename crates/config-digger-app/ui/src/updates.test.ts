@@ -34,9 +34,12 @@ describe("an update that was not installed", () => {
     );
   });
 
-  test("reads the same when no update was found", () => {
+  test("reads the same when no update was found or the CLI runs", () => {
     expect(installFailedText("no update was found: check for updates first")).toBe(
       "The update was not installed: no update was found: check for updates first",
     );
+    const cliRunning =
+      "the config-digger CLI is running (C:\\Programs\\config-digger\\config-digger.exe), and the update cannot replace it while it runs: let it finish or close it, then try again";
+    expect(installFailedText(cliRunning)).toBe(`The update was not installed: ${cliRunning}`);
   });
 });
