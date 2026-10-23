@@ -12,8 +12,8 @@ repository = "https://github.com/samfaina/config-digger"
 config-digger-core = { path = "crates/config-digger-core" }
 anstream = "1.0"
 anstyle = "1.0"
-# The release's check of the updater's signature, with the crates
-# `tauri-plugin-updater` verifies it with.
+# The release decodes the updater's public key and signatures as
+# `tauri-plugin-updater` does: minisign text in standard base64.
 base64 = "0.22"
 clap = { version = "4.6", features = ["derive"] }
 clap_complete = "4.6"
@@ -23,7 +23,8 @@ jsonc-parser = { version = "=0.34.0", features = ["cst", "serde", "serde_json"] 
 # The UAT plan's check against its JSON Schema. No remote references, so no
 # HTTP client.
 jsonschema = { version = "0.59", default-features = false }
-# The updater signature check's, as `base64`.
+# The release verifies the updater's signature as `tauri-plugin-updater`
+# does.
 minisign-verify = "0.2"
 # The Windows picker for folders and files. Windows only, so no default
 # (Linux portal) feature is needed.
@@ -32,7 +33,8 @@ rfd = { version = "0.16", default-features = false }
 # library is needed.
 rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = "1.2"
-# The updater signature check's, as `base64`.
+# The release compares the version a signature was made for as
+# `tauri-plugin-updater` does.
 semver = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }

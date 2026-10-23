@@ -11,7 +11,7 @@ use minisign_verify::{PublicKey, Signature};
 /// another version than the one `manifest` announces; or the key, a
 /// signature or the manifest cannot be decoded.
 pub fn problems(tauri_conf: &str, installer: &[u8], sig: &str, manifest: &str) -> Vec<String> {
-    let (public_key, (version, announced)) = match (public_key(tauri_conf), announced(manifest)) {
+    let (public_key, announced) = match (public_key(tauri_conf), Announced::read(manifest)) {
         (Ok(public_key), Ok(announced)) => (public_key, announced),
         (public_key, announced) => {
             return [public_key.err(), announced.err()]
@@ -23,14 +23,47 @@ pub fn problems(tauri_conf: &str, installer: &[u8], sig: &str, manifest: &str) -
     [
         // Trimmed, as `latest.json` gets it.
         ("the .sig", sig.trim()),
-        ("the windows-x86_64 signature in latest.json", &announced),
+        (
+            "the windows-x86_64 signature in latest.json",
+            &announced.signature,
+        ),
     ]
     .into_iter()
     .filter_map(|(name, signature)| {
-        let problem = verify(&public_key, installer, signature, &version).err()?;
+        let problem = verify(&public_key, installer, signature, &announced.version).err()?;
         Some(format!("{name} {problem}"))
     })
     .collect()
+}
+
+/// What the updater manifest announces: the version, as the updater reads
+/// it, and the signature of the `windows-x86_64` installer.
+struct Announced {
+    version: semver::Version,
+    signature: String,
+}
+
+impl Announced {
+    fn read(manifest: &str) -> Result<Self, String> {
+        let manifest: serde_json::Value = serde_json::from_str(manifest)
+            .map_err(|error| format!("latest.json is no JSON: {error}"))?;
+        let text = |value: &serde_json::Value, missing: &str| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("latest.json has no {missing}"))
+        };
+        let version = text(&manifest["version"], "version")?;
+        Ok(Self {
+            version: semver::Version::parse(version.trim_start_matches('v')).map_err(|error| {
+                format!("latest.json announces the version {version}, which is no SemVer version: {error}")
+            })?,
+            signature: text(
+                &manifest["platforms"]["windows-x86_64"]["signature"],
+                "windows-x86_64 signature",
+            )?,
+        })
+    }
 }
 
 /// The `plugins.updater.pubkey` of `tauri_conf`, the key the app's updater
@@ -41,29 +74,8 @@ fn public_key(tauri_conf: &str) -> Result<PublicKey, String> {
     let pubkey = tauri_conf["plugins"]["updater"]["pubkey"]
         .as_str()
         .ok_or("tauri.conf.json has no plugins.updater.pubkey")?;
-    base64_text(pubkey)
-        .and_then(|text| PublicKey::decode(&text).map_err(|error| error.to_string()))
+    minisign(pubkey, PublicKey::decode)
         .map_err(|error| format!("the public key in tauri.conf.json cannot be decoded: {error}"))
-}
-
-/// The version the updater manifest `manifest` announces and the signature
-/// of its `windows-x86_64` installer.
-fn announced(manifest: &str) -> Result<(String, String), String> {
-    let manifest: serde_json::Value = serde_json::from_str(manifest)
-        .map_err(|error| format!("latest.json is no JSON: {error}"))?;
-    let text = |value: &serde_json::Value, missing: &str| {
-        value
-            .as_str()
-            .map(str::to_owned)
-            .ok_or_else(|| format!("latest.json has no {missing}"))
-    };
-    Ok((
-        text(&manifest["version"], "version")?,
-        text(
-            &manifest["platforms"]["windows-x86_64"]["signature"],
-            "windows-x86_64 signature",
-        )?,
-    ))
 }
 
 /// `installer` against `signature`, as `tauri-plugin-updater` verifies an
@@ -72,10 +84,9 @@ fn verify(
     public_key: &PublicKey,
     installer: &[u8],
     signature: &str,
-    version: &str,
+    version: &semver::Version,
 ) -> Result<(), String> {
-    let signature = base64_text(signature)
-        .and_then(|text| Signature::decode(&text).map_err(|error| error.to_string()))
+    let signature = minisign(signature, Signature::decode)
         .map_err(|error| format!("cannot be decoded: {error}"))?;
     public_key
         .verify(installer, &signature, true)
@@ -96,22 +107,26 @@ fn verify(
     }
 }
 
-/// Whether the versions are the same, as the updater compares them: as
-/// SemVer without a leading `v`, or as text when either is not SemVer.
-fn same_version(signed: &str, announced: &str) -> bool {
-    let semver = |version: &str| semver::Version::parse(version.trim_start_matches('v'));
-    match (semver(signed), semver(announced)) {
-        (Ok(signed), Ok(announced)) => signed == announced,
-        _ => signed == announced,
+/// Whether the `signed` version is `announced`, as the updater compares
+/// them: as SemVer without a leading `v`, or as text when it is not SemVer.
+fn same_version(signed: &str, announced: &semver::Version) -> bool {
+    match semver::Version::parse(signed.trim_start_matches('v')) {
+        Ok(signed) => signed == *announced,
+        Err(_) => signed == announced.to_string(),
     }
 }
 
-/// The text `encoded` holds in standard base64.
-fn base64_text(encoded: &str) -> Result<String, String> {
+/// The minisign text `encoded` holds in standard base64, read with
+/// `decode`, as the updater reads its public key and signatures.
+fn minisign<T>(
+    encoded: &str,
+    decode: fn(&str) -> Result<T, minisign_verify::Error>,
+) -> Result<T, String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|error| error.to_string())?;
-    String::from_utf8(bytes).map_err(|error| error.to_string())
+    let text = String::from_utf8(bytes).map_err(|error| error.to_string())?;
+    decode(&text).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -123,14 +138,18 @@ mod tests {
     /// its signatures are made with: `tauri signer generate`, then
     /// `tauri signer sign`, `--app-version 0.1.0` for the one that carries a
     /// version. The throwaway private key is not kept.
-    const INSTALLER: &[u8] = include_bytes!("../tests/fixtures/updater/installer.txt");
-    const PUBLIC_KEY: &str = include_str!("../tests/fixtures/updater/throwaway.pub");
-    const SIGNATURE: &str = include_str!("../tests/fixtures/updater/installer.txt.sig");
+    const INSTALLER: &[u8] = b"A stand-in for the installer, signed with a throwaway key pair.\n";
+    const PUBLIC_KEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCN0VCMzE3NkFCRjdCMDMKUldRRGU3OXFGN04rU3pFenBPQU5uQ2hYVkZLSWlOTDVKRURqazNqcmNJTnVSV1JRUnR3VEdYNmcK";
+    /// A signature whose trusted comment carries no version.
+    const SIGNATURE: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRGU3OXFGN04rUzZOYktHQzlSMGhWZVI1ZHVVdm42ZWp3QThnemc4bDh0Vlg3RmdUWDNUdDZiNlF2a3ZJa0Q2MTZyZUhONTR1MGo3MkNlL0oxYi9QZWFZS1hqdkNxN1FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzY5NzYzCWZpbGU6aW5zdGFsbGVyLnR4dApaRWZZOWoyWmlTOWRGRnRxQjJNa1JVbzkyYXgvWWdMODA2REszMmg2V1MrS0NLYnJnRnd3MnVmcm5MMjJLZFdPR0kycWRxUEsrV0VSU3JJSUZtVEpBUT09Cg==";
     /// A signature whose trusted comment carries `version:0.1.0`.
-    const VERSION_0_1_0: &str =
-        include_str!("../tests/fixtures/updater/installer.txt.version-0.1.0.sig");
+    const VERSION_0_1_0: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRRGU3OXFGN04rUzlvNWZsMEdTVTFVMDlCcnZMUnFHM1hSTFhpb2F1V1Q2RWFUTmh2OTBSY3RKMEgzZmh0N3l5Tmc3RllvQ25uREd3Ykh2eVdFYndKblhpSGlFamZVc2dRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzY5NzY0CWZpbGU6aW5zdGFsbGVyLXYudHh0CXZlcnNpb246MC4xLjAKSzA0VElQVHdHQVZ5T3ZLVW9abCtrSnVDNWY4SStueXBjNXF5elVnNmxaUXFHZFFsYzlCQlVCYVprYjFOVmRnOCtUZFZ5Wlg5L3VqK1VOOUxnK2xYQnc9PQo=";
     /// A signature of the installer stand-in made with another throwaway key.
-    const OTHER_KEY: &str = include_str!("../tests/fixtures/updater/installer.txt.other-key.sig");
+    const OTHER_KEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTZlhhelp3THc5SkQ5cE0yS1RXVGdPTGc2WFNuclhZR1FsNVkxT2Zwd08xTGlDbUJ2QjVuNTd6NVBTSnVWWXhDRGorQnJpUHZDNlZ5YlowajJvdzFYT2V4My9abFBUcVE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzY5NzY1CWZpbGU6aW5zdGFsbGVyLW90aGVyLnR4dAp4NEJRRHpFbjZpeG91TlZoOXNrenZXN3Rma0dLOHp1SkJaNzVNdXlEeDhJTjR0VkxnVm1LNVJnb1NMT1ozYnpTSmhJSzBIZjVBd3ovak9uVnNUMStCUT09Cg==";
+    /// Base64 of minisign text that is no signature, and of one that is no
+    /// public key.
+    const NOT_A_SIGNATURE: &str = PUBLIC_KEY;
+    const NOT_A_KEY: &str = SIGNATURE;
 
     /// A `tauri.conf.json` whose updater has the throwaway public key.
     fn tauri_conf() -> String {
@@ -218,7 +237,7 @@ mod tests {
             serde_json::json!({ "plugins": { "updater": { "pubkey": "not base64!" } } })
                 .to_string();
         let not_a_key =
-            serde_json::json!({ "plugins": { "updater": { "pubkey": SIGNATURE } } }).to_string();
+            serde_json::json!({ "plugins": { "updater": { "pubkey": NOT_A_KEY } } }).to_string();
 
         assert_eq!(
             problems(&without, INSTALLER, SIGNATURE, &manifest(SIGNATURE)),
@@ -238,7 +257,7 @@ mod tests {
     #[test]
     fn a_signature_that_cannot_be_decoded_fails() {
         assert_eq!(
-            problems(&tauri_conf(), INSTALLER, "", &manifest(PUBLIC_KEY)),
+            problems(&tauri_conf(), INSTALLER, "", &manifest(NOT_A_SIGNATURE)),
             [
                 "the .sig cannot be decoded: Invalid encoding in minisign data",
                 "the windows-x86_64 signature in latest.json cannot be decoded: \
@@ -248,8 +267,9 @@ mod tests {
     }
 
     #[test]
-    fn a_latest_json_that_is_no_json_or_lacks_the_version_or_the_signature_fails() {
+    fn a_latest_json_that_is_no_json_or_lacks_a_semver_version_or_the_signature_fails() {
         let without_signature = serde_json::json!({ "version": "0.1.0" }).to_string();
+        let not_semver = updater_manifest("0.1", SIGNATURE).unwrap();
         let without_version =
             serde_json::json!({ "platforms": { "windows-x86_64": { "signature": SIGNATURE } } })
                 .to_string();
@@ -265,6 +285,13 @@ mod tests {
         assert_eq!(
             problems(&tauri_conf(), INSTALLER, SIGNATURE, &without_version),
             ["latest.json has no version"]
+        );
+        assert_eq!(
+            problems(&tauri_conf(), INSTALLER, SIGNATURE, &not_semver),
+            [
+                "latest.json announces the version 0.1, which is no SemVer version: \
+              unexpected end of input while parsing minor version number"
+            ]
         );
     }
 }

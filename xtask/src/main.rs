@@ -157,6 +157,9 @@ fn list_unverified() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The app's Tauri config, relative to the repository root.
+const TAURI_CONF: &str = "crates/config-digger-app/tauri.conf.json";
+
 /// The installer's install folder, as CI checks it.
 fn check_installer() -> ExitCode {
     let read = |path: &str| {
@@ -166,7 +169,7 @@ fn check_installer() -> ExitCode {
         })
     };
     let files = read("crates/config-digger-app/installer/hooks.nsh")
-        .and_then(|hooks| Ok((hooks, read("crates/config-digger-app/tauri.conf.json")?)));
+        .and_then(|hooks| Ok((hooks, read(TAURI_CONF)?)));
     match files {
         Ok((hooks, tauri_conf)) => report(
             &installer::problems(&hooks, &tauri_conf),
@@ -380,35 +383,23 @@ fn check_signature(tag: &str, dir: &Path) -> ExitCode {
         Ok(release) => release,
         Err(code) => return code,
     };
-    let read = |path: &Path| {
-        std::fs::read(path).map_err(|error| {
-            eprintln!("cannot read {}: {error}", path.display());
-            ExitCode::FAILURE
-        })
+    let failed = |path: &Path, error: std::io::Error| {
+        eprintln!("cannot read {}: {error}", path.display());
+        ExitCode::FAILURE
     };
-    let text = |path: &Path| {
-        read(path).and_then(|bytes| {
-            String::from_utf8(bytes).map_err(|error| {
-                eprintln!("{} is no UTF-8 text: {error}", path.display());
-                ExitCode::FAILURE
-            })
-        })
-    };
+    let text = |path: &Path| std::fs::read_to_string(path).map_err(|error| failed(path, error));
     let installer = dir.join(release::installer_name(&release.version));
-    let files = text(&repo_file("crates/config-digger-app/tauri.conf.json")).and_then(|conf| {
+    let files = text(&repo_file(TAURI_CONF)).and_then(|conf| {
         Ok((
             conf,
-            read(&installer)?,
+            std::fs::read(&installer).map_err(|error| failed(&installer, error))?,
             text(&dir.join(release::signature_name(&release.version)))?,
             text(&dir.join(release::UPDATER_MANIFEST))?,
         ))
     });
     match files {
         Ok((tauri_conf, bytes, sig, manifest)) => report(
-            &signature::problems(&tauri_conf, &bytes, &sig, &manifest)
-                .iter()
-                .map(|problem| format!("{}: {problem}", installer.display()))
-                .collect::<Vec<_>>(),
+            &signature::problems(&tauri_conf, &bytes, &sig, &manifest),
             &format!(
                 "the updater's signature of {} verifies against the app's public key",
                 installer.display()
