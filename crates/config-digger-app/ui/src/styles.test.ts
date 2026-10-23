@@ -681,14 +681,17 @@ describe("a hint in a dialog", () => {
   });
 });
 
-/** Each tone of a tag, by what it tells: plain, git-versioned, a link, read-only. */
+/** Each tone of a tag, by what it tells: plain, git-versioned, a Linked Entry, read-only. */
 const TAGS = [".tag", ".tag.git", ".tag.junction", ".tag.read-only"];
 
 /** The declarations of a tag of the tone `selector`, over those of every tag. */
 const tone = (selector: string) => new Map([...styled(".tag"), ...styled(selector)]);
 
 /** The colour of the outline of a tag of the tone `selector`, set on its own or in its `border`. */
-const outline = (selector: string) => tone(selector).get("border-color") ?? tone(selector).get("border")?.split(/\s+/).pop();
+const outline = (selector: string) => {
+  const declarations = tone(selector);
+  return declarations.get("border-color") ?? declarations.get("border")?.split(/\s+/).pop();
+};
 
 describe("a tag", () => {
   test("of each tone has text that meets WCAG AA on its own background", () => {
@@ -698,22 +701,17 @@ describe("a tag", () => {
     }
   });
 
-  test("of each tone has an outline seen against the rows it sits on, as WCAG asks 3:1 of it", () => {
-    const rows = ["--tile", "--tile-hover", "--panel", "--background"];
+  test("of each tone has an outline seen against every surface of the app, as WCAG asks 3:1 of it", () => {
     for (const selector of TAGS) {
       const edge = colour(outline(selector));
-      for (const row of rows) expect(contrast(edge, colour(`var(${row})`)), `${selector} on ${row}`).toBeGreaterThanOrEqual(3);
+      for (const surface of SURFACES) expect(contrast(edge, colour(`var(${surface})`)), `${selector} on ${surface}`).toBeGreaterThanOrEqual(3);
     }
   });
 
   test("differs by tone, in its text, its background and its outline, so each tells what it means at a glance", () => {
-    for (const [name, of] of [
-      ["color", (selector: string) => tone(selector).get("color")],
-      ["background", (selector: string) => tone(selector).get("background")],
-      ["outline", outline],
-    ] as const) {
-      expect(new Set(TAGS.map((selector) => colour(of(selector)))).size, name).toBe(TAGS.length);
-    }
+    expect(new Set(TAGS.map((selector) => colour(tone(selector).get("color")))).size).toBe(TAGS.length);
+    expect(new Set(TAGS.map((selector) => colour(tone(selector).get("background")))).size).toBe(TAGS.length);
+    expect(new Set(TAGS.map((selector) => colour(outline(selector)))).size).toBe(TAGS.length);
   });
 
   test("that says git-versioned is outlined in the colour of the git-versioned ring of a dialog", () => {

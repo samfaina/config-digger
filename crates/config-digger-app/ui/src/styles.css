@@ -585,6 +585,28 @@ p {
   white-space: nowrap;
 }
 
+.tag.git {
+  /* The colour of the ring on a git-versioned Remove in a dialog. */
+  border-color: var(--git-versioned);
+  background: var(--tag-git);
+  color: var(--tag-git-text);
+}
+
+.tag.junction {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: var(--tag-link-edge);
+  background: var(--tag-link);
+  color: var(--tag-link-text);
+}
+
+.tag.read-only {
+  border-color: var(--tag-read-only-edge);
+  background: var(--tag-read-only);
+  color: var(--tag-read-only-text);
+}
+
 /* State pills: one colour per State */
 
 .state-pill {
@@ -1150,27 +1172,11 @@ p {
   gap: 5px;
 }
 
-.tag.git {
-  /* The colour of the ring on a git-versioned Remove in a dialog. */
-  border-color: var(--git-versioned);
-  background: var(--tag-git);
-  color: var(--tag-git-text);
-}
-
 /* A long tag is cut at the row's width; its tooltip holds the full path. */
 .tags .tag {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tag.junction {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-color: var(--tag-link-edge);
-  background: var(--tag-link);
-  color: var(--tag-link-text);
 }
 
 .entry-location {
@@ -2531,12 +2537,6 @@ p {
 .cta.small {
   padding: 6px 12px;
   font-size: 10.5px;
-}
-
-.tag.read-only {
-  border-color: var(--tag-read-only-edge);
-  background: var(--tag-read-only);
-  color: var(--tag-read-only-text);
 }
 
 .side-row {

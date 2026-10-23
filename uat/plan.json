@@ -321,11 +321,10 @@
           "instructions": [
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
-            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home.",
-            "Si alguna fila tiene una etiqueta que dice read-only, mírala también."
+            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home."
           ],
           "commands": [],
-          "expect": "Cada una de esas filas tiene sus etiquetas, como el nombre de su Agent y «added by you», en una píldora rellena de gris, con un borde gris claro y el texto casi blanco: se leen sin esfuerzo sobre la fila, no son un texto gris tenue. Una etiqueta read-only, si sale, es naranja: fondo marrón, borde naranja y texto naranja claro.",
+          "expect": "Cada una de esas tres filas tiene dos etiquetas: el nombre de su Agent (Claude Code, Codex o Claude Desktop) y added by you. Cada etiqueta es una píldora rellena de gris, con un borde gris claro alrededor y el texto casi blanco, no un texto gris sobre el fondo de la fila.",
           "covers": ["#232"]
         },
         {
