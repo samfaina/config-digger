@@ -86,7 +86,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`.
 
-4. Write the automated results with one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. Leave out the steps that still need a person (`manual`), and any step that already has a tester's result, one with no `by`: a tester's verdict is never overwritten. The runner shows each step with a result as done and starts the tester on the first step without one, so the automated steps drop out of the walk.
+4. Write the automated results with one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. Leave out the steps that still need a person (`manual`), unless their automated verdict is already KO, which a ticket fixes first; and leave out any step that already has a tester's result, one with no `by`: a tester's verdict is never overwritten. The runner shows each step with a result as done and starts the tester on the first step without one, so the automated steps drop out of the walk.
 
 5. Give the tester the link, and post it on the walk's issue with the steps left to walk.
 
