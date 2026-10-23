@@ -1,7 +1,7 @@
 // Moves that several steps share: adding an Agent home, opening a home's
 // Inventory, opening an Item, running an action through its dialog.
-import { ref } from "../driver.mjs";
-import { buttonEl, choose, go, press, tab, typeInto, wait, waitNotice } from "../lib.mjs";
+import { ref, unwrap } from "../driver.mjs";
+import { choose, go, press, tab, wait, waitNotice } from "../lib.mjs";
 
 // Add Agent home with `agent` and `folder` typed in, as 1.2, 10.2 and 10.3 do,
 // and the checks they share: the notice, the row under its Agent's group, its
@@ -71,7 +71,7 @@ export async function inventoryOf(t, agent, home) {
   const homeTile = home
     ? await s
         .exec(`return [...document.querySelectorAll(".home-tile")].find((b) => b.querySelector(".home-name")?.textContent.trim().endsWith(arguments[0])) ?? null;`, home)
-        .then((v) => (v ? Object.values(v)[0] : null))
+        .then(unwrap)
     : null;
   if (homeTile) {
     if ((await s.attr(homeTile, "aria-pressed")) !== "true") {
@@ -81,7 +81,7 @@ export async function inventoryOf(t, agent, home) {
   } else if (home) {
     const picker = await s
       .exec(`return document.querySelector(".home-row [role=combobox]") ?? null;`)
-      .then((v) => (v ? Object.values(v)[0] : null));
+      .then(unwrap);
     if (picker) {
       const value = await s.text(picker);
       if (!value.endsWith(home)) {
@@ -90,7 +90,7 @@ export async function inventoryOf(t, agent, home) {
           () =>
             s
               .exec(`return [...document.querySelectorAll("[role=option]")].find((o) => o.textContent.trim().endsWith(arguments[0])) ?? null;`, home)
-              .then((v) => (v ? Object.values(v)[0] : null)),
+              .then(unwrap),
           { what: `the home ${home}` },
         );
         await s.click(opt);
@@ -115,7 +115,7 @@ export async function openItem(t, name) {
     () =>
       s
         .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === arguments[0]) ?? null;`, name)
-        .then((v) => (v ? Object.values(v)[0] : null)),
+        .then(unwrap),
     { what: `the Item ${name}` },
   );
   await s.exec("arguments[0].scrollIntoView({block: 'nearest'})", ref(row));
@@ -220,7 +220,7 @@ export async function confirm(s, verb) {
           `return [...document.querySelectorAll(".dialog .dialog-foot button")].find((b) => b.textContent.trim().toLowerCase().startsWith(arguments[0].toLowerCase()) && !b.disabled) ?? null;`,
           verb,
         )
-        .then((v) => (v ? Object.values(v)[0] : null)),
+        .then(unwrap),
     { what: `the dialog's ${verb} button` },
   );
   await s.click(button);
@@ -253,4 +253,33 @@ export async function done(s) {
 // The Operation id in a result's grey line "Operation <id> · …".
 export function operationId(text) {
   return /\b(\d{8}-\d{6}-[0-9a-f]{3,})\b/.exec(text ?? "")?.[1];
+}
+
+// Runs `body` with Claude Desktop open, as 7.2 and 13.1 ask, opening it when
+// it is closed and closing it again after. Claude Desktop keeps the tester's
+// own configuration: config-digger runs on the throwaway profile, so nothing
+// of it changes. Returns false, with the step Blocked, when it isn't installed.
+export async function withClaudeDesktop(t, body) {
+  const app = t.ps("@(Get-StartApps | Where-Object { $_.Name -eq 'Claude' } | Select-Object -First 1 -ExpandProperty AppID)");
+  if (!app) {
+    t.blocked = "Claude Desktop no está instalado en este PC";
+    return false;
+  }
+  // Claude Code's CLI is also claude.exe: only Claude Desktop's own process counts.
+  const running = () =>
+    Number(t.ps("@(Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Path -notlike '*\\.local\\bin\\*' }).Count"));
+  const before = running();
+  if (!before) {
+    t.ps(`Start-Process 'shell:AppsFolder\\${app}'`);
+    await t.s.until(async () => running() > 0, { what: "Claude Desktop open", timeout: 30000 });
+    await wait(3000);
+  }
+  try {
+    t.check(running() > 0, "Claude Desktop está abierto");
+    await body();
+  } finally {
+    if (!before)
+      t.ps("Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Path -notlike '*\\.local\\bin\\*' } | ForEach-Object { [void]$_.CloseMainWindow() }");
+  }
+  return true;
 }

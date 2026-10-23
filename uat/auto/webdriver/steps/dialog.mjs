@@ -1,9 +1,7 @@
 // Section 7: the action dialog and the buttons that delete.
-import { ref } from "../driver.mjs";
-import { KEY } from "../driver.mjs";
-import { buttonEl, focused, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, confirm, dialog, dialogParts, done, inventoryOf, openItem, operationId, project, waitPreview } from "./common.mjs";
-import { fieldValue } from "../lib.mjs";
+import { KEY, ref, unwrap } from "../driver.mjs";
+import { buttonEl, fieldValue, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
+import { act, addHome, confirm, dialog, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview, withClaudeDesktop } from "./common.mjs";
 
 // Claude Code Disables a user Entry per Project, so Disable is offered only
 // with a Project chosen. The steps that Disable cd-throwaway-user name none:
@@ -128,33 +126,22 @@ export default [
     note: "Claude Desktop de verdad, abierto en este PC. config-digger corre con el perfil de prueba, así que solo cambia el home de prueba.",
     async run(t) {
       const { s } = t;
-      const running = () => t.ps("@(Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*\\WindowsApps\\Claude_*' }).Count");
-      const before = Number(running());
-      if (!before) {
-        t.ps("Start-Process 'shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude'");
-        await s.until(async () => Number(running()) > 0, { what: "Claude Desktop running", timeout: 30000 });
-        await wait(3000);
-      }
-      try {
-        t.check(Number(running()) > 0, "Claude Desktop está abierto");
-        const homes = await s.exec(`return [...document.querySelectorAll(".place-name")].map((e) => e.textContent.trim());`);
-        void homes;
+      await withClaudeDesktop(t, async () => {
         await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
         await openItem(t, "cd-throwaway-desktop");
         await press(s, "Disable", ".panel.detail");
         const d = await waitPreview(s);
         t.check(!/Claude Desktop is running/.test(d.text), "el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running»", d.text.match(/Claude Desktop is running[^\n]*/)?.[0]);
+        // The step ticks the warning boxes first, as it asks, then presses Disable.
+        await tickAll(s);
         const disable = await buttonEl(s, "Disable", ".dialog .dialog-foot");
-        await s.exec("for (const box of document.querySelectorAll('.dialog input[type=checkbox]')) if (!box.checked) box.click();");
         t.check(disable && (await s.attr(disable, "disabled")) === null, "su botón «Disable» se puede pulsar");
         await confirm(s, "Disable");
         await done(s);
         await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
         const states = await s.exec(`return [...document.querySelectorAll(".item-row")].filter((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop").map((r) => r.querySelector(".state-pill").firstChild.textContent.trim());`);
         t.check(states.includes("Disabled"), "tras Done, «cd-throwaway-desktop» sale como «Disabled» en ese home", states.join(", "));
-      } finally {
-        if (!before) t.ps("Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*\\WindowsApps\\Claude_*' } | ForEach-Object { [void]$_.CloseMainWindow() }");
-      }
+      });
     },
   },
   {
@@ -170,7 +157,7 @@ export default [
       t.check(grey1.some((l) => l === `Operation ${id} · backup kept`), "tras Disable, la línea gris dice «Operation <id> · backup kept»", grey1.join(" | "));
       await done(s);
       await go(s, "History · Undo");
-      await s.click(await s.until(() => s.exec(`return [...document.querySelectorAll(".operation-row")].find((r) => r.textContent.includes(arguments[0])) ?? null;`, id).then((v) => (v ? Object.values(v)[0] : null)), { what: `Operation ${id}` }));
+      await s.click(await s.until(() => s.exec(`return [...document.querySelectorAll(".operation-row")].find((r) => r.textContent.includes(arguments[0])) ?? null;`, id).then(unwrap), { what: `Operation ${id}` }));
       await wait(400);
       await press(s, "Delete backup", ".history-detail");
       await s.until(() => dialog(s), { what: "the Delete backup dialog" });

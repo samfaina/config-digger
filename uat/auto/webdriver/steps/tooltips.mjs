@@ -1,5 +1,5 @@
 // Section 3: the app's tooltips, by mouse and by keyboard.
-import { KEY, ref } from "../driver.mjs";
+import { KEY, ref, unwrap } from "../driver.mjs";
 import { focused, go, hoverFresh, tabTo, tooltip, wait } from "../lib.mjs";
 import { inventoryOf, openItem } from "./common.mjs";
 
@@ -35,7 +35,7 @@ export default [
       // line is its Effective Entry's location.
       const loc = await s
         .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-user")?.querySelector(".item-location") ?? null;`)
-        .then((v) => (v ? Object.values(v)[0] : null));
+        .then(unwrap);
       if (t.check(loc, "la fila tiene su ubicación")) {
         await hoverFresh(s, loc);
         await wait(900);
@@ -81,7 +81,7 @@ export default [
       await inventoryOf(t, "Claude Code", "claude-code-home");
       const row = await s
         .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-user-skill")?.querySelector(".item-location") ?? null;`)
-        .then((v) => (v ? Object.values(v)[0] : null));
+        .then(unwrap);
       await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(row));
       await hoverFresh(s, row);
       await wait(900);

@@ -1,7 +1,6 @@
 // Section 15: the loading states of the first read and of a re-read. The
 // reads take a few milliseconds here, so each step holds the read's answer
 // with a delay (driver.mjs, Session.delay) to look at the state it shows.
-import { ref } from "../driver.mjs";
 import { go, press, refocus, wait } from "../lib.mjs";
 import { inventoryOf, openItem } from "./common.mjs";
 

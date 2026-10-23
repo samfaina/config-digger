@@ -1,6 +1,6 @@
 // Section 10: the Projects & homes screen, with real list changes on the
 // throwaway profile.
-import { ref } from "../driver.mjs";
+import { unwrap } from "../driver.mjs";
 import { buttonEl, choose, go, notices, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
 import { addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, operationId, pickFolder, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
@@ -33,7 +33,7 @@ const inGroup = (groups, title, name) => groups.find((g) => g.title.startsWith(t
 async function openGroup(s, title) {
   const toggle = await s
     .exec(`return [...document.querySelectorAll(".place-group-toggle")].find((b) => b.textContent.includes(arguments[0])) ?? null;`, title)
-    .then((v) => (v ? Object.values(v)[0] : null));
+    .then(unwrap);
   if (toggle && (await s.attr(toggle, "aria-expanded")) !== "true") {
     await s.click(toggle);
     await wait(200);
@@ -478,7 +478,7 @@ async function openSection(s, title) {
       `return [...document.querySelectorAll(".dialog button, .dialog summary, .dialog [aria-expanded]")].find((e) => e.textContent.trim().startsWith(arguments[0]) && e.getAttribute("aria-expanded") !== "true") ?? null;`,
       title,
     )
-    .then((v) => (v ? Object.values(v)[0] : null));
+    .then(unwrap);
   if (header) {
     await s.click(header);
     await wait(300);

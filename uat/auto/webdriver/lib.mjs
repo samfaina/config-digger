@@ -2,7 +2,7 @@
 // tab, press a button, choose an option. Each helper finds its element by
 // what the tester reads, not by a class name, where the app gives a role or a
 // label to find it by.
-import { ref } from "./driver.mjs";
+import { KEY, ref, unwrap } from "./driver.mjs";
 
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,7 +33,7 @@ export function buttonEl(s, text, scope = "body") {
       scope,
       text,
     )
-    .then((v) => (v ? Object.values(v)[0] : null));
+    .then(unwrap);
 }
 
 export async function press(s, text, scope) {
@@ -51,7 +51,7 @@ export async function choose(s, label, option) {
     () =>
       s
         .exec(`return [...document.querySelectorAll("[role=combobox][aria-label='" + arguments[0] + "']")].at(-1) ?? null;`, label)
-        .then((v) => (v ? Object.values(v)[0] : null)),
+        .then(unwrap),
     { what: `the ${label} field` },
   );
   await s.click(field);
@@ -63,7 +63,7 @@ export async function choose(s, label, option) {
                   [...document.querySelectorAll("[role=option]")].find((o) => o.textContent.includes(arguments[0])) ?? null;`,
           option,
         )
-        .then((v) => (v ? Object.values(v)[0] : null)),
+        .then(unwrap),
     { what: `option "${option}" of ${label}` },
   );
   await s.exec("arguments[0].scrollIntoView({block: 'nearest'})", ref(opt));
@@ -84,7 +84,7 @@ export function fieldValue(s, label) {
 // React sees each change: WebDriver's clear sends no input event.
 export async function typeInto(s, css, text) {
   const el = await s.waitFor(css);
-  await s.type(el, "a");
+  await s.type(el, KEY.Control + "a" + KEY.Null + KEY.Backspace);
   if (text) await s.type(el, text);
   return el;
 }
@@ -101,32 +101,6 @@ export function waitNotice(s, text, opts) {
     async () => (await notices(s)).find((n) => n.text.includes(text)),
     { what: `the notice "${text}"`, ...opts },
   );
-}
-
-// Starts a recorder that keeps, with its time, every notice, busy notice,
-// loading block and read bar that appears, so a step can check what showed
-// for less than a second after the fact.
-export function record(s) {
-  return s.exec(`
-    const seen = (window.__uatSeen = []);
-    const t0 = performance.now();
-    const look = () => {
-      for (const el of document.querySelectorAll(".notice, .snackbar, .loading, .read-progress, .dialog-title, .card-reading, [role=progressbar]")) {
-        const text = (el.getAttribute("aria-label") ?? "") + "|" + el.textContent.trim().slice(0, 200);
-        const key = el.className + "|" + text;
-        if (!seen.some((e) => e.key === key && e.live)) seen.push({ key, cls: el.className, text, t: Math.round(performance.now() - t0), live: true });
-      }
-      for (const e of seen) e.live = e.live && [...document.querySelectorAll("*")].length > 0;
-    };
-    if (window.__uatObserver) window.__uatObserver.disconnect();
-    window.__uatObserver = new MutationObserver(look);
-    window.__uatObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
-    look();
-  `);
-}
-
-export function seen(s) {
-  return s.exec("return (window.__uatSeen ?? []).map(({ cls, text, t }) => ({ cls, text, t }));");
 }
 
 // Moves the mouse off to a quiet spot and then onto `el`, as the tester
@@ -185,7 +159,7 @@ export async function tabTo(s, match, max = 40) {
   for (let i = 0; i < max; i++) {
     const f = await focused(s);
     if (f && match(f)) return f;
-    await s.keys("");
+    await s.keys(KEY.Tab);
   }
   return null;
 }
@@ -197,16 +171,6 @@ export function refocus(s) {
   return s.exec("window.dispatchEvent(new FocusEvent('focus'));");
 }
 
-// The row of a Project or an Agent home, by the path it shows.
-export function placeRow(s, path) {
-  return s
-    .exec(
-      `return [...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0]) ?? null;`,
-      path,
-    )
-    .then((v) => (v ? Object.values(v)[0] : null));
-}
-
 export async function rowButton(s, path, text) {
   return s.exec(
     `const row = [...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0]);
@@ -214,5 +178,5 @@ export async function rowButton(s, path, text) {
      return [...row.querySelectorAll("button")].find((b) => b.textContent.trim().toLowerCase().startsWith(arguments[1].toLowerCase())) ?? null;`,
     path,
     text,
-  ).then((v) => (v ? Object.values(v)[0] : null));
+  ).then(unwrap);
 }

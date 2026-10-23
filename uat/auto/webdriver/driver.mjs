@@ -47,7 +47,10 @@ export async function startTauriDriver({ nativeDriver, env, port = 4444 }) {
       const res = await fetch(`http://127.0.0.1:${port}/status`);
       if (res.ok) return child;
     } catch {}
-    if (Date.now() > end) throw new Error("tauri-driver did not answer on /status");
+    if (Date.now() > end) {
+      child.kill();
+      throw new Error("tauri-driver did not answer on /status");
+    }
     await sleep(200);
   }
 }
@@ -87,16 +90,6 @@ export class Session {
   async find(css, root) {
     const path = root ? `/element/${root}/element` : "/element";
     const value = await this.cmd("POST", path, { using: "css selector", value: css });
-    return value[ELEMENT];
-  }
-
-  async findAll(css) {
-    const value = await this.cmd("POST", "/elements", { using: "css selector", value: css });
-    return value.map((v) => v[ELEMENT]);
-  }
-
-  async xpath(expr) {
-    const value = await this.cmd("POST", "/element", { using: "xpath", value: expr });
     return value[ELEMENT];
   }
 
@@ -149,10 +142,6 @@ export class Session {
     }
   }
 
-  clear(el) {
-    return this.cmd("POST", `/element/${el}/clear`, {});
-  }
-
   type(el, text) {
     return this.cmd("POST", `/element/${el}/value`, { text });
   }
@@ -203,24 +192,6 @@ export class Session {
         : { type: "pointerMove", duration: 50, origin: "viewport", x: target.x, y: target.y };
     await this.cmd("POST", "/actions", {
       actions: [{ type: "pointer", id: "mouse", parameters: { pointerType: "mouse" }, actions: [move] }],
-    });
-  }
-
-  async drag(el, dx, dy) {
-    await this.cmd("POST", "/actions", {
-      actions: [
-        {
-          type: "pointer",
-          id: "mouse",
-          parameters: { pointerType: "mouse" },
-          actions: [
-            { type: "pointerMove", duration: 50, origin: { [ELEMENT]: el }, x: 0, y: 0 },
-            { type: "pointerDown", button: 0 },
-            { type: "pointerMove", duration: 300, origin: "pointer", x: dx, y: dy },
-            { type: "pointerUp", button: 0 },
-          ],
-        },
-      ],
     });
   }
 
@@ -307,20 +278,25 @@ function instruments() {
 const INSTRUMENTS = `(${instruments})();`;
 
 export const KEY = {
-  Tab: "",
-  Enter: "",
-  Escape: "",
+  Tab: "\uE004",
+  Enter: "\uE007",
+  Escape: "\uE00C",
   Space: " ",
-  Backspace: "",
-  Up: "",
-  Down: "",
-  Alt: "",
-  Shift: "",
-  Control: "",
+  Backspace: "\uE003",
+  Up: "\uE013",
+  Down: "\uE015",
+  Alt: "\uE00A",
+  Shift: "\uE008",
+  Control: "\uE009",
+  // Lifts every modifier an earlier key of the same text holds down.
+  Null: "\uE000",
 };
 
 // An element found by `find`, as an argument of `exec`.
 export const ref = (el) => ({ [ELEMENT]: el });
+
+// The element a script returned, as `find` gives it, or null.
+export const unwrap = (value) => (value ? value[ELEMENT] : null);
 
 async function call(base, method, path, body) {
   const res = await fetch(base + path, {

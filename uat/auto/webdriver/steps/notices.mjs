@@ -2,8 +2,8 @@
 // text and timing are checked from styles and clocks; the motion is checked
 // from the keyframes of their animations. Whether that motion looks smooth
 // on screen is left to a person (docs/research/uat-automation.md, section 9).
-import { ref } from "../driver.mjs";
-import { go, hoverFresh, notices, press, wait } from "../lib.mjs";
+import { unwrap } from "../driver.mjs";
+import { go, notices, wait } from "../lib.mjs";
 import { inventoryOf, openItem } from "./common.mjs";
 
 const rgb = (c) => (c?.match(/\d+(\.\d+)?/g) ?? []).map(Number);
@@ -59,7 +59,7 @@ async function copyPath(t) {
     () =>
       s
         .exec(`return [...document.querySelectorAll(".panel.detail .entry-location button")].find((b) => b.textContent.trim().toLowerCase() === "copy path") ?? null;`)
-        .then((v) => (v ? Object.values(v)[0] : null)),
+        .then(unwrap),
     { what: "Copy path" },
   );
   return button;
@@ -134,7 +134,7 @@ export default [
                return row ? [...row.querySelectorAll("button")].find((b) => b.textContent.trim() === "Open folder") ?? null : null;`,
               name,
             )
-            .then((v) => (v ? Object.values(v)[0] : null)),
+            .then(unwrap),
         { what: `Open folder of ${name}` },
       );
       await s.click(button);

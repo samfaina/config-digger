@@ -3,15 +3,14 @@
 // its scrollbar is the app's 10 px one rather than the system's 17 px, the
 // thumb drags to the end. How the thumb looks, and how it lightens under the
 // mouse, is judged from screenshots.
-import { ref } from "../driver.mjs";
-import { KEY } from "../driver.mjs";
+import { KEY, ref, unwrap } from "../driver.mjs";
 import { go, hoverFresh, panel, press, tab, tooltip, wait } from "../lib.mjs";
 import { act, addHome, done, inventoryOf, openItem, project } from "./common.mjs";
 
 // The scrolling element matching `css` (the last one when several match).
 async function scroller(s, css) {
   const v = await s.exec(`return [...document.querySelectorAll(arguments[0])].at(-1) ?? null;`, css);
-  return v ? Object.values(v)[0] : null;
+  return unwrap(v);
 }
 
 function bar(s, el) {
@@ -135,7 +134,7 @@ export default [
       sameBar(t, list, "la barra de la lista de licencias es igual a la de la lista de Items");
       const first = await s
         .exec(`return document.querySelector(".dialog details.license summary") ?? null;`)
-        .then((v) => (v ? Object.values(v)[0] : null));
+        .then(unwrap);
       if (t.check(first, "la primera licencia se despliega")) {
         await s.exec("arguments[0].scrollIntoView({ block: 'start' });", ref(first));
         await s.click(first);
@@ -216,7 +215,7 @@ export default [
       t.check(layout.ellipsis, "la ubicación acaba en «…»");
       const loc = await s
         .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-many-01").querySelector(".item-location");`)
-        .then((v) => Object.values(v)[0]);
+        .then(unwrap);
       await hoverFresh(s, loc);
       await wait(900);
       const tip = await tooltip(s);

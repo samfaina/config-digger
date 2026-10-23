@@ -2,10 +2,12 @@
 // log lines, the updater's controls, parking cd-throwaway-desktop, and the
 // throwaway data's teardown. Install, update and uninstall run in Windows
 // Sandbox (uat/auto/sandbox).
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { buttonEl, go, press, wait } from "../lib.mjs";
-import { confirm, done, inventoryOf, openItem, project, waitPreview } from "./common.mjs";
+import { spawnSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { go, press, wait } from "../lib.mjs";
+import { confirm, done, inventoryOf, openItem, project, waitPreview, withClaudeDesktop } from "./common.mjs";
+import { unwrap } from "../driver.mjs";
 
 // The scan lines since the last "app started", as the steps' command prints them.
 function scanLines(t) {
@@ -60,18 +62,22 @@ export default [
   },
   {
     id: "14.2",
+    note: "Con el CLI que va junto a la app, sobre tus homes reales y sin escribir: «list -v» hace el escaneo del arranque y «disable --dry-run -v» los dos de la preview, con CODEX_HOME en el home de Codex de prueba solo para esa orden.",
     async run(t) {
-      const { s } = t;
-      await t.restart();
-      await s.waitFor(".panel.items .scroll", { timeout: 20000 });
-      await wait(1000);
-      await codexDisablePreview(t, { apply: true });
-      await wait(800);
-      const finished = scanLines(t).filter((l) => l.includes("scan finished"));
-      t.check(finished.length >= 3, "la orden imprime al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»", `${finished.length} líneas`);
-      const ms = finished.map((l) => Number(/elapsed_ms=(\d+)/.exec(l)?.[1]));
-      t.check(ms.every((n) => n < 5000), "en cada una, «elapsed_ms» es menor que 5000", ms.join(", "));
-      t.note("El perfil de prueba no tiene los homes del tester: el escaneo lee solo los homes cd-throwaway. El tiempo con los homes reales lo mide el script local con el CLI.");
+      // The step's goal is a full scan of the tester's own homes, which the
+      // throwaway profile hides from the app. The CLI reads them as the app
+      // does and logs the same lines; neither command writes.
+      const cli = join(dirname(t.app), "config-digger.exe");
+      const lines = (args, env = {}) =>
+        spawnSync(cli, ["--color", "never", "-v", ...args], { encoding: "utf8", env: { ...process.env, ...env } })
+          .stderr.split(/\r?\n/)
+          .filter((l) => l.includes("scan finished"));
+      const startup = lines(["list"]);
+      const preview = lines(["--project", `${t.root}\\project`, "disable", "--dry-run", "cd-throwaway-codex"], { CODEX_HOME: `${t.root}\\codex-home` });
+      const all = [...startup, ...preview];
+      t.check(startup.length >= 1 && preview.length >= 2, "salen al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»: la del arranque y las dos de la preview del Disable", `${startup.length} + ${preview.length}`);
+      const ms = all.map((l) => Number(/elapsed_ms=(\d+)/.exec(l)?.[1]));
+      t.check(ms.length > 0 && ms.every((n) => n < 5000), "en cada una, «elapsed_ms» es menor que 5000", ms.join(", "));
     },
   },
   {
@@ -102,28 +108,30 @@ export default [
   },
   {
     id: "13.1",
+    note: "Con Claude Desktop abierto, el caso que el paso pide que no lo cambie.",
     async run(t) {
       const { s } = t;
-      await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
-      const row = await s.until(
-        () =>
-          s
-            .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop" && r.querySelector(".state-pill")?.firstChild?.textContent.trim() === "Effective") ?? null;`)
-            .then((v) => (v ? Object.values(v)[0] : null)),
-        { what: "cd-throwaway-desktop Effective" },
-      );
-      await s.click(row);
-      await wait(400);
-      await press(s, "Disable", ".panel.detail");
-      const d = await waitPreview(s);
-      t.check(!/Claude Desktop is running/.test(d.text), "el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running»");
-      const result = await confirm(s, "Disable");
-      t.check(/^Disabled 1 Entry\. Operation \S+: verified\.$/m.test(result.text), "el resultado dice «Disabled 1 Entry. Operation <id>: verified.»");
-      await done(s);
-      await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
-      const states = await s.exec(`return [...document.querySelectorAll(".item-row")].filter((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop").map((r) => r.querySelector(".state-pill").firstChild.textContent.trim());`);
-      t.check(states.length > 0 && states.every((x) => x === "Disabled"), "tras Done, cd-throwaway-desktop sale como «Disabled», porque está aparcada", states.join(", "));
-      t.note("Sin Claude Desktop abierto: el paso 7.2 lo comprobó con Claude Desktop abierto.");
+      await withClaudeDesktop(t, async () => {
+        await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
+        const row = await s.until(
+          () =>
+            s
+              .exec(`return [...document.querySelectorAll(".item-row")].find((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop" && r.querySelector(".state-pill")?.firstChild?.textContent.trim() === "Effective") ?? null;`)
+              .then(unwrap),
+          { what: "cd-throwaway-desktop Effective" },
+        );
+        await s.click(row);
+        await wait(400);
+        await press(s, "Disable", ".panel.detail");
+        const d = await waitPreview(s);
+        t.check(!/Claude Desktop is running/.test(d.text), "el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running»");
+        const result = await confirm(s, "Disable");
+        t.check(/^Disabled 1 Entry\. Operation \S+: verified\.$/m.test(result.text), "el resultado dice «Disabled 1 Entry. Operation <id>: verified.»");
+        await done(s);
+        await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
+        const states = await s.exec(`return [...document.querySelectorAll(".item-row")].filter((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop").map((r) => r.querySelector(".state-pill").firstChild.textContent.trim());`);
+        t.check(states.length > 0 && states.every((x) => x === "Disabled"), "tras Done, cd-throwaway-desktop sale como «Disabled», porque está aparcada", states.join(", "));
+      });
     },
   },
   {

@@ -13,11 +13,13 @@
 //   node uat/auto/webdriver/walk.mjs --app <config-digger-app.exe> --driver <msedgedriver.exe>
 //        --profile <…\cd-throwaway-profile> --out <results.json> --shots <dir> [--only 10.1,10.2] [--attach <session>]
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { Session, profileEnv, startTauriDriver } from "./driver.mjs";
+import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
+import { refocus, wait } from "./lib.mjs";
 import sections from "./steps/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -51,7 +53,37 @@ const order = plan.sections.flatMap((section) => section.steps.map((step) => ste
 const runners = new Map(sections.flat().map((step) => [step.id, step]));
 let ids = order.filter((id) => runners.has(id));
 if (opt.only) ids = ids.filter((id) => opt.only.split(",").includes(id));
-if (opt.from) ids = ids.slice(ids.indexOf(opt.from));
+if (opt.from) {
+  if (!ids.includes(opt.from)) throw new Error(`--from ${opt.from} is no step the walk knows`);
+  ids = ids.slice(ids.indexOf(opt.from));
+}
+
+// The tester's own data the walk must never touch: config-digger's real data
+// folders and the configuration files of the Agents the steps open. A hash of
+// each file before the walk is compared with one after. Claude Code's files
+// are left out: an agent running the walk writes them itself.
+function realData() {
+  const files = [];
+  const walkDir = (dir) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walkDir(path);
+      else files.push(path);
+    }
+  };
+  walkDir(join(process.env.APPDATA, "config-digger"));
+  walkDir(join(process.env.LOCALAPPDATA, "config-digger"));
+  files.push(join(process.env.USERPROFILE, ".codex", "config.toml"), join(process.env.APPDATA, "Claude", "claude_desktop_config.json"));
+  const packages = join(process.env.LOCALAPPDATA, "Packages");
+  if (existsSync(packages)) {
+    for (const name of readdirSync(packages).filter((n) => n.startsWith("Claude_"))) {
+      files.push(join(packages, name, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
+    }
+  }
+  return new Map(files.filter((f) => existsSync(f)).map((f) => [f, createHash("sha256").update(readFileSync(f)).digest("hex")]));
+}
+const before = realData();
 
 const port = Number(opt.port);
 let driver;
@@ -147,7 +179,7 @@ for (const id of ids) {
       const file = join(opt.shots, `${id}-${shots.length + 1}-${name}.png`);
       await s.screenshot(file);
       shots.push(file);
-      for (const what of judge) looks.push({ what, file });
+      for (const what of judge) looks.push({ what, file: basename(file) });
       return file;
     },
     blocked: null,
@@ -164,8 +196,8 @@ for (const id of ids) {
         ctx.setup();
         // The tester runs the setup in PowerShell and comes back to the
         // window, whose focus reads the files again.
-        await s.exec("window.dispatchEvent(new FocusEvent('focus'));").catch(() => {});
-        await new Promise((r) => setTimeout(r, 800));
+        await refocus(s).catch(() => {});
+        await wait(800);
       }
       await runners.get(id).run(t);
     } catch (e) {
@@ -200,15 +232,20 @@ for (const id of ids) {
     looks.length = 0;
   }
   const failed = checks.filter((c) => !c.ok);
+  // A step that failed before any of its own checks, such as on its setup or
+  // on the state an earlier step left, is Blocked, not KO
+  // (docs/research/uat-automation.md, section 6).
+  if (error && !checks.length && !t.blocked) t.blocked = `antes de sus comprobaciones: ${error.message}`;
   const status = t.blocked ? "blocked" : error || failed.length ? "ko" : "ok";
   const notes = [
     t.blocked && `Bloqueado: ${t.blocked}`,
     ...failed.map((c) => `KO: ${c.what}${c.actual ? `: ${c.actual}` : ""}`),
     error && `Error: ${error.message}`,
     ...findings.map((f) => `Nota: ${f}`),
-    `Comprobado por WebDriver (${checks.length - failed.length}/${checks.length}): ${checks.filter((c) => c.ok).map((c) => c.what).join("; ")}`,
-    looks.length && `A juzgar en capturas: ${looks.map((l) => `${l.what} [${l.file.split(/[\\/]/).at(-1)}]`).join("; ")}`,
+    `Comprobado (${checks.length - failed.length}/${checks.length}): ${checks.filter((c) => c.ok).map((c) => c.what).join("; ")}`,
+    looks.length && `A juzgar en capturas: ${looks.map((l) => `${l.what} [${l.file}]`).join("; ")}`,
     runners.get(id).note,
+    runners.get(id).manual && `Queda para una persona: ${runners.get(id).manual}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -222,6 +259,8 @@ for (const id of ids) {
     evidence: `uat/auto/webdriver/steps · ${id}${shots.length ? ` · ${shots.length} capturas locales` : ""}`,
     checks,
     looks,
+    // What a person must still see: the step stays in the tester's walk.
+    manual: runners.get(id).manual,
   };
   save(result);
   writeFileSync(sharedFile, JSON.stringify(shared, null, 2) + "\n");
@@ -232,3 +271,10 @@ if (!opt.attach) {
   await s.close().catch(() => {});
   driver?.kill();
 }
+
+const after = realData();
+const changed = [...new Set([...before.keys(), ...after.keys()])].filter((f) => before.get(f) !== after.get(f));
+if (changed.length) {
+  console.error(`The walk changed the tester's own data:\n${changed.join("\n")}`);
+  process.exitCode = 2;
+} else console.log(`Nothing outside the throwaway profile and ${opt.root} changed (${before.size} files compared).`);

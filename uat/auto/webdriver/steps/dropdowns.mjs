@@ -1,6 +1,5 @@
 // Section 2: the app's dropdowns, by mouse and by keyboard.
-import { ref } from "../driver.mjs";
-import { KEY } from "../driver.mjs";
+import { KEY, ref, unwrap } from "../driver.mjs";
 import { choose, fieldValue, focused, go, panel, press, tab, tabTo, wait } from "../lib.mjs";
 import { inventoryOf } from "./common.mjs";
 
@@ -16,7 +15,7 @@ const purple = (c) => {
 
 async function field(s, label) {
   const v = await s.exec(`return [...document.querySelectorAll("[role=combobox][aria-label='" + arguments[0] + "']")].at(-1) ?? null;`, label);
-  return v ? Object.values(v)[0] : null;
+  return unwrap(v);
 }
 
 // Moves the active option with the arrows until its text is `text`.
@@ -68,7 +67,7 @@ export default [
       const other = p.options.find((o) => !o.chosen && !o.disabled && o.text.startsWith(t.root) && o.text !== before);
       const otherEl = await s
         .exec(`return [...document.querySelectorAll(".select-panel [role=option]")].find((o) => o.textContent.trim() === arguments[0]) ?? null;`, other.text)
-        .then((v) => Object.values(v)[0]);
+        .then(unwrap);
       await s.hover(otherEl);
       await wait(150);
       const lit = (await panel(s)).options.find((o) => o.text === other.text);
@@ -188,7 +187,7 @@ export default [
       await wait(400);
       const row = await s
         .exec(`return [...document.querySelectorAll(".home-row")].find((r) => r.textContent.includes("Claude Code") && r.querySelector("[role=combobox]")) ?? null;`)
-        .then((v) => (v ? Object.values(v)[0] : null));
+        .then(unwrap);
       if (!t.check(row, "la fila de Claude Code de Agent home tiene su desplegable (dos homes)")) return;
       await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(row));
       const combo = await s.find("[role=combobox]", row);
@@ -227,14 +226,14 @@ export default [
       t.check(none?.disabled && Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && r < 200, "«Choose an Agent…» sale en gris dentro del panel", none && `${none.color}`);
       const noneEl = await s
         .exec(`return [...document.querySelectorAll(".select-panel [role=option]")].find((o) => o.textContent.trim() === "Choose an Agent…");`)
-        .then((v) => Object.values(v)[0]);
+        .then(unwrap);
       await s.click(noneEl);
       await wait(200);
       p = await panel(s);
       t.check(p && (await s.text(agent)).trim() === "Choose an Agent…", "el clic en esa opción no hace nada y el panel sigue abierto");
       const codex = await s
         .exec(`return [...document.querySelectorAll(".select-panel [role=option]")].find((o) => o.textContent.trim() === "Codex");`)
-        .then((v) => Object.values(v)[0]);
+        .then(unwrap);
       await s.click(codex);
       await wait(200);
       t.check(!(await panel(s)) && (await s.text(agent)).trim() === "Codex", "el clic en «Codex» cierra el panel y el campo muestra «Codex»");

@@ -1,5 +1,4 @@
 // Section 6: a row of Entries by State, chosen as a filter.
-import { ref } from "../driver.mjs";
 import { press, wait } from "../lib.mjs";
 import { inventoryOf } from "./common.mjs";
 

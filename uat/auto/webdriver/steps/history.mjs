@@ -1,11 +1,11 @@
 // Section 11: History · Undo, with real Operations on the throwaway Codex
 // home: Disable, Undo, a refused Undo, a failed Operation, Needs attention,
 // Delete backup, the busy states and the History filters.
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { KEY, ref } from "../driver.mjs";
-import { buttonEl, choose, focused, go, hoverFresh, notices, press, tabTo, tooltip, typeInto, wait, waitNotice } from "../lib.mjs";
-import { confirm, dialog, dialogParts, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview } from "./common.mjs";
+import { KEY, ref, unwrap } from "../driver.mjs";
+import { buttonEl, choose, focused, go, hoverFresh, press, refocus, tabTo, tooltip, typeInto, wait, waitNotice } from "../lib.mjs";
+import { confirm, dialog, dialogParts, done, inventoryOf, openItem, operationId, project, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
 
 const rgb = (c) => (c?.match(/\d+(\.\d+)?/g) ?? []).map(Number);
@@ -37,7 +37,7 @@ function rows(s) {
 
 async function pickOperation(s, id) {
   const row = await s.until(
-    () => s.exec(`return [...document.querySelectorAll(".operation-row")].find((r) => r.querySelector(".operation-meta")?.textContent.includes("Operation " + arguments[0])) ?? null;`, id).then((v) => (v ? Object.values(v)[0] : null)),
+    () => s.exec(`return [...document.querySelectorAll(".operation-row")].find((r) => r.querySelector(".operation-meta")?.textContent.includes("Operation " + arguments[0])) ?? null;`, id).then(unwrap),
     { what: `the Operation ${id}` },
   );
   await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(row));
@@ -168,7 +168,7 @@ export default [
         const toml = readFileSync(file, "utf8").replace(/\r?\nenabled = false/, "");
         writeFileSync(file, toml.endsWith("\n") ? toml : toml + "\n");
         t.note(`cd-throwaway-codex seguía Disabled porque el Undo del paso 11.3 se rechazó, y la tarjeta no ofrece Enable${enable ? ` («${enable}»)` : ""}. Se quitó «enabled = false» a mano y config.toml recibió el salto de línea final que le falta, para que los pasos siguientes no choquen con el mismo rechazo.`);
-        await s.exec("window.dispatchEvent(new FocusEvent('focus'));");
+        await refocus(s);
         await wait(800);
         await codex(t);
       }

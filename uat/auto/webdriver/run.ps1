@@ -35,9 +35,9 @@ if (-not (Test-Path $driver)) {
 
 # A fresh profile each run: the app keeps its lists, settings, backups and
 # log there. The name is checked, so only a throwaway folder is ever deleted.
-$profile = Join-Path $Work "cd-throwaway-profile"
-if ((Split-Path $profile -Leaf) -ne "cd-throwaway-profile") { throw "refusing to reset $profile" }
-if (Test-Path $profile) { Remove-Item $profile -Recurse -Force }
+$throwaway = Join-Path $Work "cd-throwaway-profile"
+if ((Split-Path $throwaway -Leaf) -ne "cd-throwaway-profile") { throw "refusing to reset $throwaway" }
+if (Test-Path $throwaway) { Remove-Item $throwaway -Recurse -Force }
 
 $results = Join-Path $Work "webdriver.json"
 foreach ($file in $results, ($results -replace '\.json$', '.shared.json')) { if (Test-Path $file) { Remove-Item $file } }
@@ -49,8 +49,9 @@ if (Test-Path $shots) { Remove-Item $shots -Recurse -Force }
 # The version under test is the one the executable reports, whatever the
 # checkout says.
 $version = (Get-Item $App).VersionInfo.ProductVersion
-$arguments = @("$here\walk.mjs", "--app", $App, "--version", $version, "--driver", $driver, "--profile", $profile, "--out", $results, "--shots", $shots, "--root", $Root)
+$arguments = @("$here\walk.mjs", "--app", $App, "--version", $version, "--driver", $driver, "--profile", $throwaway, "--out", $results, "--shots", $shots, "--root", $Root)
 if ($Only) { $arguments += @("--only", $Only) }
 node @arguments
+if ($LASTEXITCODE) { throw "the walk stopped with exit code $LASTEXITCODE: see its output above" }
 Write-Output "Results: $results"
 Write-Output "Screenshots, for the agent judge only: $shots"
