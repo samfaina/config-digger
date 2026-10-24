@@ -46,6 +46,8 @@ Desktop apps (Claude Desktop, Cursor, VS Code):
 
 - Give each one a throwaway profile. VS Code and Cursor take `--user-data-dir` and `--extensions-dir`. Read their logs and `state.vscdb`.
 - `--user-data-dir` on an Electron app's Chromium processes shows the data folder it chose.
+- VS Code also needs `--shared-data-dir`, `--agent-plugins-dir`, and `USERPROFILE` and `APPDATA` in the launch's folder, or it reads the owner's `~\.vscode\argv.json` and other apps' configs. Stop only the processes whose command line holds the launch's data folder: the owner may have VS Code open.
+- VS Code starts an MCP server only when asked. `vscode.mjs`'s probe extension runs `workbench.mcp.startServer *` with `autoTrustChanges`, and each server writes a marker. Extend that probe rather than drive the window.
 - Claude Desktop starts no MCP server before someone signs in. It still reads `claude_desktop_config.json` at start, and names an entry it cannot use in the dialog "Some MCP servers couldn't be loaded", which UI Automation reads. It names each entry only once, so give each launch new names.
 
 Accounts:

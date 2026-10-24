@@ -912,7 +912,76 @@ fn a_cached_extension_server_s_launch_secrets_are_masked() {
 
     let dart = &item(&inventory, "Dart SDK MCP Server").entries[0];
     assert_eq!(dart.config["launch"]["env"]["DART_TOKEN"], "••••");
+    assert_eq!(
+        dart.config["launch"]["args"],
+        serde_json::json!(["••••", "••••", "••••"])
+    );
+    // The cache spells headers as `[name, value]` pairs, and a URL as a URI
+    // object whose `external` encodes its query's `=`.
+    let github = item(&inventory, "GitHub")
+        .entries
+        .iter()
+        .find(|entry| entry.locator.contains("extCachedServers"))
+        .unwrap();
+    let launch = &github.config["launch"];
+    assert_eq!(
+        launch["headers"],
+        serde_json::json!([["Authorization", "Bearer ••••"]])
+    );
+    assert_eq!(launch["uri"]["path"], "/mcp/");
+    assert_eq!(launch["uri"]["scheme"], "https");
+    for part in ["external", "authority", "query", "fragment"] {
+        assert_eq!(launch["uri"][part], "••••", "{part}");
+    }
     assert!(!json(&inventory).to_string().contains(SECRET));
+}
+
+/// What VS Code does, as its definition says, with the file at `path`,
+/// which config-digger cannot read.
+fn reaction(inventory: &Inventory, path: &Path) -> String {
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.agent == "vscode" && failure.path == path)
+        .expect("the file is a Read failure");
+    code(failure.reaction)
+}
+
+#[test]
+fn vs_code_skips_an_mcp_file_it_cannot_parse_but_reads_a_plugin_s_around_the_error() {
+    let broken = r#"{ "servers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
+    let user_mcp = PathBuf::from(USER).join("mcp.json");
+    let plugin_mcp = PathBuf::from(HOME).join(r".vscode\agent-plugins\review-kit\.mcp.json");
+    let files = [
+        project(r"app\.vscode\mcp.json"),
+        project(r"app\.mcp.json"),
+        user_mcp.clone(),
+        plugin_mcp.clone(),
+    ];
+    let fs = files
+        .iter()
+        .fold(with_home(with_project(vscode(), "app")), |fs, file| {
+            fs.with_file(file, broken)
+        });
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let reaction = |path: &Path| reaction(&inventory, path);
+    assert_eq!(reaction(&project(r"app\.vscode\mcp.json")), "ignores_file");
+    assert_eq!(reaction(&project(r"app\.mcp.json")), "ignores_file");
+    assert_eq!(reaction(&user_mcp), "ignores_file");
+    // VS Code starts the servers around the error, which config-digger
+    // cannot read (#322).
+    assert_eq!(reaction(&plugin_mcp), "unknown");
+}
+
+#[test]
+fn vs_code_skips_the_servers_of_a_workspace_file_it_cannot_parse() {
+    let file = workspace();
+    let fs =
+        with_project(vscode(), "multi").with_file(&file, r#"{ "folders": [],, "settings": {} }"#);
+    let inventory = inventory_at(&fs, &file);
+
+    assert_eq!(reaction(&inventory, &file), "ignores_file");
 }
 
 #[test]
