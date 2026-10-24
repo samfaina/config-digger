@@ -257,7 +257,7 @@ interpolation = { block = "braces", default_separator = ":-" }
 # Claude Code puts the plugin's folder, with `/` between its names, in place
 # of `${CLAUDE_PLUGIN_ROOT}` in these fields [docs], so two plugins' servers
 # written alike have two endpoints.
-plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers"], forward_slashes = true }
+plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
 on_read_failure = "ignores_file"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
@@ -268,14 +268,16 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # declared later replaces an earlier one [docs], so this location ranks
 # above it. It extracts a bundle into the plugin's `.mcpb-cache` folder and
 # reads its server config [docs]: the `server.mcp_config` of its
-# `manifest.json`, named by its `name`, `${__dirname}` standing for the
-# folder [binary]. A bundle it has not extracted yet, before it first loads
-# the plugin, has no Entry. A plugin whose `plugin.json` does not parse
+# `manifest.json`, `${__dirname}` standing for the folder [docs], named by
+# its `name` [binary]. A bundle it has not extracted yet, before it first
+# loads the plugin, has no Entry. It does not start a bundle's server whose
+# required `user_config` is not set [binary], which config-digger does not
+# check. A plugin whose `plugin.json` does not parse
 # fails to load, the servers of its `.mcp.json` and its skills with it
 # [test]; config-digger leaves out this file's Entries alone (#295).
 [[locations]]
 id = "plugin-manifest-mcp"
-unverified = "Claude Code is taken to record each bundle it extracts in `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and the `extractedPath` it went to, as its code does."
+unverified = "Claude Code is taken to record each bundle it extracts in `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and the absolute `extractedPath` it went to, and to name the bundle's server by its manifest's `name`, as its code does."
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
 name_template = "plugin:{plugin}:{name}"
 references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }
@@ -286,7 +288,7 @@ scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-" }
-plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers"], forward_slashes = true }
+plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
 on_read_failure = "ignores_file"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
@@ -550,15 +552,20 @@ on_read_failure = "ignores_file"
 
 # A plugin's skills, in its `skills` folder [docs, disk], and in each folder
 # its manifest's `skills` declares besides it, a path or a list of paths:
-# each a folder of skill folders, or one skill's folder [docs]. They answer
-# to `<plugin>:<folder>`, and to `<plugin>:<name>` as an alias [test], so
-# they never compete with other skills [docs]. config-digger reads a folder
-# declared twice once. A `SKILL.md` at the plugin's root, with neither, is
-# not read.
+# each a folder of skill folders, or one skill's folder, `.` the plugin's
+# own [docs]. They answer to `<plugin>:<folder>`, and to `<plugin>:<name>`
+# as an alias [test], so they never compete with other skills [docs]. A
+# declared folder that holds a `SKILL.md` is one skill, named
+# `<plugin>:<name>` by its frontmatter, or else by its folder, and Claude
+# Code loads a `SKILL.md` it reaches twice once [binary]. It writes `-` for
+# each character of a plugin skill's name other than a letter, a digit, `_`
+# and `-` [binary], which config-digger does not yet. A `SKILL.md`
+# at the plugin's root, with no `skills` folder or field, is not read.
 [[locations]]
 id = "plugin-skills"
+unverified = "A folder the manifest's `skills` declares that holds a `SKILL.md` is taken to be one skill named by its frontmatter `name`, as Claude Code's code names it."
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
-format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
 name_template = "{plugin}:{name}"
 kind = "skill"
 scope = "plugin"

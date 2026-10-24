@@ -2399,12 +2399,19 @@ pub(crate) struct ManifestSkills {
     pub path_may_name_one: bool,
     /// How each folder of skill folders is read.
     pub skills: SkillFolder,
+    /// How a path that names one skill folder reads it, when not as
+    /// `skills` reads the folders in a folder, such as by its frontmatter
+    /// `name`.
+    pub one_skill: Option<SkillFolder>,
 }
 
 impl Validate for ManifestSkills {
     fn validate(&self) -> Result<(), String> {
         validate_key_path(&self.field)?;
         validate_relative(&self.default)?;
+        if let Some(one_skill) = &self.one_skill {
+            one_skill.validate()?;
+        }
         self.skills.validate()
     }
 }
@@ -2545,7 +2552,7 @@ impl McpbCache {
 }
 
 /// Puts `with` in place of `text` in every text of `value`, at any depth.
-fn replace_in_texts(value: &mut Value, text: &str, with: &str) {
+pub(crate) fn replace_in_texts(value: &mut Value, text: &str, with: &str) {
     match value {
         Value::String(value) => *value = value.replace(text, with),
         Value::Array(values) => values

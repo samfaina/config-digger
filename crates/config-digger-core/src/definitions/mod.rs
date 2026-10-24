@@ -855,6 +855,15 @@ pub(crate) struct PluginRoot {
     pub forward_slashes: bool,
 }
 
+impl Validate for PluginRoot {
+    fn validate(&self) -> Result<(), String> {
+        if self.reference.is_empty() || self.fields.is_empty() {
+            return Err("plugin_root needs a reference and the fields it stands in".into());
+        }
+        Ok(())
+    }
+}
+
 impl PluginRoot {
     /// Puts `folder` in place of the reference in the fields of `config`.
     pub fn expand(&self, config: &mut serde_json::Value, folder: &Path) {
@@ -863,20 +872,9 @@ impl PluginRoot {
             true => folder.replace('\\', "/"),
             false => folder,
         };
-        let Some(config) = config.as_object_mut() else {
-            return;
-        };
         for field in &self.fields {
-            let texts: Vec<&mut serde_json::Value> = match config.get_mut(field) {
-                Some(serde_json::Value::Array(values)) => values.iter_mut().collect(),
-                Some(serde_json::Value::Object(values)) => values.values_mut().collect(),
-                Some(value) => vec![value],
-                None => Vec::new(),
-            };
-            for text in texts {
-                if let serde_json::Value::String(text) = text {
-                    *text = text.replace(&self.reference, &folder);
-                }
+            if let Some(value) = config.get_mut(field) {
+                blocks::replace_in_texts(value, &self.reference, &folder);
             }
         }
     }
@@ -1577,11 +1575,7 @@ impl AgentDefinition {
                         "only a location in plugins takes plugin_root".into(),
                     ));
                 }
-                if root.reference.is_empty() || root.fields.is_empty() {
-                    return Err(context(
-                        "plugin_root needs a reference and the fields it stands in".into(),
-                    ));
-                }
+                root.validate().map_err(context)?;
             }
             if let Some(cached_at) = &location.cached_at {
                 if location.format.file().is_none() {

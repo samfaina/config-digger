@@ -2169,6 +2169,17 @@
               "description": "How each folder of skill folders is read.",
               "$ref": "#/$defs/SkillFolder"
             },
+            "one_skill": {
+              "description": "How a path that names one skill folder reads it, when not as\n`skills` reads the folders in a folder, such as by its frontmatter\n`name`.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SkillFolder"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "manifest-skills"

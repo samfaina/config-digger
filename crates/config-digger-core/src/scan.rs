@@ -3348,8 +3348,7 @@ impl Scanner<'_> {
 
     /// Adds the skills at the paths the manifest `manifest` of `plugin`
     /// declares, or else of its default folder. A folder outside the
-    /// plugin's, or one already read, is skipped, and the plugin's own
-    /// folder names no one skill.
+    /// plugin's, or one already read, is skipped.
     fn read_manifest_skills(
         &mut self,
         home: &FoundHome,
@@ -3369,18 +3368,18 @@ impl Scanner<'_> {
             false => None,
         };
         let base = &plugin.folder;
-        let mut read = Vec::new();
+        let mut read_folders = Vec::new();
         for declared in block.paths(text.as_deref()) {
             let folder = paths::lexical(&base.join(&declared.path));
-            if read.contains(&folder) {
+            if read_folders.contains(&folder) {
                 continue;
             }
-            read.push(folder.clone());
-            if declared.may_name_one && folder != *base {
+            read_folders.push(folder.clone());
+            if declared.may_name_one {
                 let added = self.add_named_skill(
                     home,
                     location,
-                    &block.skills,
+                    block.one_skill.as_ref().unwrap_or(&block.skills),
                     base,
                     &declared.path,
                     &project,

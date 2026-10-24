@@ -1,5 +1,5 @@
 ---
-name: solo
+name: solo-skill
 description: The solo skill of toolbox.
 ---
 

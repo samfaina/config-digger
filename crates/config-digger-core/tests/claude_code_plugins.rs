@@ -149,12 +149,14 @@ fn skills_in_every_folder_the_manifest_declares_are_read_besides_the_skills_fold
     let inventory = no_project(&fixture());
 
     // toolbox's manifest declares `./skills/` again, `./extra-skills/`, a
-    // folder of skill folders, and `./solo/`, one skill's folder.
+    // folder of skill folders, and `./solo/` and `.`, each one skill's
+    // folder, which the skill's frontmatter `name` names.
     let folder = in_cache(r"claude-plugins-official\toolbox\2.0.0");
     for (name, path) in [
-        ("toolbox:core", r"skills\core"),
-        ("toolbox:lint", r"extra-skills\lint"),
-        ("toolbox:solo", "solo"),
+        ("toolbox:core", folder.join(r"skills\core")),
+        ("toolbox:lint", folder.join(r"extra-skills\lint")),
+        ("toolbox:solo-skill", folder.join("solo")),
+        ("toolbox:guide", folder.clone()),
     ] {
         let skill = item(&inventory, name);
         let paths: Vec<&Path> = skill
@@ -162,7 +164,7 @@ fn skills_in_every_folder_the_manifest_declares_are_read_besides_the_skills_fold
             .iter()
             .map(|entry| entry.path.as_path())
             .collect();
-        assert_eq!(paths, [folder.join(path)], "{name}");
+        assert_eq!(paths, [path], "{name}");
         assert_eq!(code(skill.state), "effective", "{name}");
         let entry = entry_json(&skill.entries[0]);
         assert_eq!(entry["scope"], "plugin", "{name}");
@@ -462,8 +464,9 @@ fn disable_of_a_plugin_lists_its_bundle_server_and_the_skills_of_every_declared_
             ("plugin:toolbox:runner", "effective", "disabled"),
             ("plugin:toolbox:weather", "effective", "disabled"),
             ("toolbox:core", "effective", "disabled"),
+            ("toolbox:guide", "effective", "disabled"),
             ("toolbox:lint", "effective", "disabled"),
-            ("toolbox:solo", "effective", "disabled"),
+            ("toolbox:solo-skill", "effective", "disabled"),
         ])
     );
 }
