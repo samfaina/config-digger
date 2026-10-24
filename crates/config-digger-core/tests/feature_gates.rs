@@ -1,7 +1,9 @@
 //! Feature gates through the core `api`, with fake ports: Claude Code's
 //! claude.ai skill sync gate read from the value it last cached in
 //! `~/.claude.json`, assumed when it cannot be read, and bypassed by the
-//! variables that make Claude Code ignore its cache.
+//! variables that make Claude Code ignore its cache. The gate decides
+//! whether Claude Code downloads skills, not whether it reads them, so it
+//! is a caveat on the synced skills and leaves them Effective.
 
 use config_digger_core::api::{Context, Core, Entry, Inventory, Item, ScanOptions};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
@@ -14,6 +16,9 @@ const HOME: &str = r"C:\Users\fixture";
 const CACHED_AT: u64 = 1_790_926_800_000;
 
 const SYNC_GATE: &str = "tengu_claudeai_skills_sync_enabled";
+
+/// The synced skill of `claude_home`.
+const PDF: &str = "anthropic-skills:pdf";
 
 fn in_home(relative: &str) -> PathBuf {
     PathBuf::from(HOME).join(relative)
@@ -75,7 +80,7 @@ fn a_cached_gate_value_is_a_caveat_on_the_entries_it_affects() {
 
     let inventory = inventory(&fs);
 
-    let pdf = skill(&inventory, "pdf");
+    let pdf = skill(&inventory, PDF);
     let entry = entry_json(&pdf.entries[0]);
     assert_eq!(entry["state"], "effective");
     assert_eq!(
@@ -95,49 +100,24 @@ fn a_cached_gate_value_is_a_caveat_on_the_entries_it_affects() {
 }
 
 #[test]
-fn a_location_whose_gate_is_cached_off_is_unread() {
+fn a_synced_skill_stays_effective_while_the_sync_gate_is_cached_off() {
     let fs = claude_home(&cached(json!(false)));
 
     let inventory = inventory(&fs);
 
-    let pdf = skill(&inventory, "pdf");
-    let entry = entry_json(&pdf.entries[0]);
-    assert_eq!(entry["state"], "unread");
-    assert_eq!(entry["reason"]["code"], "feature_gate");
     assert_eq!(
-        entry["reason"]["sentence"],
-        "Claude Code does not read it while its gate `tengu_claudeai_skills_sync_enabled` is off."
-    );
-    assert_eq!(entry["caveats"][0]["code"], "gate_cached");
-    assert_eq!(
-        entry["caveats"][0]["sentence"],
+        pdf_caveat(&inventory, "gate_cached"),
         "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: off as of 2 Oct 2026 07:40 UTC."
     );
-    assert_eq!(serde_json::to_value(pdf.state).unwrap(), "unread");
-}
-
-#[test]
-fn a_gate_cached_off_leaves_a_local_skill_of_the_same_name_effective() {
-    let fs = with_skill(
-        claude_home(&cached(json!(false))),
-        in_home(r".claude\skills\pdf"),
-        &skill_md("pdf"),
+    assert_eq!(
+        serde_json::to_value(skill(&inventory, PDF).state).unwrap(),
+        "effective"
     );
-
-    let inventory = inventory(&fs);
-
-    let pdf = skill(&inventory, "pdf");
-    let states: Vec<Value> = pdf
-        .entries
-        .iter()
-        .map(|entry| entry_json(entry)["state"].clone())
-        .collect();
-    assert_eq!(states, [json!("effective"), json!("unread")]);
 }
 
 /// The sentence of the one caveat of the synced skill `pdf`, checking its code.
 fn pdf_caveat(inventory: &Inventory, code: &str) -> String {
-    let entry = entry_json(&skill(inventory, "pdf").entries[0]);
+    let entry = entry_json(&skill(inventory, PDF).entries[0]);
     assert_eq!(entry["state"], "effective", "{entry}");
     let caveats = entry["caveats"].as_array().unwrap();
     assert_eq!(caveats.len(), 1, "{entry}");
@@ -145,11 +125,10 @@ fn pdf_caveat(inventory: &Inventory, code: &str) -> String {
     caveats[0]["sentence"].as_str().unwrap().to_owned()
 }
 
-const ASSUMED_UNREADABLE: &str =
-    "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed on; cannot be read.";
+const ASSUMED_UNREADABLE: &str = "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read.";
 
 #[test]
-fn a_gate_without_a_cached_value_is_assumed_on() {
+fn a_gate_without_a_cached_value_is_assumed_off() {
     for state in [
         json!({}),
         json!({ "cachedGrowthBookFeatures": {}, "cachedGrowthBookFeaturesAt": CACHED_AT }),
@@ -166,7 +145,7 @@ fn a_gate_without_a_cached_value_is_assumed_on() {
 }
 
 #[test]
-fn a_gate_whose_cache_file_is_missing_or_unreadable_is_assumed_on() {
+fn a_gate_whose_cache_file_is_missing_or_unreadable_is_assumed_off() {
     let missing = claude_home(&json!({}));
     missing.delete_file(in_home(".claude.json"));
     let broken = claude_home(&json!({})).with_file(in_home(".claude.json"), "{ not json");
@@ -205,9 +184,10 @@ fn a_cached_value_has_no_age_limit() {
 
     let inventory = core.resolve(&snapshot, &Context::default());
 
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
-    assert_eq!(entry["state"], "unread");
-    assert_eq!(entry["caveats"][0]["code"], "gate_cached");
+    assert_eq!(
+        pdf_caveat(&inventory, "gate_cached"),
+        "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: off as of 2 Oct 2026 07:40 UTC."
+    );
 }
 
 /// The inventory of a home that cached the sync gate off, read with the
@@ -223,7 +203,7 @@ fn cached_off_with(vars: &[(&str, &str)]) -> Inventory {
 
 fn bypassed_by(variable: &str) -> String {
     format!(
-        "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed on; Claude Code ignores its cached value while `{variable}` is set."
+        "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; Claude Code ignores its cached value while `{variable}` is set."
     )
 }
 
@@ -268,8 +248,8 @@ fn values_that_leave_fetching_on_keep_the_cached_value() {
     ] {
         let inventory = cached_off_with(&vars);
 
-        let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
-        assert_eq!(entry["state"], "unread", "{vars:?}");
+        let entry = entry_json(&skill(&inventory, PDF).entries[0]);
+        assert_eq!(entry["state"], "effective", "{vars:?}");
         assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{vars:?}");
     }
 }
@@ -299,8 +279,8 @@ fn an_empty_value_in_the_user_settings_env_replaces_the_one_in_the_environment()
 
     let inventory = inventory_with(&fs, env);
 
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
-    assert_eq!(entry["state"], "unread");
+    let entry = entry_json(&skill(&inventory, PDF).entries[0]);
+    assert_eq!(entry["state"], "effective");
     assert_eq!(entry["caveats"][0]["code"], "gate_cached");
 }
 
@@ -481,7 +461,7 @@ fn a_value_in_a_settings_env_that_is_not_a_string_sets_nothing() {
 
     let inventory = inventory(&fs);
 
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    let entry = entry_json(&skill(&inventory, PDF).entries[0]);
     assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
 }
 
@@ -602,7 +582,7 @@ fn the_user_registry_policy_env_is_not_read_beneath_an_admin_source() {
 
     let inventory = inventory_with(&fs, env);
 
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    let entry = entry_json(&skill(&inventory, PDF).entries[0]);
     assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
 }
 
@@ -632,7 +612,7 @@ fn a_variable_in_a_projects_settings_env_bypasses_the_cache_in_that_project_only
         );
 
         let in_project = inventory_in(&fs, Some(PROJECT));
-        let entry = entry_json(&skill(&in_project, "pdf").entries[0]);
+        let entry = entry_json(&skill(&in_project, PDF).entries[0]);
         assert_eq!(entry["state"], "effective", "{file}");
         assert_eq!(
             pdf_caveat(&in_project, "gate_assumed"),
@@ -641,8 +621,8 @@ fn a_variable_in_a_projects_settings_env_bypasses_the_cache_in_that_project_only
         );
 
         let outside = inventory_in(&fs, None);
-        let entry = entry_json(&skill(&outside, "pdf").entries[0]);
-        assert_eq!(entry["state"], "unread", "{file}");
+        let entry = entry_json(&skill(&outside, PDF).entries[0]);
+        assert_eq!(entry["state"], "effective", "{file}");
         assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{file}");
     }
 }
@@ -672,7 +652,7 @@ fn a_projects_settings_env_yields_to_the_managed_env() {
         },
     );
 
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    let entry = entry_json(&skill(&inventory, PDF).entries[0]);
     assert_eq!(entry["caveats"][0]["code"], "gate_cached", "{entry}");
 }
 

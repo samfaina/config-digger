@@ -351,7 +351,7 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
   skill(path.join(synced, "skills", "synced", "cd-throwaway-org_cd-throwaway-acct", "cd-throwaway-sync"), ["name: cd-throwaway-sync", "description: synced"]);
   await p.check("locations[synced-skills]", "with an API key, the synced skills folder is not read, whatever the gate", async () => {
     const t = await session(synced, fresh("empty", dir));
-    return same(t.skills.includes("cd-throwaway-sync"), false);
+    return same(t.skills.filter((n) => n.includes("cd-throwaway-sync")), []);
   });
 }
 

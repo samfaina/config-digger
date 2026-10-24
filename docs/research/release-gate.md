@@ -2,7 +2,7 @@
 
 Issue: [#80](https://github.com/samfaina/config-digger/issues/80). Terms follow [`CONTEXT.md`](../../CONTEXT.md).
 
-Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23, and the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer. Cursor, VS Code and the rest of Claude Desktop, which need their windows driven, come next.
+Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23; the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer; and Claude Code's marks that need a claude.ai account, tested on 2026-10-24 with the owner's Max account. Cursor, VS Code and the rest of Claude Desktop, which need their windows driven, come next.
 
 ## The probes
 
@@ -50,11 +50,23 @@ It maps into the Sandbox, read-only, the probes, this machine's Node (Volta's im
 | `codex-machine.mjs` | `codex mcp list`: `enabled`, or `disabled: requirements (<file>)` |
 | `claude-desktop.mjs` | The files the installers write, and the servers the app starts: each `claude_desktop_config.json` declares a server whose command writes a marker file named after its folder |
 
+### With a claude.ai account
+
+`claude-account.mjs` tests the skills Claude Code syncs from claude.ai and its sync gate. It needs a home signed in to claude.ai, and the owner signs in to a throwaway one once, outside their own home folder:
+
+```bash
+CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth login --claudeai
+node uat/agents/claude-account.mjs [--bin <claude.exe>]
+CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth logout
+```
+
+`!` in a Claude Code prompt runs bash, so `$env:CLAUDE_CONFIG_DIR=…` there signs in the user's own home instead. `CD_PROBE_ACCOUNT_HOME` names another signed-in home, a folder named `claude-account-home*` in the probe root; the probe refuses any other, and runs only when `claude auth status` says `claude.ai` and no variable that takes Claude Code off the account or its gates is set. Its model is the local stand-in, so no prompt reaches a model; Claude Code still signs in, fetches its gates and downloads the account's skills. It plants skills beside the synced ones, sets the gate's cached value in `.claude.json`, and puts both back at the end. Its oracle is the `init` event's skills, the skill listing and the body of a skill a `/<name>` prompt runs, as for `claude-code.mjs`, and what Claude Code downloads into `skills/synced/<organizationUuid>_<accountUuid>`.
+
 ## Versions
 
 | Agent | Versions every check passes on | `verified` |
 |---|---|---|
-| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
+| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too; `claude-account.mjs` on 2.1.299, 2.1.302, 2.1.309 and 2.1.310, with a Max account | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
 | Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
 | Claude Desktop | 3.6556.2, `claude-desktop.mjs` only | unchanged, 2.16120: 3.x keeps a package's data elsewhere ([#305](https://github.com/samfaina/config-digger/issues/305)) |
@@ -71,14 +83,15 @@ Outcomes:
 - **Corrected**: the Agent does something else, and the definition now says what. The mark is gone.
 - **Ticket**: the Agent does something else that the definition format or the core cannot express yet. The mark is gone, the definition states the fact with `[test]` and names the ticket.
 - **Pending**: not tested yet. The mark stays, and the reason says what the test needs.
+- **Pending, under the exception**: #80's last criterion lets a mark stay untested when its test needs an account or a deployment the project does not have: a Codex enterprise account, Claude Teams or Enterprise, or a Claude Desktop deployment for a third-party provider. The release notes list such a mark with what its test needs.
 
 ### Claude Code
 
 | Mark | What the probe saw | Outcome |
 |---|---|---|
-| `:86` `settings[managed]`: `remote-settings.json` is one JSON object | With an API key, Claude Code does not read `remote-settings.json` at all | Pending: needs an account with server-managed settings |
+| `:86` `settings[managed]`: `remote-settings.json` is one JSON object | With an API key, Claude Code does not read `remote-settings.json` at all; a Max account has no server-managed settings | Pending, under the exception: server-managed settings need Claude Teams or Enterprise |
 | `:140` `locations[managed-mcp]`: unparsable `managed-mcp.json` | Skipped; `claude mcp list` reports "[Failed to parse] Enterprise config"; the file keeps its exclusive control, so only `managedMcpServers` load, and Claude Code starts | Corrected: `ignores_file`; the exclusive gate already counts a file whatever it holds |
-| `:155` `locations[managed-settings-mcp]`: unparsable managed settings | An HKLM value, `managed-settings.json` or drop-in that does not parse stops Claude Code ("Managed settings document could not be parsed as a JSON object"), even beside a source that parses; an HKCU value that does not parse is skipped. `remote-settings.json` not tested | Corrected: each source of `settings[managed]` now says what Claude Code does about it (`on_read_failure` on a source, new in the format). The mark stays for `remote-settings.json`: Pending, needs an account with server-managed settings |
+| `:155` `locations[managed-settings-mcp]`: unparsable managed settings | An HKLM value, `managed-settings.json` or drop-in that does not parse stops Claude Code ("Managed settings document could not be parsed as a JSON object"), even beside a source that parses; an HKCU value that does not parse is skipped. `remote-settings.json` not tested | Corrected: each source of `settings[managed]` now says what Claude Code does about it (`on_read_failure` on a source, new in the format). The mark stays for `remote-settings.json`: Pending, under the exception, as for `:86` |
 | `:189` `locations[project-mcp]`: parent folders | `.mcp.json` is read in every folder above the Project, past the repo root and outside a repo; of same-named servers the nearest folder's wins | Ticket [#292](https://github.com/samfaina/config-digger/issues/292) |
 | `:190` `locations[project-mcp]`: unparsable `.mcp.json` | Skipped; the other servers load; `claude mcp list` reports "[Failed to parse] Project config" | Corrected: `ignores_file` |
 | `:226` `locations[plugin-mcp]`: unparsable plugin `.mcp.json` | The plugin loads without those servers | Corrected: `ignores_file` |
@@ -89,11 +102,12 @@ Outcomes:
 | `:367`, `:391`, `:402` `items.mcp.disable[1]`, `[3]`, `[4]`: plain-string `disabledMcpjsonServers` skips nothing | It skips that server, in the user's, the Project's and the local settings | Ticket [#172](https://github.com/samfaina/config-digger/issues/172) |
 | `:438` `items.mcp.disable[6]`: a plugin missing from every settings file is on | It is off: no server, no skill | Corrected: `default_value = false` on the user's `enabledPlugins` |
 | `:506` `locations[project-skills]`: the nearest same-named skill wins | Confirmed | Confirmed |
-| `:536` `locations[synced-skills]`: skipped while the sync gate is off | With an API key the synced folder is not read even with the gate on | Pending: needs a claude.ai account |
-| `:537` `locations[synced-skills]`: read only at `synced/<org>_<account>/<name>` | As above | Pending: needs a claude.ai account |
+| `:536` `locations[synced-skills]`: skipped while the sync gate is off | Signed in to claude.ai, Claude Code reads the folder whatever the gate: with the gate cached off it downloads nothing and lists what is there, a skill `manifest.json` does not list included. With an API key it reads none of it | Corrected: no `when` on the gate. Ticket [#308](https://github.com/samfaina/config-digger/issues/308): read only while signed in to claude.ai |
+| `:537` `locations[synced-skills]`: read only at `synced/<org>_<account>/<name>` | Read at that depth only, and only in the signed-in account's folder, `<organizationUuid>_<accountUuid>`: a skill directly under `synced/`, in another account's folder or deeper is not read. A sync round that downloads deletes the first two | Confirmed for the depth; ticket [#308](https://github.com/samfaina/config-digger/issues/308) for the account's folder |
+| `locations[synced-skills]`, added at `9e628d3`: a synced skill is named by its folder | It is, as `anthropic-skills:<folder>`, its frontmatter `name` an alias with that prefix. It never competes with a local skill: both are listed, and the bare `/<folder>` runs the local one, or the synced one when no local skill takes it. `skillOverrides` turns it off by `anthropic-skills:<folder>` or by `<folder>` | Corrected: `name_template = "anthropic-skills:{name}"`, so it no longer competes. Ticket [#309](https://github.com/samfaina/config-digger/issues/309) for the bare `skillOverrides` key |
 | `:560` `items.skill`: names are not rewritten | Confirmed: capitals and `_` are kept | Confirmed |
 | `:561` `items.skill`: the 2.1.299 name rule | Pinned, see below | Ticket [#171](https://github.com/samfaina/config-digger/issues/171) |
-| `:695` `feature_gates[tengu_claudeai_skills_sync_enabled]`: what the gate does | As for `:536` | Pending: needs a claude.ai account |
+| `:695` `feature_gates[tengu_claudeai_skills_sync_enabled]`: what the gate does | It turns the sync on: while it is on, Claude Code downloads the account's skills at start, by the value it cached last, then refreshes the cache. With `DISABLE_GROWTHBOOK` set it downloads nothing even with the gate cached on, so its default is off | Corrected: `assumed = false`; the gate is a caveat on synced skills, saying whether Claude Code keeps them in step with claude.ai, and closes nothing |
 
 The name rule, on 2.1.299 to 2.1.309 with `tengu_slate_wicket` at its default:
 
@@ -153,13 +167,16 @@ Pending: these 37 marks need the apps' windows driven, on throwaway profiles. Cu
 - **Claude Code never reads `managedMcpServers` from the HKCU policy**, though it applies the value's other settings when no admin source holds any. config-digger lists such a server as Effective: ticket [#303](https://github.com/samfaina/config-digger/issues/303).
 - **Claude Code drops a `managedMcpServers` entry with a command, or at an `http://` URL**, and loads the others: only remote servers at an `https://` URL load. The definition's shape cannot say so: ticket [#304](https://github.com/samfaina/config-digger/issues/304).
 - **Claude Desktop 3.x keeps its MSIX package's data in `%LOCALAPPDATA%\Claude-Data\<family>`**, leaving a `.user-data-left.<family>` marker in the package's `LocalCache`. On the reference machine, with 3.6556.2.0, config-digger finds no Claude Desktop home at all. A fresh install in Windows Sandbox did not move over several launches, so when it moves is not known yet: ticket [#305](https://github.com/samfaina/config-digger/issues/305).
+- **Skills sync works on a Max account.** It does not need Teams or Enterprise: the owner's Max account (`organizationType: claude_max`) syncs the Anthropic example skills, so the `synced-skills` marks were tested and do not fall under the exception.
+- **Claude Code does not download again a synced skill deleted by hand** while the account's folder holds `.last-complete-round`. Without that file, the next run with the gate on downloads every skill again. The probe clears the copy that way before each gate check.
+- **`syncClaudeAiSkills: false` in the user's settings** stops the reading, as the rule says, and Claude Code deletes the skills it downloaded, `manifest.json` included. A skill planted in the account's folder stays.
 - **Claude Desktop starts no MCP server before someone signs in**, but reads `claude_desktop_config.json` at start: an entry it cannot use is named in a dialog, "Some MCP servers couldn't be loaded", which is what `claude-desktop.mjs` reads.
 
 ## What is left
 
 | Needs | Marks |
 |---|---|
-| A claude.ai account, with server-managed settings for `:86` and `:155` | Claude Code `:86`, `:155` (a `remote-settings.json` that does not parse), `:536`, `:537`, `:695`, and the new `locations[synced-skills]` mark that a synced skill is named by its folder |
+| Server-managed settings: Claude Teams or Enterprise | Claude Code `:86`, `:155` (a `remote-settings.json` that does not parse) |
 | A Codex enterprise account, with remote plugins | Codex `:175`, `:176`, `:233`, `:287` |
 | Orca | Codex `:63` |
 | A deployment of Claude Desktop for a third-party provider | Claude Desktop `:234` |

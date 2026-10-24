@@ -2,9 +2,10 @@
 # Claude Code. Facts from docs/research/claude-code.md, and those tagged
 # [test] from the release gate's probes, uat/agents/claude-code.mjs and,
 # for `%ProgramFiles%` and the policy values, claude-code-machine.mjs in
-# Windows Sandbox (docs/research/release-gate.md). They pass on 2.1.299 to
-# 2.1.309; 2.1.286 reads plain-string lists and skill names as before
-# 2.1.299.
+# Windows Sandbox, and, for the skills synced from claude.ai,
+# claude-account.mjs with a claude.ai account
+# (docs/research/release-gate.md). They pass on 2.1.299 to 2.1.309;
+# 2.1.286 reads plain-string lists and skill names as before 2.1.299.
 
 format_version = 1
 verified = { min = "2.1.299", max = "2.1.309" }
@@ -553,29 +554,34 @@ store_class = "plain"
 on_read_failure = "ignores_file"
 
 # Skills synced from claude.ai sit one level deeper than the docs say, in
-# `synced/<org>_<account>/<name>` [disk], next to `manifest.json` and a
-# `.staging` folder, and are read at that depth only. Claude Code owns this
-# copy. It syncs these skills into its sessions only while its claude.ai
-# sync gate is on [docs].
+# `synced/<org>_<account>/<folder>` [disk], next to `manifest.json` and a
+# `.staging` folder. Claude Code owns this copy: it downloads the account's
+# skills there while its claude.ai sync gate is on, and reads the folder
+# whatever the gate, a skill `manifest.json` does not list included [test].
+# While the folder holds `.last-complete-round`, it does not download again
+# a skill deleted by hand [test]. It reads no skill directly under
+# `synced/` or deeper than a skill folder, and a sync round that downloads
+# deletes what sits directly under `synced/` [test]. A synced skill is named
+# `anthropic-skills:<folder>`, its frontmatter `name` an alias with the same
+# prefix [test]. It reads the folder only while signed in to claude.ai, and
+# only the signed-in account's folder, leaving another `<org>_<account>`
+# unread [test]; config-digger reads every account's folder, and does not
+# know how Claude Code is signed in (#308). Tested with a Max account.
 [[locations]]
 id = "synced-skills"
-unverified = [
-  "Claude Code skips the synced skills folder while its claude.ai sync gate is off.",
-  "Claude Code reads a synced skill only at `synced/<org>_<account>/<name>`, not directly under `synced/` or deeper.",
-  "That a synced skill is named by its folder, as every other skill is, is inferred.",
-]
 anchor = { block = "home", root = "skills", path = "synced" }
 format = { block = "skill-folder", depth = 2, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+name_template = "anthropic-skills:{name}"
 kind = "skill"
 scope = "user"
 provenance = "cloud-mirror"
 store_class = "plain"
 on_read_failure = "ignores_file"
-when = [{ block = "feature-gate", gate = "tengu_claudeai_skills_sync_enabled" }]
 
-# Enterprise beats personal, and personal beats project [docs]. A local
-# skill beats a synced one, which then answers only to
-# `/anthropic-skills:<name>` [docs]. Claude Code skips a skill it cannot
+# Enterprise beats personal, and personal beats project [docs]. A synced
+# skill never competes with them: Claude Code lists both, and only the bare
+# `/<folder>` goes to the local skill, a synced skill answering to it while
+# no local skill takes it [test]. Claude Code skips a skill it cannot
 # load before they compete. Names are used as written, capitals and `_`
 # included [test]. Since 2.1.299 a name rule applies, behind the gate
 # `tengu_slate_wicket`, on by default [docs, binary]. It skips a skill whose
@@ -591,9 +597,10 @@ precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills"
 competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence", "rules"]
 
-# `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]. Settings
-# files rank managed, local, Project, user [docs]: the highest that holds it
-# decides.
+# `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]: Claude
+# Code then reads no synced skill, and deletes those it downloaded, in the
+# user's settings [test]. Settings files rank managed, local, Project, user
+# [docs]: the highest that holds it decides.
 [[items.skill.rules]]
 block = "global-switch"
 off = false
@@ -609,7 +616,9 @@ sources = [
 # local settings [docs]. `"name-only"` lists only the name to Claude and
 # `"user-invocable-only"` lists nothing, both keeping the skill in the `/`
 # menu: partial switches. `"on"` is the default. It does not apply to plugin
-# skills [docs].
+# skills [docs]. It turns a synced skill off by `anthropic-skills:<folder>`,
+# or by `<folder>` alone, which a local skill of that folder answers to too
+# [test]; config-digger reads the first only (#309).
 [[items.skill.disable]]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
@@ -718,10 +727,18 @@ locations = ["plugin-skills"]
 # whichever source supplies the other managed settings [docs]. A Project's
 # settings bypass the cache in that Project alone [docs]. A Claude apps gateway
 # session also skips the fetch, which nothing on disk shows.
+#
+# This gate turns the claude.ai skill sync on: while it is on, Claude Code
+# downloads the account's skills into `synced-skills` at start, by the value
+# it cached last, and refreshes the cache after [test]. It reads the folder
+# whatever the gate [test], so the gate closes no location: its caveat says
+# whether Claude Code keeps the copy in step with claude.ai. Without a value
+# it is off [binary]: with the fetch skipped, by `DISABLE_GROWTHBOOK`, it is
+# off whatever the cache holds [test]. Tested on a Max account, whose gate
+# is on.
 [[feature_gates]]
 name = "tengu_claudeai_skills_sync_enabled"
-unverified = "That this gate turns the claude.ai skill sync on is inferred from its name."
-assumed = true
+assumed = false
 affects = ["synced-skills"]
 lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
 

@@ -845,7 +845,7 @@ fn a_global_switch_in_a_user_file_disables_globally_without_enable() {
 
     let inventory = inventory(&fs);
 
-    let pdf = entry_json(&server(&inventory, "pdf").entries[0]);
+    let pdf = entry_json(&server(&inventory, "anthropic-skills:pdf").entries[0]);
     assert_eq!(pdf["state"], "disabled");
     assert_eq!(
         pdf["reason"],
@@ -878,11 +878,11 @@ fn the_highest_file_holding_a_global_switch_decides() {
     );
 
     assert_eq!(
-        state_and_code(&inventory(&managed), "pdf"),
+        state_and_code(&inventory(&managed), "anthropic-skills:pdf"),
         pair("blocked", "policy")
     );
     assert_eq!(
-        state_and_code(&inventory(&overridden), "pdf"),
+        state_and_code(&inventory(&overridden), "anthropic-skills:pdf"),
         pair("effective", "")
     );
 }
@@ -969,7 +969,7 @@ fn a_later_drop_in_overrides_a_global_switch() {
     );
 
     assert_eq!(
-        state_and_code(&inventory(&fs), "pdf"),
+        state_and_code(&inventory(&fs), "anthropic-skills:pdf"),
         pair("effective", "")
     );
 }

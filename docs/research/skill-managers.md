@@ -234,6 +234,6 @@ In priority order, a skill folder's manager Provenance can be inferred from:
 - What makes the copy fallback fire in practice on Windows? Candidates: home on a network share or redirected folder, OneDrive-redirected folders, antivirus locks. Not reproduced.
 - How does Rust's `std::fs::symlink_metadata` / `FileType` classify junctions on the toolchain config-digger uses? It decides whether the scanner sees a link or a directory.
 - Each universal Agent's precedence between `~/.agents/skills`, its own user folder and project folders (needed for Effective/Shadowed). Belongs to the per-Agent research tickets.
-- How does Claude Code treat `~/.claude/skills/synced/` and `.trash/`? This session shows synced skills with an `anthropic-skills:` prefix, so a synced `unslop` and a local `~/.claude/skills/unslop` appear side by side rather than one shadowing the other. Needs Claude Code docs.
+- How does Claude Code treat `~/.claude/skills/synced/` and `.trash/`? This session shows synced skills with an `anthropic-skills:` prefix, so a synced `unslop` and a local `~/.claude/skills/unslop` appear side by side rather than one shadowing the other. Needs Claude Code docs. Answered by the [release gate](release-gate.md): they never compete.
 - Does git on Windows handle a committed project folder that contains junctions with absolute targets? `skills` creates them in project Scope.
 - Are there other skill managers with real adoption (Python, Go, or editor-bundled ones)? I only checked the ones found on this machine plus openskills.
