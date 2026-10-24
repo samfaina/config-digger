@@ -937,19 +937,33 @@ pub(crate) fn resolve(
                     .project
                     .as_ref()
                     .map(|key| project_path(snapshot, key)),
+                location: failure.shape.as_ref().map(|shape| shape.location.clone()),
+                key_path: failure.shape.as_ref().map(|shape| shape.key_path.clone()),
                 kind: failure.kind,
                 position: failure.position.map(|(line, column)| api::Position {
                     line: line.try_into().unwrap_or(u32::MAX),
                     column: column.try_into().unwrap_or(u32::MAX),
                 }),
                 reaction: reaction.strongest.into(),
-                sentence: explain::read_failure(
-                    &agent.name,
-                    &failure.path,
-                    failure.kind,
-                    reaction.dialect,
-                    failure.position,
-                ),
+                sentence: match &failure.shape {
+                    Some(shape) => explain::shape_failure(
+                        &agent.name,
+                        &failure.path,
+                        definitions[failure.agent_index]
+                            .location(&shape.location)
+                            .kind,
+                        &shape.key_path,
+                        shape.found,
+                        shape.expected,
+                    ),
+                    None => explain::read_failure(
+                        &agent.name,
+                        &failure.path,
+                        failure.kind,
+                        reaction.dialect,
+                        failure.position,
+                    ),
+                },
                 notes: (reaction.strongest == ReadFailureReaction::AsksUser)
                     .then(|| explain::asks_user(&agent.name))
                     .into_iter()
@@ -1395,6 +1409,19 @@ fn reaction(
     failure: &ScannedReadFailure,
 ) -> Reaction {
     let definition = &definitions[failure.agent_index];
+    // A shape fails its location alone, as that location says.
+    if let Some(shape) = &failure.shape {
+        let location = definition.location(&shape.location);
+        return Reaction {
+            strongest: location.shape_failure_reaction(),
+            risks: BTreeSet::new(),
+            dialect: location
+                .format
+                .file()
+                .map_or(JsonFormat::STRICT.dialect(), Parse::dialect),
+            kinds: BTreeSet::from([location.kind]),
+        };
+    }
     let locations: Vec<&LocationDefinition> = snapshot
         .readers_of(&failure.path)
         .iter()

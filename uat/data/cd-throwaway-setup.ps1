@@ -120,6 +120,19 @@ Write-TestFile "$Root\claude-desktop-home\claude_desktop_config.json" @"
 }
 "@
 
+# A Claude Code home whose Project servers are a list, which fails only that
+# location: the user server is still read.
+Write-TestFile "$Root\claude-code-shape-home\.claude.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-shape-user": { "command": "npx", "args": ["-y", "cd-throwaway-shape-user"] }
+  },
+  "projects": {
+    "$slash/project": { "mcpServers": [] }
+  }
+}
+"@
+
 # A second Claude Code home with 30 user servers and 30 Projects, so that the
 # Items, the Projects and the Project dropdown scroll in the smallest window,
 # and a missing Project with 12 leftovers, so that the What changes of their

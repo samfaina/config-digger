@@ -264,7 +264,11 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 <h2 className="panel-title">Read failures</h2>
                 <div className="scroll cards">
                   {failures.map((failure) => (
-                    <ReadFailureCard key={`${failure.agent}|${failure.home}|${failure.path}`} failure={failure} notify={setNotice} />
+                    <ReadFailureCard
+                      key={`${failure.agent}|${failure.home}|${failure.path}|${failure.location}|${failure.key_path?.join(".")}`}
+                      failure={failure}
+                      notify={setNotice}
+                    />
                   ))}
                   {failures.length === 0 && <p className="empty">Every location in this context was read.</p>}
                 </div>

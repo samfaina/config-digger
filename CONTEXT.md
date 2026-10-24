@@ -121,7 +121,7 @@ Said of an Entry the Agent rejects, on its own or in combination: a server missi
 _Avoid_: Broken, conflicting, error
 
 **Read failure**:
-A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
+A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect, or because it holds, where its Entries are, a value of a shape config-digger cannot enumerate, such as a list where servers should be. A file that cannot be opened, decoded or parsed is a Read failure for every location in it; a shape is one only for the location whose Entries it holds, so the other locations in the same file are still read. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
 _Avoid_: Unreadable, broken file, corrupt file, invalid file
 
 **Secret**:

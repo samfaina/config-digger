@@ -191,7 +191,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # identifiers start with `plugin-` and the plugin's name [code, disk].
 [[locations]]
 id = "cursor-plugin-manifest-mcp"
-unverified = "What Cursor does with a plugin manifest it cannot parse is not known."
+unverified = [
+  "What Cursor does with a plugin manifest it cannot parse is not known.",
+  "A manifest `mcpServers` that is not an object is taken to leave the manifest's `skills` read: Cursor rejects an `mcp.json` whole for it [code], but what it does with a manifest is not known.",
+]
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 name_template = "plugin-{plugin}-{name}"
 references = { root = ["mcpServers"] }

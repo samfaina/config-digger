@@ -2327,8 +2327,14 @@ pub struct ReadFailure {
     pub home: String,
     pub path: PathBuf,
     /// The Project whose folder holds the location, or `None` for a
-    /// location outside any Project, which reaches every context.
+    /// location outside any Project, which reaches every context. For a
+    /// shape, the Project it is keyed to, if any.
     pub project: Option<PathBuf>,
+    /// For a shape, the id of the location it fails, the other locations
+    /// in the file being read; `None` when the whole file fails.
+    pub location: Option<String>,
+    /// For a shape, the key path of the value it holds where Entries are.
+    pub key_path: Option<Vec<String>>,
     pub kind: ReadFailureKind,
     /// Where a parse error is, when the parser knows. A Read failure never
     /// quotes the file, which can hold a Secret.
@@ -2353,8 +2359,8 @@ pub enum ReadFailureReaction {
     IgnoresFile,
     /// It asks about the file at startup, and otherwise starts without its Entries.
     AsksUser,
-    /// What it does is not known, so every Item in the contexts the
-    /// location reaches gets a caveat.
+    /// What it does is not known, so every Item of the location's kinds in
+    /// the contexts it reaches gets a caveat.
     Unknown,
     /// It refuses to start in the contexts the location reaches, which
     /// flags it as unable to start there.
@@ -2477,7 +2483,11 @@ impl ReadFailure {
     /// Whether `other` is the same reader failing on the same location,
     /// whatever the kind of failure.
     pub(crate) fn same_reader_and_location(&self, other: &ReadFailure) -> bool {
-        self.agent == other.agent && self.home == other.home && self.path == other.path
+        self.agent == other.agent
+            && self.home == other.home
+            && self.path == other.path
+            && self.location == other.location
+            && self.key_path == other.key_path
     }
 
     /// Whether it reaches the context of `project`, or of no Project: one
@@ -2490,9 +2500,13 @@ impl ReadFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFailureKind {
-    /// The text does not parse in the reader's dialect, or holds a shape
-    /// where Entries are that config-digger cannot enumerate.
+    /// The text does not parse in the reader's dialect.
     Parse,
+    /// Where a location's Entries are, the file holds a value of a shape
+    /// config-digger cannot enumerate, such as a list where servers
+    /// should be. Only that location fails, or every location in the file
+    /// when the file itself is not an object.
+    Shape,
     /// The bytes do not decode into text the way the Agent decodes them.
     Decode,
     /// The file cannot be opened for lack of permission.
@@ -2508,6 +2522,7 @@ impl ReadFailureKind {
     pub fn code(self) -> &'static str {
         match self {
             ReadFailureKind::Parse => "parse",
+            ReadFailureKind::Shape => "shape",
             ReadFailureKind::Decode => "decode",
             ReadFailureKind::Permission => "permission",
             ReadFailureKind::Io => "io",

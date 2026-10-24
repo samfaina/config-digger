@@ -260,6 +260,39 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#75", "#175"]
+        },
+        {
+          "id": "1.3",
+          "title": "Un home de Claude Code con servidores de una forma inesperada",
+          "goal": "Una forma inesperada en una location de ~/.claude.json deja leer el resto del fichero y se muestra como Read failure de esa location.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-shape-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario y elige ese home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "Elige el servidor cd-throwaway-shape-user y mira su tarjeta.",
+            "En el aviso de arriba, pulsa View."
+          ],
+          "commands": [],
+          "expect": [
+            "El Inventario de ese home muestra el servidor «cd-throwaway-shape-user».",
+            "El aviso de arriba dice «1 location couldn't be read.».",
+            "La tarjeta de cd-throwaway-shape-user tiene el aviso «A location that could take part couldn't be read: E:\\cd-throwaway\\claude-code-shape-home\\.claude.json, so the State shown may not be the one Claude Code has.».",
+            "El panel «Read failures» tiene una sola tarjeta, con la etiqueta «Unexpected shape».",
+            "Esa tarjeta dice «Claude Code cannot read the MCP servers at `projects.E:/cd-throwaway/project.mcpServers` in E:\\cd-throwaway\\claude-code-shape-home\\.claude.json: it holds a list, not an object, so it reads no Entries from there.»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#123"]
         }
       ]
     },
