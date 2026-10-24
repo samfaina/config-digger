@@ -6,10 +6,11 @@
 // and Claude Desktop's config, is throwaway too. It runs beside a VS Code
 // the user has open, and stops only the processes of its own launches.
 //
-//   node uat/agents/vscode.mjs [--bin <Code.exe>]
+//   node uat/agents/vscode.mjs [--bin <Code.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
-// `files`, `broken-<folder|dot|user|plugin|workspace>` and `discovery`.
+// `files`, `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
+// `experiments`, `trust`, `nonce`, `enablement`, `skills` and `policy`.
 //
 // VS Code starts an MCP server only when asked. A probe extension, loaded
 // with `--extensionDevelopmentPath`, asks it to start every server it
@@ -18,12 +19,18 @@
 // running `server.mjs <tag>`, which writes a marker named after its tag,
 // with the arguments and the `CD_PROBE_*` variables it got. The extension
 // also gives VS Code servers of its own, which VS Code caches in the
-// workspace's `state.vscdb`.
+// workspace's `state.vscdb`, and reports what the window saw through the
+// proposed API `chatPromptFiles`, `--enable-proposed-api` letting it.
+//
+// Only the `policy` check runs signed in to a GitHub account, on the
+// profile `--sign-in` opens for the owner: `vscode-account` in the probe
+// root, or the folder `CD_PROBE_VSCODE_ACCOUNT` names there, whose name
+// starts the same. The other launches sign in to nothing.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { fresh, json, probe, run, same, write } from "./lib.mjs";
+import { fresh, json, probe, root, run, same, skill, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -35,6 +42,90 @@ const bin = process.argv.includes("--bin")
 // `product.json` sits in the folder of the commit `Code.exe` runs.
 const commit = fs.readdirSync(path.dirname(bin)).find((f) => fs.existsSync(path.join(path.dirname(bin), f, "resources", "app", "product.json")));
 const version = json(path.join(path.dirname(bin), commit, "resources", "app", "product.json")).version;
+
+const powershell = async (command) => (await run("powershell.exe", ["-NoProfile", "-Command", command])).stdout.trim();
+// The PowerShell that lists the processes given the data folder `data`.
+const processesOf = (data) => `Get-CimInstance Win32_Process -Filter "Name='Code.exe'" | Where-Object { $_.CommandLine -like '*${data}*' }`;
+// Stops what is left of a launch: the processes given its data folder only.
+const stop = (data) => powershell(`${processesOf(data)} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// The folders of a launch in `dir`.
+const folders = (dir) => ({
+  data: path.join(dir, "data"),
+  user: path.join(dir, "data", "User"),
+  global: path.join(dir, "data", "User", "globalStorage", "state.vscdb"),
+  home: path.join(dir, "home"),
+  appData: path.join(dir, "home", "AppData", "Roaming"),
+  plugins: path.join(dir, "home", ".vscode", "agent-plugins"),
+  shared: path.join(dir, "shared"),
+  probeExt: path.join(dir, "probe-ext"),
+});
+// The flags that give a launch in `dir` its own profile and folders.
+const profileArgs = (dir) => {
+  const d = folders(dir);
+  return [`--user-data-dir=${d.data}`, `--extensions-dir=${path.join(dir, "ext")}`, `--shared-data-dir=${d.shared}`, `--agent-plugins-dir=${d.plugins}`];
+};
+
+// The rows of `keys` in the SQLite store `file`, each value parsed, or
+// `{}` when the file does not exist.
+function rows(file, keys) {
+  if (!fs.existsSync(file)) return {};
+  const db = new DatabaseSync(file, { readOnly: true });
+  const found = {};
+  for (const key of keys) {
+    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get(key);
+    if (row) found[key] = JSON.parse(row.value);
+  }
+  db.close();
+  return found;
+}
+// Sets the rows of `values` in the SQLite store `file`, as VS Code lays one
+// out, each value as JSON text.
+function plant(file, values) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec("CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)");
+  for (const [key, value] of Object.entries(values)) db.prepare("INSERT INTO ItemTable (key, value) VALUES (?, ?)").run(key, JSON.stringify(value));
+  db.close();
+}
+
+// The profile signed in to a GitHub account, a folder named
+// `vscode-account*` in the probe root: `--sign-in` opens it for the owner.
+const account = path.resolve(process.env.CD_PROBE_VSCODE_ACCOUNT ?? path.join(root, "vscode-account"));
+if (path.dirname(account) !== root || !path.basename(account).startsWith("vscode-account")) {
+  throw new Error(`CD_PROBE_VSCODE_ACCOUNT must be a folder named vscode-account* in ${root}, not ${account}`);
+}
+// Whether `dir`'s profile holds a GitHub session, which VS Code keeps
+// encrypted in the shared data folder's store on Windows.
+function accountSignedIn(dir) {
+  const file = path.join(folders(dir).shared, "sharedStorage", "state.vscdb");
+  if (!fs.existsSync(file)) return false;
+  const db = new DatabaseSync(file, { readOnly: true });
+  const row = db.prepare("SELECT key FROM ItemTable WHERE key LIKE 'secret://%vscode.github-authentication%github.auth%'").get();
+  db.close();
+  return Boolean(row);
+}
+
+// VS Code opens GitHub's sign-in page in the default browser, which gets
+// the owner's own app data here, and so their own browser profile. The
+// owner signs in from the Accounts menu; the probe only waits.
+if (process.argv.includes("--sign-in")) {
+  const d = folders(account);
+  write(path.join(d.user, "settings.json"), { "telemetry.telemetryLevel": "off", "update.mode": "none", "workbench.startupEditor": "none" });
+  const proj = path.join(account, "proj");
+  fs.mkdirSync(proj, { recursive: true });
+  fs.mkdirSync(d.home, { recursive: true });
+  spawn(bin, [...profileArgs(account), "--new-window", proj], { detached: true, stdio: "ignore", env: { ...process.env, USERPROFILE: d.home } }).unref();
+  console.log(`Sign in to GitHub from the Accounts menu of the window that opened, on the profile in ${account}, then close the window.`);
+  const running = async () => Number(await powershell(`@(${processesOf(d.data)}).Count`));
+  while (!(await running())) await sleep(1000);
+  while (await running()) await sleep(2000);
+  const done = accountSignedIn(account);
+  console.log(done ? "The profile is signed in." : "The profile is not signed in.");
+  process.exit(done ? 0 : 1);
+}
+
 const p = probe("VS Code", version);
 const base = fresh("vscode");
 const only = process.env.CD_PROBE_ONLY?.split(",");
@@ -49,6 +140,26 @@ const [tag, ...args] = process.argv.slice(2);
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("CD_PROBE_")));
 fs.mkdirSync(path.join(import.meta.dirname, "markers"), { recursive: true });
 fs.writeFileSync(path.join(import.meta.dirname, "markers", tag + ".json"), JSON.stringify({ args, env }));
+// A \`serve-\` server answers VS Code as an MCP server with one tool, named
+// after its tag, so that VS Code records what it saw of it and lists its
+// tool.
+if (tag.startsWith("serve-")) {
+  const reply = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\\n");
+  let buffer = "";
+  process.stdin.on("data", (d) => {
+    buffer += d;
+    let end;
+    while ((end = buffer.indexOf("\\n")) >= 0) {
+      const message = JSON.parse(buffer.slice(0, end));
+      buffer = buffer.slice(end + 1);
+      if (message.method === "initialize") {
+        reply(message.id, { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: tag, version: "1.0.0" } });
+      } else if (message.method === "tools/list") {
+        reply(message.id, { tools: [{ name: tag.replaceAll("-", "_"), description: "probe", inputSchema: { type: "object", properties: {} } }] });
+      } else if (message.id !== undefined) reply(message.id, {});
+    }
+  });
+}
 `,
 );
 const markers = path.join(base, "markers");
@@ -58,10 +169,20 @@ const server = (tag, extra = {}) => ({ command: process.execPath, args: [script,
 // no JSON parser accepts.
 const broken = (tags) => `{ ${tags.map((t) => `"cd-throwaway-${t}": ${JSON.stringify(server(t))}`).join(",, ")} }`;
 const fileUri = (file) => pathToFileURL(file).href;
+// A file's URI as VS Code spells it as text, its drive in lower case and
+// its `:` encoded.
+const vscodeUri = (file) => fileUri(file).replace(/^file:\/\/\/([A-Za-z]):/, (_, drive) => `file:///${drive.toLowerCase()}%3A`);
+// A file's URI as VS Code writes one in a store, which it reads back with
+// its scheme and path.
+const storedUri = (file) => ({ $mid: 1, path: pathToFileURL(file).pathname, scheme: "file" });
 
 // The probe extension: it gives VS Code `provider`'s servers, starts every
-// server VS Code loaded, writes `done.json` and quits VS Code.
-function extension(dir, provider) {
+// server VS Code loaded with the options `start`, writes `done.json` and
+// quits VS Code. `done.json` also holds whether the window is trusted, the
+// default value of each setting of `inspect`, and the skills of the
+// proposed API `chatPromptFiles`: those VS Code lists to its model,
+// `chat.getSkills`, and those the user can run, `chat.getSlashCommands`.
+function extension(dir, { provider, start = { autoTrustChanges: true }, inspect = [] }) {
   write(path.join(dir, "package.json"), {
     name: "probe",
     publisher: "cd-throwaway",
@@ -69,15 +190,18 @@ function extension(dir, provider) {
     engines: { vscode: "^1.100.0" },
     main: "extension.js",
     activationEvents: ["onStartupFinished"],
+    enabledApiProposals: ["chatPromptFiles"],
+    capabilities: { untrustedWorkspaces: { supported: true } },
     contributes: { mcpServerDefinitionProviders: [{ id: "cd-throwaway-provider", label: "cd-throwaway-provider" }] },
   });
-  write(path.join(dir, "probe.json"), { provider, done: path.join(dir, "done.json") });
+  write(path.join(dir, "probe.json"), { provider, start, inspect, done: path.join(dir, "done.json") });
   write(
     path.join(dir, "extension.js"),
     `const vscode = require("vscode");
 const fs = require("fs");
 const config = require("./probe.json");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const skillList = (list) => (list ?? []).map((s) => ({ name: s.name, path: s.uri.fsPath, description: s.description ?? null }));
 exports.activate = async () => {
   const p = config.provider;
   if (p) {
@@ -91,15 +215,29 @@ exports.activate = async () => {
   await sleep(8000);
   let error = null;
   try {
-    await Promise.race([vscode.commands.executeCommand("workbench.mcp.startServer", "*", { autoTrustChanges: true }), sleep(20000)]);
+    await Promise.race([vscode.commands.executeCommand("workbench.mcp.startServer", "*", config.start), sleep(20000)]);
   } catch (e) {
     error = String(e);
   }
   await sleep(4000);
+  const settings = vscode.workspace.getConfiguration();
+  let skills = null;
+  let commands = null;
+  try {
+    skills = skillList(await vscode.chat.getSkills(new vscode.CancellationTokenSource().token));
+    commands = skillList(await vscode.chat.getSlashCommands(new vscode.CancellationTokenSource().token));
+  } catch (e) {
+    error = (error ? error + "; " : "") + String(e);
+  }
   fs.writeFileSync(config.done, JSON.stringify({
     error,
     folders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
     workspaceFile: vscode.workspace.workspaceFile ? vscode.workspace.workspaceFile.fsPath : null,
+    trusted: vscode.workspace.isTrusted,
+    defaults: Object.fromEntries(config.inspect.map((key) => [key, settings.inspect(key)?.defaultValue ?? null])),
+    skills,
+    commands,
+    tools: vscode.lm.tools.map((t) => t.name),
   }));
   await vscode.commands.executeCommand("workbench.action.quit");
 };
@@ -107,29 +245,17 @@ exports.activate = async () => {
   );
 }
 
-const powershell = async (command) => (await run("powershell.exe", ["-NoProfile", "-Command", command])).stdout.trim();
-// Stops what is left of a launch: the processes given its data folder only.
-const stop = (data) =>
-  powershell(`Get-CimInstance Win32_Process -Filter "Name='Code.exe'" | Where-Object { $_.CommandLine -like '*${data}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
-
-// The folders of a launch in `dir`.
-const folders = (dir) => ({
-  data: path.join(dir, "data"),
-  user: path.join(dir, "data", "User"),
-  home: path.join(dir, "home"),
-  appData: path.join(dir, "home", "AppData", "Roaming"),
-  plugins: path.join(dir, "home", ".vscode", "agent-plugins"),
-  probeExt: path.join(dir, "probe-ext"),
-});
-
 // Launches VS Code on `open`, a folder or a `.code-workspace` file, with the
 // user's `settings`, and resolves once the probe extension is done: the
 // servers VS Code started, by tag, what the extension saw, and the
-// workspace's `mcp.extCachedServers`.
-async function launch(dir, open, { settings = {}, provider = null, env = {}, seconds = 120 } = {}) {
+// workspace's `mcp.extCachedServers`. A launch with `trust` keeps
+// workspace trust on, and one with `shared: false` leaves the shared data
+// folder where VS Code puts it, `~\.vscode-shared` of the launch's home.
+async function launch(dir, open, { settings = {}, provider = null, start, inspect, env = {}, args: extra = [], trust = false, shared = true, seconds = 120 } = {}) {
   const d = folders(dir);
   write(path.join(d.user, "settings.json"), {
-    "security.workspace.trust.enabled": false,
+    "security.workspace.trust.enabled": trust,
+    "security.workspace.trust.startupPrompt": "never",
     "telemetry.telemetryLevel": "off",
     "update.mode": "none",
     "extensions.autoUpdate": false,
@@ -138,29 +264,29 @@ async function launch(dir, open, { settings = {}, provider = null, env = {}, sec
     "chat.mcp.autostart": "never",
     ...settings,
   });
-  extension(d.probeExt, provider);
+  extension(d.probeExt, { provider, start, inspect });
+  const doneFile = path.join(d.probeExt, "done.json");
+  fs.rmSync(doneFile, { force: true });
   // 1.129.1 starts a profile's servers in the home folder, and fails to
   // when it does not exist.
   fs.mkdirSync(d.home, { recursive: true });
   fs.rmSync(markers, { recursive: true, force: true });
   const args = [
-    `--user-data-dir=${d.data}`,
-    `--extensions-dir=${path.join(dir, "ext")}`,
-    `--shared-data-dir=${path.join(dir, "shared")}`,
-    `--agent-plugins-dir=${d.plugins}`,
+    ...profileArgs(dir).filter((a) => shared || !a.startsWith("--shared-data-dir=")),
     `--extensionDevelopmentPath=${d.probeExt}`,
-    "--disable-workspace-trust",
+    "--enable-proposed-api=cd-throwaway.probe",
+    ...(trust ? [] : ["--disable-workspace-trust"]),
     "--skip-welcome",
     "--skip-release-notes",
     "--log=trace",
+    ...extra,
     "--new-window",
     open,
   ];
   spawn(bin, args, { detached: true, stdio: "ignore", env: { ...process.env, USERPROFILE: d.home, APPDATA: d.appData, ...env } }).unref();
-  const doneFile = path.join(d.probeExt, "done.json");
   const end = Date.now() + seconds * 1000;
-  while (!fs.existsSync(doneFile) && Date.now() < end) await new Promise((r) => setTimeout(r, 1000));
-  await new Promise((r) => setTimeout(r, 3000));
+  while (!fs.existsSync(doneFile) && Date.now() < end) await sleep(1000);
+  await sleep(3000);
   await stop(d.data);
   const done = fs.existsSync(doneFile) ? json(doneFile) : { timeout: true };
   const started = fs.existsSync(markers)
@@ -174,12 +300,8 @@ function extCache(data) {
   const storage = path.join(data, "User", "workspaceStorage");
   if (!fs.existsSync(storage)) return null;
   for (const ws of fs.readdirSync(storage)) {
-    const file = path.join(storage, ws, "state.vscdb");
-    if (!fs.existsSync(file)) continue;
-    const db = new DatabaseSync(file, { readOnly: true });
-    const row = db.prepare("SELECT value FROM ItemTable WHERE key = 'mcp.extCachedServers'").get();
-    db.close();
-    if (row) return JSON.parse(row.value);
+    const cached = rows(path.join(storage, ws, "state.vscdb"), ["mcp.extCachedServers"])["mcp.extCachedServers"];
+    if (cached) return cached;
   }
   return null;
 }
@@ -207,8 +329,9 @@ function marketplace(plugins, list) {
 }
 const manifest = (tag, extra = {}) => ({ name: `cd-throwaway-${tag}`, version: "1.0.0", description: "probe plugin", ...extra });
 const dotMcp = (tag) => ({ mcpServers: { [`cd-throwaway-${tag}`]: server(tag) } });
-// Claude Desktop's config in a launch's `APPDATA`, with the server `desktop`.
-const claudeDesktop = (d) => write(path.join(d.appData, "Claude", "claude_desktop_config.json"), dotMcp("desktop"));
+// Claude Desktop's config in a launch's `APPDATA`, with the server `desktop`
+// or the servers of `config`.
+const claudeDesktop = (d, config = dotMcp("desktop")) => write(path.join(d.appData, "Claude", "claude_desktop_config.json"), config);
 
 // ---------------------------------------------------------------- agent plugins
 
@@ -423,6 +546,303 @@ if (runs("discovery")) {
     same(
       { on: await discovers("member-on", { folder: true, workspace: null }), off: await discovers("member-off", { folder: false, workspace: null, user: true }) },
       { on: false, off: true },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- the ExP experiment cache
+
+// VS Code reads its cache of ExP assignments only while the telemetry level
+// is `all`. The launch sends every request to a closed local port, so that
+// neither its telemetry nor a request for new assignments leaves the
+// machine. `control` is a setting whose schema marks it for experiments in
+// every version tested; `assigned` holds the settings `vscode.toml` once
+// read in the cache, each assigned a value other than its default. Claude
+// Desktop's config holds a server VS Code would start were discovery on.
+const control = "editor.inlineSuggest.experimental.suppressInlineSuggestions";
+if (runs("experiments")) {
+  const dir = fresh("experiments", base);
+  const d = folders(dir);
+  const proj = path.join(dir, "proj");
+  write(path.join(proj, ".vscode", "mcp.json"), { servers: { "cd-throwaway-folder": server("folder") } });
+  claudeDesktop(d);
+  const assigned = {
+    "chat.mcp.access": "none",
+    "chat.mcp.collisionBehavior": "suffix",
+    "chat.mcp.discovery.enabled": { "claude-desktop": true, "cursor-global": true, "cursor-workspace": true, windsurf: true },
+    "chat.useAgentSkills": false,
+    "security.workspace.trust.enabled": false,
+  };
+  plant(d.global, {
+    "memento/experiment.service.memento": {
+      "VSCode.ABExp.FeatureData": {
+        features: [],
+        assignmentContext: "",
+        configs: [
+          { Id: "cd-throwaway", Parameters: { [`config.${control}`]: "cd-throwaway-first" } },
+          { Id: "vscode", Parameters: { [`config.${control}`]: "cd-throwaway-vscode", ...Object.fromEntries(Object.entries(assigned).map(([k, v]) => [`config.${k}`, v])) } },
+        ],
+      },
+    },
+  });
+  const seen = await launch(dir, proj, {
+    settings: { "telemetry.telemetryLevel": "all", "http.proxy": "http://127.0.0.1:9" },
+    args: ["--proxy-server=http://127.0.0.1:9"],
+    inspect: [control, ...Object.keys(assigned)],
+  });
+
+  await p.check("(top)", "VS Code takes a setting's ExP default from the `Parameters` of the item of `configs` whose `Id` is `vscode`, as `config.<setting>`, here the second item", async () =>
+    same(seen.done.defaults?.[control], "cd-throwaway-vscode"),
+  );
+  await p.check("(top)", "VS Code runs no experiment on `chat.mcp.access`, `chat.mcp.collisionBehavior`, `chat.mcp.discovery.enabled`, `chat.useAgentSkills` or `security.workspace.trust.enabled`: an assignment leaves their defaults, and the servers run as without it", async () =>
+    same(
+      {
+        defaults: Object.entries(assigned).map(([k, v]) => JSON.stringify(seen.done.defaults?.[k]) === JSON.stringify(v)),
+        started: seen.tags,
+      },
+      { defaults: [false, false, false, false, false], started: ["folder"] },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- the trusted folders
+
+if (runs("trust")) {
+  const dir = fresh("trust", base);
+  const d = folders(dir);
+  const trusted = path.join(dir, "trusted");
+  const other = path.join(dir, "other");
+  fs.mkdirSync(trusted, { recursive: true });
+  fs.mkdirSync(other, { recursive: true });
+  plant(path.join(d.home, ".vscode-shared", "sharedStorage", "state.vscdb"), { "content.trust.model.key": { uriTrustInfo: [{ uri: storedUri(trusted), trusted: true }] } });
+  const opened = await launch(dir, trusted, { trust: true, shared: false });
+  const elsewhere = await launch(dir, other, { trust: true, shared: false });
+
+  await p.check("items.mcp.gates[0]", "without `--shared-data-dir`, VS Code reads the folders it trusts from `~\\.vscode-shared\\sharedStorage\\state.vscdb`: a folder trusted there opens trusted, another does not", async () =>
+    same({ trusted: opened.done.trusted, other: elsewhere.done.trusted }, { trusted: true, other: false }),
+  );
+}
+
+// ---------------------------------------------------------------- the trust of a discovered server
+
+// A server of Claude Desktop's config, which VS Code trusts at the nonce of
+// its launch configuration. It answers VS Code, which records the nonce of
+// the configuration it last ran in the profile's `mcpToolCache`.
+if (runs("nonce")) {
+  const dir = fresh("nonce", base);
+  const d = folders(dir);
+  const proj = path.join(dir, "proj");
+  fs.mkdirSync(proj, { recursive: true });
+  const id = "claude-desktop.null.cd-throwaway-serve-desktop";
+  const desktop = (...extra) => claudeDesktop(d, { mcpServers: { "cd-throwaway-serve-desktop": server("serve-desktop", { args: [script, "serve-desktop", ...extra] }) } });
+  const record = () => rows(d.global, ["mcpToolCache"]).mcpToolCache?.serverTools?.find(([key]) => key === id)?.[1] ?? null;
+  const matching = (r) => typeof r?.nonce === "string" && r.nonce === r.trustedAtNonce;
+  const settings = { "chat.mcp.discovery.enabled": { "claude-desktop": true } };
+  // Starting with `promptType: "never"` starts a trusted server only.
+  const untrusting = { settings, start: { promptType: "never" } };
+  desktop();
+  const trusting = await launch(dir, proj, { settings });
+  const trusted = record();
+  const again = await launch(dir, proj, untrusting);
+  desktop("changed");
+  const before = record();
+  const changed = await launch(dir, proj, untrusting);
+  const after = record();
+
+  await p.check("items.mcp.gates[1]", "once trusted, a discovered server starts without asking while its file is unchanged, its record's `trustedAtNonce` and `nonce` matching", async () =>
+    same(
+      { trusted: trusting.tags, matching: matching(trusted), again: again.tags },
+      { trusted: ["serve-desktop"], matching: true, again: ["serve-desktop"] },
+    ),
+  );
+  await p.check("items.mcp.gates[1]", "once its file changes, VS Code no longer starts it without asking, though its record's two nonces still match, before that launch and after it", async () =>
+    same({ started: changed.tags, before: matching(before), after: matching(after) }, { started: [], before: true, after: true }),
+  );
+}
+
+// ---------------------------------------------------------------- servers turned off in a store
+
+// Each location's server `serve-<location>`, which a pair of
+// `mcp.enablement` turns off, in the workspace's store for a Project's
+// file and in the profile's for the others, and `serve-on`, which none
+// names. `workbench.mcp.startServer` starts a server that is off all the
+// same, but VS Code gives the model no tool of it: the oracle is the tools
+// `lm.tools` lists, each server's named after its tag. One launch opens a
+// folder, the other a `.code-workspace` file.
+const serving = (tag) => ({ mcpServers: { [`cd-throwaway-${tag}`]: server(tag) } });
+// The tags of `seen`'s servers that VS Code lists a tool of, of `tags`.
+const tooled = (seen, tags) => tags.filter((tag) => seen.done.tools?.some((t) => new RegExp(`(^|_)serve_${tag.replaceAll("-", "_")}$`).test(t)));
+// Launches VS Code on `open` twice, with `options`: before and after it
+// plants each store's `false` pairs, `{ store: [id, ...] }`, the
+// workspace's store found once the first launch made it.
+async function enablement(dir, open, options, pairs) {
+  const d = folders(dir);
+  const first = await launch(dir, open, options);
+  plant(path.join(d.user, "workspaceStorage", workspaceStorage(d, open), "state.vscdb"), { "mcp.enablement": pairs.workspace.map((id) => [id, false]) });
+  plant(d.global, { "mcp.enablement": pairs.profile.map((id) => [id, false]) });
+  return { first, second: await launch(dir, open, options) };
+}
+
+if (runs("enablement")) {
+  const dir = fresh("enablement", base);
+  const d = folders(dir);
+  const proj = path.join(dir, "proj");
+  write(path.join(proj, ".vscode", "mcp.json"), { servers: { "cd-throwaway-serve-folder": server("serve-folder"), "cd-throwaway-serve-on": server("serve-on") } });
+  write(path.join(proj, ".mcp.json"), serving("serve-dot"));
+  write(path.join(d.user, "mcp.json"), { servers: { "cd-throwaway-serve-user": server("serve-user") } });
+  claudeDesktop(d, serving("serve-desktop"));
+  const plugin = marketplace(d.plugins, [["serve-plugin", { "plugin.json": manifest("serve-plugin"), ".mcp.json": serving("serve-plugin") }]])["serve-plugin"];
+  // The ids the definition's `switch_id`s make.
+  const folder = await enablement(
+    dir,
+    proj,
+    {
+      settings: { "chat.mcp.discovery.enabled": { "claude-desktop": true } },
+      provider: { command: process.execPath, args: [script, "serve-extension"], env: {}, uri: "http://127.0.0.1:9/mcp", headers: {} },
+    },
+    {
+      workspace: ["mcp.config.ws0.cd-throwaway-serve-folder", "workspace-dot-mcp.0.cd-throwaway-serve-dot"],
+      profile: [
+        "mcp.config.usrlocal.cd-throwaway-serve-user",
+        "claude-desktop.null.cd-throwaway-serve-desktop",
+        `plugin.${vscodeUri(plugin)}.cd-throwaway-serve-plugin`,
+        "cd-throwaway.probe/cd-throwaway-ext-stdio",
+      ],
+    },
+  );
+  const tags = ["desktop", "dot", "extension", "folder", "on", "plugin", "user"];
+
+  const wsDir = fresh("enablement-workspace", base);
+  const w = folders(wsDir);
+  write(path.join(wsDir, "proj", ".cursor", "mcp.json"), serving("serve-cursor-workspace"));
+  write(path.join(w.home, ".cursor", "mcp.json"), serving("serve-cursor"));
+  write(path.join(w.home, ".codeium", "windsurf", "mcp_config.json"), serving("serve-windsurf"));
+  const file = path.join(wsDir, "cd-throwaway.code-workspace");
+  write(file, { folders: [{ path: "proj" }], settings: { mcp: { servers: { "cd-throwaway-serve-workspace": server("serve-workspace"), "cd-throwaway-serve-on": server("serve-on") } } } });
+  const workspace = await enablement(
+    wsDir,
+    file,
+    { settings: { "chat.mcp.discovery.enabled": { "cursor-workspace": true, "cursor-global": true, windsurf: true } } },
+    {
+      workspace: ["mcp.config.workspace.cd-throwaway-serve-workspace", "cursor-workspace.0.cd-throwaway-serve-cursor-workspace"],
+      profile: ["cursor.null.cd-throwaway-serve-cursor", "windsurf.null.cd-throwaway-serve-windsurf"],
+    },
+  );
+  const wsTags = ["cursor", "cursor-workspace", "on", "windsurf", "workspace"];
+
+  await p.check("items.mcp.disable[0]", "VS Code reads `mcp.enablement` in a workspace's store and the profile's as the JSON text of `[id, enabled]` pairs, each id the server's collection followed by its name, as each location's `switch_id` makes it, and gives the model no tool of a server a `false` names", async () =>
+    same(
+      {
+        folder: [tooled(folder.first, tags), tooled(folder.second, tags)],
+        workspace: [tooled(workspace.first, wsTags), tooled(workspace.second, wsTags)],
+      },
+      { folder: [tags, ["on"]], workspace: [wsTags, ["on"]] },
+    ),
+  );
+}
+
+// The folder of `d`'s `workspaceStorage` that holds the store of `open`, a
+// folder or a `.code-workspace` file.
+function workspaceStorage(d, open) {
+  const storage = path.join(d.user, "workspaceStorage");
+  const uri = decodeURIComponent(fileUri(open)).toLowerCase();
+  return fs.readdirSync(storage).find((ws) => {
+    const file = path.join(storage, ws, "workspace.json");
+    if (!fs.existsSync(file)) return false;
+    const opened = json(file);
+    return decodeURIComponent(opened.folder ?? opened.workspace ?? "").toLowerCase() === uri;
+  });
+}
+
+// ---------------------------------------------------------------- skills
+
+// The oracle is the proposed API `chatPromptFiles`: `chat.getSkills` is
+// the list VS Code builds its model's `<skills>` from, dropping only those
+// without a `description` or with `disable-model-invocation` [binary], and
+// `chat.getSlashCommands` the skills the user can run.
+if (runs("skills")) {
+  const dir = fresh("skills", base);
+  const d = folders(dir);
+  const proj = path.join(dir, "proj");
+  const at = (folder, name) => path.join(proj, folder, "skills", name);
+  for (const folder of [".agents", ".github", ".claude"]) skill(at(folder, "cd-throwaway-order"), [`description: ${folder}`]);
+  for (const folder of [".github", ".claude"]) skill(at(folder, "cd-throwaway-order-b"), [`description: ${folder}`]);
+  write(path.join(at(".agents", "cd-throwaway-bare"), "SKILL.md"), "A skill with no frontmatter.\n");
+  skill(at(".agents", "cd-throwaway-broken"), ["description: [unclosed"]);
+  skill(at(".agents", "cd-throwaway-broken-field"), ["description: probe", "argument-hint: [unclosed"]);
+  skill(at(".agents", "cd-throwaway-broken-line"), ["description: probe", "not a key"]);
+  skill(at(".agents", "cd-throwaway-broken-colon"), ["description: a: b"]);
+  write(path.join(at(".agents", "cd-throwaway-unclosed"), "SKILL.md"), "---\ndescription: probe\nbody\n");
+  // A personal skill, which the same code reads.
+  skill(path.join(d.home, ".copilot", "skills", "cd-throwaway-broken-user"), ["description: probe", "not a key"]);
+  skill(at(".agents", "cd-throwaway-off"), ["description: probe"]);
+  skill(at(".agents", "cd-throwaway-off-folder"), ["description: probe"]);
+  plant(d.global, {
+    "chat.disabledPromptFiles.skill": [storedUri(path.join(at(".agents", "cd-throwaway-off"), "SKILL.md")), storedUri(at(".agents", "cd-throwaway-off-folder"))],
+  });
+  const seen = await launch(dir, proj);
+  const named = (list, name) => (list ?? []).filter((s) => s.name === name);
+  const where = (name) => named(seen.done.skills, name).map((s) => path.relative(proj, s.path));
+
+  await p.check("locations[folder-agents-skills]", "of a workspace folder's skills of one name, VS Code keeps the `.agents` one, then the `.github` one, over the `.claude` one", async () =>
+    same(
+      { order: where("cd-throwaway-order"), b: where("cd-throwaway-order-b") },
+      { order: [path.join(".agents", "skills", "cd-throwaway-order", "SKILL.md")], b: [path.join(".github", "skills", "cd-throwaway-order-b", "SKILL.md")] },
+    ),
+  );
+  await p.check("items.skill", "VS Code loads a `SKILL.md` with no frontmatter under its folder's name, with no description, and the user can run it", async () =>
+    same(
+      { skill: named(seen.done.skills, "cd-throwaway-bare").map((s) => s.description), command: named(seen.done.commands, "cd-throwaway-bare").length },
+      { skill: [null], command: 1 },
+    ),
+  );
+  await p.check("items.skill", "VS Code loads a `SKILL.md` whose frontmatter is not YAML, or never closes, under its folder's name, a workspace folder's or a personal one, keeping the values it can read", async () => {
+    const broken = ["broken", "broken-field", "broken-line", "broken-colon", "unclosed", "broken-user"];
+    return same(
+      Object.fromEntries(broken.map((tag) => [tag, named(seen.done.skills, `cd-throwaway-${tag}`).map((s) => s.description)])),
+      { broken: [null], "broken-field": ["probe"], "broken-line": ["probe"], "broken-colon": ["a: b"], unclosed: ["probe"], "broken-user": ["probe"] },
+    );
+  });
+  await p.check("items.skill.disable[0]", "`chat.disabledPromptFiles.skill` in the profile's store names a skill by its `SKILL.md`: the user can no longer run it, while a skill named by its folder stays", async () =>
+    same(
+      { off: named(seen.done.commands, "cd-throwaway-off").length, folder: named(seen.done.commands, "cd-throwaway-off-folder").length },
+      { off: 0, folder: 1 },
+    ),
+  );
+  await p.check("items.skill.disable[0]", "a skill turned off there, with a description, stays in `chat.getSkills`, the list VS Code builds its model's `<skills>` from", async () =>
+    same(named(seen.done.skills, "cd-throwaway-off").length, 1),
+  );
+}
+
+// ---------------------------------------------------------------- the account's policy
+
+// VS Code fetches the account's entitlements at each start, then the
+// Copilot token's, which bring `policyData.mcp`, and, while `mcp` is not
+// `false`, the MCP registry's, which bring `policyData.mcpAccess`, each of
+// the last two only once its last fetch is an hour old [binary]. Two
+// launches in a row tell the times apart. The account's policy must allow
+// MCP, `mcp: true`, or VS Code fetches no registry data to date.
+if (runs("policy") && !accountSignedIn(account)) {
+  await p.check("items.mcp.rules[0]", "the account profile is signed in", async () => ({ pass: false, observed: `${account} is not: run node uat/agents/vscode.mjs --sign-in` }));
+} else if (runs("policy")) {
+  const policy = () => rows(folders(account).global, ["defaultAccount.cachedPolicyData"])["defaultAccount.cachedPolicyData"]?.accountPolicyData;
+  await launch(account, path.join(account, "proj"));
+  const first = policy();
+  const startedAt = Date.now();
+  await launch(account, path.join(account, "proj"));
+  const endedAt = Date.now();
+  const second = policy();
+  const kept = (key) => typeof second?.[key] === "number" && second[key] === first?.[key] && second[key] < startedAt;
+
+  await p.check("items.mcp.rules[0]", "of two launches in a row, the second fetches the account's entitlements again, `entitlementsFetchedAt`, and keeps the time of the token's, `tokenEntitlementsFetchedAt`, and of the MCP registry's, `mcpRegistryDataFetchedAt`, from the first: each part of the cached policy has a time of its own", async () =>
+    same(
+      {
+        entitlements: typeof second?.entitlementsFetchedAt === "number" && second.entitlementsFetchedAt >= startedAt && second.entitlementsFetchedAt <= endedAt,
+        token: kept("tokenEntitlementsFetchedAt"),
+        mcp: second?.policyData?.mcp,
+        registry: kept("mcpRegistryDataFetchedAt"),
+      },
+      { entitlements: true, token: true, mcp: true, registry: true },
     ),
   );
 }

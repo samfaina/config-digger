@@ -587,12 +587,17 @@ fn a_discovered_server_trusted_at_the_nonce_vs_code_last_saw_is_effective() {
 }
 
 /// `fs` whose application store caches the account's policy as `policy`,
-/// fetched at 2026-09-21 14:13:20 UTC.
+/// each part with the time of the request that brought it: `mcp` the
+/// token's, fetched at 2026-09-21 14:13:20 UTC, and `mcpAccess` the MCP
+/// registry's, at 2026-09-10 14:13:20 UTC, both older than the
+/// entitlements VS Code fetched at its last start.
 fn with_account_policy(fs: FakeFileSystem, policy: Value) -> FakeFileSystem {
     let cached = json!({ "accountPolicyData": {
         "accountId": "fixture",
         "policyData": policy,
-        "entitlementsFetchedAt": 1_790_000_000_000_u64,
+        "entitlementsFetchedAt": 1_790_864_000_000_u64,
+        "tokenEntitlementsFetchedAt": 1_790_000_000_000_u64,
+        "mcpRegistryDataFetchedAt": 1_789_049_600_000_u64,
     } });
     fs.with_sqlite_item(
         profile_store(),
@@ -602,7 +607,7 @@ fn with_account_policy(fs: FakeFileSystem, policy: Value) -> FakeFileSystem {
 }
 
 #[test]
-fn the_account_s_policy_without_mcp_blocks_every_server_as_of_its_fetch() {
+fn the_account_s_policy_without_mcp_blocks_every_server_as_of_the_token_s_fetch() {
     let fs = with_account_policy(with_project(vscode(), "app"), json!({ "mcp": false }));
     let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
 
@@ -620,14 +625,21 @@ fn the_account_s_policy_without_mcp_blocks_every_server_as_of_its_fetch() {
 }
 
 #[test]
-fn the_account_s_registry_only_policy_blocks_every_server_but_the_installed_ones() {
+fn a_registry_only_policy_blocks_all_but_the_installed_servers_as_of_the_registry_s_fetch() {
     let fs = with_account_policy(
         with_project(vscode(), "app"),
         json!({ "mcpAccess": "registry_only" }),
     );
     let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
 
-    assert_eq!(code(item(&inventory, "supabase").state), "blocked");
+    let supabase = item(&inventory, "supabase");
+    assert_eq!(code(supabase.state), "blocked");
+    let reason = supabase.entries[0].reason.as_ref().unwrap();
+    assert!(
+        reason.sentence.contains("as of 10 Sep 2026"),
+        "{}",
+        reason.sentence
+    );
     assert_eq!(code(item(&inventory, "fetch").state), "effective");
 }
 
@@ -683,39 +695,23 @@ fn with_experiments(fs: FakeFileSystem, parameters: Value) -> FakeFileSystem {
 }
 
 #[test]
-fn an_exp_assignment_is_the_default_of_a_setting_the_user_leaves_unset() {
+fn an_exp_assignment_changes_none_of_the_settings_read_here() {
     let fs = with_experiments(
         with_project(vscode(), "app"),
-        json!({ "config.chat.mcp.collisionBehavior": "suffix" }),
+        json!({
+            "config.chat.mcp.access": "none",
+            "config.chat.mcp.collisionBehavior": "suffix",
+        }),
     );
     let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
 
-    // With `"suffix"`, same-named servers do not compete.
-    assert_eq!(item(&inventory, "GitHub").entries.len(), 1);
-    assert_eq!(code(item(&inventory, "github").state), "effective");
-}
-
-#[test]
-fn the_user_s_own_setting_beats_an_exp_assignment() {
-    let fs = with_experiments(
-        with_project(vscode(), "app"),
-        json!({ "config.chat.mcp.access": "none" }),
-    )
-    .with_file(
-        format!(r"{USER}\settings.json"),
-        r#"{ "chat.mcp.access": "all" }"#,
-    );
-    let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
-
+    // VS Code runs no experiment on these settings: every server may run,
+    // and same-named servers still compete.
     assert_eq!(code(item(&inventory, "fetch").state), "effective");
-}
-
-#[test]
-fn an_exp_assignment_of_mcp_access_disables_the_servers() {
-    let fs = with_experiments(vscode(), json!({ "config.chat.mcp.access": "none" }));
-    let inventory = inventory(&core(&fs), &context(None));
-
-    assert_eq!(code(item(&inventory, "fetch").state), "disabled");
+    assert_eq!(
+        code(item(&inventory, "GitHub").entries[1].state),
+        "shadowed"
+    );
 }
 
 #[test]
