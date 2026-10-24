@@ -434,22 +434,68 @@ fn skill_folders_are_read_at_any_depth_and_only_the_same_path_competes() {
 }
 
 #[test]
-fn a_user_skill_and_a_project_skill_of_the_same_name_are_separate_items() {
+fn a_project_skill_at_the_path_of_a_user_skill_loses_to_it() {
     let fs = with_skill(
-        with_skill(cursor(), in_home(r".cursor\skills\review")),
-        project(r"app\.claude\skills\review"),
+        with_skill(
+            with_skill(cursor(), in_home(r".cursor\skills\review")),
+            project(r"app\.claude\skills\review"),
+        ),
+        project(r"app\.cursor\skills\team\review"),
     );
 
     let inventory = inventory_at(&fs, &project("app"));
 
     let review = skills_named(&inventory, "review");
-    assert_eq!(review.len(), 2, "{review:?}");
-    assert!(review.iter().all(|(state, _)| state == "effective"));
-    let scopes: Vec<String> = cursor_items(&inventory)
-        .filter(|item| item.name == "review")
-        .map(|item| item.entries[0].scope.clone())
-        .collect();
-    assert!(scopes.contains(&"user".to_owned()) && scopes.contains(&"project".to_owned()));
+    assert_eq!(
+        review,
+        [
+            (
+                "effective".to_owned(),
+                vec![
+                    (
+                        "effective".to_owned(),
+                        in_home(r".cursor\skills\review").display().to_string()
+                    ),
+                    (
+                        "shadowed".to_owned(),
+                        project(r"app\.claude\skills\review").display().to_string()
+                    ),
+                ]
+            ),
+            (
+                "effective".to_owned(),
+                vec![(
+                    "effective".to_owned(),
+                    project(r"app\.cursor\skills\team\review")
+                        .display()
+                        .to_string()
+                )]
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_skill_whose_frontmatter_does_not_parse_is_read_under_its_folder_s_name() {
+    let fs = cursor()
+        .with_file(
+            in_home(r".cursor\skills\unclosed\SKILL.md"),
+            "---\nname: other\ndescription: Never closes.\n",
+        )
+        .with_file(
+            in_home(r".claude\skills\no-key\SKILL.md"),
+            "---\nname: other\njust text\n---\nbody\n",
+        )
+        .with_file(
+            in_home(r".agents\skills\bare\SKILL.md"),
+            "No frontmatter.\n",
+        );
+
+    let inventory = inventory(&fs);
+
+    for name in ["unclosed", "no-key", "bare"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
 }
 
 #[test]

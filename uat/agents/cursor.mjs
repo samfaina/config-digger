@@ -9,7 +9,15 @@
 //   node uat/agents/cursor.mjs [--bin <Cursor.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=plugins,broken-user` runs those launches only: `plugins`,
-// `broken-<user|project>`, `project-plugins` and `sign-in`.
+// `broken-<user|project>`, `project-plugins`, `sign-in`, `gates` and
+// `skills`.
+//
+// Cursor takes a Statsig gate from the account's cache, or signed out from
+// its code's default, unless an override in the profile's
+// `workbench.experiments.featureFlagOverrides` says otherwise, which it
+// reads only when it runs an extension under development. The `gates`
+// launches that turn gates off write such overrides, and load an empty
+// extension with `--extensionDevelopmentPath`.
 //
 // Cursor starts the servers of `~\.cursor\mcp.json` and of the plugins
 // without asking, and a Project's once approved: the probe approves them in
@@ -32,7 +40,7 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { fresh, json, probe, root, run, same, write } from "./lib.mjs";
+import { fresh, json, probe, root, run, same, skill, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -45,9 +53,16 @@ const version = json(path.join(path.dirname(bin), "resources", "app", "product.j
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const powershell = async (command) => (await run("powershell.exe", ["-NoProfile", "-Command", command])).stdout.trim();
+// The processes given the data folder `data`, how many.
+const running = async (data) => Number(await powershell(`@(Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' }).Count`));
 // Stops what is left of a launch: the processes given its data folder only.
-const stop = (data) =>
-  powershell(`Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+// Resolves once they are gone, and their stores closed.
+async function stop(data) {
+  await powershell(`Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+  const end = Date.now() + 30_000;
+  while ((await running(data)) && Date.now() < end) await sleep(1000);
+  await sleep(2000);
+}
 
 // The folders of a launch in `dir`.
 const folders = (dir) => ({
@@ -95,9 +110,8 @@ if (process.argv.includes("--sign-in")) {
     env: { ...process.env, USERPROFILE: d.home },
   }).unref();
   console.log(`Sign in to Cursor in the window that opened, on the profile in ${account}, then close the window.`);
-  const running = async () => Number(await powershell(`@(Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${d.data}*' }).Count`));
-  while (!(await running())) await sleep(1000);
-  while (await running()) await sleep(2000);
+  while (!(await running(d.data))) await sleep(1000);
+  while (await running(d.data)) await sleep(2000);
   const done = accountSignedIn(account);
   console.log(done ? "The profile is signed in." : "The profile is not signed in.");
   process.exit(done ? 0 : 1);
@@ -147,12 +161,44 @@ function windowLog(data, name) {
     .join("");
 }
 
+// The profile's store, the application's state, in the folders `d`.
+const globalState = (d) => path.join(d.user, "globalStorage", "state.vscdb");
+// The store Cursor keeps for the Project folder of `d`, if it has one.
+function workspaceState(d) {
+  const storage = path.join(d.user, "workspaceStorage");
+  if (!fs.existsSync(storage)) return undefined;
+  const uri = `file:///${d.proj.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_, drive) => `${drive.toLowerCase()}%3A`)}`;
+  const id = fs.readdirSync(storage).find((w) => fs.existsSync(path.join(storage, w, "workspace.json")) && json(path.join(storage, w, "workspace.json")).folder === uri);
+  return id && path.join(storage, id, "state.vscdb");
+}
+// The value of `key` in the store `file`, parsed, or null.
+function stored(file, key) {
+  if (!file || !fs.existsSync(file)) return null;
+  const db = new DatabaseSync(file, { readOnly: true });
+  const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get(key);
+  db.close();
+  return row ? JSON.parse(String(row.value)) : null;
+}
+// Sets `key` to `value`, as JSON, in the store `file`.
+function store(file, key, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec("CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)");
+  db.prepare("INSERT INTO ItemTable VALUES (?, ?)").run(key, JSON.stringify(value));
+  db.close();
+}
+
+// An extension with nothing in it: running it under development lets
+// Cursor read the overrides of its gates.
+const devExtension = path.join(base, "devext");
+write(path.join(devExtension, "package.json"), { name: "cd-throwaway-devext", publisher: "cd-throwaway", version: "0.0.1", engines: { vscode: "*" } });
+
 // Launches Cursor on the Project folder of `dir`, approving the Project
-// servers `approved` names by identifier, and resolves once it has loaded
-// its servers and `during`, given the window, is done: the servers it
-// started, by tag. The profile is left in `dir`, so a launch can follow
-// another on it.
-async function launch(dir, { approved = [], during } = {}) {
+// servers `approved` names by identifier, with each gate of `gates`, a
+// name and a value, overridden, and resolves once it has loaded its servers
+// and `during`, given the window, is done: the servers it started, by tag.
+// The profile is left in `dir`, so a launch can follow another on it.
+async function launch(dir, { approved = [], gates, during } = {}) {
   const d = folders(dir);
   write(path.join(d.user, "settings.json"), {
     "security.workspace.trust.enabled": false,
@@ -162,19 +208,18 @@ async function launch(dir, { approved = [], during } = {}) {
     "workbench.startupEditor": "none",
     "workbench.externalBrowser": path.join(process.env.SystemRoot, "System32", "curl.exe"),
   });
-  if (approved.length) {
-    const file = path.join(d.user, "globalStorage", "state.vscdb");
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const db = new DatabaseSync(file);
-    db.exec("CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)");
-    db.prepare("INSERT INTO ItemTable VALUES (?, ?)").run("cursor/approvedProjectMcpServers", JSON.stringify(approved));
-    db.close();
+  if (approved.length) store(globalState(d), "cursor/approvedProjectMcpServers", approved);
+  if (gates) {
+    const overrides = Object.fromEntries(Object.entries(gates).map(([gate, value]) => [gate, { value, expiresAt: null }]));
+    store(globalState(d), "workbench.experiments.featureFlagOverrides", overrides);
   }
   fs.mkdirSync(d.proj, { recursive: true });
   fs.rmSync(markers, { recursive: true, force: true });
   const port = await freePort();
   const sessions = fs.existsSync(path.join(d.data, "logs")) ? fs.readdirSync(path.join(d.data, "logs")).length : 0;
-  const args = [`--user-data-dir=${d.data}`, `--extensions-dir=${path.join(dir, "ext")}`, `--remote-debugging-port=${port}`, "--log=trace", "--new-window", d.proj];
+  const args = [`--user-data-dir=${d.data}`, `--extensions-dir=${path.join(dir, "ext")}`, `--remote-debugging-port=${port}`, "--log=trace", "--new-window"];
+  if (gates) args.push(`--extensionDevelopmentPath=${devExtension}`);
+  args.push(d.proj);
   spawn(bin, args, { detached: true, stdio: "ignore", env: env(d) }).unref();
   // Cursor logs a census of the servers once it has read their files.
   const census = () => (windowLog(d.data, "workbench.mcp.files.log").match(/Plugin MCP census/g) ?? []).length;
@@ -203,11 +248,42 @@ async function devtools(port) {
     pending.get(m.id)?.(m);
     pending.delete(m.id);
   });
-  const evaluate = (expression) =>
+  const send = (method, params) =>
     new Promise((resolve) => {
-      pending.set(++id, (m) => resolve(m.result?.result?.value));
-      ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, returnByValue: true, awaitPromise: true } }));
+      pending.set(++id, resolve);
+      ws.send(JSON.stringify({ id, method, params }));
     });
+  const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.result?.value;
+  const key = async (name, code, keyCode, modifiers = 0) => {
+    for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: name, code, windowsVirtualKeyCode: keyCode, modifiers });
+  };
+  // Opens Customize on its tab `tab`, such as `mcps` or `skills`.
+  const customize = async (tab) => {
+    await evaluate(`(() => {
+      const open = [...document.querySelectorAll(".tab")].find((t) => t.getAttribute("aria-label") === "Customize");
+      const button = [...document.querySelectorAll("*")].find((e) => e.offsetParent !== null && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() === "Customize"));
+      (open ?? button)?.click();
+    })()`);
+    await sleep(2000);
+    await evaluate(`document.querySelector("[data-customize-manage-tab-id=${tab}]")?.click()`);
+    await sleep(2500);
+  };
+  // Types `text` into the agent's prompt, cleared first.
+  const type = async (text) => {
+    await evaluate(`[...document.querySelectorAll(".aislash-editor-input")].find((e) => e.offsetParent !== null)?.focus()`);
+    await key("a", "KeyA", 65, 2);
+    await key("Backspace", "Backspace", 8);
+    for (const ch of text) {
+      await send("Input.insertText", { text: ch });
+      await sleep(80);
+    }
+    await sleep(2000);
+  };
+  // The skills of the `/` menu the prompt shows, each `/<name>` and its
+  // description.
+  const menu = () =>
+    evaluate(`[...document.querySelectorAll("[aria-label='Slash commands'] [role=menuitem]")].filter((e) => e.offsetParent !== null)
+      .map((e) => e.innerText.split("\\n").map((s) => s.trim()).filter(Boolean)).filter(([name]) => name.startsWith("/"))`);
   return {
     // Clicks the visible element whose own text or `aria-label` is `label`.
     click: (label) =>
@@ -227,6 +303,63 @@ async function devtools(port) {
         button?.click();
         return Boolean(button);
       })()`),
+    // The servers Customize lists, by name.
+    async mcpServers() {
+      await customize("mcps");
+      return evaluate(`[...document.querySelectorAll("[data-mcp-manage-server]")].map((e) => e.getAttribute("data-mcp-manage-server")).sort()`);
+    },
+    // The sources of the server `name` in Customize, each with whether
+    // Cursor runs the server from it.
+    async sources(name) {
+      await customize("mcps");
+      await evaluate(`document.querySelector(${JSON.stringify(`[aria-label="Configure ${name}"]`)})?.click()`);
+      await sleep(2000);
+      const sources = await evaluate(`Object.fromEntries([...document.querySelectorAll("[role=switch]")].filter((e) => e.offsetParent !== null)
+        .map((e) => [(e.getAttribute("aria-label") ?? "").match(/^(?:Disable|Enable) .+ for (.+) source$/)?.[1], e.getAttribute("aria-checked") === "true"])
+        .filter(([source]) => source))`);
+      await evaluate(`[...document.querySelectorAll("button")].find((e) => e.offsetParent !== null && e.innerText.trim() === "Done")?.click()`);
+      await sleep(1500);
+      return sources;
+    },
+    // Turns the server `name` off with its toggle in Customize, and
+    // resolves with the toggle's label once it says Enable.
+    async toggleOff(name) {
+      await customize("mcps");
+      await evaluate(`document.querySelector(${JSON.stringify(`[aria-label="Configure ${name}"]`)})?.click()`);
+      await sleep(2000);
+      const label = await evaluate(`(async () => {
+        const toggle = [...document.querySelectorAll("[role=switch]")].find((e) => e.offsetParent !== null && (e.getAttribute("aria-label") ?? "").startsWith(${JSON.stringify(`Disable ${name} `)}));
+        toggle?.click();
+        await new Promise((r) => setTimeout(r, 2000));
+        return toggle?.getAttribute("aria-label");
+      })()`);
+      await sleep(3000);
+      return label;
+    },
+    // Customize's skills, each its folder's name and the line below it, its
+    // description or an error, with every group shown whole.
+    async skills() {
+      await customize("skills");
+      await evaluate(`[...document.querySelectorAll("*")].filter((e) => e.offsetParent !== null && /^Show \\d+ more$/.test(e.innerText?.trim() ?? "") && e.children.length === 0).forEach((e) => e.click())`);
+      await sleep(1500);
+      return Object.fromEntries(
+        await evaluate(`[...document.querySelectorAll("[data-customize-manage-kind=skill]")].filter((e) => e.offsetParent !== null)
+          .map((e) => [e.getAttribute("data-customize-manage-row"), e.innerText.split("\\n").map((s) => s.trim()).filter(Boolean)[1] ?? ""])`),
+      );
+    },
+    // The skills the `/` menu lists for `query`.
+    async slash(query) {
+      await type(query);
+      return menu();
+    },
+    // Picks from the `/` menu for `query` the `down`th entry below the
+    // first, with Enter.
+    async pick(query, down = 0) {
+      await type(query);
+      for (let i = 0; i < down; i++) await key("ArrowDown", "ArrowDown", 40);
+      await key("Enter", "Enter", 13);
+      await sleep(2000);
+    },
   };
 }
 
@@ -570,6 +703,163 @@ if (runs("sign-in")) {
     );
   }
   oauth.close();
+}
+
+// ---------------------------------------------------------------- gates and the Disabled store
+
+const gateNames = ["enable_cc_plugin_import", "dedupe_mcp_servers", "mcp_profile_scoped_global_disabled_state"];
+
+// Two profiles, one with Cursor's gates as it takes them without an
+// account, from its code, and one with the three overridden off. Each has a
+// user's server and a Project's, a Claude Code plugin's server, and two
+// remote servers at one URL on a closed local port, the user's and a local
+// plugin's. The probe reads the servers Customize lists, turns the user's
+// and the Project's servers off with their toggles, reads both stores, and
+// starts Cursor again.
+if (runs("gates")) {
+  const url = { url: `http://127.0.0.1:${await freePort()}/mcp` };
+  const project = "project-0-proj-cd-throwaway-project";
+  const seen = {};
+  for (const [label, gates] of [["default", undefined], ["off", Object.fromEntries(gateNames.map((g) => [g, false]))]]) {
+    const dir = fresh(`gates-${label}`, base);
+    const d = folders(dir);
+    write(path.join(d.cursor, "mcp.json"), { mcpServers: { ...servers("user").mcpServers, "cd-throwaway-url-user": url } });
+    write(path.join(d.proj, ".cursor", "mcp.json"), servers("project"));
+    localPlugins(d.cursor, [["cd-throwaway-url", { ".mcp.json": { mcpServers: { "cd-throwaway-url-plugin": url } } }]]);
+    claudePlugins(d.claude, [["cd-throwaway-cc", { ".claude-plugin/plugin.json": { name: "cd-throwaway-cc" }, ".mcp.json": servers("cc") }]]);
+    const s = {};
+    s.first = await launch(dir, {
+      approved: [project],
+      gates,
+      during: async (win) => {
+        s.remote = Object.fromEntries((await win.mcpServers()).filter((name) => /url/i.test(name)).map((name) => [name, null]));
+        for (const name of Object.keys(s.remote)) s.remote[name] = await win.sources(name);
+        s.toggles = [await win.toggleOff("cd-throwaway-user"), await win.toggleOff("cd-throwaway-project")];
+      },
+    });
+    s.stores = { profile: stored(globalState(d), "cursor/disabledGlobalMcpServers"), workspace: stored(workspaceState(d), "cursor/disabledMcpServers") };
+    s.again = await launch(dir, { approved: [project], gates });
+    seen[label] = s;
+  }
+  const { default: on, off } = seen;
+  const toggled = ["Enable cd-throwaway-user for User source", "Enable cd-throwaway-project for proj source"];
+
+  await p.check("items.mcp.disable[0]", "Cursor's toggle of a Project's server writes its identifier to the workspace's `cursor/disabledMcpServers`, a JSON list, and Cursor no longer starts it there", async () =>
+    same(
+      [on, off].map((s) => ({ toggles: s.toggles, workspace: s.stores.workspace?.includes(project), started: s.first.includes("project"), again: s.again.includes("project") })),
+      [on, off].map(() => ({ toggles: toggled, workspace: true, started: true, again: false })),
+    ),
+  );
+  await p.check("feature_gates[mcp_profile_scoped_global_disabled_state]", "on, as Cursor takes it without an account, the toggle of a user's server writes its identifier to the profile's `cursor/disabledGlobalMcpServers`, not the workspace's list, and Cursor no longer starts it", async () =>
+    same(
+      { stores: on.stores, started: on.first.includes("user"), again: on.again.includes("user") },
+      { stores: { profile: ["user-cd-throwaway-user"], workspace: [project] }, started: true, again: false },
+    ),
+  );
+  await p.check("feature_gates[mcp_profile_scoped_global_disabled_state]", "off, the toggle of a user's server writes the workspace's `cursor/disabledMcpServers`, as a Project's does, and Cursor no longer starts it there", async () =>
+    same(
+      { stores: off.stores, started: off.first.includes("user"), again: off.again.includes("user") },
+      { stores: { profile: null, workspace: ["user-cd-throwaway-user", project] }, started: true, again: false },
+    ),
+  );
+  await p.check("feature_gates[enable_cc_plugin_import]", "Cursor starts a Claude Code plugin's servers while this gate is on, as Cursor takes it without an account, and not while it is off", async () =>
+    same({ on: [on.first.includes("cc"), on.again.includes("cc")], off: [off.first.includes("cc"), off.again.includes("cc")] }, { on: [true, true], off: [false, false] }),
+  );
+  await p.check("feature_gates[dedupe_mcp_servers]", "while this gate is on, as Cursor takes it without an account, Cursor makes one server of two remote servers at one URL, the user's and a plugin's, from the user's source; off, it keeps both", async () =>
+    same(
+      { on: on.remote, off: off.remote },
+      {
+        on: { "Cd Throwaway URL": { User: true, Plugin: false } },
+        off: { "cd-throwaway-url-plugin": { Plugin: true }, "cd-throwaway-url-user": { User: true } },
+      },
+    ),
+  );
+
+  // What config-digger reads when Cursor is signed in: the account's cache
+  // of its gates, each under the djb2 hash of its name.
+  const djb2 = (name) => String([...name].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 0) >>> 0);
+  await p.check("feature_gates[mcp_profile_scoped_global_disabled_state]", "the owner's account, in no team, has the three gates on in Cursor's cache", async () => {
+    if (!accountSignedIn(account)) return { pass: false, observed: `${account} is not signed in: run node uat/agents/cursor.mjs --sign-in` };
+    const cache = stored(globalState(folders(account)), "workbench.experiments.statsigBootstrap");
+    return same(Object.fromEntries(gateNames.map((g) => [g, cache?.feature_gates?.[djb2(g)]?.value])), Object.fromEntries(gateNames.map((g) => [g, true])));
+  });
+}
+
+// ---------------------------------------------------------------- skills
+
+// One launch whose user's and Project's skill folders hold skills Cursor
+// cannot parse, two skills of one name at different paths, and skills of a
+// user and of the Project at the same path below their folders. The probe
+// reads the `/` menu of the agent's prompt and Customize's list of skills,
+// picks skills from the menu, and reads the skills Cursor records as picked
+// in the profile's `cursor.skills.recentlyUsed`, each by its path below its
+// `skills` folder, most recent first.
+if (runs("skills")) {
+  const dir = fresh("skills", base);
+  const d = folders(dir);
+  const userSkills = path.join(d.cursor, "skills");
+  const skillAt = (folder, text) => write(path.join(folder, "SKILL.md"), text);
+  skill(path.join(userSkills, "cd-throwaway-ok"), ["name: cd-throwaway-ok", "description: parses"]);
+  skillAt(path.join(userSkills, "cd-throwaway-bare"), "No frontmatter.\n");
+  skill(path.join(userSkills, "cd-throwaway-yaml"), ["name: [unclosed", "description: YAML that does not parse"]);
+  skillAt(path.join(userSkills, "cd-throwaway-unclosed"), "---\nname: cd-throwaway-unclosed\ndescription: never closes\nbody\n");
+  skill(path.join(userSkills, "cd-throwaway-no-key"), ["name: cd-throwaway-no-key", "a line that is no key"]);
+  // One name, two paths below `.cursor`.
+  skill(path.join(userSkills, "cd-throwaway-twin"), ["name: cd-throwaway-twin", "description: user top"]);
+  skill(path.join(d.proj, ".cursor", "skills", "nested", "cd-throwaway-twin"), ["name: cd-throwaway-twin", "description: project nested"]);
+  // One path below two folders, whatever the folder holding each, and the
+  // names.
+  skill(path.join(d.home, ".agents", "skills", "cd-throwaway-path"), ["name: cd-throwaway-path", "description: user agents"]);
+  skill(path.join(d.proj, ".claude", "skills", "cd-throwaway-path"), ["name: cd-throwaway-path", "description: project claude"]);
+  skill(path.join(userSkills, "cd-throwaway-folder"), ["name: cd-throwaway-user-name", "description: user named"]);
+  skill(path.join(d.proj, ".cursor", "skills", "cd-throwaway-folder"), ["name: cd-throwaway-project-name", "description: project named"]);
+
+  const unparsed = ["cd-throwaway-bare", "cd-throwaway-yaml", "cd-throwaway-unclosed", "cd-throwaway-no-key"];
+  let seen;
+  await launch(dir, {
+    during: async (win) => {
+      const listed = {};
+      for (const name of [...unparsed, "cd-throwaway-ok"]) listed[name] = (await win.slash(`/${name}`)).map(([n]) => n);
+      seen = { listed, customize: await win.skills(), twins: [] };
+      // The menu before any pick, after a pick of its first entry, and
+      // after a pick of its second.
+      seen.twins.push(await win.slash("/cd-throwaway-twin"));
+      await win.pick("/cd-throwaway-twin");
+      seen.twins.push(await win.slash("/cd-throwaway-twin"));
+      await win.pick("/cd-throwaway-twin", 1);
+      seen.twins.push(await win.slash("/cd-throwaway-twin"));
+      Object.assign(seen, {
+        path: await win.slash("/cd-throwaway-path"),
+        userName: await win.slash("/cd-throwaway-user-name"),
+        projectName: await win.slash("/cd-throwaway-project-name"),
+      });
+    },
+  });
+  const picked = stored(globalState(d), "cursor.skills.recentlyUsed");
+
+  await p.check("items.skill", "Cursor lists a `SKILL.md` with no frontmatter, one whose YAML does not parse, one whose frontmatter never closes and one with a line that is no key under their folder's names in the `/` menu, and Customize marks each \"Error parsing skill\"", async () =>
+    same(
+      { listed: seen?.listed, customize: Object.fromEntries([...unparsed, "cd-throwaway-ok"].map((n) => [n, seen?.customize[n]])) },
+      {
+        listed: Object.fromEntries([...unparsed, "cd-throwaway-ok"].map((n) => [n, [`/${n}`]])),
+        customize: { ...Object.fromEntries(unparsed.map((n) => [n, "Error parsing skill"])), "cd-throwaway-ok": "parses" },
+      },
+    ),
+  );
+  const user = ["/cd-throwaway-twin", "user top"];
+  const project = ["/cd-throwaway-twin", "project nested"];
+  // Enter on the first entry picks the user's; the record of that pick puts
+  // the Project's first, and a pick of the second entry is the user's
+  // again, which the record shows unchanged.
+  await p.check("items.skill", "Cursor lists both of two skills of one name at different paths under `/name`, the user's first until one is picked; once the user's was picked, the Project's comes first, so which one Enter takes depends on earlier picks", async () =>
+    same({ twins: seen?.twins, picked }, { twins: [[user, project], [project, user], [project, user]], picked: ["cd-throwaway-twin/SKILL.md"] }),
+  );
+  await p.check("items.skill", "Of a user's skill and a Project's at the same path below their `.cursor`, `.claude` or `.agents` folders, whatever their names, Cursor lists the user's only", async () =>
+    same(
+      { path: seen?.path, userName: seen?.userName, projectName: seen?.projectName },
+      { path: [["/cd-throwaway-path", "user agents"]], userName: [["/cd-throwaway-user-name", "user named"]], projectName: [] },
+    ),
+  );
 }
 
 p.finish();
