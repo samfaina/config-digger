@@ -854,12 +854,46 @@ pub(crate) struct ScannedReadFailure {
 pub(crate) struct ScannedShape {
     /// The id of the location.
     pub location: String,
+    /// The kind of the location's Items.
+    pub kind: ItemKind,
     /// The key path of the value from the root of the file.
     pub key_path: Vec<String>,
-    /// What the value is, as a sentence names it: `a list`.
-    pub found: &'static str,
-    /// What it should be, as a sentence names it: `an object`.
-    pub expected: &'static str,
+    pub found: ValueType,
+    pub expected: Expected,
+}
+
+/// The type of a JSON value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ValueType {
+    Null,
+    Boolean,
+    Number,
+    String,
+    List,
+    Object,
+}
+
+impl ValueType {
+    fn of(value: &serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Null => ValueType::Null,
+            serde_json::Value::Bool(_) => ValueType::Boolean,
+            serde_json::Value::Number(_) => ValueType::Number,
+            serde_json::Value::String(_) => ValueType::String,
+            serde_json::Value::Array(_) => ValueType::List,
+            serde_json::Value::Object(_) => ValueType::Object,
+        }
+    }
+}
+
+/// What a location reads where it found a value of another type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Expected {
+    Object,
+    /// The list of a location whose Entries are named by a field.
+    List,
+    /// A plugin manifest's inline servers, or the path of a file of them.
+    ObjectOrPath,
 }
 
 impl ScannedReadFailure {
@@ -869,9 +903,27 @@ impl ScannedReadFailure {
         self.project.is_none() || self.project.as_deref() == project_key
     }
 
-    /// Whether the whole file fails, rather than one location in it.
-    pub fn whole_file(&self) -> bool {
+    /// Whether it fails the whole file `path` for the Agent home `home` of
+    /// the Agent at `agent_index`, rather than one location in it.
+    fn fails_whole(&self, agent_index: usize, home: &str, path: &Path) -> bool {
         self.shape.is_none()
+            && self.agent_index == agent_index
+            && self.home == home
+            && self.path == path
+    }
+
+    /// Whether `other` is the same Agent home failing on the same file, or
+    /// for a shape, on the same value in it.
+    fn same_place(&self, other: &ScannedReadFailure) -> bool {
+        let at = |shape: &Option<ScannedShape>| {
+            shape
+                .as_ref()
+                .map(|shape| (shape.location.clone(), shape.key_path.clone()))
+        };
+        self.agent_index == other.agent_index
+            && self.home == other.home
+            && self.path == other.path
+            && at(&self.shape) == at(&other.shape)
     }
 }
 
@@ -1266,12 +1318,9 @@ fn read_as_if(
             })
     });
     scanner.entries.retain(|entry| {
-        !failures.iter().any(|failure| {
-            failure.whole_file()
-                && failure.agent_index == entry.agent_index
-                && failure.home == entry.home
-                && failure.path == entry.path
-        })
+        !failures
+            .iter()
+            .any(|failure| failure.fails_whole(entry.agent_index, &entry.home, &entry.path))
     });
     Ok(Snapshot {
         read_at,
@@ -2003,12 +2052,10 @@ impl Places<'_> {
         for (path, project, file_of) in files {
             // A file the Agent home cannot read sets nothing; one with a
             // shape in a location still sets what is beside it.
-            let failed = reader.failures.iter().any(|failure| {
-                failure.whole_file()
-                    && failure.agent_index == home.agent_index
-                    && failure.home == home.home
-                    && failure.path == path
-            });
+            let failed = reader
+                .failures
+                .iter()
+                .any(|failure| failure.fails_whole(home.agent_index, &home.home, &path));
             if failed {
                 unreadable.insert(path);
                 continue;
@@ -3404,12 +3451,16 @@ impl Scanner<'_> {
             let project = match failure.project {
                 Some(spelling) => match self.projects.add(Path::new(&spelling), None) {
                     Some(key) => Some(key),
-                    None => continue,
+                    None => {
+                        tracing::debug!(path = %path.display(), project = %spelling, "shape under a key that is no Project path");
+                        continue;
+                    }
                 },
                 None => project.map(str::to_owned),
             };
             let shape = ScannedShape {
                 location: location.id.clone(),
+                kind: location.kind,
                 key_path: failure.key_path,
                 found: failure.found,
                 expected: failure.expected,
@@ -3622,7 +3673,7 @@ impl Scanner<'_> {
                 _ => {
                     let mut key_path = location.root.clone();
                     key_path.extend(index.map(|index| index.to_string()));
-                    let failure = NotEnumerable::new(value, key_path, None, "an object or a path");
+                    let failure = NotEnumerable::new(value, key_path, None, Expected::ObjectOrPath);
                     self.fail_shapes(home, location, &path, project, vec![failure]);
                 }
             }
@@ -4204,10 +4255,8 @@ pub(crate) struct NotEnumerable {
     pub key_path: Vec<String>,
     /// The Project key it sits under, in the Agent's spelling.
     pub project: Option<String>,
-    /// What the value is, as a sentence names it: `a list`.
-    pub found: &'static str,
-    /// What it should be, as a sentence names it: `an object`.
-    pub expected: &'static str,
+    pub found: ValueType,
+    pub expected: Expected,
 }
 
 impl NotEnumerable {
@@ -4215,26 +4264,14 @@ impl NotEnumerable {
         value: &serde_json::Value,
         key_path: Vec<String>,
         project: Option<String>,
-        expected: &'static str,
+        expected: Expected,
     ) -> Self {
         NotEnumerable {
             key_path,
             project,
-            found: a_value_like(value),
+            found: ValueType::of(value),
             expected,
         }
-    }
-}
-
-/// `value`'s type, as a sentence names it: `a list`.
-fn a_value_like(value: &serde_json::Value) -> &'static str {
-    match value {
-        serde_json::Value::Null => "null",
-        serde_json::Value::Bool(_) => "a boolean",
-        serde_json::Value::Number(_) => "a number",
-        serde_json::Value::String(_) => "a string",
-        serde_json::Value::Array(_) => "a list",
-        serde_json::Value::Object(_) => "an object",
     }
 }
 
@@ -4304,9 +4341,9 @@ pub(crate) fn find_objects<'v>(
                 .collect(),
             _ => {
                 let expected = if named_by.is_some() {
-                    "a list"
+                    Expected::List
                 } else {
-                    "an object"
+                    Expected::Object
                 };
                 failures.push(NotEnumerable::new(value, key_path, project, expected));
                 return;
@@ -4320,7 +4357,12 @@ pub(crate) fn find_objects<'v>(
         return;
     };
     let serde_json::Value::Object(object) = value else {
-        failures.push(NotEnumerable::new(value, key_path, project, "an object"));
+        failures.push(NotEnumerable::new(
+            value,
+            key_path,
+            project,
+            Expected::Object,
+        ));
         return;
     };
     let children: Vec<(&String, &serde_json::Value)> = if key == PROJECT_KEY || key == ANY_KEY {
@@ -4348,10 +4390,6 @@ pub(crate) fn find_objects<'v>(
     }
 }
 
-/// A Read failure reported, by the Agent's index, its home and the file, and
-/// for a shape, its location and key path.
-type Reported = (usize, String, PathBuf, Option<(String, Vec<String>)>);
-
 /// Reads each file once per scan, and reports each Read failure once per Agent home.
 struct Reader<'p> {
     /// The file system as the scan reads it.
@@ -4361,7 +4399,6 @@ struct Reader<'p> {
     files: BTreeMap<PathBuf, Result<Option<String>, ReadFailureKind>>,
     /// What SQLite stores hold, by store and key.
     items: BTreeMap<(PathBuf, String), Result<Option<String>, ReadFailureKind>>,
-    reported: BTreeSet<Reported>,
     failures: Vec<ScannedReadFailure>,
     /// The files each Agent, by its index, skips without reading them, since
     /// someone other than an administrator can change them.
@@ -4375,7 +4412,6 @@ impl<'p> Reader<'p> {
             written,
             files: BTreeMap::new(),
             items: BTreeMap::new(),
-            reported: BTreeSet::new(),
             failures: Vec::new(),
             not_admin_owned: NotAdminOwned::default(),
         }
@@ -4486,17 +4522,7 @@ impl<'p> Reader<'p> {
         kind: ReadFailureKind,
         position: Option<(usize, usize)>,
     ) {
-        let id = (
-            home.agent_index,
-            home.home.clone(),
-            path.to_path_buf(),
-            None,
-        );
-        if !self.reported.insert(id) {
-            return;
-        }
-        tracing::warn!(path = %path.display(), ?kind, "read failure");
-        self.failures.push(ScannedReadFailure {
+        self.report(ScannedReadFailure {
             agent_index: home.agent_index,
             home: home.home.clone(),
             path: path.to_path_buf(),
@@ -4517,13 +4543,7 @@ impl<'p> Reader<'p> {
         project: Option<String>,
         shape: ScannedShape,
     ) {
-        let at = Some((shape.location.clone(), shape.key_path.clone()));
-        let id = (home.agent_index, home.home.clone(), path.to_path_buf(), at);
-        if !self.reported.insert(id) {
-            return;
-        }
-        tracing::warn!(path = %path.display(), location = %shape.location, "shape read failure");
-        self.failures.push(ScannedReadFailure {
+        self.report(ScannedReadFailure {
             agent_index: home.agent_index,
             home: home.home.clone(),
             path: path.to_path_buf(),
@@ -4532,6 +4552,20 @@ impl<'p> Reader<'p> {
             position: None,
             shape: Some(shape),
         });
+    }
+
+    /// Reports `failure` unless the same place failed already.
+    fn report(&mut self, failure: ScannedReadFailure) {
+        if self
+            .failures
+            .iter()
+            .any(|reported| reported.same_place(&failure))
+        {
+            return;
+        }
+        let location = failure.shape.as_ref().map(|shape| shape.location.as_str());
+        tracing::warn!(path = %failure.path.display(), kind = ?failure.kind, ?location, "read failure");
+        self.failures.push(failure);
     }
 }
 

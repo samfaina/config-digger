@@ -11,6 +11,8 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
+use crate::locator;
+use crate::scan::{Expected, ScannedShape, ValueType};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -1358,25 +1360,30 @@ pub(crate) fn read_failure(
     }
 }
 
-/// What a location of `kind` that holds `found` at `key_path` in `path`,
-/// where `agent_name` reads `expected`, means: only that location fails. It
+/// What a location that holds a value of another shape where its Entries
+/// are in `path`, as `shape` says, means: only that location fails. It
 /// never quotes the file.
-pub(crate) fn shape_failure(
-    agent_name: &str,
-    path: &Path,
-    kind: ItemKind,
-    key_path: &[String],
-    found: &str,
-    expected: &str,
-) -> String {
-    let items = match kind {
+pub(crate) fn shape_failure(agent_name: &str, path: &Path, shape: &ScannedShape) -> String {
+    let items = match shape.kind {
         ItemKind::Mcp => "MCP servers",
         ItemKind::Skill => "skills",
     };
+    let found = match shape.found {
+        ValueType::Null => "null",
+        ValueType::Boolean => "true or false",
+        ValueType::Number => "a number",
+        ValueType::String => "a string",
+        ValueType::List => "a list",
+        ValueType::Object => "an object",
+    };
+    let expected = match shape.expected {
+        Expected::Object => "an object",
+        Expected::List => "a list",
+        Expected::ObjectOrPath => "an object or a path",
+    };
     format!(
-        "{agent_name} cannot read the {items} at `{}` in {}: it holds {found}, not {expected}, so it reads no Entries from there.",
-        key_path.join("."),
-        path.display()
+        "{agent_name} cannot read the {items} at {}: it holds {found}, not {expected}, so it reads no Entries from there.",
+        locator::render(path, &shape.key_path)
     )
 }
 

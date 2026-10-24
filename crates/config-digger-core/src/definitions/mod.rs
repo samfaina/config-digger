@@ -772,6 +772,8 @@ pub(crate) struct LocationDefinition {
     /// What the Agent does when the location holds, where its Entries are,
     /// a value of a shape config-digger cannot enumerate, such as a list
     /// where servers should be, the other locations in the file being read.
+    /// A file of valid text that is not an object fails every location in
+    /// it, which take the strongest of their reactions to a shape.
     /// `unknown` when omitted. `on_read_failure` and the risks do not apply.
     pub on_shape_failure: Option<ReadFailureReaction>,
     /// How the Agent's own recovery from a Read failure here can lose

@@ -2330,11 +2330,9 @@ pub struct ReadFailure {
     /// location outside any Project, which reaches every context. For a
     /// shape, the Project it is keyed to, if any.
     pub project: Option<PathBuf>,
-    /// For a shape, the id of the location it fails, the other locations
-    /// in the file being read; `None` when the whole file fails.
-    pub location: Option<String>,
-    /// For a shape, the key path of the value it holds where Entries are.
-    pub key_path: Option<Vec<String>>,
+    /// For a shape, the location it fails, the other locations in the file
+    /// being read; `None` when the whole file fails.
+    pub location: Option<FailedLocation>,
     pub kind: ReadFailureKind,
     /// Where a parse error is, when the parser knows. A Read failure never
     /// quotes the file, which can hold a Secret.
@@ -2349,6 +2347,15 @@ pub struct ReadFailure {
     /// How the Agent's own recovery may lose configuration if the file is
     /// not fixed before it starts.
     pub warnings: Vec<RiskWarning>,
+}
+
+/// The one location of a file that a shape Read failure fails.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct FailedLocation {
+    /// The id of the location in the Agent's definition.
+    pub id: String,
+    /// The key path of the value it holds where its Entries are.
+    pub key_path: Vec<String>,
 }
 
 /// What an Agent does with a location it cannot read.
@@ -2487,7 +2494,6 @@ impl ReadFailure {
             && self.home == other.home
             && self.path == other.path
             && self.location == other.location
-            && self.key_path == other.key_path
     }
 
     /// Whether it reaches the context of `project`, or of no Project: one
@@ -2505,7 +2511,8 @@ pub enum ReadFailureKind {
     /// Where a location's Entries are, the file holds a value of a shape
     /// config-digger cannot enumerate, such as a list where servers
     /// should be. Only that location fails, or every location in the file
-    /// when the file itself is not an object.
+    /// when the file itself is not an object; either way the Agent does
+    /// what the locations say of a shape, not of a file that does not parse.
     Shape,
     /// The bytes do not decode into text the way the Agent decodes them.
     Decode,

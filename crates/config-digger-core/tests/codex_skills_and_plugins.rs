@@ -361,6 +361,8 @@ fn a_manifest_value_codex_cannot_read_leaves_the_defaults_in_place() {
     assert!(
         codex_items(&inventory).all(|item| item.name != "ignored" && item.name != "linear:plan")
     );
+    // Codex ignores such a value, so it is no Read failure either.
+    assert_eq!(json_of(&inventory.read_failures), json!([]));
 }
 
 #[test]

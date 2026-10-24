@@ -93,7 +93,6 @@ function failure(overrides: Partial<ReadFailure> = {}): ReadFailure {
     path: String.raw`C:\Users\me\.claude.json`,
     project: null,
     location: null,
-    key_path: null,
     kind: "parse",
     position: { line: 3, column: 7 },
     reaction: "unknown",

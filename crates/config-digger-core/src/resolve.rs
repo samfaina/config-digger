@@ -937,8 +937,10 @@ pub(crate) fn resolve(
                     .project
                     .as_ref()
                     .map(|key| project_path(snapshot, key)),
-                location: failure.shape.as_ref().map(|shape| shape.location.clone()),
-                key_path: failure.shape.as_ref().map(|shape| shape.key_path.clone()),
+                location: failure.shape.as_ref().map(|shape| api::FailedLocation {
+                    id: shape.location.clone(),
+                    key_path: shape.key_path.clone(),
+                }),
                 kind: failure.kind,
                 position: failure.position.map(|(line, column)| api::Position {
                     line: line.try_into().unwrap_or(u32::MAX),
@@ -946,16 +948,7 @@ pub(crate) fn resolve(
                 }),
                 reaction: reaction.strongest.into(),
                 sentence: match &failure.shape {
-                    Some(shape) => explain::shape_failure(
-                        &agent.name,
-                        &failure.path,
-                        definitions[failure.agent_index]
-                            .location(&shape.location)
-                            .kind,
-                        &shape.key_path,
-                        shape.found,
-                        shape.expected,
-                    ),
+                    Some(shape) => explain::shape_failure(&agent.name, &failure.path, shape),
                     None => explain::read_failure(
                         &agent.name,
                         &failure.path,
@@ -1409,25 +1402,42 @@ fn reaction(
     failure: &ScannedReadFailure,
 ) -> Reaction {
     let definition = &definitions[failure.agent_index];
-    // A shape fails its location alone, as that location says.
-    if let Some(shape) = &failure.shape {
-        let location = definition.location(&shape.location);
-        return Reaction {
-            strongest: location.shape_failure_reaction(),
-            risks: BTreeSet::new(),
-            dialect: location
+    // A shape in one location fails that location alone.
+    let locations: Vec<&LocationDefinition> = match &failure.shape {
+        Some(shape) => vec![definition.location(&shape.location)],
+        None => snapshot
+            .readers_of(&failure.path)
+            .iter()
+            .filter(|reader| {
+                reader.agent_index == failure.agent_index && reader.home == failure.home
+            })
+            .map(|reader| definition.location(&reader.location))
+            .collect(),
+    };
+    let dialect = locations
+        .first()
+        .map_or(JsonFormat::STRICT.dialect(), |location| {
+            location
                 .format
                 .file()
-                .map_or(JsonFormat::STRICT.dialect(), Parse::dialect),
-            kinds: BTreeSet::from([location.kind]),
+                .map_or(JsonFormat::STRICT.dialect(), Parse::dialect)
+        });
+    let kinds = locations.iter().map(|location| location.kind).collect();
+    // A file of valid text holding a value of another shape, even at its
+    // top level, is no file that does not parse: the Agent does what its
+    // locations say of a shape, with none of the risks of the other.
+    if failure.kind == api::ReadFailureKind::Shape {
+        return Reaction {
+            strongest: locations
+                .iter()
+                .map(|location| location.shape_failure_reaction())
+                .max()
+                .unwrap_or(ReadFailureReaction::IgnoresFile),
+            risks: BTreeSet::new(),
+            dialect,
+            kinds,
         };
     }
-    let locations: Vec<&LocationDefinition> = snapshot
-        .readers_of(&failure.path)
-        .iter()
-        .filter(|reader| reader.agent_index == failure.agent_index && reader.home == failure.home)
-        .map(|reader| definition.location(&reader.location))
-        .collect();
     // A source of settings can say what the Agent does about its own files.
     let reaction_to_failure = |location: &LocationDefinition| {
         location
@@ -1453,15 +1463,8 @@ fn reaction(
             .iter()
             .flat_map(|location| location.risks.iter().copied())
             .collect(),
-        dialect: locations
-            .first()
-            .map_or(JsonFormat::STRICT.dialect(), |location| {
-                location
-                    .format
-                    .file()
-                    .map_or(JsonFormat::STRICT.dialect(), Parse::dialect)
-            }),
-        kinds: locations.iter().map(|location| location.kind).collect(),
+        dialect,
+        kinds,
     }
 }
 

@@ -1939,7 +1939,7 @@
           "$ref": "#/$defs/ReadFailureReaction"
         },
         "on_shape_failure": {
-          "description": "What the Agent does when the location holds, where its Entries are,\na value of a shape config-digger cannot enumerate, such as a list\nwhere servers should be, the other locations in the file being read.\n`unknown` when omitted. `on_read_failure` and the risks do not apply.",
+          "description": "What the Agent does when the location holds, where its Entries are,\na value of a shape config-digger cannot enumerate, such as a list\nwhere servers should be, the other locations in the file being read.\nA file of valid text that is not an object fails every location in\nit, which take the strongest of their reactions to a shape.\n`unknown` when omitted. `on_read_failure` and the risks do not apply.",
           "anyOf": [
             {
               "$ref": "#/$defs/ReadFailureReaction"

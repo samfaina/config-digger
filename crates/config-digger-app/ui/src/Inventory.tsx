@@ -265,7 +265,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 <div className="scroll cards">
                   {failures.map((failure) => (
                     <ReadFailureCard
-                      key={`${failure.agent}|${failure.home}|${failure.path}|${failure.location}|${failure.key_path?.join(".")}`}
+                      key={`${failure.agent}|${failure.home}|${failure.path}|${failure.location?.id}|${failure.location?.key_path.join(".")}`}
                       failure={failure}
                       notify={setNotice}
                     />

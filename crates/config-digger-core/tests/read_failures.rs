@@ -294,8 +294,8 @@ fn servers_that_are_not_an_object_are_a_shape_read_failure_of_their_location() {
     assert_eq!(items(&inventory), []);
     assert_eq!(failures(&inventory), [("shape".to_owned(), Value::Null)]);
     let failure = &inventory["read_failures"][0];
-    assert_eq!(failure["location"], "user-mcp");
-    assert_eq!(failure["key_path"], json!(["servers"]));
+    assert_eq!(failure["location"]["id"], "user-mcp");
+    assert_eq!(failure["location"]["key_path"], json!(["servers"]));
 }
 
 #[test]
@@ -316,13 +316,33 @@ fn a_location_says_what_its_agent_does_about_a_shape() {
 #[test]
 fn a_shape_takes_none_of_the_reaction_to_a_file_that_does_not_parse() {
     let definition = user_agent("agent.json", STRICT, "stops_agent");
+    // Servers that are a list, and a file that is valid JSON but not an object.
+    for text in [r#"{"servers": []}"#, "[]"] {
+        let inventory = inventory(
+            FakeFileSystem::new().with_file(in_home("agent.json"), text),
+            &[("user-agent.toml", &definition)],
+        );
+
+        assert_eq!(
+            inventory["read_failures"][0]["reaction"], "unknown",
+            "{text}"
+        );
+        assert_eq!(inventory["agent_flags"], json!([]), "{text}");
+    }
+}
+
+#[test]
+fn a_claude_json_that_is_not_an_object_carries_no_reset_warning() {
     let inventory = inventory(
-        FakeFileSystem::new().with_file(in_home("agent.json"), r#"{"servers": []}"#),
-        &[("user-agent.toml", &definition)],
+        FakeFileSystem::new().with_file(in_home(".claude.json"), "[]"),
+        &[],
     );
 
-    assert_eq!(inventory["read_failures"][0]["reaction"], "unknown");
-    assert_eq!(inventory["agent_flags"], json!([]));
+    let failure = &inventory["read_failures"][0];
+    assert_eq!(failure["kind"], "shape");
+    assert_eq!(failure["reaction"], "unknown");
+    assert_eq!(failure["notes"], json!([]));
+    assert_eq!(failure["warnings"], json!([]));
 }
 
 #[test]
@@ -347,7 +367,6 @@ fn a_document_that_is_not_an_object_fails_every_location_in_the_file() {
     assert_eq!(failures(&inventory), [("shape".to_owned(), Value::Null)]);
     let failure = &inventory["read_failures"][0];
     assert_eq!(failure["location"], Value::Null);
-    assert_eq!(failure["key_path"], Value::Null);
     assert_eq!(
         failure["sentence"],
         r"User Agent cannot read C:\Users\fixture\agent.json: it is strict JSON but not an object, so it reads no Entries from it."
@@ -375,8 +394,11 @@ fn a_project_key_that_is_not_an_object_fails_only_its_projects_local_servers() {
     assert_eq!(items(&inventory), [item("claude-code", "a", "effective")]);
     assert_eq!(failures(&inventory), [("shape".to_owned(), Value::Null)]);
     let failure = &inventory["read_failures"][0];
-    assert_eq!(failure["location"], "local-mcp");
-    assert_eq!(failure["key_path"], json!(["projects", "E:/work/app"]));
+    assert_eq!(failure["location"]["id"], "local-mcp");
+    assert_eq!(
+        failure["location"]["key_path"],
+        json!(["projects", "E:/work/app"])
+    );
     assert_eq!(failure["project"], PROJECT);
 }
 
@@ -393,8 +415,8 @@ fn projects_that_are_not_an_object_fail_the_local_servers_of_every_project_and_n
     assert_eq!(items(&inventory), [item("claude-code", "a", "effective")]);
     assert_eq!(failures(&inventory), [("shape".to_owned(), Value::Null)]);
     let failure = &inventory["read_failures"][0];
-    assert_eq!(failure["location"], "local-mcp");
-    assert_eq!(failure["key_path"], json!(["projects"]));
+    assert_eq!(failure["location"]["id"], "local-mcp");
+    assert_eq!(failure["location"]["key_path"], json!(["projects"]));
     assert_eq!(failure["project"], Value::Null);
 }
 
@@ -411,8 +433,8 @@ fn user_servers_that_are_a_list_leave_the_local_servers_read() {
     assert_eq!(items(&inventory), [item("claude-code", "b", "effective")]);
     assert_eq!(failures(&inventory), [("shape".to_owned(), Value::Null)]);
     let failure = &inventory["read_failures"][0];
-    assert_eq!(failure["location"], "user-mcp");
-    assert_eq!(failure["key_path"], json!(["mcpServers"]));
+    assert_eq!(failure["location"]["id"], "user-mcp");
+    assert_eq!(failure["location"]["key_path"], json!(["mcpServers"]));
     assert_eq!(failure["project"], Value::Null);
     assert_eq!(failure["reaction"], "unknown");
     assert_eq!(failure["notes"], json!([]));
@@ -439,12 +461,14 @@ fn a_shape_read_failure_drops_only_its_own_location_in_its_project() {
             "home": "default",
             "path": claude_json,
             "project": PROJECT,
-            "location": "local-mcp",
-            "key_path": ["projects", "E:/work/app", "mcpServers"],
+            "location": {
+                "id": "local-mcp",
+                "key_path": ["projects", "E:/work/app", "mcpServers"]
+            },
             "kind": "shape",
             "position": null,
             "reaction": "unknown",
-            "sentence": r"Claude Code cannot read the MCP servers at `projects.E:/work/app.mcpServers` in C:\Users\fixture\.claude.json: it holds a list, not an object, so it reads no Entries from there.",
+            "sentence": r"Claude Code cannot read the MCP servers at C:\Users\fixture\.claude.json#projects.E:/work/app.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
             "notes": [],
             "warnings": []
         }])
@@ -859,7 +883,7 @@ fn switches_beside_a_shape_read_failure_still_disable_and_are_written() {
         json!([{
             "code": "still_rejected",
             "path": claude_json,
-            "sentence": r"After this change too, Claude Code cannot read the MCP servers at `mcpServers` in C:\Users\fixture\.claude.json: it holds a list, not an object, so it reads no Entries from there."
+            "sentence": r"After this change too, Claude Code cannot read the MCP servers at C:\Users\fixture\.claude.json#mcpServers: it holds a list, not an object, so it reads no Entries from there."
         }])
     );
 }

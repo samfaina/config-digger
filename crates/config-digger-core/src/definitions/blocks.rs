@@ -1375,7 +1375,12 @@ impl JsonKeys {
             .try_fold(&document, |value, key| value.get(key));
         Ok(match root {
             Some(serde_json::Value::Object(projects)) => projects.keys().cloned().collect(),
-            _ => Vec::new(),
+            None => Vec::new(),
+            // It records no Project, though the file is still read.
+            Some(_) => {
+                tracing::debug!(root = ?self.root, "project registry that is not an object");
+                Vec::new()
+            }
         })
     }
 }

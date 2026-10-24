@@ -285,7 +285,7 @@
             "El aviso de arriba dice «1 location couldn't be read.».",
             "La tarjeta de cd-throwaway-shape-user tiene el aviso «A location that could take part couldn't be read: E:\\cd-throwaway\\claude-code-shape-home\\.claude.json, so the State shown may not be the one Claude Code has.».",
             "El panel «Read failures» tiene una sola tarjeta, con la etiqueta «Unexpected shape».",
-            "Esa tarjeta dice «Claude Code cannot read the MCP servers at `projects.E:/cd-throwaway/project.mcpServers` in E:\\cd-throwaway\\claude-code-shape-home\\.claude.json: it holds a list, not an object, so it reads no Entries from there.»."
+            "Esa tarjeta dice «Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.»."
           ],
           "setup": {
             "label": "Restablecer los datos de prueba",
