@@ -85,19 +85,19 @@ workspace_files = true
 
 # Agent plugins, which VS Code keeps in `~\.vscode\agent-plugins` [disk].
 # It reads the plugins the folder's `installed.json` lists, each
-# `installed[].pluginUri`, wherever that folder is and whatever its
-# manifest: `plugin.json` at its root, in `.github\plugin`, `.claude-plugin`
-# or `.plugin`, or none [test]. A plugin from a marketplace sits in VS
-# Code's clone of it, `<host>\<owner>\<repo>` in this folder [test], and a
-# folder directly here that `installed.json` does not list is not read
-# [test]. `chat.pluginLocations` adds plugins by their path [binary].
-# config-digger reads the folders directly here instead (#321). A plugin is
+# `installed[].pluginUri`, whatever its manifest: `plugin.json` at its root,
+# in `.github\plugin`, `.claude-plugin` or `.plugin`, or none [test]. A
+# plugin from a marketplace sits in VS Code's clone of it,
+# `<host>\<owner>\<repo>` in this folder [binary], and a folder directly
+# here that `installed.json` does not list is not read [test]. `chat.pluginLocations` adds plugins by their path [binary].
+# config-digger reads the folders directly here instead, each with one of
+# those manifests (#321). A plugin is
 # named by its manifest's `name`, or else by its folder. VS Code uninstalls
 # one in the Extensions view.
 [[plugins]]
 id = "agent-plugins"
-registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json"] }
-name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }]
+registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json", ".plugin/plugin.json"] }
+name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = ".plugin/plugin.json", key_path = ["name"] }]
 
 # The extensions installed in `~\.vscode\extensions`, a folder each [docs,
 # disk], each named by its manifest's `name`. The built-in extensions in the
@@ -231,8 +231,8 @@ on_read_failure = "ignores_file"
 # A launch spells `env` as an object, `headers` as `[name, value]` pairs,
 # `args` as an array, and `uri` as a URI object whose `authority`, `query`
 # and `fragment` hold the URL's userinfo, query and fragment [test]. Unlike
-# 1.129.1, 1.135.0 and later add `external`, the whole URL with the `=` and `&` of its query and
-# fragment encoded [test]. So the env values, the header values and those
+# 1.129.1, 1.135.0 and later add `external`, the whole URL with the `=`
+# and `&` of its query and fragment encoded [test]. So the env values, the header values and those
 # four parts of the URI are Secrets, `external` whole since its query
 # values cannot be told apart. Every arg is too: the rule that finds the
 # Secrets in a server's `args` reads only an Entry's own `args`.

@@ -23,7 +23,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { fresh, probe, run, same, write } from "./lib.mjs";
+import { fresh, json, probe, run, same, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -34,11 +34,11 @@ const bin = process.argv.includes("--bin")
   : path.join(process.env.LOCALAPPDATA, "Programs", "Microsoft VS Code", "Code.exe");
 // `product.json` sits in the folder of the commit `Code.exe` runs.
 const commit = fs.readdirSync(path.dirname(bin)).find((f) => fs.existsSync(path.join(path.dirname(bin), f, "resources", "app", "product.json")));
-const version = JSON.parse(fs.readFileSync(path.join(path.dirname(bin), commit, "resources", "app", "product.json"), "utf8")).version;
+const version = json(path.join(path.dirname(bin), commit, "resources", "app", "product.json")).version;
 const p = probe("VS Code", version);
 const base = fresh("vscode");
 const only = process.env.CD_PROBE_ONLY?.split(",");
-const runs = (launches) => !only || only.includes(launches);
+const runs = (name) => !only || only.includes(name);
 
 const script = path.join(base, "server.mjs");
 write(
@@ -162,9 +162,9 @@ async function launch(dir, open, { settings = {}, provider = null, env = {}, sec
   while (!fs.existsSync(doneFile) && Date.now() < end) await new Promise((r) => setTimeout(r, 1000));
   await new Promise((r) => setTimeout(r, 3000));
   await stop(d.data);
-  const done = fs.existsSync(doneFile) ? JSON.parse(fs.readFileSync(doneFile, "utf8")) : { timeout: true };
+  const done = fs.existsSync(doneFile) ? json(doneFile) : { timeout: true };
   const started = fs.existsSync(markers)
-    ? Object.fromEntries(fs.readdirSync(markers).map((f) => [f.slice(0, -".json".length), JSON.parse(fs.readFileSync(path.join(markers, f), "utf8"))]))
+    ? Object.fromEntries(fs.readdirSync(markers).map((f) => [f.slice(0, -".json".length), json(path.join(markers, f))]))
     : {};
   return { done, started, tags: Object.keys(started).sort(), cache: extCache(d.data) };
 }
@@ -184,26 +184,31 @@ function extCache(data) {
   return null;
 }
 
-// A marketplace cloned the way VS Code clones one from a git URL, into
-// `agent-plugins\<host>\<owner>\<repo>`, holding a plugin per `[tag,
+// A marketplace laid out the way VS Code's code clones one from a git URL,
+// into `agent-plugins\<host>\<owner>\<repo>`, holding a plugin per `[tag,
 // files]`, each listed in `installed.json`. `files` maps a path in the
-// plugin's folder to its content.
+// plugin's folder to its content. The folder of each plugin, by tag.
 const marketUrl = "https://cd-throwaway.invalid/cd-throwaway/market.git";
 function marketplace(plugins, list) {
   const market = path.join(plugins, "cd-throwaway.invalid", "cd-throwaway", "market");
   const installed = [];
+  const folders = {};
   for (const [tag, files] of list) {
     const name = `cd-throwaway-${tag}`;
     const folder = path.join(market, "plugins", tag);
     for (const [file, content] of Object.entries(files)) write(path.join(folder, file), content);
     installed.push({ pluginUri: fileUri(folder), marketplace: marketUrl, name });
+    folders[tag] = folder;
   }
   const listed = list.map(([tag]) => ({ name: `cd-throwaway-${tag}`, source: `./plugins/${tag}`, description: "probe plugin", version: "1.0.0" }));
   write(path.join(market, ".github", "plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: listed });
   write(path.join(plugins, "installed.json"), { version: 1, installed });
+  return folders;
 }
 const manifest = (tag, extra = {}) => ({ name: `cd-throwaway-${tag}`, version: "1.0.0", description: "probe plugin", ...extra });
 const dotMcp = (tag) => ({ mcpServers: { [`cd-throwaway-${tag}`]: server(tag) } });
+// Claude Desktop's config in a launch's `APPDATA`, with the server `desktop`.
+const claudeDesktop = (d) => write(path.join(d.appData, "Claude", "claude_desktop_config.json"), dotMcp("desktop"));
 
 // ---------------------------------------------------------------- agent plugins
 
@@ -249,14 +254,14 @@ if (runs("files")) {
     },
   });
   write(path.join(d.user, "mcp.json"), { servers: { "cd-throwaway-user": server("user") } });
-  write(path.join(d.appData, "Claude", "claude_desktop_config.json"), { mcpServers: { "cd-throwaway-desktop": server("desktop") } });
+  claudeDesktop(d);
   const seen = await launch(dir, proj, {
     settings: { "chat.mcp.discovery.enabled": { "claude-desktop": true }, "chat.mcp.workspaceRootConfig.enabled": false },
     provider: {
       command: process.execPath,
       args: [script, "ext-stdio", "--token=not-a-real-secret"],
       env: { CD_PROBE_KEY: "not-a-real-secret" },
-      uri: "http://cd-throwaway:not-a-real-secret@127.0.0.1:9/mcp?key=not-a-real-secret#t=not-a-real-secret",
+      uri: "http://cd-throwaway:not-a-real-secret@127.0.0.1:9/mcp?key=not-a-real-secret&mode=x#t=not-a-real-secret",
       headers: { Authorization: "Bearer not-a-real-secret" },
     },
     env: { CD_PROBE_REF: "from-env" },
@@ -274,20 +279,21 @@ if (runs("files")) {
     same(["dot", "folder", "user"].filter((t) => seen.tags.includes(t)), ["dot", "folder", "user"]),
   );
   await p.check("locations[claude-desktop-mcp]", "the user's `chat.mcp.discovery.enabled` turns Claude Desktop's config on", async () => same(seen.tags.includes("desktop"), true));
-  // 1.129.1 writes no `external`.
-  await p.check("locations[extension-mcp]", "the cache spells a launch's `env` as an object, its `headers` as `[name, value]` pairs, its `args` as an array, and its `uri` as a URI object whose `authority`, `query`, `fragment` and `external`, if any, hold the userinfo, the query and the fragment, `external` with `=` and `&` encoded", async () => {
+  // `external` is there from 1.135.0 on, and not in 1.129.1.
+  const [major, minor] = version.split(".").map(Number);
+  const hasExternal = major > 1 || minor >= 135;
+  await p.check("locations[extension-mcp]", "the cache spells a launch's `env` as an object, its `headers` as `[name, value]` pairs, its `args` as an array, and its `uri` as a URI object whose `authority`, `query` and `fragment` hold the userinfo, the query and the fragment, and, from 1.135.0, whose `external` holds the whole URL with `=` and `&` encoded", async () => {
     const servers = seen.cache?.["cd-throwaway.probe/cd-throwaway-provider"]?.servers ?? [];
     const launchOf = (label) => servers.find((s) => s.label === label)?.launch;
     const stdio = launchOf("cd-throwaway-ext-stdio");
     const http = launchOf("cd-throwaway-ext-http");
-    const external = "http://cd-throwaway:not-a-real-secret@127.0.0.1:9/mcp?key%3Dnot-a-real-secret#t%3Dnot-a-real-secret";
     const spelled = {
       stdio: stdio && { type: stdio.type, args: stdio.args.slice(1), env: stdio.env },
       http: http && {
         type: http.type,
         headers: http.headers,
         uri: Object.keys(http.uri).filter((k) => k !== "external").sort(),
-        external: (http.uri.external ?? external) === external,
+        external: http.uri.external ?? null,
         authority: http.uri.authority,
         query: http.uri.query,
         fragment: http.uri.fragment,
@@ -300,9 +306,9 @@ if (runs("files")) {
         type: 2,
         headers: [["Authorization", "Bearer not-a-real-secret"]],
         uri: ["$mid", "authority", "fragment", "path", "query", "scheme"],
-        external: true,
+        external: hasExternal ? "http://cd-throwaway:not-a-real-secret@127.0.0.1:9/mcp?key%3Dnot-a-real-secret%26mode%3Dx#t%3Dnot-a-real-secret" : null,
         authority: "cd-throwaway:not-a-real-secret@127.0.0.1:9",
-        query: "key=not-a-real-secret",
+        query: "key=not-a-real-secret&mode=x",
         fragment: "t=not-a-real-secret",
         path: "/mcp",
       },
@@ -360,8 +366,8 @@ if (runs("broken-user")) {
 }
 if (runs("broken-plugin")) {
   const seen = await brokenLaunch("plugin", ({ d }) => {
-    marketplace(d.plugins, [["plugin-p", { "plugin.json": manifest("plugin-p"), ".mcp.json": `{ "mcpServers": ${broken(["plugin-a", "plugin-b"])} }` }]]);
-    return { file: path.join(d.plugins, "cd-throwaway.invalid", "cd-throwaway", "market", "plugins", "plugin-p", ".mcp.json") };
+    const plugin = marketplace(d.plugins, [["plugin-p", { "plugin.json": manifest("plugin-p"), ".mcp.json": `{ "mcpServers": ${broken(["plugin-a", "plugin-b"])} }` }]]);
+    return { file: path.join(plugin["plugin-p"], ".mcp.json") };
   });
   await p.check("locations[plugin-mcp]", "VS Code reads an agent plugin's `.mcp.json` it cannot parse around the error: both servers start", async () =>
     same(seen.tags, ["folder-ok", "plugin-a", "plugin-b", "user-ok"]),
@@ -370,8 +376,10 @@ if (runs("broken-plugin")) {
 if (runs("broken-workspace")) {
   const seen = await brokenLaunch("workspace", ({ dir, d }) => {
     const file = path.join(dir, "cd-throwaway.code-workspace");
-    write(file, `{ "folders": [{ "path": "proj" }],, "settings": { "chat.mcp.discovery.enabled": { "claude-desktop": true }, "mcp": { "servers": ${broken(["workspace-a", "workspace-b"])} } } }`);
-    write(path.join(d.appData, "Claude", "claude_desktop_config.json"), { mcpServers: { "cd-throwaway-desktop": server("desktop") } });
+    // The one error is outside `settings.mcp`.
+    const settings = { "chat.mcp.discovery.enabled": { "claude-desktop": true }, mcp: { servers: { "cd-throwaway-workspace": server("workspace") } } };
+    write(file, `{ "folders": [{ "path": "proj" }],, "settings": ${JSON.stringify(settings)} }`);
+    claudeDesktop(d);
     return { file, open: file };
   });
   await p.check("locations[workspace-mcp]", "VS Code skips the servers of a `.code-workspace` file it cannot parse, and still opens its folders and applies its other settings", async () =>
@@ -400,7 +408,7 @@ async function discovers(name, { folder, workspace, user }) {
     open = path.join(dir, "cd-throwaway.code-workspace");
     write(open, { folders: [{ path: "proj" }], settings: workspace === null ? {} : on(workspace) });
   }
-  write(path.join(d.appData, "Claude", "claude_desktop_config.json"), { mcpServers: { "cd-throwaway-desktop": server("desktop") } });
+  claudeDesktop(d);
   return (await launch(dir, open, { settings: user === undefined ? {} : on(user) })).tags.includes("desktop");
 }
 

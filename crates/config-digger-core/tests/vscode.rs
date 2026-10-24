@@ -936,6 +936,17 @@ fn a_cached_extension_server_s_launch_secrets_are_masked() {
     assert!(!json(&inventory).to_string().contains(SECRET));
 }
 
+/// What VS Code does, as its definition says, with the file at `path`,
+/// which config-digger cannot read.
+fn reaction(inventory: &Inventory, path: &Path) -> String {
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.agent == "vscode" && failure.path == path)
+        .expect("the file is a Read failure");
+    code(failure.reaction)
+}
+
 #[test]
 fn vs_code_skips_an_mcp_file_it_cannot_parse_but_reads_a_plugin_s_around_the_error() {
     let broken = r#"{ "servers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
@@ -954,14 +965,7 @@ fn vs_code_skips_an_mcp_file_it_cannot_parse_but_reads_a_plugin_s_around_the_err
         });
     let inventory = inventory_at(&fs, &project("app"));
 
-    let reaction = |path: &Path| {
-        let failure = inventory
-            .read_failures
-            .iter()
-            .find(|failure| failure.agent == "vscode" && failure.path == path)
-            .unwrap_or_else(|| panic!("{} is no Read failure", path.display()));
-        code(failure.reaction)
-    };
+    let reaction = |path: &Path| reaction(&inventory, path);
     assert_eq!(reaction(&project(r"app\.vscode\mcp.json")), "ignores_file");
     assert_eq!(reaction(&project(r"app\.mcp.json")), "ignores_file");
     assert_eq!(reaction(&user_mcp), "ignores_file");
@@ -977,12 +981,7 @@ fn vs_code_skips_the_servers_of_a_workspace_file_it_cannot_parse() {
         with_project(vscode(), "multi").with_file(&file, r#"{ "folders": [],, "settings": {} }"#);
     let inventory = inventory_at(&fs, &file);
 
-    let failure = inventory
-        .read_failures
-        .iter()
-        .find(|failure| failure.agent == "vscode" && failure.path == file)
-        .expect("the workspace file is a Read failure");
-    assert_eq!(code(failure.reaction), "ignores_file");
+    assert_eq!(reaction(&inventory, &file), "ignores_file");
 }
 
 #[test]

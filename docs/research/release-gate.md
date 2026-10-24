@@ -158,11 +158,11 @@ Tested on 3.6556.2, the version claude.ai served on 2026-10-23, in Windows Sandb
 
 ### VS Code
 
-The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. Each broken file holds `,,` between two servers, which no JSON parser accepts, and each launch keeps a server in two other files.
+The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. A file VS Code cannot parse holds `,,` between two servers, which no JSON parser accepts, and each such launch keeps a server in two other files.
 
 | Mark | What the probe saw | Outcome |
 |---|---|---|
-| `:90` `plugins[agent-plugins]`: each plugin sits directly in `~\.vscode\agent-plugins`, with `plugin.json` at its root, in `.github\plugin` or `.claude-plugin` | VS Code reads the plugins `agent-plugins\installed.json` lists, each `pluginUri` a folder anywhere; a marketplace's plugin sits in VS Code's clone, `<host>\<owner>\<repo>\<source>`. `plugin.json` at the root, in `.github\plugin`, `.claude-plugin` or `.plugin`, or none, all load. A plugin folder directly in `agent-plugins` that `installed.json` does not list is not read | Ticket [#321](https://github.com/samfaina/config-digger/issues/321): no registry block reads a JSON list of folder URIs |
+| `:90` `plugins[agent-plugins]`: each plugin sits directly in `~\.vscode\agent-plugins`, with `plugin.json` at its root, in `.github\plugin` or `.claude-plugin` | VS Code reads the plugins `agent-plugins\installed.json` lists, each `pluginUri` a plugin's folder; the probe puts them where VS Code's code clones a marketplace, `<host>\<owner>\<repo>\<source>`, which no real install checked. `plugin.json` at the root, in `.github\plugin`, `.claude-plugin` or `.plugin`, or none, all load. A plugin folder directly in `agent-plugins` that `installed.json` does not list is not read | Corrected: `.plugin\plugin.json` marks a plugin too. Ticket [#321](https://github.com/samfaina/config-digger/issues/321) for the rest: no registry block reads a JSON list of folder URIs |
 | `:142` `locations[folder-mcp]`: unparsable `.vscode\mcp.json` | Skipped; the other files load; the file is left as it is | Corrected: `ignores_file` |
 | `:160` `locations[dot-mcp]`: references | `${NAME}`, `${env:NAME}` and `$NAME`, in `args` and `env`, reach the server unchanged | Confirmed |
 | `:161` `locations[dot-mcp]`: unparsable `.mcp.json` | Skipped; the other files load | Corrected: `ignores_file` |
