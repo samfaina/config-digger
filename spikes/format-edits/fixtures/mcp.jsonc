@@ -1,0 +1,22 @@
+// User MCP config, edited by hand
+{
+  "mcpServers": {
+    // Filesystem access for the monorepo
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\work"], // only C:\work
+    },
+
+    /* GitHub: token comes from the environment */
+    "github": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GH_TOKEN}" },
+      "disabled": false,
+    },
+    "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] }, // last one
+  },
+  "disabledMcpjsonServers": [
+    "legacy",
+  ],
+}
