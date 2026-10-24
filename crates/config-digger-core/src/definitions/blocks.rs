@@ -3526,6 +3526,8 @@ impl Compete for PathKey {
             return paths::key(path);
         };
         let below: PathBuf = components[cut + 1..].iter().collect();
+        // `::` keeps these keys apart from the whole paths of Entries that
+        // pass through no marker.
         format!("::{}", paths::key(&below))
     }
 

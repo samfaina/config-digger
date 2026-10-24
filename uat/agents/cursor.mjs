@@ -53,26 +53,30 @@ const version = json(path.join(path.dirname(bin), "resources", "app", "product.j
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const powershell = async (command) => (await run("powershell.exe", ["-NoProfile", "-Command", command])).stdout.trim();
+// PowerShell's processes given the data folder `data`.
+const processesOf = (data) => `Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' }`;
 // The processes given the data folder `data`, how many.
-const running = async (data) => Number(await powershell(`@(Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' }).Count`));
+const running = async (data) => Number(await powershell(`@(${processesOf(data)}).Count`));
 // Stops what is left of a launch: the processes given its data folder only.
-// Resolves once they are gone, and their stores closed.
+// Resolves once they are gone and their stores closed, or after 30 s.
 async function stop(data) {
-  await powershell(`Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${data}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+  await powershell(`${processesOf(data)} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
   const end = Date.now() + 30_000;
   while ((await running(data)) && Date.now() < end) await sleep(1000);
   await sleep(2000);
 }
 
-// The folders of a launch in `dir`.
-const folders = (dir) => ({
+// The folders of a launch in `dir`, its home folder `home` unless said.
+const folders = (dir, home = path.join(dir, "home")) => ({
   data: path.join(dir, "data"),
   user: path.join(dir, "data", "User"),
-  home: path.join(dir, "home"),
-  cursor: path.join(dir, "home", ".cursor"),
-  claude: path.join(dir, "home", ".claude"),
+  home,
+  cursor: path.join(home, ".cursor"),
+  claude: path.join(home, ".claude"),
   proj: path.join(dir, "proj"),
 });
+// The profile's store, the application's state, in the folders `d`.
+const globalState = (d) => path.join(d.user, "globalStorage", "state.vscdb");
 
 // What a launch with the folders `d` runs with: its own home folder, so
 // that `~\.cursor` and `~\.claude` are its own, and its own app data.
@@ -89,7 +93,7 @@ if (path.dirname(account) !== root || !path.basename(account).startsWith("cursor
 }
 // Whether `dir`'s profile is signed in to a Cursor account.
 function accountSignedIn(dir) {
-  const file = path.join(folders(dir).user, "globalStorage", "state.vscdb");
+  const file = globalState(folders(dir));
   if (!fs.existsSync(file)) return false;
   const db = new DatabaseSync(file, { readOnly: true });
   const token = db.prepare("SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken'").get();
@@ -161,8 +165,6 @@ function windowLog(data, name) {
     .join("");
 }
 
-// The profile's store, the application's state, in the folders `d`.
-const globalState = (d) => path.join(d.user, "globalStorage", "state.vscdb");
 // The store Cursor keeps for the Project folder of `d`, if it has one.
 function workspaceState(d) {
   const storage = path.join(d.user, "workspaceStorage");
@@ -195,11 +197,12 @@ write(path.join(devExtension, "package.json"), { name: "cd-throwaway-devext", pu
 
 // Launches Cursor on the Project folder of `dir`, approving the Project
 // servers `approved` names by identifier, with each gate of `gates`, a
-// name and a value, overridden, and resolves once it has loaded its servers
-// and `during`, given the window, is done: the servers it started, by tag.
-// The profile is left in `dir`, so a launch can follow another on it.
-async function launch(dir, { approved = [], gates, during } = {}) {
-  const d = folders(dir);
+// name and a value, overridden, and with its home folder `home` if given,
+// and resolves once it has loaded its servers and `during`, given the
+// window, is done: the servers it started, by tag. The profile is left in
+// `dir`, so a launch can follow another on it.
+async function launch(dir, { approved = [], gates, home, during } = {}) {
+  const d = folders(dir, home);
   write(path.join(d.user, "settings.json"), {
     "security.workspace.trust.enabled": false,
     "telemetry.telemetryLevel": "off",
@@ -337,15 +340,13 @@ async function devtools(port) {
       return label;
     },
     // Customize's skills, each its folder's name and the line below it, its
-    // description or an error, with every group shown whole.
+    // description or an error, sorted, with every group shown whole.
     async skills() {
       await customize("skills");
       await evaluate(`[...document.querySelectorAll("*")].filter((e) => e.offsetParent !== null && /^Show \\d+ more$/.test(e.innerText?.trim() ?? "") && e.children.length === 0).forEach((e) => e.click())`);
       await sleep(1500);
-      return Object.fromEntries(
-        await evaluate(`[...document.querySelectorAll("[data-customize-manage-kind=skill]")].filter((e) => e.offsetParent !== null)
-          .map((e) => [e.getAttribute("data-customize-manage-row"), e.innerText.split("\\n").map((s) => s.trim()).filter(Boolean)[1] ?? ""])`),
-      );
+      return evaluate(`[...document.querySelectorAll("[data-customize-manage-kind=skill]")].filter((e) => e.offsetParent !== null)
+        .map((e) => [e.getAttribute("data-customize-manage-row"), e.innerText.split("\\n").map((s) => s.trim()).filter(Boolean)[1] ?? ""]).sort()`);
     },
     // The skills the `/` menu lists for `query`.
     async slash(query) {
@@ -794,9 +795,19 @@ if (runs("gates")) {
 // picks skills from the menu, and reads the skills Cursor records as picked
 // in the profile's `cursor.skills.recentlyUsed`, each by its path below its
 // `skills` folder, most recent first.
+//
+// Cursor's code takes a skill under `<drive>:\Users\<name>` for a user's,
+// so the launch's home folder is `<drive>:\Users\cd-throwaway`, on a drive
+// `subst` maps to a folder of the launch, which the probe takes off again.
 if (runs("skills")) {
   const dir = fresh("skills", base);
-  const d = folders(dir);
+  const letter = [..."ZYXWVUTSRQPONMLKJIHG"].find((l) => !fs.existsSync(`${l}:\\`));
+  const drive = path.join(dir, "drive");
+  fs.mkdirSync(path.join(drive, "Users", "cd-throwaway"), { recursive: true });
+  const mapped = await run("subst.exe", [`${letter}:`, drive]);
+  if (mapped.code !== 0) throw new Error(`subst ${letter}: failed: ${mapped.stdout}${mapped.stderr}`);
+  const home = `${letter}:\\Users\\cd-throwaway`;
+  const d = folders(dir, home);
   const userSkills = path.join(d.cursor, "skills");
   const skillAt = (folder, text) => write(path.join(folder, "SKILL.md"), text);
   skill(path.join(userSkills, "cd-throwaway-ok"), ["name: cd-throwaway-ok", "description: parses"]);
@@ -804,6 +815,7 @@ if (runs("skills")) {
   skill(path.join(userSkills, "cd-throwaway-yaml"), ["name: [unclosed", "description: YAML that does not parse"]);
   skillAt(path.join(userSkills, "cd-throwaway-unclosed"), "---\nname: cd-throwaway-unclosed\ndescription: never closes\nbody\n");
   skill(path.join(userSkills, "cd-throwaway-no-key"), ["name: cd-throwaway-no-key", "a line that is no key"]);
+  skill(path.join(userSkills, "cd-throwaway-no-description"), ["name: cd-throwaway-no-description"]);
   // One name, two paths below `.cursor`.
   skill(path.join(userSkills, "cd-throwaway-twin"), ["name: cd-throwaway-twin", "description: user top"]);
   skill(path.join(d.proj, ".cursor", "skills", "nested", "cd-throwaway-twin"), ["name: cd-throwaway-twin", "description: project nested"]);
@@ -814,35 +826,44 @@ if (runs("skills")) {
   skill(path.join(userSkills, "cd-throwaway-folder"), ["name: cd-throwaway-user-name", "description: user named"]);
   skill(path.join(d.proj, ".cursor", "skills", "cd-throwaway-folder"), ["name: cd-throwaway-project-name", "description: project named"]);
 
-  const unparsed = ["cd-throwaway-bare", "cd-throwaway-yaml", "cd-throwaway-unclosed", "cd-throwaway-no-key"];
+  // Skills whose frontmatter Cursor cannot read, and one it reads that has
+  // no description.
+  const unparsed = ["cd-throwaway-bare", "cd-throwaway-yaml", "cd-throwaway-unclosed", "cd-throwaway-no-key", "cd-throwaway-no-description"];
   let seen;
-  await launch(dir, {
-    during: async (win) => {
-      const listed = {};
-      for (const name of [...unparsed, "cd-throwaway-ok"]) listed[name] = (await win.slash(`/${name}`)).map(([n]) => n);
-      seen = { listed, customize: await win.skills(), twins: [] };
-      // The menu before any pick, after a pick of its first entry, and
-      // after a pick of its second.
-      seen.twins.push(await win.slash("/cd-throwaway-twin"));
-      await win.pick("/cd-throwaway-twin");
-      seen.twins.push(await win.slash("/cd-throwaway-twin"));
-      await win.pick("/cd-throwaway-twin", 1);
-      seen.twins.push(await win.slash("/cd-throwaway-twin"));
-      Object.assign(seen, {
-        path: await win.slash("/cd-throwaway-path"),
-        userName: await win.slash("/cd-throwaway-user-name"),
-        projectName: await win.slash("/cd-throwaway-project-name"),
-      });
-    },
-  });
+  try {
+    await launch(dir, {
+      home,
+      during: async (win) => {
+        const listed = {};
+        for (const name of [...unparsed, "cd-throwaway-ok"]) listed[name] = (await win.slash(`/${name}`)).map(([n]) => n);
+        seen = { listed, customize: await win.skills(), twins: [] };
+        // The menu before any pick, after a pick of its first entry, and
+        // after a pick of its second.
+        seen.twins.push(await win.slash("/cd-throwaway-twin"));
+        await win.pick("/cd-throwaway-twin");
+        seen.twins.push(await win.slash("/cd-throwaway-twin"));
+        await win.pick("/cd-throwaway-twin", 1);
+        seen.twins.push(await win.slash("/cd-throwaway-twin"));
+        Object.assign(seen, {
+          path: await win.slash("/cd-throwaway-path"),
+          userName: await win.slash("/cd-throwaway-user-name"),
+          projectName: await win.slash("/cd-throwaway-project-name"),
+        });
+      },
+    });
+  } finally {
+    await run("subst.exe", [`${letter}:`, "/d"]);
+  }
   const picked = stored(globalState(d), "cursor.skills.recentlyUsed");
+  // Customize's line below each skill of `names`, by folder.
+  const customized = (names) => Object.fromEntries((seen?.customize ?? []).filter(([n]) => names.includes(n)));
 
-  await p.check("items.skill", "Cursor lists a `SKILL.md` with no frontmatter, one whose YAML does not parse, one whose frontmatter never closes and one with a line that is no key under their folder's names in the `/` menu, and Customize marks each \"Error parsing skill\"", async () =>
+  await p.check("items.skill", "Cursor lists a `SKILL.md` with no frontmatter, one whose YAML does not parse, one whose frontmatter never closes and one with a line that is no key under their folder's names in the `/` menu, and Customize marks each \"Error parsing skill\", as it does a skill with no description", async () =>
     same(
-      { listed: seen?.listed, customize: Object.fromEntries([...unparsed, "cd-throwaway-ok"].map((n) => [n, seen?.customize[n]])) },
+      { listed: seen?.listed, customize: customized([...unparsed, "cd-throwaway-ok"]) },
       {
         listed: Object.fromEntries([...unparsed, "cd-throwaway-ok"].map((n) => [n, [`/${n}`]])),
-        customize: { ...Object.fromEntries(unparsed.map((n) => [n, "Error parsing skill"])), "cd-throwaway-ok": "parses" },
+        customize: Object.fromEntries([...unparsed, "cd-throwaway-ok"].sort().map((n) => [n, n === "cd-throwaway-ok" ? "parses" : "Error parsing skill"])),
       },
     ),
   );
@@ -854,10 +875,17 @@ if (runs("skills")) {
   await p.check("items.skill", "Cursor lists both of two skills of one name at different paths under `/name`, the user's first until one is picked; once the user's was picked, the Project's comes first, so which one Enter takes depends on earlier picks", async () =>
     same({ twins: seen?.twins, picked }, { twins: [[user, project], [project, user], [project, user]], picked: ["cd-throwaway-twin/SKILL.md"] }),
   );
-  await p.check("items.skill", "Of a user's skill and a Project's at the same path below their `.cursor`, `.claude` or `.agents` folders, whatever their names, Cursor lists the user's only", async () =>
+  // The `/` menu names a skill by its frontmatter's `name`, Customize by its
+  // folder.
+  await p.check("items.skill", "Of a user's skill and a Project's at the same path below their `.cursor`, `.claude` or `.agents` folders, whatever their names, Cursor lists the user's only, in the `/` menu and in Customize", async () =>
     same(
-      { path: seen?.path, userName: seen?.userName, projectName: seen?.projectName },
-      { path: [["/cd-throwaway-path", "user agents"]], userName: [["/cd-throwaway-user-name", "user named"]], projectName: [] },
+      { path: seen?.path, userName: seen?.userName, projectName: seen?.projectName, customize: seen?.customize.filter(([n]) => ["cd-throwaway-path", "cd-throwaway-folder"].includes(n)) },
+      {
+        path: [["/cd-throwaway-path", "user agents"]],
+        userName: [["/cd-throwaway-user-name", "user named"]],
+        projectName: [],
+        customize: [["cd-throwaway-folder", "user named"], ["cd-throwaway-path", "user agents"]],
+      },
     ),
   );
 }

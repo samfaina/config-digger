@@ -312,15 +312,16 @@ unseen = ["extensions", "team", "marketplace-plugins", "user-pick"]
 # The toggle of each server in Cursor's MCP settings adds its identifier to
 # `cursor/disabledMcpServers` in the workspace's store, a JSON list of
 # identifiers, and Cursor no longer starts it there, so a server is Disabled
-# in that Project only [test]; Enable takes it out [code]. A window with no
-# folder has none, so a user's server is Disabled in a Project only. While
-# Cursor's gate `mcp_profile_scoped_global_disabled_state` is on, the toggle
-# of a server that is not a Project's writes `cursor/disabledGlobalMcpServers`
-# in the profile's store instead, the application's state for the default
-# profile, so that it is Disabled in every Project [test].
+# in that Project only [test]; Enable takes it out [code]. While Cursor's
+# gate `mcp_profile_scoped_global_disabled_state` is on, the toggle of a
+# server that is not a Project's writes `cursor/disabledGlobalMcpServers` in
+# the profile's store instead, the application's state for the default
+# profile, so that it is Disabled in every Project [test]. While the gate is
+# off, a user's server goes in the workspace's list too [test], and since a
+# window with no folder has none, it is Disabled in a Project only.
 [[items.mcp.disable]]
 block = "json-name-list"
-switch ={ anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["cursor/disabledMcpServers"], store_class = "sqlite" }
+switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["cursor/disabledMcpServers"], store_class = "sqlite" }
 target = "name"
 context = "project"
 enable_action = "remove-item"
@@ -615,15 +616,18 @@ on_read_failure = "ignores_file"
 # first in this order wins, a user's skill over a Project's [test].
 #
 # Cursor lists a `SKILL.md` without a frontmatter, one whose YAML does not
-# parse or never closes, under its folder's name, and the user can run it
-# with `/` [test]. Its Customize page marks such a skill "Error parsing
-# skill", as it does one with no `description`, and Cursor leaves those out
+# parse or never closes, under its folder's name in the `/` menu, where the
+# user can pick it [test]; every location's skills are read by the same
+# code [code]. Its Customize page marks such a skill "Error parsing skill",
+# as it does one with no `description` [test], and Cursor leaves those out
 # of the skills its model gets [code]: config-digger still shows them
 # Effective (#345). Two skills of one name at different paths are both
-# listed under `/name`, and the user picks one; Enter takes the first, a
-# user's skill before a Project's [test].
+# listed under `/name`, and the user picks one, which Cursor records by its
+# path below `skills` [test]. Enter takes the first listed: a user's skill
+# before a Project's until one is picked, after which the order follows
+# that record, which can match either path [test].
 [items.skill]
-precedence =["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
+precedence = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
 checks = ["frontmatter", "rules", "disable", "precedence"]
 
