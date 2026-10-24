@@ -35,12 +35,15 @@ const missingGroup = (groups) => groups.find((g) => /Missing · \d/.test(g.title
 const noLeftoversGroup = (groups) => groups.find((g) => g.title.includes("Missing, no leftovers · "));
 
 // Opens the group titled `title`, such as "Missing" or "Missing, no leftovers", if it is closed.
-// Fails when no group has that title.
-export async function openGroup(s, title) {
-  const toggle = await s
-    .exec(`return [...document.querySelectorAll(".place-group-toggle")].find((b) => b.textContent.replace(/^[▾▸]\\s*/, "").startsWith(arguments[0] + " · ")) ?? null;`, title)
-    .then(unwrap);
-  if (!toggle) throw new Error(`no group "${title}" on the Projects tab`);
+// Fails when no group has that title, once the tab has had time to read its list.
+export async function openGroup(s, title, opts) {
+  const toggle = await s.until(
+    () =>
+      s
+        .exec(`return [...document.querySelectorAll(".place-group-toggle")].find((b) => b.textContent.replace(/^[▾▸]\\s*/, "").startsWith(arguments[0] + " · ")) ?? null;`, title)
+        .then(unwrap),
+    { what: `the group "${title}"`, ...opts },
+  );
   if ((await s.attr(toggle, "aria-expanded")) !== "true") {
     await s.click(toggle);
     await wait(200);

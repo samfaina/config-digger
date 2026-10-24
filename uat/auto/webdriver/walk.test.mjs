@@ -76,8 +76,8 @@ test("the profile holds both AppData folders, the known folders and a Claude Cod
   }
 });
 
-// A session on a Projects tab of group toggles, each `{ text, open }`: a
-// script runs here on a page of those toggles, and a click opens or closes one.
+// A session whose page is only the group toggles of a Projects tab, each
+// `{ text, open }`: a script runs on them, and a click opens or closes one.
 class GroupsPage extends Session {
   constructor(groups) {
     super("http://fake", "fake");
@@ -99,7 +99,7 @@ class GroupsPage extends Session {
   }
 }
 
-test("openGroup opens a closed group and leaves an open one open", async () => {
+test("a closed group on the Projects tab opens, and an open one stays open", async () => {
   const page = new GroupsPage([
     { text: "▾ Missing · 1", open: true },
     { text: "▸ Missing, no leftovers · 1", open: false },
@@ -113,10 +113,17 @@ test("openGroup opens a closed group and leaves an open one open", async () => {
   );
 });
 
-test("openGroup fails when no group has that title", async () => {
+test("opening a group waits for the tab to read its list", async () => {
+  const page = new GroupsPage([]);
+  setTimeout(() => page.toggles.push({ id: "toggle-0", textContent: "▸ Hidden · 1", open: false }), 300);
+  await openGroup(page, "Hidden");
+  assert.equal(page.toggles[0].open, true);
+});
+
+test("opening a group fails when no group has that title", async () => {
   const page = new GroupsPage([{ text: "▸ Missing, no leftovers · 1", open: false }]);
-  await assert.rejects(openGroup(page, "Hidden"), /group "Hidden"/);
-  await assert.rejects(openGroup(page, "Missing"), /group "Missing"/);
+  await assert.rejects(openGroup(page, "Hidden", { timeout: 0 }), /group "Hidden"/);
+  await assert.rejects(openGroup(page, "Missing", { timeout: 0 }), /group "Missing"/);
   assert.equal(page.toggles[0].open, false);
 });
 
