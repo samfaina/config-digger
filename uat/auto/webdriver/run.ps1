@@ -52,6 +52,6 @@ $version = (Get-Item $App).VersionInfo.ProductVersion
 $arguments = @("$here\walk.mjs", "--app", $App, "--version", $version, "--driver", $driver, "--profile", $throwaway, "--out", $results, "--shots", $shots, "--root", $Root)
 if ($Only) { $arguments += @("--only", $Only) }
 node @arguments
-if ($LASTEXITCODE) { throw "the walk stopped with exit code $LASTEXITCODE: see its output above" }
+if ($LASTEXITCODE) { throw "the walk stopped with exit code ${LASTEXITCODE}: see its output above" }
 Write-Output "Results: $results"
 Write-Output "Screenshots, for the agent judge only: $shots"

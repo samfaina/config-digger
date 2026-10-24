@@ -13,17 +13,21 @@ const purple = (c) => {
   return b > g + 30 && r > g;
 };
 
+// Whether an option or the field shows the Project at `path`: from step 1.3
+// on, E:\cd-throwaway\project reads "<path> · 1 location couldn't be read".
+const showsProject = (text, path) => text === path || (text ?? "").startsWith(`${path} · `);
+
 async function field(s, label) {
   const v = await s.exec(`return [...document.querySelectorAll("[role=combobox][aria-label='" + arguments[0] + "']")].at(-1) ?? null;`, label);
   return unwrap(v);
 }
 
-// Moves the active option with the arrows until its text is `text`.
-async function arrowTo(s, text) {
+// Moves the active option with the arrows until it shows the Project at `path`.
+async function arrowTo(s, path) {
   for (const key of [KEY.Down, KEY.Up]) {
     for (let i = 0; i < 40; i++) {
       const p = await panel(s);
-      if (p?.options.find((o) => o.active)?.text === text) return true;
+      if (showsProject(p?.options.find((o) => o.active)?.text, path)) return true;
       await s.keys(key);
     }
   }
@@ -116,16 +120,16 @@ export default [
       await arrowTo(s, `${t.root}\\project`);
       await s.keys(KEY.Enter);
       await wait(400);
-      t.check(!(await panel(s)) && (await fieldValue(s, "Project")) === `${t.root}\\project`, "Enter elige la opción iluminada y cierra el panel");
+      t.check(!(await panel(s)) && showsProject(await fieldValue(s, "Project"), `${t.root}\\project`), "Enter elige la opción iluminada y cierra el panel");
       await s.keys(KEY.Down);
       await wait(600);
       const next = await fieldValue(s, "Project");
       const closed = !(await panel(s));
-      t.check(closed && next !== `${t.root}\\project`, "con el panel cerrado, Flecha abajo pasa al Project siguiente sin abrir el panel", next);
+      t.check(closed && !showsProject(next, `${t.root}\\project`), "con el panel cerrado, Flecha abajo pasa al Project siguiente sin abrir el panel", next);
       await s.keys(KEY.Up);
       await s.until(() => s.exec("return !document.querySelector('.loading') && !document.querySelector('.read-progress')"), { what: "the read" });
       await wait(500);
-      t.check(!(await panel(s)) && (await fieldValue(s, "Project")) === `${t.root}\\project`, `Flecha arriba vuelve a «${t.root}\\project» sin abrir el panel`);
+      t.check(!(await panel(s)) && showsProject(await fieldValue(s, "Project"), `${t.root}\\project`), `Flecha arriba vuelve a «${t.root}\\project» sin abrir el panel`);
       const items = await s.exec("return [...document.querySelectorAll('.item-row .item-name')].map((e) => e.textContent.trim())");
       t.check(items.includes("cd-throwaway-project"), "cada flecha carga el Project: la lista de Items muestra «cd-throwaway-project»", items.join(", "));
     },

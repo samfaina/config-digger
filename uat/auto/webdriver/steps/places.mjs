@@ -112,15 +112,18 @@ export default [
         .map((l) => l.trim().split(/\s+/))
         .filter((r) => r.length === 2);
       const homes = new Map(rows.map(([agent, folder]) => [folder, agent]));
+      const paths = [];
       for (const [agent, folder] of [
         ["claude-code", "claude-code-home"],
         ["codex", "codex-home"],
         ["claude-desktop", "claude-desktop-home"],
       ]) {
         const path = `${t.root}\\${folder}`;
+        paths.push(path);
         t.eq(homes.get(path), agent, `una fila dice «${agent}» con «${path}»`);
       }
-      const extra = rows.filter(([, folder]) => folder.startsWith(t.root)).length;
+      // Step 1.3 adds claude-code-shape-home too, which is none of those folders.
+      const extra = rows.filter(([, folder]) => paths.includes(folder)).length;
       t.eq(extra, 3, "ninguna de esas carpetas sale con otro Agent");
     },
   },

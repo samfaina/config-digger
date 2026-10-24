@@ -45,7 +45,8 @@ export async function press(s, text, scope) {
 }
 
 // Picks `option` in the combobox labelled `label`, the last one on the page
-// when a dialog sits over the screen.
+// when a dialog sits over the screen. An option may add " · …" to the text,
+// as a Project with a Read failure does.
 export async function choose(s, label, option) {
   const field = await s.until(
     () =>
@@ -60,6 +61,7 @@ export async function choose(s, label, option) {
       s
         .exec(
           `return [...document.querySelectorAll("[role=option]")].find((o) => o.textContent.trim() === arguments[0]) ??
+                  [...document.querySelectorAll("[role=option]")].find((o) => o.textContent.trim().startsWith(arguments[0] + " · ")) ??
                   [...document.querySelectorAll("[role=option]")].find((o) => o.textContent.includes(arguments[0])) ?? null;`,
           option,
         )
