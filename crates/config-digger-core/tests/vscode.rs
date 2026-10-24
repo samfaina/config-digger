@@ -612,6 +612,17 @@ fn vs_code_names_a_skill_by_its_folder() {
 }
 
 #[test]
+fn vs_code_loads_a_skill_whose_frontmatter_is_not_yaml_under_its_folder_s_name() {
+    let fs = with_home(vscode()).with_file(
+        format!(r"{HOME}\.agents\skills\broken\SKILL.md"),
+        "---\ndescription: probe\nnot a key\n---\nbody\n",
+    );
+    let inventory = inventory(&fs);
+
+    assert_eq!(json(skill(&inventory, "broken").state), "effective");
+}
+
+#[test]
 fn a_personal_skill_s_skill_manager_is_its_provenance() {
     let inventory = inventory(&with_home(vscode()));
 
