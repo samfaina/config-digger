@@ -1911,14 +1911,15 @@ fn preview(
 /// Refuses a plan that must write a file in `files` that is one of
 /// `read_failures` for an Agent home whose States it changes in `changes`,
 /// or that cannot be opened or decoded at all: config-digger never writes a
-/// file it cannot read.
+/// file it cannot read. A shape in one location leaves the rest of the file
+/// read, and written; an edit into the value itself fails on its own.
 fn refuse_read_failure_targets(
     read_failures: &[ReadFailure],
     changes: &[Change],
     files: &[PlannedFile],
 ) -> Result<(), Error> {
     for failure in read_failures {
-        if !files.iter().any(|file| file.path == failure.path) {
+        if failure.location.is_some() || !files.iter().any(|file| file.path == failure.path) {
             continue;
         }
         let acting = changes
@@ -1946,14 +1947,16 @@ fn read_failure_info(
     let mut info = Vec::new();
     for failure in read_failures {
         if files.iter().any(|file| file.path == failure.path) {
+            let sentence = match failure.location {
+                Some(_) => explain::still_unreadable(&failure.sentence),
+                None => {
+                    explain::still_rejected(&failure.agent_name, &failure.path, &failure.sentence)
+                }
+            };
             info.push(Info {
                 code: InfoCode::StillRejected,
                 path: failure.path.clone(),
-                sentence: explain::still_rejected(
-                    &failure.agent_name,
-                    &failure.path,
-                    &failure.sentence,
-                ),
+                sentence,
             });
             continue;
         }

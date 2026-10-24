@@ -406,6 +406,21 @@ fn an_admin_managed_settings_source_that_does_not_parse_stops_claude_code() {
 }
 
 #[test]
+fn managed_servers_of_another_shape_do_not_stop_claude_code() {
+    let managed = |text: &str| {
+        claude_home(&json!({}))
+            .with_file(in_program_files(r"ClaudeCode\managed-settings.json"), text)
+    };
+
+    let unknown = (vec!["unknown".to_owned()], vec![]);
+    assert_eq!(
+        reactions(&inventory(&managed(r#"{"managedMcpServers": []}"#))),
+        unknown
+    );
+    assert_eq!(reactions(&inventory(&managed("[]"))), unknown);
+}
+
+#[test]
 fn a_user_registry_policy_that_does_not_parse_is_skipped() {
     let env = env().with_registry_value(Hive::CurrentUser, POLICIES, "Settings", "{ not json");
 

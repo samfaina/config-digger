@@ -769,6 +769,13 @@ pub(crate) struct LocationDefinition {
     pub secrets: SecretFields,
     /// What the Agent does when it cannot open, decode or parse the location.
     pub on_read_failure: ReadFailureReaction,
+    /// What the Agent does when the location holds, where its Entries are,
+    /// a value of a shape config-digger cannot enumerate, such as a list
+    /// where servers should be, the other locations in the file being read.
+    /// A file of valid text that is not an object fails every location in
+    /// it, which take the strongest of their reactions to a shape.
+    /// `unknown` when omitted. `on_read_failure` and the risks do not apply.
+    pub on_shape_failure: Option<ReadFailureReaction>,
     /// How the Agent's own recovery from a Read failure here can lose
     /// configuration, shown as warnings on the Read failure.
     #[serde(default)]
@@ -942,8 +949,8 @@ pub(crate) enum ReadFailureReaction {
     /// It asks the user at startup what to do with the file, and otherwise
     /// starts without its Entries.
     AsksUser,
-    /// What it does is not known: every Item in the contexts the location
-    /// reaches gets a caveat.
+    /// What it does is not known: every Item of the location's kinds in the
+    /// contexts it reaches gets a caveat.
     Unknown,
     /// It refuses to start in the contexts the location reaches.
     StopsAgent,
@@ -1038,6 +1045,13 @@ impl LocationDefinition {
     /// Whether the location's Entries are keyed by Project inside the file.
     pub fn keyed_by_project(&self) -> bool {
         self.root.iter().any(|key| key == PROJECT_KEY)
+    }
+
+    /// What the Agent does about a shape here: `unknown` unless the
+    /// definition says.
+    pub fn shape_failure_reaction(&self) -> ReadFailureReaction {
+        self.on_shape_failure
+            .unwrap_or(ReadFailureReaction::Unknown)
     }
 
     /// The name the Agent gives an Entry named `name`, of the plugin and

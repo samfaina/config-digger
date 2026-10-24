@@ -215,7 +215,7 @@ export function failuresInContext(failures: ReadFailure[], project: string | nul
   );
 }
 
-/** The Read failures in the folder of the Project at `project`, which badge it. */
+/** The Read failures that reach only the Project at `project`, in its folder or keyed to it, which badge it. */
 export function projectFailures(failures: ReadFailure[], project: string): number {
   return failures.filter((failure) => failure.project !== null && samePath(failure.project, project)).length;
 }

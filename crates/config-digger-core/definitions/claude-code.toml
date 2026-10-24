@@ -218,6 +218,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 
 [[locations]]
 id = "user-mcp"
+unverified = "A value of `~/.claude.json` where servers are that is not an object, such as `mcpServers` or a Project's `mcpServers` holding a list, is taken to leave the file's other servers read: what Claude Code does with it is not known."
 anchor = { block = "home", root = "state_file" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -277,7 +278,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # [test]; config-digger leaves out this file's Entries alone (#295).
 [[locations]]
 id = "plugin-manifest-mcp"
-unverified = "Claude Code is taken to record each bundle it extracts in `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and the absolute `extractedPath` it went to, and to name the bundle's server by its manifest's `name`, as its code does."
+unverified = [
+  "Claude Code is taken to record each bundle it extracts in `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and the absolute `extractedPath` it went to, and to name the bundle's server by its manifest's `name`, as its code does.",
+  "A manifest `mcpServers` that is not an object, a path or a list of them is taken to leave the plugin's other servers and its skills read, though a manifest that does not parse fails the plugin whole (#295).",
+]
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
 name_template = "plugin:{plugin}:{name}"
 references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }

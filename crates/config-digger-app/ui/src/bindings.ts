@@ -718,6 +718,14 @@ export type Executed =
 /**  What changed, as a sentence rendered by the core. */
 cause: string };
 
+/**  The one location of a file that a shape Read failure fails. */
+export type FailedLocation = {
+	/**  The id of the location in the Agent's definition. */
+	id: string,
+	/**  The key path of the value it holds where its Entries are. */
+	key_path: string[],
+};
+
 /**  An Operation that failed after it was recorded in History. */
 export type FailedOperation = {
 	/**  Its id in History. */
@@ -1459,9 +1467,15 @@ export type ReadFailure = {
 	path: string,
 	/**
 	 *  The Project whose folder holds the location, or `None` for a
-	 *  location outside any Project, which reaches every context.
+	 *  location outside any Project, which reaches every context. For a
+	 *  shape, the Project it is keyed to, if any.
 	 */
 	project: string | null,
+	/**
+	 *  For a shape, the location it fails, the other locations in the file
+	 *  being read; `None` when the whole file fails.
+	 */
+	location: FailedLocation | null,
 	kind: ReadFailureKind,
 	/**
 	 *  Where a parse error is, when the parser knows. A Read failure never
@@ -1485,11 +1499,16 @@ export type ReadFailure = {
 };
 
 export type ReadFailureKind = 
-/**
- *  The text does not parse in the reader's dialect, or holds a shape
- *  where Entries are that config-digger cannot enumerate.
- */
+/**  The text does not parse in the reader's dialect. */
 "parse" | 
+/**
+ *  Where a location's Entries are, the file holds a value of a shape
+ *  config-digger cannot enumerate, such as a list where servers
+ *  should be. Only that location fails, or every location in the file
+ *  when the file itself is not an object; either way the Agent does
+ *  what the locations say of a shape, not of a file that does not parse.
+ */
+"shape" | 
 /**  The bytes do not decode into text the way the Agent decodes them. */
 "decode" | 
 /**  The file cannot be opened for lack of permission. */
@@ -1506,8 +1525,8 @@ export type ReadFailureReaction =
 /**  It asks about the file at startup, and otherwise starts without its Entries. */
 "asks_user" | 
 /**
- *  What it does is not known, so every Item in the contexts the
- *  location reaches gets a caveat.
+ *  What it does is not known, so every Item of the location's kinds in
+ *  the contexts it reaches gets a caveat.
  */
 "unknown" | 
 /**

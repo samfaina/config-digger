@@ -7,6 +7,7 @@ import { Tooltip } from "./Tooltip";
 
 const KIND_LABELS: Record<ReadFailureKind, string> = {
   parse: "Parse error",
+  shape: "Unexpected shape",
   decode: "Cannot decode",
   permission: "Permission denied",
   io: "Cannot read",

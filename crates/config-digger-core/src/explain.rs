@@ -11,6 +11,8 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
+use crate::locator;
+use crate::scan::{Expected, ScannedShape, ValueType};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -1342,6 +1344,10 @@ pub(crate) fn read_failure(
                 "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
             )
         }
+        // A shape in one location is worded by `shape_failure`.
+        ReadFailureKind::Shape => format!(
+            "{agent_name} cannot read {path}: it is {dialect} but not an object, so it reads no Entries from it."
+        ),
         ReadFailureKind::Decode => {
             format!("{path} is not text {agent_name} can decode, so it reads no Entries from it.")
         }
@@ -1352,6 +1358,33 @@ pub(crate) fn read_failure(
             "config-digger cannot read {path}, so it lists no {agent_name} Entries from it."
         ),
     }
+}
+
+/// What a location that holds a value of another shape where its Entries
+/// are in `path`, as `shape` says, means: only that location fails. It
+/// never quotes the file.
+pub(crate) fn shape_failure(agent_name: &str, path: &Path, shape: &ScannedShape) -> String {
+    let items = match shape.kind {
+        ItemKind::Mcp => "MCP servers",
+        ItemKind::Skill => "skills",
+    };
+    let found = match shape.found {
+        ValueType::Null => "null",
+        ValueType::Boolean => "true or false",
+        ValueType::Number => "a number",
+        ValueType::String => "a string",
+        ValueType::List => "a list",
+        ValueType::Object => "an object",
+    };
+    let expected = match shape.expected {
+        Expected::Object => "an object",
+        Expected::List => "a list",
+        Expected::ObjectOrPath => "an object or a path",
+    };
+    format!(
+        "{agent_name} cannot read the {items} at {}: it holds {found}, not {expected}, so it reads no Entries from there.",
+        locator::render(path, &shape.key_path)
+    )
 }
 
 /// The note of a Read failure in a file `agent_name` asks about at startup.
@@ -1558,6 +1591,12 @@ pub(crate) fn still_rejected(agent_name: &str, path: &Path, failure: &str) -> St
         "{agent_name} still rejects {} after this change: {failure}",
         path.display()
     )
+}
+
+/// The info row of a plan that writes the file of a location that, as
+/// `failure` says, still holds a value of a shape its Agent cannot read.
+pub(crate) fn still_unreadable(failure: &str) -> String {
+    format!("After this change too, {failure}")
 }
 
 /// The info row of a plan whose States after could differ, since `path`,

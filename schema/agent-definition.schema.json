@@ -1140,7 +1140,7 @@
           "const": "asks_user"
         },
         {
-          "description": "What it does is not known: every Item in the contexts the location\nreaches gets a caveat.",
+          "description": "What it does is not known: every Item of the location's kinds in the\ncontexts it reaches gets a caveat.",
           "type": "string",
           "const": "unknown"
         },
@@ -1937,6 +1937,17 @@
         "on_read_failure": {
           "description": "What the Agent does when it cannot open, decode or parse the location.",
           "$ref": "#/$defs/ReadFailureReaction"
+        },
+        "on_shape_failure": {
+          "description": "What the Agent does when the location holds, where its Entries are,\na value of a shape config-digger cannot enumerate, such as a list\nwhere servers should be, the other locations in the file being read.\nA file of valid text that is not an object fails every location in\nit, which take the strongest of their reactions to a shape.\n`unknown` when omitted. `on_read_failure` and the risks do not apply.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadFailureReaction"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "risks": {
           "description": "How the Agent's own recovery from a Read failure here can lose\nconfiguration, shown as warnings on the Read failure.",

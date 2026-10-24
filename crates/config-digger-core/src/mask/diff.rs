@@ -236,7 +236,11 @@ fn secret_spans(
         .parse(text)
         .map_err(|error| unparsed(error.position))?;
     let syntax = format.syntax();
-    let objects = scan::entries_of(location, &document).map_err(|_| unparsed(None))?;
+    // A value it cannot enumerate could hold a Secret it would not mask.
+    let (objects, failures) = scan::entries_of(location, &document);
+    if !failures.is_empty() {
+        return Err(unparsed(None));
+    }
     // Each Secret's key path from the root of the file, with its mask.
     let mut secrets = super::file_fields(location, &document);
     for object in objects {

@@ -188,6 +188,7 @@ fn a_claude_json_that_does_not_parse_is_a_read_failure_with_no_entries() {
             "home": "default",
             "path": r"C:\Users\fixture\.claude.json",
             "project": null,
+            "location": null,
             "kind": "parse",
             "position": { "line": 1, "column": 16 },
             "reaction": "asks_user",
