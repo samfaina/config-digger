@@ -81,6 +81,13 @@ fn cursor() -> FakeFileSystem {
         )
 }
 
+/// The same, with the gate that keeps the Disables of servers outside
+/// Projects in the profile cached off: the user's server then goes in the
+/// workspace's list too.
+fn cursor_gate_off() -> FakeFileSystem {
+    profile_scoped(cursor(), false)
+}
+
 fn env() -> FakeEnvironment {
     FakeEnvironment::with_home(HOME)
         .with_var("APPDATA", APP_DATA)
@@ -235,7 +242,7 @@ fn app_server(name: &str) -> String {
 
 #[test]
 fn a_server_cursor_lists_in_the_workspace_s_disabled_servers_is_disabled_natively() {
-    let fs = cursor().with_sqlite_item(
+    let fs = cursor_gate_off().with_sqlite_item(
         app_state(),
         "cursor/disabledMcpServers",
         r#"["user-fetch","project-0-app-docs"]"#,
@@ -264,7 +271,7 @@ fn inventory_without_project(fs: &FakeFileSystem) -> Inventory {
 
 #[test]
 fn disable_in_a_project_adds_the_server_s_identifier_to_the_workspace_s_list() {
-    let fs = cursor();
+    let fs = cursor_gate_off();
     let core = core(&fs);
 
     for (server, name) in [
@@ -292,7 +299,7 @@ fn disable_in_a_project_adds_the_server_s_identifier_to_the_workspace_s_list() {
 
 #[test]
 fn enable_takes_the_identifier_out_of_the_workspace_s_list() {
-    let fs = cursor().with_sqlite_item(
+    let fs = cursor_gate_off().with_sqlite_item(
         app_state(),
         "cursor/disabledMcpServers",
         r#"["user-fetch","user-other"]"#,
@@ -312,7 +319,7 @@ fn enable_takes_the_identifier_out_of_the_workspace_s_list() {
 
 #[test]
 fn an_undo_of_a_disable_puts_the_workspace_s_list_back() {
-    let fs = cursor().with_sqlite_item(app_state(), "cursor/disabledMcpServers", "[]");
+    let fs = cursor_gate_off().with_sqlite_item(app_state(), "cursor/disabledMcpServers", "[]");
     let core = core(&fs);
     let plan = plan(&core, &in_app(), Action::Disable, &[&user_server("fetch")]).unwrap();
     let outcome = core.execute(plan, &[]).unwrap();
@@ -351,7 +358,7 @@ fn a_write_to_cursor_s_store_is_blocked_while_cursor_runs() {
 
 #[test]
 fn without_a_project_a_user_server_has_no_list_to_go_in() {
-    let inventory = inventory_without_project(&cursor());
+    let inventory = inventory_without_project(&cursor_gate_off());
 
     let entry = &item(&inventory, "user-fetch").entries[0];
     let disable = json_of(&entry.disable);
@@ -367,7 +374,7 @@ fn a_project_cursor_keeps_no_store_for_yet_offers_no_disable() {
 
     let inventory = inventory(&core(&fs), &context(Some(&project("new"))));
 
-    let entry = &item(&inventory, "user-fetch").entries[0];
+    let entry = &item(&inventory, "project-0-new-docs").entries[0];
     let disable = json_of(&entry.disable);
     assert_eq!(disable["code"], "no_mechanism", "{disable}");
 }
@@ -482,7 +489,7 @@ fn plan_in_app_disable(core: &Core, server: &str) -> PathBuf {
 }
 
 #[test]
-fn the_profile_scoped_gate_is_assumed_off() {
+fn the_profile_scoped_gate_is_assumed_on() {
     let fs = cursor().with_sqlite_item(
         global_state(),
         "cursor/disabledGlobalMcpServers",
@@ -492,7 +499,7 @@ fn the_profile_scoped_gate_is_assumed_off() {
     let inventory = inventory(&core(&fs), &in_app());
 
     let entry = &item(&inventory, "user-fetch").entries[0];
-    assert_eq!(code(entry.state), "effective");
+    assert_eq!(code(entry.state), "disabled");
     let caveat = entry
         .caveats
         .iter()

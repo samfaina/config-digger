@@ -3131,7 +3131,7 @@
           ]
         },
         {
-          "description": "Entries compete when they lie at the same path below the same folder,\nwhatever their names, once each path is cut at the first of `markers` it\npasses through, as Cursor compares skills: `~\\.claude\\skills\\review` and\n`~\\.agents\\skills\\review` both lie at `skills\\review` below `~`, while\n`~\\.claude\\skills\\x\\review` does not. Paths compare without regard to\ncase. An Entry whose path passes through no marker competes with none.",
+          "description": "Entries compete when they lie at the same path below the first of\n`markers` each path passes through, whatever their names and whatever\nfolder holds the marker, as Cursor compares skills: `~\\.claude\\skills\\review`,\n`~\\.agents\\skills\\review` and `<project>\\.cursor\\skills\\review` all lie at\n`skills\\review`, while `~\\.claude\\skills\\x\\review` does not. Paths\ncompare without regard to case. An Entry whose path passes through no\nmarker competes with none.",
           "type": "object",
           "properties": {
             "markers": {

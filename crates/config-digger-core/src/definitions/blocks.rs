@@ -3483,12 +3483,13 @@ impl Compete for ExactName {
     }
 }
 
-/// Entries compete when they lie at the same path below the same folder,
-/// whatever their names, once each path is cut at the first of `markers` it
-/// passes through, as Cursor compares skills: `~\.claude\skills\review` and
-/// `~\.agents\skills\review` both lie at `skills\review` below `~`, while
-/// `~\.claude\skills\x\review` does not. Paths compare without regard to
-/// case. An Entry whose path passes through no marker competes with none.
+/// Entries compete when they lie at the same path below the first of
+/// `markers` each path passes through, whatever their names and whatever
+/// folder holds the marker, as Cursor compares skills: `~\.claude\skills\review`,
+/// `~\.agents\skills\review` and `<project>\.cursor\skills\review` all lie at
+/// `skills\review`, while `~\.claude\skills\x\review` does not. Paths
+/// compare without regard to case. An Entry whose path passes through no
+/// marker competes with none.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PathKey {
@@ -3524,9 +3525,10 @@ impl Compete for PathKey {
         let Some(cut) = cut else {
             return paths::key(path);
         };
-        let root: PathBuf = components[..cut].iter().collect();
         let below: PathBuf = components[cut + 1..].iter().collect();
-        format!("{}::{}", paths::key(&root), paths::key(&below))
+        // `::` keeps these keys apart from the whole paths of Entries that
+        // pass through no marker.
+        format!("::{}", paths::key(&below))
     }
 
     fn by_endpoint(&self, _id: &str) -> bool {
