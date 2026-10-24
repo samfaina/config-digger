@@ -2,7 +2,7 @@
 
 Issue: [#80](https://github.com/samfaina/config-digger/issues/80). Terms follow [`CONTEXT.md`](../../CONTEXT.md).
 
-Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23; the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer; Claude Code's marks that need a claude.ai account, tested on 2026-10-24 with the owner's Max account; and VS Code's marks about the MCP files it reads, tested on 2026-10-24 on throwaway profiles. Cursor, the rest of VS Code and the rest of Claude Desktop, which need their windows driven, come next.
+Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23; the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer; Claude Code's marks that need a claude.ai account, tested on 2026-10-24 with the owner's Max account; VS Code's marks about the MCP files it reads, tested on 2026-10-24 on throwaway profiles; and Cursor's marks about the MCP files and plugins it reads, tested on 2026-10-24 on throwaway profiles, the plugins of a Project's settings with the owner's Cursor account. The rest of Cursor, the rest of VS Code and the rest of Claude Desktop, which need their windows driven, come next.
 
 ## The probes
 
@@ -13,6 +13,7 @@ node uat/agents/claude-code.mjs [--bin <claude.exe>]
 node uat/agents/codex.mjs       [--bin <codex.exe or codex.cmd>]
 node uat/agents/gemini-cli.mjs  [--bin <gemini.cmd>]
 node uat/agents/vscode.mjs      [--bin <Code.exe>]
+node uat/agents/cursor.mjs      [--bin <Cursor.exe>]
 ```
 
 Each check names the table of the definition it tests, as `cargo xtask unverified` prints it, and passes when the Agent does what the definition now says. A probe exits 1 when a check fails. `CD_PROBE_VERBOSE=1` prints what each check saw, and `CD_PROBE_JSON=<file>` writes the results. Run a probe again with each new version of its Agent: when every check passes, the version can join the definition's `verified` range.
@@ -25,6 +26,8 @@ What keeps a probe off the user's own configuration:
 - No request reaches a model. Claude Code's Messages API is a local server in the probe, which keeps each request so the probe can read the skills Claude Code lists to its model. Codex and Gemini CLI point at a closed local port.
 - Claude Code still fetches its GrowthBook features at start, without an account. Older Claude Code versions come from npm into the probe root (`npm install --prefix E:\cd-throwaway-agents\cc-<version> @anthropic-ai/claude-code@<version>`).
 - VS Code gets a throwaway profile per launch: `--user-data-dir`, `--extensions-dir`, `--shared-data-dir` and `--agent-plugins-dir`, and `USERPROFILE` and `APPDATA` in the launch's folder, so that `~\.vscode\argv.json` and Claude Desktop's config are throwaway too. It runs beside a VS Code the user has open, and the probe stops only the processes given its own data folder. Its servers are this machine's Node writing a marker file, and nothing signs in. Another version comes as the zip archive from `update.code.visualstudio.com/<version>/win32-x64-archive/stable`, unpacked into the probe root.
+- Cursor gets a throwaway profile per launch too: `--user-data-dir` and `--extensions-dir`, and `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` in the launch's folder, so that `~\.cursor` and `~\.claude` are throwaway. The probe stops only the processes given its own data folder. Its servers are this machine's Node writing a marker file. The sign-in checks run a local MCP server behind OAuth, which grants `not-a-real-secret` and answers its own authorization request by calling Cursor's loopback redirect. `workbench.externalBrowser` hands every URL Cursor opens to `curl.exe`: Cursor opens its own sign-in page at first start, and a browser started with the launch's `LOCALAPPDATA` would make a new profile there.
+- Only the `plugins[project]` checks run signed in to a Cursor account, the owner's, on the throwaway profile `E:\cd-throwaway-agents\cursor-account`: without an account, Cursor resolves no plugin key of a Project's `.cursor\settings.json`. `node uat/agents/cursor.mjs --sign-in` opens that profile for the owner to sign in, with only `USERPROFILE` moved, so that the sign-in page opens in the owner's own browser.
 
 How each probe reads what the Agent loaded:
 
@@ -34,6 +37,7 @@ How each probe reads what the Agent loaded:
 | Codex | `codex mcp list`, `codex debug prompt-input` (the skills its model gets), the files `codex exec` and `codex archive` write |
 | Gemini CLI | `gemini extensions list` (`Enabled (Workspace)` for the folder it starts in), `gemini mcp list`, `gemini -p` |
 | VS Code | The servers it starts: a probe extension, loaded with `--extensionDevelopmentPath`, runs `workbench.mcp.startServer *`, trusting discovered servers, and each server writes a marker with the arguments and variables it got; the folders the window opened; the workspace's `mcp.extCachedServers` in its `state.vscdb` |
+| Cursor | The servers it starts, each writing a marker, a Project's approved beforehand in the profile's `state.vscdb`; the requests a local OAuth server gets, after the probe clicks Authenticate in Customize over the Chrome DevTools Protocol (`--remote-debugging-port`); the plugin log, `Cursor Plugins.log`, and the commits in the plugin cache |
 
 ### In Windows Sandbox
 
@@ -73,6 +77,7 @@ CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth logou
 | Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
 | VS Code | 1.129.1, 1.135.0, 1.141.0, `vscode.mjs` | 1.129.1 to 1.141.0 (was 1.129.1) |
+| Cursor | 3.27.12, `cursor.mjs`; 3.22.12 every check but the two `plugins[project]` ones, since Cursor updated itself before the account was signed in | 3.22.12 to 3.27.12 (was 3.22.12) |
 | Claude Desktop | 3.6556.2, `claude-desktop.mjs` only | unchanged, 2.16120: 3.x keeps a package's data elsewhere ([#305](https://github.com/samfaina/config-digger/issues/305)) |
 
 Claude Code 2.1.286 fails 7 checks, all on what 2.1.299 changed: a plain-string `enabledMcpjsonServers` or `disabledMcpjsonServers` voids its settings file, there is no name rule, and the skill listing gives no alias. The definition describes 2.1.299 and later, so the range starts there.
@@ -173,9 +178,26 @@ The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version
 | `:240` `locations[plugin-mcp]`: unparsable plugin `.mcp.json` | VS Code reads it around the error and starts both servers | Ticket [#322](https://github.com/samfaina/config-digger/issues/322); `unknown` stays, so the Items it reaches keep a caveat |
 | `:258` `locations[claude-desktop-mcp]`: which settings hold `chat.mcp.discovery.enabled` | The user's turn a source on. A folder opened alone reads its `.vscode\settings.json`, over the user's; a workspace file reads its `settings`, over the user's, and never a member folder's `.vscode\settings.json` | Ticket [#323](https://github.com/samfaina/config-digger/issues/323): the core reads a member folder's settings first |
 
-### Cursor, and the rest of VS Code
+### Cursor
 
-Pending: these 27 marks need the apps' windows driven, on throwaway profiles. Cursor `:109`, `:110`, `:145`, `:146`, `:170`, `:194`, `:211`, `:234`, `:235`, `:254`, `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
+The MCP files and plugins, tested with `cursor.mjs` (#312) on 3.22.12 and 3.27.12, to which Cursor updated itself during the session; both behave alike. A file Cursor cannot parse holds `,,` between two servers, which no JSON parser accepts, and each such launch keeps a server in two other files. The `plugins[project]` checks ran on 3.27.12 only, signed in to the owner's Cursor account, which is in no team.
+
+| Mark | What the probe saw | Outcome |
+|---|---|---|
+| `:109` `plugins[project]`: which marketplace a key that names none resolves to | Without an account, Cursor resolves no key at all. Signed in, the server resolves `superdesign` to `cursor-public`, and Cursor loads it from `cursor-public`'s cache, not from a marketplace `aaa-cd-throwaway` whose cache holds a complete plugin of the same name | Corrected: a key that names no marketplace is read in `cursor-public`'s cache only (`marketplace` on `project-plugin-keys`, new in the format) |
+| `:110` `plugins[project]`: of several complete commits, which is taken | Cursor downloads the commit its server names and, as it loads the plugin, deletes its other commits, a complete one that comes last by name included | Corrected: once Cursor has run, the cache holds one commit; which of several Cursor would run cannot be told from the disk, and the last by name is read |
+| `:145` `locations[user-mcp]`: whether Cursor forgets the sign-in of the servers it no longer sees | Signed in to a local OAuth server, Cursor keeps the sign-in across restarts, even when the server was missing from `mcp.json`, or the file did not parse, while it started. While it runs, taking the server out of the file, or breaking the file, forgets it: put back, the server needs signing in again | Corrected: the user file's Read failure no longer warns `agent_may_clear_auth`, since starting on such a file costs no sign-in; the Project file's warning rests on the same code, untested |
+| `:146` `locations[user-mcp]`: unparsable `~\.cursor\mcp.json` | Skipped; the other files load; the file is left as it is | Corrected: `ignores_file` |
+| `:170` `locations[project-mcp]`: unparsable `.cursor\mcp.json` | Skipped, its servers approved; the other files load; the file is left as it is | Corrected: `ignores_file` |
+| `:194` `locations[cursor-plugin-manifest-mcp]`: unparsable manifest | Its servers are skipped and the plugin's `.mcp.json` still loads, but Cursor reads the plugin's next manifest instead, `.claude-plugin\plugin.json` after `.cursor-plugin\plugin.json` | Corrected: `ignores_file`; ticket [#338](https://github.com/samfaina/config-digger/issues/338) for the next manifest |
+| `:211` `locations[cursor-plugin-mcp]`: unparsable plugin `mcp.json` | Cursor reads it around the error and starts both servers | Ticket [#322](https://github.com/samfaina/config-digger/issues/322), as for VS Code; `unknown` stays |
+| `:234` `locations[claude-plugin-manifest-mcp]`: whether `.mcp.json` is read only when the manifest declares no servers | Read beside the manifest's servers; of a server both declare, the manifest's starts | Confirmed |
+| `:235` `locations[claude-plugin-manifest-mcp]`: unparsable manifest | As for Cursor's own plugins: skipped, `.mcp.json` still loads, and the next manifest is read | Corrected: `ignores_file`; ticket [#338](https://github.com/samfaina/config-digger/issues/338) |
+| `:254` `locations[claude-plugin-mcp]`: unparsable `.mcp.json` | Read around the error; both servers start | Ticket [#322](https://github.com/samfaina/config-digger/issues/322); `unknown` stays |
+
+### The rest of Cursor and VS Code
+
+Pending: these 17 marks need the apps' windows driven, on throwaway profiles. Cursor `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
 
 ## Found beside the marks
 
@@ -194,6 +216,8 @@ Pending: these 27 marks need the apps' windows driven, on throwaway profiles. Cu
 - **Claude Desktop starts no MCP server before someone signs in**, but reads `claude_desktop_config.json` at start: an entry it cannot use is named in a dialog, "Some MCP servers couldn't be loaded", which is what `claude-desktop.mjs` reads.
 - **VS Code reads `.mcp.json` with `chat.mcp.workspaceRootConfig.enabled` off.** The setting decides only whether VS Code adds a server to `.mcp.json` or to `.vscode\mcp.json`, so `dot-mcp` needs no `when`. This answers the research's open question on that gate.
 - **VS Code reads `chat.mcp.collisionBehavior` for the window**, as it reads `chat.mcp.discovery.enabled` [binary]: in a workspace file, a member folder's value is ignored, while config-digger reads it first. Not tested; [#323](https://github.com/samfaina/config-digger/issues/323) covers both.
+- **Cursor resolves a Project's plugin keys only when signed in**: without an account, `.cursor\settings.json`'s `plugins` load nothing and leave nothing in the logs. Cursor's own sign-in opens `cursor.com/loginDeepControl` in the default browser at first start, and it completes on its own when that browser is already signed in to cursor.com.
+- **Cursor updated itself from 3.22.12 to 3.27.12 during the session**, a minute after a launch on the account profile was stopped, though each launch set `update.mode` to `none`. What started the update was not found.
 
 ## What is left
 
@@ -205,7 +229,6 @@ Marks are named by their table, as `cargo xtask unverified` prints them; line nu
 | A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]` | Under the exception |
 | A deployment of Claude Desktop for a third-party provider | Claude Desktop `items.mcp.rules[1]` | Under the exception |
 | The same, and a GitHub account | VS Code's stores, policy and skills (10) | [#316](https://github.com/samfaina/config-digger/issues/316) |
-| Cursor's windows, on a throwaway profile | Cursor's MCP files and plugins (10) | [#312](https://github.com/samfaina/config-digger/issues/312) |
 | The same, and maybe an account for its gates | Cursor's Disabled store, skills and gates (7) | [#317](https://github.com/samfaina/config-digger/issues/317) |
 | The app signed in, after [#305](https://github.com/samfaina/config-digger/issues/305) | Claude Desktop `locations[mirrored-skills]` | [#313](https://github.com/samfaina/config-digger/issues/313) |
 | Orca | Codex `mirrored_homes[orca]` | [#314](https://github.com/samfaina/config-digger/issues/314) |

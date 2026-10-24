@@ -1674,10 +1674,48 @@ fn a_plugin_s_manifests_are_tried_in_cursor_s_order() {
 }
 
 #[test]
+fn a_key_naming_no_marketplace_is_read_in_cursor_public_s_cache_only() {
+    let tracker = |fs, marketplace, command: &str| {
+        with_cached(
+            fs,
+            marketplace,
+            "tracker",
+            &[(
+                ".mcp.json",
+                json!({ "mcpServers": { "issues": { "command": command } } }),
+            )],
+        )
+    };
+    // `aaa` comes before `cursor-public` by name; `acme` alone holds `kit`.
+    let fs = tracker(cursor(), "aaa", "aaa-mcp");
+    let fs = tracker(fs, "cursor-public", "tracker-mcp");
+    let fs = with_cached(
+        fs,
+        "acme",
+        "kit",
+        &[(
+            ".mcp.json",
+            json!({ "mcpServers": { "lint": { "command": "kit-lint" } } }),
+        )],
+    );
+    let fs = with_project_plugins(
+        fs,
+        json!({ "tracker": { "enabled": true }, "kit": { "enabled": true } }),
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let entries = &item(&inventory, "plugin-tracker-issues").entries;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].config["command"], "tracker-mcp");
+    assert!(cursor_items(&inventory).all(|item| item.name != "plugin-kit-lint"));
+}
+
+#[test]
 fn a_project_plugin_is_named_by_its_key_and_a_dot_folder_is_no_local_plugin() {
     let fs = with_cached(
         cursor(),
-        "acme",
+        "cursor-public",
         "tracker",
         &[
             (r".cursor-plugin\plugin.json", json!({ "name": "Tracker" })),
@@ -1694,7 +1732,6 @@ fn a_project_plugin_is_named_by_its_key_and_a_dot_folder_is_no_local_plugin() {
 
     let inventory = inventory_at(&fs, &project("app"));
 
-    // A key naming no marketplace is found in any marketplace's cache.
     assert_eq!(
         code(item(&inventory, "plugin-tracker-issues").state),
         "effective"
@@ -1761,4 +1798,103 @@ fn a_cursor_plugin_s_servers_secrets_are_masked() {
     assert_eq!(entry.config["auth"]["CLIENT_ID"], "posthog-client");
     let cursor: Vec<&Item> = cursor_items(&inventory).collect();
     assert!(!json_of(&cursor).to_string().contains(SECRET));
+}
+
+/// What Cursor does about the Read failure of `path`, as its definition says.
+fn reaction(inventory: &Inventory, path: &Path) -> String {
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.agent == "cursor" && failure.path == path)
+        .unwrap_or_else(|| panic!("{} is no Read failure", path.display()));
+    code(failure.reaction)
+}
+
+#[test]
+fn cursor_skips_an_mcp_file_or_a_manifest_it_cannot_parse_but_reads_a_plugin_s_mcp_json_around_the_error()
+ {
+    let broken = r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
+    let kit = local_plugin("kit");
+    let kit_mcp = local_plugin("kit-mcp");
+    let files = [
+        user_mcp(),
+        project(r"app\.cursor\mcp.json"),
+        kit.join(r".cursor-plugin\plugin.json"),
+        kit_mcp.join("mcp.json"),
+        plugin_cache(r"market\context7\1.0.0\.claude-plugin\plugin.json"),
+        plugin_cache(r"market\docs\1.0.0\.mcp.json"),
+    ];
+    let fs = with_installed(
+        context7(cursor()),
+        json!({
+            "context7@market": user_install("context7"),
+            "docs@market": user_install("docs"),
+        }),
+        json!({ "context7@market": true, "docs@market": true }),
+    );
+    let fs = files.iter().fold(fs, |fs, file| fs.with_file(file, broken));
+    let fs = with_files(
+        fs,
+        &kit,
+        &[(
+            ".mcp.json",
+            json!({ "mcpServers": { "lint": { "command": "kit-lint" } } }),
+        )],
+    );
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    for file in &files[..3] {
+        assert_eq!(
+            reaction(&inventory, file),
+            "ignores_file",
+            "{}",
+            file.display()
+        );
+    }
+    assert_eq!(reaction(&inventory, &files[4]), "ignores_file");
+    // Cursor starts the servers around the error, which config-digger
+    // cannot read (#322).
+    assert_eq!(reaction(&inventory, &files[3]), "unknown");
+    assert_eq!(reaction(&inventory, &files[5]), "unknown");
+    // A plugin whose manifest does not parse still has its `.mcp.json` read.
+    assert_eq!(code(item(&inventory, "plugin-kit-lint").state), "effective");
+    assert_eq!(
+        code(item(&inventory, "plugin-context7-context7").state),
+        "effective"
+    );
+}
+
+#[test]
+fn of_a_server_a_claude_code_plugin_s_manifest_and_mcp_json_both_declare_the_manifest_s_wins() {
+    let fs = with_plugin_files(
+        plugins_installed(),
+        "context7",
+        &[(
+            r".claude-plugin\plugin.json",
+            json!({ "name": "context7", "mcpServers": {
+                "context7": { "command": "context7-manifest" },
+                "docs": { "command": "docs-mcp" },
+            } }),
+        )],
+    );
+
+    let inventory = inventory(&fs);
+
+    let states: Vec<(String, String)> = item(&inventory, "plugin-context7-context7")
+        .entries
+        .iter()
+        .map(|entry| (entry.config["command"].to_string(), code(entry.state)))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            ("\"context7-manifest\"".to_owned(), "effective".to_owned()),
+            ("\"npx\"".to_owned(), "shadowed".to_owned()),
+        ]
+    );
+    assert_eq!(
+        code(item(&inventory, "plugin-context7-docs").state),
+        "effective"
+    );
 }

@@ -3476,6 +3476,28 @@ checks = {CHECKS}
     }
 
     #[test]
+    fn a_project_s_plugins_marketplace_is_one_folder_name() {
+        let keys = |marketplace: &str| {
+            with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "project-plugin-keys", anchor = {IN_PROJECT}, root = ["plugins"], scope = "project", cache = {{ block = "machine", path = "~/.agent/cache" }}, marker = ".complete", marketplace = "{marketplace}" }}"#
+                ),
+            )
+        };
+        let text = keys("public");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for marketplace in ["", "..", "a/b"] {
+            let text = keys(marketplace);
+            assert!(
+                error(&text).contains("marketplace is one folder name"),
+                "{marketplace}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
     fn a_plugin_anchor_names_declared_plugins() {
         let text = with_plugins("").replace(
             r#"plugins = "installed", path"#,

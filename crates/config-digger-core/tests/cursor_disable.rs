@@ -187,8 +187,17 @@ fn locator(path: &Path, key_path: &str) -> String {
 }
 
 #[test]
-fn a_read_failure_of_cursor_s_mcp_json_warns_it_may_drop_servers_and_their_sign_in() {
-    for (path, context) in [(user_mcp(), context(None)), (app_mcp(), in_app())] {
+fn a_read_failure_of_cursor_s_mcp_json_warns_it_may_drop_servers_and_a_project_s_their_sign_in() {
+    // Cursor forgets the sign-in of the user's servers only when the file
+    // stops parsing while it runs, never when it starts on such a file.
+    for (path, context, risks) in [
+        (user_mcp(), context(None), &["agent_may_drop_entries"][..]),
+        (
+            app_mcp(),
+            in_app(),
+            &["agent_may_drop_entries", "agent_may_clear_auth"][..],
+        ),
+    ] {
         let fs = cursor().with_file(&path, "{ \"mcpServers\": { ");
 
         let inventory = inventory(&core(&fs), &context);
@@ -203,7 +212,7 @@ fn a_read_failure_of_cursor_s_mcp_json_warns_it_may_drop_servers_and_their_sign_
             .iter()
             .map(|warning| code(warning.code))
             .collect();
-        assert_eq!(codes, ["agent_may_drop_entries", "agent_may_clear_auth"]);
+        assert_eq!(codes, risks, "{}", path.display());
         assert!(
             failure.warnings[0]
                 .sentence
