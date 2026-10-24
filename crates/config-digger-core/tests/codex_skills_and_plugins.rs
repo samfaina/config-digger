@@ -328,6 +328,256 @@ fn of_two_plugins_with_a_same_named_server_the_first_by_id_wins() {
     assert_eq!(entry_json(&docs.entries[0])["plugin"]["id"], "docs@alpha");
 }
 
+/// The manifest of the plugin whose folder is `plugin`.
+fn manifest_of(plugin: &Path) -> PathBuf {
+    plugin.join(r".codex-plugin\plugin.json")
+}
+
+#[test]
+fn a_manifest_value_codex_cannot_read_leaves_the_defaults_in_place() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(
+            manifest_of(&linear),
+            json!({ "name": "linear", "mcpServers": ["./config/mcp.json"], "skills": ["./more", 3] })
+                .to_string(),
+        )
+        .with_file(
+            linear.join(r"config\mcp.json"),
+            mcp_json("ignored", "https://ignored.example/mcp"),
+        )
+        .with_file(skill(&linear.join("more"), "plan"), skill_md("plan"))
+        .with_file(
+            linear.join(".mcp.json"),
+            mcp_json("linear", "https://linear.example/mcp"),
+        )
+        .with_file(skill(&linear.join("skills"), "triage"), skill_md("triage"));
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(states(item(&inventory, "linear")), ["effective"]);
+    assert_eq!(states(item(&inventory, "linear:triage")), ["effective"]);
+    assert!(
+        codex_items(&inventory).all(|item| item.name != "ignored" && item.name != "linear:plan")
+    );
+}
+
+#[test]
+fn a_plugin_s_mcp_file_may_hold_its_servers_at_its_top_level() {
+    let alpha = plugin("alpha", "docs", "1.0.0");
+    let zeta = plugin("zeta", "wiki", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["docs@alpha", "wiki@zeta"]))
+        .with_file(
+            manifest_of(&alpha),
+            json!({ "name": "docs", "mcpServers": "./servers.json" }).to_string(),
+        )
+        .with_file(
+            alpha.join("servers.json"),
+            json!({ "docs": { "url": "https://docs.example/mcp" } }).to_string(),
+        )
+        .with_file(
+            zeta.join(".mcp.json"),
+            json!({ "wiki": { "url": "https://wiki.example/mcp" } }).to_string(),
+        );
+
+    let inventory = inventory(&fs);
+
+    let docs = entry_json(&item(&inventory, "docs").entries[0]);
+    assert_eq!(docs["key_path"], json!(["docs"]));
+    assert_eq!(docs["state"], "effective");
+    let wiki = entry_json(&item(&inventory, "wiki").entries[0]);
+    assert_eq!(wiki["path"], zeta.join(".mcp.json").display().to_string());
+    assert_eq!(wiki["state"], "effective");
+}
+
+#[test]
+fn a_skills_path_that_names_one_skill_folder_reads_that_skill() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(
+            manifest_of(&linear),
+            json!({ "name": "linear", "skills": "./triage" }).to_string(),
+        )
+        .with_file(linear.join(r"triage\SKILL.md"), skill_md("triage"));
+
+    let inventory = inventory(&fs);
+
+    let triage = item(&inventory, "linear:triage");
+    assert_eq!(states(triage), ["effective"]);
+    assert_eq!(
+        entry_json(&triage.entries[0])["path"],
+        linear.join("triage").display().to_string()
+    );
+}
+
+#[test]
+fn the_servers_a_manifest_declares_inline_replace_those_of_mcp_json() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(
+            manifest_of(&linear),
+            json!({ "name": "linear", "mcpServers": { "linear": { "url": "https://linear.example/mcp" } } })
+                .to_string(),
+        )
+        .with_file(
+            linear.join(".mcp.json"),
+            mcp_json("stale", "https://stale.example/mcp"),
+        );
+
+    let inventory = inventory(&fs);
+
+    let item = item(&inventory, "linear");
+    assert_eq!(states(item), ["effective"]);
+    let entry = entry_json(&item.entries[0]);
+    assert_eq!(entry["path"], manifest_of(&linear).display().to_string());
+    assert_eq!(entry["key_path"], json!(["mcpServers", "linear"]));
+    assert_eq!(entry["scope"], "plugin");
+    assert_eq!(entry["provenance"], "plugin");
+    assert_eq!(entry["plugin"]["id"], "linear@openai-curated");
+    assert!(codex_items(&inventory).all(|item| item.name != "stale"));
+}
+
+#[test]
+fn the_skills_folders_a_manifest_names_replace_the_skills_folder() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(
+            manifest_of(&linear),
+            json!({ "name": "linear", "skills": ["./agent/skills", "./more"] }).to_string(),
+        )
+        .with_file(
+            skill(&linear.join(r"agent\skills"), "triage"),
+            skill_md("triage"),
+        )
+        .with_file(skill(&linear.join("more"), "plan"), skill_md("plan"))
+        .with_file(skill(&linear.join("skills"), "stale"), skill_md("stale"));
+
+    let inventory = inventory(&fs);
+
+    for (name, folder) in [
+        ("linear:triage", r"agent\skills\triage"),
+        ("linear:plan", r"more\plan"),
+    ] {
+        let item = item(&inventory, name);
+        assert_eq!(states(item), ["effective"], "{name}");
+        let entry = entry_json(&item.entries[0]);
+        assert_eq!(entry["path"], linear.join(folder).display().to_string());
+        assert_eq!(entry["scope"], "plugin");
+        assert_eq!(entry["provenance"], "plugin");
+        assert_eq!(entry["plugin"]["id"], "linear@openai-curated");
+    }
+    assert!(codex_items(&inventory).all(|item| item.name != "linear:stale"));
+}
+
+#[test]
+fn a_plugin_s_switch_turns_off_what_its_manifest_declares() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(
+            user_config(),
+            "[plugins.\"linear@openai-curated\"]\nenabled = false\n",
+        )
+        .with_file(
+            manifest_of(&linear),
+            json!({
+                "name": "linear",
+                "mcpServers": { "linear": { "url": "https://linear.example/mcp" } },
+                "skills": "./agent-skills",
+            })
+            .to_string(),
+        )
+        .with_file(
+            skill(&linear.join("agent-skills"), "triage"),
+            skill_md("triage"),
+        );
+
+    let inventory = inventory(&fs);
+
+    for name in ["linear", "linear:triage"] {
+        let item = item(&inventory, name);
+        assert_eq!(states(item), ["disabled"], "{name}");
+        let reason = item.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "plugin_disabled", "{name}");
+        let switch = reason.switch.as_deref().unwrap();
+        assert!(
+            switch.starts_with(&user_config().display().to_string())
+                && switch.contains("linear@openai-curated"),
+            "{switch}"
+        );
+    }
+}
+
+#[test]
+fn a_manifest_path_that_does_not_start_with_dot_slash_is_ignored() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(
+            manifest_of(&linear),
+            json!({ "name": "linear", "mcpServers": "config/mcp.json", "skills": ["more", "./a/../more"] })
+                .to_string(),
+        )
+        .with_file(
+            linear.join(r"config\mcp.json"),
+            mcp_json("ignored", "https://ignored.example/mcp"),
+        )
+        .with_file(skill(&linear.join("more"), "plan"), skill_md("plan"))
+        .with_file(
+            linear.join(".mcp.json"),
+            mcp_json("linear", "https://linear.example/mcp"),
+        )
+        .with_file(skill(&linear.join("skills"), "triage"), skill_md("triage"));
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(states(item(&inventory, "linear")), ["effective"]);
+    assert_eq!(states(item(&inventory, "linear:triage")), ["effective"]);
+    assert!(
+        codex_items(&inventory).all(|item| item.name != "ignored" && item.name != "linear:plan")
+    );
+}
+
+#[test]
+fn servers_a_manifest_declares_by_path_compete_like_those_of_mcp_json() {
+    let alpha = plugin("alpha", "docs", "1.0.0");
+    let zeta = plugin("zeta", "docs", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["docs@zeta", "docs@alpha"]))
+        .with_file(
+            manifest_of(&alpha),
+            json!({ "name": "docs", "mcpServers": "./config/mcp.json" }).to_string(),
+        )
+        .with_file(
+            alpha.join(r"config\mcp.json"),
+            mcp_json("docs", "https://alpha.example/mcp"),
+        )
+        .with_file(
+            alpha.join(".mcp.json"),
+            mcp_json("stale", "https://stale.example/mcp"),
+        )
+        .with_file(
+            zeta.join(".mcp.json"),
+            mcp_json("docs", "https://zeta.example/mcp"),
+        );
+
+    let inventory = inventory(&fs);
+
+    let docs = item(&inventory, "docs");
+    assert_eq!(states(docs), ["effective", "shadowed"]);
+    let entry = entry_json(&docs.entries[0]);
+    assert_eq!(entry["plugin"]["id"], "docs@alpha");
+    assert_eq!(
+        entry["path"],
+        alpha.join(r"config\mcp.json").display().to_string()
+    );
+    assert!(codex_items(&inventory).all(|item| item.name != "stale"));
+}
+
 #[test]
 fn a_remote_plugin_is_account_managed_and_read_only() {
     let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
@@ -356,6 +606,43 @@ fn a_remote_plugin_is_account_managed_and_read_only() {
         let entry = entry_json(&item.entries[0]);
         assert_eq!(entry["provenance"], "account_managed", "{name}");
         assert_eq!(entry["plugin"]["id"], "work-pets@openai-curated-remote");
+        assert_eq!(entry["disable"]["code"], "read_only", "{name}");
+        assert_eq!(entry["remove"]["code"], "read_only", "{name}");
+    }
+}
+
+#[test]
+fn what_a_remote_plugin_s_manifest_declares_is_account_managed_and_read_only() {
+    let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), "")
+        .with_file(
+            pets.parent()
+                .unwrap()
+                .join(".codex-remote-plugin-install.json"),
+            r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
+        )
+        .with_file(
+            manifest_of(&pets),
+            json!({
+                "name": "work-pets",
+                "mcpServers": { "pets": { "url": "https://pets.example/mcp" } },
+                "skills": "./pet-skills",
+            })
+            .to_string(),
+        )
+        .with_file(
+            skill(&pets.join("pet-skills"), "create-pet"),
+            skill_md("create-pet"),
+        );
+
+    let inventory = inventory(&fs);
+
+    for name in ["pets", "work-pets:create-pet"] {
+        let item = item(&inventory, name);
+        assert_eq!(states(item), ["effective"], "{name}");
+        let entry = entry_json(&item.entries[0]);
+        assert_eq!(entry["provenance"], "account_managed", "{name}");
         assert_eq!(entry["disable"]["code"], "read_only", "{name}");
         assert_eq!(entry["remove"]["code"], "read_only", "{name}");
     }
@@ -495,6 +782,145 @@ fn requirements_toml_allowlists_block_every_other_server_with_policy() {
             reason.sentence
         );
     }
+}
+
+#[test]
+fn requirements_that_match_args_or_urls_block_the_servers_that_fail_them() {
+    let args = r#"{ executable = "docs-mcp", args = [{ match = "exact", value = "--stdio" }, { match = "regex", expression = "n[0-9]+" }] }"#;
+    let requirements_toml = [
+        ("docs", format!("command = {args}")),
+        ("docs-partial", format!("command = {args}")),
+        ("docs-short", format!("command = {args}")),
+        ("docs-prefix", format!("command = {args}")),
+        (
+            "wiki",
+            r#"url = { match = "prefix", value = "https://wiki.example/" }"#.to_owned(),
+        ),
+        (
+            "wiki-other",
+            r#"url = { match = "prefix", value = "https://wiki.example/" }"#.to_owned(),
+        ),
+        (
+            "wiki-key",
+            r#"url = { match = "prefix", value = "https://wiki.example/" }"#.to_owned(),
+        ),
+        (
+            "wiki-other-key",
+            r#"url = { match = "prefix", value = "https://wiki.example/" }"#.to_owned(),
+        ),
+        (
+            "search",
+            r#"url = { match = "regex", expression = 'https://search\.example/v[0-9]+' }"#
+                .to_owned(),
+        ),
+        (
+            "search-longer",
+            r#"url = { match = "regex", expression = 'https://search\.example/v[0-9]+' }"#
+                .to_owned(),
+        ),
+        (
+            "exact",
+            r#"url = { match = "exact", value = "https://exact.example/mcp" }"#.to_owned(),
+        ),
+        (
+            "exact-other",
+            r#"url = { match = "exact", value = "https://exact.example/mcp" }"#.to_owned(),
+        ),
+    ]
+    .iter()
+    .map(|(name, identity)| format!("[mcp_servers.{name}]\nidentity = {{ {identity} }}\n\n"))
+    .collect::<String>();
+    let servers = [
+        (
+            "docs",
+            r#"command = "docs-mcp"
+args = ["--stdio", "n42"]"#,
+        ),
+        (
+            "docs-partial",
+            r#"command = "docs-mcp"
+args = ["--stdio", "xn42"]"#,
+        ),
+        (
+            "docs-short",
+            r#"command = "docs-mcp"
+args = ["--stdio"]"#,
+        ),
+        (
+            "docs-prefix",
+            r#"command = "docs-mcp-other"
+args = ["--stdio", "n42"]"#,
+        ),
+        ("wiki", r#"url = "https://wiki.example/mcp""#),
+        (
+            "wiki-other",
+            r#"url = "https://other.example/wiki.example/""#,
+        ),
+        // Their query values are Secrets, shown masked.
+        (
+            "wiki-key",
+            r#"url = "https://wiki.example/mcp?key=not-a-real-secret""#,
+        ),
+        (
+            "wiki-other-key",
+            r#"url = "https://other.example/mcp?key=not-a-real-secret""#,
+        ),
+        ("search", r#"url = "https://search.example/v2""#),
+        (
+            "search-longer",
+            r#"url = "https://search.example/v2/extra""#,
+        ),
+        ("exact", r#"url = "https://exact.example/mcp""#),
+        ("exact-other", r#"url = "https://exact.example/mcp/""#),
+    ]
+    .iter()
+    .map(|(name, server)| format!("[mcp_servers.{name}]\n{server}\n\n"))
+    .collect::<String>();
+    let fs = FakeFileSystem::new()
+        .with_file(requirements(), requirements_toml)
+        .with_file(user_config(), servers);
+
+    let inventory = inventory(&fs);
+
+    for name in ["docs", "wiki", "wiki-key", "search", "exact"] {
+        assert_eq!(states(item(&inventory, name)), ["effective"], "{name}");
+    }
+    for name in [
+        "docs-partial",
+        "docs-short",
+        "docs-prefix",
+        "wiki-other",
+        "wiki-other-key",
+        "search-longer",
+        "exact-other",
+    ] {
+        let item = item(&inventory, name);
+        assert_eq!(states(item), ["blocked"], "{name}");
+        assert_eq!(
+            code(item.entries[0].reason.as_ref().unwrap().code),
+            "policy",
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_masked_arg_is_taken_to_meet_a_regex_it_cannot_be_shown_against() {
+    let fs = FakeFileSystem::new()
+        .with_file(
+            requirements(),
+            "[mcp_servers.docs.identity.command]\nexecutable = \"docs-mcp\"\nargs = [{ match = \"exact\", value = \"--token\" }, { match = \"regex\", expression = \"sk-[a-z]+\" }]\n",
+        )
+        .with_file(
+            user_config(),
+            "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--token\", \"sk-secret\"]\n",
+        );
+
+    let inventory = inventory(&fs);
+
+    let docs = item(&inventory, "docs");
+    assert_eq!(docs.entries[0].config["args"][1], "sk-••••");
+    assert_eq!(states(docs), ["effective"]);
 }
 
 #[test]

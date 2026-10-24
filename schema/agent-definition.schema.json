@@ -2214,6 +2214,11 @@
                 }
               ]
             },
+            "dot_slash": {
+              "description": "Whether a declared path counts only when it starts with `./`, as\nCodex requires of its plugins' manifests: one that does not is\nignored, and a field holding no path that counts, or a list with\nan item that is no path, declares none.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "manifest-skills"
@@ -2896,6 +2901,23 @@
               "type": "null"
             }
           ]
+        },
+        "default": {
+          "description": "A `/`-separated path relative to the plugin's folder of the file\nread in place of the value at the location's root when the\nlocation's file declares none there, or there is no such file, as a\nCodex plugin's `.mcp.json` is read unless its manifest declares\n`mcpServers`. While the location's file cannot be parsed, neither\nis read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dot_slash": {
+          "description": "Whether the value at the location's root counts only when it is an\nobject of Entries or a path starting with `./`, as Codex requires\nof its plugins' manifests: any other value, a list included, is\nignored, as if not declared.",
+          "type": "boolean",
+          "default": false
+        },
+        "bare": {
+          "description": "Whether a file pointed to without `root` holds its Entries at its\ntop level instead, as Codex reads a plugin's `.mcp.json` that is a\nbare object of servers.",
+          "type": "boolean",
+          "default": false
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"
@@ -4342,7 +4364,7 @@
           ]
         },
         {
-          "description": "Tables of the servers an organisation allows, each keyed by a server's\nname and holding what that server must be, such as the `mcp_servers` of\nCodex's `requirements.toml`: `identity = { command = \"…\" }` or\n`identity = { url = \"…\" }`. The tables of every source merge name by\nname, a higher source's winning. Once any source holds a table, a server\nwhose name it lacks, or whose command or URL is not the one its name\nrequires, is kept out. A requirement held some other way, such as a\ntable matching a command's args, is not read: its server is taken to\nmeet it.",
+          "description": "Tables of the servers an organisation allows, each keyed by a server's\nname and holding what that server must be, such as the `mcp_servers` of\nCodex's `requirements.toml`: `identity = { command = \"…\" }` or\n`identity = { url = \"…\" }`, or with matchers, `identity = { command =\n{ executable = \"…\", args = [<matcher>, …] } }`, as many args each\nmatching its matcher, or `identity = { url = <matcher> }`. The tables of\nevery source merge name by name, a higher source's winning. Once any\nsource holds a table, a server whose name it lacks, or that does not\nmeet what its name requires, is kept out. A requirement held some other\nway is not read: its server is taken to meet it.",
           "type": "object",
           "properties": {
             "sources": {

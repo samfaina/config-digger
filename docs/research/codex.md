@@ -175,6 +175,7 @@ No Shadowing. Roots are deduped by path ([S-skill-roots] L271–L274), skills by
 
 - **Installed plugins** live in `%CODEX_HOME%\plugins\cache\<marketplace>\<plugin>\<version>\`. The highest valid version folder is the active one ([S-installed] L10–L12, L47–L60; [S-store] L25, L108–L116). Per-plugin data goes to `%CODEX_HOME%\plugins\data\` ([S-store] L25–L26).
 - **Manifest**: `<version>\.codex-plugin\plugin.json` (`name`, `version`, `skills`, `mcpServers`, `apps`, `hooks`, `interface`). Codex also recognises `.claude-plugin\plugin.json`, `.cursor-plugin\plugin.json` and a bare `plugin.json` ("agent plugins") ([S-manifest-paths] L48–L53; [S-plugin-ns] L12).
+- **Manifest paths** (`skills`, a path or a list, and `mcpServers` as a path) must start with `./`, must not be `./` alone, and must not hold `..` or a root. Codex ignores any other with a warning, and reads the default `skills` folder or `.mcp.json` when none is left ([S-plugin-manifest] `resolve_manifest_path`; [S-plugin-loader] L1079–L1130). A plugin with no manifest, or one that does not parse, is not loaded at all ([S-plugin-loader] L892–L895).
 - **Plugin MCP servers** come from the manifest's `mcpServers` (inline object or path), else `<root>\.mcp.json`. Their transport is owned by the plugin. Host config may only add policy under `[plugins."<id>".mcp_servers.<name>]` (`enabled`, approval mode, tool lists) ([S-plugin-loader] L69, L1109–L1130, L1513–L1580; [S-types] L1002–L1030). The catalog attributes each such server to its plugin id and root ([S-config] L1772–L1799), which is how config-digger can attribute an Entry: a server that lives in a plugin's `.mcp.json` under `plugins\cache\<marketplace>\<plugin>\` has plugin Provenance.
 - **Enablement record**: `[plugins."<plugin>@<marketplace>"] enabled = true|false` in config ([S-cfgtoml] L494; [S-plugin-loader] L731–L744, L859).
 - **Remote-installed plugins** (account catalog, marketplace `openai-curated-remote`) are not listed in `config.toml`. Each has `<plugin>\.codex-remote-plugin-install.json` (`{schema_version, remote_plugin_id}`) next to its version folders. Codex takes their `enabled` from the server-side install list and keeps only the local `mcp_servers` policy ([S-plugin-loader] L233–L372). On this machine `plugin-management 0.1.0` and `work-pets 0.1.6` are installed this way, with no `[plugins]` table in `config.toml` [disk]. Their Provenance is cloud.
@@ -317,6 +318,7 @@ Source (`openai/codex` @ `rust-v0.159.3`, paths under `codex-rs/`):
 - [S-skills-watcher](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/app-server/src/skills_watcher.rs): `app-server/src/skills_watcher.rs`
 - [S-plugin-loader](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/loader.rs): `core-plugins/src/loader.rs`
 - [S-plugin-mgr](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/manager.rs): `core-plugins/src/manager.rs`
+- [S-plugin-manifest](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/manifest.rs): `core-plugins/src/manifest.rs`
 - [S-store](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/store.rs): `core-plugins/src/store.rs`
 - [S-manifest-paths](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/exec-server-protocol/src/protocol.rs): `exec-server-protocol/src/protocol.rs`
 - [S-marketplace](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/marketplace.rs): `core-plugins/src/marketplace.rs`
@@ -381,6 +383,7 @@ On-disk evidence (read-only): `%USERPROFILE%\.codex\` (`config.toml`, `skills\`,
 [S-skills-watcher]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/app-server/src/skills_watcher.rs
 [S-plugin-loader]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/loader.rs
 [S-plugin-mgr]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/manager.rs
+[S-plugin-manifest]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/manifest.rs
 [S-store]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/store.rs
 [S-manifest-paths]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/exec-server-protocol/src/protocol.rs
 [S-marketplace]: https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core-plugins/src/marketplace.rs

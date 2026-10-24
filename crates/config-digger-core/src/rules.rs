@@ -287,18 +287,11 @@ fn unmet_requirement(
     let requirement = lists
         .iter()
         .find_map(|(_, value)| block.table(value.value.as_ref()?, plugin)?.get(&entry.name));
-    let shown_command = |command: &str| {
-        masked_command(location, &[command])
-            .into_iter()
-            .next()
-            .unwrap_or_default()
-    };
     let met = requirement.is_some_and(|requirement| {
         block.meets(
             requirement,
-            config.get("command").and_then(Value::as_str),
-            config.get("url").and_then(Value::as_str),
-            &shown_command,
+            &identity(entry, config),
+            &|command| masked_command(location, command),
             &|url| masked_url(location, url),
         )
     });
