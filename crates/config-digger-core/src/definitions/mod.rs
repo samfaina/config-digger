@@ -65,6 +65,14 @@ pub fn unverified_marks() -> Result<Vec<marks::Mark>, String> {
     Ok(found)
 }
 
+/// The `unverified` marks of the Agent definition `text` of `file`, in the
+/// order they appear, once it loads.
+pub fn agent_marks(file: &str, text: &str) -> Result<Vec<marks::Mark>, String> {
+    parse_marked(file, text)
+        .map(|(_, marks)| marks)
+        .map_err(|e| e.to_string())
+}
+
 /// Checks the definition files in `folder`, laid out as the built-in ones
 /// are in the source tree: each `*.toml` file an Agent definition, and each
 /// one in its `skill-managers` folder a skill manager definition, as CI

@@ -51,4 +51,4 @@ Desktop apps (Claude Desktop, Cursor, VS Code):
 Accounts:
 
 - The owner signs in on a throwaway home, outside their own home folder: `CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth login --claudeai`. `!` in a Claude Code prompt runs bash, so `$env:…` there signs in the owner's own home.
-- A mark whose test needs an account or a deployment the project does not have (a Codex enterprise account, Claude Teams or Enterprise, a Claude Desktop deployment for a third-party provider) stays. Its reason says what the test needs, and `release-gate.md` lists it under the exception.
+- A mark whose test needs an account or a deployment the project does not have (a Codex enterprise account, Claude Teams or Enterprise, a Claude Desktop deployment for a third-party provider) stays, written `unverified = { sentence = "…", needs = "<what the test needs>" }`, and `release-gate.md` lists it under the exception. `needs` is what lets the release workflow ship with it; any mark without it stops the release.

@@ -248,7 +248,7 @@ sources = [
 # [docs, bundle].
 [[items.mcp.rules]]
 block = "global-switch"
-unverified = "Which default a deployment for a third-party provider takes is not known: on is assumed."
+unverified = { sentence = "Which default a deployment for a third-party provider takes is not known: on is assumed.", needs = "a Claude Desktop deployment for a third-party provider" }
 off = false
 every_source = true
 locations = ["extension-mcp"]

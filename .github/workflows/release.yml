@@ -11,6 +11,11 @@ name: Release
 # when it carries one. No release ships without the updater's signature
 # and manifest, or with a signature the installed app refuses: the run
 # fails before the release is created.
+# No release ships while an `unverified` mark of the built-in definitions
+# is outside the exception, which lets a mark stay untested when its test
+# needs an account or a deployment the project does not have: the run fails
+# before the build, listing them. The release notes list each mark under
+# the exception with what its test needs, above GitHub's generated notes.
 # `vX.Y.Z-rc.N` tags are published as prereleases, never marked latest, so
 # the app's updater, which reads `releases/latest`, never sees them. The tag
 # must be the workspace version, which is the one version of every crate.
@@ -42,6 +47,8 @@ jobs:
         id: release
         shell: bash
         run: cargo xtask release "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+      - name: Every unverified mark is under the exception
+        run: cargo xtask unverified --gate
       - name: The updater signing key is set
         shell: bash
         env:
@@ -107,5 +114,7 @@ jobs:
         run: |
           flags=(--latest)
           if [ "$PRERELEASE" = "true" ]; then flags=(--prerelease --latest=false); fi
+          notes="$RUNNER_TEMP/unverified.md"
+          cargo xtask unverified --notes "$notes"
           gh release create "$GITHUB_REF_NAME" dist/* \
-            --verify-tag --title "config-digger $VERSION" --generate-notes "${flags[@]}"
+            --verify-tag --title "config-digger $VERSION" --notes-file "$notes" --generate-notes "${flags[@]}"

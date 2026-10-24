@@ -175,8 +175,8 @@ on_read_failure = "stops_agent"
 [[locations]]
 id = "cloud-mcp"
 unverified = [
-  "Whether Codex still uses the cached bundle once it has expired is not known.",
-  "What Codex does with a bundle cache it cannot parse is not known.",
+  { sentence = "Whether Codex still uses the cached bundle once it has expired is not known.", needs = "a Codex enterprise account with remote plugins" },
+  { sentence = "What Codex does with a bundle cache it cannot parse is not known.", needs = "a Codex enterprise account with remote plugins" },
 ]
 anchor = { block = "home", root = "cloud_bundle" }
 format = { block = "toml-fragments", lists = [["signed_payload", "bundle", "config_toml", "enterprise_managed"], ["signed_payload", "bundle", "requirements_toml", "enterprise_managed"]], contents = "contents", highest_first = true }
@@ -233,7 +233,7 @@ on_read_failure = "ignores_file"
 # The servers of a plugin the account installed, read only.
 [[locations]]
 id = "remote-plugin-mcp"
-unverified = "What Codex does with a `.mcp.json` it cannot parse, in a plugin the account installed, is not known."
+unverified = { sentence = "What Codex does with a `.mcp.json` it cannot parse, in a plugin the account installed, is not known.", needs = "a Codex enterprise account with remote plugins" }
 anchor = { block = "plugin", plugins = "remote", path = ".mcp.json" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -281,7 +281,7 @@ requires_unset_above = true
 # `config.toml` alone.
 [[items.mcp.disable]]
 block = "json-field"
-unverified = "That Codex honours the switch of a plugin's server, in a plugin the account installed too, comes from its source only."
+unverified = { sentence = "That Codex honours the switch of a plugin's server, in a plugin the account installed too, comes from its source only.", needs = "a Codex enterprise account with remote plugins" }
 switch = { anchor = { block = "home", root = "config" }, key_path = ["plugins", "{plugin_id}", "mcp_servers", "{name}", "enabled"], store_class = "rewritten-while-running", toml = true }
 target = "entry"
 context = "all"

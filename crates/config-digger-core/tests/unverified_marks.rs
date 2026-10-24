@@ -179,6 +179,75 @@ fn a_mark_without_a_sentence_rejects_the_definition() {
 }
 
 #[test]
+fn a_mark_under_the_exception_keeps_what_its_test_needs() {
+    let alpha = ALPHA.replacen(
+        "[items.mcp]",
+        "[items.mcp]\nunverified = [\n  \"The first server of a name wins.\",\n  { sentence = \"Alpha's enterprise servers win.\", needs = \"an Alpha enterprise account\" },\n]",
+        1,
+    );
+
+    let marks = config_digger_core::definitions::agent_marks("alpha.toml", &alpha).unwrap();
+
+    let found: Vec<(&str, &str, Option<&str>)> = marks
+        .iter()
+        .map(|mark| {
+            (
+                mark.location.as_str(),
+                mark.sentence.as_str(),
+                mark.needs.as_deref(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("items.mcp", "The first server of a name wins.", None),
+            (
+                "items.mcp",
+                "Alpha's enterprise servers win.",
+                Some("an Alpha enterprise account")
+            ),
+        ]
+    );
+    let line = alpha.lines().nth(marks[1].line - 1).unwrap();
+    assert!(line.contains("enterprise servers"), "{line}");
+    assert!(
+        marks[1].to_string().ends_with(
+            ": items.mcp: Alpha's enterprise servers win. Its test needs an Alpha enterprise account."
+        ),
+        "{}",
+        marks[1]
+    );
+}
+
+#[test]
+fn a_mark_under_the_exception_without_a_sentence_or_a_need_rejects_the_definition() {
+    let alpha = |mark: &str| ALPHA.replacen("[agent]", &format!("[agent]\nunverified = {mark}"), 1);
+    for (mark, word) in [
+        (r#"{ needs = "an Alpha enterprise account" }"#, "sentence"),
+        (r#"{ sentence = "Alpha has one name." }"#, "needs"),
+        (
+            r#"{ sentence = "Alpha has one name.", needs = " " }"#,
+            "needs",
+        ),
+        (
+            r#"{ sentence = "Alpha has one name.", needs = 1 }"#,
+            "needs",
+        ),
+        (
+            r#"{ sentence = "Alpha has one name.", account = "Alpha" }"#,
+            "account",
+        ),
+    ] {
+        let error = config_digger_core::definitions::agent_marks("alpha.toml", &alpha(mark))
+            .expect_err(mark);
+
+        assert!(error.contains("agent.unverified"), "{mark}: {error}");
+        assert!(error.contains(word), "{mark}: {error}");
+    }
+}
+
+#[test]
 fn a_skill_manager_definition_may_carry_marks() {
     let acme = r#"
 format_version = 1
@@ -232,17 +301,36 @@ fn both_schemas_give_every_table_a_mark_of_sentences() {
     ] {
         let schema: serde_json::Value = serde_json::from_str(&schema).unwrap();
 
-        // A sentence, or a list of at least one; not empty, nor only blanks.
+        // A mark, or a list of at least one. A mark is a sentence, not empty
+        // nor only blanks, or a table of its sentence and what its test
+        // needs.
         let sentence = serde_json::json!({ "type": "string", "pattern": r"\S" });
-        assert_eq!(
-            schema["$defs"]["Unverified"]["anyOf"],
-            serde_json::json!([
+        let mark = serde_json::json!({
+            "anyOf": [
                 sentence,
-                { "type": "array", "items": sentence, "minItems": 1 },
+                {
+                    "type": "object",
+                    "properties": { "sentence": sentence, "needs": sentence },
+                    "required": ["sentence", "needs"],
+                    "additionalProperties": false,
+                },
+            ],
+        });
+        let unverified = &schema["$defs"]["Unverified"];
+        assert_eq!(
+            unverified["anyOf"],
+            serde_json::json!([
+                mark["anyOf"][0],
+                mark["anyOf"][1],
+                { "type": "array", "items": mark, "minItems": 1 },
             ]),
-            "{:#}",
-            schema["$defs"]["Unverified"]
+            "{unverified:#}"
         );
+        let mut schema = schema.clone();
+        schema["$defs"]
+            .as_object_mut()
+            .unwrap()
+            .remove("Unverified");
         let objects = objects(&schema);
         assert!(objects.len() > 3, "{}", objects.len());
         for object in objects {
@@ -286,4 +374,41 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         let line = text.lines().nth(mark.line - 1).unwrap();
         assert!(line.contains(word), "{file}:{}: {line}", mark.line);
     }
+}
+
+#[test]
+fn the_built_in_marks_under_the_exception_say_what_their_test_needs() {
+    let marks = config_digger_core::definitions::unverified_marks().unwrap();
+
+    let under: Vec<(&str, &str, &str)> = marks
+        .iter()
+        .filter_map(|mark| {
+            Some((
+                mark.file.as_str(),
+                mark.location.as_str(),
+                mark.needs.as_deref()?,
+            ))
+        })
+        .collect();
+
+    // #80's exception: a test that needs an account or a deployment the
+    // project does not have.
+    let teams = "Claude Teams or Enterprise";
+    let codex = "a Codex enterprise account with remote plugins";
+    assert_eq!(
+        under,
+        [
+            ("claude-code.toml", "settings[managed]", teams),
+            ("claude-code.toml", "locations[managed-settings-mcp]", teams),
+            (
+                "claude-desktop.toml",
+                "items.mcp.rules[1]",
+                "a Claude Desktop deployment for a third-party provider"
+            ),
+            ("codex.toml", "locations[cloud-mcp]", codex),
+            ("codex.toml", "locations[cloud-mcp]", codex),
+            ("codex.toml", "locations[remote-plugin-mcp]", codex),
+            ("codex.toml", "items.mcp.disable[1]", codex),
+        ]
+    );
 }

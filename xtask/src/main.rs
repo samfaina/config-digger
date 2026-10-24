@@ -7,8 +7,16 @@
 //!   files: each loads, as the schemas' types and their validation read it,
 //!   and the folder holds exactly the files that ship. It writes nothing.
 //! - `unverified`: lists every `unverified` mark of the built-in definitions,
-//!   one line each with its file, line, table and sentence: what the
-//!   release gate still has to test. It writes nothing.
+//!   one line each with its file, line, table and sentence, and what its
+//!   test needs for a mark under the exception: what the release gate
+//!   still has to test. It writes nothing.
+//! - `unverified --gate`: fails, listing them, while a mark of the built-in
+//!   definitions is outside the exception, which lets a mark ship when its
+//!   test needs an account or a deployment the project does not have. It
+//!   writes nothing.
+//! - `unverified --notes <file>`: writes the release notes' section on the
+//!   marks under the exception, each with what its test needs, into
+//!   `<file>`: empty when no mark is under it.
 //! - `installer`: checks that the installer's install folder in `hooks.nsh`
 //!   is a folder of its own: no data folder, nor a folder inside or above
 //!   one. It writes nothing.
@@ -42,6 +50,7 @@
 //! With `--check`, a task writes nothing and fails when a committed file is stale.
 
 mod fixtures;
+mod gate;
 mod installer;
 mod release;
 mod signature;
@@ -90,6 +99,8 @@ fn main() -> ExitCode {
         ["bindings", "--check"] => (BINDINGS, true),
         ["definitions"] => return check_definitions(),
         ["unverified"] => return list_unverified(),
+        ["unverified", "--gate"] => return check_unverified(),
+        ["unverified", "--notes", file] => return write_unverified_notes(Path::new(file)),
         ["installer"] => return check_installer(),
         ["fixtures"] => return check_fixtures(),
         ["fake-backend"] => return record_fake_backend(),
@@ -105,6 +116,7 @@ fn main() -> ExitCode {
         _ => {
             eprintln!(
                 "usage: cargo xtask <schema|bindings> [--check] | cargo xtask <definitions|unverified|installer|fixtures|fake-backend>\n       \
+                 cargo xtask unverified --gate | unverified --notes <file>\n       \
                  cargo xtask release <tag> | checksums <dir> | winget <tag> <installer> <dir>
                         cargo xtask updater <tag> <dir> | signature <tag> <dir> | assets <tag> <dir> | vcruntime <exe>"
             );
@@ -141,20 +153,70 @@ fn check_definitions() -> ExitCode {
 
 /// The `unverified` marks of the built-in definitions, each as
 /// `<file>:<line>: <table>: <sentence>`, the file relative to the
-/// repository root.
+/// repository root, and `Its test needs <needs>.` for a mark under the
+/// exception.
 fn list_unverified() -> ExitCode {
-    let marks = match config_digger_core::definitions::unverified_marks() {
+    let marks = match unverified_marks() {
         Ok(marks) => marks,
-        Err(error) => {
-            eprintln!("{error}");
-            return ExitCode::FAILURE;
-        }
+        Err(code) => return code,
     };
     for mark in &marks {
         println!("{DEFINITIONS}/{mark}");
     }
     println!("{} unverified marks", marks.len());
     ExitCode::SUCCESS
+}
+
+/// The `unverified` marks of the built-in definitions, as the release
+/// checks them before the build.
+fn check_unverified() -> ExitCode {
+    let marks = match unverified_marks() {
+        Ok(marks) => marks,
+        Err(code) => return code,
+    };
+    let refused = gate::refused(&marks);
+    if refused.is_empty() {
+        println!(
+            "every unverified mark is under the exception ({} marks)",
+            marks.len()
+        );
+        return ExitCode::SUCCESS;
+    }
+    for mark in &refused {
+        eprintln!("{DEFINITIONS}/{mark}");
+    }
+    eprintln!(
+        "{} unverified marks are outside the exception: no release ships until they are tested",
+        refused.len()
+    );
+    ExitCode::FAILURE
+}
+
+/// Writes the release notes' section on the marks under the exception.
+fn write_unverified_notes(file: &Path) -> ExitCode {
+    let marks = match unverified_marks() {
+        Ok(marks) => marks,
+        Err(code) => return code,
+    };
+    match std::fs::write(file, gate::notes(&marks)) {
+        Ok(()) => {
+            println!("wrote {}", file.display());
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("cannot write {}: {error}", file.display());
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// The `unverified` marks of the built-in definitions, or the exit code of
+/// a definition that does not load.
+fn unverified_marks() -> Result<Vec<config_digger_core::definitions::marks::Mark>, ExitCode> {
+    config_digger_core::definitions::unverified_marks().map_err(|error| {
+        eprintln!("{error}");
+        ExitCode::FAILURE
+    })
 }
 
 /// The app's Tauri config, relative to the repository root.

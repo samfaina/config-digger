@@ -32,10 +32,15 @@ pub struct Mark {
     pub location: String,
     /// What the fact assumes.
     pub sentence: String,
+    /// For a mark under the release gate's exception, the account or the
+    /// deployment its test needs, which the project does not have: the
+    /// release gate lets such a mark ship, and the release notes list it.
+    pub needs: Option<String>,
 }
 
 /// `<file>:<line>: <table>: <sentence>`, the table `(top)` for the top of
-/// the file.
+/// the file, followed by `Its test needs <needs>.` for a mark under the
+/// exception.
 impl std::fmt::Display for Mark {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let table = if self.location.is_empty() {
@@ -43,7 +48,11 @@ impl std::fmt::Display for Mark {
         } else {
             &self.location
         };
-        write!(f, "{}:{}: {table}: {}", self.file, self.line, self.sentence)
+        write!(f, "{}:{}: {table}: {}", self.file, self.line, self.sentence)?;
+        if let Some(needs) = &self.needs {
+            write!(f, " Its test needs {needs}.")?;
+        }
+        Ok(())
     }
 }
 
@@ -78,29 +87,43 @@ struct Marks<'a> {
 
 impl Marks<'_> {
     /// Takes the marks out of `table`, at key path `location`, and out of
-    /// every table inside it. A table holds one mark, a sentence, or
-    /// several, a list of them.
+    /// every table inside it. A table holds one mark or several, a list of
+    /// them. A mark is a sentence, or, under the exception, a table of its
+    /// `sentence` and what its test `needs`.
     fn take(&mut self, table: &mut DeTable<'_>, location: &str) -> Result<(), String> {
         if let Some((_, value)) = table.remove_entry(KEY) {
             let at = child(location, KEY);
-            let sentences: Vec<&Spanned<DeValue<'_>>> = match value.get_ref() {
-                DeValue::Array(sentences) => sentences.iter().collect(),
+            let items: Vec<&Spanned<DeValue<'_>>> = match value.get_ref() {
+                DeValue::Array(items) => items.iter().collect(),
                 _ => vec![&value],
             };
-            if sentences.is_empty() {
+            if items.is_empty() {
                 return Err(format!("{at}: needs at least one sentence"));
             }
-            for item in sentences {
-                let sentence = item
-                    .get_ref()
-                    .as_str()
-                    .filter(|sentence| !sentence.trim().is_empty())
+            for item in items {
+                let (sentence, needs) = match item.get_ref() {
+                    DeValue::Table(mark) => {
+                        if let Some(key) = mark
+                            .keys()
+                            .find(|key| !["sentence", "needs"].contains(&key.get_ref().as_ref()))
+                        {
+                            return Err(format!("{at}: unknown key `{}`", key.get_ref()));
+                        }
+                        let needs = mark.get("needs").and_then(text).ok_or_else(|| {
+                            format!("{at}: `needs` must name the account or the deployment the test needs")
+                        })?;
+                        (mark.get("sentence").and_then(text), Some(needs))
+                    }
+                    _ => (text(item), None),
+                };
+                let sentence = sentence
                     .ok_or_else(|| format!("{at}: must be a sentence saying what is assumed"))?;
                 self.found.push(Mark {
                     file: self.file.to_owned(),
                     line: self.text[..item.span().start].matches('\n').count() + 1,
                     location: location.to_owned(),
                     sentence: sentence.to_owned(),
+                    needs: needs.map(str::to_owned),
                 });
             }
         }
@@ -136,6 +159,14 @@ impl Marks<'_> {
     }
 }
 
+/// The text of `value`, unless it is not text or is only blanks.
+fn text<'v>(value: &'v Spanned<DeValue<'_>>) -> Option<&'v str> {
+    value
+        .get_ref()
+        .as_str()
+        .filter(|text| !text.trim().is_empty())
+}
+
 /// The key path of `key` in the table at key path `location`.
 fn child(location: &str, key: &str) -> String {
     if location.is_empty() {
@@ -158,13 +189,27 @@ pub(crate) fn json_schema<T: JsonSchema>() -> String {
         .into_generator()
         .into_root_schema_for::<T>();
     let sentence = serde_json::json!({ "type": "string", "pattern": r"\S" });
+    let under_exception = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "sentence": sentence,
+            "needs": sentence,
+        },
+        "required": ["sentence", "needs"],
+        "additionalProperties": false,
+    });
     object_at(&mut schema, "$defs").insert(
         SCHEMA_NAME.into(),
         serde_json::json!({
-            "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. It changes nothing the definition does.",
+            "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. A fact whose test needs an account or a deployment the project does not have is under the release gate's exception: its mark is a table of the `sentence` and what the test `needs`, which the release gate lets ship and the release notes list. It changes nothing the definition does.",
             "anyOf": [
                 sentence,
-                { "type": "array", "items": sentence, "minItems": 1 },
+                under_exception,
+                {
+                    "type": "array",
+                    "items": { "anyOf": [sentence, under_exception] },
+                    "minItems": 1,
+                },
             ],
         }),
     );
