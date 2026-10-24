@@ -77,7 +77,7 @@ CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth logou
 | Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
 | VS Code | 1.129.1, 1.135.0, 1.141.0, `vscode.mjs` | 1.129.1 to 1.141.0 (was 1.129.1) |
-| Cursor | 3.27.12, `cursor.mjs`; 3.22.12 every check but the two `plugins[project]` ones, since Cursor updated itself before the account was signed in | 3.22.12 to 3.27.12 (was 3.22.12) |
+| Cursor | 3.27.12, `cursor.mjs`; 3.22.12 every check but the `plugins[project]` ones, since Cursor updated itself before they ran | 3.27.12 (was 3.22.12) |
 | Claude Desktop | 3.6556.2, `claude-desktop.mjs` only | unchanged, 2.16120: 3.x keeps a package's data elsewhere ([#305](https://github.com/samfaina/config-digger/issues/305)) |
 
 Claude Code 2.1.286 fails 7 checks, all on what 2.1.299 changed: a plain-string `enabledMcpjsonServers` or `disabledMcpjsonServers` voids its settings file, there is no name rule, and the skill listing gives no alias. The definition describes 2.1.299 and later, so the range starts there.
@@ -92,7 +92,7 @@ Outcomes:
 - **Corrected**: the Agent does something else, and the definition now says what. The mark is gone.
 - **Ticket**: the Agent does something else that the definition format or the core cannot express yet. The mark is gone, the definition states the fact with `[test]` and names the ticket.
 - **Pending**: not tested yet. The mark stays, and the reason says what the test needs.
-- **Pending, under the exception**: #80's last criterion lets a mark stay untested when its test needs an account or a deployment the project does not have: a Codex enterprise account, Claude Teams or Enterprise, or a Claude Desktop deployment for a third-party provider. The release notes list such a mark with what its test needs.
+- **Pending, under the exception**: #80's last criterion lets a mark stay untested when its test needs an account or a deployment the project does not have: a Codex enterprise account, Claude Teams or Enterprise, a Claude Desktop deployment for a third-party provider, or a Cursor team account. The release notes list such a mark with what its test needs.
 
 ### Claude Code
 
@@ -184,15 +184,15 @@ The MCP files and plugins, tested with `cursor.mjs` (#312) on 3.22.12 and 3.27.1
 
 | Mark | What the probe saw | Outcome |
 |---|---|---|
-| `:109` `plugins[project]`: which marketplace a key that names none resolves to | Without an account, Cursor resolves no key at all. Signed in, the server resolves `superdesign` to `cursor-public`, and Cursor loads it from `cursor-public`'s cache, not from a marketplace `aaa-cd-throwaway` whose cache holds a complete plugin of the same name | Corrected: a key that names no marketplace is read in `cursor-public`'s cache only (`marketplace` on `project-plugin-keys`, new in the format) |
-| `:110` `plugins[project]`: of several complete commits, which is taken | Cursor downloads the commit its server names and, as it loads the plugin, deletes its other commits, a complete one that comes last by name included | Corrected: once Cursor has run, the cache holds one commit; which of several Cursor would run cannot be told from the disk, and the last by name is read |
+| `:109` `plugins[project]`: which marketplace a key that names none resolves to | Signed out, Cursor loads no plugin a key names, even one complete in the cache. Signed in, the server resolves `superdesign` to `cursor-public`, and Cursor loads it from `cursor-public`'s cache, not from a marketplace `aaa-cd-throwaway` whose cache holds a complete plugin of the same name | Corrected: a key that names no marketplace is read in `cursor-public`'s cache only (`marketplace` on `project-plugin-keys`, new in the format). The same for an account in a team stays, under the exception: it needs a Cursor team account |
+| `:110` `plugins[project]`: of several complete commits, which is taken | Cursor downloads the commit its server names and, as it loads the plugin, deletes its other commits, complete or not, a complete one that comes last by name included | Corrected: once Cursor has run, the cache holds one commit; which of several Cursor would run cannot be told from the disk, and the last by name is read |
 | `:145` `locations[user-mcp]`: whether Cursor forgets the sign-in of the servers it no longer sees | Signed in to a local OAuth server, Cursor keeps the sign-in across restarts, even when the server was missing from `mcp.json`, or the file did not parse, while it started. While it runs, taking the server out of the file, or breaking the file, forgets it: put back, the server needs signing in again | Corrected: the user file's Read failure no longer warns `agent_may_clear_auth`, since starting on such a file costs no sign-in; the Project file's warning rests on the same code, untested |
 | `:146` `locations[user-mcp]`: unparsable `~\.cursor\mcp.json` | Skipped; the other files load; the file is left as it is | Corrected: `ignores_file` |
 | `:170` `locations[project-mcp]`: unparsable `.cursor\mcp.json` | Skipped, its servers approved; the other files load; the file is left as it is | Corrected: `ignores_file` |
-| `:194` `locations[cursor-plugin-manifest-mcp]`: unparsable manifest | Its servers are skipped and the plugin's `.mcp.json` still loads, but Cursor reads the plugin's next manifest instead, `.claude-plugin\plugin.json` after `.cursor-plugin\plugin.json` | Corrected: `ignores_file`; ticket [#338](https://github.com/samfaina/config-digger/issues/338) for the next manifest |
+| `:194` `locations[cursor-plugin-manifest-mcp]`: unparsable manifest | Its servers are skipped and the plugin's `.mcp.json` still loads, but Cursor reads the plugin's next manifest instead, `.claude-plugin\plugin.json` after `.cursor-plugin\plugin.json` | Ticket [#338](https://github.com/samfaina/config-digger/issues/338) for the next manifest; `unknown` stays, as for `:211`, since Cursor runs servers config-digger does not list |
 | `:211` `locations[cursor-plugin-mcp]`: unparsable plugin `mcp.json` | Cursor reads it around the error and starts both servers | Ticket [#322](https://github.com/samfaina/config-digger/issues/322), as for VS Code; `unknown` stays |
 | `:234` `locations[claude-plugin-manifest-mcp]`: whether `.mcp.json` is read only when the manifest declares no servers | Read beside the manifest's servers; of a server both declare, the manifest's starts | Confirmed |
-| `:235` `locations[claude-plugin-manifest-mcp]`: unparsable manifest | As for Cursor's own plugins: skipped, `.mcp.json` still loads, and the next manifest is read | Corrected: `ignores_file`; ticket [#338](https://github.com/samfaina/config-digger/issues/338) |
+| `:235` `locations[claude-plugin-manifest-mcp]`: unparsable manifest | As for Cursor's own plugins: skipped, `.mcp.json` still loads, and the next manifest is read | Ticket [#338](https://github.com/samfaina/config-digger/issues/338); `unknown` stays |
 | `:254` `locations[claude-plugin-mcp]`: unparsable `.mcp.json` | Read around the error; both servers start | Ticket [#322](https://github.com/samfaina/config-digger/issues/322); `unknown` stays |
 
 ### The rest of Cursor and VS Code
@@ -228,6 +228,7 @@ Marks are named by their table, as `cargo xtask unverified` prints them; line nu
 | Server-managed settings: Claude Teams or Enterprise | Claude Code `settings[managed]`, `locations[managed-settings-mcp]` (a `remote-settings.json` that does not parse) | Under the exception |
 | A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]` | Under the exception |
 | A deployment of Claude Desktop for a third-party provider | Claude Desktop `items.mcp.rules[1]` | Under the exception |
+| A Cursor team account | Cursor `plugins[project]` (the marketplace of a key that names none, on an account in a team) | Under the exception |
 | The same, and a GitHub account | VS Code's stores, policy and skills (10) | [#316](https://github.com/samfaina/config-digger/issues/316) |
 | The same, and maybe an account for its gates | Cursor's Disabled store, skills and gates (7) | [#317](https://github.com/samfaina/config-digger/issues/317) |
 | The app signed in, after [#305](https://github.com/samfaina/config-digger/issues/305) | Claude Desktop `locations[mirrored-skills]` | [#313](https://github.com/samfaina/config-digger/issues/313) |

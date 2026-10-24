@@ -187,7 +187,7 @@ fn locator(path: &Path, key_path: &str) -> String {
 }
 
 #[test]
-fn a_read_failure_of_cursor_s_mcp_json_warns_it_may_drop_servers_and_a_project_s_their_sign_in() {
+fn a_read_failure_of_cursor_s_mcp_json_warns_it_may_drop_servers_and_for_a_project_their_sign_in() {
     // Cursor forgets the sign-in of the user's servers only when the file
     // stops parsing while it runs, never when it starts on such a file.
     for (path, context, risks) in [

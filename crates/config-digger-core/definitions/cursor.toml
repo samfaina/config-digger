@@ -2,14 +2,14 @@
 # Cursor, the IDE. Facts from docs/research/cursor.md (verified against
 # 3.22.12), and those tagged [test] from the release gate's probe,
 # uat/agents/cursor.mjs (docs/research/release-gate.md), which passes on
-# 3.27.12, and on 3.22.12 but for its two `plugins[project]` checks, which
-# ran only after Cursor updated itself. The Cursor CLI, `cursor-agent`, is
-# another Agent: its own files in `~\.cursor\projects\<slug>` are not read
-# here.
+# 3.27.12. On 3.22.12 it passes but for its `plugins[project]` checks,
+# which ran only after Cursor updated itself. The Cursor CLI,
+# `cursor-agent`, is another Agent: its own files in
+# `~\.cursor\projects\<slug>` are not read here.
 
 format_version = 1
 
-verified = { min = "3.22.12", max = "3.27.12" }
+verified = { min = "3.27.12", max = "3.27.12" }
 
 [agent]
 id = "cursor"
@@ -103,19 +103,22 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # `~\.cursor\plugins\cache\<marketplace>\<name>\<commit>`, a folder it marks
 # complete with `.cache-complete` once downloaded [code, disk]: a plugin it
 # has not downloaded yet is not listed. Cursor resolves each key with its
-# server, which needs an account [test]. The server resolves a key that
-# names no marketplace to `cursor-public`, Cursor's public Marketplace, and
-# Cursor reads the plugin from that marketplace's cache only, not from
-# another marketplace's holding a plugin of the same name [test], on the
-# owner's account, which is in no team. The server names the commit:
-# Cursor downloads it and, as it loads the plugin, deletes the plugin's
-# other commits, complete or not [test], so once Cursor has run the cache
-# holds one. Which of several Cursor would run cannot be told from the
-# disk, and the last by name is read. The `.cursor\settings.json` of a
-# workspace file's folders is not read. Cursor uninstalls the plugin in its
-# Customize page, which deletes the key [code].
+# server, which needs an account: signed out, it loads no plugin a key
+# names, even one complete in the cache [test], which config-digger still
+# lists. The server resolves a key that names no marketplace to
+# `cursor-public`, Cursor's public Marketplace, and Cursor reads the plugin
+# from that marketplace's cache only, not from another marketplace's
+# holding a plugin of the same name [test], on the owner's account, which
+# is in no team. The server names the commit: Cursor downloads it and, as
+# it loads the plugin, deletes the plugin's other commits, complete or not
+# [test], so once Cursor has run the cache holds one. Which of several
+# Cursor would run cannot be told from the disk, and the last by name is
+# read. The `.cursor\settings.json` of a workspace file's folders is not
+# read. Cursor uninstalls the plugin in its Customize page, which deletes
+# the key [code].
 [[plugins]]
 id = "project"
+unverified = { sentence = "Which marketplace Cursor's server picks for a key that names none on an account in a team is not known: `cursor-public` is taken, as for an account in no team.", needs = "a Cursor team account" }
 registry = { block = "project-plugin-keys", anchor = { block = "project", path = ".cursor/settings.json" }, dialect = "jsonc", root = ["plugins"], scope = "project", cache = { block = "machine", path = "~/.cursor/plugins/cache" }, marker = ".cache-complete", marketplace = "cursor-public" }
 
 # The local plugins, each a folder of `~\.cursor\plugins\local` whose name
@@ -202,11 +205,11 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # identifiers start with `plugin-` and the plugin's name [code, disk].
 #
 # Cursor skips a manifest it cannot parse, and still reads the plugin's
-# `.mcp.json` [test]. It reads the plugin's next manifest instead [test],
-# which config-digger does not (#338). It reads a plugin's `mcp.json` it
-# cannot parse around the error, starting the servers on both sides of it
-# [test], which config-digger cannot (#322): `unknown` stays, so the Items
-# it reaches keep a caveat.
+# `.mcp.json` [test], but it reads the plugin's next manifest instead
+# [test], which config-digger does not (#338). It reads a plugin's
+# `mcp.json` it cannot parse around the error, starting the servers on
+# both sides of it [test], which config-digger cannot (#322). For both,
+# `unknown` stays, so the Items they reach keep a caveat.
 [[locations]]
 id = "cursor-plugin-manifest-mcp"
 unverified = "A manifest `mcpServers` that is not an object is taken to leave the manifest's `skills` read: Cursor rejects an `mcp.json` whole for it [code], but what it does with a manifest is not known."
@@ -221,7 +224,7 @@ provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "ignores_file"
+on_read_failure = "unknown"
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
 [[locations]]
@@ -251,7 +254,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # As for Cursor's own plugins, Cursor skips a manifest it cannot parse,
 # still reading the plugin's `.mcp.json` [test], and reads the next
 # manifest instead [test] (#338). It reads a `.mcp.json` it cannot parse
-# around the error [test] (#322): `unknown` stays.
+# around the error [test] (#322). For both, `unknown` stays.
 [[locations]]
 id = "claude-plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
@@ -265,7 +268,7 @@ provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "ignores_file"
+on_read_failure = "unknown"
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
 

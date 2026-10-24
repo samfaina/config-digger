@@ -16,7 +16,9 @@
 // the profile's `state.vscdb` before the launch. Each server is this
 // machine's Node running `server.mjs <tag>`, which writes a marker named
 // after its tag. Only the `project-plugins` checks run signed in to a
-// Cursor account, on the profile `--sign-in` opens for the owner.
+// Cursor account, on the profile `--sign-in` opens for the owner:
+// `cursor-account` in the probe root, or the folder
+// `CD_PROBE_CURSOR_ACCOUNT` names there, whose name starts the same.
 //
 // The sign-in checks run a local MCP server behind OAuth, with dynamic
 // client registration, which takes any request and grants the token
@@ -71,7 +73,7 @@ if (path.dirname(account) !== root || !path.basename(account).startsWith("cursor
   throw new Error(`CD_PROBE_CURSOR_ACCOUNT must be a folder named cursor-account* in ${root}, not ${account}`);
 }
 // Whether `dir`'s profile is signed in to a Cursor account.
-function signedIn(dir) {
+function accountSignedIn(dir) {
   const file = path.join(folders(dir).user, "globalStorage", "state.vscdb");
   if (!fs.existsSync(file)) return false;
   const db = new DatabaseSync(file, { readOnly: true });
@@ -96,7 +98,7 @@ if (process.argv.includes("--sign-in")) {
   const running = async () => Number(await powershell(`@(Get-CimInstance Win32_Process -Filter "Name='Cursor.exe'" | Where-Object { $_.CommandLine -like '*${d.data}*' }).Count`));
   while (!(await running())) await sleep(1000);
   while (await running()) await sleep(2000);
-  const done = signedIn(account);
+  const done = accountSignedIn(account);
   console.log(done ? "The profile is signed in." : "The profile is not signed in.");
   process.exit(done ? 0 : 1);
 }
@@ -150,7 +152,7 @@ function windowLog(data, name) {
 // its servers and `during`, given the window, is done: the servers it
 // started, by tag. The profile is left in `dir`, so a launch can follow
 // another on it.
-async function launch(dir, { approved = [], during, seconds = 90 } = {}) {
+async function launch(dir, { approved = [], during } = {}) {
   const d = folders(dir);
   write(path.join(d.user, "settings.json"), {
     "security.workspace.trust.enabled": false,
@@ -176,7 +178,7 @@ async function launch(dir, { approved = [], during, seconds = 90 } = {}) {
   spawn(bin, args, { detached: true, stdio: "ignore", env: env(d) }).unref();
   // Cursor logs a census of the servers once it has read their files.
   const census = () => (windowLog(d.data, "workbench.mcp.files.log").match(/Plugin MCP census/g) ?? []).length;
-  const end = Date.now() + seconds * 1000;
+  const end = Date.now() + 90_000;
   const before = sessions ? census() : 0;
   while (census() <= before && Date.now() < end) await sleep(1000);
   await sleep(15_000);
@@ -225,7 +227,6 @@ async function devtools(port) {
         button?.click();
         return Boolean(button);
       })()`),
-    close: () => ws.close(),
   };
 }
 
@@ -343,28 +344,45 @@ if (runs("broken-project")) {
 // ---------------------------------------------------------------- a Project's plugins
 
 // Cursor resolves the plugin keys of a Project's `.cursor\settings.json`
-// with its server, which needs the account: these checks run on the
-// signed-in profile. The plugin is the Marketplace's `superdesign`, which
-// holds skills only, so no server of its runs. Beside it the probe plants
-// two copies Cursor's cache could hold: one in a marketplace whose name
-// comes first, and a complete commit whose name comes last, each with a
-// server that leaves a marker.
-if (runs("project-plugins") && !signedIn(account)) {
+// with its server, which needs an account. The plugin is the Marketplace's
+// `superdesign`, which holds skills only, so no server of its runs: the
+// one real Entry of the probe, since the server resolves real keys only.
+// The probe plants copies of it Cursor's cache could hold, each with a
+// server that leaves a marker: signed out, a complete one in
+// `cursor-public`; signed in, one in a marketplace whose name comes first,
+// a complete commit whose name comes last and an incomplete one.
+// A copy of `superdesign` at `commit` in `marketplace` of `cache`.
+function decoy(cache, marketplace, commit, tag, { complete = true } = {}) {
+  const folder = path.join(cache, marketplace, "superdesign", commit);
+  write(path.join(folder, ".cursor-plugin", "plugin.json"), { name: "superdesign" });
+  write(path.join(folder, "mcp.json"), servers(tag));
+  if (complete) write(path.join(folder, ".cache-complete"), "");
+}
+const enablesSuperdesign = (d) => write(path.join(d.proj, ".cursor", "settings.json"), { plugins: { superdesign: { enabled: true } } });
+const pluginLog = (d) => windowLog(d.data, path.join("exthost", "anysphere.cursor-agent-exec", "Cursor Plugins.log"));
+
+if (runs("project-plugins")) {
+  const dir = fresh("signed-out", base);
+  const d = folders(dir);
+  enablesSuperdesign(d);
+  decoy(path.join(d.cursor, "plugins", "cache"), "cursor-public", "c".repeat(40), "signed-out");
+  const tags = await launch(dir);
+  await p.check("plugins[project]", "signed out, Cursor loads no plugin a Project's key names, even one complete in the cache", async () =>
+    same({ tags, loaded: /superdesign/.test(pluginLog(d)) }, { tags: [], loaded: false }),
+  );
+}
+
+if (runs("project-plugins") && !accountSignedIn(account)) {
   await p.check("plugins[project]", "the account profile is signed in", async () => ({ pass: false, observed: `${account} is not: run node uat/agents/cursor.mjs --sign-in` }));
 } else if (runs("project-plugins")) {
   const d = folders(account);
   const cache = path.join(d.cursor, "plugins", "cache");
   fs.rmSync(cache, { recursive: true, force: true });
   fs.rmSync(d.proj, { recursive: true, force: true });
-  write(path.join(d.proj, ".cursor", "settings.json"), { plugins: { superdesign: { enabled: true } } });
-  const decoy = (marketplace, commit, tag) => {
-    const folder = path.join(cache, marketplace, "superdesign", commit);
-    write(path.join(folder, ".cursor-plugin", "plugin.json"), { name: "superdesign" });
-    write(path.join(folder, "mcp.json"), servers(tag));
-    write(path.join(folder, ".cache-complete"), "");
-  };
-  decoy("aaa-cd-throwaway", "a".repeat(40), "first-marketplace");
-  decoy("cursor-public", "f".repeat(40), "last-commit");
+  enablesSuperdesign(d);
+  decoy(cache, "aaa-cd-throwaway", "a".repeat(40), "first-marketplace");
+  decoy(cache, "cursor-public", "f".repeat(40), "last-commit");
+  decoy(cache, "cursor-public", "e".repeat(40), "incomplete-commit", { complete: false });
   const tags = await launch(account);
   // The commits of `superdesign` in each marketplace's cache, `*` marking
   // a complete one.
@@ -374,7 +392,7 @@ if (runs("project-plugins") && !signedIn(account)) {
       return [m, fs.readdirSync(plugin).map((c) => (fs.existsSync(path.join(plugin, c, ".cache-complete")) ? `${c}*` : c))];
     }),
   );
-  const log = windowLog(d.data, path.join("exthost", "anysphere.cursor-agent-exec", "Cursor Plugins.log"));
+  const log = pluginLog(d);
   // The commit Cursor's server named, and the folders Cursor loaded.
   const named = log.match(/Adding enabled plugin: superdesign from ([0-9a-f]{40})/)?.[1];
   const loaded = [...new Set([...log.matchAll(/Found cached plugin: superdesign at (.+)/g)].map((m) => path.relative(cache, m[1].trim())))];
@@ -385,7 +403,7 @@ if (runs("project-plugins") && !signedIn(account)) {
       { tags: [], loaded: [path.join("cursor-public", "superdesign", named ?? "?")], firstMarketplace: [`${"a".repeat(40)}*`] },
     ),
   );
-  await p.check("plugins[project]", "Cursor downloads the commit its server names, and deletes the plugin's other commits, a complete one that comes last included, as it loads it", async () =>
+  await p.check("plugins[project]", "Cursor downloads the commit its server names, and deletes the plugin's other commits, complete or not, a complete one that comes last included, as it loads it", async () =>
     same({ named: Boolean(named), commits: commits["cursor-public"] }, { named: true, commits: [`${named}*`] }),
   );
 }
@@ -395,13 +413,13 @@ if (runs("project-plugins") && !signedIn(account)) {
 // A local MCP server behind OAuth. It registers any client, grants the
 // token `not-a-real-secret` for any code, and answers the authorization
 // request itself by calling the redirect it names, as a user who signs in
-// would. `phase` labels the requests that follow, and `signedIn(phase)`
+// would. `phase` labels the requests that follow, and `authorized(phase)`
 // says whether one of them carried the token.
 async function oauthServer() {
   const requests = [];
   const s = {
     phase: "start",
-    signedIn: (phase) => requests.some((r) => r.phase === phase && r.bearer),
+    authorized: (phase) => requests.some((r) => r.phase === phase && r.bearer),
     asked: (phase) => requests.some((r) => r.phase === phase),
   };
   const srv = http.createServer((req, res) => {
@@ -467,8 +485,8 @@ async function signIn(win, oauth, name) {
   }
   await win.authenticate(name);
   const end = Date.now() + 30_000;
-  while (!oauth.signedIn("signed-in") && Date.now() < end) await sleep(1000);
-  return oauth.signedIn("signed-in");
+  while (!oauth.authorized("signed-in") && Date.now() < end) await sleep(1000);
+  return oauth.authorized("signed-in");
 }
 
 // Writes `~\.cursor\mcp.json` while Cursor runs, then labels what follows.
@@ -508,7 +526,7 @@ if (runs("sign-in")) {
     await launch(dir);
     await p.check("locations[user-mcp]", "Cursor keeps the sign-in of a remote server across restarts, and of one that was gone from `mcp.json`, or in a `mcp.json` that did not parse, while it started", async () =>
       same(
-        { signedIn, restarted: oauth.signedIn("restarted"), again: oauth.signedIn("started-with-again"), repaired: oauth.signedIn("started-repaired") },
+        { signedIn, restarted: oauth.authorized("restarted"), again: oauth.authorized("started-with-again"), repaired: oauth.authorized("started-repaired") },
         { signedIn: true, restarted: true, again: true, repaired: true },
       ),
     );
@@ -529,7 +547,7 @@ if (runs("sign-in")) {
       },
     });
     await p.check("locations[user-mcp]", "Cursor forgets the sign-in of a remote server taken out of `mcp.json` while it runs: put back, it needs signing in again", async () =>
-      same({ signedIn, putBack: oauth.signedIn("put-back"), asked: oauth.asked("put-back") }, { signedIn: true, putBack: false, asked: true }),
+      same({ signedIn, putBack: oauth.authorized("put-back"), asked: oauth.asked("put-back") }, { signedIn: true, putBack: false, asked: true }),
     );
   }
 
@@ -548,7 +566,7 @@ if (runs("sign-in")) {
       },
     });
     await p.check("locations[user-mcp]", "Cursor forgets the sign-in of the remote servers of a `mcp.json` that stops parsing while it runs: repaired, it needs signing in again", async () =>
-      same({ signedIn, repaired: oauth.signedIn("repaired"), asked: oauth.asked("repaired") }, { signedIn: true, repaired: false, asked: true }),
+      same({ signedIn, repaired: oauth.authorized("repaired"), asked: oauth.asked("repaired") }, { signedIn: true, repaired: false, asked: true }),
     );
   }
   oauth.close();
