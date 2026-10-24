@@ -206,17 +206,57 @@
       ]
     },
     "Unverified": {
-      "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. It changes nothing the definition does.",
+      "description": "Facts of this table taken from inference, or defaults taken because a fact is not known, rather than from docs, disk or an experiment: a sentence saying what is assumed, or a list of them, which the release gate has to test. A fact whose test needs an account or a deployment the project does not have is under the release gate's exception: its mark is a table of the `sentence` and what the test `needs`, which the release gate lets ship and the release notes list. It changes nothing the definition does.",
       "anyOf": [
         {
           "type": "string",
           "pattern": "\\S"
         },
         {
+          "type": "object",
+          "properties": {
+            "sentence": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "needs": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "required": [
+            "sentence",
+            "needs"
+          ],
+          "additionalProperties": false
+        },
+        {
           "type": "array",
           "items": {
-            "type": "string",
-            "pattern": "\\S"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sentence": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  },
+                  "needs": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                },
+                "required": [
+                  "sentence",
+                  "needs"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "minItems": 1
         }

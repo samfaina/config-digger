@@ -90,7 +90,7 @@ plugins = ".claude/plugins"
 # applies only when no admin source holds settings, and never merges [docs].
 [[settings]]
 id = "managed"
-unverified = "`~/.claude/remote-settings.json` is taken to hold the server-managed settings as one JSON object, as a managed settings file does."
+unverified = { sentence = "`~/.claude/remote-settings.json` is taken to hold the server-managed settings as one JSON object, as a managed settings file does.", needs = "Claude Teams or Enterprise" }
 control_keys = ["managedSourcesBehavior", "wslInheritsWindowsSettings"]
 merge = { key = "managedSourcesBehavior", value = "merge" }
 sources = [
@@ -167,7 +167,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # this shape does not check (#304).
 [[locations]]
 id = "managed-settings-mcp"
-unverified = "What Claude Code does with a `remote-settings.json` it cannot parse is not known."
+unverified = { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" }
 anchor = { block = "settings", settings = "managed" }
 format = { block = "json", dialect = "strict" }
 root = ["managedMcpServers"]

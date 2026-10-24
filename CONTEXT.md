@@ -31,7 +31,7 @@ The lowest and highest versions of an Agent that its Agent definition was tested
 _Avoid_: Supported versions, compatible range, verified range
 
 **Unverified mark**:
-A sentence in an Agent definition or skill manager definition saying what one of its facts assumes, for a fact taken from inference or source code alone, or a default taken because the fact is not known. It changes nothing config-digger does; the marks of the built-in definitions list what the release gate still has to test.
+A sentence in an Agent definition or skill manager definition saying what one of its facts assumes, for a fact taken from inference or source code alone, or a default taken because the fact is not known. It changes nothing config-digger does; the marks of the built-in definitions list what the release gate still has to test. A mark whose test needs an account or a deployment the project does not have is under the exception: it says what the test needs, it lets a release ship, and the release notes list it. Any other mark stops a release.
 _Avoid_: Assumption, caveat, TODO
 
 **Running Agent**:
