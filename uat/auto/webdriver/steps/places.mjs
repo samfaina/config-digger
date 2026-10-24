@@ -35,11 +35,13 @@ const missingGroup = (groups) => groups.find((g) => /Missing · \d/.test(g.title
 const noLeftoversGroup = (groups) => groups.find((g) => g.title.includes("Missing, no leftovers · "));
 
 // Opens the group titled `title`, such as "Missing" or "Missing, no leftovers", if it is closed.
-async function openGroup(s, title) {
+// Fails when no group has that title.
+export async function openGroup(s, title) {
   const toggle = await s
-    .exec(`return [...document.querySelectorAll(".place-group-toggle")].find((b) => b.textContent.replace(/^[▾▸]\s*/, "").startsWith(arguments[0] + " · ")) ?? null;`, title)
+    .exec(`return [...document.querySelectorAll(".place-group-toggle")].find((b) => b.textContent.replace(/^[▾▸]\\s*/, "").startsWith(arguments[0] + " · ")) ?? null;`, title)
     .then(unwrap);
-  if (toggle && (await s.attr(toggle, "aria-expanded")) !== "true") {
+  if (!toggle) throw new Error(`no group "${title}" on the Projects tab`);
+  if ((await s.attr(toggle, "aria-expanded")) !== "true") {
     await s.click(toggle);
     await wait(200);
   }
@@ -498,9 +500,9 @@ export default [
       const hide = `${t.root}\\project-hide`;
       await go(s, "Projects & homes");
       await tab(s, "Projects");
-      await openGroup(s, "Hidden");
       if (!(await rowButton(s, hide, "Hide"))) {
         // A run of this step alone may find project-hide still hidden.
+        await openGroup(s, "Hidden");
         await s.click(await s.until(() => rowButton(s, hide, "Unhide"), { what: "Unhide" }));
         await waitNotice(s, `${hide} is listed again.`);
       }

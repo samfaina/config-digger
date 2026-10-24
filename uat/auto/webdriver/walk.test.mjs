@@ -1,13 +1,15 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
-// it knows match the plan, the throwaway profile, and reading an Operation id.
+// it knows match the plan, the throwaway profile, opening a group on the
+// Projects tab, and reading an Operation id.
 // Run them with `node --test uat/auto/webdriver/walk.test.mjs`.
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { profileEnv } from "./driver.mjs";
+import { profileEnv, ref, Session } from "./driver.mjs";
 import { operationId } from "./steps/common.mjs";
+import { openGroup } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
 const plan = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8"));
@@ -72,6 +74,50 @@ test("the profile holds both AppData folders, the known folders and a Claude Cod
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// A session on a Projects tab of group toggles, each `{ text, open }`: a
+// script runs here on a page of those toggles, and a click opens or closes one.
+class GroupsPage extends Session {
+  constructor(groups) {
+    super("http://fake", "fake");
+    this.toggles = groups.map(({ text, open }, i) => ({ id: `toggle-${i}`, textContent: text, open }));
+  }
+
+  async cmd(method, path, body) {
+    if (path === "/execute/sync") {
+      const document = { querySelectorAll: (css) => (css === ".place-group-toggle" ? this.toggles : []) };
+      const value = new Function("document", "args", `return (function () {${body.script}}).apply(null, args);`)(document, body.args);
+      return this.toggles.includes(value) ? ref(value.id) : value;
+    }
+    const [, id, action] = /^\/element\/([^/]+)\/(.+)$/.exec(path);
+    const toggle = this.toggles.find((t) => t.id === id);
+    if (action === "click") toggle.open = !toggle.open;
+    else if (action === "attribute/aria-expanded") return String(toggle.open);
+    else throw new Error(`${method} ${path}`);
+    return null;
+  }
+}
+
+test("openGroup opens a closed group and leaves an open one open", async () => {
+  const page = new GroupsPage([
+    { text: "▾ Missing · 1", open: true },
+    { text: "▸ Missing, no leftovers · 1", open: false },
+    { text: "▸ Hidden · 1", open: false },
+  ]);
+  await openGroup(page, "Hidden");
+  await openGroup(page, "Missing");
+  assert.deepEqual(
+    page.toggles.map((t) => t.open),
+    [true, false, true],
+  );
+});
+
+test("openGroup fails when no group has that title", async () => {
+  const page = new GroupsPage([{ text: "▸ Missing, no leftovers · 1", open: false }]);
+  await assert.rejects(openGroup(page, "Hidden"), /group "Hidden"/);
+  await assert.rejects(openGroup(page, "Missing"), /group "Missing"/);
+  assert.equal(page.toggles[0].open, false);
 });
 
 test("an Operation id is read from the lines that name one", () => {
