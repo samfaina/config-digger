@@ -23,6 +23,30 @@ test("every step the walk knows is a step of the plan, once", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test("every step of a section the walk covers is walked, but those the Sandbox walks", () => {
+  const sandbox = new Set(["12.2", "13.2", "13.3", "13.4"]);
+  const walked = new Set(steps.map((step) => step.id));
+  const covered = plan.sections.filter((section) => section.steps.some((step) => walked.has(step.id)));
+  assert.deepEqual(
+    covered.flatMap((section) => section.steps.map((step) => step.id)).filter((id) => !walked.has(id) && !sandbox.has(id)),
+    [],
+  );
+});
+
+test("step 1.1 fails when the setup script does not list the home whose Project servers are a list", async () => {
+  const root = "E:\\cd-throwaway";
+  const listed = ["claude-code-home\\.claude.json", "codex-home\\config.toml", "claude-desktop-home\\claude_desktop_config.json"];
+  const walk = async (files) => {
+    const failed = [];
+    const has = (text, part, what) => (text.includes(part) ? true : (failed.push(what), false));
+    const out = [...files.map((file) => `${root}\\${file}`), `Created the throwaway homes and Projects in ${root}`].join("\n");
+    await steps.find((step) => step.id === "1.1").run({ root, setup: () => out, has, check: (ok, what) => ok || failed.push(what) });
+    return failed;
+  };
+  assert.deepEqual(await walk([...listed, "claude-code-shape-home\\.claude.json"]), []);
+  assert.deepEqual(await walk(listed), ["lista «claude-code-shape-home\\.claude.json»"]);
+});
+
 test("a step that leaves something to a person says what", () => {
   for (const step of steps.filter((s) => "manual" in s)) {
     assert.ok(typeof step.manual === "string" && step.manual.length > 20, step.id);
