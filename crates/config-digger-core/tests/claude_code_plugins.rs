@@ -145,6 +145,35 @@ fn a_plugin_skill_is_namespaced_by_its_plugin() {
 }
 
 #[test]
+fn skills_in_every_folder_the_manifest_declares_are_read_besides_the_skills_folder() {
+    let inventory = no_project(&fixture());
+
+    // toolbox's manifest declares `./skills/` again, `./extra-skills/`, a
+    // folder of skill folders, and `./solo/` and `.`, each one skill's
+    // folder, which the skill's frontmatter `name` names.
+    let folder = in_cache(r"claude-plugins-official\toolbox\2.0.0");
+    for (name, path) in [
+        ("toolbox:core", folder.join(r"skills\core")),
+        ("toolbox:lint", folder.join(r"extra-skills\lint")),
+        ("toolbox:solo-skill", folder.join("solo")),
+        ("toolbox:guide", folder.clone()),
+    ] {
+        let skill = item(&inventory, name);
+        let paths: Vec<&Path> = skill
+            .entries
+            .iter()
+            .map(|entry| entry.path.as_path())
+            .collect();
+        assert_eq!(paths, [path], "{name}");
+        assert_eq!(code(skill.state), "effective", "{name}");
+        let entry = entry_json(&skill.entries[0]);
+        assert_eq!(entry["scope"], "plugin", "{name}");
+        assert_eq!(entry["provenance"], "plugin", "{name}");
+        assert_eq!(entry["plugin"]["id"], "toolbox@claude-plugins-official");
+    }
+}
+
+#[test]
 fn a_plugin_folder_marked_superseded_is_not_read() {
     let inventory = no_project(&fixture());
 
@@ -271,6 +300,174 @@ fn a_plugin_server_with_the_endpoint_of_another_server_is_shadowed_by_it() {
             .iter()
             .any(|item| item.name == "plugin:context7:context7"),
         "the plugin server is no Item of its own"
+    );
+}
+
+/// toolbox's server, as Claude Code runs it: `${CLAUDE_PLUGIN_ROOT}` is the
+/// plugin's folder, with forward slashes.
+const TOOLBOX_RUNNER: &str =
+    "C:/Users/fixture/.claude/plugins/cache/claude-plugins-official/toolbox/2.0.0/runner.js";
+
+#[test]
+fn claude_plugin_root_expands_to_the_plugins_folder_in_its_servers() {
+    let inventory = no_project(&fixture());
+
+    let runner = item(&inventory, "plugin:toolbox:runner");
+    assert_eq!(
+        runner.entries[0].config,
+        json!({
+            "command": "node",
+            "args": [TOOLBOX_RUNNER, "--data", "${CLAUDE_PLUGIN_DATA}"]
+        })
+    );
+}
+
+#[test]
+fn servers_two_plugins_write_alike_with_claude_plugin_root_do_not_compete() {
+    let fs = fixture().with_file(
+        in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json"),
+        json!({ "mcpServers": {
+            "context7": { "type": "http", "url": "https://MCP.context7.com:443/mcp/" },
+            "runner": {
+                "command": "node",
+                "args": ["${CLAUDE_PLUGIN_ROOT}/runner.js", "--data", "${CLAUDE_PLUGIN_DATA}"]
+            },
+        } })
+        .to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    for name in ["plugin:toolbox:runner", "plugin:context7:runner"] {
+        let runner = item(&inventory, name);
+        assert_eq!(runner.entries.len(), 1, "{name}");
+        assert_eq!(code(runner.state), "effective", "{name}");
+    }
+}
+
+#[test]
+fn a_server_running_the_expanded_command_of_a_plugin_server_shadows_it() {
+    let fs = fixture();
+    let mut state = json_of(&fs, PathBuf::from(HOME).join(".claude.json"));
+    state["mcpServers"]["runner"] =
+        json!({ "command": "node", "args": [TOOLBOX_RUNNER, "--data", "${CLAUDE_PLUGIN_DATA}"] });
+    fs.put_file(PathBuf::from(HOME).join(".claude.json"), state.to_string());
+
+    let inventory = no_project(&fs);
+
+    let runner = item(&inventory, "runner");
+    let states: Vec<String> = runner
+        .entries
+        .iter()
+        .map(|entry| code(entry.state))
+        .collect();
+    assert_eq!(states, ["effective", "shadowed"]);
+    assert_eq!(
+        runner.entries[1].path,
+        in_cache(r"claude-plugins-official\toolbox\2.0.0\.mcp.json")
+    );
+}
+
+/// Where Claude Code extracted toolbox's `bundle.mcpb`.
+fn toolbox_bundle() -> PathBuf {
+    in_cache(r"claude-plugins-official\toolbox\2.0.0\.mcpb-cache\8739c76e681f9009")
+}
+
+/// The server of toolbox's bundle, as Claude Code runs it: `${__dirname}`
+/// is the folder the bundle is extracted to.
+fn weather_server() -> String {
+    format!("{}/server/index.js", toolbox_bundle().display())
+}
+
+#[test]
+fn a_bundle_the_manifest_declares_is_a_server_read_from_the_bundles_manifest() {
+    let inventory = no_project(&fixture());
+
+    let weather = item(&inventory, "plugin:toolbox:weather");
+    assert_eq!(code(weather.state), "effective");
+    let entry = &weather.entries[0];
+    assert_eq!(entry.path, toolbox_bundle().join("manifest.json"));
+    assert_eq!(entry.key_path, ["server", "mcp_config"]);
+    assert_eq!(entry.config["command"], "node");
+    assert_eq!(entry.config["args"], json!([weather_server()]));
+    // A literal env value is a Secret, as in any other server.
+    assert_eq!(entry.masked, [["env", "UNITS"]]);
+    let entry = entry_json(entry);
+    assert_eq!(entry["scope"], "plugin");
+    assert_eq!(entry["provenance"], "plugin");
+    assert_eq!(entry["plugin"]["id"], "toolbox@claude-plugins-official");
+}
+
+#[test]
+fn a_bundle_claude_code_has_not_extracted_yet_has_no_entry() {
+    let fs = fixture();
+    fs.delete_folder(in_cache(
+        r"claude-plugins-official\toolbox\2.0.0\.mcpb-cache",
+    ));
+
+    let inventory = no_project(&fs);
+
+    assert!(
+        !inventory
+            .items
+            .iter()
+            .any(|item| item.name == "plugin:toolbox:weather")
+    );
+}
+
+#[test]
+fn a_bundles_server_competes_by_endpoint_like_other_plugin_servers() {
+    let fs = fixture();
+    let mut state = json_of(&fs, PathBuf::from(HOME).join(".claude.json"));
+    state["mcpServers"]["forecast"] = json!({ "command": "node", "args": [weather_server()] });
+    fs.put_file(PathBuf::from(HOME).join(".claude.json"), state.to_string());
+
+    let inventory = no_project(&fs);
+
+    let forecast = item(&inventory, "forecast");
+    let states: Vec<(&Path, String)> = forecast
+        .entries
+        .iter()
+        .map(|entry| (entry.path.as_path(), code(entry.state)))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (
+                PathBuf::from(HOME).join(".claude.json").as_path(),
+                "effective".to_owned()
+            ),
+            (
+                toolbox_bundle().join("manifest.json").as_path(),
+                "shadowed".to_owned()
+            ),
+        ]
+    );
+}
+
+#[test]
+fn disable_of_a_plugin_lists_its_bundle_server_and_the_skills_of_every_declared_folder() {
+    let fs = fixture();
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &Context::default(),
+        Action::Disable,
+        &["toolbox:lint"],
+    )
+    .unwrap();
+
+    assert_eq!(
+        changes(&plan, None),
+        triples(&[
+            ("plugin:toolbox:runner", "effective", "disabled"),
+            ("plugin:toolbox:weather", "effective", "disabled"),
+            ("toolbox:core", "effective", "disabled"),
+            ("toolbox:guide", "effective", "disabled"),
+            ("toolbox:lint", "effective", "disabled"),
+            ("toolbox:solo-skill", "effective", "disabled"),
+        ])
     );
 }
 
@@ -419,7 +616,8 @@ fn disable_of_a_plugin_entry_turns_the_whole_plugin_off_in_the_user_settings() {
             "enabledPlugins": {
                 "supabase@claude-plugins-official": false,
                 "context7@claude-plugins-official": true,
-                "superpowers@claude-plugins-official": false
+                "superpowers@claude-plugins-official": false,
+                "toolbox@claude-plugins-official": true
             }
         })
     );

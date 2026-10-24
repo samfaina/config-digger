@@ -1,0 +1,6 @@
+{
+  "name": "toolbox",
+  "version": "2.0.0",
+  "skills": ["./skills/", "./extra-skills/", "./solo/", "."],
+  "mcpServers": ["./bundle.mcpb"]
+}

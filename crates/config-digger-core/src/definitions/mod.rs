@@ -812,6 +812,11 @@ pub(crate) struct LocationDefinition {
     /// objects of Entries, such as a Claude Code plugin manifest's
     /// `mcpServers`.
     pub references: Option<References>,
+    /// How the Agent writes the folder of an Entry's plugin in the values
+    /// of a location in plugins, such as Claude Code's
+    /// `${CLAUDE_PLUGIN_ROOT}`. The Entry shows the folder in its place, as
+    /// the Agent runs it, and competes by endpoint with it.
+    pub plugin_root: Option<PluginRoot>,
     /// The key path, in the file as its format reads it, of when the Agent
     /// cached the file's copy of configuration held elsewhere, such as the
     /// bundle Codex caches from the account: milliseconds since 1970, or an
@@ -828,6 +833,51 @@ pub(crate) struct LocationDefinition {
 pub(crate) struct References {
     /// The key path of the object whose keys are Entries in a file pointed to.
     pub root: Vec<String>,
+    /// The bundles a value can name instead of a file, such as the `.mcpb`
+    /// bundles of a Claude Code plugin's `mcpServers`.
+    pub bundles: Option<blocks::Bundles>,
+}
+
+/// A reference that stands for the folder of an Entry's plugin in some of
+/// the Entry's fields.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginRoot {
+    /// The reference as written, such as `${CLAUDE_PLUGIN_ROOT}`.
+    pub reference: String,
+    /// The fields it stands for the folder in, such as `command` and
+    /// `args`: in a text, each text of a list, and each text value of an
+    /// object.
+    pub fields: Vec<String>,
+    /// Whether the Agent writes the folder with `/` between its names, as
+    /// Claude Code does on Windows.
+    #[serde(default)]
+    pub forward_slashes: bool,
+}
+
+impl Validate for PluginRoot {
+    fn validate(&self) -> Result<(), String> {
+        if self.reference.is_empty() || self.fields.is_empty() {
+            return Err("plugin_root needs a reference and the fields it stands in".into());
+        }
+        Ok(())
+    }
+}
+
+impl PluginRoot {
+    /// Puts `folder` in place of the reference in the fields of `config`.
+    pub fn expand(&self, config: &mut serde_json::Value, folder: &Path) {
+        let folder = folder.display().to_string();
+        let folder = match self.forward_slashes {
+            true => folder.replace('\\', "/"),
+            false => folder,
+        };
+        for field in &self.fields {
+            if let Some(value) = config.get_mut(field) {
+                blocks::replace_in_texts(value, &self.reference, &folder);
+            }
+        }
+    }
 }
 
 /// The `name_template` segment that stands for the plugin's name.
@@ -1515,6 +1565,17 @@ impl AgentDefinition {
                     return Err(context("references need a root to hold them".into()));
                 }
                 blocks::validate_key_path(&references.root).map_err(context)?;
+                if let Some(bundles) = &references.bundles {
+                    bundles.validate().map_err(context)?;
+                }
+            }
+            if let Some(root) = &location.plugin_root {
+                if location.anchor.plugin().is_none() {
+                    return Err(context(
+                        "only a location in plugins takes plugin_root".into(),
+                    ));
+                }
+                root.validate().map_err(context)?;
             }
             if let Some(cached_at) = &location.cached_at {
                 if location.format.file().is_none() {

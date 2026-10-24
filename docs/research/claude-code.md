@@ -82,7 +82,7 @@ On this machine [disk]:
 - The project `.mcp.json` Entries `supabase` and `webstorm` have `type, url`, with `type=http`.
 - The plugin Entry `supabase` (from the supabase plugin) has `type, url, headers`, with `type=http`.
 
-Variable expansion: `${VAR}` and `${VAR:-default}` work in `command`, `args`, `env`, `url` and `headers`. An unset variable stays literal and the Agent shows a warning. Credential variables such as `ANTHROPIC_API_KEY` read as empty in a remote `url` or in `headers` ([MCP](https://code.claude.com/docs/en/mcp)) [docs]. Plugin entries can also use `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `${CLAUDE_PROJECT_DIR}` and `${user_config.KEY}` ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. **Product implication:** an Entry can show a `${VAR}` reference rather than the real secret value, and config-digger should display it unexpanded.
+Variable expansion: `${VAR}` and `${VAR:-default}` work in `command`, `args`, `env`, `url` and `headers`. An unset variable stays literal and the Agent shows a warning. Credential variables such as `ANTHROPIC_API_KEY` read as empty in a remote `url` or in `headers` ([MCP](https://code.claude.com/docs/en/mcp)) [docs]. Plugin entries can also use `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `${CLAUDE_PROJECT_DIR}` and `${user_config.KEY}` ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. **Product implication:** an Entry can show a `${VAR}` reference rather than the real secret value, and config-digger should display it unexpanded. `${CLAUDE_PLUGIN_ROOT}` is the exception: it holds no Secret, Claude Code puts the plugin's folder in its place with forward slashes on Windows ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs], and config-digger shows the folder too, so that two plugins' servers written alike have two endpoints (#115).
 
 Other places where secrets live [disk, names only, never read]:
 
@@ -179,7 +179,7 @@ Plugin structure ([plugins reference](https://code.claude.com/docs/en/plugins-re
    - skill: `<plugin-name>:<skill>`.
 4. Add synced plugins (`plugins\synced\…`) and skills-dir plugins (`skills\<x>\.claude-plugin\plugin.json`). `--plugin-dir` plugins exist only for their session and leave no trace on disk.
 
-"Extensions": Claude Code has no separate extension concept. The nearest thing is `.mcpb`/`.dxt` bundles referenced from a plugin, which are extracted to `.mcpb-cache\` inside the plugin root ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs].
+"Extensions": Claude Code has no separate extension concept. The nearest thing is `.mcpb`/`.dxt` bundles referenced from a plugin, which are extracted to `.mcpb-cache\` inside the plugin root ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. In 2.1.310's code, `.mcpb-cache\<hash>.metadata.json` records each bundle it extracted: `source`, the value that names it, `extractedPath`, `.mcpb-cache\<content hash>`, which holds the bundle's `manifest.json`, and when it was cached. The bundle's one server is named by the manifest's `name`, from its `server.mcp_config` with `${__dirname}` standing for that folder [binary].
 
 ## 6. Native Disable mechanisms (no removal)
 

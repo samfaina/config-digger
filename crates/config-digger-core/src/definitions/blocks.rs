@@ -2388,14 +2388,30 @@ pub(crate) struct ManifestSkills {
     pub field: Vec<String>,
     /// A `/`-separated path relative to the plugin's folder.
     pub default: String,
+    /// Whether the `default` folder is read besides the declared paths,
+    /// as Claude Code reads its plugins' `skills` folder, rather than in
+    /// their place.
+    #[serde(default)]
+    pub adds_to_default: bool,
+    /// Whether a path declared alone, not in a list, may also name one
+    /// skill folder or its `SKILL.md`.
+    #[serde(default)]
+    pub path_may_name_one: bool,
     /// How each folder of skill folders is read.
     pub skills: SkillFolder,
+    /// How a path that names one skill folder reads it, when not as
+    /// `skills` reads the folders in a folder, such as by its frontmatter
+    /// `name`.
+    pub one_skill: Option<SkillFolder>,
 }
 
 impl Validate for ManifestSkills {
     fn validate(&self) -> Result<(), String> {
         validate_key_path(&self.field)?;
         validate_relative(&self.default)?;
+        if let Some(one_skill) = &self.one_skill {
+            one_skill.validate()?;
+        }
         self.skills.validate()
     }
 }
@@ -2411,7 +2427,8 @@ pub(crate) struct DeclaredSkills {
 
 impl ManifestSkills {
     /// The paths the manifest's text `manifest` declares, or else the
-    /// default folder when it declares none. A manifest that does not
+    /// default folder when it declares none; the default folder first,
+    /// whatever it declares, when they add to it. A manifest that does not
     /// parse declares none; a field that is neither a path nor a list of
     /// paths declares no skills.
     pub fn paths(&self, manifest: Option<&str>) -> Vec<DeclaredSkills> {
@@ -2425,15 +2442,126 @@ impl ManifestSkills {
             path: path.to_owned(),
             may_name_one,
         };
-        match declared {
-            None => vec![folder(&self.default, false)],
-            Some(Value::String(path)) => vec![folder(path, false)],
+        let declared = match declared {
+            None => return vec![folder(&self.default, false)],
+            Some(Value::String(path)) => vec![folder(path, self.path_may_name_one)],
             Some(Value::Array(paths)) => paths
                 .iter()
                 .filter_map(|path| Some(folder(path.as_str()?, true)))
                 .collect(),
             Some(_) => Vec::new(),
+        };
+        match self.adds_to_default {
+            true => std::iter::once(folder(&self.default, false))
+                .chain(declared)
+                .collect(),
+            false => declared,
         }
+    }
+}
+
+/// Bundles a value of a location's references can name instead of a file,
+/// each holding one Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum Bundles {
+    McpbCache(McpbCache),
+}
+
+impl Validate for Bundles {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Bundles::McpbCache(block) => block.validate(),
+        }
+    }
+}
+
+/// MCP bundles (`.mcpb`, formerly `.dxt`), named by a path or URL ending in
+/// one of `extensions`, which the Agent extracts into the `cache` folder of
+/// the plugin, as Claude Code does. Each extracted bundle has a
+/// `<hash>.metadata.json` there, whose `source` is the value that names it
+/// and `extractedPath` the folder inside the cache it went to. Its one
+/// server is the `server.mcp_config` of that folder's `manifest.json`,
+/// named by the manifest's `name`, with the folder in place of
+/// `${__dirname}`. A bundle the Agent has not extracted yet has no Entry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct McpbCache {
+    /// The endings of a value that names a bundle, such as `.mcpb`.
+    pub extensions: Vec<String>,
+    /// A `/`-separated path relative to the plugin's folder.
+    pub cache: String,
+}
+
+impl Validate for McpbCache {
+    fn validate(&self) -> Result<(), String> {
+        if self.extensions.is_empty() || self.extensions.iter().any(String::is_empty) {
+            return Err("an mcpb-cache needs the extensions that name a bundle".into());
+        }
+        validate_relative(&self.cache)
+    }
+}
+
+impl McpbCache {
+    /// The file of an extracted bundle that declares its server.
+    pub const MANIFEST: &str = "manifest.json";
+    /// The key path of the server in the manifest.
+    pub const SERVER: [&str; 2] = ["server", "mcp_config"];
+    /// The ending of the name of a file of metadata in the cache.
+    const METADATA: &str = ".metadata.json";
+    /// What stands for the folder a bundle is extracted to.
+    const DIRNAME: &str = "${__dirname}";
+
+    /// Whether the value `value` names a bundle.
+    pub fn names_bundle(&self, value: &str) -> bool {
+        self.extensions
+            .iter()
+            .any(|extension| value.ends_with(extension.as_str()))
+    }
+
+    /// Whether the file at `path` in the cache holds the metadata of an
+    /// extracted bundle.
+    pub fn is_metadata(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(Self::METADATA))
+    }
+
+    /// The folder the bundle named `source` is extracted to, when the
+    /// metadata text `metadata` records it.
+    pub fn extracted(metadata: &str, source: &str) -> Option<PathBuf> {
+        let metadata = JsonFormat::STRICT.parse(metadata).ok()?;
+        if metadata.get("source")?.as_str()? != source {
+            return None;
+        }
+        Some(PathBuf::from(metadata.get("extractedPath")?.as_str()?))
+    }
+
+    /// The name and configuration of the server that the manifest
+    /// `manifest` of a bundle extracted to `folder` declares, if it
+    /// declares one.
+    pub fn server(manifest: &Value, folder: &Path) -> Option<(String, Value)> {
+        let name = manifest.get("name")?.as_str()?.to_owned();
+        let mut config = Self::SERVER
+            .iter()
+            .try_fold(manifest, |value, key| value.get(key))?
+            .clone();
+        replace_in_texts(&mut config, Self::DIRNAME, &folder.display().to_string());
+        Some((name, config))
+    }
+}
+
+/// Puts `with` in place of `text` in every text of `value`, at any depth.
+pub(crate) fn replace_in_texts(value: &mut Value, text: &str, with: &str) {
+    match value {
+        Value::String(value) => *value = value.replace(text, with),
+        Value::Array(values) => values
+            .iter_mut()
+            .for_each(|value| replace_in_texts(value, text, with)),
+        Value::Object(values) => values
+            .values_mut()
+            .for_each(|value| replace_in_texts(value, text, with)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
     }
 }
 

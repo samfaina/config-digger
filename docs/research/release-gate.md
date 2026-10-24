@@ -209,5 +209,6 @@ Marks are named by their table, as `cargo xtask unverified` prints them; line nu
 | The same, and maybe an account for its gates | Cursor's Disabled store, skills and gates (7) | [#317](https://github.com/samfaina/config-digger/issues/317) |
 | The app signed in, after [#305](https://github.com/samfaina/config-digger/issues/305) | Claude Desktop `locations[mirrored-skills]` | [#313](https://github.com/samfaina/config-digger/issues/313) |
 | Orca | Codex `mirrored_homes[orca]` | [#314](https://github.com/samfaina/config-digger/issues/314) |
+| A throwaway plugin with a `.mcpb` bundle and a `skills` field | Claude Code `locations[plugin-manifest-mcp]` (the bundle cache), `locations[plugin-skills]` (a declared folder holding a `SKILL.md`), both from [#115](https://github.com/samfaina/config-digger/issues/115) | To file under [#80](https://github.com/samfaina/config-digger/issues/80) |
 
 Each mark of the three rows under the exception is written as a table of its `sentence` and what its test `needs`. The release workflow runs `cargo xtask unverified --gate` before the build and fails, listing them, while any other mark is left; the release notes list each mark under the exception with what its test needs ([#315](https://github.com/samfaina/config-digger/issues/315)).
