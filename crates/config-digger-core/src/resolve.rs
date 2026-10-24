@@ -2106,14 +2106,14 @@ fn remove(
             | Provenance::AccountManaged => api::RemoveOption::Offered,
         };
     };
-    let declared = definition
+    let plugins = definition
         .declared_plugins(&plugin.plugins)
         .expect("validation declares the plugins a location reads");
-    let command = declared.uninstall(&plugin.id, plugin.scope.as_deref());
+    let command = plugins.uninstall(&plugin.id, plugin.scope.as_deref());
     // An extension goes by the name its Agent's settings show it under, a
     // plugin by the id its uninstall command takes.
     let (code, sentence) = match location.provenance {
-        Provenance::Extension if declared.registry.built_in() => (
+        Provenance::Extension if plugins.registry.built_in() => (
             api::RemoveNotOffered::Extension,
             explain::built_in_extension_not_removed(&plugin.name, agent_name),
         ),

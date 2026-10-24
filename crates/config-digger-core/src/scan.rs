@@ -989,16 +989,16 @@ fn read_as_if(
     let mut installed = Installed::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
-        let installed_at: Vec<&Path> = installations
+        let installation_folders: Vec<&Path> = installations
             .iter()
             .filter(|installation| {
-                installation.agent_index == home.agent_index
-                    && installations::reads_laid_out(
-                        definition,
-                        installation,
-                        home.mirror.as_ref(),
-                        home.declared.as_deref(),
-                    )
+                installations::reads_laid_out(
+                    definition,
+                    installation,
+                    home.agent_index,
+                    home.mirror.as_ref(),
+                    home.declared.as_deref(),
+                )
             })
             .map(|installation| installation.folder.as_path())
             .collect();
@@ -1007,7 +1007,7 @@ fn read_as_if(
             .plugins
             .iter()
             .filter(|plugins| !plugins.registry.in_project())
-            .flat_map(|plugins| scanner.read_plugins(home, plugins, None, &installed_at))
+            .flat_map(|plugins| scanner.read_plugins(home, plugins, None, &installation_folders))
             .collect();
         installed.insert((home.agent_index, home.home.clone()), plugins.clone());
         scanner.read_plugin_locations(home, definition, &plugins);
@@ -2904,20 +2904,20 @@ impl Scanner<'_> {
     /// once, leaving out those whose folder carries the superseded marker.
     /// The Project a record applies in is recorded as a Project. A registry
     /// in a Project is read in `folder`, a Project folder and its key, and
-    /// one in an Installation in each of `installed_at`, the folders of the
-    /// Installations that read the home.
+    /// one in an Installation in each of `installation_folders`, the
+    /// folders of the Installations that read the home.
     fn read_plugins(
         &mut self,
         home: &FoundHome,
         plugins: &PluginsDefinition,
         folder: Option<(&Path, &str)>,
-        installed_at: &[&Path],
+        installation_folders: &[&Path],
     ) -> Vec<ScannedPlugin> {
         let records = match &plugins.registry {
             PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
             PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
             PluginRegistry::InstallationFolders(block) => {
-                self.installation_folders(block, installed_at)
+                self.installation_folders(block, installation_folders)
             }
             PluginRegistry::PluginCache(block) => self.plugin_cache(home, block),
             PluginRegistry::ProjectPluginKeys(block) => match folder {
@@ -3138,15 +3138,16 @@ impl Scanner<'_> {
     }
 
     /// A record for each folder that holds the marker in the folder the
-    /// registry names in each of `installed_at`, an Installation's folder,
-    /// sorted by name within each, Installation by Installation.
+    /// registry names in each of `installation_folders`, the folders of
+    /// Installations, sorted by name within each, Installation by
+    /// Installation.
     fn installation_folders(
         &self,
         block: &InstallationFolders,
-        installed_at: &[&Path],
+        installation_folders: &[&Path],
     ) -> Vec<PluginRecord> {
         let fs = self.reader.fs;
-        installed_at
+        installation_folders
             .iter()
             .flat_map(|installation| paths::expand_relative(fs, installation, &block.folder))
             .flat_map(|folder| marked_folders(fs, &folder, Some(&block.marker)))

@@ -775,7 +775,7 @@ fn an_extension_s_chat_skills_rank_last() {
 }
 
 #[test]
-fn an_extension_version_obsolete_lists_contributes_nothing() {
+fn an_extension_version_marked_obsolete_contributes_no_entries() {
     let inventory = inventory(&with_home(vscode()));
 
     let extension = Path::new(HOME).join(r".vscode\extensions\acme.helper-1.0.0");

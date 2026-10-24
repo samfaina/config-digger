@@ -148,24 +148,28 @@ fn reads(
     installation: &ScannedInstallation,
     home: &ScannedHome,
 ) -> bool {
-    installation.agent_index == home.agent_index
-        && reads_laid_out(
-            definition,
-            installation,
-            home.mirror.as_ref(),
-            home.declared.as_deref(),
-        )
+    reads_laid_out(
+        definition,
+        installation,
+        home.agent_index,
+        home.mirror.as_ref(),
+        home.declared.as_deref(),
+    )
 }
 
-/// Whether `installation`, of `definition`'s Agent, reads a home of it
-/// found as `declared`, or added by the user when `None`, that copies
-/// another when `mirror` says so.
+/// Whether `installation` reads a home of the Agent at `agent_index`,
+/// `definition`'s, found as `declared`, or added by the user when `None`,
+/// that copies another when `mirror` says so.
 pub(crate) fn reads_laid_out(
     definition: &AgentDefinition,
     installation: &ScannedInstallation,
+    agent_index: usize,
     mirror: Option<&Mirror>,
     declared: Option<&str>,
 ) -> bool {
+    if installation.agent_index != agent_index {
+        return false;
+    }
     let defined = definition
         .installations
         .iter()

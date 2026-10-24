@@ -104,9 +104,14 @@ name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/
 # [disk], each named by its manifest's `name`. The user cannot uninstall
 # one. VS Code ranks them before the installed extensions [binary]. What
 # VS Code does with an installed extension that has a built-in one's id is
-# not checked: both are read.
+# not checked: both are read. An Installation's folder holds one commit
+# folder [disk]: one left over from an update would be read too.
 [[plugins]]
 id = "built-in-extensions"
+unverified = [
+  "That VS Code ranks its built-in extensions before the installed ones comes from its code only.",
+  "What VS Code does with an installed extension that has a built-in one's id is not known: both are taken to be read.",
+]
 registry = { block = "installation-folders", folder = "*/resources/app/extensions", marker = "package.json" }
 name = { file = "package.json", key_path = ["name"] }
 
@@ -121,6 +126,7 @@ name = { file = "package.json", key_path = ["name"] }
 # the folders are read instead.
 [[plugins]]
 id = "extensions"
+unverified = "The shape of `.obsolete` comes from VS Code's code only: none was seen on disk."
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/extensions" }, marker = "package.json", removals = ".obsolete" }
 name = { file = "package.json", key_path = ["name"] }
 

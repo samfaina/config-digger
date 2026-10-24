@@ -1797,13 +1797,7 @@ pub(crate) struct InstallationFolders {
 impl Validate for InstallationFolders {
     fn validate(&self) -> Result<(), String> {
         validate_relative(&self.folder)?;
-        if self.marker.all().is_empty() {
-            return Err("an installation folders marker needs a path".into());
-        }
-        self.marker
-            .all()
-            .iter()
-            .try_for_each(|marker| validate_relative(marker))
+        self.marker.validate()
     }
 }
 
@@ -1992,12 +1986,7 @@ impl Validate for PluginFolders {
             }
         }
         if let Some(marker) = &self.marker {
-            if marker.all().is_empty() {
-                return Err("a plugin folders marker needs a path".into());
-            }
-            for marker in marker.all() {
-                validate_relative(marker)?;
-            }
+            marker.validate()?;
         }
         if let Some(records) = &self.records {
             validate_key_path(&records.root)?;
@@ -2063,6 +2052,17 @@ impl RelativePaths {
             RelativePaths::One(path) => std::slice::from_ref(path),
             RelativePaths::Several(paths) => paths,
         }
+    }
+}
+
+impl Validate for RelativePaths {
+    fn validate(&self) -> Result<(), String> {
+        if self.all().is_empty() {
+            return Err("a marker needs a path".into());
+        }
+        self.all()
+            .iter()
+            .try_for_each(|path| validate_relative(path))
     }
 }
 
