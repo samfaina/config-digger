@@ -32,6 +32,9 @@ rfd = { version = "0.16", default-features = false }
 # SQLite stores such as `state.vscdb`, read-only. Bundled, so no system
 # library is needed.
 rusqlite = { version = "0.40", features = ["bundled"] }
+# The regexes of Codex's `requirements.toml` matchers, read with the
+# engine Codex compiles them with.
+regex-lite = "0.1"
 schemars = "1.2"
 # The release compares the version a signature was made for as
 # `tauri-plugin-updater` does.

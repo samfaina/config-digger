@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 humantime.workspace = true
 jsonc-parser.workspace = true
+regex-lite.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true
 serde.workspace = true

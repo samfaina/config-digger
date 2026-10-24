@@ -8,6 +8,7 @@
 use super::ReadFailureReaction;
 use crate::edit::{Edit, Syntax};
 use crate::installations::pe;
+use crate::mask::MASK;
 use crate::paths;
 use crate::ports::{Environment, FileSystem, Hive, Ports, RegistryData};
 use crate::version::Version;
@@ -2459,6 +2460,12 @@ pub(crate) struct ManifestSkills {
     /// `skills` reads the folders in a folder, such as by its frontmatter
     /// `name`.
     pub one_skill: Option<SkillFolder>,
+    /// Whether a declared path counts only when it starts with `./`, as
+    /// Codex requires of its plugins' manifests: one that does not is
+    /// ignored, and a field holding no path that counts, or a list with
+    /// an item that is no path, declares none.
+    #[serde(default)]
+    pub dot_slash: bool,
 }
 
 impl Validate for ManifestSkills {
@@ -2486,7 +2493,7 @@ impl ManifestSkills {
     /// default folder when it declares none; the default folder first,
     /// whatever it declares, when they add to it. A manifest that does not
     /// parse declares none; a field that is neither a path nor a list of
-    /// paths declares no skills.
+    /// paths declares no skills, unless `dot_slash` reads it as none.
     pub fn paths(&self, manifest: Option<&str>) -> Vec<DeclaredSkills> {
         let document = manifest.and_then(|text| JsonFormat::STRICT.parse(text).ok());
         let declared = document.as_ref().and_then(|document| {
@@ -2498,14 +2505,31 @@ impl ManifestSkills {
             path: path.to_owned(),
             may_name_one,
         };
-        let declared = match declared {
-            None => return vec![folder(&self.default, false)],
-            Some(Value::String(path)) => vec![folder(path, self.path_may_name_one)],
-            Some(Value::Array(paths)) => paths
-                .iter()
-                .filter_map(|path| Some(folder(path.as_str()?, true)))
-                .collect(),
-            Some(_) => Vec::new(),
+        let mut declared = match declared {
+            None => None,
+            Some(Value::String(path)) => Some(vec![folder(path, self.path_may_name_one)]),
+            Some(Value::Array(paths)) if self.dot_slash && !paths.iter().all(Value::is_string) => {
+                None
+            }
+            Some(Value::Array(paths)) => Some(
+                paths
+                    .iter()
+                    .filter_map(|path| Some(folder(path.as_str()?, true)))
+                    .collect(),
+            ),
+            Some(_) if self.dot_slash => None,
+            Some(_) => Some(Vec::new()),
+        };
+        if self.dot_slash
+            && let Some(paths) = &mut declared
+        {
+            paths.retain(|declared| is_dot_slash_path(&declared.path));
+            if paths.is_empty() {
+                declared = None;
+            }
+        }
+        let Some(declared) = declared else {
+            return vec![folder(&self.default, false)];
         };
         match self.adds_to_default {
             true => std::iter::once(folder(&self.default, false))
@@ -6030,12 +6054,13 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
 /// Tables of the servers an organisation allows, each keyed by a server's
 /// name and holding what that server must be, such as the `mcp_servers` of
 /// Codex's `requirements.toml`: `identity = { command = "…" }` or
-/// `identity = { url = "…" }`. The tables of every source merge name by
-/// name, a higher source's winning. Once any source holds a table, a server
-/// whose name it lacks, or whose command or URL is not the one its name
-/// requires, is kept out. A requirement held some other way, such as a
-/// table matching a command's args, is not read: its server is taken to
-/// meet it.
+/// `identity = { url = "…" }`, or with matchers, `identity = { command =
+/// { executable = "…", args = [<matcher>, …] } }`, as many args each
+/// matching its matcher, or `identity = { url = <matcher> }`. The tables of
+/// every source merge name by name, a higher source's winning. Once any
+/// source holds a table, a server whose name it lacks, or that does not
+/// meet what its name requires, is kept out. A requirement held some other
+/// way is not read: its server is taken to meet it.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct IdentityAllowlist {
@@ -6098,29 +6123,136 @@ impl IdentityAllowlist {
         })
     }
 
-    /// Whether a server whose command and URL are `command` and `url` meets
-    /// `requirement`, its name's entry in a table. `shown_command` and
-    /// `shown_url` give a required command or URL as the server's would be
-    /// shown, so that masked values compare alike.
+    /// Whether `server` meets `requirement`, its name's entry in a table.
+    /// `shown_command` gives a command line the requirement names as the
+    /// server's would be shown, and `shown_url` a URL, so that masked
+    /// values compare alike.
     pub fn meets(
         &self,
         requirement: &Value,
-        command: Option<&str>,
-        url: Option<&str>,
-        shown_command: &dyn Fn(&str) -> String,
+        server: &ServerIdentity,
+        shown_command: &dyn Fn(&[&str]) -> Vec<String>,
         shown_url: &dyn Fn(&str) -> String,
     ) -> bool {
         let Some(identity) = requirement.get(&self.identity) else {
             return true;
         };
+        let (command, args) = match server.command.as_deref() {
+            Some([command, args @ ..]) => (Some(*command), args),
+            _ => (None, &[][..]),
+        };
+        let is_command = |required: &str| {
+            command.is_some_and(|command| {
+                shown_command(&[required]).first().map(String::as_str) == Some(command)
+            })
+        };
         match (identity.get("command"), identity.get("url")) {
-            (Some(Value::String(required)), None) => {
-                command.is_some_and(|command| shown_command(required) == command)
-            }
+            (Some(Value::String(required)), None) => is_command(required),
             (None, Some(Value::String(required))) => {
-                url.is_some_and(|url| shown_url(required) == url)
+                server.url.is_some_and(|url| shown_url(required) == url)
             }
+            (Some(matcher @ Value::Object(_)), None) => match CommandMatcher::of(matcher) {
+                Some(matcher) => {
+                    is_command(matcher.executable) && matcher.matches_args(args, shown_command)
+                }
+                None => true,
+            },
+            (None, Some(matcher @ Value::Object(_))) => match ValueMatcher::of(matcher) {
+                Some(matcher) => server
+                    .url
+                    .is_some_and(|url| matcher.matches(url, shown_url)),
+                None => true,
+            },
             _ => true,
+        }
+    }
+}
+
+/// What a matcher in Codex's `requirements.toml` holds a server's command
+/// line to: `{ executable = "…", args = [<matcher>, …] }`.
+struct CommandMatcher<'a> {
+    executable: &'a str,
+    args: Vec<ValueMatcher<'a>>,
+}
+
+impl<'a> CommandMatcher<'a> {
+    /// The matcher `value` holds; `None` when it holds none.
+    fn of(value: &'a Value) -> Option<Self> {
+        Some(Self {
+            executable: value.get("executable")?.as_str()?,
+            args: value
+                .get("args")?
+                .as_array()?
+                .iter()
+                .map(ValueMatcher::of)
+                .collect::<Option<_>>()?,
+        })
+    }
+
+    /// Whether `args`, a server's as its Entry shows them, are as many as
+    /// its matchers, each matching its own. `shown_command` gives a command
+    /// line as the server's would be shown.
+    fn matches_args(&self, args: &[&str], shown_command: &dyn Fn(&[&str]) -> Vec<String>) -> bool {
+        self.args.len() == args.len()
+            && self
+                .args
+                .iter()
+                .zip(args)
+                .enumerate()
+                .all(|(index, (matcher, arg))| {
+                    // An arg shows as it follows the args before it.
+                    let shown_arg = |value: &str| {
+                        let line: Vec<&str> = [self.executable]
+                            .into_iter()
+                            .chain(args[..index].iter().copied())
+                            .chain([value])
+                            .collect();
+                        shown_command(&line).pop().unwrap_or_default()
+                    };
+                    matcher.matches(arg, &shown_arg)
+                })
+    }
+}
+
+/// What a matcher in Codex's `requirements.toml` holds a value to:
+/// `{ match = "exact" | "prefix", value = "…" }` or `{ match = "regex",
+/// expression = "…" }`, the regex matching the whole value.
+enum ValueMatcher<'a> {
+    Exact(&'a str),
+    Prefix(&'a str),
+    Regex(&'a str),
+}
+
+impl<'a> ValueMatcher<'a> {
+    /// The matcher `value` holds; `None` when it holds none.
+    fn of(value: &'a Value) -> Option<Self> {
+        let field = |key: &str| value.get(key).and_then(Value::as_str);
+        match field("match")? {
+            "exact" => Some(Self::Exact(field("value")?)),
+            "prefix" => Some(Self::Prefix(field("value")?)),
+            "regex" => Some(Self::Regex(field("expression")?)),
+            _ => None,
+        }
+    }
+
+    /// Whether `value`, as its Entry shows it, matches. `shown` gives an
+    /// exact value as `value` would be shown. A prefix is compared with the
+    /// text before a mask, and one that reaches past it matches; a regex
+    /// cannot be compared with a masked value, which matches it. A regex
+    /// that does not compile matches nothing, as in Codex.
+    fn matches(&self, value: &str, shown: &dyn Fn(&str) -> String) -> bool {
+        let visible = value.find(MASK).map(|at| &value[..at]);
+        match self {
+            Self::Exact(exact) => shown(exact) == value,
+            Self::Prefix(prefix) => match visible {
+                None => value.starts_with(prefix),
+                Some(visible) => visible.starts_with(prefix) || prefix.starts_with(visible),
+            },
+            Self::Regex(expression) => {
+                visible.is_some()
+                    || regex_lite::Regex::new(&format!(r"\A(?:{expression})\z"))
+                        .is_ok_and(|regex| regex.is_match(value))
+            }
         }
     }
 }
@@ -7535,6 +7667,18 @@ pub(crate) fn validate_relative(path: &str) -> Result<(), String> {
             "`{path}` must be a relative path without `.` or `..`"
         ))
     }
+}
+
+/// Whether `path`, relative to a plugin's folder, is written as Codex
+/// requires in its plugins' manifests: it starts with `./`, names more than
+/// `./`, and has no `..` and no root or drive of its own.
+pub(crate) fn is_dot_slash_path(path: &str) -> bool {
+    let Some(relative) = path.strip_prefix("./") else {
+        return false;
+    };
+    let rooted = relative.starts_with(['/', '\\'])
+        || matches!(relative.as_bytes(), [drive, b':', ..] if drive.is_ascii_alphabetic());
+    !relative.is_empty() && !rooted && !relative.split(['/', '\\']).any(|part| part == "..")
 }
 
 /// Joins a `/`-separated relative path so the result uses native separators.

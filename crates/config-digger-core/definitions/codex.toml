@@ -213,14 +213,28 @@ store_class = "plain"
 secrets = { fields = [["http_headers"], ["http_headers_helper"], ["oauth", "client_secret"]], variable_names = [["bearer_token_env_var"], ["env_http_headers", "*"]] }
 on_read_failure = "stops_agent"
 
-# A plugin's servers, from its `.mcp.json` [source]. The servers its
-# manifest declares in `mcpServers`, which Codex reads instead when there
-# are any, are not read yet. The plugin owns their transport: `config.toml`
-# can only switch them [source]. Codex starts without the servers of a
-# plugin's `.mcp.json` it cannot parse, and keeps the plugin's skills [test].
+# A plugin's servers, those its manifest declares in `mcpServers`, inline
+# or as a path to a file of the plugin shaped like `.mcp.json`, or else
+# those of its `.mcp.json` [source]. The plugin owns their transport:
+# `config.toml` can only switch them [source]. Such a file holds its
+# servers in `mcpServers`, or at its top level [source]. Codex starts
+# without the servers of a plugin's `.mcp.json` it cannot parse, and keeps
+# the plugin's skills [test].
+#
+# Its manifest is the first of `.codex-plugin\plugin.json`,
+# `.claude-plugin\plugin.json` and `.cursor-plugin\plugin.json` it has
+# [source]. Codex ignores a path of the manifest, here and in `skills`,
+# that does not start with `./` or holds `..`, and any other value than a
+# path or, here, an object [source]. It does not load a plugin without a
+# manifest it can parse [source]; config-digger reads such a plugin's
+# `.mcp.json` and `skills` folder when it has no manifest, and only its
+# `skills` folder when the manifest does not parse. A `plugin.json` at the
+# plugin's root naming an Agent Plugins `$schema`, which Codex reads first
+# and in a format of its own [source], is not read.
 [[locations]]
 id = "plugin-mcp"
-anchor = { block = "plugin", plugins = "installed", path = ".mcp.json" }
+anchor = { block = "plugin", plugins = "installed", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
+references = { root = ["mcpServers"], default = ".mcp.json", dot_slash = true, bare = true }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
 kind = "mcp"
@@ -234,7 +248,8 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "remote-plugin-mcp"
 unverified = { sentence = "What Codex does with a `.mcp.json` it cannot parse, in a plugin the account installed, is not known.", needs = "a Codex enterprise account with remote plugins" }
-anchor = { block = "plugin", plugins = "remote", path = ".mcp.json" }
+anchor = { block = "plugin", plugins = "remote", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
+references = { root = ["mcpServers"], default = ".mcp.json", dot_slash = true, bare = true }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
 kind = "mcp"
@@ -332,9 +347,11 @@ trusted = "trusted"
 # many args, each matching its matcher, and `identity = { url = <matcher> }`
 # a matching URL: `{ match = "exact" | "prefix", value = "…" }` or
 # `{ match = "regex", expression = "…" }` on the whole value; a regex that
-# does not compile stops Codex [source, test]. config-digger reads neither
-# form and takes such a server to meet its requirement (#141). Once it
-# lists any, Codex turns off every other server [source, test], checking
+# does not compile stops Codex [source, test]. A prefix or regex cannot see
+# a Secret config-digger masks, so config-digger lets a masked arg or URL
+# meet it; a regex that does not compile matches nothing here, and
+# config-digger does not say that Codex will not start. Once it lists any,
+# Codex turns off every other server [source, test], checking
 # the server it built from its layers [source]. The machine's
 # `%ProgramData%\OpenAI\Codex\requirements.toml` is the lowest source and
 # the cloud bundle's `requirements_toml` fragments rank above it, merged
@@ -443,13 +460,15 @@ provenance = "managed"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
-# A plugin's skills, in its `skills` folder [source]. The folder its
-# manifest names in `skills`, which Codex reads instead, is not read yet.
-# Codex names them `<plugin>:<skill>` [source].
+# A plugin's skills, in the folders of skill folders its manifest names in
+# `skills`, a path or a list of them, or else in its `skills` folder
+# [source]. Codex names them `<plugin>:<skill>` [source]. It finds every
+# `SKILL.md` below each folder, the folder's own included [source]; a
+# declared folder holding one is read here as that one skill alone.
 [[locations]]
 id = "plugin-skills"
-anchor = { block = "plugin", plugins = "installed", path = "skills" }
-format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+anchor = { block = "plugin", plugins = "installed", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", dot_slash = true, path_may_name_one = true, skills = { recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" } }
 name_template = "{plugin}:{name}"
 kind = "skill"
 scope = "plugin"
@@ -460,8 +479,8 @@ on_read_failure = "ignores_file"
 # The skills of a plugin the account installed, read only.
 [[locations]]
 id = "remote-plugin-skills"
-anchor = { block = "plugin", plugins = "remote", path = "skills" }
-format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+anchor = { block = "plugin", plugins = "remote", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", dot_slash = true, path_may_name_one = true, skills = { recursive = true, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" } }
 name_template = "{plugin}:{name}"
 kind = "skill"
 scope = "plugin"

@@ -836,6 +836,37 @@ pub(crate) struct References {
     /// The bundles a value can name instead of a file, such as the `.mcpb`
     /// bundles of a Claude Code plugin's `mcpServers`.
     pub bundles: Option<blocks::Bundles>,
+    /// A `/`-separated path relative to the plugin's folder of the file
+    /// read in place of the value at the location's root when the
+    /// location's file declares none there, or there is no such file, as a
+    /// Codex plugin's `.mcp.json` is read unless its manifest declares
+    /// `mcpServers`. While the location's file cannot be parsed, neither
+    /// is read.
+    pub default: Option<String>,
+    /// Whether the value at the location's root counts only when it is an
+    /// object of Entries or a path starting with `./`, as Codex requires
+    /// of its plugins' manifests: any other value, a list included, is
+    /// ignored, as if not declared.
+    #[serde(default)]
+    pub dot_slash: bool,
+    /// Whether a file pointed to without `root` holds its Entries at its
+    /// top level instead, as Codex reads a plugin's `.mcp.json` that is a
+    /// bare object of servers.
+    #[serde(default)]
+    pub bare: bool,
+}
+
+impl References {
+    /// Whether the Agent ignores `value`, the value at the location's
+    /// root, as if it declared nothing there.
+    pub fn ignores(&self, value: &serde_json::Value) -> bool {
+        self.dot_slash
+            && match value {
+                serde_json::Value::String(path) => !blocks::is_dot_slash_path(path),
+                serde_json::Value::Object(_) => false,
+                _ => true,
+            }
+    }
 }
 
 /// A reference that stands for the folder of an Entry's plugin in some of
@@ -1567,6 +1598,9 @@ impl AgentDefinition {
                 blocks::validate_key_path(&references.root).map_err(context)?;
                 if let Some(bundles) = &references.bundles {
                     bundles.validate().map_err(context)?;
+                }
+                if let Some(default) = &references.default {
+                    blocks::validate_relative(default).map_err(context)?;
                 }
             }
             if let Some(root) = &location.plugin_root {

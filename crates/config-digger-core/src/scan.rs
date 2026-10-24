@@ -3469,7 +3469,8 @@ impl Scanner<'_> {
 
     /// Adds the Entries at the root of the file `path` of `plugin`: an
     /// object of Entries, a path to another file of the plugin holding
-    /// them, or a list of either.
+    /// them, or a list of either; or else those of the references' default
+    /// file, when the root declares none the Agent reads.
     fn read_references(
         &mut self,
         home: &FoundHome,
@@ -3481,19 +3482,30 @@ impl Scanner<'_> {
     ) {
         self.add_reader(home, location, &path);
         let project = plugin.project.as_deref();
-        let Some(document) = self.document(home, location, &path, project) else {
-            return;
+        let document = match self.reader.fs.exists(&path) {
+            true => match self.document(home, location, &path, project) {
+                Some(document) => Some(document),
+                None => return,
+            },
+            false => None,
         };
-        let values: Vec<(Option<usize>, &serde_json::Value)> =
-            match lookup(&document, &location.root) {
-                None => Vec::new(),
-                Some(serde_json::Value::Array(values)) => values
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (Some(i), v))
-                    .collect(),
-                Some(value) => vec![(None, value)],
-            };
+        let default = references
+            .default
+            .as_ref()
+            .map(|default| serde_json::Value::String(default.clone()));
+        let declared = document
+            .as_ref()
+            .and_then(|document| lookup(document, &location.root))
+            .filter(|value| !references.ignores(value));
+        let values: Vec<(Option<usize>, &serde_json::Value)> = match declared.or(default.as_ref()) {
+            None => Vec::new(),
+            Some(serde_json::Value::Array(values)) => values
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (Some(i), v))
+                .collect(),
+            Some(value) => vec![(None, value)],
+        };
         for (index, value) in values {
             match value {
                 serde_json::Value::String(relative) => {
@@ -3512,16 +3524,15 @@ impl Scanner<'_> {
                     let Some(referenced) = self.document(home, location, &file, project) else {
                         continue;
                     };
+                    let root: &[String] =
+                        if references.bare && lookup(&referenced, &references.root).is_none() {
+                            &[]
+                        } else {
+                            &references.root
+                        };
                     let mut objects = Vec::new();
-                    if find_objects(
-                        &referenced,
-                        &references.root,
-                        None,
-                        Vec::new(),
-                        None,
-                        &mut objects,
-                    )
-                    .is_err()
+                    if find_objects(&referenced, root, None, Vec::new(), None, &mut objects)
+                        .is_err()
                     {
                         self.reader
                             .fail(home, &file, project, ReadFailureKind::Parse, None);
