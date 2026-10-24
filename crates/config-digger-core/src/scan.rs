@@ -5,11 +5,11 @@
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
-    Format, Gate, GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins,
-    Locate, LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache,
-    PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register,
-    Registry, RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
-    StoreClass, is_entry_key,
+    Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect, JsonFormat,
+    JsonPluginRecords, ListPlugins, Locate, LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom,
+    PLUGIN_KEY, Parse, PluginCache, PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys,
+    ProjectWalk, Register, Registry, RelativePaths, SettingsSource, SkillDefect, SkillFolder,
+    SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -971,6 +971,10 @@ fn read_as_if(
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
 
     let settings = read_settings(definitions, ports, &mut scanner.reader);
+    let installations = match known_installations {
+        Some(known) => known.to_vec(),
+        None => installations::find(definitions, ports),
+    };
     for home in &found {
         scanner.read_registries(home, &definitions[home.agent_index]);
     }
@@ -985,12 +989,25 @@ fn read_as_if(
     let mut installed = Installed::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
+        let installed_at: Vec<&Path> = installations
+            .iter()
+            .filter(|installation| {
+                installation.agent_index == home.agent_index
+                    && installations::reads_laid_out(
+                        definition,
+                        installation,
+                        home.mirror.as_ref(),
+                        home.declared.as_deref(),
+                    )
+            })
+            .map(|installation| installation.folder.as_path())
+            .collect();
         // A Project's own plugins wait for every Project.
         let plugins: Vec<ScannedPlugin> = definition
             .plugins
             .iter()
             .filter(|plugins| !plugins.registry.in_project())
-            .flat_map(|plugins| scanner.read_plugins(home, plugins, None))
+            .flat_map(|plugins| scanner.read_plugins(home, plugins, None, &installed_at))
             .collect();
         installed.insert((home.agent_index, home.home.clone()), plugins.clone());
         scanner.read_plugin_locations(home, definition, &plugins);
@@ -1060,7 +1077,7 @@ fn read_as_if(
         for list in definition.plugins.iter() {
             if list.registry.in_project() {
                 for (folder, key) in &folders {
-                    plugins.extend(scanner.read_plugins(home, list, Some((folder, key))));
+                    plugins.extend(scanner.read_plugins(home, list, Some((folder, key)), &[]));
                 }
             }
         }
@@ -1235,10 +1252,7 @@ fn read_as_if(
     });
     Ok(Snapshot {
         read_at,
-        installations: match known_installations {
-            Some(known) => known.to_vec(),
-            None => installations::find(definitions, ports),
-        },
+        installations,
         homes: found
             .into_iter()
             .zip(last_ran)
@@ -2679,6 +2693,31 @@ struct Scanner<'p> {
     cached: BTreeMap<PathBuf, Option<SystemTime>>,
 }
 
+/// The folders of `folder` that hold `marker`, or with no marker those
+/// whose name does not start with `.`, sorted by name, each with its name.
+fn marked_folders(
+    fs: &dyn FileSystem,
+    folder: &Path,
+    marker: Option<&RelativePaths>,
+) -> Vec<(String, PathBuf)> {
+    let mut children = fs.read_dir(folder).unwrap_or_default();
+    children.sort_by_key(|child| paths::key(child));
+    children
+        .into_iter()
+        .filter_map(|child| {
+            let name = child.file_name()?.to_str()?.to_owned();
+            let plugin = match marker {
+                Some(marker) => marker
+                    .all()
+                    .iter()
+                    .any(|marker| fs.exists(&blocks::join_relative(&child, marker))),
+                None => !name.starts_with('.') && fs.read_dir(&child).is_ok(),
+            };
+            plugin.then_some((name, child))
+        })
+        .collect()
+}
+
 /// The path `relative` names in each folder the Agent home `home` of the
 /// Agent at `agent_index` keeps for a Project, with that Project's key.
 fn storage_paths<'s>(
@@ -2864,16 +2903,22 @@ impl Scanner<'_> {
     /// The plugins of `plugins` that the Agent home installed, each record
     /// once, leaving out those whose folder carries the superseded marker.
     /// The Project a record applies in is recorded as a Project. A registry
-    /// in a Project is read in `folder`, a Project folder and its key.
+    /// in a Project is read in `folder`, a Project folder and its key, and
+    /// one in an Installation in each of `installed_at`, the folders of the
+    /// Installations that read the home.
     fn read_plugins(
         &mut self,
         home: &FoundHome,
         plugins: &PluginsDefinition,
         folder: Option<(&Path, &str)>,
+        installed_at: &[&Path],
     ) -> Vec<ScannedPlugin> {
         let records = match &plugins.registry {
             PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
             PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
+            PluginRegistry::InstallationFolders(block) => {
+                self.installation_folders(block, installed_at)
+            }
             PluginRegistry::PluginCache(block) => self.plugin_cache(home, block),
             PluginRegistry::ProjectPluginKeys(block) => match folder {
                 Some((folder, key)) => self.project_plugin_keys(home, block, folder, key),
@@ -3059,21 +3104,20 @@ impl Scanner<'_> {
                 }
             })
             .unwrap_or_default();
+        let removed = block
+            .removals
+            .as_ref()
+            .and_then(|removals| {
+                let path = blocks::join_relative(&folder, removals);
+                Some(PluginFolders::removed(self.reader.peek(&path).ok()??))
+            })
+            .unwrap_or_default();
         let fs = self.reader.fs;
-        let mut children = fs.read_dir(&folder).unwrap_or_default();
-        children.sort_by_key(|child| paths::key(child));
-        children
+        marked_folders(fs, &folder, block.marker.as_ref())
             .into_iter()
-            .filter_map(|child| {
-                let id = child.file_name()?.to_str()?.to_owned();
-                let plugin = match &block.marker {
-                    Some(marker) => marker
-                        .all()
-                        .iter()
-                        .any(|marker| fs.exists(&blocks::join_relative(&child, marker))),
-                    None => !id.starts_with('.') && fs.read_dir(&child).is_ok(),
-                };
-                if !plugin {
+            .filter_map(|(id, child)| {
+                if removed.contains(&id.to_lowercase()) {
+                    tracing::debug!(plugin = %id, "plugin folder marked for deletion");
                     return None;
                 }
                 let linked = block.linked.as_ref().and_then(|linked| {
@@ -3089,6 +3133,30 @@ impl Scanner<'_> {
                     scope: None,
                     project: None,
                 })
+            })
+            .collect()
+    }
+
+    /// A record for each folder that holds the marker in the folder the
+    /// registry names in each of `installed_at`, an Installation's folder,
+    /// sorted by name within each, Installation by Installation.
+    fn installation_folders(
+        &self,
+        block: &InstallationFolders,
+        installed_at: &[&Path],
+    ) -> Vec<PluginRecord> {
+        let fs = self.reader.fs;
+        installed_at
+            .iter()
+            .flat_map(|installation| paths::expand_relative(fs, installation, &block.folder))
+            .flat_map(|folder| marked_folders(fs, &folder, Some(&block.marker)))
+            .map(|(id, folder)| PluginRecord {
+                id,
+                name: None,
+                folder: folder.display().to_string(),
+                scope: None,
+                project: None,
+                version: None,
             })
             .collect()
     }

@@ -1,0 +1,11 @@
+{
+  "name": "helper",
+  "publisher": "acme",
+  "version": "0.9.0",
+  "contributes": {
+    "chatSkills": [
+      { "path": "./skills/troubleshoot/SKILL.md" },
+      { "path": "./skills/legacy/SKILL.md" }
+    ]
+  }
+}

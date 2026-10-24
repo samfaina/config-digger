@@ -774,6 +774,118 @@ fn an_extension_s_chat_skills_rank_last() {
     assert_eq!(code(last.state), "shadowed");
 }
 
+#[test]
+fn an_extension_version_obsolete_lists_contributes_nothing() {
+    let inventory = inventory(&with_home(vscode()));
+
+    let extension = Path::new(HOME).join(r".vscode\extensions\acme.helper-1.0.0");
+    let troubleshoot = skill(&inventory, "troubleshoot");
+    let paths: Vec<&Path> = troubleshoot
+        .entries
+        .iter()
+        .map(|entry| entry.path.as_path())
+        .collect();
+    assert_eq!(paths, [extension.join(r"skills\troubleshoot")]);
+    assert!(
+        !inventory
+            .items
+            .iter()
+            .any(|item| item.agent == "vscode" && item.name == "legacy"),
+        "the obsolete version's own skill is listed"
+    );
+}
+
+/// The folder of the fixture user setup of VS Code.
+fn installation() -> PathBuf {
+    Path::new(LOCAL_APP_DATA).join(r"Programs\Microsoft VS Code")
+}
+
+/// `fs` with the fixture user setup of VS Code, whose commit folder holds
+/// the built-in extensions GitHub Copilot Chat and Git.
+fn with_installation(fs: FakeFileSystem) -> FakeFileSystem {
+    load(fs, &fixture_folder("installation"), &installation()).with_file(
+        installation().join("Code.exe"),
+        fake::executable(Some([1, 129, 1, 0])),
+    )
+}
+
+/// The folder of the fixture built-in GitHub Copilot Chat.
+fn copilot() -> PathBuf {
+    installation().join(r"8a7abeba6e\resources\app\extensions\copilot")
+}
+
+#[test]
+fn a_built_in_extension_s_chat_skills_are_extension_skills() {
+    let inventory = inventory(&with_installation(with_home(vscode())));
+
+    let create_skill = &skill(&inventory, "create-skill").entries[0];
+    assert_eq!(
+        create_skill.path,
+        copilot().join(r"assets\prompts\skills\create-skill")
+    );
+    assert_eq!(code(create_skill.state), "effective");
+    assert_eq!(code(create_skill.provenance), "extension");
+    assert_eq!(create_skill.scope, "extension");
+    let plugin = create_skill.plugin.as_ref().unwrap();
+    assert_eq!(
+        (plugin.id.as_str(), plugin.name.as_str()),
+        ("copilot", "copilot-chat")
+    );
+    assert_eq!(code(skill(&inventory, "init").state), "effective");
+}
+
+#[test]
+fn a_built_in_extension_s_skills_rank_among_extensions_before_installed_ones() {
+    let fs = with_project(with_installation(with_home(vscode())), "app");
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let review = skill(&inventory, "review");
+    let entries: Vec<(&str, &Path)> = review
+        .entries
+        .iter()
+        .map(|entry| (entry.scope.as_str(), entry.path.as_path()))
+        .collect();
+    let user_extension = Path::new(HOME).join(r".vscode\extensions\acme.helper-1.0.0");
+    assert_eq!(
+        entries[3..],
+        [
+            ("plugin", review_kit().join(r"skills\review").as_path()),
+            (
+                "extension",
+                copilot().join(r"assets\prompts\skills\review").as_path()
+            ),
+            ("extension", user_extension.join(r"skills\review").as_path()),
+        ]
+    );
+    assert_eq!(
+        entries[..3]
+            .iter()
+            .map(|(scope, _)| *scope)
+            .collect::<Vec<_>>(),
+        ["workspace-folder", "user", "user"]
+    );
+    assert_eq!(code(review.entries[0].state), "effective");
+    assert!(
+        review.entries[1..]
+            .iter()
+            .all(|entry| code(entry.state) == "shadowed")
+    );
+}
+
+#[test]
+fn a_built_in_extension_s_skill_cannot_be_removed() {
+    let inventory = inventory(&with_installation(with_home(vscode())));
+
+    let remove = json(&skill(&inventory, "create-skill").entries[0].remove);
+    assert_eq!(remove["status"], "not_offered");
+    assert_eq!(remove["code"], "extension");
+    assert_eq!(
+        remove["sentence"],
+        "copilot-chat is built into VS Code, which cannot uninstall it."
+    );
+    assert_eq!(remove["how_to_remove"], Value::Null);
+}
+
 /// Claude Desktop's config file, which VS Code can discover.
 const CLAUDE_DESKTOP: &str = r"C:\Users\fixture\AppData\Roaming\Claude\claude_desktop_config.json";
 

@@ -11,7 +11,7 @@ use crate::api;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
 use crate::definitions::{AgentDefinition, DefinitionNote};
 use crate::ports::Ports;
-use crate::scan::{ScannedHome, Snapshot};
+use crate::scan::{Mirror, ScannedHome, Snapshot};
 use crate::version::{Standing, Version};
 use crate::{explain, paths};
 use std::collections::BTreeSet;
@@ -23,6 +23,8 @@ pub(crate) struct ScannedInstallation {
     pub agent_index: usize,
     /// The id of its definition's installation.
     pub id: String,
+    /// The folder its definition's `folder` glob matched.
+    pub folder: PathBuf,
     pub executable: PathBuf,
     /// `None` when no source of its version could be read.
     pub version: Option<VersionRead>,
@@ -146,23 +148,38 @@ fn reads(
     installation: &ScannedInstallation,
     home: &ScannedHome,
 ) -> bool {
-    if installation.agent_index != home.agent_index {
-        return false;
-    }
-    let declared = definition
+    installation.agent_index == home.agent_index
+        && reads_laid_out(
+            definition,
+            installation,
+            home.mirror.as_ref(),
+            home.declared.as_deref(),
+        )
+}
+
+/// Whether `installation`, of `definition`'s Agent, reads a home of it
+/// found as `declared`, or added by the user when `None`, that copies
+/// another when `mirror` says so.
+pub(crate) fn reads_laid_out(
+    definition: &AgentDefinition,
+    installation: &ScannedInstallation,
+    mirror: Option<&Mirror>,
+    declared: Option<&str>,
+) -> bool {
+    let defined = definition
         .installations
         .iter()
-        .find(|declared| declared.id == installation.id)
+        .find(|defined| defined.id == installation.id)
         .expect("a found Installation comes from its definition");
-    let Some(homes) = &declared.homes else {
+    let Some(homes) = &defined.homes else {
         return true;
     };
     // A Mirrored home is laid out like the home it copies.
-    let laid_out_as = match &home.mirror {
-        Some(mirror) => &mirror.source,
-        None => home.declared.as_ref().unwrap_or(&definition.homes[0].id),
+    let laid_out_as = match mirror {
+        Some(mirror) => mirror.source.as_str(),
+        None => declared.unwrap_or(&definition.homes[0].id),
     };
-    homes.contains(laid_out_as)
+    homes.iter().any(|home| home == laid_out_as)
 }
 
 /// Every Installation of every Agent, in definition order, each found once
@@ -196,6 +213,7 @@ pub(crate) fn find(definitions: &[AgentDefinition], ports: &Ports) -> Vec<Scanne
                 found.push(ScannedInstallation {
                     agent_index,
                     id: installation.id.clone(),
+                    folder,
                     executable,
                     version,
                 });
