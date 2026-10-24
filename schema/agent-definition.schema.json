@@ -1649,7 +1649,7 @@
           ]
         },
         {
-          "description": "The keys of an object in a file of each Project folder, each a plugin\nthe Project installs from a marketplace, such as the `plugins` of\nCursor's `.cursor/settings.json`. A key is the plugin's name, or its\nmarketplace's and its name joined by `/`, and holds an object; the\nplugin is named by the name. Its files are in a folder of a cache on\nthe machine, `<marketplace>/<name>/<version>`, the version being a\nfolder that holds the marker. The marketplace of a key that names none\nis the first, by name, whose cache holds the plugin. A key whose plugin\nis not in the cache installs nothing on disk yet, and is left out.",
+          "description": "The keys of an object in a file of each Project folder, each a plugin\nthe Project installs from a marketplace, such as the `plugins` of\nCursor's `.cursor/settings.json`. A key is the plugin's name, or its\nmarketplace's and its name joined by `/`, and holds an object; the\nplugin is named by the name. Its files are in a folder of a cache on\nthe machine, `<marketplace>/<name>/<version>`, the version being a\nfolder that holds the marker. The marketplace of a key that names none\nis `marketplace`, or else the first, by name, whose cache holds the\nplugin. A key whose plugin is not in the cache installs nothing on disk\nyet, and is left out.",
           "type": "object",
           "properties": {
             "anchor": {
@@ -1685,6 +1685,13 @@
             "marker": {
               "description": "A `/`-separated path relative to a version folder whose presence\nsays the folder is complete, such as `.cache-complete`.",
               "type": "string"
+            },
+            "marketplace": {
+              "description": "The marketplace of a key that names none, as the Agent resolves it,\nsuch as Cursor's `cursor-public`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "block": {
               "type": "string",

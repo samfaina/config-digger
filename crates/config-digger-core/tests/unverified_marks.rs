@@ -405,6 +405,7 @@ fn the_built_in_marks_under_the_exception_say_what_their_test_needs() {
                 "items.mcp.rules[1]",
                 "a Claude Desktop deployment for a third-party provider"
             ),
+            ("cursor.toml", "plugins[project]", "a Cursor team account"),
             ("codex.toml", "locations[cloud-mcp]", codex),
             ("codex.toml", "locations[cloud-mcp]", codex),
             ("codex.toml", "locations[remote-plugin-mcp]", codex),

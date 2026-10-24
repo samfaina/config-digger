@@ -1814,8 +1814,9 @@ impl Validate for InstallationFolders {
 /// plugin is named by the name. Its files are in a folder of a cache on
 /// the machine, `<marketplace>/<name>/<version>`, the version being a
 /// folder that holds the marker. The marketplace of a key that names none
-/// is the first, by name, whose cache holds the plugin. A key whose plugin
-/// is not in the cache installs nothing on disk yet, and is left out.
+/// is `marketplace`, or else the first, by name, whose cache holds the
+/// plugin. A key whose plugin is not in the cache installs nothing on disk
+/// yet, and is left out.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProjectPluginKeys {
@@ -1832,6 +1833,9 @@ pub(crate) struct ProjectPluginKeys {
     /// A `/`-separated path relative to a version folder whose presence
     /// says the folder is complete, such as `.cache-complete`.
     pub marker: String,
+    /// The marketplace of a key that names none, as the Agent resolves it,
+    /// such as Cursor's `cursor-public`.
+    pub marketplace: Option<String>,
 }
 
 /// A plugin a key of a Project's file names.
@@ -1862,8 +1866,16 @@ impl Validate for ProjectPluginKeys {
         if self.scope.is_empty() {
             return Err("a Project's plugin keys need a scope".into());
         }
+        if self.marketplace.as_deref().is_some_and(|m| !one_folder(m)) {
+            return Err("a Project's plugins' marketplace is one folder name".into());
+        }
         validate_relative(&self.marker)
     }
+}
+
+/// Whether `part` of a plugin key names one folder.
+fn one_folder(part: &str) -> bool {
+    !part.is_empty() && !matches!(part, "." | "..") && !part.contains(['/', '\\'])
 }
 
 impl ListPlugins for ProjectPluginKeys {
@@ -1888,9 +1900,6 @@ impl ProjectPluginKeys {
             .try_fold(&document, |value, key| value.get(key));
         let Some(Value::Object(plugins)) = root else {
             return Ok(Vec::new());
-        };
-        let one_folder = |part: &str| {
-            !part.is_empty() && !matches!(part, "." | "..") && !part.contains(['/', '\\'])
         };
         Ok(plugins
             .iter()

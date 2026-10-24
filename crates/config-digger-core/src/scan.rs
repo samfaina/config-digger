@@ -3083,7 +3083,8 @@ impl Scanner<'_> {
     /// A record for each plugin the Project folder `folder`, whose key is
     /// `project`, installs that is in the cache, in the file's order,
     /// applying in that Project. Of several complete versions, the last by
-    /// name is taken.
+    /// name is taken: which the Agent would run cannot be told from the
+    /// disk.
     fn project_plugin_keys(
         &mut self,
         home: &FoundHome,
@@ -3124,7 +3125,7 @@ impl Scanner<'_> {
         };
         keys.into_iter()
             .filter_map(|plugin| {
-                let version = match &plugin.marketplace {
+                let version = match plugin.marketplace.as_ref().or(block.marketplace.as_ref()) {
                     Some(marketplace) => complete(cache.join(marketplace).join(&plugin.name)),
                     None => {
                         let mut marketplaces = fs.read_dir(&cache).unwrap_or_default();

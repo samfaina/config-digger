@@ -1,11 +1,15 @@
 #:schema ../../../schema/agent-definition.schema.json
 # Cursor, the IDE. Facts from docs/research/cursor.md (verified against
-# 3.22.12). The Cursor CLI, `cursor-agent`, is another Agent: its own files
-# in `~\.cursor\projects\<slug>` are not read here.
+# 3.22.12), and those tagged [test] from the release gate's probe,
+# uat/agents/cursor.mjs (docs/research/release-gate.md), which passes on
+# 3.27.12. On 3.22.12 it passes but for its `plugins[project]` checks,
+# which ran only after Cursor updated itself. The Cursor CLI,
+# `cursor-agent`, is another Agent: its own files in
+# `~\.cursor\projects\<slug>` are not read here.
 
 format_version = 1
 
-verified = { min = "3.22.12", max = "3.22.12" }
+verified = { min = "3.27.12", max = "3.27.12" }
 
 [agent]
 id = "cursor"
@@ -97,19 +101,25 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # `<marketplace>/<name>`, holding `{ "enabled": true }` [code, disk]. The
 # plugin is named by the name [code]. Cursor keeps the plugin's files in
 # `~\.cursor\plugins\cache\<marketplace>\<name>\<commit>`, a folder it marks
-# complete with `.cache-complete` once downloaded, and prunes the other
-# commits [code, disk]: a plugin it has not downloaded yet is not listed.
-# Cursor's server picks the marketplace of a key that names none [code].
-# The `.cursor\settings.json` of a workspace file's folders is not read.
-# Cursor uninstalls the plugin in its Customize page, which deletes the key
-# [code].
+# complete with `.cache-complete` once downloaded [code, disk]: a plugin it
+# has not downloaded yet is not listed. Cursor resolves each key with its
+# server, which needs an account: signed out, it loads no plugin a key
+# names, even one complete in the cache [test], which config-digger still
+# lists. The server resolves a key that names no marketplace to
+# `cursor-public`, Cursor's public Marketplace, and Cursor reads the plugin
+# from that marketplace's cache only, not from another marketplace's
+# holding a plugin of the same name [test], on the owner's account, which
+# is in no team. The server names the commit: Cursor downloads it and, as
+# it loads the plugin, deletes the plugin's other commits, complete or not
+# [test], so once Cursor has run the cache holds one. Which of several
+# Cursor would run cannot be told from the disk, and the last by name is
+# read. The `.cursor\settings.json` of a workspace file's folders is not
+# read. Cursor uninstalls the plugin in its Customize page, which deletes
+# the key [code].
 [[plugins]]
 id = "project"
-unverified = [
-  "Which marketplace Cursor's server picks for a key that names none is not known: the first, by name, whose cache holds the plugin is taken.",
-  "Of several complete commits, which pruning has not reached yet, the last by name is taken.",
-]
-registry = { block = "project-plugin-keys", anchor = { block = "project", path = ".cursor/settings.json" }, dialect = "jsonc", root = ["plugins"], scope = "project", cache = { block = "machine", path = "~/.cursor/plugins/cache" }, marker = ".cache-complete" }
+unverified = { sentence = "Which marketplace Cursor's server picks for a key that names none on an account in a team is not known: `cursor-public` is taken, as for an account in no team.", needs = "a Cursor team account" }
+registry = { block = "project-plugin-keys", anchor = { block = "project", path = ".cursor/settings.json" }, dialect = "jsonc", root = ["plugins"], scope = "project", cache = { block = "machine", path = "~/.cursor/plugins/cache" }, marker = ".cache-complete", marketplace = "cursor-public" }
 
 # The local plugins, each a folder of `~\.cursor\plugins\local` whose name
 # does not start with `.`, named by the folder, with or without a manifest
@@ -138,13 +148,17 @@ registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.
 # dropping every server [code]. Cursor keeps the sign-in of remote servers
 # in its state [disk]. config-digger never writes a comment into either.
 #
-# `~\.cursor\mcp.json` [docs, disk]. No variable moves it [code].
+# `~\.cursor\mcp.json` [docs, disk]. No variable moves it [code]. Cursor
+# skips one it cannot parse, and leaves it as it is [test]. It keeps the
+# sign-in of a remote server across restarts, even one the file did not
+# hold, or held in a file that did not parse, while Cursor started [test],
+# but forgets it once the server leaves the file, or the file stops
+# parsing, while Cursor runs: put back, the server needs signing in again
+# [test]. So a file that does not parse costs no sign-in when Cursor
+# starts on it, and its Read failure does not warn of one. The Project's
+# file rests on the same code [code], untested.
 [[locations]]
 id = "user-mcp"
-unverified = [
-  "Whether Cursor forgets the sign-in of the servers it no longer sees is not known.",
-  "What Cursor does with a `mcp.json` it cannot parse is not known.",
-]
 anchor = { block = "machine", path = "~/.cursor/mcp.json" }
 name_template = "user-{name}"
 format = { block = "json", dialect = "jsonc" }
@@ -155,8 +169,8 @@ provenance = "file"
 store_class = "rewritten-while-running"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "unknown"
-risks = ["agent_may_drop_entries", "agent_may_clear_auth"]
+on_read_failure = "ignores_file"
+risks = ["agent_may_drop_entries"]
 no_comments = true
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
@@ -164,10 +178,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # folder above or below it [code]. `0` in its servers' identifiers is the
 # folder's position in the Project, followed by its name [code, disk]. A
 # `name` a `.code-workspace` file gives a folder, which Cursor may name it
-# by instead, is not read.
+# by instead, is not read. Cursor skips a `.cursor\mcp.json` it cannot
+# parse, and leaves it as it is [test].
 [[locations]]
 id = "project-mcp"
-unverified = "What Cursor does with a Project's `mcp.json` it cannot parse is not known."
 anchor = { block = "project", path = ".cursor/mcp.json" }
 name_template = "project-{folder_index}-{folder}-{name}"
 format = { block = "json", dialect = "jsonc" }
@@ -178,7 +192,7 @@ provenance = "file"
 store_class = "rewritten-while-running"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries", "agent_may_clear_auth"]
 no_comments = true
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
@@ -189,12 +203,16 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # plugin or a list of either, which win over the former by name [code]. No
 # Feature gate or setting of the user's holds them back [code]. Their
 # identifiers start with `plugin-` and the plugin's name [code, disk].
+#
+# Cursor skips a manifest it cannot parse, and still reads the plugin's
+# `.mcp.json` [test], but it reads the plugin's next manifest instead
+# [test], which config-digger does not (#338). It reads a plugin's
+# `mcp.json` it cannot parse around the error, starting the servers on
+# both sides of it [test], which config-digger cannot (#322). For both,
+# `unknown` stays, so the Items they reach keep a caveat.
 [[locations]]
 id = "cursor-plugin-manifest-mcp"
-unverified = [
-  "What Cursor does with a plugin manifest it cannot parse is not known.",
-  "A manifest `mcpServers` that is not an object is taken to leave the manifest's `skills` read: Cursor rejects an `mcp.json` whole for it [code], but what it does with a manifest is not known.",
-]
+unverified = "A manifest `mcpServers` that is not an object is taken to leave the manifest's `skills` read: Cursor rejects an `mcp.json` whole for it [code], but what it does with a manifest is not known."
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 name_template = "plugin-{plugin}-{name}"
 references = { root = ["mcpServers"] }
@@ -211,7 +229,6 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 
 [[locations]]
 id = "cursor-plugin-mcp"
-unverified = "What Cursor does with a plugin's `mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
 format = { block = "json", dialect = "strict" }
@@ -229,14 +246,17 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # `enable_cc_plugin_import` is on [code]: those its first manifest declares
 # in `mcpServers`, inline, as a path to a file of the plugin or a list of
 # either [code, disk], and those of its `.mcp.json`, or else its `mcp.json`
-# [code]. Its servers' identifiers start with `plugin-` and the plugin's
-# name [disk].
+# [code]: it reads the `.mcp.json` beside the servers the manifest
+# declares, and of a server both declare, one identifier, the manifest's
+# starts [test]. Its servers' identifiers start with `plugin-` and the
+# plugin's name [disk].
+#
+# As for Cursor's own plugins, Cursor skips a manifest it cannot parse,
+# still reading the plugin's `.mcp.json` [test], and reads the next
+# manifest instead [test] (#338). It reads a `.mcp.json` it cannot parse
+# around the error [test] (#322). For both, `unknown` stays.
 [[locations]]
 id = "claude-plugin-manifest-mcp"
-unverified = [
-  "Whether Cursor reads a Claude Code plugin's `.mcp.json` only when its manifest declares no servers is not known: a server both declare under one name is one identifier, and the manifest's is taken to win.",
-  "What Cursor does with a Claude Code plugin's manifest it cannot parse is not known.",
-]
 anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 name_template = "plugin-{plugin}-{name}"
 references = { root = ["mcpServers"] }
@@ -254,7 +274,6 @@ when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
 
 [[locations]]
 id = "claude-plugin-mcp"
-unverified = "What Cursor does with a Claude Code plugin's `mcp.json` it cannot parse is not known."
 anchor = { block = "plugin", plugins = "claude-code", path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
 format = { block = "json", dialect = "strict" }
