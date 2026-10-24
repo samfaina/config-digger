@@ -124,13 +124,18 @@ export async function openItem(t, name) {
   return s.exec("return document.querySelector('.panel.detail').innerText");
 }
 
-// The open action dialog: its title, its text, and whether it is still
-// preparing the preview.
+// The open action dialog: its title, its text, whether it is still
+// preparing the preview, and its foot's buttons, all read at once.
 export function dialog(s) {
   return s.exec(`
     const d = document.querySelector(".dialog");
     if (!d) return null;
-    return { title: d.querySelector(".dialog-title")?.textContent.trim(), text: d.innerText, loading: !!d.querySelector(".loading") };`);
+    return {
+      title: d.querySelector(".dialog-title")?.textContent.trim(),
+      text: d.innerText,
+      loading: !!d.querySelector(".loading"),
+      foot: [...d.querySelectorAll(".dialog-foot button")].map((b) => b.textContent.trim()),
+    };`);
 }
 
 export async function waitPreview(s) {
@@ -225,12 +230,13 @@ export async function confirm(s, verb) {
   );
   await s.click(button);
   // The result is in when the foot offers Done or Close. Its other buttons
-  // may repeat the verb: an Undo's result offers Undo again.
+  // may repeat the verb: an Undo's result offers Undo again. The text and the
+  // foot come from one read, or a result landing between two reads would
+  // return the preview's text.
   return s.until(
     async () => {
       const d = await dialog(s);
-      const foot = await s.exec(`return [...document.querySelectorAll(".dialog .dialog-foot button")].map((b) => b.textContent.trim());`);
-      return d && foot.some((b) => b === "Done" || b === "Close") ? d : null;
+      return d?.foot.some((b) => b === "Done" || b === "Close") ? d : null;
     },
     { what: `the result of ${verb}`, timeout: 30000 },
   );
