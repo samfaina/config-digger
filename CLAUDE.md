@@ -20,6 +20,10 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 
 The UAT kit in `uat/`: the plan, the runner page and the results. Add steps when a feature lands, publish a run, and turn its results into tickets as `docs/agents/uat.md` says.
 
+### Real-Agent probes
+
+The release gate (#80) tests the definitions' `unverified` marks against the real Agents, one child ticket per Agent or area. See `docs/agents/real-agent-probes.md`; #80's comments are history, not instructions.
+
 ### Screenshots
 
 To see a screen of the UI, run it in a browser on the fake backend and take screenshots with `npm run screenshots`. They stay local, never in a commit or a PR. See `docs/agents/screenshots.md`.

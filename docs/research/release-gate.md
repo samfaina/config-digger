@@ -174,10 +174,18 @@ Pending: these 37 marks need the apps' windows driven, on throwaway profiles. Cu
 
 ## What is left
 
-| Needs | Marks |
-|---|---|
-| Server-managed settings: Claude Teams or Enterprise | Claude Code `:86`, `:155` (a `remote-settings.json` that does not parse) |
-| A Codex enterprise account, with remote plugins | Codex `:175`, `:176`, `:233`, `:287` |
-| Orca | Codex `:63` |
-| A deployment of Claude Desktop for a third-party provider | Claude Desktop `:234` |
-| The apps' windows | Claude Desktop `:280`, and the 37 marks of Cursor and VS Code |
+Marks are named by their table, as `cargo xtask unverified` prints them; line numbers drift. Each row still to test has a child ticket of #80, and `docs/agents/real-agent-probes.md` is how to work one.
+
+| Needs | Marks | Ticket |
+|---|---|---|
+| Server-managed settings: Claude Teams or Enterprise | Claude Code `settings[managed]`, `locations[managed-settings-mcp]` (a `remote-settings.json` that does not parse) | Under the exception |
+| A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]` | Under the exception |
+| A deployment of Claude Desktop for a third-party provider | Claude Desktop `items.mcp.rules[1]` | Under the exception |
+| VS Code's windows, on a throwaway profile | VS Code's MCP files (10) | [#311](https://github.com/samfaina/config-digger/issues/311) |
+| The same, and a GitHub account | VS Code's stores, policy and skills (10) | [#316](https://github.com/samfaina/config-digger/issues/316) |
+| Cursor's windows, on a throwaway profile | Cursor's MCP files and plugins (10) | [#312](https://github.com/samfaina/config-digger/issues/312) |
+| The same, and maybe an account for its gates | Cursor's Disabled store, skills and gates (7) | [#317](https://github.com/samfaina/config-digger/issues/317) |
+| The app signed in, after [#305](https://github.com/samfaina/config-digger/issues/305) | Claude Desktop `locations[mirrored-skills]` | [#313](https://github.com/samfaina/config-digger/issues/313) |
+| Orca | Codex `mirrored_homes[orca]` | [#314](https://github.com/samfaina/config-digger/issues/314) |
+
+The release workflow's refusal of the marks outside the exception is [#315](https://github.com/samfaina/config-digger/issues/315).
