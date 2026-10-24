@@ -33,7 +33,8 @@ function Write-TestFile([string]$Path, [string]$Text) {
 $slash = $Root -replace '\\', '/'
 
 # Claude Code home: a user server, a Project with a local server, a missing
-# Project with one leftover, and a Project to hide.
+# Project with one leftover, a missing Project with nothing but a trust, as
+# Claude Code keeps for a deleted worktree, and a Project to hide.
 Write-TestFile "$Root\claude-code-home\.claude.json" @"
 {
   "mcpServers": {
@@ -58,6 +59,7 @@ Write-TestFile "$Root\claude-code-home\.claude.json" @"
         "cd-throwaway-leftover": { "command": "npx", "args": ["-y", "cd-throwaway-leftover"] }
       }
     },
+    "$slash/project-deleted": { "hasTrustDialogAccepted": true },
     "$slash/project-hide": {}
   }
 }

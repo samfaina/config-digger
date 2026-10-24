@@ -64,7 +64,17 @@ impl HomeSelector {
 #[derive(Subcommand)]
 pub(crate) enum ProjectsCommand {
     /// List the Projects the Agents record and the ones added, with where each came from.
-    List,
+    ///
+    /// A missing Project with no leftovers, such as a deleted worktree
+    /// Claude Code still records, is left out of the text unless
+    /// --all-missing asks for it, or it is hidden and --include-hidden asks
+    /// for the hidden ones; --json lists it either way.
+    List {
+        /// Also list the missing Projects with no leftovers, which only
+        /// `projects hide` acts on.
+        #[arg(long)]
+        all_missing: bool,
+    },
     /// Add an existing folder or `.code-workspace` file as a Project.
     Add {
         /// The folder or `.code-workspace` file.
@@ -191,15 +201,32 @@ pub(crate) fn projects(cli: &Cli, core: &Core, command: &ProjectsCommand) -> Res
     let width = terminal::output_width(cli.wide);
     let absolute = |path: &Path| std::path::absolute(path).map_err(api::Error::unexpected);
     let (project, done) = match command {
-        ProjectsCommand::List => {
-            let inventory = listing(cli, core)?;
+        ProjectsCommand::List { all_missing } => {
+            let snapshot = core.scan(&ScanOptions::default())?;
+            let mut inventory = core.resolve(&snapshot, &Context::default());
             if cli.json {
+                if !cli.include_hidden {
+                    inventory = inventory.without_hidden();
+                }
                 print_json(&ProjectsBody {
                     projects: &inventory.projects,
                 });
-            } else {
-                let agents = core.agents(&inventory);
-                anstream::print!("{}", render_projects(&inventory.projects, &agents, width));
+                return Ok(());
+            }
+            let mut leftovers = core.leftovers(&snapshot);
+            if !cli.include_hidden {
+                leftovers = inventory.leftovers_without_hidden(leftovers);
+                inventory = inventory.without_hidden();
+            }
+            let listed = inventory.projects.len();
+            if !all_missing {
+                inventory = inventory.without_missing_lacking_leftovers(&leftovers);
+            }
+            let agents = core.agents(&inventory);
+            anstream::print!("{}", render_projects(&inventory.projects, &agents, width));
+            let left_out = listed - inventory.projects.len();
+            if left_out > 0 {
+                anstream::print!("{}", plain_line(&left_out_sentence(left_out), width));
             }
             return Ok(());
         }
@@ -417,6 +444,18 @@ fn installed(home: &api::Home) -> String {
         })
         .collect();
     versions.join(", ")
+}
+
+/// What `projects list` says of the missing Projects with no leftovers it
+/// leaves out.
+fn left_out_sentence(count: usize) -> String {
+    if count == 1 {
+        "1 missing Project with no leftovers is not listed; --all-missing lists it".to_owned()
+    } else {
+        format!(
+            "{count} missing Projects with no leftovers are not listed; --all-missing lists them"
+        )
+    }
 }
 
 /// One table of Projects: where each came from, then its path.

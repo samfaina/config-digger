@@ -2733,6 +2733,105 @@ fn projects_list_marks_a_missing_project_missing() {
 }
 
 #[test]
+fn projects_list_leaves_out_the_missing_projects_without_leftovers_unless_asked_for() {
+    let harness = Harness::new();
+    let cwd = harness.cwd().to_path_buf();
+    let path = |name: &str| cwd.join(name).display().to_string();
+    let key = |name: &str| path(name).replace('\\', "/");
+    let claude_json = json!({
+        "projects": {
+            key("gone"): { "mcpServers": { "old": { "command": "old" } } },
+            key("deleted"): { "hasTrustDialogAccepted": true },
+            key("forgotten"): {}
+        }
+    });
+    let harness = harness.with_file(".claude.json", &claude_json.to_string());
+    let (gone, deleted, forgotten) = (path("gone"), path("deleted"), path("forgotten"));
+    let left_out =
+        "2 missing Projects with no leftovers are not listed; --all-missing lists them\n";
+
+    let text = harness.run(&["projects", "list", "--wide"]);
+    let all = harness.run(&["projects", "list", "--wide", "--all-missing"]);
+    let json = harness.run(&["projects", "list", "--json"]);
+    let hide = harness.run(&["projects", "hide", &deleted]);
+    let after_hide = harness.run(&["projects", "list", "--wide"]);
+    let hidden = harness.run(&["projects", "list", "--wide", "--include-hidden"]);
+    let hidden_all = harness.run(&[
+        "projects",
+        "list",
+        "--wide",
+        "--include-hidden",
+        "--all-missing",
+    ]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(text.stdout.contains(&gone), "{}", text.stdout);
+    assert!(!text.stdout.contains(&deleted), "{}", text.stdout);
+    assert!(!text.stdout.contains(&forgotten), "{}", text.stdout);
+    assert!(text.stdout.ends_with(left_out), "{}", text.stdout);
+    assert_eq!(all.code, 0, "{}", all.stderr);
+    for path in [&gone, &deleted, &forgotten] {
+        assert!(all.stdout.contains(path.as_str()), "{}", all.stdout);
+    }
+    assert!(!all.stdout.contains("--all-missing"), "{}", all.stdout);
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    assert_eq!(
+        listed_projects(&json.document()),
+        [deleted.clone(), forgotten.clone(), gone.clone()]
+    );
+    assert_eq!(hide.code, 0, "{}", hide.stderr);
+    // A hidden Project is listed with --include-hidden, leftovers or not.
+    let one_left_out =
+        "1 missing Project with no leftovers is not listed; --all-missing lists it\n";
+    let hidden_row = format!("registry of Claude Code, missing, hidden  {deleted}\n");
+    assert!(
+        !after_hide.stdout.contains(&deleted),
+        "{}",
+        after_hide.stdout
+    );
+    assert!(
+        after_hide.stdout.ends_with(one_left_out),
+        "{}",
+        after_hide.stdout
+    );
+    assert!(hidden.stdout.contains(&hidden_row), "{}", hidden.stdout);
+    assert!(!hidden.stdout.contains(&forgotten), "{}", hidden.stdout);
+    assert!(hidden.stdout.ends_with(one_left_out), "{}", hidden.stdout);
+    assert!(
+        hidden_all.stdout.contains(&hidden_row),
+        "{}",
+        hidden_all.stdout
+    );
+    assert!(
+        hidden_all.stdout.contains(&forgotten),
+        "{}",
+        hidden_all.stdout
+    );
+}
+
+#[test]
+fn projects_list_says_how_many_missing_projects_without_leftovers_it_leaves_out_in_the_singular() {
+    let harness = Harness::new();
+    let key = harness
+        .cwd()
+        .join("deleted")
+        .display()
+        .to_string()
+        .replace('\\', "/");
+    let harness = harness.with_file(
+        ".claude.json",
+        &json!({ "projects": { key: {} } }).to_string(),
+    );
+
+    let text = harness.run(&["projects", "list", "--wide"]);
+
+    assert_eq!(
+        text.stdout,
+        "No Project found.\n1 missing Project with no leftovers is not listed; --all-missing lists it\n"
+    );
+}
+
+#[test]
 fn list_of_a_missing_project_in_any_spelling_shows_its_unread_entries() {
     let harness = with_missing_projects();
     let gone = harness.cwd().join("gone").display().to_string();

@@ -134,10 +134,55 @@ describe("the Projects tab", () => {
     ]);
   });
 
-  test("offers Hide for a missing Project without leftovers", () => {
-    const { missing } = projectSections(places({ projects: [project({ path: GONE, missing: true })] }));
+  const DELETED = String.raw`E:\code\deleted`;
 
-    expect(missing[0]).toMatchObject({ leftovers: [], count: "No leftovers", hideOffered: true });
+  test("lists the missing Projects without leftovers apart from those with, each offering Hide", () => {
+    const { missing, noLeftovers } = projectSections(
+      places({
+        projects: [project({ path: DELETED, missing: true }), project({ path: GONE, missing: true })],
+        leftovers: [leftovers([leftover("old")])],
+      }),
+    );
+
+    expect(missing.map((row) => row.path)).toEqual([GONE]);
+    expect(noLeftovers).toEqual([
+      {
+        project: expect.objectContaining({ path: DELETED }),
+        path: DELETED,
+        source: "The folder no longer exists · known to Claude Code",
+        leftovers: [],
+        count: "No leftovers",
+        hideOffered: true,
+      },
+    ]);
+  });
+
+  test("counts no leftover of a missing Project in a hidden Agent home", () => {
+    const { missing, noLeftovers } = projectSections(
+      places({
+        projects: [project({ path: GONE, missing: true })],
+        leftovers: [leftovers([leftover("old"), leftover("search", "vscode")])],
+        agents: [agent({ homes: [home({ hidden: true })] }), agent({ id: "vscode", name: "VS Code", homes: [home({ agent: "vscode" })] })],
+      }),
+    );
+
+    expect(missing.map(({ leftovers, count }) => ({ leftovers, count }))).toEqual([
+      { leftovers: [`${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.search`], count: "1 leftover" },
+    ]);
+    expect(noLeftovers).toEqual([]);
+  });
+
+  test("moves a missing Project whose leftovers are all in hidden Agent homes to those without leftovers", () => {
+    const { missing, noLeftovers } = projectSections(
+      places({
+        projects: [project({ path: GONE, missing: true })],
+        leftovers: [leftovers([leftover("old")])],
+        agents: [agent({ homes: [home({ hidden: true })] })],
+      }),
+    );
+
+    expect(missing).toEqual([]);
+    expect(noLeftovers).toMatchObject([{ path: GONE, count: "No leftovers", hideOffered: true }]);
   });
 
   test("lists hidden Projects, missing ones included, on their own, with Remove from list for the user's own", () => {
@@ -153,13 +198,14 @@ describe("the Projects tab", () => {
 
     expect(sections.present).toEqual([]);
     expect(sections.missing).toEqual([]);
+    expect(sections.noLeftovers).toEqual([]);
     expect(sections.hidden.map(({ path, source, removable }) => ({ path, source, removable }))).toEqual([
       { path: String.raw`E:\code\old`, source: "Known to Claude Code", removable: false },
       { path: GONE, source: "Missing · Added by you", removable: true },
     ]);
   });
 
-  test("narrows every section, Missing and Hidden included, to the Projects whose path holds the search, in any case", () => {
+  test("narrows every section, both Missing ones and Hidden included, to the Projects whose path holds the search, in any case", () => {
     const sections = projectSections(
       places({
         projects: [
@@ -167,15 +213,19 @@ describe("the Projects tab", () => {
           project({ path: String.raw`E:\code\billing` }),
           project({ path: String.raw`E:\old\Shop-legacy`, missing: true }),
           project({ path: String.raw`E:\old\gone`, missing: true }),
+          project({ path: String.raw`E:\old\shop-deleted`, missing: true }),
+          project({ path: String.raw`E:\old\deleted`, missing: true }),
           project({ path: String.raw`E:\code\shop-admin`, hidden: true }),
           project({ path: String.raw`E:\code\notes`, hidden: true }),
         ],
+        leftovers: [String.raw`E:\old\Shop-legacy`, String.raw`E:\old\gone`].map((path) => ({ ...leftovers([leftover("old")]), project: path })),
       }),
       "SHOP",
     );
 
     expect(sections.present.map((row) => row.path)).toEqual([String.raw`E:\code\shop`]);
     expect(sections.missing.map((row) => row.path)).toEqual([String.raw`E:\old\Shop-legacy`]);
+    expect(sections.noLeftovers.map((row) => row.path)).toEqual([String.raw`E:\old\shop-deleted`]);
     expect(sections.hidden.map((row) => row.path)).toEqual([String.raw`E:\code\shop-admin`]);
   });
 

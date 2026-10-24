@@ -11,7 +11,7 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 /// What the Projects & homes screen lists: every Project and Agent home,
 /// hidden ones included, as `projects list` and `homes list` do with
@@ -54,6 +54,9 @@ pub struct Session {
     /// The locations shown so far: every Entry and Read failure of each
     /// resolved context, and every backup copy listed.
     openable: HashSet<String>,
+    /// The leftovers of the missing Projects, hidden ones included, worked
+    /// out once: each takes a resolve of its Project.
+    leftovers: OnceLock<Vec<Leftovers>>,
 }
 
 /// The app's [`Session`], once the inventory was read.
@@ -123,6 +126,7 @@ impl Session {
             snapshot,
             started,
             openable: HashSet::new(),
+            leftovers: OnceLock::new(),
         })
     }
 
@@ -136,18 +140,26 @@ impl Session {
         &self.snapshot
     }
 
+    /// The leftovers of the missing Projects, hidden ones included.
+    fn leftovers(&self) -> &[Leftovers] {
+        self.leftovers
+            .get_or_init(|| self.core.leftovers(&self.snapshot))
+    }
+
     /// Checks `path` as a Project before it is added, against this scan.
     pub fn check_project(&self, path: &Path) -> Result<ProjectCheck, Error> {
         self.core.check_project_in(&self.snapshot, path)
     }
 
     /// The inventory for `project`, or for no Project, without the Agent
-    /// homes and Projects the user hid. It never reads the disk.
+    /// homes and Projects the user hid, nor the missing Projects with no
+    /// leftovers outside them. It never reads the disk.
     pub fn resolve(&mut self, project: Option<PathBuf>) -> Inventory {
-        let inventory = self
-            .core
-            .resolve(&self.snapshot, &Context { project })
-            .without_hidden();
+        let inventory = self.core.resolve(&self.snapshot, &Context { project });
+        let leftovers = inventory.leftovers_without_hidden(self.leftovers().to_vec());
+        let inventory = inventory
+            .without_hidden()
+            .without_missing_lacking_leftovers(&leftovers);
         let entries = inventory.items.iter().flat_map(|item| &item.entries);
         let locations = entries.map(|entry| entry.path.as_path()).chain(
             inventory
@@ -167,7 +179,7 @@ impl Session {
         let inventory = self.core.resolve(&self.snapshot, &Context::default());
         Places {
             agents: self.core.agents(&inventory),
-            leftovers: self.core.leftovers(&self.snapshot),
+            leftovers: self.leftovers().to_vec(),
             read_at: inventory.read_at,
             projects: inventory.projects,
         }
@@ -466,6 +478,30 @@ mod tests {
                 .any(|home| home.home == "default" && home.hidden)
         }));
         assert!(kept.can_open(&claude_json()));
+    }
+
+    #[test]
+    fn the_inventory_lists_the_missing_projects_with_leftovers_outside_hidden_homes() {
+        let fs = FakeFileSystem::new()
+            .with_file(
+                claude_json(),
+                r#"{ "projects": { "E:/projects/app": {}, "E:/projects/deleted": {}, "E:/projects/gone": { "mcpServers": { "old": { "command": "old" } } } } }"#,
+            )
+            .with_folder(PROJECT);
+        let paths = |inventory: Inventory| -> Vec<String> {
+            inventory
+                .projects
+                .iter()
+                .map(|project| project.path.display().to_string())
+                .collect()
+        };
+
+        let listed = paths(session(&fs).resolve(None));
+        core(&fs).hide_home("default", Some("claude-code")).unwrap();
+        let hidden = paths(session(&fs).resolve(None));
+
+        assert_eq!(listed, [PROJECT, r"E:\projects\gone"]);
+        assert_eq!(hidden, [PROJECT]);
     }
 
     #[test]
