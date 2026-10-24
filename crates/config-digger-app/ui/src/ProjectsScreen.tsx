@@ -168,16 +168,21 @@ type ProjectsTabProps = {
 };
 
 /**
- * The Projects, No Project, the missing Projects (open by default) and the
- * hidden ones (collapsed), narrowed to the search; No Project shows without one.
+ * The Projects, No Project, the missing Projects with leftovers (open by
+ * default), those without (collapsed, open while the search finds one of
+ * them) and the hidden ones (collapsed), narrowed to the search; No Project
+ * shows without one.
  */
 export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
   const [missingOpen, setMissingOpen] = useState(true);
+  const [noLeftoversOpen, setNoLeftoversOpen] = useState(false);
   const [hiddenOpen, setHiddenOpen] = useState(false);
-  const { present, missing, hidden } = projectSections(places, search);
+  const { present, missing, noLeftovers, hidden } = projectSections(places, search);
   const hide = (path: string) => onChange({ kind: "hide_project", path });
   const forget = (path: string) => onChange({ kind: "forget_project", path });
-  if (search !== "" && present.length + missing.length + hidden.length === 0) {
+  // While the search finds one of them, they show whatever the user left the group in.
+  const searchOpens = search !== "" && noLeftovers.length > 0;
+  if (search !== "" && present.length + missing.length + noLeftovers.length + hidden.length === 0) {
     return <p className="empty">No Project path holds “{search}”.</p>;
   }
   return (
@@ -206,6 +211,28 @@ export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLe
           <GroupTitle title="Missing" count={missing.length} open={missingOpen} onToggle={() => setMissingOpen(!missingOpen)} />
           {missingOpen &&
             missing.map((row) => (
+              <MissingLine
+                key={row.path}
+                row={row}
+                busy={busy.includes(rowOf(row))}
+                onShow={onShow}
+                onHide={hide}
+                onRemoveLeftovers={onRemoveLeftovers}
+              />
+            ))}
+        </>
+      )}
+
+      {noLeftovers.length > 0 && (
+        <>
+          <GroupTitle
+            title="Missing, no leftovers"
+            count={noLeftovers.length}
+            open={searchOpens || noLeftoversOpen}
+            onToggle={searchOpens ? undefined : () => setNoLeftoversOpen(!noLeftoversOpen)}
+          />
+          {(searchOpens || noLeftoversOpen) &&
+            noLeftovers.map((row) => (
               <MissingLine
                 key={row.path}
                 row={row}

@@ -444,11 +444,12 @@
         {
           "id": "10.5",
           "title": "La pestaña Projects",
-          "goal": "La pestaña Projects lista los Projects que conoce Claude Code y, aparte, los que faltan con sus leftovers.",
+          "goal": "La pestaña Projects lista los Projects que conoce Claude Code y, aparte, los que faltan con sus leftovers y, cerrados, los que faltan sin leftovers.",
           "instructions": [
             "Abre la pestaña Projects.",
             "Busca los Projects de E:\\cd-throwaway en la lista.",
-            "Mira el grupo Missing."
+            "Mira el grupo Missing.",
+            "Mira el grupo que le sigue, sin abrirlo."
           ],
           "commands": [],
           "expect": [
@@ -456,9 +457,47 @@
             "Cada uno tiene la línea «Folder · Known to Claude Code».",
             "«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\claude-desktop-home» no salen como Projects.",
             "El grupo «▾ Missing · 1» está abierto.",
-            "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover»."
+            "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover».",
+            "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».",
+            "Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado."
           ],
-          "covers": ["#75"]
+          "covers": ["#75", "#319"]
+        },
+        {
+          "id": "10.17",
+          "title": "Los Projects que faltan sin leftovers",
+          "goal": "Un Project que falta sin leftovers sale en su grupo cerrado, con Hide, se abre solo al buscarlo y no sale en el campo Project del Inventario.",
+          "instructions": [
+            "En la pestaña Projects, haz clic en la caja «Search Projects…».",
+            "Escribe deleted.",
+            "Mira el grupo Missing, no leftovers.",
+            "Borra lo escrito.",
+            "Mira el grupo Missing, no leftovers.",
+            "Abre el grupo ▸ Missing, no leftovers · 1.",
+            "En la fila de E:/cd-throwaway/project-deleted, pulsa Hide.",
+            "Abre el grupo ▸ Hidden · 1.",
+            "En la fila de project-deleted, pulsa Unhide.",
+            "Ve al Inventario.",
+            "Abre el campo Project de la cabecera.",
+            "Mira el grupo Missing Projects.",
+            "Pulsa Escape."
+          ],
+          "commands": [],
+          "expect": [
+            "Con deleted, el grupo «Missing, no leftovers · 1» se abre solo.",
+            "Con deleted, ese grupo muestra «E:/cd-throwaway/project-deleted».",
+            "La fila de project-deleted dice «The folder no longer exists · known to Claude Code» y «No leftovers».",
+            "El único botón de la fila es «Hide».",
+            "Al borrar lo escrito, el grupo vuelve a «▸ Missing, no leftovers · 1», cerrado.",
+            "Hide da el aviso «Hid E:/cd-throwaway/project-deleted. Picking it in the Inventory still evaluates it.».",
+            "Tras Hide, el grupo «Missing, no leftovers» ya no sale.",
+            "El grupo «Hidden · 1» muestra project-deleted con la línea «Missing · Known to Claude Code».",
+            "Unhide da el aviso «E:/cd-throwaway/project-deleted is listed again.».",
+            "Tras Unhide, project-deleted vuelve al grupo «Missing, no leftovers · 1».",
+            "En el campo Project, el grupo «MISSING PROJECTS» muestra «E:/cd-throwaway/project-gone».",
+            "«E:/cd-throwaway/project-deleted» no sale en el campo Project."
+          ],
+          "covers": ["#319"]
         },
         {
           "id": "10.6",
@@ -515,7 +554,8 @@
             "Marca las casillas.",
             "Pulsa Remove 1 leftover.",
             "Apunta el id de la Operation del resultado: lo usa el paso 11.6.",
-            "Pulsa Done."
+            "Pulsa Done.",
+            "Cuando se vaya el aviso de la rueda, abre el grupo ▸ Missing, no leftovers · 2."
           ],
           "commands": [],
           "expect": [
@@ -532,9 +572,11 @@
             "El resultado dice «Removed 1 Entry. Operation <id>: verified.».",
             "Tras Done, mientras la pantalla vuelve a leer, sale abajo un aviso con una rueda que gira y el texto «Reading the Projects and Agent homes again…», aunque dure menos de un segundo.",
             "Mientras sale ese aviso, los botones de la fila de project-gone están apagados.",
-            "Luego la fila de project-gone dice «No leftovers» y ofrece «Hide»."
+            "Luego el grupo «Missing» ya no sale.",
+            "En su lugar sale el grupo «▸ Missing, no leftovers · 2», cerrado.",
+            "Abierto, en ese grupo la fila de project-gone dice «No leftovers» y ofrece «Hide»."
           ],
-          "covers": ["#75", "#179", "#230"]
+          "covers": ["#75", "#179", "#230", "#319"]
         },
         {
           "id": "10.8",
@@ -705,13 +747,14 @@
             "Con HIDE, el grupo «Hidden · 1» muestra «E:\\cd-throwaway\\project-hide».",
             "Con gone, el grupo de Projects dice «Projects · 0».",
             "Con gone, el grupo «Hidden» no sale.",
-            "Con gone, el grupo «Missing · 1» muestra solo «E:/cd-throwaway/project-gone».",
+            "Con gone, el grupo «Missing, no leftovers · 1» se abre solo.",
+            "Con gone, ese grupo muestra solo «E:/cd-throwaway/project-gone», sin leftovers desde el paso 10.7.",
             "Con zz, la lista dice «No Project path holds “zz”.».",
             "Al borrar, vuelven todas las filas y «No Project».",
             "Unhide devuelve project-hide a la lista principal.",
             "La pestaña Agent homes no tiene caja de búsqueda."
           ],
-          "covers": ["#224"]
+          "covers": ["#224", "#319"]
         }
       ]
     },
@@ -737,6 +780,11 @@
             "Los Projects que faltan salen bajo el título «MISSING PROJECTS».",
             "Al hacer clic, el panel se cierra y el campo muestra el Project elegido."
           ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
           "covers": ["#181"]
         },
         {

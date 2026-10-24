@@ -1565,6 +1565,22 @@ impl Inventory {
         leftovers.retain(|leftovers| !leftovers.items.is_empty());
         leftovers
     }
+
+    /// The inventory without the missing Projects that have none of
+    /// `leftovers`, which only Hide can act on: Claude Code keeps a key for
+    /// every folder it was ever started on. A hidden Project stays, listed
+    /// with the hidden ones. The context stays as it was resolved, even when
+    /// its Project is one of them.
+    pub fn without_missing_lacking_leftovers(mut self, leftovers: &[Leftovers]) -> Inventory {
+        self.projects.retain(|project| {
+            !project.missing
+                || project.hidden
+                || leftovers
+                    .iter()
+                    .any(|leftovers| leftovers.project == project.path)
+        });
+        self
+    }
 }
 
 /// What an Agent can be started on.

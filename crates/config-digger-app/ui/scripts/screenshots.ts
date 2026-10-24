@@ -93,6 +93,13 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "projects-missing",
+    steps: async (page) => {
+      await rail(page, "Projects & homes");
+      await page.locator(".places-list .scroll").evaluate((list) => list.scrollTo(0, list.scrollHeight));
+    },
+  },
+  {
     name: "projects-homes",
     steps: async (page) => {
       await rail(page, "Projects & homes");

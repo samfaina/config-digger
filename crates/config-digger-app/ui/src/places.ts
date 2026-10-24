@@ -7,6 +7,7 @@ import type {
   Home,
   HomeSource,
   Installation,
+  Item,
   ListChange,
   Listed,
   Places,
@@ -32,12 +33,12 @@ export type ProjectRow = {
   offer: ListOffer;
 };
 
-/** A missing Project that is not hidden. */
+/** A missing Project that is not hidden, with or without leftovers. */
 export type MissingRow = {
   project: Project;
   path: string;
   source: string;
-  /** Each leftover as its file → key path. */
+  /** Each leftover as its file → key path, without those in hidden Agent homes. */
   leftovers: string[];
   /** Such as "2 leftovers". */
   count: string;
@@ -48,8 +49,11 @@ export type MissingRow = {
 /** A hidden Project, missing or not: Unhide, and Remove from list for the user's own. */
 export type HiddenRow = { project: Project; path: string; source: string; removable: boolean };
 
-/** The Projects tab's sections, in the order it shows them. */
-export type ProjectSections = { present: ProjectRow[]; missing: MissingRow[]; hidden: HiddenRow[] };
+/**
+ * The Projects tab's sections, in the order it shows them: the missing
+ * Projects with leftovers, then those without, which only Hide acts on.
+ */
+export type ProjectSections = { present: ProjectRow[]; missing: MissingRow[]; noLeftovers: MissingRow[]; hidden: HiddenRow[] };
 
 /** `count` of a noun, such as "1 leftover" or "2 leftovers", or "No leftovers" for none. */
 export function counted(count: number, one: string, many: string): string {
@@ -58,8 +62,8 @@ export function counted(count: number, one: string, many: string): string {
 }
 
 /**
- * The Projects tab: the Projects, then the missing ones, then the hidden ones,
- * each narrowed to the Projects whose path holds `search`, in any case.
+ * The Projects tab: the Projects, then the missing ones with leftovers, then
+ * those without, then the hidden ones, each narrowed to the Projects whose path holds `search`, in any case.
  */
 export function projectSections(places: Places, search = ""): ProjectSections {
   const agentName = (id: string) => places.agents.find((agent) => agent.id === id)?.name ?? id;
@@ -93,17 +97,24 @@ export function projectSections(places: Places, search = ""): ProjectSections {
   });
   const found = places.projects.filter((project) => project.path.toLowerCase().includes(search.toLowerCase()));
   const shown = found.filter((project) => !project.hidden);
+  const missing = shown.filter((project) => project.missing).map(missingRow);
   return {
     present: shown.filter((project) => !project.missing).map(row),
-    missing: shown.filter((project) => project.missing).map(missingRow),
+    missing: missing.filter((row) => row.leftovers.length > 0),
+    noLeftovers: missing.filter((row) => row.leftovers.length === 0),
     hidden: found.filter((project) => project.hidden).map(hiddenRow),
   };
 }
 
-/** The leftovers of the missing Project at `path`, each once, as file → key path. */
+/**
+ * The leftovers of the missing Project at `path`, each once, as file → key
+ * path, without those in Agent homes the user hid.
+ */
 function leftoversOf(places: Places, path: string): string[] {
+  const hidden = places.agents.flatMap((agent) => agent.homes).filter((home) => home.hidden);
+  const shown = (item: Item) => !hidden.some((home) => home.agent === item.agent && home.home === item.home);
   const found = places.leftovers.find((leftovers) => leftovers.project === path);
-  const entries = (found?.items ?? []).flatMap((item) => item.entries);
+  const entries = (found?.items ?? []).filter(shown).flatMap((item) => item.entries);
   const locations = entries.map((entry) => `${entry.path} → ${entry.locator.slice(entry.path.length + 1)}`);
   return [...new Set(locations)];
 }

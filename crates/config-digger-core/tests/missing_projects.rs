@@ -477,6 +477,37 @@ fn the_leftovers_of_a_hidden_project_are_listed_only_when_asked_for() {
 }
 
 #[test]
+fn the_missing_projects_without_leftovers_can_be_left_out_of_the_inventory() {
+    let mut document: Value = serde_json::from_str(CLAUDE_JSON).unwrap();
+    document["projects"]["E:/archive/deleted"] = json!({ "hasTrustDialogAccepted": true });
+    document["projects"]["E:/archive/hidden"] = json!({});
+    let fs = FakeFileSystem::new()
+        .with_file(claude_json(), document.to_string())
+        .with_folder(PETME);
+    let core = core(&fs);
+    core.hide_project(Path::new(r"E:\archive\hidden")).unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let kept = inventory.without_missing_lacking_leftovers(&core.leftovers(&snapshot));
+
+    let projects: Vec<&Path> = kept
+        .projects
+        .iter()
+        .map(|project| project.path.as_path())
+        .collect();
+    // A hidden Project is listed with the hidden ones, leftovers or not.
+    assert_eq!(
+        projects,
+        [
+            Path::new(r"E:\archive\hidden"),
+            Path::new(GONE),
+            Path::new(PETME)
+        ]
+    );
+}
+
+#[test]
 fn each_project_and_home_counts_its_entries_once_in_any_context() {
     let fs = fixture().with_file(
         Path::new(PETME).join(".mcp.json"),
