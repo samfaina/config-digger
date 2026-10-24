@@ -1959,6 +1959,17 @@
             }
           ]
         },
+        "plugin_root": {
+          "description": "How the Agent writes the folder of an Entry's plugin in the values\nof a location in plugins, such as Claude Code's\n`${CLAUDE_PLUGIN_ROOT}`. The Entry shows the folder in its place, as\nthe Agent runs it, and competes by endpoint with it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginRoot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cached_at": {
           "description": "The key path, in the file as its format reads it, of when the Agent\ncached the file's copy of configuration held elsewhere, such as the\nbundle Codex caches from the account: milliseconds since 1970, or an\nRFC 3339 time. Each Entry then carries a caveat that it is as of\nthen, or that the Agent does not record when, if the file does not\nsay. Omitted for a file the Agent reads as it is.",
           "type": [
@@ -2143,6 +2154,16 @@
             "default": {
               "description": "A `/`-separated path relative to the plugin's folder.",
               "type": "string"
+            },
+            "adds_to_default": {
+              "description": "Whether the `default` folder is read besides the declared paths,\nas Claude Code reads its plugins' `skills` folder, rather than in\ntheir place.",
+              "type": "boolean",
+              "default": false
+            },
+            "path_may_name_one": {
+              "description": "Whether a path declared alone, not in a list, may also name one\nskill folder or its `SKILL.md`.",
+              "type": "boolean",
+              "default": false
             },
             "skills": {
               "description": "How each folder of skill folders is read.",
@@ -2820,6 +2841,17 @@
             "type": "string"
           }
         },
+        "bundles": {
+          "description": "The bundles a value can name instead of a file, such as the `.mcpb`\nbundles of a Claude Code plugin's `mcpServers`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bundles"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -2827,6 +2859,71 @@
       "additionalProperties": false,
       "required": [
         "root"
+      ]
+    },
+    "Bundles": {
+      "description": "Bundles a value of a location's references can name instead of a file,\neach holding one Entry.",
+      "oneOf": [
+        {
+          "description": "MCP bundles (`.mcpb`, formerly `.dxt`), named by a path or URL ending in\none of `extensions`, which the Agent extracts into the `cache` folder of\nthe plugin, as Claude Code does. Each extracted bundle has a\n`<hash>.metadata.json` there, whose `source` is the value that names it\nand `extractedPath` the folder inside the cache it went to. Its one\nserver is the `server.mcp_config` of that folder's `manifest.json`,\nnamed by the manifest's `name`, with the folder in place of\n`${__dirname}`. A bundle the Agent has not extracted yet has no Entry.",
+          "type": "object",
+          "properties": {
+            "extensions": {
+              "description": "The endings of a value that names a bundle, such as `.mcpb`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cache": {
+              "description": "A `/`-separated path relative to the plugin's folder.",
+              "type": "string"
+            },
+            "block": {
+              "type": "string",
+              "const": "mcpb-cache"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "extensions",
+            "cache"
+          ]
+        }
+      ]
+    },
+    "PluginRoot": {
+      "description": "A reference that stands for the folder of an Entry's plugin in some of\nthe Entry's fields.",
+      "type": "object",
+      "properties": {
+        "reference": {
+          "description": "The reference as written, such as `${CLAUDE_PLUGIN_ROOT}`.",
+          "type": "string"
+        },
+        "fields": {
+          "description": "The fields it stands for the folder in, such as `command` and\n`args`: in a text, each text of a list, and each text value of an\nobject.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forward_slashes": {
+          "description": "Whether the Agent writes the folder with `/` between its names, as\nClaude Code does on Windows.",
+          "type": "boolean",
+          "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "fields"
       ]
     },
     "ItemRules": {

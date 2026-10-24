@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "runner": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/runner.js", "--data", "${CLAUDE_PLUGIN_DATA}"]
+    }
+  }
+}

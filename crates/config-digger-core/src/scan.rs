@@ -4,12 +4,12 @@
 
 use crate::api::ReadFailureKind;
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy, Format,
-    Gate, GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins, Locate,
-    LookUp, ManifestSkills, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
-    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
-    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
-    is_entry_key,
+    self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
+    Format, Gate, GateStore, HoldsHere, JsonDialect, JsonFormat, JsonPluginRecords, ListPlugins,
+    Locate, LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache,
+    PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register,
+    Registry, RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
+    StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -3339,13 +3339,17 @@ impl Scanner<'_> {
                 };
                 location.entry_name(&entry.name, &parts)
             };
+            if let Some(root) = &location.plugin_root {
+                root.expand(&mut entry.config, &plugin.folder);
+            }
             entry.plugin = Some(plugin.clone());
         }
     }
 
     /// Adds the skills at the paths the manifest `manifest` of `plugin`
     /// declares, or else of its default folder. A folder outside the
-    /// plugin's is skipped.
+    /// plugin's, or one already read, is skipped, and the plugin's own
+    /// folder names no one skill.
     fn read_manifest_skills(
         &mut self,
         home: &FoundHome,
@@ -3364,9 +3368,15 @@ impl Scanner<'_> {
             }
             false => None,
         };
+        let base = &plugin.folder;
+        let mut read = Vec::new();
         for declared in block.paths(text.as_deref()) {
-            let base = &plugin.folder;
-            if declared.may_name_one {
+            let folder = paths::lexical(&base.join(&declared.path));
+            if read.contains(&folder) {
+                continue;
+            }
+            read.push(folder.clone());
+            if declared.may_name_one && folder != *base {
                 let added = self.add_named_skill(
                     home,
                     location,
@@ -3380,7 +3390,6 @@ impl Scanner<'_> {
                     continue;
                 }
             }
-            let folder = paths::lexical(&base.join(&declared.path));
             if !folder.starts_with(base) {
                 tracing::debug!(plugin = %plugin.id, "skills folder outside the plugin");
                 continue;
@@ -3420,6 +3429,12 @@ impl Scanner<'_> {
         for (index, value) in values {
             match value {
                 serde_json::Value::String(relative) => {
+                    if let Some(Bundles::McpbCache(bundles)) = &references.bundles
+                        && bundles.names_bundle(relative)
+                    {
+                        self.read_bundle(home, definition, location, bundles, plugin, relative);
+                        continue;
+                    }
                     let file = paths::lexical(&plugin.folder.join(relative));
                     if !file.starts_with(&plugin.folder) {
                         tracing::debug!(plugin = %plugin.id, "reference outside the plugin");
@@ -3471,6 +3486,58 @@ impl Scanner<'_> {
                     .fail(home, &path, project, ReadFailureKind::Parse, None),
             }
         }
+    }
+
+    /// Adds the server of the bundle named `source` in a file of `plugin`,
+    /// from the folder the Agent extracted it to, if it has. A folder
+    /// outside the plugin's cache is skipped.
+    fn read_bundle(
+        &mut self,
+        home: &FoundHome,
+        definition: &AgentDefinition,
+        location: &LocationDefinition,
+        bundles: &McpbCache,
+        plugin: &ScannedPlugin,
+        source: &str,
+    ) {
+        let fs = self.reader.fs;
+        let cache = paths::lexical(&blocks::join_relative(&plugin.folder, &bundles.cache));
+        let extracted = fs
+            .read_dir(&cache)
+            .into_iter()
+            .flatten()
+            .filter(|path| McpbCache::is_metadata(path))
+            .find_map(|path| {
+                McpbCache::extracted(&String::from_utf8(fs.read(&path).ok()?).ok()?, source)
+            })
+            .map(|folder| paths::lexical(&folder))
+            .filter(|folder| folder.starts_with(&cache) && *folder != cache);
+        let Some(folder) = extracted else {
+            tracing::debug!(plugin = %plugin.id, source, "bundle not extracted");
+            return;
+        };
+        let manifest = folder.join(McpbCache::MANIFEST);
+        self.add_reader(home, location, &manifest);
+        let project = plugin.project.as_deref();
+        let Some(document) = self.document(home, location, &manifest, project) else {
+            return;
+        };
+        let Some((name, config)) = McpbCache::server(&document, &folder) else {
+            tracing::debug!(plugin = %plugin.id, source, "bundle without a server");
+            return;
+        };
+        let [object, key] = McpbCache::SERVER;
+        let objects = vec![RootObject {
+            key_path: vec![object.to_owned()],
+            project: None,
+            entries: vec![FoundEntry {
+                key: key.to_owned(),
+                name,
+                value: &config,
+            }],
+        }];
+        let owned = plugin.project.clone();
+        self.add_objects(home, definition, location, &manifest, owned, 0, objects);
     }
 
     /// Gives the Entries read since the first `start` the names the
