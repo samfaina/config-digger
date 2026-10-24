@@ -9,6 +9,7 @@ Each fact is tagged:
 - **[disk]**: verified read-only on this machine, either by reading files or by running `codex mcp list` / `codex debug prompt-input`.
 - **[sandbox]**: verified by running the installed 0.159.3 binary against a throwaway `CODEX_HOME` and throwaway projects inside the session scratchpad. No real config was touched.
 - **[source]**: read in the `rust-v0.159.3` source and not observable here.
+- **[binary]**: read in a shipped build and not tested, such as Orca's bundle, `resources\app.asar`, for its Codex home ([`release-gate.md`](release-gate.md)).
 - **[docs]**: stated by OpenAI's docs.
 - **[contradicts docs]**: the source or the binary does something the docs don't say, or say differently.
 

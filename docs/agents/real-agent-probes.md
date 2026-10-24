@@ -55,7 +55,7 @@ Desktop apps (Claude Desktop, Cursor, VS Code):
 
 Orca:
 
-- Never test a tool that copies an Agent home on the copy the open app keeps: Orca copies from the `~\.codex` of the user it runs as, whatever `CODEX_HOME` says, and writes settings back into it. `orca-codex.mjs` loads the modules of Orca's install, `resources\app.asar.unpacked\out\main\chunks`, in Node, with `USERPROFILE` and `ORCA_USER_DATA_PATH` moved. Their exports' names change with Orca's version; the bundle, `resources\app.asar`, is where to find them again.
+- Never test a Mirrored home on the copy the open tool keeps: Orca copies from the `~\.codex` of the user it runs as, whatever `CODEX_HOME` says, and writes settings back into it. `orca-codex.mjs` loads the modules of Orca's install, `resources\app.asar.unpacked\out\main\chunks`, in Node, with `USERPROFILE` and `ORCA_USER_DATA_PATH` moved. Their exports' names change with Orca's version; the bundle, `resources\app.asar`, is where to find them again.
 
 Accounts:
 

@@ -4,17 +4,21 @@
 // Orca's own code: the main-process modules an Orca install unpacks, loaded
 // in Node with `USERPROFILE` and `ORCA_USER_DATA_PATH` in throwaway folders,
 // so that `~\.codex` and Orca's data folder are throwaway too. Each launch
-// runs what Orca runs before it starts a Codex on that home.
+// runs what Orca runs before it starts a Codex on that home; when Orca
+// starts one there is read in its bundle, not tested.
 //
 //   node uat/agents/orca-codex.mjs [--orca <Orca's install folder>]
 //
 // Driving the Orca that is open is not safe: it copies from the `~\.codex`
 // of the user it runs as, whatever `CODEX_HOME` says, and writes settings
-// back into it. What Orca's home holds is read from its files.
+// back into it. A second Orca on throwaway folders was not tried: it starts
+// a Codex on this home only for a launch whose `CODEX_HOME` is not
+// `~\.codex`, which would have to be driven in its window. What Orca's home
+// holds is read from its files.
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { fresh, probe, same, write } from "./lib.mjs";
+import { fresh, probe, same, skill, write } from "./lib.mjs";
 
 const install = process.argv.includes("--orca") ? process.argv[process.argv.indexOf("--orca") + 1] : path.join(process.env.LOCALAPPDATA, "Programs", "orca");
 const asar = path.join(install, "resources", "app.asar");
@@ -52,10 +56,15 @@ const base = fresh("orca-codex");
 
 // The exports as Orca 1.4.239's bundler names them; another version may
 // name them otherwise, which `setup` catches through the paths they give.
-const paths = chunk("codex-home-paths");
-const sync = chunk("managed-agent-hook-controls");
-const systemHome = () => paths.a();
-const orcaHome = () => paths.o();
+// `codex-home-paths` holds the homes and the links between them;
+// `managed-agent-hook-controls` holds, among Orca's hook code, the merge of
+// `config.toml`.
+const homes = chunk("codex-home-paths");
+const hookControls = chunk("managed-agent-hook-controls");
+const systemHome = () => homes.a();
+const orcaHome = () => homes.o();
+const linkSharedFolders = () => homes.c();
+const mergeConfig = () => hookControls.X();
 
 // A throwaway user for one check: their home folder, Orca's data folder,
 // and a `CODEX_HOME` of their own, which Orca must not copy from.
@@ -71,14 +80,16 @@ function setup(name) {
   if (systemHome() !== user.codex || orcaHome() !== user.orca) {
     throw new Error(`Orca ${version} names its exports otherwise: ${systemHome()}, ${orcaHome()}`);
   }
+  user.config = path.join(user.codex, "config.toml");
+  user.copy = path.join(user.orca, "config.toml");
   return user;
 }
 
 // What Orca 1.4.239 runs before it starts a Codex on its home: it links
 // `~\.codex`'s folders into it, then merges `~\.codex\config.toml` with it.
 function launch() {
-  paths.c();
-  sync.X();
+  linkSharedFolders();
+  mergeConfig();
 }
 
 const stdio = (name, tag = name) => `[mcp_servers.${name}]\ncommand = "cmd"\nargs = ["/c", "${tag}"]\n`;
@@ -93,61 +104,54 @@ function servers(file) {
 
 await p.check("mirrored_homes[orca]", "Orca copies `~\\.codex\\config.toml` into its home when it prepares a Codex launch, never from `CODEX_HOME`", async () => {
   const user = setup("source");
-  write(path.join(user.codex, "config.toml"), stdio("cd-throwaway-user"));
+  write(user.config, stdio("cd-throwaway-user"));
   write(path.join(user.codexHome, "config.toml"), stdio("cd-throwaway-codex-home"));
-  const before = read(path.join(user.orca, "config.toml"));
+  const before = read(user.copy);
   launch();
-  return same({ before, after: servers(path.join(user.orca, "config.toml")) }, { before: null, after: ["cd-throwaway-user"] });
+  return same({ before, after: servers(user.copy) }, { before: null, after: ["cd-throwaway-user"] });
 });
 
 await p.check("mirrored_homes[orca]", "Orca's copy of `config.toml` follows a change to `~\\.codex\\config.toml` at the next launch, not before", async () => {
   const user = setup("follows");
-  const config = path.join(user.codex, "config.toml");
-  write(config, stdio("cd-throwaway-user"));
+  write(user.config, stdio("cd-throwaway-user"));
   launch();
-  write(config, stdio("cd-throwaway-user") + stdio("cd-throwaway-later"));
-  const between = servers(path.join(user.orca, "config.toml"));
+  write(user.config, stdio("cd-throwaway-user") + stdio("cd-throwaway-later"));
+  const between = servers(user.copy);
   launch();
-  return same({ between, next: servers(path.join(user.orca, "config.toml")) }, { between: ["cd-throwaway-user"], next: ["cd-throwaway-later", "cd-throwaway-user"] });
+  return same({ between, next: servers(user.copy) }, { between: ["cd-throwaway-user"], next: ["cd-throwaway-later", "cd-throwaway-user"] });
 });
 
 // What config-digger's Disable and Remove of an Entry of Orca's home write,
 // in the Entry it was copied from.
-await p.check("mirrored_homes[orca]", "a server Disabled or removed in `~\\.codex\\config.toml` is Disabled or gone in Orca's copy at the next launch", async () => {
+await p.check("mirrored_homes[orca]", "a server Disabled or Removed in `~\\.codex\\config.toml` is Disabled or gone in Orca's copy at the next launch", async () => {
   const user = setup("disable");
-  const config = path.join(user.codex, "config.toml");
-  write(config, stdio("cd-throwaway-off") + stdio("cd-throwaway-gone"));
+  write(user.config, stdio("cd-throwaway-off") + stdio("cd-throwaway-gone"));
   launch();
-  write(config, `${stdio("cd-throwaway-off")}enabled = false\n`);
+  write(user.config, `${stdio("cd-throwaway-off")}enabled = false\n`);
   launch();
-  const copy = read(path.join(user.orca, "config.toml"));
-  return same({ servers: servers(path.join(user.orca, "config.toml")), off: /^\[mcp_servers\.cd-throwaway-off\]\n(?:(?!\n\[).)*\nenabled = false$/ms.test(copy) }, { servers: ["cd-throwaway-off"], off: true });
+  return same({ servers: servers(user.copy), off: /^\[mcp_servers\.cd-throwaway-off\]\n(?:(?!\n\[).)*\nenabled = false$/ms.test(read(user.copy)) }, { servers: ["cd-throwaway-off"], off: true });
 });
 
 await p.check("mirrored_homes[orca]", "a server only Orca's home holds stays in it across launches, and Orca never copies it to `~\\.codex`", async () => {
   const user = setup("orca-only");
-  const config = path.join(user.codex, "config.toml");
-  write(config, stdio("cd-throwaway-user"));
+  write(user.config, stdio("cd-throwaway-user"));
   launch();
-  const copy = path.join(user.orca, "config.toml");
-  write(copy, `${read(copy)}\n${stdio("cd-throwaway-orca-only")}`);
+  write(user.copy, `${read(user.copy)}\n${stdio("cd-throwaway-orca-only")}`);
   launch();
-  return same({ orca: servers(copy), user: servers(config) }, { orca: ["cd-throwaway-orca-only", "cd-throwaway-user"], user: ["cd-throwaway-user"] });
+  return same({ orca: servers(user.copy), user: servers(user.config) }, { orca: ["cd-throwaway-orca-only", "cd-throwaway-user"], user: ["cd-throwaway-user"] });
 });
 
 // The other way: Orca keeps a baseline of a few settings, `model` among
 // them, in `.orca-config-settings-baseline.json`, and of the plugin tables.
 await p.check("mirrored_homes[orca]", "Orca writes back to `~\\.codex\\config.toml` a setting such as `model` changed in its home since the last launch, and a plugin table added there", async () => {
   const user = setup("write-back");
-  const config = path.join(user.codex, "config.toml");
-  write(config, `model = "cd-throwaway-first"\n\n${stdio("cd-throwaway-user")}`);
+  write(user.config, `model = "cd-throwaway-first"\n\n${stdio("cd-throwaway-user")}`);
   launch();
-  const copy = path.join(user.orca, "config.toml");
-  write(copy, `${read(copy).replace("cd-throwaway-first", "cd-throwaway-second")}\n[plugins."cd-throwaway-p@cd-throwaway-m"]\nenabled = true\n`);
+  write(user.copy, `${read(user.copy).replace("cd-throwaway-first", "cd-throwaway-second")}\n[plugins."cd-throwaway-p@cd-throwaway-m"]\nenabled = true\n`);
   launch();
-  const source = read(config);
+  const source = read(user.config);
   return same(
-    { model: source.match(/^model = "(.*)"$/m)?.[1], plugin: source.includes('[plugins."cd-throwaway-p@cd-throwaway-m"]'), servers: servers(config) },
+    { model: source.match(/^model = "(.*)"$/m)?.[1], plugin: source.includes('[plugins."cd-throwaway-p@cd-throwaway-m"]'), servers: servers(user.config) },
     { model: "cd-throwaway-second", plugin: true, servers: ["cd-throwaway-user"] },
   );
 });
@@ -163,7 +167,7 @@ await p.check("mirrored_homes[orca]", "Orca links each folder of `~\\.codex` it 
     const target = path.join(user.orca, f);
     return fs.lstatSync(target).isSymbolicLink() && fs.realpathSync(target) === fs.realpathSync(path.join(user.codex, f));
   });
-  write(path.join(user.codex, "skills", "cd-throwaway-later", "SKILL.md"), "---\nname: cd-throwaway-later\ndescription: d\n---\n");
+  skill(path.join(user.codex, "skills", "cd-throwaway-later"), ["name: cd-throwaway-later", "description: d-cd-throwaway-later"]);
   const later = fs.existsSync(path.join(user.orca, "skills", "cd-throwaway-later", "SKILL.md"));
   return same({ linked: linked.sort(), themes: fs.existsSync(path.join(user.orca, "themes")), later }, { linked: [...shared].sort(), themes: false, later: true });
 });
@@ -181,8 +185,7 @@ await p.check("mirrored_homes[orca]", "Orca links `~\\.codex\\AGENTS.md` into it
   const between = read(copy);
   launch();
   const seen = { kind, between, next: read(copy) };
-  const expected = { kind, between: kind === "link" ? "cd-throwaway-second\n" : "cd-throwaway-first\n", next: "cd-throwaway-second\n" };
-  return { pass: kind !== "other" && JSON.stringify(seen) === JSON.stringify(expected), observed: JSON.stringify(seen) };
+  return { pass: kind !== "other" && same(seen, { kind, between: kind === "link" ? "cd-throwaway-second\n" : "cd-throwaway-first\n", next: "cd-throwaway-second\n" }).pass, observed: JSON.stringify(seen) };
 });
 
 p.finish();
