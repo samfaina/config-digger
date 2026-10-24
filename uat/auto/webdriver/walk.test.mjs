@@ -1,6 +1,7 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
 // it knows match the plan, the throwaway profile, opening a group on the
-// Projects tab, and reading an Operation id.
+// Projects tab, confirming an action dialog up to its result, and reading an
+// Operation id.
 // Run them with `node --test uat/auto/webdriver/walk.test.mjs`.
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -8,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { profileEnv, ref, Session } from "./driver.mjs";
-import { operationId } from "./steps/common.mjs";
+import { confirm, operationId } from "./steps/common.mjs";
 import { openGroup } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
@@ -76,6 +77,12 @@ test("the profile holds both AppData folders, the known folders and a Claude Cod
   }
 });
 
+// Runs a script of the walk on a fake page's `document`, with its `args` as
+// `arguments`.
+function runScript(document, { script, args }) {
+  return new Function("document", "args", `return (function () {${script}}).apply(null, args);`)(document, args);
+}
+
 // A session whose page is only the group toggles of a Projects tab, each
 // `{ text, open }`: a script runs on them, and a click opens or closes one.
 class GroupsPage extends Session {
@@ -87,7 +94,7 @@ class GroupsPage extends Session {
   async cmd(method, path, body) {
     if (path === "/execute/sync") {
       const document = { querySelectorAll: (css) => (css === ".place-group-toggle" ? this.toggles : []) };
-      const value = new Function("document", "args", `return (function () {${body.script}}).apply(null, args);`)(document, body.args);
+      const value = runScript(document, body);
       return this.toggles.includes(value) ? ref(value.id) : value;
     }
     const [, id, action] = /^\/element\/([^/]+)\/(.+)$/.exec(path);
@@ -125,6 +132,64 @@ test("opening a group fails when no group has that title", async () => {
   await assert.rejects(openGroup(page, "Hidden", { timeout: 0 }), /group "Hidden"/);
   await assert.rejects(openGroup(page, "Missing", { timeout: 0 }), /group "Missing"/);
   assert.equal(page.toggles[0].open, false);
+});
+
+// A session whose page is only an action dialog, each of its states
+// `{ title, text, foot }` with the foot's button texts. Clicking a foot
+// button whose text starts with `verb` lands `result` right after the page's
+// next script: a read of the dialog that runs as two scripts sees the preview
+// in the first and the result's foot in the second.
+class DialogPage extends Session {
+  constructor(preview, verb, result) {
+    super("http://fake", "fake");
+    this.state = preview;
+    this.verb = verb;
+    this.result = result;
+    this.landing = false;
+  }
+
+  buttons() {
+    return this.state.foot.map((text, i) => ({ id: `button-${i}`, textContent: text, disabled: false }));
+  }
+
+  async cmd(method, path, body) {
+    if (path === "/execute/sync") {
+      const page = this;
+      const buttons = this.buttons();
+      const dialog = {
+        get innerText() {
+          return page.state.text;
+        },
+        querySelector: (css) => (css === ".dialog-title" ? { textContent: page.state.title } : null),
+        querySelectorAll: (css) => (css === ".dialog-foot button" ? buttons : []),
+      };
+      const document = {
+        querySelector: (css) => (css === ".dialog" ? dialog : null),
+        querySelectorAll: (css) => (css === ".dialog .dialog-foot button" ? buttons : []),
+      };
+      const value = runScript(document, body);
+      if (this.landing) {
+        this.state = this.result;
+        this.landing = false;
+      }
+      return buttons.includes(value) ? ref(value.id) : value;
+    }
+    const [, id, action] = /^\/element\/([^/]+)\/(.+)$/.exec(path);
+    if (action !== "click") throw new Error(`${method} ${path}`);
+    const button = this.buttons().find((b) => b.id === id);
+    if (button.textContent.startsWith(this.verb)) this.landing = true;
+    return null;
+  }
+}
+
+test("confirming an action dialog returns its result, though the result lands while the walk reads the dialog", async () => {
+  const page = new DialogPage(
+    { title: "Delete backup", text: 'Delete the backup of 20261024-161841-38c "Disable 1 Entry"', foot: ["Cancel", "Delete backup"] },
+    "Delete backup",
+    { title: "Delete backup", text: "Operation 20261024-161841-38c · backup deleted · can no longer be undone", foot: ["Done"] },
+  );
+  const d = await confirm(page, "Delete backup");
+  assert.equal(d.text, "Operation 20261024-161841-38c · backup deleted · can no longer be undone");
 });
 
 test("an Operation id is read from the lines that name one", () => {
