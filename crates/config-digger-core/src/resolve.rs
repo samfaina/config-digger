@@ -2063,7 +2063,8 @@ fn plugin(entry: &ScannedEntry) -> Option<api::Plugin> {
 
 /// Whether Remove is offered for `entry` of `location`: not for an Entry
 /// config-digger only reads, nor for one of a plugin or extension, which
-/// the Agent uninstalls, with its own command when it has one.
+/// the Agent uninstalls, with its own command when it has one, unless the
+/// extension is built into the Agent.
 fn remove(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -2105,13 +2106,17 @@ fn remove(
             | Provenance::AccountManaged => api::RemoveOption::Offered,
         };
     };
-    let command = definition
+    let plugins = definition
         .declared_plugins(&plugin.plugins)
-        .expect("validation declares the plugins a location reads")
-        .uninstall(&plugin.id, plugin.scope.as_deref());
+        .expect("validation declares the plugins a location reads");
+    let command = plugins.uninstall(&plugin.id, plugin.scope.as_deref());
     // An extension goes by the name its Agent's settings show it under, a
     // plugin by the id its uninstall command takes.
     let (code, sentence) = match location.provenance {
+        Provenance::Extension if plugins.registry.built_in() => (
+            api::RemoveNotOffered::Extension,
+            explain::built_in_extension_not_removed(&plugin.name, agent_name),
+        ),
         Provenance::Extension => (
             api::RemoveNotOffered::Extension,
             explain::extension_not_removed(&plugin.name, agent_name),

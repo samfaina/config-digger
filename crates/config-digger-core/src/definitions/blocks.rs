@@ -14,7 +14,7 @@ use crate::version::Version;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -1690,6 +1690,7 @@ pub(crate) trait ListPlugins {
 pub(crate) enum PluginRegistry {
     JsonPluginRecords(JsonPluginRecords),
     PluginFolders(PluginFolders),
+    InstallationFolders(InstallationFolders),
     ProjectPluginKeys(ProjectPluginKeys),
     PluginCache(PluginCache),
 }
@@ -1699,6 +1700,7 @@ impl Validate for PluginRegistry {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.validate(),
             PluginRegistry::PluginFolders(block) => block.validate(),
+            PluginRegistry::InstallationFolders(block) => block.validate(),
             PluginRegistry::ProjectPluginKeys(block) => block.validate(),
             PluginRegistry::PluginCache(block) => block.validate(),
         }
@@ -1710,6 +1712,7 @@ impl ListPlugins for PluginRegistry {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.anchors(),
             PluginRegistry::PluginFolders(block) => block.anchors(),
+            PluginRegistry::InstallationFolders(_) => Vec::new(),
             PluginRegistry::ProjectPluginKeys(block) => block.anchors(),
             PluginRegistry::PluginCache(block) => block.anchors(),
         }
@@ -1767,6 +1770,34 @@ impl PluginRegistry {
     /// every Project is known, and its plugins apply in that Project only.
     pub fn in_project(&self) -> bool {
         matches!(self, PluginRegistry::ProjectPluginKeys(_))
+    }
+
+    /// Whether its plugins ship with an Installation, so that the Agent
+    /// never uninstalls them.
+    pub fn built_in(&self) -> bool {
+        matches!(self, PluginRegistry::InstallationFolders(_))
+    }
+}
+
+/// The folders, in a folder of each Installation that reads the Agent
+/// home, that hold a marker file, each a plugin that ships with the
+/// Installation and whose id is the folder's name, such as the built-in
+/// extensions in VS Code's `<commit>\resources\app\extensions`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct InstallationFolders {
+    /// A `/`-separated path relative to the Installation's folder, where
+    /// `*` and `?` stand for any name, such as a commit folder.
+    pub folder: String,
+    /// A `/`-separated path relative to a plugin's folder, or several, any
+    /// of which makes the folder a plugin's.
+    pub marker: RelativePaths,
+}
+
+impl Validate for InstallationFolders {
+    fn validate(&self) -> Result<(), String> {
+        validate_relative(&self.folder)?;
+        self.marker.validate()
     }
 }
 
@@ -1892,6 +1923,11 @@ pub(crate) struct PluginFolders {
     /// A file in a plugin's folder that can say the plugin's files are in
     /// another folder, as for an extension Gemini CLI links.
     pub linked: Option<LinkedFolder>,
+    /// A strict JSON file in the folder the plugins' folders are in whose
+    /// object's keys name, without regard to case, the folders the Agent
+    /// marked for deletion, such as VS Code's `.obsolete`: they hold no
+    /// plugin.
+    pub removals: Option<String>,
 }
 
 /// A strict JSON file in a plugin's folder, such as the
@@ -1950,18 +1986,16 @@ impl Validate for PluginFolders {
             }
         }
         if let Some(marker) = &self.marker {
-            if marker.all().is_empty() {
-                return Err("a plugin folders marker needs a path".into());
-            }
-            for marker in marker.all() {
-                validate_relative(marker)?;
-            }
+            marker.validate()?;
         }
         if let Some(records) = &self.records {
             validate_key_path(&records.root)?;
             if records.version.is_empty() {
                 return Err("a records field must not be empty".into());
             }
+        }
+        if let Some(removals) = &self.removals {
+            validate_relative(removals)?;
         }
         if let Some(linked) = &self.linked {
             validate_relative(&linked.file)?;
@@ -2021,11 +2055,33 @@ impl RelativePaths {
     }
 }
 
+impl Validate for RelativePaths {
+    fn validate(&self) -> Result<(), String> {
+        if self.all().is_empty() {
+            return Err("a marker needs a path".into());
+        }
+        self.all()
+            .iter()
+            .try_for_each(|path| validate_relative(path))
+    }
+}
+
 impl ListPlugins for PluginFolders {
     fn anchors(&self) -> Vec<&Anchor> {
         std::iter::once(&self.anchor)
             .chain(self.records.as_ref().map(|records| &records.anchor))
             .collect()
+    }
+}
+
+impl PluginFolders {
+    /// The folder names, lowercased, that the text of the `removals` file
+    /// marks for deletion. A text that does not parse marks none.
+    pub fn removed(text: &str) -> BTreeSet<String> {
+        match JsonFormat::STRICT.parse(text) {
+            Ok(Value::Object(removed)) => removed.keys().map(|key| key.to_lowercase()).collect(),
+            _ => BTreeSet::new(),
+        }
     }
 }
 

@@ -1862,6 +1862,12 @@ pub(crate) fn extension_not_removed(extension: &str, agent_name: &str) -> String
     format!("Not in v0.1: uninstall the extension {extension} in {agent_name}'s settings.")
 }
 
+/// Why Remove is not offered for an Entry of `extension`, built into the
+/// Agent named `agent_name`.
+pub(crate) fn built_in_extension_not_removed(extension: &str, agent_name: &str) -> String {
+    format!("{extension} is built into {agent_name}, which cannot uninstall it.")
+}
+
 /// Why Remove is not offered for a server an extension gives the Agent
 /// named `agent_name`, which it keeps only in a cache.
 pub(crate) fn cached_extension_not_removed(agent_name: &str) -> String {

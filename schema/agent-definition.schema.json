@@ -1600,6 +1600,13 @@
                 }
               ]
             },
+            "removals": {
+              "description": "A strict JSON file in the folder the plugins' folders are in whose\nobject's keys name, without regard to case, the folders the Agent\nmarked for deletion, such as VS Code's `.obsolete`: they hold no\nplugin.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "block": {
               "type": "string",
               "const": "plugin-folders"
@@ -1612,6 +1619,33 @@
           "required": [
             "block",
             "anchor"
+          ]
+        },
+        {
+          "description": "The folders, in a folder of each Installation that reads the Agent\nhome, that hold a marker file, each a plugin that ships with the\nInstallation and whose id is the folder's name, such as the built-in\nextensions in VS Code's `<commit>\\resources\\app\\extensions`.",
+          "type": "object",
+          "properties": {
+            "folder": {
+              "description": "A `/`-separated path relative to the Installation's folder, where\n`*` and `?` stand for any name, such as a commit folder.",
+              "type": "string"
+            },
+            "marker": {
+              "description": "A `/`-separated path relative to a plugin's folder, or several, any\nof which makes the folder a plugin's.",
+              "$ref": "#/$defs/RelativePaths"
+            },
+            "block": {
+              "type": "string",
+              "const": "installation-folders"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "folder",
+            "marker"
           ]
         },
         {

@@ -99,13 +99,35 @@ id = "agent-plugins"
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json", ".plugin/plugin.json"] }
 name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = ".plugin/plugin.json", key_path = ["name"] }]
 
+# The extensions that ship with each Installation, in its commit folder's
+# `resources\app\extensions`, such as GitHub Copilot Chat in `copilot`
+# [disk], each named by its manifest's `name`. The user cannot uninstall
+# one. VS Code ranks them before the installed extensions [binary]. What
+# VS Code does with an installed extension that has a built-in one's id is
+# not checked: both are read. An Installation's folder holds one commit
+# folder [disk]: one left over from an update would be read too.
+[[plugins]]
+id = "built-in-extensions"
+unverified = [
+  "That VS Code ranks its built-in extensions before the installed ones comes from its code only.",
+  "What VS Code does with an installed extension that has a built-in one's id is not known: both are taken to be read.",
+]
+registry = { block = "installation-folders", folder = "*/resources/app/extensions", marker = "package.json" }
+name = { file = "package.json", key_path = ["name"] }
+
 # The extensions installed in `~\.vscode\extensions`, a folder each [docs,
-# disk], each named by its manifest's `name`. The built-in extensions in the
-# Installation's folder, such as GitHub Copilot Chat, and the versions
-# `.obsolete` lists for removal, are not told apart.
+# disk], each named by its manifest's `name`. A folder is named by the
+# extension's lowercased id, version and target platform, as
+# `acme.helper-1.0.0-win32-x64`, which is also how `.obsolete` names the
+# folders VS Code is to delete, in a JSON object of `true`s, such as the old
+# version an update replaced [binary]: such a folder holds no extension.
+# VS Code lists the default profile's extensions in the folder's
+# `extensions.json`, and adds there any folder it finds here [binary], so
+# the folders are read instead.
 [[plugins]]
 id = "extensions"
-registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/extensions" }, marker = "package.json" }
+unverified = "The shape of `.obsolete` comes from VS Code's code only: none was seen on disk."
+registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/extensions" }, marker = "package.json", removals = ".obsolete" }
 name = { file = "package.json", key_path = ["name"] }
 
 [[scopes]]
@@ -615,12 +637,12 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
-# The skills an extension contributes in its `package.json`'s
-# `contributes.chatSkills`, each a path to a skill folder or its `SKILL.md`
-# [disk].
+# The skills an extension, built-in or installed, contributes in its
+# `package.json`'s `contributes.chatSkills`, each a path to a skill folder
+# or its `SKILL.md` [disk]. A skill's `when` clause is not read.
 [[locations]]
 id = "extension-skills"
-anchor = { block = "plugin", plugins = "extensions", path = "package.json" }
+anchor = { block = "plugin", plugins = ["built-in-extensions", "extensions"], path = "package.json" }
 format = { block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" } }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
