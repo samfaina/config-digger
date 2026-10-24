@@ -150,9 +150,9 @@ id = "discovered"
 # as `config.<setting>`, when VS Code marks the setting as one it runs
 # experiments on, before its own default [docs]. VS Code caches the
 # assignments in `memento/experiment.service.memento` of the store every
-# profile reads, as tas-client's feature data, and reads them while the
-# telemetry level is `all`: a setting's from the `Parameters` of the item
-# of `configs` whose `Id` is `vscode` [test]. It marks none of the settings
+# profile reads, as tas-client's feature data, and reads them only while
+# the telemetry level is `all` [binary]: a setting's from the `Parameters`
+# of the item of `configs` whose `Id` is `vscode` [test]. It marks none of the settings
 # this definition reads, `chat.mcp.access`, `chat.mcp.collisionBehavior`,
 # `chat.mcp.discovery.enabled`, `chat.useAgentSkills` and
 # `security.workspace.trust.enabled`: an assignment leaves them as they
@@ -435,12 +435,13 @@ sources = [
 # setting to the user otherwise [docs]. config-digger never writes either.
 #
 # Each part of the policy is as old as the request that brought it, whose
-# time VS Code caches beside it [test]: `mcp` comes with the Copilot
-# token's entitlements, `tokenEntitlementsFetchedAt`, and `mcpAccess` with
-# the MCP registry's data, `mcpRegistryDataFetchedAt`, which VS Code asks
-# for only while `mcp` is not `false` [binary]. It fetches both again only
-# once they are an hour old, while it fetches the account's entitlements,
-# `entitlementsFetchedAt`, at each start [test].
+# time VS Code caches beside it: `mcp` comes with the Copilot token's
+# entitlements, `tokenEntitlementsFetchedAt`, and `mcpAccess` with the MCP
+# registry's data, `mcpRegistryDataFetchedAt`, which VS Code asks for only
+# while `mcp` is not `false` [binary]. It fetches the account's
+# entitlements, `entitlementsFetchedAt`, again at each start, but keeps
+# the other two times from an earlier launch [test], until they are an
+# hour old [binary].
 [[items.mcp.rules]]
 block = "global-switch"
 off = "none"
@@ -498,10 +499,10 @@ sources = [
 # `nonce` that of the one it last ran [docs]. The nonce hashes the launch
 # configuration [docs], which config-digger does not compute. While its
 # file is unchanged, a server whose two nonces match starts without asking
-# [test]. Once its file changes, VS Code asks again before it starts it,
-# while both nonces still match, and they keep matching until VS Code runs
-# the server again [test]: config-digger takes such a server to be trusted
-# (#342).
+# [test]. Once its file changes, VS Code no longer starts it without
+# asking, while both nonces still match, before that launch and after it
+# [test]: VS Code writes `nonce` only when it runs the server [binary].
+# config-digger takes such a server to be trusted (#342).
 [[items.mcp.gates]]
 block = "nonce-trust"
 locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
@@ -556,10 +557,12 @@ layered = true
 # Skills are folders holding a `SKILL.md`, read one level down [docs], each
 # named by its folder [docs]. VS Code loads a `SKILL.md` with no
 # frontmatter, or whose frontmatter never closes or is not YAML, under its
-# folder's name [test]. It keeps the values it can read, which config-digger
-# does not, so it may show no description where VS Code has one. A skill
-# with no description is one the user can run but VS Code does not list to
-# its model [test].
+# folder's name, a workspace folder's skill or a personal one [test], as
+# one code reads every location's skills [binary]. It keeps the values it
+# can read, which config-digger does not, so it may show no description
+# where VS Code has one. A skill with no description is one the user can
+# run [test], but VS Code does not list it to its model [binary]:
+# config-digger shows it Effective (#343).
 
 # A workspace folder's `.agents`, `.github` and `.claude` skills, in that
 # order [docs, test].
@@ -675,7 +678,8 @@ checks = ["frontmatter", "rules", "disable", "precedence"]
 # [docs, test]. Enable takes it out.
 #
 # A skill listed there is one the user can no longer run, but VS Code still
-# lists it to its model [test]: config-digger shows it Disabled (#341).
+# lists it in `chat.getSkills` [test], the list it builds its model's
+# `<skills>` from [binary]: config-digger shows it Disabled (#341).
 [[items.skill.disable]]
 block = "json-item-list"
 switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", store_class = "sqlite" }
