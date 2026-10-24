@@ -504,7 +504,7 @@ name: pdf
         );
     let caveat = "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: on as of 2 Oct 2026 07:40 UTC.";
 
-    let show = harness.run(&["show", "pdf"]);
+    let show = harness.run(&["show", "anthropic-skills:pdf"]);
     let list = harness.run(&["list", "--kind", "skill"]);
 
     assert_eq!(show.code, 0, "{}", show.stderr);

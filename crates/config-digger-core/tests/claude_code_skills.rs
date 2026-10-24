@@ -185,8 +185,8 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
         .iter()
         .map(|item| item.name.as_str())
         .collect();
-    assert_eq!(names, ["pdf"]);
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(names, ["anthropic-skills:pdf"]);
+    let entry = entry_json(&skill(&inventory, "anthropic-skills:pdf").entries[0]);
     assert_eq!(
         entry["path"],
         r"C:\Users\fixture\.claude\skills\synced\org1_acct1\pdf"
@@ -215,8 +215,8 @@ fn synced_skills_are_read_only_two_folders_below_synced() {
         .iter()
         .map(|item| item.name.as_str())
         .collect();
-    assert_eq!(names, ["pdf"]);
-    let entry = entry_json(&skill(&inventory, "pdf").entries[0]);
+    assert_eq!(names, ["anthropic-skills:pdf"]);
+    let entry = entry_json(&skill(&inventory, "anthropic-skills:pdf").entries[0]);
     assert_eq!(entry["provenance"], "cloud_mirror");
     let inventory = serde_json::to_value(&inventory).unwrap();
     assert_eq!(inventory["read_failures"], json!([]));
@@ -312,14 +312,13 @@ fn project_skill(name: &str) -> PathBuf {
 }
 
 #[test]
-fn a_name_clash_is_won_by_enterprise_then_personal_then_project_then_synced() {
+fn a_name_clash_is_won_by_enterprise_then_personal_then_project() {
     let program_files = r"C:\Program Files";
     let mut fs = claude_home().with_folder(PROJECT);
     for folder in [
         Path::new(program_files).join(r"ClaudeCode\.claude\skills\deploy"),
         in_home(r".claude\skills\deploy"),
         project_skill("deploy"),
-        in_home(r".claude\skills\synced\org_acct\deploy"),
     ] {
         fs = with_skill(fs, folder, &skill_md("deploy"));
     }
@@ -334,15 +333,40 @@ fn a_name_clash_is_won_by_enterprise_then_personal_then_project_then_synced() {
             ("managed", "effective"),
             ("user", "shadowed"),
             ("project", "shadowed"),
-            ("user", "shadowed"),
         ])
     );
-    let synced = &skill(&inventory, "deploy").entries[3];
-    assert_eq!(code(synced.provenance), "cloud_mirror");
+    let project = &skill(&inventory, "deploy").entries[2];
     assert_eq!(
-        synced.reason.as_ref().unwrap().effective.as_deref(),
+        project.reason.as_ref().unwrap().effective.as_deref(),
         Some(r"C:\Program Files\ClaudeCode\.claude\skills\deploy")
     );
+}
+
+#[test]
+fn a_synced_skill_goes_by_anthropic_skills_and_its_folder_and_never_competes_with_a_local_one() {
+    let fs = with_skill(
+        claude_home(),
+        in_home(r".claude\skills\deploy"),
+        &skill_md("deploy"),
+    );
+    let fs = with_skill(
+        fs,
+        in_home(r".claude\skills\synced\org_acct\deploy"),
+        &skill_md("ship-it"),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        states(&inventory, "deploy"),
+        pairs(&[("user", "effective")])
+    );
+    assert_eq!(
+        states(&inventory, "anthropic-skills:deploy"),
+        pairs(&[("user", "effective")])
+    );
+    let synced = &skill(&inventory, "anthropic-skills:deploy").entries[0];
+    assert_eq!(code(synced.provenance), "cloud_mirror");
 }
 
 #[test]
@@ -924,12 +948,22 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
     );
     let core = core(&fs);
 
-    let disable = plan(&core, &in_project(), Action::Disable, &["pdf"])
-        .err()
-        .unwrap();
-    let remove = plan(&core, &in_project(), Action::Remove, &["pdf"])
-        .err()
-        .unwrap();
+    let disable = plan(
+        &core,
+        &in_project(),
+        Action::Disable,
+        &["anthropic-skills:pdf"],
+    )
+    .err()
+    .unwrap();
+    let remove = plan(
+        &core,
+        &in_project(),
+        Action::Remove,
+        &["anthropic-skills:pdf"],
+    )
+    .err()
+    .unwrap();
 
     assert_eq!(code(disable.code), "blocked");
     assert!(
@@ -942,5 +976,27 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
         remove.message.contains("only reads it"),
         "{}",
         remove.message
+    );
+}
+
+#[test]
+fn skill_overrides_turns_a_synced_skill_off_by_its_anthropic_skills_name() {
+    let fs = with_skill(
+        claude_home().with_folder(PROJECT),
+        in_home(r".claude\skills\synced\org_acct\pdf"),
+        &skill_md("portable-docs"),
+    )
+    .with_file(
+        settings_local(),
+        json!({ "skillOverrides": { "anthropic-skills:pdf": "off" } }).to_string(),
+    );
+
+    let inventory = inventory(&core(&fs), &in_project());
+
+    let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.reason.as_ref().unwrap().switch.as_deref(),
+        Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.anthropic-skills:pdf")
     );
 }

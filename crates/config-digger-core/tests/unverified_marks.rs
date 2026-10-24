@@ -272,12 +272,6 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "locations[managed-settings-mcp]",
             "remote-settings.json",
         ),
-        ("claude-code.toml", "locations[synced-skills]", "sync gate"),
-        (
-            "claude-code.toml",
-            "feature_gates[tengu_claudeai_skills_sync_enabled]",
-            "inferred from its name",
-        ),
     ] {
         let mark = marks
             .iter()

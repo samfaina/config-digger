@@ -132,7 +132,7 @@ Inside one plugin, the default `.mcp.json` loads first, followed by each `mcpSer
 
 ### Skills: per name [docs]
 
-Enterprise > personal > project > bundled. A skill beats a legacy command of the same name. A root skill beats a nested one, though both stay invocable. Local and plugin skills beat synced skills. Plugin skills are namespaced `/<plugin>:<skill>` and answer to the bare name only when nothing else claims it ([skills](https://code.claude.com/docs/en/skills)).
+Enterprise > personal > project > bundled. A skill beats a legacy command of the same name. A root skill beats a nested one, though both stay invocable. Local and plugin skills beat synced skills, the docs say; in fact a synced skill is `anthropic-skills:<folder>` and never competes, only the bare `/<folder>` going to a local skill that takes it ([release gate](release-gate.md), 2.1.310). Plugin skills are namespaced `/<plugin>:<skill>` and answer to the bare name only when nothing else claims it ([skills](https://code.claude.com/docs/en/skills)).
 
 ### Settings files: per key, lists concatenate, objects deep-merge [docs]
 
@@ -301,4 +301,4 @@ The release gate (#80) ran Claude Code on throwaway homes with `uat/agents/claud
 5. **Sanitization rule for `~/.claude/projects/<name>`** with long paths. Some Agents truncate and hash; this wasn't observed here.
 6. **The WinGet install's binary path.** Not documented and not present on this machine.
 7. **The exact secure-storage backend on Windows** for OAuth tokens and `sensitive` plugin `userConfig` values. `.credentials.json` exists, but the docs don't say whether Windows Credential Manager is used as well.
-8. **The meaning of `plugins\store\` and `plugins\synced\<uuid>_<uuid>`**: is the pair account and organization? Undocumented.
+8. **The meaning of `plugins\store\` and `plugins\synced\<uuid>_<uuid>`**: is the pair account and organization? Undocumented. For `skills\synced\` it is `<organizationUuid>_<accountUuid>`, the ids of `oauthAccount` in `~/.claude.json`, and Claude Code reads only the signed-in account's folder ([release gate](release-gate.md)).
