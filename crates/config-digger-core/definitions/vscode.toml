@@ -1,9 +1,11 @@
 #:schema ../../../schema/agent-definition.schema.json
 # VS Code with GitHub Copilot. Facts from docs/research/vscode-copilot.md
-# (verified against 1.129.1).
+# (verified against 1.129.1), and those tagged [test] from the release
+# gate's probe, uat/agents/vscode.mjs (docs/research/release-gate.md),
+# which passes on 1.129.1, 1.135.0 and 1.141.0.
 
 format_version = 1
-verified = { min = "1.129.1", max = "1.129.1" }
+verified = { min = "1.129.1", max = "1.141.0" }
 # The shape every setting read from the ExP experiment cache relies on.
 unverified = "The shape of `configs[0].Parameters` in `memento/experiment.service.memento` is inferred from tas-client."
 
@@ -81,13 +83,19 @@ registries = [
 # first folder ranks highest [docs].
 workspace_files = true
 
-# Agent plugins, each in a folder of `~\.vscode\agent-plugins` [disk], in
-# the formats VS Code reads [docs]. A plugin is named by its manifest's
-# `name`, or else by its folder. VS Code uninstalls one in the Extensions
-# view.
+# Agent plugins, which VS Code keeps in `~\.vscode\agent-plugins` [disk].
+# It reads the plugins the folder's `installed.json` lists, each
+# `installed[].pluginUri`, wherever that folder is and whatever its
+# manifest: `plugin.json` at its root, in `.github\plugin`, `.claude-plugin`
+# or `.plugin`, or none [test]. A plugin from a marketplace sits in VS
+# Code's clone of it, `<host>\<owner>\<repo>` in this folder [test], and a
+# folder directly here that `installed.json` does not list is not read
+# [test]. `chat.pluginLocations` adds plugins by their path [binary].
+# config-digger reads the folders directly here instead (#321). A plugin is
+# named by its manifest's `name`, or else by its folder. VS Code uninstalls
+# one in the Extensions view.
 [[plugins]]
 id = "agent-plugins"
-unverified = 'That each agent plugin sits directly in `~\.vscode\agent-plugins`, with its `plugin.json` at its root, in `.github\plugin` or in `.claude-plugin`, is inferred from the formats VS Code reads.'
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json"] }
 name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }]
 
@@ -136,10 +144,10 @@ id = "discovered"
 # user types, `${workspaceFolder}` and `${userHome}` [docs]. `envFile` is the
 # path of a file of variables, and shown.
 
-# A workspace folder's `.vscode\mcp.json` [docs].
+# A workspace folder's `.vscode\mcp.json` [docs]. VS Code skips one it
+# cannot parse, and leaves it as it is [test].
 [[locations]]
 id = "folder-mcp"
-unverified = 'What VS Code does with a `.vscode\mcp.json` it cannot parse is not known.'
 anchor = { block = "project", path = ".vscode/mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
@@ -149,17 +157,18 @@ scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
 interpolation = { block = "braces", namespaces = ["env", "input"], names = ["workspaceFolder", "userHome"] }
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
 # Claude Code's `.mcp.json` in a workspace folder, which VS Code reads under
-# `mcpServers` or as a bare object of servers [docs]. VS Code writes no
-# reference there [docs].
+# `mcpServers` or as a bare object of servers [docs]. VS Code takes every
+# value as written: `${NAME}`, `${env:NAME}` and `$NAME` reach the server
+# unchanged [test], so a `${NAME}` Claude Code replaces is a Secret to VS
+# Code. It writes no reference there [docs]. It skips a `.mcp.json` it
+# cannot parse [test]. It reads the file with
+# `chat.mcp.workspaceRootConfig.enabled` off too [test]: that setting
+# decides where VS Code adds a server [binary].
 [[locations]]
 id = "dot-mcp"
-unverified = [
-  "How VS Code reads a reference in `.mcp.json` is not known: every value is taken as written, so a `${NAME}` Claude Code replaces is a Secret to VS Code.",
-  "What VS Code does with a `.mcp.json` it cannot parse is not known.",
-]
 anchor = { block = "project", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -169,12 +178,14 @@ switch_id = "workspace-dot-mcp.{folder_index}.{name}"
 scope = "workspace-folder"
 provenance = "file"
 store_class = "plain"
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
-# A `.code-workspace` file's `settings.mcp` [docs].
+# A `.code-workspace` file's `settings.mcp` [docs]. VS Code skips these
+# servers when the file does not parse, but still opens the file's folders
+# and applies its other settings, read around the error [test].
+# config-digger reads nothing of such a file, its folders included (#322).
 [[locations]]
 id = "workspace-mcp"
-unverified = "What VS Code does with a `.code-workspace` file it cannot parse is not known."
 anchor = { block = "project-file" }
 format = { block = "json", dialect = "jsonc" }
 root = ["settings", "mcp", "servers"]
@@ -191,14 +202,14 @@ secrets.file_fields = [
   ["settings", "mcp.enterpriseManagedAuth.idp", "clientSecret"],
   ["settings", "mcp", "enterpriseManagedAuth", "idp", "clientSecret"],
 ]
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
 # The profile's `mcp.json` [docs]. VS Code rewrites it whole on every
 # install or remove, dropping its comments, and deletes it once it holds
-# nothing [docs].
+# nothing [docs]. It skips one it cannot parse, and leaves it as it is
+# [test].
 [[locations]]
 id = "user-mcp"
-unverified = "What VS Code does with a profile's `mcp.json` it cannot parse is not known."
 anchor = { block = "home", root = "mcp" }
 format = { block = "json", dialect = "jsonc" }
 root = ["servers"]
@@ -208,7 +219,7 @@ scope = "user"
 provenance = "file"
 store_class = "rewritten-while-running"
 interpolation = { block = "braces", namespaces = ["env", "input"], names = ["workspaceFolder", "userHome"] }
-on_read_failure = "unknown"
+on_read_failure = "ignores_file"
 
 # The servers an extension gives VS Code exist only while it runs [docs].
 # VS Code caches the last ones each extension gave in the workspace's
@@ -216,9 +227,17 @@ on_read_failure = "unknown"
 # `{"<publisher.extension>/<provider>": {"servers": [...]}}`, each server
 # with its `label` and its `launch` [docs, disk]. The cache can be stale.
 # VS Code rebuilds a `state.vscdb` it cannot open from its backup [docs].
+#
+# A launch spells `env` as an object, `headers` as `[name, value]` pairs,
+# `args` as an array, and `uri` as a URI object whose `authority`, `query`
+# and `fragment` hold the URL's userinfo, query and fragment [test]. Unlike
+# 1.129.1, 1.135.0 and later add `external`, the whole URL with the `=` and `&` of its query and
+# fragment encoded [test]. So the env values, the header values and those
+# four parts of the URI are Secrets, `external` whole since its query
+# values cannot be told apart. Every arg is too: the rule that finds the
+# Secrets in a server's `args` reads only an Entry's own `args`.
 [[locations]]
 id = "extension-mcp"
-unverified = "How the cache spells a launch's headers and env is not known: every value of its `env`, `headers`, `args` and `uri` is taken as a Secret."
 anchor = { block = "project-storage", path = "state.vscdb" }
 format = { block = "sqlite-json", key = "mcp.extCachedServers" }
 root = ["mcp.extCachedServers", "*", "servers"]
@@ -228,17 +247,26 @@ switch_id = "{extension}/{name}"
 scope = "extension"
 provenance = "extension"
 store_class = "sqlite"
-secrets.fields = [["launch", "env"], ["launch", "headers"], ["launch", "args"], ["launch", "uri"]]
+secrets.fields = [
+  ["launch", "env"],
+  ["launch", "headers", "*", "1"],
+  ["launch", "args"],
+  ["launch", "uri", "external"],
+  ["launch", "uri", "authority"],
+  ["launch", "uri", "query"],
+  ["launch", "uri", "fragment"],
+]
 on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries"]
 
-# An agent plugin's servers.
+# An agent plugin's servers are in the `.mcp.json` at its root, whatever
+# its manifest [test]. A manifest's `mcpServers` adds the file it names
+# [test], which config-digger does not read (#321). VS Code reads a
+# `.mcp.json` it cannot parse around the error, and starts the servers it
+# finds there [test]. config-digger cannot read that much (#322), so the
+# Items such a file reaches keep a caveat.
 [[locations]]
 id = "plugin-mcp"
-unverified = [
-  "That an agent plugin's servers are in the `.mcp.json` at its root is inferred.",
-  "What VS Code does with an agent plugin's `.mcp.json` it cannot parse is not known.",
-]
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -253,9 +281,15 @@ on_read_failure = "unknown"
 # The configurations of other apps VS Code discovers, each only while its
 # source is on in `chat.mcp.discovery.enabled`, and every source is off by
 # default [disk]. Each is read in its own app's format [docs].
+#
+# VS Code reads the setting as it reads `chat.mcp.collisionBehavior`, for
+# the window [binary]. A folder opened alone reads its own
+# `.vscode\settings.json`, over the user's [test]. A workspace file reads
+# its own `settings`, over the user's, and never the `.vscode\settings.json`
+# of its folders [test]; config-digger reads those too, first, as for a
+# folder (#323).
 [[locations]]
 id = "claude-desktop-mcp"
-unverified = "Which settings files hold the `chat.mcp.discovery.enabled` VS Code reads is not known: for each app it discovers, they are read as for `chat.mcp.collisionBehavior`."
 anchor = { block = "machine", path = "%APPDATA%/Claude/claude_desktop_config.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]

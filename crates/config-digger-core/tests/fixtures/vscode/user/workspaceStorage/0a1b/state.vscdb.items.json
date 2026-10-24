@@ -26,10 +26,12 @@
             "type": 2,
             "uri": {
               "$mid": 1,
-              "scheme": "https",
-              "authority": "api.githubcopilot.com",
+              "external": "https://bot:not-a-real-secret@api.githubcopilot.com/mcp/?token%3Dnot-a-real-secret#t%3Dnot-a-real-secret",
               "path": "/mcp/",
-              "query": "token=not-a-real-secret"
+              "scheme": "https",
+              "authority": "bot:not-a-real-secret@api.githubcopilot.com",
+              "query": "token=not-a-real-secret",
+              "fragment": "t=not-a-real-secret"
             },
             "headers": [["Authorization", "Bearer not-a-real-secret"]]
           }

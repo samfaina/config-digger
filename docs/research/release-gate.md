@@ -2,7 +2,7 @@
 
 Issue: [#80](https://github.com/samfaina/config-digger/issues/80). Terms follow [`CONTEXT.md`](../../CONTEXT.md).
 
-Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23; the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer; and Claude Code's marks that need a claude.ai account, tested on 2026-10-24 with the owner's Max account. Cursor, VS Code and the rest of Claude Desktop, which need their windows driven, come next.
+Before v0.1 ships, every Unverified mark of the built-in definitions is tested against the real Agent on the reference machine (Windows 11 Pro, home `C:\Users\kgon1`, a second drive `E:`). Each mark is then removed, or the rule is corrected, with the evidence in the definition as a `[test]` tag and here. This file covers the three CLI Agents, tested on 2026-10-23; the marks that need Windows Sandbox, since their files sit in `%ProgramFiles%` or `%ProgramData%`, or come with an installer; Claude Code's marks that need a claude.ai account, tested on 2026-10-24 with the owner's Max account; and VS Code's marks about the MCP files it reads, tested on 2026-10-24 on throwaway profiles. Cursor, the rest of VS Code and the rest of Claude Desktop, which need their windows driven, come next.
 
 ## The probes
 
@@ -12,6 +12,7 @@ A probe per Agent in `uat/agents/` builds throwaway homes and Projects, runs the
 node uat/agents/claude-code.mjs [--bin <claude.exe>]
 node uat/agents/codex.mjs       [--bin <codex.exe or codex.cmd>]
 node uat/agents/gemini-cli.mjs  [--bin <gemini.cmd>]
+node uat/agents/vscode.mjs      [--bin <Code.exe>]
 ```
 
 Each check names the table of the definition it tests, as `cargo xtask unverified` prints it, and passes when the Agent does what the definition now says. A probe exits 1 when a check fails. `CD_PROBE_VERBOSE=1` prints what each check saw, and `CD_PROBE_JSON=<file>` writes the results. Run a probe again with each new version of its Agent: when every check passes, the version can join the definition's `verified` range.
@@ -23,6 +24,7 @@ What keeps a probe off the user's own configuration:
 - Servers are `cmd /c <tag>`, which exits at once, or an HTTP URL on a closed local port. Entries are `cd-throwaway-*` and the only key is `not-a-real-secret`.
 - No request reaches a model. Claude Code's Messages API is a local server in the probe, which keeps each request so the probe can read the skills Claude Code lists to its model. Codex and Gemini CLI point at a closed local port.
 - Claude Code still fetches its GrowthBook features at start, without an account. Older Claude Code versions come from npm into the probe root (`npm install --prefix E:\cd-throwaway-agents\cc-<version> @anthropic-ai/claude-code@<version>`).
+- VS Code gets a throwaway profile per launch: `--user-data-dir`, `--extensions-dir`, `--shared-data-dir` and `--agent-plugins-dir`, and `USERPROFILE` and `APPDATA` in the launch's folder, so that `~\.vscode\argv.json` and Claude Desktop's config are throwaway too. It runs beside a VS Code the user has open, and the probe stops only the processes given its own data folder. Its servers are this machine's Node writing a marker file, and nothing signs in. Another version comes as the zip archive from `update.code.visualstudio.com/<version>/win32-x64-archive/stable`, unpacked into the probe root.
 
 How each probe reads what the Agent loaded:
 
@@ -31,6 +33,7 @@ How each probe reads what the Agent loaded:
 | Claude Code | `claude mcp list` (approval status, parse diagnostics), `claude mcp get`, `claude plugin list`, the `init` event of `claude -p --output-format stream-json --verbose` (servers, skills, plugins), and the request Claude Code sends its model: the skill listing, `- <name> (<alias>): <description>`, and the body of a skill a `/<name>` prompt runs |
 | Codex | `codex mcp list`, `codex debug prompt-input` (the skills its model gets), the files `codex exec` and `codex archive` write |
 | Gemini CLI | `gemini extensions list` (`Enabled (Workspace)` for the folder it starts in), `gemini mcp list`, `gemini -p` |
+| VS Code | The servers it starts: a probe extension, loaded with `--extensionDevelopmentPath`, runs `workbench.mcp.startServer *`, trusting discovered servers, and each server writes a marker with the arguments and variables it got; the folders the window opened; the workspace's `mcp.extCachedServers` in its `state.vscdb` |
 
 ### In Windows Sandbox
 
@@ -69,6 +72,7 @@ CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth logou
 | Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too; `claude-account.mjs` on 2.1.299, 2.1.302, 2.1.309 and 2.1.310, with a Max account | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
 | Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
+| VS Code | 1.129.1, 1.135.0, 1.141.0, `vscode.mjs` | 1.129.1 to 1.141.0 (was 1.129.1) |
 | Claude Desktop | 3.6556.2, `claude-desktop.mjs` only | unchanged, 2.16120: 3.x keeps a package's data elsewhere ([#305](https://github.com/samfaina/config-digger/issues/305)) |
 
 Claude Code 2.1.286 fails 7 checks, all on what 2.1.299 changed: a plain-string `enabledMcpjsonServers` or `disabledMcpjsonServers` voids its settings file, there is no name rule, and the skill listing gives no alias. The definition describes 2.1.299 and later, so the range starts there.
@@ -152,9 +156,26 @@ Tested on 3.6556.2, the version claude.ai served on 2026-10-23, in Windows Sandb
 | `:9` (top): where the classic installer puts the app | Squirrel installs for the user in `%LOCALAPPDATA%\AnthropicClaude`: a launcher `claude.exe` with the app's version, `Update.exe`, and `app-<version>\claude.exe`, which runs the app. The uninstall key is `HKCU\…\Uninstall\AnthropicClaude`. The classic app reads `%APPDATA%\Claude` | Corrected: a `classic` Installation, and its process path |
 | `:234`, `:280` | Not tested | Pending: `:234` needs a deployment for a third-party provider; `:280` needs the app's windows driven, signed in |
 
-### Cursor and VS Code
+### VS Code
 
-Pending: these 37 marks need the apps' windows driven, on throwaway profiles. Cursor `:109`, `:110`, `:145`, `:146`, `:170`, `:194`, `:211`, `:234`, `:235`, `:254`, `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:90`, `:142`, `:160`, `:161`, `:177`, `:201`, `:221`, `:239`, `:240`, `:258`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
+The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. Each broken file holds `,,` between two servers, which no JSON parser accepts, and each launch keeps a server in two other files.
+
+| Mark | What the probe saw | Outcome |
+|---|---|---|
+| `:90` `plugins[agent-plugins]`: each plugin sits directly in `~\.vscode\agent-plugins`, with `plugin.json` at its root, in `.github\plugin` or `.claude-plugin` | VS Code reads the plugins `agent-plugins\installed.json` lists, each `pluginUri` a folder anywhere; a marketplace's plugin sits in VS Code's clone, `<host>\<owner>\<repo>\<source>`. `plugin.json` at the root, in `.github\plugin`, `.claude-plugin` or `.plugin`, or none, all load. A plugin folder directly in `agent-plugins` that `installed.json` does not list is not read | Ticket [#321](https://github.com/samfaina/config-digger/issues/321): no registry block reads a JSON list of folder URIs |
+| `:142` `locations[folder-mcp]`: unparsable `.vscode\mcp.json` | Skipped; the other files load; the file is left as it is | Corrected: `ignores_file` |
+| `:160` `locations[dot-mcp]`: references | `${NAME}`, `${env:NAME}` and `$NAME`, in `args` and `env`, reach the server unchanged | Confirmed |
+| `:161` `locations[dot-mcp]`: unparsable `.mcp.json` | Skipped; the other files load | Corrected: `ignores_file` |
+| `:177` `locations[workspace-mcp]`: unparsable `.code-workspace` | Its servers are skipped, but VS Code opens its folders, reads their files, and applies its other settings, such as `chat.mcp.discovery.enabled`, read around the error | Corrected: `ignores_file` for the servers; ticket [#322](https://github.com/samfaina/config-digger/issues/322) for the folders and settings config-digger cannot read |
+| `:201` `locations[user-mcp]`: unparsable profile `mcp.json` | Skipped; the other files load; the file is left as it is | Corrected: `ignores_file` |
+| `:221` `locations[extension-mcp]`: how the cache spells a launch | `env` an object; `headers` `[name, value]` pairs; `args` an array; `uri` a URI object with `scheme`, `authority`, `path`, `query` and `fragment`, and from 1.135.0 `external`, the whole URL with the `=` and `&` of its query and fragment encoded | Corrected: header names and the URI's `scheme` and `path` are shown; env and header values, args, and the URI's `authority`, `query`, `fragment` and `external` are Secrets |
+| `:239` `locations[plugin-mcp]`: servers in the `.mcp.json` at the plugin's root | Confirmed for every manifest layout; a manifest's `mcpServers` naming a file adds that file's servers too | Confirmed; the named file is in ticket [#321](https://github.com/samfaina/config-digger/issues/321) |
+| `:240` `locations[plugin-mcp]`: unparsable plugin `.mcp.json` | VS Code reads it around the error and starts both servers | Ticket [#322](https://github.com/samfaina/config-digger/issues/322); `unknown` stays, so the Items it reaches keep a caveat |
+| `:258` `locations[claude-desktop-mcp]`: which settings hold `chat.mcp.discovery.enabled` | The user's turn a source on. A folder opened alone reads its `.vscode\settings.json`, over the user's; a workspace file reads its `settings`, over the user's, and never a member folder's `.vscode\settings.json` | Ticket [#323](https://github.com/samfaina/config-digger/issues/323): the core reads a member folder's settings first |
+
+### Cursor, and the rest of VS Code
+
+Pending: these 27 marks need the apps' windows driven, on throwaway profiles. Cursor `:109`, `:110`, `:145`, `:146`, `:170`, `:194`, `:211`, `:234`, `:235`, `:254`, `:299`, `:595`, `:596`, `:700`, `:709`, `:720`, `:721`; VS Code `:8`, `:385`, `:417`, `:444`, `:473`, `:474`, `:503`, `:601`, `:615`, `:616`.
 
 ## Found beside the marks
 
@@ -171,6 +192,8 @@ Pending: these 37 marks need the apps' windows driven, on throwaway profiles. Cu
 - **Claude Code does not download again a synced skill deleted by hand** while the account's folder holds `.last-complete-round`. Without that file, the next run with the gate on downloads every skill again. The probe clears the copy that way before each gate check.
 - **`syncClaudeAiSkills: false` in the user's settings** stops the reading, as the rule says, and Claude Code deletes the skills it downloaded, `manifest.json` included. A skill planted in the account's folder stays.
 - **Claude Desktop starts no MCP server before someone signs in**, but reads `claude_desktop_config.json` at start: an entry it cannot use is named in a dialog, "Some MCP servers couldn't be loaded", which is what `claude-desktop.mjs` reads.
+- **VS Code reads `.mcp.json` with `chat.mcp.workspaceRootConfig.enabled` off.** The setting decides only whether VS Code adds a server to `.mcp.json` or to `.vscode\mcp.json`, so `dot-mcp` needs no `when`. This answers the research's open question on that gate.
+- **VS Code reads `chat.mcp.collisionBehavior` for the window**, as it reads `chat.mcp.discovery.enabled` [binary]: in a workspace file, a member folder's value is ignored, while config-digger reads it first. Not tested; [#323](https://github.com/samfaina/config-digger/issues/323) covers both.
 
 ## What is left
 
@@ -181,7 +204,6 @@ Marks are named by their table, as `cargo xtask unverified` prints them; line nu
 | Server-managed settings: Claude Teams or Enterprise | Claude Code `settings[managed]`, `locations[managed-settings-mcp]` (a `remote-settings.json` that does not parse) | Under the exception |
 | A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]` | Under the exception |
 | A deployment of Claude Desktop for a third-party provider | Claude Desktop `items.mcp.rules[1]` | Under the exception |
-| VS Code's windows, on a throwaway profile | VS Code's MCP files (10) | [#311](https://github.com/samfaina/config-digger/issues/311) |
 | The same, and a GitHub account | VS Code's stores, policy and skills (10) | [#316](https://github.com/samfaina/config-digger/issues/316) |
 | Cursor's windows, on a throwaway profile | Cursor's MCP files and plugins (10) | [#312](https://github.com/samfaina/config-digger/issues/312) |
 | The same, and maybe an account for its gates | Cursor's Disabled store, skills and gates (7) | [#317](https://github.com/samfaina/config-digger/issues/317) |
