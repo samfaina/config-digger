@@ -53,6 +53,10 @@ Desktop apps (Claude Desktop, Cursor, VS Code):
 - Cursor may update itself during a session, `update.mode` set to `none` or not. Check the version a run reports.
 - Claude Desktop starts no MCP server before someone signs in. It still reads `claude_desktop_config.json` at start, and names an entry it cannot use in the dialog "Some MCP servers couldn't be loaded", which UI Automation reads. It names each entry only once, so give each launch new names.
 
+Orca:
+
+- Never test a tool that copies an Agent home on the copy the open app keeps: Orca copies from the `~\.codex` of the user it runs as, whatever `CODEX_HOME` says, and writes settings back into it. `orca-codex.mjs` loads the modules of Orca's install, `resources\app.asar.unpacked\out\main\chunks`, in Node, with `USERPROFILE` and `ORCA_USER_DATA_PATH` moved. Their exports' names change with Orca's version; the bundle, `resources\app.asar`, is where to find them again.
+
 Accounts:
 
 - The owner signs in on a throwaway home, outside their own home folder: `CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth login --claudeai`. `!` in a Claude Code prompt runs bash, so `$env:…` there signs in the owner's own home.

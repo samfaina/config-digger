@@ -3,7 +3,8 @@
 # configuration with on Windows [docs]. Facts from docs/research/codex.md,
 # and those tagged [test] from the release gate's probes,
 # uat/agents/codex.mjs and, for `%ProgramData%`, codex-machine.mjs in
-# Windows Sandbox (docs/research/release-gate.md), which pass on 0.159.3.
+# Windows Sandbox (docs/research/release-gate.md), which pass on 0.159.3,
+# and, for Orca's home, orca-codex.mjs, which runs Orca 1.4.239's code.
 
 format_version = 1
 verified = { min = "0.159.3", max = "0.159.3" }
@@ -56,13 +57,21 @@ sessions = "sessions"
 archived_sessions = "archived_sessions"
 state = "state_5.sqlite"
 
-# The home Orca sets `CODEX_HOME` to for every Codex it starts: a copy of
-# the user's `config.toml`, with Orca's own additions, next to links to
-# `~\.codex\plugins` and `~\.codex\skills` [disk]. config-digger only reads
-# it.
+# The home Orca sets `CODEX_HOME` to when it starts a Codex on its shared
+# home. Orca 1.4.239 does so for the system-default account only when the
+# launch's environment or PowerShell profile sets a `CODEX_HOME` other than
+# `~\.codex`; its other launches run on `~\.codex` itself or on an account's
+# own home [source]. Before each launch on it, Orca merges
+# `~\.codex\config.toml` into the home's `config.toml`, never `CODEX_HOME`'s
+# file, so the copy follows `~\.codex` from one launch to the next: a server
+# Disabled or removed there is Disabled or gone in the copy, and a server
+# only the copy holds stays [test]. `skills`, `plugins`, the other folders
+# it shares and `AGENTS.md` are links to `~\.codex`'s, which follow at once
+# [test]. Orca also writes back to `~\.codex\config.toml` a few settings
+# changed in the copy, such as `model`, and the plugin tables added there
+# [test]. config-digger only reads it.
 [[mirrored_homes]]
 id = "orca"
-unverified = 'How and when Orca copies this home is not known: it is taken to follow `~\.codex`.'
 owner = "Orca"
 folder = { block = "path", path = "%APPDATA%/orca/codex-runtime-home/home" }
 source = "default"

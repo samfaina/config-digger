@@ -69,9 +69,9 @@ What moves with `CODEX_HOME`: the user `config.toml` and profile files, `skills\
 | Home | Who uses it | Contents |
 |---|---|---|
 | `C:\Users\kgon1\.codex` | any Codex started without `CODEX_HOME` | `config.toml` with `cd-throwaway-user`, `cd-throwaway-http`, one trusted project; `skills\.system\`; `plugins\cache\openai-curated-remote\{plugin-management,work-pets}\`; `state_5.sqlite` and other DBs; `auth.json` |
-| `%APPDATA%\orca\codex-runtime-home\home` | every Codex started from an Orca terminal (`CODEX_HOME` set by Orca) | its own `config.toml` holding the same two servers and trusted project plus Orca's `[hooks.state]` trust hashes; `hooks.json`; `config.toml.bak`; `.orca-config-settings-baseline.json` (lists `mcpServers: [cd-throwaway-user, cd-throwaway-http]`); its own `auth.json` and DBs; `plugins` and `skills` are **directory links to `~/.codex\plugins` and `~/.codex\skills`** |
+| `%APPDATA%\orca\codex-runtime-home\home` | a Codex Orca starts on its shared home (`CODEX_HOME` set by Orca); Orca 1.4.239 starts most on `~/.codex` instead, see `release-gate.md` | its own `config.toml` holding the same two servers and trusted project plus Orca's `[hooks.state]` trust hashes; `hooks.json`; `config.toml.bak`; `.orca-config-settings-baseline.json` (lists `mcpServers: [cd-throwaway-user, cd-throwaway-http]`); its own `auth.json` and DBs; `plugins` and `skills` are **directory links to `~/.codex\plugins` and `~/.codex\skills`** |
 
-The Orca home looks like a mirror Orca maintains from `~/.codex\config.toml`. That is Orca's behaviour, not Codex's, and its sync rules are unknown (see Open questions). For config-digger it means the same Entry can appear in two user files, and the plugin and skill folders must be deduplicated by resolved path.
+The Orca home is a mirror Orca maintains from `~/.codex\config.toml`. That is Orca's behaviour, not Codex's; its rules, tested on Orca 1.4.239's code, are in [`release-gate.md`](release-gate.md) (Codex `mirrored_homes[orca]`). For config-digger it means the same Entry can appear in two user files, and the plugin and skill folders must be deduplicated by resolved path.
 
 `codex mcp list` run from the scratch project gives the same result in both homes [disk].
 
@@ -338,7 +338,7 @@ On-disk evidence (read-only): `%USERPROFILE%\.codex\` (`config.toml`, `skills\`,
 
 ## Open questions
 
-1. **Orca's mirror.** How and when does Orca copy `~/.codex\config.toml` into its home, and in which direction? `.orca-config-settings-baseline.json` suggests a three-way sync of selected keys and `mcpServers`. If config-digger Disables an Entry in `~/.codex`, does Orca propagate it, or revert it? This needs Orca's source or a controlled test, not read-only inspection.
+1. **Orca's mirror.** Answered in [`release-gate.md`](release-gate.md), from Orca 1.4.239's code run on throwaway homes: Orca merges `~/.codex\config.toml` into its home before each Codex launch on it, so a Disable in `~/.codex` reaches the copy at the next launch, and it writes back a few settings and the plugin tables added in its home, which `.orca-config-settings-baseline.json` keeps the baseline of.
 2. **Remote plugin enablement offline.** Where, if anywhere, is the server-side enabled state of `openai-curated-remote` plugins cached locally? Without it, config-digger can't tell whether `plugin-management` and `work-pets` are enabled without calling the account API.
 3. **Untrusted `.codex\skills`.** Is loading skills from disabled project layers intended or a bug? It contradicts the docs. If OpenAI fixes it, the Agent definition's trust rule for skills will change with the version.
 4. **Desktop app on Windows.** Its process name, whether it starts its own app-server or reuses the CLI daemon in `~/.codex\packages\app-server-daemon`, and whether it writes `projects`/`project_roots` in `state_5.sqlite`. The app isn't installed here.
