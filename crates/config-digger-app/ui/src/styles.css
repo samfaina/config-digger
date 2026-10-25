@@ -57,9 +57,9 @@
 
   color-scheme: dark;
   font-family: Outfit, "Segoe UI", sans-serif;
-  /* The one base of every text size: 1rem is body text, the size of a row's
-     location, a description and a dialog's notes. Every other size is a rem of
-     it, so changing it changes them all. A share of the browser's 16px. */
+  /* The one base of every text size: 1rem is the text of a row's location, a
+     description and a dialog's notes. Every other size is a rem of it, so
+     changing it changes them all. A share of the browser's 16px. */
   font-size: 87.5%;
   color: var(--white);
   background: var(--background);
@@ -1036,7 +1036,7 @@ p {
   margin: 2px 4px 0;
   color: var(--grey);
   font-size: 0.9583rem;
-  line-height: 16px;
+  line-height: 1.4;
 }
 
 .home-name {

@@ -155,42 +155,6 @@ const SHOTS: Shot[] = [
       await page.getByRole("heading", { name: "Links" }).waitFor();
     },
   },
-  // Each main screen in the smallest window, where the text has the least room.
-  { name: "smallest-inventory-item", steps: (page) => page.setViewportSize(SMALLEST).then(() => selectItem(page, "cd-throwaway-user")) },
-  {
-    name: "smallest-projects",
-    steps: async (page) => {
-      await page.setViewportSize(SMALLEST);
-      await rail(page, "Projects & homes");
-      await page.getByRole("tab", { name: "Projects" }).waitFor();
-    },
-  },
-  {
-    name: "smallest-projects-homes",
-    steps: async (page) => {
-      await page.setViewportSize(SMALLEST);
-      await rail(page, "Projects & homes");
-      await page.getByRole("tab", { name: "Agent homes" }).click();
-    },
-  },
-  {
-    name: "smallest-history-operation",
-    steps: async (page) => {
-      await page.setViewportSize(SMALLEST);
-      await rail(page, "History · Undo");
-      await page.locator(".operation-row").first().click();
-      await page.getByText("Backup folder").first().waitFor();
-    },
-  },
-  { name: "smallest-settings", steps: (page) => page.setViewportSize(SMALLEST).then(() => rail(page, "Settings")) },
-  {
-    name: "smallest-about",
-    steps: async (page) => {
-      await page.setViewportSize(SMALLEST);
-      await rail(page, "About");
-      await page.getByRole("heading", { name: "Links" }).waitFor();
-    },
-  },
   {
     name: "notice-success",
     steps: async (page) => {
@@ -217,6 +181,19 @@ const SHOTS: Shot[] = [
     },
   },
 ];
+
+/** Each main screen again in the smallest window, where the text has the least room, as `smallest-<name>`. */
+const SMALLEST_SHOTS: Shot[] = ["inventory-item", "projects", "projects-homes", "history-operation", "settings", "about"].map((name) => {
+  const shot = SHOTS.find((each) => each.name === name);
+  if (shot === undefined) throw new Error(`No shot named ${name}.`);
+  return {
+    name: `smallest-${name}`,
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await shot.steps?.(page);
+    },
+  };
+});
 
 /** Once every animation that ends has ended, such as a notice sliding in; a spinner never does. */
 async function settled(page: Page) {
@@ -252,7 +229,7 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   const failed: string[] = [];
   try {
-    for (const shot of SHOTS) {
+    for (const shot of [...SHOTS, ...SMALLEST_SHOTS]) {
       const page = await browser.newPage({ viewport: WINDOW, colorScheme: "dark" });
       try {
         await page.goto(`${url}${shot.query ?? ""}`);
