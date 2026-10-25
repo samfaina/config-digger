@@ -723,3 +723,20 @@ describe("a tag", () => {
     expectTokenColours(TAGS);
   });
 });
+
+describe("an element the keyboard reaches for its tooltip", () => {
+  // The Mirrored and not read tags, a single home's name, a flag alert, the
+  // time the inventory was read, the parked from tag, and the action dialog's
+  // info lines and file names.
+  const TAB_STOPS = [".tag", ".single-home", ".alert", ".banner-value", ".check.info", ".change-file-name .mono"];
+
+  test("shows the focus ring of the other controls under :focus-visible", () => {
+    const ring = styled(".tile:focus-visible");
+    expect(ring.get("outline")).toBe("2px solid var(--primary-hover)");
+    for (const selector of TAB_STOPS) {
+      const focused = styled(`${selector}:focus-visible`);
+      expect(focused.get("outline"), selector).toBe(ring.get("outline"));
+      expect(focused.get("outline-offset"), selector).toBe(ring.get("outline-offset"));
+    }
+  });
+});

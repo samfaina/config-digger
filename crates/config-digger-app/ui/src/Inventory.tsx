@@ -234,7 +234,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
             )}
             {flags.map((flag) => (
               <Tooltip key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} text={flag.path}>
-                <div className="alert" role="status">
+                <div className="alert" role="status" tabIndex={0}>
                   <Icon name="flag" small />
                   {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
                 </div>
@@ -388,7 +388,7 @@ export function Banner({ inventory, project, agentName, stats, reading, rereadin
       <div>
         <div className="caption">Inventory read</div>
         <Tooltip text={inventory?.read_at}>
-          <div className="banner-value">
+          <div className="banner-value" tabIndex={0}>
             {inventory ? readTime(inventory.read_at) : "—"}
             <span className="caption"> · on focus</span>
           </div>
@@ -528,16 +528,22 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const lastOpened = lastOpenedHomes(inventory);
   const opened = (home: Home) => isLastOpened(lastOpened, home);
   // Another tool copies a Mirrored home, so config-digger only reads it.
-  const mirrored = (home: Home) =>
+  // A tag is a tab stop, `tabIndex` 0, for the keyboard to show its tooltip,
+  // except inside a tile's button, whose own tooltip then says it.
+  const mirrored = (home: Home, tabIndex?: number) =>
     home.mirror && (
       <Tooltip text={home.mirror.sentence}>
-        <span className="tag read-only">{home.mirror.label}</span>
+        <span className="tag read-only" tabIndex={tabIndex}>
+          {home.mirror.label}
+        </span>
       </Tooltip>
     );
-  const notRead = (home: Home) =>
+  const notRead = (home: Home, tabIndex?: number) =>
     home.not_read && (
       <Tooltip text={home.not_read.sentence}>
-        <span className="tag">not read</span>
+        <span className="tag" tabIndex={tabIndex}>
+          not read
+        </span>
       </Tooltip>
     );
 
@@ -554,8 +560,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
         <div className="home-row" key={agent}>
           <span>{agentName}</span>
           <span className="grow" />
-          {mirrored(chosen)}
-          {notRead(chosen)}
+          {mirrored(chosen, 0)}
+          {notRead(chosen, 0)}
           <FailureBadge count={failuresOf(chosen)} where="this home" />
           {own.length > 1 ? (
             <Select
@@ -568,7 +574,9 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
             />
           ) : (
             <Tooltip text={chosen.folder}>
-              <span className="dim">{chosen.home}</span>
+              <span className="dim single-home" tabIndex={0}>
+                {chosen.home}
+              </span>
             </Tooltip>
           )}
         </div>
@@ -581,7 +589,7 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       .map((home) => {
         const selected = selection.homes[agent] === home.home;
         return (
-          <Tooltip key={home.home} text={home.no_configuration ?? home.folder}>
+          <Tooltip key={home.home} text={homeTileTooltip(home)}>
             <button
               type="button"
               className={`tile home-tile${selected ? " selected" : ""}`}
@@ -616,6 +624,15 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
 
 /** The mark of a Project's Last-opened home. */
 const LAST_OPENED = "last opened here";
+
+/**
+ * The tooltip of a home's tile: its folder, or that it has no configuration,
+ * then the sentence of its Mirrored or not read tag, which takes no focus
+ * inside the tile's button.
+ */
+function homeTileTooltip(home: Home): string {
+  return [home.no_configuration ?? home.folder, home.mirror?.sentence, home.not_read?.sentence].filter(Boolean).join("\n");
+}
 
 /** A home as the select of All Agents lists it, with its marks and how many locations couldn't be read in it. */
 export function homeLabel(home: Home, failed: number, lastOpened: boolean): string {
