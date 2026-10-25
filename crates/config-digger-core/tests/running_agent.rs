@@ -817,25 +817,25 @@ fn a_running_agent_without_an_installation_for_that_home_never_warns_of_a_skill_
     assert_eq!(running_agent_sentence(&plan), None);
 }
 
-/// Where [`linked_root_fixture`]'s `~/.claude/skills` junction leads.
-const LINKED_ROOT: &str = r"D:\skills";
+/// Where [`linked_skills_folder_fixture`]'s `~/.claude/skills` junction leads.
+const LINKED_SKILLS: &str = r"D:\skills";
 
-/// [`fixture`] with `~/.claude/skills` a junction to [`LINKED_ROOT`], which
+/// [`fixture`] with `~/.claude/skills` a junction to [`LINKED_SKILLS`], which
 /// holds the skill `review`.
-fn linked_root_fixture() -> FakeFileSystem {
+fn linked_skills_folder_fixture() -> FakeFileSystem {
     fixture()
-        .with_folder(LINKED_ROOT)
+        .with_folder(LINKED_SKILLS)
         .with_file(
-            PathBuf::from(LINKED_ROOT).join(r"review\SKILL.md"),
+            PathBuf::from(LINKED_SKILLS).join(r"review\SKILL.md"),
             SKILL_MD,
         )
         .with_folder(PathBuf::from(HOME).join(".claude"))
-        .with_link(PathBuf::from(HOME).join(r".claude\skills"), LINKED_ROOT)
+        .with_link(PathBuf::from(HOME).join(r".claude\skills"), LINKED_SKILLS)
 }
 
 #[test]
-fn removing_a_skill_folder_the_running_agent_reads_through_a_linked_skills_root_gets_a_warning() {
-    let fs = linked_root_fixture();
+fn removing_a_skill_folder_the_running_agent_reads_through_a_linked_skills_folder_gets_a_warning() {
+    let fs = linked_skills_folder_fixture();
     let core = core(&fs, &[claude_code_cli()]);
 
     let plan = remove(&core, "review");
@@ -846,7 +846,7 @@ fn removing_a_skill_folder_the_running_agent_reads_through_a_linked_skills_root_
         sentence.contains(&review_skill().display().to_string()),
         "{sentence}"
     );
-    assert!(!sentence.contains(LINKED_ROOT), "{sentence}");
+    assert!(!sentence.contains(LINKED_SKILLS), "{sentence}");
     let error = core.execute(plan, &[]).unwrap_err();
     assert_eq!(error.code, ErrorCode::AckRequired);
 }
@@ -894,17 +894,17 @@ fn linked_store_fs() -> FakeFileSystem {
 /// root `running_at` of its home, and an Agent with no process that reads
 /// it at `other_at`.
 fn linked_store_core(fs: &FakeFileSystem, running_at: &str, other_at: &str) -> Core {
-    let at = |definition: String, state: &str| {
+    let reading_store_at = |definition: String, state: &str| {
         definition.replace("\".store/state.vscdb\"", &format!("\"{state}\""))
     };
-    let running = at(
+    let running = reading_store_at(
         plain_agent("[process]\nimages = [\"store.exe\"]\n"),
         running_at,
     );
     let other = plain_agent("")
         .replace("id = \"store-agent\"", "id = \"other-agent\"")
         .replace("name = \"Store Agent\"", "name = \"Other Agent\"");
-    let other = at(other, other_at);
+    let other = reading_store_at(other, other_at);
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     let mut ports = fake::ports(fs.clone(), env);
     ports.processes = Box::new(FakeProcesses::default().with_process(store_agent()));
@@ -923,7 +923,7 @@ fn writing_a_file_the_running_agent_reads_through_a_link_gets_a_warning() {
     assert!(
         sentence.contains(&format!(
             "Store Agent is running and reads {}",
-            store().display()
+            real_store().display()
         )),
         "{sentence}"
     );
@@ -943,15 +943,15 @@ fn writing_a_file_through_a_link_that_the_running_agent_reads_at_its_real_path_g
     assert!(
         sentence.contains(&format!(
             "Store Agent is running and reads {}",
-            real_store().display()
+            store().display()
         )),
         "{sentence}"
     );
 }
 
 #[test]
-fn an_undo_that_moves_a_skill_folder_back_into_a_linked_skills_root_gets_the_warning() {
-    let fs = linked_root_fixture();
+fn an_undo_that_moves_a_skill_folder_back_into_a_linked_skills_folder_gets_the_warning() {
+    let fs = linked_skills_folder_fixture();
     let processes = FakeProcesses::default();
     let core = core_watching(&fs, &processes);
     let outcome = core.execute(remove(&core, "review"), &[]).unwrap();
@@ -967,9 +967,9 @@ fn an_undo_that_moves_a_skill_folder_back_into_a_linked_skills_root_gets_the_war
 }
 
 #[test]
-fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_root_needs_a_fresh_preview()
+fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_folder_needs_a_fresh_preview()
  {
-    let fs = linked_root_fixture();
+    let fs = linked_skills_folder_fixture();
     let processes = FakeProcesses::default();
     let core = core_watching(&fs, &processes);
     let plan = remove(&core, "review");
@@ -980,6 +980,6 @@ fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_root_ne
 
     assert_eq!(error.code, ErrorCode::Stale);
     assert!(error.message.contains("Claude Code"), "{}", error.message);
-    let skill_md = PathBuf::from(LINKED_ROOT).join(r"review\SKILL.md");
+    let skill_md = PathBuf::from(LINKED_SKILLS).join(r"review\SKILL.md");
     assert!(fs.contents(skill_md).is_some());
 }
