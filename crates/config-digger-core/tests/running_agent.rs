@@ -816,3 +816,170 @@ fn a_running_agent_without_an_installation_for_that_home_never_warns_of_a_skill_
 
     assert_eq!(running_agent_sentence(&plan), None);
 }
+
+/// Where [`linked_skills_folder_fixture`]'s `~/.claude/skills` junction leads.
+const LINKED_SKILLS: &str = r"D:\skills";
+
+/// [`fixture`] with `~/.claude/skills` a junction to [`LINKED_SKILLS`], which
+/// holds the skill `review`.
+fn linked_skills_folder_fixture() -> FakeFileSystem {
+    fixture()
+        .with_folder(LINKED_SKILLS)
+        .with_file(
+            PathBuf::from(LINKED_SKILLS).join(r"review\SKILL.md"),
+            SKILL_MD,
+        )
+        .with_folder(PathBuf::from(HOME).join(".claude"))
+        .with_link(PathBuf::from(HOME).join(r".claude\skills"), LINKED_SKILLS)
+}
+
+#[test]
+fn removing_a_skill_folder_the_running_agent_reads_through_a_linked_skills_folder_gets_a_warning() {
+    let fs = linked_skills_folder_fixture();
+    let core = core(&fs, &[claude_code_cli()]);
+
+    let plan = remove(&core, "review");
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(sentence.contains("Claude Code"), "{sentence}");
+    assert!(
+        sentence.contains(&review_skill().display().to_string()),
+        "{sentence}"
+    );
+    assert!(!sentence.contains(LINKED_SKILLS), "{sentence}");
+    let error = core.execute(plan, &[]).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AckRequired);
+}
+
+#[test]
+fn the_warning_names_the_linked_entry_the_running_agent_reads_a_moved_folder_through() {
+    let fs = linked_fixture();
+    let processes = FakeProcesses::default().with_process(claude_code_cli());
+    let core = core_with(&fs, AGENTS_READER, &processes);
+
+    let plan = remove(&core, &shared_skill().display().to_string());
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(
+        sentence.contains(&format!(
+            "Claude Code is running and reads {}",
+            shared_link().display()
+        )),
+        "{sentence}"
+    );
+    assert!(!sentence.contains(r".agents\skills"), "{sentence}");
+}
+
+/// Where [`linked_store_fs`]'s `~/.store` junction leads.
+fn real_store() -> PathBuf {
+    PathBuf::from(HOME).join(r".real-store\state.vscdb")
+}
+
+/// The store of [`store_fs`] in `~/.real-store`, which the junction
+/// `~/.store` leads to.
+fn linked_store_fs() -> FakeFileSystem {
+    FakeFileSystem::new()
+        .with_file(real_store(), STORE)
+        .with_file(
+            PathBuf::from(HOME).join(r".real-store\store.exe"),
+            fake::executable(None),
+        )
+        .with_link(
+            PathBuf::from(HOME).join(".store"),
+            real_store().parent().unwrap(),
+        )
+}
+
+/// A core over `fs` with Store Agent running, which reads its store at the
+/// root `running_at` of its home, and an Agent with no process that reads
+/// it at `other_at`.
+fn linked_store_core(fs: &FakeFileSystem, running_at: &str, other_at: &str) -> Core {
+    let reading_store_at = |definition: String, state: &str| {
+        definition.replace("\".store/state.vscdb\"", &format!("\"{state}\""))
+    };
+    let running = reading_store_at(
+        plain_agent("[process]\nimages = [\"store.exe\"]\n"),
+        running_at,
+    );
+    let other = plain_agent("")
+        .replace("id = \"store-agent\"", "id = \"other-agent\"")
+        .replace("name = \"Store Agent\"", "name = \"Other Agent\"");
+    let other = reading_store_at(other, other_at);
+    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let mut ports = fake::ports(fs.clone(), env);
+    ports.processes = Box::new(FakeProcesses::default().with_process(store_agent()));
+    let definitions = [("running.toml", running.as_str()), ("other.toml", &other)];
+    Core::with_extra_definitions(ports, &definitions).unwrap()
+}
+
+#[test]
+fn writing_a_file_the_running_agent_reads_through_a_link_gets_a_warning() {
+    let fs = linked_store_fs();
+    let core = linked_store_core(&fs, ".store/state.vscdb", ".real-store/state.vscdb");
+
+    let plan = remove(&core, &format!("{}#servers.search", real_store().display()));
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(
+        sentence.contains(&format!(
+            "Store Agent is running and reads {}",
+            real_store().display()
+        )),
+        "{sentence}"
+    );
+    let error = core.execute(plan, &[]).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AckRequired);
+    assert_eq!(fs.contents(real_store()).unwrap(), STORE.as_bytes());
+}
+
+#[test]
+fn writing_a_file_through_a_link_that_the_running_agent_reads_at_its_real_path_gets_a_warning() {
+    let fs = linked_store_fs();
+    let core = linked_store_core(&fs, ".real-store/state.vscdb", ".store/state.vscdb");
+
+    let plan = remove(&core, &format!("{}#servers.search", store().display()));
+
+    let sentence = running_agent_sentence(&plan).expect("a running-agent warning");
+    assert!(
+        sentence.contains(&format!(
+            "Store Agent is running and reads {}",
+            store().display()
+        )),
+        "{sentence}"
+    );
+}
+
+#[test]
+fn an_undo_that_moves_a_skill_folder_back_into_a_linked_skills_folder_gets_the_warning() {
+    let fs = linked_skills_folder_fixture();
+    let processes = FakeProcesses::default();
+    let core = core_watching(&fs, &processes);
+    let outcome = core.execute(remove(&core, "review"), &[]).unwrap();
+
+    processes.start(claude_code_cli());
+    let undo = core.plan_undo(&outcome.operation).unwrap();
+
+    let sentence = running_agent_sentence(&undo).expect("a running-agent warning");
+    assert!(
+        sentence.contains(&review_skill().display().to_string()),
+        "{sentence}"
+    );
+}
+
+#[test]
+fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_folder_needs_a_fresh_preview()
+ {
+    let fs = linked_skills_folder_fixture();
+    let processes = FakeProcesses::default();
+    let core = core_watching(&fs, &processes);
+    let plan = remove(&core, "review");
+    assert!(plan.warnings().is_empty());
+
+    processes.start(claude_code_cli());
+    let error = core.execute(plan, &[]).unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::Stale);
+    assert!(error.message.contains("Claude Code"), "{}", error.message);
+    let skill_md = PathBuf::from(LINKED_SKILLS).join(r"review\SKILL.md");
+    assert!(fs.contents(skill_md).is_some());
+}

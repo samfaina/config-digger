@@ -732,6 +732,33 @@ fn preview_and_history_diffs_mask_a_field_a_loaded_definition_marks() {
     assert!(history.contains("CLIENT_SECRET"), "{history}");
 }
 
+#[test]
+fn a_field_a_definition_marks_in_a_file_it_reads_through_a_junction_is_masked_in_both_views() {
+    // The marker reads `~/.claude.json` through the junction `D:\alias`.
+    let marker = MARKS_CLAUDE_JSON.replace(r#"path = "~""#, r#"path = "D:/alias""#);
+    let fs = FakeFileSystem::new()
+        .with_file(claude_json(), AUTH_SERVERS)
+        .with_file(PathBuf::from(DEFINITIONS).join("marker.toml"), marker)
+        .with_link(r"D:\alias", HOME);
+    let ports = fake::ports(fs, app_data_env());
+    let loaded = Core::with_definitions_folder(ports, &PathBuf::from(DEFINITIONS)).unwrap();
+    assert!(loaded.rejected.is_empty(), "{:?}", loaded.rejected);
+    let core = loaded.core;
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    for agent in ["claude-code", "marker"] {
+        let entry = entry_of(&inventory, agent, "context7");
+        assert_eq!(entry.config["auth"]["CLIENT_SECRET"], "••••", "{agent}");
+    }
+    assert!(!serde_json::to_string(&inventory).unwrap().contains(SECRET));
+    let locator = format!("{}#mcpServers.context7", claude_json().display());
+    let plan = plan_with(&core, Action::Remove, &locator);
+    let preview = serde_json::to_string(plan.preview()).unwrap();
+    assert!(!preview.contains(SECRET), "{preview}");
+}
+
 /// Claude Desktop's classic user file, whose servers config-digger parks
 /// to Disable them.
 fn desktop_config() -> PathBuf {

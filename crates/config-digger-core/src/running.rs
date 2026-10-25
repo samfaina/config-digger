@@ -90,6 +90,7 @@ impl RunningReader<'_> {
 /// A written file or a moved folder that an Agent home reads, or keeps a
 /// Disable switch in.
 struct Touched<'a> {
+    /// The file, or the folder where the Agent home reads it.
     path: &'a PathBuf,
     /// An Entry is parked out of the file or put back into it.
     parking: bool,
@@ -138,17 +139,16 @@ pub(crate) fn check<'a>(
             )
         });
     let in_folders = folders.iter().flat_map(|folder| {
-        folder
-            .readers
-            .iter()
-            .map(located)
-            .map(move |(agent_index, home, class)| Touched {
-                path: &folder.path,
+        folder.readers.iter().map(|read| {
+            let (agent_index, home, class) = located(&read.reader);
+            Touched {
+                path: &read.at,
                 parking: false,
                 agent_index,
                 home,
                 class,
-            })
+            }
+        })
     });
     for Touched {
         path,
