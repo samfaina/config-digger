@@ -17,7 +17,7 @@ use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::running::RunningHomes;
-use crate::scan::{LocationReader, ScannedEntry, Snapshot, SwitchStore};
+use crate::scan::{LocationReader, ScannedEntry, ScannedStranded, Snapshot, SwitchStore};
 use crate::store::{self, Medium, Written};
 use crate::{explain, history, park, resolve, rules, running, scan, select};
 use std::io;
@@ -157,7 +157,34 @@ pub(crate) fn plan(
     // The leftovers of the context's own Project are in it already.
     let mut leftovers = resolve::leftovers(definitions, snapshot);
     leftovers.retain(|leftovers| before.project.as_ref() != Some(&leftovers.project));
-    let selected = select::select_entries(&before, &leftovers, &targets.selectors, targets.all)?;
+    // A Stranded Entry is in no Item, so only its locator names it.
+    let mut stranded: Vec<&ScannedStranded> = Vec::new();
+    let mut selectors: Vec<String> = Vec::new();
+    for selector in &targets.selectors {
+        let at = snapshot.stranded.iter().find(|stranded| {
+            let store = snapshot.parked_store.as_deref();
+            store.is_some_and(|store| select::is_locator_of(selector, store, &stranded.key_path))
+        });
+        match at {
+            Some(at) if stranded.iter().any(|known| std::ptr::eq(*known, at)) => {}
+            Some(at) => stranded.push(at),
+            None => selectors.push(selector.clone()),
+        }
+    }
+    if let (Action::Disable | Action::Enable, Some(first)) = (action, stranded.first()) {
+        let store = snapshot
+            .parked_store
+            .as_ref()
+            .expect("a Stranded Entry is in the store");
+        return Err(Error::blocked(explain::stranded_refused(
+            action,
+            &crate::locator::render(store, &first.key_path),
+            first.reason,
+            first.agent_name(definitions),
+            &first.origin,
+        )));
+    }
+    let selected = select::select_entries(&before, &leftovers, &selectors, targets.all)?;
     let (targeted, mirrored) = redirected(definitions, snapshot, &before, selected, action)?;
     let targeted_entries = Targeted {
         definitions,
@@ -169,6 +196,7 @@ pub(crate) fn plan(
         before: &before,
         leftovers: &leftovers,
         entries: &targeted,
+        stranded: &stranded,
     };
     let mut planned = match action {
         Action::Remove => targeted_entries.remove(),
@@ -308,6 +336,37 @@ pub(crate) fn plan_remove_leftovers(
     )
 }
 
+/// Plans the Remove of every Stranded Entry as one Operation, with no
+/// Project.
+pub(crate) fn plan_remove_stranded(
+    definitions: &Definitions,
+    ports: &Ports,
+    snapshot: &Snapshot,
+    scan_options: &ScanOptions,
+) -> Result<Planned, Error> {
+    let store = match &snapshot.parked_store {
+        Some(store) if !snapshot.stranded.is_empty() => store,
+        _ => return Err(Error::none_stranded()),
+    };
+    let targets = Targets {
+        selectors: snapshot
+            .stranded
+            .iter()
+            .map(|stranded| crate::locator::render(store, &stranded.key_path))
+            .collect(),
+        all: false,
+    };
+    plan(
+        definitions,
+        ports,
+        snapshot,
+        scan_options,
+        &Context::default(),
+        Action::Remove,
+        &targets,
+    )
+}
+
 /// An action on the Entries it targets, about to be planned.
 struct Targeted<'a> {
     definitions: &'a Definitions,
@@ -321,9 +380,16 @@ struct Targeted<'a> {
     /// The leftovers of the missing Projects other than the context's.
     leftovers: &'a [Leftovers],
     entries: &'a [&'a api::Entry],
+    /// The Stranded Entries it Removes, which no Item holds.
+    stranded: &'a [&'a ScannedStranded],
 }
 
 impl Targeted<'_> {
+    /// How many Entries it targets, Stranded ones included.
+    fn count(&self) -> usize {
+        self.entries.len() + self.stranded.len()
+    }
+
     /// A Remove: each Entry's key goes from its file, each skill folder
     /// into the backup, and each Linked Entry's link away.
     fn remove(&self) -> Result<Planned, Error> {
@@ -360,6 +426,29 @@ impl Targeted<'_> {
                 Some((_, _, edits)) => edits.push(edit),
                 None => {
                     by_file.push((entry.path.clone(), syntax, vec![edit]));
+                }
+            }
+        }
+        // A Stranded Entry goes from the store as a parked one does, its
+        // skill's folder with it.
+        if let Some(store) = &self.snapshot.parked_store {
+            let fs = self.ports.fs.as_ref();
+            for stranded in self.stranded {
+                if let Some(folder) = stranded.folder.as_ref().filter(|folder| fs.exists(folder)) {
+                    planned_folders.push(PlannedFolder {
+                        path: folder.clone(),
+                        op: FolderOp::MoveToBackup,
+                        size: folders::measure(fs, folder)?,
+                        git_versioned: false,
+                        readers: self.snapshot.readers_of_folder(folder),
+                    });
+                }
+                let edit = Edit::Remove {
+                    key_path: stranded.key_path.clone(),
+                };
+                match by_file.iter_mut().find(|(path, ..)| path == store) {
+                    Some((_, _, edits)) => edits.push(edit),
+                    None => by_file.push((store.clone(), Syntax::Jsonc, vec![edit])),
                 }
             }
         }
@@ -420,6 +509,19 @@ impl Targeted<'_> {
         let breaks = self.breaks_links(&planned_folders);
         let mut planned = self.planned(files, planned_folders, changes, effective, breaks)?;
         planned.preview.info.extend(self.approvals_kept());
+        if let Some(store) = &self.snapshot.parked_store {
+            planned
+                .preview
+                .info
+                .extend(self.stranded.iter().map(|stranded| Info {
+                    code: InfoCode::RemovesStranded,
+                    path: store.clone(),
+                    sentence: explain::removes_stranded(
+                        stranded.agent_name(self.definitions),
+                        &stranded.origin,
+                    ),
+                }));
+        }
         Ok(planned)
     }
 
@@ -1070,7 +1172,7 @@ impl Targeted<'_> {
         effective: Vec<EffectiveChange>,
         action_warning: Option<Warning>,
     ) -> Result<Planned, Error> {
-        let title = explain::operation_title(self.action, self.entries.len());
+        let title = explain::operation_title(self.action, self.count());
         let preview = preview(
             self.definitions,
             self.ports,
@@ -1091,7 +1193,7 @@ impl Targeted<'_> {
         warnings.extend(action_warning);
         Ok(Planned {
             action: self.action,
-            entries: self.entries.len(),
+            entries: self.count(),
             context: self.context.clone(),
             scan_options: self.scan_options.clone(),
             warnings,

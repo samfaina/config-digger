@@ -3,7 +3,7 @@
 
 use crate::api::{
     Action, Advice, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode,
-    RiskCode, State, Verify,
+    RiskCode, State, StrandedReason, Verify,
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
@@ -11,8 +11,8 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{FolderOp, FolderSize};
-use crate::locator;
 use crate::scan::{Expected, ScannedShape, ValueType};
+use crate::{locator, park};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -641,6 +641,98 @@ pub(crate) fn parked_unreadable(locator: &str, store: &Path) -> String {
         "cannot Enable {locator}: what {} holds for it does not read as a parked Entry",
         store.display()
     )
+}
+
+/// What of the origin of a Stranded Entry is not found, as `reason` says,
+/// its Agent named `agent_name`.
+fn not_found(reason: StrandedReason, agent_name: &str, origin: &park::Origin) -> String {
+    match reason {
+        StrandedReason::NoDefinition => {
+            format!("no definition of the Agent `{}` is loaded", origin.agent)
+        }
+        StrandedReason::HomeNotFound => {
+            format!("the {agent_name} home `{}` is not found", origin.home)
+        }
+        StrandedReason::LocationGone => format!(
+            "the location `{}` is no longer in the definition of {agent_name}",
+            origin.location
+        ),
+    }
+}
+
+/// A Stranded Entry's reason: what of its `origin` is not found.
+pub(crate) fn stranded(reason: StrandedReason, agent_name: &str, origin: &park::Origin) -> String {
+    format!(
+        "Stranded: {}, so config-digger cannot put `{}` back into {}; it can only be Removed.",
+        not_found(reason, agent_name, origin),
+        origin.name,
+        origin.path.display()
+    )
+}
+
+/// The note of a Remove of the Stranded Entry parked from `origin`, of the
+/// Agent named `agent_name`.
+pub(crate) fn removes_stranded(agent_name: &str, origin: &park::Origin) -> String {
+    format!(
+        "Removes the Stranded Entry `{}` of {agent_name}, parked from {}, from config-digger's parked-Entry store; no Agent reads it, so no State changes.",
+        origin.name,
+        locator::render(&origin.path, &origin.key_path)
+    )
+}
+
+/// Why `action` on the Stranded Entry at `locator` is not offered: what
+/// of its `origin` is not found.
+pub(crate) fn stranded_refused(
+    action: Action,
+    locator: &str,
+    reason: StrandedReason,
+    agent_name: &str,
+    origin: &park::Origin,
+) -> String {
+    format!(
+        "cannot {} {locator}: it is Stranded, since {}, so it can only be Removed",
+        action_verb(action),
+        not_found(reason, agent_name, origin)
+    )
+}
+
+/// A Read failure of the parked-Entry store `store`: of its Entry `entry`,
+/// which does not read as a parked Entry, or of the whole manifest. It never
+/// quotes the manifest.
+pub(crate) fn store_read_failure(
+    store: &Path,
+    entry: Option<&str>,
+    kind: ReadFailureKind,
+    position: Option<(usize, usize)>,
+) -> String {
+    let store = store.display();
+    let what = match (entry, kind) {
+        (Some(id), _) => format!(
+            "The Entry `{id}` of config-digger's parked-Entry store {store} does not read as a parked Entry, so it is not listed"
+        ),
+        (None, ReadFailureKind::Parse) => {
+            let at = match position {
+                Some((line, column)) => format!(" (line {line}, column {column})"),
+                None => String::new(),
+            };
+            format!(
+                "config-digger cannot parse its parked-Entry store {store} as strict JSON{at}, so it lists none of the Entries parked there"
+            )
+        }
+        (None, ReadFailureKind::Shape) => format!(
+            "The parked-Entry store {store} does not hold its Entries as an object, so config-digger lists none of the Entries parked there"
+        ),
+        (None, ReadFailureKind::Decode) => format!(
+            "The parked-Entry store {store} is not UTF-8 text, so config-digger lists none of the Entries parked there"
+        ),
+        (None, ReadFailureKind::Permission) => format!(
+            "config-digger has no permission to read its parked-Entry store {store}, so it lists none of the Entries parked there"
+        ),
+        (None, ReadFailureKind::Io | ReadFailureKind::Sqlite) => format!(
+            "config-digger cannot read its parked-Entry store {store}, so it lists none of the Entries parked there"
+        ),
+    };
+    format!("{what}. config-digger never writes to the store because of it: fix the file by hand.")
 }
 
 /// The note of a Remove of the Entry `name`, which `agent_name` approved

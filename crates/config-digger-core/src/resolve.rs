@@ -1003,8 +1003,81 @@ pub(crate) fn resolve(
         homes,
         items,
         read_failures,
+        store_read_failures: store_read_failures(snapshot),
         agent_flags,
     }
+}
+
+/// The Read failures of the parked-Entry store, whole manifest first.
+fn store_read_failures(snapshot: &Snapshot) -> Vec<api::StoreReadFailure> {
+    let Some(store) = &snapshot.parked_store else {
+        return Vec::new();
+    };
+    snapshot
+        .store_failures
+        .iter()
+        .map(|failure| api::StoreReadFailure {
+            path: store.clone(),
+            entry: failure.entry.clone(),
+            kind: failure.kind,
+            position: failure.position.map(|(line, column)| api::Position {
+                line: line.try_into().unwrap_or(u32::MAX),
+                column: column.try_into().unwrap_or(u32::MAX),
+            }),
+            sentence: explain::store_read_failure(
+                store,
+                failure.entry.as_deref(),
+                failure.kind,
+                failure.position,
+            ),
+        })
+        .collect()
+}
+
+/// The parked Entries whose origin is not found, sorted by their locators
+/// in the store.
+pub(crate) fn stranded(definitions: &[AgentDefinition], snapshot: &Snapshot) -> Vec<api::Stranded> {
+    let Some(store) = &snapshot.parked_store else {
+        return Vec::new();
+    };
+    let mut stranded: Vec<api::Stranded> = snapshot
+        .stranded
+        .iter()
+        .map(|stranded| {
+            let origin = &stranded.origin;
+            let agent_name = stranded.agent_name(definitions);
+            api::Stranded {
+                name: origin.name.clone(),
+                kind: stranded.kind.into(),
+                agent: origin.agent.clone(),
+                agent_name: agent_name.to_owned(),
+                origin: api::StrandedOrigin {
+                    home: origin.home.clone(),
+                    location: origin.location.clone(),
+                    project: origin.project.as_ref().map(|key| {
+                        snapshot
+                            .projects
+                            .iter()
+                            .find(|project| project.key == *key)
+                            .map_or_else(|| PathBuf::from(key), |project| project.path.clone())
+                    }),
+                    path: origin.path.clone(),
+                    key_path: origin.key_path.clone(),
+                    locator: locator::render(&origin.path, &origin.key_path),
+                },
+                reason: stranded.reason,
+                sentence: explain::stranded(stranded.reason, agent_name, origin),
+                parked_at: stranded.parked_at.clone(),
+                path: store.clone(),
+                key_path: stranded.key_path.clone(),
+                locator: locator::render(store, &stranded.key_path),
+                config: stranded.config.clone(),
+                masked: stranded.masked.clone(),
+            }
+        })
+        .collect();
+    stranded.sort_by(|a, b| a.locator.cmp(&b.locator));
+    stranded
 }
 
 /// How many distinct Entries `counted` keeps: one an Agent home of each of

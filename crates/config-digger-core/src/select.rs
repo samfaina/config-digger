@@ -3,6 +3,7 @@
 use crate::api::{Entry, Error, ErrorCode, Inventory, Item, Leftovers};
 use crate::{locator, paths};
 use std::collections::BTreeSet;
+use std::path::Path;
 
 /// The Items with an Entry at the locator `selector`, or else the Items named
 /// `selector`. Locator paths compare like any other path; key paths exactly.
@@ -105,6 +106,15 @@ fn leftover_entries<'i>(
     })
 }
 
+/// Whether `selector` can be read as the locator of what is at `key_path`
+/// in the file at `path`, as [`at_locator`] compares them.
+pub(crate) fn is_locator_of(selector: &str, path: &Path, key_path: &[String]) -> bool {
+    let path = paths::lexical_key(path);
+    locator::parse(selector)
+        .into_iter()
+        .any(|(want, want_key_path)| paths::lexical_key(&want) == path && want_key_path == key_path)
+}
+
 /// Whether an Entry is at one of the locators `selector` can be read as.
 fn at_locator(selector: &str) -> impl Fn(&&Entry) -> bool {
     let locators: Vec<(String, Vec<String>)> = locator::parse(selector)
@@ -177,6 +187,7 @@ mod tests {
             homes: Vec::new(),
             items,
             read_failures: Vec::new(),
+            store_read_failures: Vec::new(),
             agent_flags: Vec::new(),
         }
     }

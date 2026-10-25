@@ -208,6 +208,13 @@ impl Core {
         resolve::leftovers(&self.definitions, &snapshot.scanned)
     }
 
+    /// The parked Entries whose origin is not found, in the order of their
+    /// locators in the store. Each is Removed by that locator alone, from
+    /// any context. It never reads the disk.
+    pub fn stranded(&self, snapshot: &Snapshot) -> Vec<Stranded> {
+        resolve::stranded(&self.definitions, &snapshot.scanned)
+    }
+
     /// The one Item `selector` names in `context`: an Item name, or the
     /// `<path>#<key path>` locator of any of its Entries.
     pub fn show(
@@ -257,6 +264,18 @@ impl Core {
             &snapshot.scanned,
             &snapshot.options,
             project,
+        )
+        .map(Plan)
+    }
+
+    /// Plans the Remove of every Stranded Entry as one Operation, with no
+    /// Project. It fails with `NoMatch` when none is Stranded.
+    pub fn plan_remove_stranded(&self, snapshot: &Snapshot) -> Result<Plan, Error> {
+        plan::plan_remove_stranded(
+            &self.definitions,
+            &self.ports,
+            &snapshot.scanned,
+            &snapshot.options,
         )
         .map(Plan)
     }
@@ -661,7 +680,10 @@ impl Core {
         };
         let document: serde_json::Value =
             serde_json::from_slice(&bytes).map_err(|error| unreadable(&error))?;
-        let mut stored: Vec<StoredParkedEntry> = park::parked_entries(&document)
+        let parked_entries = park::parked_entries(&document)
+            .map(|held| held.parked)
+            .unwrap_or_default();
+        let mut stored: Vec<StoredParkedEntry> = parked_entries
             .into_iter()
             .map(|(_, parked)| {
                 let origin = parked.origin;
@@ -945,6 +967,9 @@ pub enum InfoCode {
     /// were copied from instead: the change reaches the Mirrored home through
     /// the tool that copies it. Its path is the Mirrored home's folder.
     ReachesMirroredHome,
+    /// It Removes a Stranded Entry, which has no State to change. Its path
+    /// is the parked-Entry store.
+    RemovesStranded,
 }
 
 impl AgentNoteCode {
@@ -1497,6 +1522,9 @@ pub struct Inventory {
     pub items: Vec<Item>,
     /// Every Read failure the scan met, in any context.
     pub read_failures: Vec<ReadFailure>,
+    /// The Read failures of config-digger's parked-Entry store, which
+    /// belongs to no Agent.
+    pub store_read_failures: Vec<StoreReadFailure>,
     /// The problems of Agent homes in the context, such as one that cannot start.
     pub agent_flags: Vec<AgentFlag>,
 }
@@ -1620,6 +1648,88 @@ impl Leftovers {
     pub fn entries(&self) -> impl Iterator<Item = &Entry> {
         self.items.iter().flat_map(|item| &item.entries)
     }
+}
+
+/// A parked Entry whose origin config-digger cannot find (ADR 0002). It has
+/// no State and belongs to no Item, so only its locator in the store names
+/// it, and it can only be Removed. It is Parked again once its origin is
+/// found.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct Stranded {
+    pub name: String,
+    pub kind: ItemKind,
+    /// The id of the Agent it was parked from.
+    pub agent: String,
+    /// That Agent's name, or its id when no loaded definition is of it.
+    pub agent_name: String,
+    /// Where it was parked from.
+    pub origin: StrandedOrigin,
+    /// The first part of its origin that is not found.
+    pub reason: StrandedReason,
+    /// The reason as a sentence naming what is not found, rendered by the core.
+    pub sentence: String,
+    /// When it was parked, in RFC 3339.
+    pub parked_at: String,
+    /// The parked-Entry store, and its key path there.
+    pub path: PathBuf,
+    pub key_path: Vec<String>,
+    /// `<path>#<key path>` of where it is in the store.
+    pub locator: String,
+    /// Its value as parked, with every Secret masked as `••••`: as its
+    /// location masks it when the location is loaded, and else every text.
+    #[specta(type = JsonValue)]
+    pub config: serde_json::Value,
+    /// The key paths in `config`, relative to the Entry, whose values were
+    /// masked.
+    pub masked: Vec<Vec<String>>,
+}
+
+/// Where a Stranded Entry was parked from.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct StrandedOrigin {
+    /// The id of the Agent home.
+    pub home: String,
+    /// The id of the location in the Agent's definition.
+    pub location: String,
+    /// The Project it applied in, `None` when it applied in every context.
+    pub project: Option<PathBuf>,
+    /// The file or skill folder it was parked from, and its key path there.
+    pub path: PathBuf,
+    pub key_path: Vec<String>,
+    /// `<path>#<key path>` of where it was.
+    pub locator: String,
+}
+
+/// Which part of a Stranded Entry's origin is not found, the first that
+/// applies in this order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum StrandedReason {
+    /// No loaded definition is of its Agent.
+    NoDefinition,
+    /// Its Agent home is not found.
+    HomeNotFound,
+    /// Its location id is no longer in its Agent's definition.
+    LocationGone,
+}
+
+/// A Read failure of config-digger's parked-Entry store: its manifest
+/// cannot be opened or parsed, or an Entry in it does not read as a parked
+/// Entry. config-digger never writes to the store because of one: the user
+/// fixes the file by hand.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct StoreReadFailure {
+    /// The store's manifest.
+    pub path: PathBuf,
+    /// The id of the Entry that does not read as a parked Entry, `None`
+    /// when the whole manifest fails.
+    pub entry: Option<String>,
+    pub kind: ReadFailureKind,
+    /// Where a parse error is, when the parser knows. It never quotes the
+    /// manifest, which can hold a Secret.
+    pub position: Option<Position>,
+    /// The failure as a sentence, rendered by the core.
+    pub sentence: String,
 }
 
 /// A loaded Agent definition and the Agent homes listed for it.
@@ -2705,6 +2815,14 @@ impl Error {
                 "{} is not a missing Project with leftovers; `config-digger list --leftovers` lists them",
                 project.display()
             ),
+        )
+    }
+
+    /// No parked Entry is Stranded, so there is none to Remove.
+    pub(crate) fn none_stranded() -> Self {
+        Self::new(
+            ErrorCode::NoMatch,
+            "no parked Entry is Stranded; `config-digger list --leftovers` lists them".to_owned(),
         )
     }
 
