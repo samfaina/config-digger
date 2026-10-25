@@ -934,3 +934,19 @@ fn remove_of_a_project_server_cursor_never_approved_has_no_approval_to_leave() {
         plan.preview().info
     );
 }
+
+#[test]
+fn a_plain_string_in_the_workspace_s_disabled_servers_disables_nothing() {
+    let fs = cursor_gate_off().with_sqlite_item(
+        app_state(),
+        "cursor/disabledMcpServers",
+        r#""project-0-app-docs""#,
+    );
+
+    let inventory = inventory(&core(&fs), &in_app());
+
+    assert_eq!(
+        code(item(&inventory, "project-0-app-docs").entries[0].state),
+        "effective"
+    );
+}

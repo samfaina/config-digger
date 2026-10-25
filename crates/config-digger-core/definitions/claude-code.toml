@@ -390,22 +390,23 @@ checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
 # settings count only while the Project's state, under its path with
 # forward slashes, holds `hasTrustDialogAccepted: true`; the user's count
 # in any Project [test]. config-digger does not check that trust yet
-# (#293). Since 2.1.299 a list written as one plain-string name no
-# longer voids its settings file [docs]: in a settings file it approves
-# that one server, and in the Project's state none [test], which
-# config-digger does not read yet (#172).
+# (#293). Since 2.1.299 a list written as one plain-string name, of
+# letters, digits, `-` or `_`, no longer voids its settings file [docs]:
+# in a settings file it approves that one server, and in the Project's
+# state none [test], so only the settings files' sources read it
+# (`plain_string_name`).
 [[items.mcp.gates]]
 block = "approval-list"
 locations = ["project-mcp"]
 prompt = "on-start"
 sources = [
-  { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "settings", settings = "managed" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledMcpjsonServers"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "home", root = "settings_file" }, key_path = ["enableAllProjectMcpServers"] },
   { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enabledMcpjsonServers"] },
   { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enableAllProjectMcpServers"] },
@@ -468,9 +469,10 @@ reason = "disabled_by_name"
 
 # `disabledMcpjsonServers` in any settings file skips `.mcp.json` servers by
 # name [docs], in a Project trusted or not [test]. Written as one
-# plain-string name, it skips that server [test], which config-digger does
-# not read yet (#172). The local settings file is the one meant to stay out
-# of git.
+# plain-string name, it skips that server [test] (`plain_string_name`):
+# Disable then writes a list of the old name and the new one, and Enable of
+# the old name deletes the key. The local settings file is the one meant to
+# stay out of git.
 [[items.mcp.disable]]
 block = "json-name-list"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["disabledMcpjsonServers"], store_class = "plain" }
@@ -479,9 +481,11 @@ context = "project"
 enable_action = "remove-item"
 reason = "disabled_by_name"
 locations = ["project-mcp"]
+plain_string_name = true
 
 # The `.mcp.json` approval dialog keeps the servers it rejects per Project
-# in `~/.claude.json`. Enable lifts it there too.
+# in `~/.claude.json`. Enable lifts it there too. Claude Code writes a list
+# there itself, and a plain string there is untested, so it names nothing.
 [[items.mcp.disable]]
 block = "json-name-list"
 switch = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "disabledMcpjsonServers"], store_class = "rewritten-while-running" }
@@ -502,6 +506,7 @@ context = "project"
 enable_action = "remove-item"
 reason = "disabled_by_name"
 locations = ["project-mcp"]
+plain_string_name = true
 enable_offered = false
 
 [[items.mcp.disable]]
@@ -512,6 +517,7 @@ context = "all"
 enable_action = "remove-item"
 reason = "disabled_by_name"
 locations = ["project-mcp"]
+plain_string_name = true
 enable_offered = false
 
 # A plugin is on or off as a whole, with every server and skill it carries,

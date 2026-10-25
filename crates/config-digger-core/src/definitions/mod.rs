@@ -3348,6 +3348,31 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
     }
 
     #[test]
+    fn a_plain_string_name_loads_on_an_approval_lists_source_and_on_a_name_list() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"key_path = ["projects", "{project}", "approved"] }"#,
+            r#"key_path = ["projects", "{project}", "approved"], plain_string_name = true }"#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_disable(&name_list(false, ", plain_string_name = true"));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_plain_string_name_is_read_only_on_an_approval_lists_sources() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"key_path = ["denied"] }"#,
+            r#"key_path = ["denied"], plain_string_name = true }"#,
+        );
+        assert!(
+            error(&text)
+                .contains("plain_string_name is read only on an approval-list gate's sources"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn a_settings_anchor_names_declared_settings() {
         let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
             r#"settings = "managed" }, key_path = ["denied"]"#,

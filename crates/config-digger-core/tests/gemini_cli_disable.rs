@@ -694,3 +694,16 @@ fn a_rule_reaches_only_the_folder_spelled_with_its_case() {
 
     assert_eq!(code(server(&inventory, "forecast").state), "effective");
 }
+
+#[test]
+fn a_plain_string_in_skills_disabled_disables_nothing() {
+    let fs = with_user_skill(
+        FakeFileSystem::new()
+            .with_file(user_settings(), r#"{ "skills": { "disabled": "review" } }"#),
+        "review",
+    );
+
+    let inventory = inventory(&core(&fs), &context(None));
+
+    assert_eq!(code(skill(&inventory, "review").state), "effective");
+}
