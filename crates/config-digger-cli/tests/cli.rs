@@ -1450,7 +1450,7 @@ impl Harness {
     /// Parks the user's Cursor skill `name` with `--yes` and returns the
     /// locator of its record in the parked-Entry store.
     fn parked_cursor_skill(&self, name: &str) -> String {
-        let folder = self.path(&format!(r".cursor\skills\{name}"));
+        let folder = real_path(&self.path(&format!(r".cursor\skills\{name}")));
         let folder = folder.display().to_string();
         let run = self.run(&[
             "disable",
