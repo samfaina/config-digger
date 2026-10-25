@@ -1541,7 +1541,13 @@ p {
 .link:focus-visible,
 .reader:focus-visible,
 .segmented button:focus-visible,
-.dialog-section-body:focus-visible {
+.dialog-section-body:focus-visible,
+.tag:focus-visible,
+.single-home:focus-visible,
+.alert:focus-visible,
+.banner-value:focus-visible,
+.check.info:focus-visible,
+.change-file-name .mono:focus-visible {
   outline: 2px solid var(--primary-hover);
   outline-offset: 2px;
 }

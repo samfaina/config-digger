@@ -56,7 +56,9 @@ export function EntryCard({ entry, rank, agentName, flash, busy, inItem, onShowW
         {entry.link && <LinkTag link={entry.link} withTarget />}
         {entry.parked && (
           <Tooltip text={`Parked from ${entry.parked.locator}\non ${entry.parked.parked_at}`}>
-            <span className="tag">parked from {entry.parked.locator}</span>
+            <span className="tag" tabIndex={0}>
+              parked from {entry.parked.locator}
+            </span>
           </Tooltip>
         )}
       </div>

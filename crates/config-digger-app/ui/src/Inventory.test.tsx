@@ -1,46 +1,18 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
-import type { Entry, Home, Inventory, Item, LastOpened, LinkKind, Project, State } from "./bindings";
+import type { Item, LastOpened, LinkKind, Project, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
 import { EntryCard } from "./EntryCard";
 import { Banner, homeLabel, HomesPane, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
 import { LinkTag } from "./Location";
 import { applyReaction } from "./Select";
+import { entry, home, inventory } from "./testData";
 import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
 
 // A tooltip portals into `document.body`, which a render to markup has not.
 vi.mock("./Tooltip", () => ({ Tooltip: ({ children }: { children: ReactElement }) => children }));
-
-function entry(overrides: Partial<Entry> = {}): Entry {
-  return {
-    path: String.raw`C:\Users\me\.claude.json`,
-    key_path: ["mcpServers", "notes"],
-    locator: String.raw`C:\Users\me\.claude.json#mcpServers.notes`,
-    scope: "user",
-    provenance: "file",
-    skill_manager: null,
-    plugin: null,
-    git_versioned: false,
-    link: null,
-    parked: null,
-    state: "effective",
-    reason: null,
-    secondary: [],
-    what_if: null,
-    notes: [],
-    config: { command: "notes-mcp" },
-    masked: [],
-    disable: { status: "offered", path: String.raw`C:\Users\me\.claude.json`, sentence: "Disable adds `notes` to `disabledMcpServers`." },
-    enable: null,
-    remove: { status: "offered" },
-    caveats: [],
-    also_read_by: [],
-    copied_from: null,
-    ...overrides,
-  };
-}
 
 function item(overrides: Partial<Item> = {}): Item {
   return {
@@ -79,27 +51,6 @@ describe("the Entries by State filter", () => {
     }
   });
 });
-
-function home(overrides: Partial<Home> = {}): Home {
-  return {
-    agent: "codex",
-    agent_name: "Codex",
-    home: "default",
-    folder: String.raw`C:\Users\me`,
-    source: { kind: "default" },
-    hidden: false,
-    not_read: null,
-    mirror: null,
-    no_configuration: null,
-    scopes: ["user", "project"],
-    installations: [],
-    out_of_range: false,
-    last_ran: null,
-    entries: 0,
-    notes: [],
-    ...overrides,
-  };
-}
 
 function project(path: string, missing = false, last_opened: LastOpened[] = []): Project {
   return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened };
@@ -235,10 +186,6 @@ describe("choosing a Project", () => {
     });
   });
 });
-
-function inventory(overrides: Partial<Inventory> = {}): Inventory {
-  return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], store_read_failures: [], agent_flags: [], ...overrides };
-}
 
 describe("the Agent home pane of a Project VS Code last opened in a profile", () => {
   const work = String.raw`C:\Users\me\AppData\Roaming\Code\User\profiles\-5a1b2c3d`;

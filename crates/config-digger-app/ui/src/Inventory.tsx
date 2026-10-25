@@ -234,7 +234,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
             )}
             {flags.map((flag) => (
               <Tooltip key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} text={flag.path}>
-                <div className="alert" role="status">
+                <div className="alert" role="status" tabIndex={0}>
                   <Icon name="flag" small />
                   {agent === "all" ? `${flag.agent_name}: ${flag.sentence}` : flag.sentence}
                 </div>
@@ -388,7 +388,7 @@ export function Banner({ inventory, project, agentName, stats, reading, rereadin
       <div>
         <div className="caption">Inventory read</div>
         <Tooltip text={inventory?.read_at}>
-          <div className="banner-value">
+          <div className="banner-value" tabIndex={0}>
             {inventory ? readTime(inventory.read_at) : "—"}
             <span className="caption"> · on focus</span>
           </div>
@@ -528,16 +528,22 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const lastOpened = lastOpenedHomes(inventory);
   const opened = (home: Home) => isLastOpened(lastOpened, home);
   // Another tool copies a Mirrored home, so config-digger only reads it.
-  const mirrored = (home: Home) =>
+  // A tag is a tab stop, for the keyboard to show its tooltip, except inside
+  // a tile's button, whose own tooltip then says it.
+  const mirrored = (home: Home, tabStop: boolean) =>
     home.mirror && (
       <Tooltip text={home.mirror.sentence}>
-        <span className="tag read-only">{home.mirror.label}</span>
+        <span className="tag read-only" tabIndex={tabStop ? 0 : undefined}>
+          {home.mirror.label}
+        </span>
       </Tooltip>
     );
-  const notRead = (home: Home) =>
+  const notRead = (home: Home, tabStop: boolean) =>
     home.not_read && (
       <Tooltip text={home.not_read.sentence}>
-        <span className="tag">not read</span>
+        <span className="tag" tabIndex={tabStop ? 0 : undefined}>
+          not read
+        </span>
       </Tooltip>
     );
 
@@ -554,8 +560,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
         <div className="home-row" key={agent}>
           <span>{agentName}</span>
           <span className="grow" />
-          {mirrored(chosen)}
-          {notRead(chosen)}
+          {mirrored(chosen, true)}
+          {notRead(chosen, true)}
           <FailureBadge count={failuresOf(chosen)} where="this home" />
           {own.length > 1 ? (
             <Select
@@ -568,7 +574,9 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
             />
           ) : (
             <Tooltip text={chosen.folder}>
-              <span className="dim">{chosen.home}</span>
+              <span className="dim single-home" tabIndex={0}>
+                {chosen.home}
+              </span>
             </Tooltip>
           )}
         </div>
@@ -580,8 +588,10 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       .filter((home) => home.agent === agent)
       .map((home) => {
         const selected = selection.homes[agent] === home.home;
+        // The tags inside the button take no focus, so its tooltip says them too.
+        const tooltip = [home.no_configuration ?? home.folder, home.mirror?.sentence, home.not_read?.sentence].filter(Boolean).join("\n");
         return (
-          <Tooltip key={home.home} text={home.no_configuration ?? home.folder}>
+          <Tooltip key={home.home} text={tooltip}>
             <button
               type="button"
               className={`tile home-tile${selected ? " selected" : ""}`}
@@ -591,8 +601,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               <span className="home-name">{home.home}</span>
               <span className="grow" />
               {opened(home) && <span className="tag">{LAST_OPENED}</span>}
-              {mirrored(home)}
-              {notRead(home)}
+              {mirrored(home, false)}
+              {notRead(home, false)}
               <FailureBadge count={failuresOf(home)} where="this home" />
             </button>
           </Tooltip>

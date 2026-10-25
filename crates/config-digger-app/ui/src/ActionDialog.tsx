@@ -337,7 +337,7 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
           })}
           {preview.info.map((info, index) => (
             <Tooltip key={`info-${index}`} text={info.path}>
-              <div className="check info">
+              <div className="check info" tabIndex={0}>
                 <Icon name="info" small />
                 <div>{info.sentence}</div>
               </div>
@@ -437,7 +437,9 @@ export function Changes({ changes, notify }: { changes: Change[]; notify: Notify
               <h4 className="change-file-name">
                 <span className="change-label">{file.label}</span>{" "}
                 <Tooltip text={file.path}>
-                  <span className="mono">{file.name}</span>
+                  <span className="mono" tabIndex={0}>
+                    {file.name}
+                  </span>
                 </Tooltip>
                 <CopyButton text={file.path} what="path" notify={notify} />
               </h4>

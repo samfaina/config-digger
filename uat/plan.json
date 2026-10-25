@@ -1090,6 +1090,44 @@
             "El de la fila muestra la ruta entera de la skill, partida en varias líneas."
           ],
           "covers": ["#182", "#221"]
+        },
+        {
+          "id": "3.4",
+          "title": "Leer tooltips solo con el teclado",
+          "goal": "Lo que un tooltip dice y no sale en otro sitio de la pantalla se lee también con el teclado: su elemento recibe el foco con Tab, con el anillo de foco de la app, y el tooltip sale al momento. La etiqueta de un Mirrored home, la etiqueta «not read» y las alertas de flags sobre la lista de Items se leen igual, pero los datos de prueba no las tienen: las cubren solo los tests de ui/src.",
+          "instructions": [
+            "Ve al Inventario y, en Agents, elige All Agents.",
+            "Aparta el ratón de la ventana de config-digger: en este paso ningún tooltip se lee con el ratón.",
+            "Pulsa Tab hasta que el foco llegue a la hora bajo «Inventory read», en el banner de arriba.",
+            "Pulsa Tab hasta que el foco llegue al nombre gris del home de un Agent que tiene un solo home, a la derecha de su fila en Agent home, sin desplegable.",
+            "En Agents, elige Claude Desktop.",
+            "En Agent home, elige claude-desktop-home.",
+            "Elige el servidor cd-throwaway-desktop que sale Effective.",
+            "Pulsa Disable.",
+            "En el diálogo, pulsa Tab hasta que el foco llegue al nombre claude_desktop_config.json, bajo What changes.",
+            "Si Before you apply tiene una nota con el icono de información, pulsa Tab hasta que el foco llegue a ella.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "Pulsa Disable y luego Done.",
+            "Elige el servidor cd-throwaway-desktop que sale Disabled.",
+            "Pulsa Tab hasta que el foco llegue a la etiqueta «parked from» de su tarjeta.",
+            "Pulsa Enable, luego Enable en el diálogo y Done.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home.",
+            "Elige la skill cd-throwaway-synced:cd-throwaway-synced-skill y mira bajo los botones de su tarjeta."
+          ],
+          "commands": [],
+          "expect": [
+            "Cada elemento al que llega el foco tiene un anillo violeta.",
+            "En la hora de «Inventory read» sale al momento un tooltip con la fecha y la hora exactas, con segundos, como «2026-10-25T09:30:12Z».",
+            "En el nombre del home sale un tooltip con su carpeta entera.",
+            "En «claude_desktop_config.json» sale un tooltip con «E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json».",
+            "Si hay una nota de información, sale en ella un tooltip con una ruta entera.",
+            "En la etiqueta sale un tooltip que empieza por «Parked from E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop».",
+            "La segunda línea de ese tooltip empieza por «on » y sigue con la fecha en que se aparcó.",
+            "Tras Enable, cd-throwaway-desktop vuelve a salir como «Effective».",
+            "Bajo los botones de la skill dice «Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.», sin pasar el ratón por ningún sitio."
+          ],
+          "covers": ["#209"]
         }
       ]
     },
