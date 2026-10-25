@@ -270,11 +270,16 @@ mod tests {
         assert_eq!(ids, ["npx-skills", "skillfish", "openskills"]);
     }
 
-    fn error(detector: &str) -> String {
+    /// A definition with the one detector `detector`.
+    fn with_detector(detector: &str) -> Result<SkillManagerDefinition, DefinitionError> {
         let text = format!(
             "format_version = 1\nmanager = {{ id = \"m\", name = \"M\" }}\n[[detectors]]\n{detector}\n"
         );
-        parse("m.toml", &text).unwrap_err().message
+        parse("m.toml", &text)
+    }
+
+    fn error(detector: &str) -> String {
+        with_detector(detector).unwrap_err().message
     }
 
     #[test]
@@ -308,13 +313,8 @@ mod tests {
             let message = error(&lock_file_entry(&format!("scope = {scope}\n")));
             assert!(message.contains("Scope"), "{scope}: {message}");
         }
-        let text = |detector: String| {
-            format!(
-                "format_version = 1\nmanager = {{ id = \"m\", name = \"M\" }}\n[[detectors]]\n{detector}\n"
-            )
-        };
-        parse("m.toml", &text(lock_file_entry("scope = \"user\"\n"))).unwrap();
-        parse("m.toml", &text(lock_file_entry(""))).unwrap();
+        with_detector(&lock_file_entry("scope = \"user\"\n")).unwrap();
+        with_detector(&lock_file_entry("")).unwrap();
     }
 
     #[test]

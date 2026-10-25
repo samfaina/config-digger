@@ -1,7 +1,8 @@
 //! Skill managers through the core `api`, with a fake file system that
 //! models junctions: the skill manager definitions that ship recognise
 //! skills installed by `npx skills`, skillfish and openskills, the
-//! strongest detector wins, a weak one notes that it rests on the name, and
+//! strongest detector wins, a weak one notes that it rests on the name, a
+//! lock file says nothing of skills outside the Scope it covers, and
 //! Remove of one managed skill touches that folder alone.
 
 use config_digger_core::api::{
@@ -221,7 +222,12 @@ fn project_skill(name: &str) -> PathBuf {
 
 /// The only Entry of Claude Code's skill `name`, scanned with `PROJECT`.
 fn claude_project_entry(fs: &FakeFileSystem, name: &str) -> Entry {
-    let core = core(fs);
+    project_entry(&core(fs), name)
+}
+
+/// The only Entry of Claude Code's skill `name` in `core`, scanned with
+/// `PROJECT`.
+fn project_entry(core: &Core, name: &str) -> Entry {
     let project = PathBuf::from(PROJECT);
     let snapshot = core
         .scan(&ScanOptions {
@@ -279,6 +285,8 @@ fn a_project_lock_in_the_home_folder_says_nothing_about_a_user_skill() {
 
 #[test]
 fn a_lock_file_entry_without_a_scope_covers_every_scope() {
+    // The user lock of `npx skills`, loaded first, would win the tie, but
+    // it covers user skills only.
     const DEFINITIONS: &str = r"E:\dev\definitions";
     let acme = r#"
 format_version = 1
@@ -296,6 +304,10 @@ strength = "weak"
     let fs = with_skill(claude_home(), project_skill("deploy"), "deploy")
         .with_file(in_home(".acme-lock.json"), skill_lock(&["deploy"]))
         .with_file(
+            in_home(r".agents\.skill-lock.json"),
+            skill_lock(&["deploy"]),
+        )
+        .with_file(
             Path::new(DEFINITIONS).join(r"skill-managers\acme.toml"),
             acme,
         );
@@ -303,21 +315,11 @@ strength = "weak"
     let loaded =
         Core::with_definitions_folder(fake::ports(fs, env), Path::new(DEFINITIONS)).unwrap();
     assert!(loaded.rejected.is_empty(), "{:?}", loaded.rejected);
-    let project = PathBuf::from(PROJECT);
-    let snapshot = loaded
-        .core
-        .scan(&ScanOptions {
-            projects: vec![project.clone()],
-        })
-        .unwrap();
-    let context = Context {
-        project: Some(project),
-    };
-    let inventory = loaded.core.resolve(&snapshot, &context);
 
-    let entry = &skill(&inventory, "claude-code", "deploy").entries[0];
-    assert_eq!(entry_json(entry)["scope"], "project");
-    assert_eq!(entry_json(entry)["skill_manager"]["id"], "acme");
+    let entry = project_entry(&loaded.core, "deploy");
+
+    assert_eq!(entry_json(&entry)["scope"], "project");
+    assert_eq!(entry_json(&entry)["skill_manager"]["id"], "acme");
 }
 
 #[test]
