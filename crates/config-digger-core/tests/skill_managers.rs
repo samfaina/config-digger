@@ -213,6 +213,113 @@ fn a_skill_no_detector_matches_is_a_file_entry() {
     assert_eq!(entry_json(&entry)["skill_manager"], Value::Null);
 }
 
+const PROJECT: &str = r"E:\projects\app";
+
+fn project_skill(name: &str) -> PathBuf {
+    PathBuf::from(PROJECT).join(r".claude\skills").join(name)
+}
+
+/// The only Entry of Claude Code's skill `name`, scanned with `PROJECT`.
+fn claude_project_entry(fs: &FakeFileSystem, name: &str) -> Entry {
+    let core = core(fs);
+    let project = PathBuf::from(PROJECT);
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![project.clone()],
+        })
+        .unwrap();
+    let context = Context {
+        project: Some(project),
+    };
+    let inventory = core.resolve(&snapshot, &context);
+    skill(&inventory, "claude-code", name).entries[0].clone()
+}
+
+#[test]
+fn the_user_lock_says_nothing_about_a_project_skill() {
+    let fs = with_skill(claude_home(), project_skill("deploy"), "deploy").with_file(
+        in_home(r".agents\.skill-lock.json"),
+        skill_lock(&["deploy"]),
+    );
+
+    let entry = claude_project_entry(&fs, "deploy");
+
+    assert_eq!(entry_json(&entry)["scope"], "project");
+    assert_eq!(entry_json(&entry)["provenance"], "file");
+    assert_eq!(entry_json(&entry)["skill_manager"], Value::Null);
+    assert_eq!(entry_json(&entry)["notes"], json!([]));
+}
+
+#[test]
+fn a_project_skill_named_in_its_project_lock_is_npx_skills_by_name_only() {
+    let fs = with_skill(claude_home(), project_skill("deploy"), "deploy").with_file(
+        PathBuf::from(PROJECT).join("skills-lock.json"),
+        skill_lock(&["deploy"]),
+    );
+
+    let entry = claude_project_entry(&fs, "deploy");
+
+    assert_eq!(entry_json(&entry)["skill_manager"]["id"], "npx-skills");
+    assert_eq!(entry.notes[0].code, NoteCode::ProvenanceByNameOnly);
+}
+
+#[test]
+fn a_project_lock_in_the_home_folder_says_nothing_about_a_user_skill() {
+    // `~/.claude/skills/deploy` is three folders below `~`, where the
+    // project lock is looked for.
+    let fs = with_skill(claude_home(), claude_skill("deploy"), "deploy")
+        .with_file(in_home("skills-lock.json"), skill_lock(&["deploy"]));
+
+    let entry = claude_entry(&fs, "deploy");
+
+    assert_eq!(entry_json(&entry)["provenance"], "file");
+    assert_eq!(entry_json(&entry)["skill_manager"], Value::Null);
+    assert_eq!(entry_json(&entry)["notes"], json!([]));
+}
+
+#[test]
+fn a_lock_file_entry_without_a_scope_covers_every_scope() {
+    const DEFINITIONS: &str = r"E:\dev\definitions";
+    let acme = r#"
+format_version = 1
+
+[manager]
+id = "acme"
+name = "Acme skills"
+
+[[detectors]]
+block = "lock-file-entry"
+file = "~/.acme-lock.json"
+key_path = ["skills"]
+strength = "weak"
+"#;
+    let fs = with_skill(claude_home(), project_skill("deploy"), "deploy")
+        .with_file(in_home(".acme-lock.json"), skill_lock(&["deploy"]))
+        .with_file(
+            Path::new(DEFINITIONS).join(r"skill-managers\acme.toml"),
+            acme,
+        );
+    let env = FakeEnvironment::with_home(HOME);
+    let loaded =
+        Core::with_definitions_folder(fake::ports(fs, env), Path::new(DEFINITIONS)).unwrap();
+    assert!(loaded.rejected.is_empty(), "{:?}", loaded.rejected);
+    let project = PathBuf::from(PROJECT);
+    let snapshot = loaded
+        .core
+        .scan(&ScanOptions {
+            projects: vec![project.clone()],
+        })
+        .unwrap();
+    let context = Context {
+        project: Some(project),
+    };
+    let inventory = loaded.core.resolve(&snapshot, &context);
+
+    let entry = &skill(&inventory, "claude-code", "deploy").entries[0];
+    assert_eq!(entry_json(entry)["scope"], "project");
+    assert_eq!(entry_json(entry)["skill_manager"]["id"], "acme");
+}
+
 #[test]
 fn remove_of_one_npx_skills_skill_touches_that_folder_alone() {
     // `skills remove deploy` would delete both folders and edit the lock.

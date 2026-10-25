@@ -159,6 +159,13 @@
                 }
               ]
             },
+            "scope": {
+              "description": "The id of the Scope whose skills the lock file covers, such as\n`user` or `project`, compared with the Scope its Agent definition\ngives the skill folder's location. Without it, the lock file covers\nskills in every Scope.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "strength": {
               "$ref": "#/$defs/Strength"
             },
