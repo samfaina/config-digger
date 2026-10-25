@@ -155,6 +155,42 @@ const SHOTS: Shot[] = [
       await page.getByRole("heading", { name: "Links" }).waitFor();
     },
   },
+  // Each main screen in the smallest window, where the text has the least room.
+  { name: "smallest-inventory-item", steps: (page) => page.setViewportSize(SMALLEST).then(() => selectItem(page, "cd-throwaway-user")) },
+  {
+    name: "smallest-projects",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "Projects & homes");
+      await page.getByRole("tab", { name: "Projects" }).waitFor();
+    },
+  },
+  {
+    name: "smallest-projects-homes",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "Projects & homes");
+      await page.getByRole("tab", { name: "Agent homes" }).click();
+    },
+  },
+  {
+    name: "smallest-history-operation",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "History · Undo");
+      await page.locator(".operation-row").first().click();
+      await page.getByText("Backup folder").first().waitFor();
+    },
+  },
+  { name: "smallest-settings", steps: (page) => page.setViewportSize(SMALLEST).then(() => rail(page, "Settings")) },
+  {
+    name: "smallest-about",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await rail(page, "About");
+      await page.getByRole("heading", { name: "Links" }).waitFor();
+    },
+  },
   {
     name: "notice-success",
     steps: async (page) => {

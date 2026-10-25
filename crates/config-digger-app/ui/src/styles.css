@@ -57,7 +57,10 @@
 
   color-scheme: dark;
   font-family: Outfit, "Segoe UI", sans-serif;
-  font-size: 13px;
+  /* The one base of every text size: 1rem is body text, the size of a row's
+     location, a description and a dialog's notes. Every other size is a rem of
+     it, so changing it changes them all. A share of the browser's 16px. */
+  font-size: 87.5%;
   color: var(--white);
   background: var(--background);
 }
@@ -100,6 +103,8 @@
 
 body {
   margin: 0;
+  /* What text without a size of its own takes. */
+  font-size: 1.0833rem;
   height: 100vh;
   overflow: hidden;
 }
@@ -142,7 +147,7 @@ p {
 
 .caption {
   color: #bdb6d8;
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .empty {
@@ -182,7 +187,7 @@ p {
 
 .logo {
   font-weight: 800;
-  font-size: 22px;
+  font-size: 1.8333rem;
   letter-spacing: -0.06em;
   line-height: 1;
   color: var(--primary);
@@ -259,7 +264,7 @@ p {
   gap: 8px;
   margin-bottom: 12px;
   font-weight: 500;
-  font-size: 14.5px;
+  font-size: 1.2083rem;
 }
 
 .scroll {
@@ -281,7 +286,7 @@ p {
   border: 0;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 0.9167rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--white);
@@ -334,7 +339,7 @@ p {
 }
 
 .banner-title {
-  font-size: 28px;
+  font-size: 2.3333rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -347,7 +352,7 @@ p {
 
 .banner-value {
   margin-top: 4px;
-  font-size: 15px;
+  font-size: 1.25rem;
   font-weight: 500;
 }
 
@@ -397,7 +402,7 @@ p {
   border-radius: 12px;
   background: var(--tile);
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 1.125rem;
 }
 
 .tile.selected,
@@ -426,7 +431,7 @@ p {
 
 .count {
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .alert {
@@ -438,7 +443,7 @@ p {
   border-radius: 12px;
   background: #f8717114;
   color: #fecaca;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 .group {
@@ -447,7 +452,7 @@ p {
   gap: 8px;
   margin: 10px 2px 2px;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -513,7 +518,7 @@ p {
 
 .item-name {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 1.1667rem;
   overflow-wrap: anywhere;
 }
 
@@ -524,7 +529,7 @@ p {
   text-overflow: ellipsis;
   color: var(--grey);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .item-count {
@@ -532,7 +537,7 @@ p {
   flex: none;
   text-align: right;
   color: var(--faint);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
 }
 
 /* An Item's tags, Entry count and State: in the row's line in a wide Items list. */
@@ -581,7 +586,7 @@ p {
   border-radius: 999px;
   background: var(--tag);
   color: var(--tag-text);
-  font-size: 11px;
+  font-size: 0.9167rem;
   white-space: nowrap;
 }
 
@@ -618,7 +623,7 @@ p {
   padding: 5px 12px;
   border-radius: 999px;
   background: #ffffff0d;
-  font-size: 12px;
+  font-size: 1rem;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -665,7 +670,7 @@ p {
 .state-pill.small {
   min-width: 0;
   padding: 3px 9px;
-  font-size: 11px;
+  font-size: 0.9167rem;
 }
 
 /* Buttons that read as text */
@@ -675,7 +680,7 @@ p {
   border: 0;
   background: none;
   color: #c9bcf5;
-  font-size: 12px;
+  font-size: 1rem;
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -694,7 +699,7 @@ p {
   border-radius: 999px;
   background: var(--button);
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   cursor: pointer;
 }
 
@@ -739,7 +744,7 @@ p {
 
 .mono {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 1rem;
   overflow-wrap: anywhere;
 }
 
@@ -753,7 +758,7 @@ p {
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 1.25rem;
 }
 
 .ring svg {
@@ -786,14 +791,14 @@ p {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
-  font-size: 13.5px;
+  font-size: 1.125rem;
 }
 
 .home-select {
   min-width: 0;
   max-width: 150px;
   margin-top: 0;
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 /* The app's dropdown: a field, and its panel of options over the page */
@@ -839,7 +844,7 @@ p {
   background: var(--tile);
   box-shadow: 0 8px 24px #00000066;
   color: var(--white);
-  font-size: 13px;
+  font-size: 1.0833rem;
   display: flex;
   flex-direction: column;
 }
@@ -886,7 +891,7 @@ p {
 .select-group {
   padding: 8px 10px 4px;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -902,7 +907,7 @@ p {
   background: var(--tile);
   box-shadow: 0 8px 24px #00000066;
   color: var(--white);
-  font-size: 12px;
+  font-size: 1rem;
   line-height: 1.4;
   white-space: pre-line;
   overflow-wrap: anywhere;
@@ -915,7 +920,7 @@ p {
   gap: 3px;
   margin-left: 6px;
   color: var(--state-blocked);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   font-weight: 700;
 }
 
@@ -954,7 +959,7 @@ p {
 
 .agent-counts {
   color: #ffffffb0;
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   font-weight: 400;
   text-align: right;
   line-height: 1.35;
@@ -986,7 +991,7 @@ p {
 
 .bar-label {
   width: 70px;
-  font-size: 12px;
+  font-size: 1rem;
   text-align: left;
 }
 
@@ -1013,7 +1018,7 @@ p {
 .bar-count {
   position: relative;
   padding-left: 8px;
-  font-size: 11px;
+  font-size: 0.9167rem;
   line-height: 18px;
 }
 
@@ -1023,14 +1028,14 @@ p {
 
 .home-tile {
   padding: 8px 12px;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 /* Where an Agent last opened the Project, while another of its homes is shown */
 .home-note {
   margin: 2px 4px 0;
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   line-height: 16px;
 }
 
@@ -1055,7 +1060,7 @@ p {
   border-radius: 999px;
   background: transparent;
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   cursor: pointer;
 }
 
@@ -1099,7 +1104,7 @@ p {
 .detail-context {
   margin: -6px 0 10px;
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .cards {
@@ -1150,7 +1155,7 @@ p {
   align-items: center;
   gap: 6px;
   color: var(--faint);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
 }
 
 .entry-head .entry-reading + .state-pill {
@@ -1165,13 +1170,13 @@ p {
   flex: none;
   border-radius: 50%;
   background: #ffffff14;
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   font-weight: 700;
 }
 
 .entry-scope {
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 1.125rem;
 }
 
 .tags {
@@ -1216,7 +1221,7 @@ p {
   border-radius: 10px;
   background: #00000033;
   color: #d6d3e3;
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   white-space: pre-wrap;
 }
 
@@ -1241,7 +1246,7 @@ p {
 .field-origins dt {
   flex: none;
   color: #d6d3e3;
-  font-size: 11.5px;
+  font-size: 0.9583rem;
 }
 
 .field-origins dd {
@@ -1259,7 +1264,7 @@ p {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
   line-height: 1.4;
 }
 
@@ -1282,7 +1287,7 @@ p {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .reader {
@@ -1293,7 +1298,7 @@ p {
   border: 0;
   border-radius: 999px;
   background: var(--button);
-  font-size: 12px;
+  font-size: 1rem;
   cursor: pointer;
 }
 
@@ -1311,7 +1316,7 @@ p {
 
 .action-note {
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   line-height: 1.4;
 }
 
@@ -1359,7 +1364,7 @@ p {
   border-radius: 14px;
   box-shadow: 0 8px 24px var(--shadow);
   color: var(--white);
-  font-size: 12.5px;
+  font-size: 1.0417rem;
   line-height: 1.4;
   animation: float-in 160ms ease-out;
 }
@@ -1558,7 +1563,7 @@ p {
   display: block;
   margin-top: 2px;
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
 }
 
 /* The action dialog: preview, then Back up → Write → Verify and the result */
@@ -1583,7 +1588,7 @@ p {
 }
 
 .dialog-title {
-  font-size: 20px;
+  font-size: 1.6667rem;
   font-weight: 700;
 }
 
@@ -1602,7 +1607,7 @@ p {
   gap: 8px;
   margin: 0 0 8px;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1661,7 +1666,7 @@ p {
 
 .change-project-name {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -1670,7 +1675,7 @@ p {
    such as Project, File or Key. */
 .change-label {
   color: var(--grey);
-  font-size: 10.5px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1827,7 +1832,7 @@ p {
 
 .check-kind {
   margin-right: 6px;
-  font-size: 10.5px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1836,7 +1841,7 @@ p {
 .check-path {
   display: block;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 1rem;
   overflow-wrap: anywhere;
 }
 
@@ -1884,7 +1889,7 @@ p {
   overflow: auto;
   background: #121317;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   line-height: 1.55;
 }
 
@@ -1925,12 +1930,12 @@ p {
 .dialog-backup {
   flex-basis: 100%;
   color: var(--hint);
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 .apply-why {
   color: var(--hint);
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 .dialog-callout {
@@ -1944,7 +1949,7 @@ p {
 }
 
 .callout-title {
-  font-size: 14px;
+  font-size: 1.1667rem;
   font-weight: 600;
 }
 
@@ -1997,7 +2002,7 @@ p {
   place-items: center;
   border-radius: 50%;
   background: #ffffff12;
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 800;
 }
 
@@ -2041,7 +2046,7 @@ p {
 .differences th {
   padding: 4px 8px;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 500;
   text-align: left;
 }
@@ -2078,7 +2083,7 @@ p {
 }
 
 .rollback-outcome {
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2104,7 +2109,7 @@ p {
   background: var(--snackbar);
   box-shadow: 0 8px 24px var(--shadow);
   color: var(--white);
-  font-size: 12.5px;
+  font-size: 1.0417rem;
   animation: float-in 160ms ease-out;
 }
 
@@ -2114,7 +2119,7 @@ p {
   border-radius: 8px;
   background: transparent;
   color: var(--snackbar-edge);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2249,7 +2254,7 @@ p {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
-  font-size: 13px;
+  font-size: 1.0833rem;
 }
 
 .filtered-out .cta {
@@ -2296,7 +2301,7 @@ p {
   width: 110px;
   flex: none;
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .operation-text {
@@ -2308,7 +2313,7 @@ p {
 
 .operation-title {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 1.1667rem;
 }
 
 .operation-meta {
@@ -2317,7 +2322,7 @@ p {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .status-chip {
@@ -2327,7 +2332,7 @@ p {
   gap: 4px;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2365,7 +2370,7 @@ p {
   border-radius: 999px;
   background: #26272d;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2398,7 +2403,7 @@ p {
 
 .places-tabs button {
   padding: 6px 16px;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
   white-space: nowrap;
 }
 
@@ -2410,6 +2415,7 @@ p {
 
 .places-list {
   flex: 1;
+  container: places / inline-size;
 }
 
 .places-side {
@@ -2423,7 +2429,7 @@ p {
   gap: 8px;
   margin: 10px 2px 6px;
   color: var(--grey);
-  font-size: 11px;
+  font-size: 0.9167rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2448,7 +2454,7 @@ p {
 
 .agent-group {
   color: var(--white);
-  font-size: 13px;
+  font-size: 1.0833rem;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -2456,7 +2462,7 @@ p {
 
 .agent-version {
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   font-weight: 400;
 }
 
@@ -2466,7 +2472,7 @@ p {
   gap: 6px;
   margin: 0 2px 6px;
   color: #e9c46a;
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .place-row {
@@ -2513,14 +2519,14 @@ p {
 }
 
 .place-name {
-  font-size: 13.5px;
+  font-size: 1.125rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 
 .place-sub {
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -2530,7 +2536,7 @@ p {
   padding: 0;
   list-style: none;
   color: var(--grey);
-  font-size: 11.5px;
+  font-size: 0.9583rem;
   line-height: 1.5;
 }
 
@@ -2538,7 +2544,7 @@ p {
   width: 130px;
   flex: none;
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 .place-actions {
@@ -2548,9 +2554,32 @@ p {
   margin-top: 0;
 }
 
+/* In a narrow list, as at the smallest window, the count and the buttons go
+   on a line of their own, under the name, which keeps the row's width. 44px
+   is the icon's width plus the row's gap. */
+@container places (max-width: 760px) {
+  .place-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .place-text {
+    flex-basis: calc(100% - 44px);
+  }
+
+  .place-count {
+    width: auto;
+    margin-left: 44px;
+  }
+
+  .place-actions {
+    margin-left: auto;
+  }
+}
+
 .cta.small {
   padding: 6px 12px;
-  font-size: 10.5px;
+  font-size: 0.875rem;
 }
 
 .side-row {
@@ -2563,7 +2592,7 @@ p {
 
 .side-row .dim {
   grid-column: 1;
-  font-size: 12px;
+  font-size: 1rem;
   overflow-wrap: anywhere;
 }
 
@@ -2576,13 +2605,13 @@ p {
 .side-note {
   margin: 10px 0 0;
   color: var(--grey);
-  font-size: 12px;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
 .dialog .side-note {
   color: var(--hint);
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 .dialog .dim,
@@ -2716,7 +2745,7 @@ p {
 
 .parked-none {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 1rem;
 }
 
 /* About */
@@ -2724,7 +2753,7 @@ p {
 .about-logo {
   color: var(--primary);
   font-weight: 800;
-  font-size: 40px;
+  font-size: 3.3333rem;
   letter-spacing: -0.06em;
   line-height: 1;
 }
@@ -2746,7 +2775,7 @@ p {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  font-size: 12.5px;
+  font-size: 1.0417rem;
 }
 
 .update-notice.floating {
@@ -2835,7 +2864,7 @@ p {
   border-radius: 10px;
   background: var(--tile);
   color: var(--grey);
-  font: 11.5px/1.5 var(--mono);
+  font: 0.9583rem/1.5 var(--mono);
   white-space: pre-wrap;
 }
 
@@ -2850,7 +2879,7 @@ p {
 }
 
 .empty-title {
-  font-size: 22px;
+  font-size: 1.8333rem;
   font-weight: 700;
 }
 
