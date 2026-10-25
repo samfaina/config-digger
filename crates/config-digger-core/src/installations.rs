@@ -31,7 +31,8 @@ pub(crate) struct ScannedInstallation {
 }
 
 /// The Installations among `installations` that read `home`, and what to
-/// note about their versions there, the one that last ran included.
+/// note about their versions there, a last-ran file that cannot be used
+/// included.
 pub(crate) fn of_home(
     definition: &AgentDefinition,
     installations: &[ScannedInstallation],

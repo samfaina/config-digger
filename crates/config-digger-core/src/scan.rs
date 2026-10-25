@@ -1661,7 +1661,7 @@ fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader)
         Ok(None) => return LastRanReading::NotRecorded,
         Err(_) => return LastRanReading::Unreadable(path),
     };
-    let Ok(document) = JsonFormat::of(last_ran.dialect).parse(text) else {
+    let Ok(document) = last_ran.format().parse(text) else {
         return LastRanReading::Unreadable(path);
     };
     match lookup(&document, &last_ran.key_path) {

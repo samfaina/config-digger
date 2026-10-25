@@ -11,9 +11,9 @@ use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, JsonDialect,
-    ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register,
-    Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate,
-    VersionSource,
+    JsonFormat, ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk,
+    Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape,
+    StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -479,6 +479,13 @@ pub(crate) struct LastRan {
     pub dialect: Option<JsonDialect>,
     /// The key path of the string, one key per segment.
     pub key_path: Vec<String>,
+}
+
+impl LastRan {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -2833,7 +2840,7 @@ homes = ["default"]"#;
     }
 
     #[test]
-    fn the_last_ran_file_is_read_in_a_known_dialect() {
+    fn last_ran_accepts_only_a_known_dialect() {
         let last_ran = |dialect: &str| {
             format!(
                 "{VALID}\n[last_ran]\nanchor = {{ block = \"home\", root = \"state\" }}\nkey_path = [\"v\"]\ndialect = \"{dialect}\"\n"

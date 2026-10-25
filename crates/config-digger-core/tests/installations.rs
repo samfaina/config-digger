@@ -759,16 +759,25 @@ fn last_ran_agent(dialect: Option<&str>) -> String {
         )
 }
 
-/// The default home of the test Agent read with `definition`, its
-/// `~/.test/last.json` holding `last`, if anything.
-fn last_ran_home(definition: &str, last: Option<&str>) -> Home {
+/// The default home's last-ran file.
+fn last_json() -> PathBuf {
+    PathBuf::from(HOME).join(r".test\last.json")
+}
+
+/// The test Agent's homes, the default one's last-ran file holding `last`,
+/// if anything.
+fn last_ran_fixture(last: Option<&str>) -> FakeFileSystem {
     let fs = test_fixture(&[]);
     if let Some(last) = last {
-        fs.put_file(
-            PathBuf::from(HOME).join(r".test\last.json"),
-            last.as_bytes().to_vec(),
-        );
+        fs.put_file(last_json(), last.as_bytes().to_vec());
     }
+    fs
+}
+
+/// The default home of the test Agent read with `definition`, its
+/// last-ran file holding `last`, if anything.
+fn last_ran_home(definition: &str, last: Option<&str>) -> Home {
+    let fs = last_ran_fixture(last);
     let core = test_core(&fs, FakeEnvironment::with_home(HOME), definition);
     let agents = agents(&core);
     let agent = agents
@@ -805,12 +814,7 @@ fn a_last_ran_file_that_does_not_parse_in_the_agents_dialect_is_noted() {
         .expect("a LastRanUnreadable note");
     assert_eq!(note.installation, None);
     assert!(
-        note.sentence.contains(
-            &PathBuf::from(HOME)
-                .join(r".test\last.json")
-                .display()
-                .to_string()
-        ),
+        note.sentence.contains(&last_json().display().to_string()),
         "{}",
         note.sentence
     );
@@ -840,14 +844,10 @@ fn a_last_ran_value_that_is_not_a_string_is_noted() {
 
 #[test]
 fn the_last_ran_note_stays_out_of_operation_previews() {
-    let fs = test_fixture(&[]);
+    let fs = last_ran_fixture(Some(JSONC_LAST));
     fs.put_file(
         PathBuf::from(HOME).join(r".test\state.json"),
         br#"{ "servers": { "notes": { "command": "notes-mcp" } } }"#.to_vec(),
-    );
-    fs.put_file(
-        PathBuf::from(HOME).join(r".test\last.json"),
-        JSONC_LAST.as_bytes().to_vec(),
     );
     let core = test_core(&fs, FakeEnvironment::with_home(HOME), &last_ran_agent(None));
 
