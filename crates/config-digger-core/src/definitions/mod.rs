@@ -630,6 +630,11 @@ pub(crate) struct PluginsDefinition {
     /// The text that ends a plugin's name in its id, such as the `@` before
     /// a marketplace. Without it, a plugin with no name is named by its id.
     pub id_separator: Option<String>,
+    /// The id the Agent's switches know a plugin by, made from its name,
+    /// `{plugin}` standing for it, such as Claude Code's `{plugin}@synced`
+    /// for a plugin synced from claude.ai. Without it, the id is the one
+    /// the registry gives.
+    pub id_template: Option<String>,
     /// Whether the Agent names a plugin by its id when one before it, in
     /// the registry's order, has its name, as Claude Desktop does with
     /// extensions, so that their Entries never share a name.
@@ -694,6 +699,15 @@ impl PluginsDefinition {
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
+        }
+        if self
+            .id_template
+            .as_ref()
+            .is_some_and(|template| !template.contains(PLUGIN_NAME))
+        {
+            return Err(format!(
+                "id_template must name the plugin with `{PLUGIN_NAME}`"
+            ));
         }
         if self.unique_names && self.same_names_invalid {
             return Err("plugins that share a name are renamed or invalid, not both".into());

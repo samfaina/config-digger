@@ -1504,6 +1504,13 @@
             "null"
           ]
         },
+        "id_template": {
+          "description": "The id the Agent's switches know a plugin by, made from its name,\n`{plugin}` standing for it, such as Claude Code's `{plugin}@synced`\nfor a plugin synced from claude.ai. Without it, the id is the one\nthe registry gives.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "unique_names": {
           "description": "Whether the Agent names a plugin by its id when one before it, in\nthe registry's order, has its name, as Claude Desktop does with\nextensions, so that their Entries never share a name.",
           "type": "boolean",
@@ -1597,6 +1604,13 @@
             "anchor": {
               "description": "The folder the plugins' folders are in.",
               "$ref": "#/$defs/Anchor"
+            },
+            "depth": {
+              "description": "How many folders below the anchor each plugin's folder sits, at\nleast 1: 1 is its direct subfolders, and 2 the subfolders of each,\nsuch as Claude Code's synced plugins in a folder per account.\nFolders above that depth whose name starts with `.` are not read.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 1,
+              "default": 1
             },
             "marker": {
               "description": "A `/`-separated path relative to a plugin's folder, or several, any\nof which makes the folder a plugin's.",

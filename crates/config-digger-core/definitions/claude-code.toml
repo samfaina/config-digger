@@ -13,6 +13,9 @@ verified = { min = "2.1.299", max = "2.1.309" }
 [agent]
 id = "claude-code"
 name = "Claude Code"
+# claude.ai connectors live in the account; Claude Code keeps only their
+# names, as `claude.ai <Name>`, in `disabledMcpServers` [docs, disk].
+notes = ["cloud_connectors_not_on_disk"]
 
 # The native installer's launcher. It is a copy of the newest file in
 # `~/.local/share/claude/versions`, whose older files are not Installations.
@@ -139,6 +142,36 @@ superseded_marker = ".orphaned_at"
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
 id_separator = "@"
 uninstall = "claude plugin uninstall {id} --scope {scope}"
+
+# Plugins synced from claude.ai, one folder each in
+# `plugins/synced/<org>_<account>/<name>~g<generation>` [disk], beside the
+# account's `manifest.json`, `.marketplaces.json`, `.last-complete-round`
+# and a `<name>~g<generation>.meta.json` per plugin, none of them a plugin,
+# and the empty file `synced/.bucket-<org>_<account>` [disk]. Claude Code
+# owns this copy and loads it with no `enabledPlugins` key [disk]. A synced
+# plugin is named by its manifest's `name`, not by its folder [disk], and
+# its switches know it as `<name>@synced` [docs]. Its Entries are
+# read-only, being a copy of the account's configuration. Like
+# `synced-skills`, every account's folder is read, though Claude Code
+# reads only the signed-in account's (#308).
+#
+# Of same-named plugins Claude Code loads one: an installed marketplace
+# plugin, then a skills-dir plugin, then a synced one [docs]. config-digger
+# makes a synced plugin's servers and skills rank below an installed
+# plugin's, so each of them that an installed plugin of its name also
+# carries is Shadowed; one only the synced plugin carries stays Effective
+# (#354).
+[[plugins]]
+id = "synced"
+unverified = [
+  "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
+  "While an installed plugin of the same name loads, Claude Code loads nothing of the synced one, the docs say; config-digger Shadows only the synced servers and skills the installed plugin carries too, leaving the others Effective, and takes a Disabled installed plugin to leave the synced one loaded.",
+  "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
+]
+registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2 }
+name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
+id_separator = "~g"
+id_template = "{plugin}@synced"
 
 # Servers an administrator deploys to the machine [docs]. config-digger
 # only reads them. Claude Code skips a `managed-mcp.json` it cannot parse,
@@ -296,6 +329,39 @@ plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args"
 on_read_failure = "ignores_file"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
+# A synced plugin's servers, in its `.mcp.json` and its manifest's
+# `mcpServers`, read as an installed plugin's are, at user Scope.
+[[locations]]
+id = "synced-plugin-manifest-mcp"
+anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
+name_template = "plugin:{plugin}:{name}"
+references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-" }
+plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
+on_read_failure = "ignores_file"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+
+[[locations]]
+id = "synced-plugin-mcp"
+anchor = { block = "plugin", plugins = "synced", path = ".mcp.json" }
+name_template = "plugin:{plugin}:{name}"
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+interpolation = { block = "braces", default_separator = ":-" }
+plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
+on_read_failure = "ignores_file"
+shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+
 # Same-named Entries compete whole; the highest location wins. Claude Code
 # skips a malformed Entry with a warning [docs], and a Disabled one, before
 # they compete, so the next one down can win. A plugin server competes by
@@ -307,8 +373,8 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # its first place [test]; config-digger does not order them yet
 # (#294).
 [items.mcp]
-precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-manifest-mcp", "plugin-mcp"]
-competition = { block = "exact-name", by_endpoint = ["plugin-mcp", "plugin-manifest-mcp"] }
+precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-manifest-mcp", "plugin-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
+competition = { block = "exact-name", by_endpoint = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"] }
 # An exclusive `managed-mcp.json` suppresses the other servers, and an
 # unapproved server is not loaded: neither competes. The allow and deny
 # lists apply after precedence, to the server that wins [docs].
@@ -470,7 +536,7 @@ disabled_value = false
 reason = "plugin_disabled"
 layered = true
 policy = true
-locations = ["plugin-mcp", "plugin-manifest-mcp"]
+locations = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 enable_offered = false
 
 [[items.mcp.disable]]
@@ -483,7 +549,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
-locations = ["plugin-mcp", "plugin-manifest-mcp"]
+locations = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 
 [[items.mcp.disable]]
 block = "json-field"
@@ -495,7 +561,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
-locations = ["plugin-mcp", "plugin-manifest-mcp"]
+locations = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 enable_offered = false
 
 [[items.mcp.disable]]
@@ -510,6 +576,38 @@ default_value = false
 reason = "plugin_disabled"
 layered = true
 locations = ["plugin-mcp", "plugin-manifest-mcp"]
+
+# A synced plugin takes the same switches, under `<name>@synced` [docs],
+# but one no settings file names is on [disk], so its user switch has no
+# default. config-digger only reads them for a synced plugin, which is
+# read-only.
+[[items.mcp.disable]]
+unverified = "`enabledPlugins[\"<name>@synced\"]: false` is taken to turn a synced plugin off, merged across settings files as an installed plugin's key is, as the docs say."
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["synced-plugin-manifest-mcp", "synced-plugin-mcp"]
+enable_offered = false
+
+# `syncClaudeAiPlugins: false` turns off every synced plugin [docs], ranked
+# as `syncClaudeAiSkills` is below. These switches are repeated for skills.
+[[items.mcp.rules]]
+unverified = "`syncClaudeAiPlugins: false` is taken to turn every synced plugin off, the highest settings file that holds it deciding, as the docs say."
+block = "global-switch"
+off = false
+locations = ["synced-plugin-manifest-mcp", "synced-plugin-mcp"]
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["syncClaudeAiPlugins"], policy = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["syncClaudeAiPlugins"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["syncClaudeAiPlugins"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["syncClaudeAiPlugins"] },
+]
 
 # Skills are folders holding a `SKILL.md`, read one level down only [docs].
 # A skill is named by its folder, as written, and competes by it; its
@@ -577,6 +675,19 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+# A synced plugin's skills, read as an installed plugin's are, at user
+# Scope.
+[[locations]]
+id = "synced-plugin-skills"
+anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+name_template = "{plugin}:{name}"
+kind = "skill"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
 # Skills synced from claude.ai sit one level deeper than the docs say, in
 # `synced/<org>_<account>/<folder>` [disk], next to `manifest.json` and a
 # `.staging` folder. Claude Code owns this copy: it downloads the account's
@@ -617,7 +728,7 @@ on_read_failure = "ignores_file"
 # letters outside ASCII [test]. config-digger does not check the rule yet
 # (#171).
 [items.skill]
-precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-skills"]
+precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence", "rules"]
 
@@ -693,7 +804,7 @@ disabled_value = false
 reason = "plugin_disabled"
 layered = true
 policy = true
-locations = ["plugin-skills"]
+locations = ["plugin-skills", "synced-plugin-skills"]
 enable_offered = false
 
 [[items.skill.disable]]
@@ -706,7 +817,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
-locations = ["plugin-skills"]
+locations = ["plugin-skills", "synced-plugin-skills"]
 
 [[items.skill.disable]]
 block = "json-field"
@@ -718,7 +829,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
-locations = ["plugin-skills"]
+locations = ["plugin-skills", "synced-plugin-skills"]
 enable_offered = false
 
 [[items.skill.disable]]
@@ -734,11 +845,36 @@ reason = "plugin_disabled"
 layered = true
 locations = ["plugin-skills"]
 
+# A synced plugin's switches, as for its servers above, whose marks cover
+# these too.
+[[items.skill.disable]]
+block = "json-field"
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
+target = "plugin"
+context = "all"
+enable_action = "set"
+enabled_value = true
+disabled_value = false
+reason = "plugin_disabled"
+layered = true
+locations = ["synced-plugin-skills"]
+enable_offered = false
+
+[[items.skill.rules]]
+block = "global-switch"
+off = false
+locations = ["synced-plugin-skills"]
+sources = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["syncClaudeAiPlugins"], policy = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["syncClaudeAiPlugins"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["syncClaudeAiPlugins"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["syncClaudeAiPlugins"] },
+]
+
 # Claude Code fetches GrowthBook features for the signed-in account and
 # caches them in `~/.claude.json` [disk]: names in clear, values as JSON,
 # and when it fetched them in milliseconds. Claude Code ships compiled, so
-# a gate's name is all that says what it does. The plugin sync gate,
-# `tengu_claudeai_plugins_sync_enabled`, joins once synced plugins are read.
+# a gate's name is all that says what it does.
 #
 # It skips the fetch and uses its own defaults when any of these is set, in
 # its environment or in the `env` of a settings file: `DISABLE_GROWTHBOOK`
@@ -764,6 +900,39 @@ locations = ["plugin-skills"]
 name = "tengu_claudeai_skills_sync_enabled"
 assumed = false
 affects = ["synced-skills"]
+lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
+
+[feature_gates.bypass]
+block = "env"
+variables = [
+  { name = "DISABLE_GROWTHBOOK", values = "truthy" },
+  { name = "DISABLE_TELEMETRY", values = "non-empty" },
+  { name = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", values = "non-empty" },
+  { name = "DO_NOT_TRACK", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_BEDROCK", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_MANTLE", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_ANTHROPIC_AWS", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_VERTEX", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_FOUNDRY", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+]
+env_maps = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["env"], every_source = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["env"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["env"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["env"] },
+]
+
+# This gate turns the claude.ai plugin sync on, as the one above does for
+# skills: on a Max account it is on and `plugins/synced` holds the
+# account's plugins [disk]. Like the skill sync gate, it closes no
+# location: its caveat says whether Claude Code keeps the copy in step with
+# claude.ai, and it is off without a value. Its mark says what that rests
+# on.
+[[feature_gates]]
+name = "tengu_claudeai_plugins_sync_enabled"
+unverified = "Claude Code is taken to read its synced plugins whatever the plugin sync gate holds, and to take the gate as off without a cached value, as it does with the skill sync gate."
+assumed = false
+affects = ["synced-plugin-manifest-mcp", "synced-plugin-mcp", "synced-plugin-skills"]
 lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
 
 [feature_gates.bypass]

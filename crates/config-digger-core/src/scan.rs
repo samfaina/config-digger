@@ -14,7 +14,8 @@ use crate::definitions::blocks::{
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
-    LocationDefinition, NameParts, PROJECT_KEY, PluginNames, PluginsDefinition, References,
+    LocationDefinition, NameParts, PLUGIN_NAME, PROJECT_KEY, PluginNames, PluginsDefinition,
+    References,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -3142,9 +3143,13 @@ impl Scanner<'_> {
             } else {
                 name
             };
+            let id = match &plugins.id_template {
+                Some(template) => template.replace(PLUGIN_NAME, &name),
+                None => record.id,
+            };
             found.push(ScannedPlugin {
                 plugins: plugins.id.clone(),
-                id: record.id,
+                id,
                 name,
                 folder,
                 scope: record.scope,
@@ -3253,9 +3258,10 @@ impl Scanner<'_> {
             .collect()
     }
 
-    /// A record for each folder that holds the marker, or with no marker
-    /// each folder whose name does not start with `.`, sorted by name, with
-    /// the version its install record gives.
+    /// A record for each folder at the block's depth that holds the marker,
+    /// or with no marker each folder whose name does not start with `.`,
+    /// sorted by name within each folder above it, with the version its
+    /// install record gives.
     fn plugin_folders(&mut self, home: &FoundHome, block: &PluginFolders) -> Vec<PluginRecord> {
         let Some(folder) = block.anchor.path(&home.roots, None) else {
             return Vec::new();
@@ -3285,8 +3291,17 @@ impl Scanner<'_> {
             })
             .unwrap_or_default();
         let fs = self.reader.fs;
-        marked_folders(fs, &folder, block.marker.as_ref())
-            .into_iter()
+        let mut parents = vec![folder];
+        for _ in 1..block.depth {
+            parents = parents
+                .iter()
+                .flat_map(|parent| marked_folders(fs, parent, None))
+                .map(|(_, child)| child)
+                .collect();
+        }
+        parents
+            .iter()
+            .flat_map(|parent| marked_folders(fs, parent, block.marker.as_ref()))
             .filter_map(|(id, child)| {
                 if removed.contains(&id.to_lowercase()) {
                     tracing::debug!(plugin = %id, "plugin folder marked for deletion");

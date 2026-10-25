@@ -636,13 +636,6 @@ fn every_home_notes_that_cloud_connectors_are_not_on_disk() {
         notes.contains(&json("cloud_connectors_not_on_disk")),
         "{notes:?}"
     );
-    let claude_code_notes = inventory
-        .homes
-        .iter()
-        .filter(|home| home.agent == "claude-code")
-        .flat_map(|home| &home.notes)
-        .any(|note| json(note.code) == "cloud_connectors_not_on_disk");
-    assert!(!claude_code_notes);
 }
 
 /// The Store package's install folder, as Windows names it.

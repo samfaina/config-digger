@@ -565,6 +565,10 @@ fn list_json_prints_one_document_with_schema_version() {
             // Its two user servers, and `dart`, keyed to a Project.
             "entries": 3,
             "notes": [{
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+            }, {
                 "code": "no_installation_found",
                 "installation": null,
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
@@ -2606,7 +2610,16 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     assert_eq!(home["installations"][0]["version"], "2.1.310");
     assert_eq!(home["installations"][0]["out_of_range"], true);
     assert_eq!(home["last_ran"], "2.1.284");
-    assert_eq!(home["notes"][0]["code"], "version_outside_tested_range");
+    let codes: Vec<&Value> = home["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|note| &note["code"])
+        .collect();
+    assert!(
+        codes.contains(&&json!("version_outside_tested_range")),
+        "{codes:?}"
+    );
 
     assert_eq!(text.code, 0, "{}", text.stderr);
     let lines: Vec<&str> = text.stdout.lines().collect();

@@ -57,4 +57,31 @@ export default [
       t.eq(cards[0]?.sentence, sentence, `esa tarjeta dice «${sentence}»`);
     },
   },
+  {
+    id: "1.4",
+    async run(t) {
+      const { s } = t;
+      const skill = "cd-throwaway-synced:cd-throwaway-synced-skill";
+      await addHome(t, "Claude Code", `${t.root}\\claude-code-synced-home`, { checks: false });
+      const text = await inventoryOf(t, "Claude Code", "claude-code-synced-home");
+      t.has(text, skill, `el Inventario de ese home muestra la skill «${skill}»`);
+      await openItem(t, skill);
+      const card = await s.exec(`
+        const c = document.querySelector(".panel.detail .entry-card");
+        return c && {
+          tags: [...c.querySelectorAll(".tag")].map((e) => e.textContent.trim()),
+          caveats: [...c.querySelectorAll(".caveat")].map((e) => e.textContent.trim()),
+          notes: [...c.querySelectorAll(".action-note")].map((e) => e.textContent.trim()),
+          buttons: [...c.querySelectorAll(".entry-actions button")].map((b) => ({ text: b.textContent.trim(), disabled: b.disabled })),
+        };`);
+      t.check(card?.tags.includes("cloud mirror"), "la tarjeta tiene la etiqueta «cloud mirror»", card?.tags.join(", "));
+      const caveat = "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC.";
+      t.check(card?.caveats.includes(caveat), `la tarjeta dice «${caveat}»`, card?.caveats.join(" | "));
+      const button = (name) => card?.buttons.find((b) => b.text === name);
+      t.check(button("Disable")?.disabled, "el botón Disable está desactivado", JSON.stringify(card?.buttons));
+      const note = "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.";
+      t.check(card?.notes.includes(note), `bajo los botones dice «${note}»`, card?.notes.join(" | "));
+      t.check(button("Remove")?.disabled, "el botón Remove está desactivado", JSON.stringify(card?.buttons));
+    },
+  },
 ];
