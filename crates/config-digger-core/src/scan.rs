@@ -2,7 +2,7 @@
 //! an immutable snapshot of Projects, Entries and Read failures. Nothing here
 //! decides a State.
 
-use crate::api::ReadFailureKind;
+use crate::api::{ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
     Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect, JsonFormat,
@@ -67,6 +67,12 @@ pub(crate) struct Snapshot {
     /// Where each parked Entry, listed among the Entries at its key path in
     /// the store, came from.
     pub parked: Vec<ScannedParked>,
+    /// The parked Entries whose origin is not found, which no Agent home
+    /// holds.
+    pub stranded: Vec<ScannedStranded>,
+    /// What of the parked-Entry store cannot be read: the whole manifest,
+    /// or Entries in it that do not read as parked Entries.
+    pub store_failures: Vec<ScannedStoreFailure>,
     /// The folder each Agent home keeps for each Project.
     pub storage: Vec<StorageFolder>,
     /// Each file read for a location that is a copy the Agent caches, with
@@ -90,6 +96,49 @@ pub(crate) struct ScannedParked {
     pub parked_at: String,
     /// For a skill, where the store keeps its folder.
     pub folder: Option<PathBuf>,
+}
+
+/// A Stranded Entry: a parked Entry at `key_path` in the parked-Entry store
+/// whose origin is not found, so that it has no State and can only be
+/// Removed.
+#[derive(Clone)]
+pub(crate) struct ScannedStranded {
+    /// Its key path in the store.
+    pub key_path: Vec<String>,
+    /// Where it was parked from, as the store holds it.
+    pub origin: park::Origin,
+    /// When it was parked, in RFC 3339.
+    pub parked_at: String,
+    /// The index of its Agent's definition, when one is loaded.
+    pub agent_index: Option<usize>,
+    pub kind: ItemKind,
+    /// The first part of its origin that is not found.
+    pub reason: StrandedReason,
+    /// Its value, with every Secret masked: as its location masks it when
+    /// the location is loaded, and else every text.
+    pub config: serde_json::Value,
+    pub masked: Vec<Vec<String>>,
+    /// For a skill, where the store keeps its folder.
+    pub folder: Option<PathBuf>,
+}
+
+impl ScannedStranded {
+    /// Its Agent's name, or the Agent's id when no definition of it is loaded.
+    pub fn agent_name<'d>(&'d self, definitions: &'d [AgentDefinition]) -> &'d str {
+        self.agent_index
+            .map_or(&self.origin.agent, |index| &definitions[index].agent.name)
+    }
+}
+
+/// A Read failure of the parked-Entry store.
+#[derive(Clone)]
+pub(crate) struct ScannedStoreFailure {
+    /// The id of the Entry that does not read as a parked Entry, `None`
+    /// when the whole manifest cannot be read.
+    pub entry: Option<String>,
+    pub kind: ReadFailureKind,
+    /// The 1-based line and column of a parse error, when the parser knows them.
+    pub position: Option<(usize, usize)>,
 }
 
 impl Snapshot {
@@ -927,6 +976,16 @@ impl ScannedReadFailure {
     }
 }
 
+/// What [`Scanner::read_parked`] read of the parked-Entry store.
+#[derive(Default)]
+struct ReadParked {
+    /// The store's manifest, `None` when there is no data folder to keep it in.
+    store: Option<PathBuf>,
+    parked: Vec<ScannedParked>,
+    stranded: Vec<ScannedStranded>,
+    failures: Vec<ScannedStoreFailure>,
+}
+
 /// Why a scan could not run at all.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ScanError {
@@ -1216,7 +1275,7 @@ fn read_as_if(
     }
 
     scanner.mask_entries(definitions);
-    let (parked_store, parked) = scanner.read_parked(definitions, &found, ports);
+    let parked = scanner.read_parked(definitions, &found, ports);
     let mut projects = scanner.projects.list;
     projects.sort_by(|a, b| a.key.cmp(&b.key));
     for project in &mut projects {
@@ -1357,8 +1416,10 @@ fn read_as_if(
         settings,
         setting_values,
         unreadable_settings,
-        parked_store,
-        parked,
+        parked_store: parked.store,
+        parked: parked.parked,
+        stranded: parked.stranded,
+        store_failures: parked.failures,
         storage: scanner.storage,
         cached: scanner.cached,
         not_admin_owned: scanner.reader.not_admin_owned,
@@ -3298,46 +3359,99 @@ impl Scanner<'_> {
 
     /// Adds the Entries of config-digger's parked-Entry store, each one of
     /// the location it was parked from, in its Agent home, at its key path
-    /// in the store. A parked Entry of an Agent, home or location not found
-    /// now is left out. Returns the store's path and where each Entry came
-    /// from.
+    /// in the store. A parked Entry whose Agent definition, home or location
+    /// is not found now is Stranded instead, and a manifest, or an Entry in
+    /// it, that cannot be read is a Read failure of the store.
     fn read_parked(
         &mut self,
         definitions: &[AgentDefinition],
         found: &[FoundHome],
         ports: &Ports,
-    ) -> (Option<PathBuf>, Vec<ScannedParked>) {
+    ) -> ReadParked {
+        let mut read = ReadParked::default();
         let Ok(store) = park::store_path(ports.env.as_ref()) else {
-            return (None, Vec::new());
+            return read;
+        };
+        read.store = Some(store.clone());
+        let whole = |kind, position| ScannedStoreFailure {
+            entry: None,
+            kind,
+            position,
         };
         let document = match self.reader.peek(&store) {
-            Ok(None) => return (Some(store), Vec::new()),
-            Ok(Some(text)) => JsonFormat::STRICT.parse(text).ok(),
-            Err(_) => None,
+            Ok(None) => return read,
+            Ok(Some(text)) => JsonFormat::STRICT
+                .parse(text)
+                .map_err(|error| whole(ReadFailureKind::Parse, error.position)),
+            Err(kind) => Err(whole(kind, None)),
         };
-        let Some(document) = document else {
-            tracing::warn!(path = %store.display(), "cannot read the parked-Entry store");
-            return (Some(store), Vec::new());
+        let read_entries = document.and_then(|document| {
+            park::parked_entries(&document).ok_or_else(|| whole(ReadFailureKind::Shape, None))
+        });
+        let held = match read_entries {
+            Ok(held) => held,
+            Err(failure) => {
+                tracing::warn!(path = %store.display(), "cannot read the parked-Entry store");
+                read.failures.push(failure);
+                return read;
+            }
         };
-        let mut parked = Vec::new();
-        for (id, parked_entry) in park::parked_entries(&document) {
-            let home = found.iter().find(|home| {
-                definitions[home.agent_index].agent.id == parked_entry.origin.agent
-                    && home.home == parked_entry.origin.home
-            });
-            let location = home.and_then(|home| {
-                definitions[home.agent_index]
+        read.failures
+            .extend(held.unreadable.into_iter().map(|id| ScannedStoreFailure {
+                entry: Some(id),
+                kind: ReadFailureKind::Shape,
+                position: None,
+            }));
+        for (id, parked_entry) in held.parked {
+            let key_path = park::key_path(&id);
+            let folder = parked_entry
+                .folder
+                .as_ref()
+                .map(|name| park::folders_path(&store).join(name));
+            let origin = &parked_entry.origin;
+            let agent_index = definitions
+                .iter()
+                .position(|definition| definition.agent.id == origin.agent);
+            let home = found
+                .iter()
+                .find(|home| Some(home.agent_index) == agent_index && home.home == origin.home);
+            let location = agent_index.and_then(|index| {
+                definitions[index]
                     .locations
                     .iter()
-                    .find(|location| location.id == parked_entry.origin.location)
+                    .find(|location| location.id == origin.location)
             });
+            let reading = locations_reading(definitions, &self.readers, &origin.path);
+            let masked = match location {
+                Some(location) => mask::entry_read_by(location, &reading, &parked_entry.entry),
+                // Nothing says where its Secrets are, so every text is one.
+                None => mask::every_text(&parked_entry.entry),
+            };
             let (Some(home), Some(location)) = (home, location) else {
-                tracing::debug!(%id, "parked Entry of no home found");
+                let reason = match (agent_index, home) {
+                    (None, _) => StrandedReason::NoDefinition,
+                    (Some(_), None) => StrandedReason::HomeNotFound,
+                    (Some(_), Some(_)) => StrandedReason::LocationGone,
+                };
+                // A skill's origin is its folder, which has no key path.
+                let kind = match location {
+                    Some(location) => location.kind,
+                    None if origin.key_path.is_empty() => ItemKind::Skill,
+                    None => ItemKind::Mcp,
+                };
+                read.stranded.push(ScannedStranded {
+                    key_path,
+                    origin: parked_entry.origin,
+                    parked_at: parked_entry.parked_at,
+                    agent_index,
+                    kind,
+                    reason,
+                    config: masked.value,
+                    masked: masked.key_paths,
+                    folder,
+                });
                 continue;
             };
-            let key_path = park::key_path(&id);
-            let reading = locations_reading(definitions, &self.readers, &parked_entry.origin.path);
-            let masked = mask::entry_read_by(location, &reading, &parked_entry.entry);
             self.entries.push(ScannedEntry {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
@@ -3356,17 +3470,15 @@ impl Scanner<'_> {
                 switch_id: None,
                 config_hash: None,
             });
-            parked.push(ScannedParked {
+            read.parked.push(ScannedParked {
                 key_path,
                 origin: parked_entry.origin.path,
                 origin_key_path: parked_entry.origin.key_path,
                 parked_at: parked_entry.parked_at,
-                folder: parked_entry
-                    .folder
-                    .map(|name| park::folders_path(&store).join(name)),
+                folder,
             });
         }
-        (Some(store), parked)
+        read
     }
 
     /// Adds the Entries of one location. `project` is the key of the Project

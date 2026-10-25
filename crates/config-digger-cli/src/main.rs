@@ -80,7 +80,10 @@ enum Command {
         selector: Option<String>,
         /// List the leftovers of missing Projects instead: the Entries that
         /// user files keep for a Project whose folder is gone, which the
-        /// Agent never reads. With --project, only that Project's.
+        /// Agent never reads. With --project, only that Project's. Then,
+        /// as a group of their own, the Stranded Entries: those config-digger
+        /// parked whose Agent definition, Agent home or location is no
+        /// longer found, which `remove` takes by their locator in the store.
         #[arg(long, conflicts_with = "selector")]
         leftovers: bool,
         /// Only the Items of this kind.
@@ -97,7 +100,8 @@ enum Command {
     /// Prints the preview, asks for confirmation, then backs up each touched
     /// file, writes, verifies and records the Operation in History. With
     /// --leftovers --project <PATH>, it Removes every leftover of that
-    /// missing Project as one Operation.
+    /// missing Project as one Operation; with --stranded, every Stranded
+    /// Entry `list --leftovers` lists.
     Remove(RemoveWrite),
     /// Disable Entries through each Agent's own machine-local switch, keeping them.
     ///
@@ -185,9 +189,9 @@ struct EntryWrite {
 struct RemoveWrite {
     /// Each one an Item name with a single Entry, or the
     /// `<path>#<key path>` locator of an Entry, such as a leftover's from
-    /// `list --leftovers`. Together they form one Operation, applied
-    /// entirely or not at all.
-    #[arg(required_unless_present = "leftovers")]
+    /// `list --leftovers`, or a Stranded Entry's in the parked-Entry store.
+    /// Together they form one Operation, applied entirely or not at all.
+    #[arg(required_unless_present_any = ["leftovers", "stranded"])]
     selectors: Vec<String>,
     /// Target every Entry of the one Item each selector names.
     #[arg(long)]
@@ -195,6 +199,10 @@ struct RemoveWrite {
     /// Target every leftover of the missing Project --project names.
     #[arg(long, conflicts_with_all = ["selectors", "all"])]
     leftovers: bool,
+    /// Target every Stranded Entry: those config-digger parked whose
+    /// origin is no longer found.
+    #[arg(long, conflicts_with_all = ["selectors", "all", "leftovers"])]
+    stranded: bool,
     #[command(flatten)]
     confirm: Confirm,
 }
@@ -544,6 +552,11 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             confirm,
             ..
         }) => remove_leftovers(cli, &core, confirm),
+        Command::Remove(RemoveWrite {
+            stranded: true,
+            confirm,
+            ..
+        }) => remove_stranded(cli, &core, confirm),
         Command::Remove(write) => {
             let targets = targets(&write.selectors, write.all);
             write_entries(cli, &core, Action::Remove, &targets, &write.confirm)
@@ -727,11 +740,29 @@ fn remove_leftovers(cli: &Cli, core: &Core, confirm: &Confirm) -> Result<(), Fai
     )
 }
 
-/// `list --leftovers --json`: the leftovers of each missing Project.
+/// `remove --stranded`: plans the Remove of every Stranded Entry, with no
+/// Project, then confirms and executes it.
+fn remove_stranded(cli: &Cli, core: &Core, confirm: &Confirm) -> Result<(), Failure> {
+    let scanned = scanned(cli, core)?;
+    let plan = core.plan_remove_stranded(&scanned.snapshot)?;
+    let width = terminal::output_width(cli.wide);
+    confirm_and_execute(
+        cli,
+        core,
+        plan,
+        Some(&context_line(None, width)),
+        &confirm.flags(),
+    )
+}
+
+/// `list --leftovers --json`: the leftovers of each missing Project, then
+/// the Stranded Entries.
 #[derive(Serialize)]
 struct LeftoversBody<'a> {
     leftovers: &'a [api::Leftovers],
+    stranded: &'a [api::Stranded],
     read_failures: &'a [api::ReadFailure],
+    store_read_failures: &'a [api::StoreReadFailure],
 }
 
 /// `list --leftovers`: the leftovers of every missing Project, or with
@@ -752,15 +783,80 @@ fn list_leftovers(cli: &Cli, core: &Core, width: Option<usize>) -> Result<(), Fa
     if !cli.include_hidden {
         leftovers = inventory.leftovers_without_hidden(leftovers);
     }
+    let stranded = core.stranded(&scanned.snapshot);
     if cli.json {
         print_json(&LeftoversBody {
             leftovers: &leftovers,
+            stranded: &stranded,
             read_failures: &inventory.read_failures,
+            store_read_failures: &inventory.store_read_failures,
         });
     } else {
         anstream::print!("{}", render_leftovers(inventory, &leftovers, width));
+        if !stranded.is_empty() {
+            anstream::print!("\n{}", render_stranded(&stranded, width));
+        }
     }
     Ok(())
+}
+
+/// The Stranded Entries, as a table of their own: each one's name, Kind,
+/// Agent, when it was parked and its locator in the store, then where it
+/// was parked from and why it is Stranded.
+fn render_stranded(stranded: &[api::Stranded], width: Option<usize>) -> String {
+    let mut out = styled_line("Stranded parked Entries", BOLD, width);
+    let header = [
+        ("NAME", DIM),
+        ("KIND", DIM),
+        ("AGENT", DIM),
+        ("PARKED", DIM),
+    ];
+    let kind = |kind: api::ItemKind| match kind {
+        api::ItemKind::Mcp => "mcp",
+        api::ItemKind::Skill => "skill",
+    };
+    let cells: Vec<[(&str, Style); 4]> = stranded
+        .iter()
+        .map(|one| {
+            [
+                (one.name.as_str(), Style::new()),
+                (kind(one.kind), Style::new()),
+                (one.agent_name.as_str(), Style::new()),
+                (one.parked_at.as_str(), Style::new()),
+            ]
+        })
+        .collect();
+    let widths = column_widths(&header, &cells);
+    let locator_width = last_column_width(&widths, width);
+    out.push_str(
+        &table_line(&header, &widths, "LOCATOR".to_owned(), DIM)
+            .fit(width)
+            .render(),
+    );
+    for (one, cells) in stranded.iter().zip(&cells) {
+        let locator = elide_locator(&one.locator, &one.path, locator_width);
+        out.push_str(
+            &table_line(cells, &widths, locator, Style::new())
+                .fit(width)
+                .render(),
+        );
+        let origin = &one.origin;
+        let project = origin
+            .project
+            .as_ref()
+            .map(|project| format!(", Project {}", project.display()))
+            .unwrap_or_default();
+        let from = format!(
+            "{INDENT}{INDENT}from home {}, location {}{project}: {}",
+            origin.home, origin.location, origin.locator
+        );
+        out.push_str(&plain_line(&from, width));
+        out.push_str(&plain_line(
+            &format!("{INDENT}{INDENT}{}", one.sentence),
+            width,
+        ));
+    }
+    out
 }
 
 /// The leftovers of each missing Project, as `list` prints a Project's
@@ -843,6 +939,9 @@ fn scanned(cli: &Cli, core: &Core) -> Result<Scanned, Failure> {
         for line in failure.notes.iter().chain(risks) {
             anstream::eprintln!("{INDENT}{line}");
         }
+    }
+    for failure in &inventory.store_read_failures {
+        anstream::eprintln!("{WARNING}warning:{WARNING:#} {}", failure.sentence);
     }
     for flag in &inventory.agent_flags {
         anstream::eprintln!("{WARNING}warning:{WARNING:#} {}", flag.sentence);
@@ -1500,7 +1599,10 @@ fn render_preview(
             out.push_str(&format!("{INDENT}{}\n", copy.display()));
         }
     } else {
-        out.push_str(&render_changes(&preview.changes, width));
+        // A Remove of Stranded Entries alone changes no State.
+        if !preview.changes.is_empty() {
+            out.push_str(&render_changes(&preview.changes, width));
+        }
         let sentence_width = width.map(|width| width.saturating_sub(INDENT.len()));
         for effective in &preview.effective {
             out.push('\n');

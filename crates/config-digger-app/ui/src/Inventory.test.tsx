@@ -169,7 +169,7 @@ describe("choosing a Project", () => {
 });
 
 function inventory(overrides: Partial<Inventory> = {}): Inventory {
-  return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], agent_flags: [], ...overrides };
+  return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], store_read_failures: [], agent_flags: [], ...overrides };
 }
 
 describe("a key on the closed Project field", () => {

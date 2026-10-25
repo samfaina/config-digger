@@ -3524,3 +3524,134 @@ fn definitions_loads_the_zed_acceptance_definition() {
         .unwrap_or_else(|| panic!("{document:#}"));
     assert_eq!(github["entries"][0]["state"], "effective");
 }
+
+/// The manifest of config-digger's parked-Entry store.
+fn parked_store(harness: &Harness) -> PathBuf {
+    harness
+        .local_app_data()
+        .join(r"config-digger\parked\manifest.json")
+}
+
+/// The store holding `linear`, a server parked from an Agent no definition
+/// is loaded for, so that it is Stranded.
+fn with_stranded_linear(harness: Harness) -> Harness {
+    let manifest = json!({ "entries": { "linear": {
+        "agent": "gone-agent",
+        "home": "default",
+        "location": "user",
+        "name": "linear",
+        "path": harness.path(r".gone\config.json"),
+        "key_path": ["mcpServers", "linear"],
+        "parked_at": "2026-10-01T12:00:00Z",
+        "entry": { "url": "https://mcp.linear.app/sse" },
+    } } });
+    let store = parked_store(&harness);
+    std::fs::create_dir_all(store.parent().unwrap()).unwrap();
+    std::fs::write(&store, manifest.to_string()).unwrap();
+    harness
+}
+
+#[test]
+fn list_leftovers_lists_the_stranded_entries_as_a_group_of_their_own() {
+    let harness = with_stranded_linear(with_missing_projects());
+    let in_store = locator(&parked_store(&harness), "entries.linear");
+
+    let json = harness.run(&["list", "--leftovers", "--json"]);
+    let text = harness.run(&["list", "--leftovers", "--wide"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let stranded = &json.document()["stranded"][0];
+    assert_eq!(stranded["name"], "linear");
+    assert_eq!(stranded["kind"], "mcp");
+    assert_eq!(stranded["agent_name"], "gone-agent");
+    assert_eq!(stranded["reason"], "no_definition");
+    assert_eq!(stranded["parked_at"], "2026-10-01T12:00:00Z");
+    assert_eq!(stranded["locator"], in_store.as_str());
+    assert_eq!(stranded["origin"]["home"], "default");
+    assert_eq!(stranded["config"]["url"], "••••");
+    let leftovers = text.stdout.find("(missing)").unwrap();
+    let group = text
+        .stdout
+        .find("Stranded parked Entries")
+        .unwrap_or_else(|| panic!("{}", text.stdout));
+    assert!(leftovers < group, "{}", text.stdout);
+    let rows = &text.stdout[group..];
+    assert!(rows.contains("linear"), "{rows}");
+    assert!(rows.contains("gone-agent"), "{rows}");
+    assert!(rows.contains(&in_store), "{rows}");
+    assert!(
+        rows.contains("no definition of the Agent `gone-agent` is loaded"),
+        "{rows}"
+    );
+}
+
+#[test]
+fn list_leftovers_says_so_when_no_entry_is_stranded() {
+    let harness = Harness::new();
+
+    let text = harness.run(&["list", "--leftovers"]);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert_eq!(text.stdout, "No missing Project has leftovers.\n");
+    let help = harness.run(&["list", "--help"]);
+    assert!(help.stdout.contains("Stranded"), "{}", help.stdout);
+}
+
+#[test]
+fn remove_stranded_removes_every_stranded_entry_and_undo_puts_them_back() {
+    let harness = with_stranded_linear(Harness::new());
+
+    let removed = harness.run(&["remove", "--stranded", "--yes", "--json"]);
+
+    assert_eq!(removed.code, 0, "{}", removed.stderr);
+    let document = removed.document();
+    assert_eq!(document["result"]["verify"], "verified");
+    assert_eq!(document["plan"]["title"], "Remove 1 Entry");
+    let left = harness.run(&["list", "--leftovers", "--json"]);
+    assert_eq!(left.document()["stranded"], json!([]));
+    let operation = document["result"]["operation"].as_str().unwrap();
+    let undone = harness.run(&["undo", operation, "--yes"]);
+    assert_eq!(undone.code, 0, "{}", undone.stderr);
+    let back = harness.run(&["list", "--leftovers", "--json"]);
+    assert_eq!(back.document()["stranded"][0]["name"], "linear");
+    let none = harness.run(&["remove", "--stranded", "--yes"]);
+    assert_eq!(none.code, 0, "{}", none.stderr);
+    let nothing = harness.run(&["remove", "--stranded", "--yes"]);
+    assert_eq!(nothing.code, 3, "{}", nothing.stderr);
+}
+
+#[test]
+fn a_stranded_entry_is_removed_by_its_locator_and_not_enabled() {
+    let harness = with_stranded_linear(Harness::new());
+    let in_store = locator(&parked_store(&harness), "entries.linear");
+
+    let enabled = harness.run(&["enable", &in_store, "--yes"]);
+    let by_name = harness.run(&["remove", "linear", "--yes"]);
+    let removed = harness.run(&["remove", &in_store, "--yes"]);
+
+    assert_eq!(enabled.code, 5, "{}", enabled.stderr);
+    assert!(enabled.stderr.contains("Stranded"), "{}", enabled.stderr);
+    assert_eq!(by_name.code, 3, "{}", by_name.stderr);
+    assert_eq!(removed.code, 0, "{}", removed.stderr);
+    let store: Value = serde_json::from_str(&read(&parked_store(&harness))).unwrap();
+    assert_eq!(store["entries"], json!({}));
+}
+
+#[test]
+fn an_unreadable_parked_entry_store_is_a_warning_on_stderr() {
+    let harness = Harness::new();
+    let store = parked_store(&harness);
+    std::fs::create_dir_all(store.parent().unwrap()).unwrap();
+    std::fs::write(&store, "{ not json").unwrap();
+
+    let run = harness.run(&["list", "--leftovers", "--json"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stderr.contains("cannot parse its parked-Entry store"),
+        "{}",
+        run.stderr
+    );
+    assert_eq!(run.document()["store_read_failures"][0]["kind"], "parse");
+    assert_eq!(read(&store), "{ not json");
+}

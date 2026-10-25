@@ -15,7 +15,7 @@ import type {
   State,
 } from "./bindings";
 import type { BusyAction } from "./busy";
-import type { HomeChoice, ItemRef } from "./view";
+import { KIND_NAMES, type HomeChoice, type ItemRef } from "./view";
 
 /** Hide, or Remove from list for what the user added and nothing discovers. */
 export type ListOffer = "hide" | "remove_from_list";
@@ -117,6 +117,38 @@ function leftoversOf(places: Places, path: string): string[] {
   const entries = (found?.items ?? []).filter(shown).flatMap((item) => item.entries);
   const locations = entries.map((entry) => `${entry.path} → ${entry.locator.slice(entry.path.length + 1)}`);
   return [...new Set(locations)];
+}
+
+/** A parked Entry whose origin is not found, which only Remove acts on. */
+export type StrandedRow = {
+  /** Its locator in the parked-Entry store, which Remove takes. */
+  locator: string;
+  name: string;
+  /** Such as "MCP server · Claude Desktop". */
+  sub: string;
+  /** Such as "From home msix, location user-mcp: <file> → mcpServers.notes". */
+  origin: string;
+  /** Why it is Stranded, as the core says it. */
+  sentence: string;
+  /** When it was parked, in RFC 3339. */
+  parkedAt: string;
+};
+
+/** The Stranded group of the Projects tab: each parked Entry whose origin is not found. */
+export function strandedRows(places: Places): StrandedRow[] {
+  return places.stranded.map((stranded) => {
+    const { origin } = stranded;
+    const project = origin.project === null ? "" : `, Project ${origin.project}`;
+    const where = origin.key_path.length === 0 ? origin.path : `${origin.path} → ${origin.locator.slice(origin.path.length + 1)}`;
+    return {
+      locator: stranded.locator,
+      name: stranded.name,
+      sub: `${KIND_NAMES[stranded.kind]} · ${stranded.agent_name}`,
+      origin: `From home ${origin.home}, location ${origin.location}${project}: ${where}`,
+      sentence: stranded.sentence,
+      parkedAt: stranded.parked_at,
+    };
+  });
 }
 
 /** `text` starting in lower case, to follow a separator. */

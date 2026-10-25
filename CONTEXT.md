@@ -100,6 +100,10 @@ _Avoid_: Partial, combined, partly Effective
 Said of an Entry that the Agent skips because it was Disabled, natively or by config-digger. When the Agent's mechanism works by name, every Entry of the Item is Disabled. A rule in a file the user writes, such as a deny list, or a setting that turns off everything it covers, Disables too; config-digger never lifts these, so Enable is not offered. The same rule in managed policy Blocks instead.
 _Avoid_: Off, inactive
 
+**Parked**:
+Said of a Disabled Entry that config-digger moved out of its Agent's reach into its own store, because the Agent has no native way to Disable it; Enable puts it back where it was parked from, its origin: an Agent, one of its Agent homes, a location and, when keyed to one, a Project. The store is never pruned.
+_Avoid_: Stashed, archived, moved
+
 **Partial switch**:
 A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note.
 _Avoid_: Partial disable, partly off
@@ -116,12 +120,16 @@ _Avoid_: Orphaned, stale, ignored
 An Unread Entry keyed to a missing Project in a user file, such as an MCP server under a Claude Code `projects["<path>"]` key. The leftovers of every missing Project are listed together and can be Removed in one Operation, or all of one Project's at once. Removing them never touches the Project's key itself, nor any trust it records.
 _Avoid_: Orphan, stale entry, remnant
 
+**Stranded**:
+Said of a Parked Entry whose origin config-digger cannot find: no definition of its Agent is loaded, its Agent home is not found, or its location is no longer in the definition. It has no State, since no Agent home holds it; it is listed apart, with the first of these reasons, and can only be Removed. It becomes Parked again once its origin is found.
+_Avoid_: Orphan, lost, dangling
+
 **Invalid**:
 Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, or Codex Entries that merge into a server with two transports, which stops the Agent from starting.
 _Avoid_: Broken, conflicting, error
 
 **Read failure**:
-A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect, or because it holds, where its Entries are, a value of a shape config-digger cannot enumerate, such as a list where servers should be. A file that cannot be opened, decoded or parsed is a Read failure for every location in it; a shape is one only for the location whose Entries it holds, so the other locations in the same file are still read. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry.
+A configuration location that, for one Agent, config-digger could not turn into Entries because it cannot be opened, decoded into text, or parsed in that Agent's dialect, or because it holds, where its Entries are, a value of a shape config-digger cannot enumerate, such as a list where servers should be. A file that cannot be opened, decoded or parsed is a Read failure for every location in it; a shape is one only for the location whose Entries it holds, so the other locations in the same file are still read. It contributes no Entries to that Agent and has no State; a missing location is not one, and a broken link is an Unread Linked Entry. config-digger's parked-Entry store is one too when it cannot be opened or parsed, and so is each Entry in it that does not read as a Parked Entry; config-digger never writes to the store because of one.
 _Avoid_: Unreadable, broken file, corrupt file, invalid file
 
 **Secret**:

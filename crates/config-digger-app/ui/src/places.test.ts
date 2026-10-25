@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { Agent, Entry, Home, Item, Leftovers, Places, Project } from "./bindings";
-import { changedSentence, changeBusy, homeGroups, inventoryStart, projectSections, rowOf } from "./places";
+import type { Agent, Entry, Home, Item, Leftovers, Places, Project, Stranded } from "./bindings";
+import { changedSentence, changeBusy, homeGroups, inventoryStart, projectSections, rowOf, strandedRows } from "./places";
 
 const CLAUDE_JSON = String.raw`C:\Users\me\.claude.json`;
 
@@ -48,6 +48,8 @@ function places(overrides: Partial<Places> = {}): Places {
     read_at: "2026-10-10T09:00:00Z",
     projects: [],
     leftovers: [],
+    stranded: [],
+    store_read_failures: [],
     agents: [agent(), agent({ id: "vscode", name: "VS Code", homes: [] })],
     ...overrides,
   };
@@ -232,6 +234,74 @@ describe("the Projects tab", () => {
   test("lists every Project with an empty search", () => {
     const all = places({ projects: [project(), project({ path: GONE, missing: true }), project({ path: String.raw`E:\x`, hidden: true })] });
     expect(projectSections(all, "")).toEqual(projectSections(all));
+  });
+});
+
+const STORE = String.raw`C:\Users\me\AppData\Local\config-digger\parked\manifest.json`;
+
+function stranded(overrides: Partial<Stranded> = {}): Stranded {
+  const config = String.raw`C:\Users\me\AppData\Roaming\Claude\claude_desktop_config.json`;
+  return {
+    name: "notes",
+    kind: "mcp",
+    agent: "claude-desktop",
+    agent_name: "Claude Desktop",
+    origin: {
+      home: "msix",
+      location: "user-mcp",
+      project: null,
+      path: config,
+      key_path: ["mcpServers", "notes"],
+      locator: `${config}#mcpServers.notes`,
+    },
+    reason: "home_not_found",
+    sentence: "Stranded: the Claude Desktop home `msix` is not found, so config-digger cannot put `notes` back.",
+    parked_at: "2026-10-01T12:00:00Z",
+    path: STORE,
+    key_path: ["entries", "notes"],
+    locator: `${STORE}#entries.notes`,
+    config: { command: "notes-mcp" },
+    masked: [],
+    ...overrides,
+  };
+}
+
+describe("the Stranded group", () => {
+  test("lists each Stranded Entry with its Kind, Agent, where it was parked from and why it is Stranded", () => {
+    const rows = strandedRows(
+      places({
+        stranded: [
+          stranded(),
+          stranded({
+            name: "review",
+            kind: "skill",
+            agent_name: "gone-agent",
+            origin: { ...stranded().origin, home: "default", location: "user-skills", project: String.raw`E:\code\shop` },
+          }),
+        ],
+      }),
+    );
+
+    expect(rows.map(({ locator, name, sub, origin }) => ({ locator, name, sub, origin }))).toEqual([
+      {
+        locator: `${STORE}#entries.notes`,
+        name: "notes",
+        sub: "MCP server · Claude Desktop",
+        origin: String.raw`From home msix, location user-mcp: C:\Users\me\AppData\Roaming\Claude\claude_desktop_config.json → mcpServers.notes`,
+      },
+      {
+        locator: `${STORE}#entries.notes`,
+        name: "review",
+        sub: "Skill · gone-agent",
+        origin: String.raw`From home default, location user-skills, Project E:\code\shop: C:\Users\me\AppData\Roaming\Claude\claude_desktop_config.json → mcpServers.notes`,
+      },
+    ]);
+    expect(rows[0].sentence).toContain("home `msix` is not found");
+    expect(rows[0].parkedAt).toBe("2026-10-01T12:00:00Z");
+  });
+
+  test("lists none without Stranded Entries", () => {
+    expect(strandedRows(places())).toEqual([]);
   });
 });
 

@@ -104,6 +104,50 @@ pub(crate) fn entry_read_by(
     masked
 }
 
+/// An Entry whose location is not known, with every text in it masked as a
+/// Secret, since nothing says where its Secrets are.
+pub(crate) fn every_text(value: &Value) -> Masked {
+    let mut masked = Masked {
+        value: value.clone(),
+        key_paths: Vec::new(),
+    };
+    text_leaves(value, &mut Vec::new(), &mut masked.key_paths);
+    for key_path in &masked.key_paths {
+        let leaf = key_path
+            .iter()
+            .try_fold(&mut masked.value, |value, key| match value {
+                Value::Object(object) => object.get_mut(key),
+                Value::Array(array) => array.get_mut(key.parse::<usize>().ok()?),
+                _ => None,
+            })
+            .expect("a text's key path is in the value");
+        *leaf = Value::from(MASK);
+    }
+    masked
+}
+
+/// The key paths below `value`, which is at `at`, of every text in it.
+fn text_leaves(value: &Value, at: &mut Vec<String>, found: &mut Vec<Vec<String>>) {
+    match value {
+        Value::String(_) => found.push(at.clone()),
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                at.push(index.to_string());
+                text_leaves(item, at, found);
+                at.pop();
+            }
+        }
+        Value::Object(object) => {
+            for (key, item) in object {
+                at.push(key.clone());
+                text_leaves(item, at, found);
+                at.pop();
+            }
+        }
+        _ => {}
+    }
+}
+
 /// The Secrets a location's definition marks outside its Entries in a file
 /// whose whole value is `document`: each one's key path from the root of the
 /// file and its masked value.

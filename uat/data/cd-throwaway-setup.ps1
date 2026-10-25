@@ -120,6 +120,16 @@ Write-TestFile "$Root\claude-desktop-home\claude_desktop_config.json" @"
 }
 "@
 
+# A second Claude Desktop home: its server, once parked, is Stranded when the
+# home is forgotten.
+Write-TestFile "$Root\claude-desktop-stranded-home\claude_desktop_config.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-stranded": { "command": "npx", "args": ["-y", "cd-throwaway-stranded"], "env": { "API_TOKEN": "not-a-real-secret" } }
+  }
+}
+"@
+
 # A Claude Code home whose Project servers are a list, which fails only that
 # location: the user server is still read.
 Write-TestFile "$Root\claude-code-shape-home\.claude.json" @"

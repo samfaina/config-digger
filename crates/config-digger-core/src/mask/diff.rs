@@ -305,14 +305,11 @@ fn parked_spans(
                     .collect()
             }
             // Nothing says where its Secrets are, so every text is one.
-            None => {
-                let mut texts = Vec::new();
-                text_leaves(value, &mut Vec::new(), &mut texts);
-                texts
-                    .into_iter()
-                    .map(|relative| (relative, Value::from(super::MASK)))
-                    .collect()
-            }
+            None => super::every_text(value)
+                .key_paths
+                .into_iter()
+                .map(|relative| (relative, Value::from(super::MASK)))
+                .collect(),
         };
         for (relative, secret) in masked {
             let mut key_path = at.clone();
@@ -328,28 +325,6 @@ fn parked_spans(
         spans.push((span, edit::string_literal(Syntax::Jsonc, secret)));
     }
     Ok(spans)
-}
-
-/// The key paths below `value`, which is at `at`, of every text in it.
-fn text_leaves(value: &Value, at: &mut Vec<String>, found: &mut Vec<Vec<String>>) {
-    match value {
-        Value::String(_) => found.push(at.clone()),
-        Value::Array(items) => {
-            for (index, item) in items.iter().enumerate() {
-                at.push(index.to_string());
-                text_leaves(item, at, found);
-                at.pop();
-            }
-        }
-        Value::Object(object) => {
-            for (key, item) in object {
-                at.push(key.clone());
-                text_leaves(item, at, found);
-                at.pop();
-            }
-        }
-        _ => {}
-    }
 }
 
 fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {

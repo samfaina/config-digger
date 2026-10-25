@@ -18,7 +18,7 @@ const project: Project = {
   hidden: true,
   entries: 0,
 };
-const places: Places = { read_at: "2026-10-20T09:00:00Z", projects: [project], leftovers: [], agents: [] };
+const places: Places = { read_at: "2026-10-20T09:00:00Z", projects: [project], leftovers: [], stranded: [], store_read_failures: [], agents: [] };
 
 /** A screen whose list changes answer when the test tells them to, with what it showed. */
 function screen() {

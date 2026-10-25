@@ -159,22 +159,34 @@ fn entries(document: &Value) -> Option<&Map<String, Value>> {
     document.get(ENTRIES).and_then(Value::as_object)
 }
 
-/// Every parked Entry the manifest `document` holds, by id. One that does
-/// not read as a parked Entry is left out, and logged without its value.
-pub(crate) fn parked_entries(document: &Value) -> Vec<(String, ParkedEntry)> {
-    entries(document)
-        .into_iter()
-        .flatten()
-        .filter_map(
-            |(id, parked)| match serde_json::from_value(parked.clone()) {
-                Ok(parked) => Some((id.clone(), parked)),
-                Err(_) => {
-                    tracing::warn!(%id, "cannot read a parked Entry");
-                    None
-                }
-            },
-        )
-        .collect()
+/// What a manifest holds, as [`parked_entries`] reads it.
+#[derive(Default)]
+pub(crate) struct Held {
+    /// Every parked Entry, by id.
+    pub parked: Vec<(String, ParkedEntry)>,
+    /// The ids of the Entries that do not read as parked Entries.
+    pub unreadable: Vec<String>,
+}
+
+/// Every Entry the manifest `document` holds, one that does not read as a
+/// parked Entry logged without its value. `None` when the manifest is not
+/// an object, or holds something else than an object where its Entries are.
+pub(crate) fn parked_entries(document: &Value) -> Option<Held> {
+    let entries = match document.get(ENTRIES) {
+        None if document.is_object() => return Some(Held::default()),
+        entries => entries?.as_object()?,
+    };
+    let mut held = Held::default();
+    for (id, parked) in entries {
+        match serde_json::from_value(parked.clone()) {
+            Ok(parked) => held.parked.push((id.clone(), parked)),
+            Err(_) => {
+                tracing::warn!(%id, "cannot read a parked Entry");
+                held.unreadable.push(id.clone());
+            }
+        }
+    }
+    Some(held)
 }
 
 /// The ids of the parked Entries the manifest `document` holds, read or not.

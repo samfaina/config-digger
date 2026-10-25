@@ -2324,6 +2324,7 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [],
+        "store_read_failures": [],
         "agent_flags": []
       }
     },
@@ -4911,6 +4912,7 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [],
+        "store_read_failures": [],
         "agent_flags": []
       }
     },
@@ -7354,6 +7356,7 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [],
+        "store_read_failures": [],
         "agent_flags": []
       }
     }
@@ -8558,6 +8561,51 @@ export const fixtures: Fixtures = {
         ]
       }
     ],
+    "stranded": [
+      {
+        "name": "cd-throwaway-stranded",
+        "kind": "mcp",
+        "agent": "claude-desktop",
+        "agent_name": "Claude Desktop",
+        "origin": {
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "location": "user-mcp",
+          "project": null,
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "key_path": [
+            "mcpServers",
+            "cd-throwaway-stranded"
+          ],
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded"
+        },
+        "reason": "home_not_found",
+        "sentence": "Stranded: the Claude Desktop home `E:\\cd-throwaway\\claude-desktop-stranded-home` is not found, so config-digger cannot put `cd-throwaway-stranded` back into E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json; it can only be Removed.",
+        "parked_at": "2026-10-01T12:00:00Z",
+        "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+        "key_path": [
+          "entries",
+          "cd-throwaway-stranded"
+        ],
+        "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-stranded",
+        "config": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "cd-throwaway-stranded"
+          ],
+          "env": {
+            "API_TOKEN": "••••"
+          }
+        },
+        "masked": [
+          [
+            "env",
+            "API_TOKEN"
+          ]
+        ]
+      }
+    ],
+    "store_read_failures": [],
     "agents": [
       {
         "id": "claude-code",
@@ -8685,7 +8733,7 @@ export const fixtures: Fixtures = {
         "built_in": true,
         "tested": {
           "min": "1.129.1",
-          "max": "1.129.1"
+          "max": "1.141.0"
         },
         "home_variables": [],
         "homes": []
@@ -8695,8 +8743,8 @@ export const fixtures: Fixtures = {
         "name": "Cursor",
         "built_in": true,
         "tested": {
-          "min": "3.22.12",
-          "max": "3.22.12"
+          "min": "3.27.12",
+          "max": "3.27.12"
         },
         "home_variables": [],
         "homes": []
@@ -9978,6 +10026,8 @@ export const fixtures: Fixtures = {
           ]
         }
       ],
+      "stranded": [],
+      "store_read_failures": [],
       "agents": [
         {
           "id": "claude-code",
@@ -10105,7 +10155,7 @@ export const fixtures: Fixtures = {
           "built_in": true,
           "tested": {
             "min": "1.129.1",
-            "max": "1.129.1"
+            "max": "1.141.0"
           },
           "home_variables": [],
           "homes": []
@@ -10115,8 +10165,8 @@ export const fixtures: Fixtures = {
           "name": "Cursor",
           "built_in": true,
           "tested": {
-            "min": "3.22.12",
-            "max": "3.22.12"
+            "min": "3.27.12",
+            "max": "3.27.12"
           },
           "home_variables": [],
           "homes": []
@@ -10203,7 +10253,33 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-690",
+      "id": "20261001-120000-651",
+      "created_at": "2026-10-01T12:00:00Z",
+      "action": "disable",
+      "title": "Disable 1 Entry",
+      "status": "applied",
+      "status_text": "Applied",
+      "cause": null,
+      "needs_attention": false,
+      "undo_of": null,
+      "undone_by": null,
+      "backup_deleted": false,
+      "backup_deletable": true,
+      "agents": [
+        "Claude Desktop"
+      ],
+      "entries": [
+        "cd-throwaway-stranded"
+      ],
+      "locations": [
+        "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+        "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
+      ],
+      "undoable": true,
+      "not_undoable": null
+    },
+    {
+      "id": "20261001-120000-229",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10225,11 +10301,11 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
-      "undoable": true,
-      "not_undoable": null
+      "undoable": false,
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229"
     },
     {
-      "id": "20261001-120000-411",
+      "id": "20261001-120000-09c",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10257,7 +10333,493 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-690",
+        "id": "20261001-120000-651",
+        "created_at": "2026-10-01T12:00:00Z",
+        "action": "disable",
+        "title": "Disable 1 Entry",
+        "status": "applied",
+        "status_text": "Applied",
+        "cause": null,
+        "needs_attention": false,
+        "undo_of": null,
+        "undone_by": null,
+        "backup_deleted": false,
+        "backup_deletable": true,
+        "agents": [
+          "Claude Desktop"
+        ],
+        "entries": [
+          "cd-throwaway-stranded"
+        ],
+        "locations": [
+          "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
+        ],
+        "undoable": true,
+        "not_undoable": null
+      },
+      "project": null,
+      "changes": [
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": null,
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-01",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-02",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-03",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-04",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-05",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-06",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-07",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-08",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-09",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-10",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-11",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-12",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-13",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-14",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-15",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-16",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-17",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-18",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-19",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-20",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-21",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-22",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-23",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-24",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-25",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-26",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-27",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-28",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-29",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-30",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\many\\project-gone",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\project",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\project-deleted",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\project-extra",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\project-gone",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\project-hide",
+          "before": "effective",
+          "after": "disabled"
+        }
+      ],
+      "locations": [
+        {
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651\\1-claude_desktop_config.json",
+          "edits": [
+            {
+              "op": "remove",
+              "key_path": [
+                "mcpServers",
+                "cd-throwaway-stranded"
+              ]
+            }
+          ],
+          "diff": {
+            "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+            "diff": null,
+            "diff_unavailable": "no_reader",
+            "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json`, so nothing says where its Secrets are; 3 lines differ.",
+            "changed_lines": 3
+          }
+        },
+        {
+          "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651\\2-manifest.json",
+          "edits": [
+            {
+              "op": "set",
+              "key_path": [
+                "entries",
+                "cd-throwaway-stranded"
+              ]
+            }
+          ],
+          "diff": {
+            "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -16,6 +16,26 @@\n         \"command\": \"npx\",\n         \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n       }\n+    },\n+    \"cd-throwaway-stranded\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-stranded\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n+        \"env\": {\n+          \"API_TOKEN\": \"••••\"\n+        }\n+      }\n     }\n   }\n }\n",
+            "diff_unavailable": null,
+            "diff_note": null,
+            "changed_lines": 20
+          }
+        }
+      ],
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651",
+      "cause": null,
+      "rollback": [],
+      "verify": "verified",
+      "differences": [],
+      "undo_refusal": null
+    },
+    {
+      "summary": {
+        "id": "20261001-120000-229",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -10279,8 +10841,8 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
-        "undoable": true,
-        "not_undoable": null
+        "undoable": false,
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229"
       },
       "project": null,
       "changes": [
@@ -10695,7 +11257,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-690\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -10733,16 +11295,31 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-690",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
-      "undo_refusal": null
+      "undo_refusal": {
+        "code": "undo_refused",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229",
+        "candidates": [],
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229",
+        "diffs": [
+          {
+            "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -0,0 +1,41 @@\n+{\n+  \"entries\": {\n+    \"cd-throwaway-desktop\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-desktop\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n+      }\n+    },\n+    \"cd-throwaway-stranded\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-stranded\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n+        \"env\": {\n+          \"API_TOKEN\": \"••••\"\n+        }\n+      }\n+    }\n+  }\n+}\n",
+            "diff_unavailable": null,
+            "diff_note": null,
+            "changed_lines": 41
+          }
+        ],
+        "failed": null
+      }
     },
     {
       "summary": {
-        "id": "20261001-120000-411",
+        "id": "20261001-120000-09c",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11179,7 +11756,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -11199,7 +11776,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -11219,10 +11796,21 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-411",
+          "operation": "20261001-120000-09c",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c\\1-config.toml"
+        }
+      ]
+    },
+    {
+      "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+      "backups": [
+        {
+          "operation": "20261001-120000-651",
+          "created_at": "2026-10-01T12:00:00Z",
+          "title": "Disable 1 Entry",
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651\\2-manifest.json"
         }
       ]
     }
@@ -11236,7 +11824,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-3",
+        "plan_id": "plan-4",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11301,7 +11889,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-4",
+        "plan_id": "plan-5",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11366,7 +11954,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-5",
+        "plan_id": "plan-6",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11431,7 +12019,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-6",
+        "plan_id": "plan-7",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11496,7 +12084,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-7",
+        "plan_id": "plan-8",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11561,7 +12149,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-8",
+        "plan_id": "plan-9",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11626,7 +12214,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-9",
+        "plan_id": "plan-10",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11691,7 +12279,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-10",
+        "plan_id": "plan-11",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11756,7 +12344,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-11",
+        "plan_id": "plan-12",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11821,7 +12409,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-12",
+        "plan_id": "plan-13",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11886,7 +12474,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-13",
+        "plan_id": "plan-14",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -11951,7 +12539,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-14",
+        "plan_id": "plan-15",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12016,7 +12604,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-15",
+        "plan_id": "plan-16",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12081,7 +12669,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-16",
+        "plan_id": "plan-17",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12146,7 +12734,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-17",
+        "plan_id": "plan-18",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12211,7 +12799,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-18",
+        "plan_id": "plan-19",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12276,7 +12864,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-19",
+        "plan_id": "plan-20",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12341,7 +12929,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-20",
+        "plan_id": "plan-21",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12406,7 +12994,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-21",
+        "plan_id": "plan-22",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12471,7 +13059,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-22",
+        "plan_id": "plan-23",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12536,7 +13124,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-23",
+        "plan_id": "plan-24",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12601,7 +13189,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-24",
+        "plan_id": "plan-25",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12666,7 +13254,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-25",
+        "plan_id": "plan-26",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12731,7 +13319,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-26",
+        "plan_id": "plan-27",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12796,7 +13384,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-27",
+        "plan_id": "plan-28",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12861,7 +13449,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-28",
+        "plan_id": "plan-29",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12926,7 +13514,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-29",
+        "plan_id": "plan-30",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -12991,7 +13579,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-30",
+        "plan_id": "plan-31",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13056,7 +13644,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-31",
+        "plan_id": "plan-32",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13121,7 +13709,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-32",
+        "plan_id": "plan-33",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13186,7 +13774,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-33",
+        "plan_id": "plan-34",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13251,7 +13839,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-34",
+        "plan_id": "plan-35",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13307,7 +13895,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-35",
+        "plan_id": "plan-36",
         "preview": {
           "action": "enable",
           "title": "Enable 1 Entry",
@@ -13774,10 +14362,10 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,21 +1,3 @@\n {\n-  \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    }\n-  }\n+  \"entries\": {}\n }\n",
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
               "diff_unavailable": null,
               "diff_note": null,
-              "changed_lines": 19
+              "changed_lines": 17
             }
           ],
           "folders": [],
@@ -13811,7 +14399,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-36",
+        "plan_id": "plan-37",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13853,10 +14441,10 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,21 +1,3 @@\n {\n-  \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    }\n-  }\n+  \"entries\": {}\n }\n",
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
               "diff_unavailable": null,
               "diff_note": null,
-              "changed_lines": 19
+              "changed_lines": 17
             }
           ],
           "folders": [],
@@ -13876,7 +14464,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-37",
+        "plan_id": "plan-38",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -13941,7 +14529,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-38",
+        "plan_id": "plan-39",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -14018,7 +14606,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-39",
+        "plan_id": "plan-40",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14099,7 +14687,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-40",
+        "plan_id": "plan-41",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -14195,7 +14783,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-41",
+        "plan_id": "plan-42",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14262,7 +14850,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-42",
+        "plan_id": "plan-43",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -14339,7 +14927,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-43",
+        "plan_id": "plan-44",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14406,7 +14994,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-44",
+        "plan_id": "plan-45",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -14502,7 +15090,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-45",
+        "plan_id": "plan-46",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14576,7 +15164,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\many\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-46",
+        "plan_id": "plan-47",
         "preview": {
           "action": "remove",
           "title": "Remove 12 Entries",
@@ -14861,7 +15449,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-47",
+        "plan_id": "plan-48",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14922,462 +15510,140 @@ export const fixtures: Fixtures = {
     },
     {
       "request": {
-        "kind": "undo",
-        "operation": "20261001-120000-690"
+        "kind": "entry",
+        "verb": "remove",
+        "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-stranded",
+        "project": null
       },
       "preview": {
-        "plan_id": "plan-48",
+        "plan_id": "plan-49",
         "preview": {
-          "action": "undo",
-          "title": "Undo 20261001-120000-690 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-690",
+          "action": "remove",
+          "title": "Remove 1 Entry",
+          "undo_of": null,
           "backup_of": null,
           "project": null,
-          "changes": [
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": null,
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-01",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-02",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-03",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-04",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-05",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-06",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-07",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-08",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-09",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-10",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-11",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-12",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-13",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-14",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-15",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-16",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-17",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-18",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-19",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-20",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-21",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-22",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-23",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-24",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-25",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-26",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-27",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-28",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-29",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-30",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\many\\project-gone",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\project",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\project-deleted",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\project-extra",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\project-gone",
-              "before": "disabled",
-              "after": "effective"
-            },
-            {
-              "agent": "claude-desktop",
-              "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "project": "E:\\cd-throwaway\\project-hide",
-              "before": "disabled",
-              "after": "effective"
-            }
-          ],
-          "effective": [
-            {
-              "agent": "claude-desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "item": "cd-throwaway-desktop",
-              "before": null,
-              "after": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "sentence": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop becomes Effective for cd-throwaway-desktop in Claude Desktop.",
-              "built_before": null,
-              "built_after": null
-            }
-          ],
+          "changes": [],
+          "effective": [],
           "info": [
             {
-              "code": "no_installation_found",
-              "path": "E:\\cd-throwaway\\claude-desktop-home",
-              "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              "code": "removes_stranded",
+              "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+              "sentence": "Removes the Stranded Entry `cd-throwaway-stranded` of Claude Desktop, parked from E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded, from config-digger's parked-Entry store; no Agent reads it, so no State changes."
             }
           ],
           "files": [
             {
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+              "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
               "git_versioned": false,
-              "store_class": "rewritten-while-running",
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "entries",
+                    "cd-throwaway-stranded"
+                  ]
+                }
+              ],
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -16,26 +16,6 @@\n         \"command\": \"npx\",\n         \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n       }\n-    },\n-    \"cd-throwaway-stranded\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-stranded\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n-        \"env\": {\n-          \"API_TOKEN\": \"••••\"\n-        }\n-      }\n     }\n   }\n }\n",
+              "diff_unavailable": null,
+              "diff_note": null,
+              "changed_lines": 20
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "stranded"
+      },
+      "preview": {
+        "plan_id": "plan-50",
+        "preview": {
+          "action": "remove",
+          "title": "Remove 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": null,
+          "changes": [],
+          "effective": [],
+          "info": [
+            {
+              "code": "removes_stranded",
+              "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+              "sentence": "Removes the Stranded Entry `cd-throwaway-stranded` of Claude Desktop, parked from E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded, from config-digger's parked-Entry store; no Agent reads it, so no State changes."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+              "git_versioned": false,
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "entries",
+                    "cd-throwaway-stranded"
+                  ]
+                }
+              ],
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -16,26 +16,6 @@\n         \"command\": \"npx\",\n         \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n       }\n-    },\n-    \"cd-throwaway-stranded\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-stranded\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n-        \"env\": {\n-          \"API_TOKEN\": \"••••\"\n-        }\n-      }\n     }\n   }\n }\n",
+              "diff_unavailable": null,
+              "diff_note": null,
+              "changed_lines": 20
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "undo",
+        "operation": "20261001-120000-651"
+      },
+      "preview": {
+        "plan_id": "plan-51",
+        "preview": {
+          "action": "undo",
+          "title": "Undo 20261001-120000-651 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-651",
+          "backup_of": null,
+          "project": null,
+          "changes": [],
+          "effective": [],
+          "info": [],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+              "git_versioned": false,
+              "store_class": "plain",
               "edits": [
                 {
                   "op": "insert",
                   "key_path": [
                     "mcpServers",
-                    "cd-throwaway-desktop"
+                    "cd-throwaway-stranded"
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n+++ b/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n@@ -1,3 +1,3 @@\n {\n-  \"mcpServers\": {}\n+  \"mcpServers\": { \"cd-throwaway-desktop\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-desktop\"] } }\n }\n\\ No newline at end of file\n",
-              "diff_unavailable": null,
-              "diff_note": null,
+              "diff": null,
+              "diff_unavailable": "no_reader",
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json`, so nothing says where its Secrets are; 1 line differs.",
               "changed_lines": 1
             },
             {
@@ -15388,14 +15654,15 @@ export const fixtures: Fixtures = {
                 {
                   "op": "remove",
                   "key_path": [
-                    "entries"
+                    "entries",
+                    "cd-throwaway-stranded"
                   ]
                 }
               ],
               "diff": null,
               "diff_unavailable": "no_reader",
-              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json`, so nothing says where its Secrets are; 21 lines differ.",
-              "changed_lines": 21
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json`, so nothing says where its Secrets are; 20 lines differ.",
+              "changed_lines": 20
             }
           ],
           "folders": [],
@@ -15410,15 +15677,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-690"
+        "operation": "20261001-120000-651"
       },
       "preview": {
-        "plan_id": "plan-49",
+        "plan_id": "plan-52",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-690 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-651 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-690",
+          "backup_of": "20261001-120000-651",
           "project": null,
           "changes": [],
           "effective": [],
@@ -15426,10 +15693,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-690\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-690",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-690 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-651",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-651 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -15438,15 +15706,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-411"
+        "operation": "20261001-120000-229"
       },
       "preview": {
-        "plan_id": "plan-50",
+        "plan_id": "plan-53",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-411 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-229 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-411",
+          "backup_of": "20261001-120000-229",
           "project": null,
           "changes": [],
           "effective": [],
@@ -15454,10 +15722,38 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-411 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-229",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-229 can no longer be undone."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "delete_backup",
+        "operation": "20261001-120000-09c"
+      },
+      "preview": {
+        "plan_id": "plan-54",
+        "preview": {
+          "action": "delete_backup",
+          "title": "Delete the backup of 20261001-120000-09c \"Disable 1 Entry\"",
+          "undo_of": null,
+          "backup_of": "20261001-120000-09c",
+          "project": null,
+          "changes": [],
+          "effective": [],
+          "info": [],
+          "files": [],
+          "folders": [],
+          "deleted": [
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c\\1-config.toml"
+          ],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-09c can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -15467,11 +15763,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-411",
+      "operation": "20261001-120000-09c",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-411",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-411: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-09c",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-09c: verified.",
       "hints": []
     }
   },
@@ -15485,7 +15781,7 @@ export const fixtures: Fixtures = {
       "logs": "E:\\cd-throwaway\\localappdata\\config-digger\\logs",
       "lists": "E:\\cd-throwaway\\appdata\\config-digger"
     },
-    "operations": 2,
+    "operations": 3,
     "retention": {
       "operations": 50,
       "days": 30
@@ -15519,8 +15815,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "eaa45f2",
-    "date": "2026-10-24",
+    "commit": "ed2e918",
+    "date": "2026-10-25",
     "platform": "Windows x64",
     "pages": [
       {

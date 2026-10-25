@@ -1,8 +1,9 @@
 // Section 10: the Projects & homes screen, with real list changes on the
 // throwaway profile.
+import { dirname, join } from "node:path";
 import { KEY, unwrap } from "../driver.mjs";
 import { buttonEl, choose, go, notices, panel, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
-import { addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, operationId, pickFolder, waitPreview } from "./common.mjs";
+import { act, addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
 
 // The Projects tab, as groups: each heading's text, whether it is open, and
@@ -542,6 +543,83 @@ export default [
       t.check(inGroup(await projectGroups(s), "Projects", hide), "Unhide devuelve project-hide a la lista principal");
       await tab(s, "Agent homes");
       t.check(!(await s.exec("return !!document.querySelector('input[aria-label=\"Search Projects\"]')")), "la pestaña Agent homes no tiene caja de búsqueda");
+    },
+  },
+  {
+    id: "10.18",
+    note: "La orden corre con el CLI que va junto a la app, sobre el perfil de prueba.",
+    async run(t) {
+      const { s } = t;
+      const home = `${t.root}\\claude-desktop-stranded-home`;
+      const name = "cd-throwaway-stranded";
+      await addHome(t, "Claude Desktop", home, { checks: false });
+      await inventoryOf(t, "Claude Desktop", "claude-desktop-stranded-home");
+      await openItem(t, name);
+      await act(t, "Disable");
+      await done(s);
+      await go(s, "Projects & homes");
+      await tab(s, "Agent homes");
+      await s.click(await s.until(() => rowButton(s, home, "Remove from list"), { what: "Remove from list" }));
+      await waitNotice(s, `Removed ${home}`);
+      await tab(s, "Projects");
+      const group = (groups) => groups.find((g) => g.title.startsWith("Stranded · "));
+      const stranded = await s.until(async () => group(await projectGroups(s)) ?? null, { what: "the Stranded group" }).catch(() => null);
+      const row = stranded?.rows.find((r) => r.name === name);
+      t.check(stranded?.title.startsWith("Stranded · 1") && row, `tras Remove from list, el grupo «Stranded · 1» muestra «${name}»`, stranded?.title);
+      t.check(row?.sub.startsWith("MCP server · Claude Desktop · parked "), "su fila dice «MCP server · Claude Desktop» y la fecha en que se aparcó", row?.sub);
+      const text = await s.exec(
+        `return [...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0])?.innerText ?? "";`,
+        name,
+      );
+      const reason = `the Claude Desktop home \`${home}\` is not found`;
+      t.check(text.includes(reason), `su fila dice «${reason}»`, text);
+      const remove = await rowButton(s, name, "Remove");
+      const removeClass = remove ? await s.attr(remove, "class") : "";
+      t.check(removeClass.includes("danger") && (await buttonEl(s, "Remove all", ".places")), "su fila tiene un botón «Remove» rojo, y el grupo un botón «Remove all»", removeClass);
+      await t.shot("stranded", "el grupo Stranded con su fila, el Remove rojo y el Remove all");
+
+      const cli = join(dirname(t.app), "config-digger.exe");
+      const out = t.ps(`& '${cli}' --color never list --leftovers --wide`);
+      const listed = out.slice(out.indexOf("Stranded parked Entries"));
+      t.check(
+        out.includes("Stranded parked Entries") && listed.split(/\r?\n/).some((l) => l.includes(name) && l.includes("Claude Desktop")),
+        `la orden imprime, tras los leftovers, el grupo «Stranded parked Entries» con una fila de «${name}» y «Claude Desktop»`,
+        listed.split(/\r?\n/).slice(0, 3).join(" | "),
+      );
+
+      await s.click(remove);
+      const d = await waitPreview(s);
+      t.eq(d.title, "Remove 1 Entry", "el diálogo de Remove se titula «Remove 1 Entry»");
+      const removes = `Removes the Stranded Entry \`${name}\` of Claude Desktop`;
+      t.check(d.text.includes(removes), `el diálogo dice «${removes}»`, d.text.split("\n").find((l) => l.includes("Stranded")));
+      const result = await confirm(s, "Remove");
+      const operation = operationId(result.text);
+      await done(s);
+      const gone = await s.until(async () => (group(await projectGroups(s)) ? null : true), { what: "the Stranded group gone" }).catch(() => false);
+      t.check(gone, "tras Remove, el grupo «Stranded» ya no sale");
+
+      await go(s, "History · Undo");
+      const op = await s.until(
+        () => s.exec(`return [...document.querySelectorAll(".operation-row")].find((r) => r.querySelector(".operation-meta")?.textContent.includes("Operation " + arguments[0])) ?? null;`, operation).then(unwrap),
+        { what: `the Operation ${operation}` },
+      );
+      await s.click(op);
+      await s.until(() => s.exec("return !!document.querySelector('.history-detail .history-body') && !/Reading what it changed/.test(document.querySelector('.history-detail').innerText)"), { what: "the detail" });
+      await press(s, "Undo", ".history-detail .dialog-foot");
+      await waitPreview(s);
+      await confirm(s, "Undo");
+      await done(s);
+      await go(s, "Projects & homes");
+      await tab(s, "Projects");
+      const back = await s.until(async () => group(await projectGroups(s)) ?? null, { what: "the Stranded group back" }).catch(() => null);
+      t.check(back?.title.startsWith("Stranded · 1") && back.rows.some((r) => r.name === name), `tras el Undo, el grupo «Stranded · 1» vuelve con «${name}»`, back?.title);
+
+      await press(s, "Remove all", ".places");
+      await waitPreview(s);
+      await confirm(s, "Remove");
+      await done(s);
+      const cleared = await s.until(async () => (group(await projectGroups(s)) ? null : true), { what: "the Stranded group gone" }).catch(() => false);
+      t.check(cleared, "tras Remove all, el grupo «Stranded» ya no sale");
     },
   },
 ];

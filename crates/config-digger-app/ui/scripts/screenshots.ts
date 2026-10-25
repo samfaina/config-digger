@@ -100,6 +100,21 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "projects-stranded",
+    steps: async (page) => {
+      await rail(page, "Projects & homes");
+      await page.getByRole("heading", { name: /^Stranded · / }).scrollIntoViewIfNeeded();
+    },
+  },
+  {
+    name: "action-dialog-stranded",
+    steps: async (page) => {
+      await rail(page, "Projects & homes");
+      await page.getByRole("button", { name: "Remove all" }).click();
+      await page.getByRole("dialog").getByText("Removes the Stranded Entry", { exact: false }).waitFor();
+    },
+  },
+  {
     name: "projects-homes",
     steps: async (page) => {
       await rail(page, "Projects & homes");

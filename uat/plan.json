@@ -788,6 +788,46 @@
             "La pestaña Agent homes no tiene caja de búsqueda."
           ],
           "covers": ["#224", "#319"]
+        },
+        {
+          "id": "10.18",
+          "title": "Un server aparcado cuyo Agent home ya no está",
+          "goal": "Un server que config-digger aparcó sale aparte, como Stranded, en la app y en el CLI cuando su Agent home ya no está; su Remove se deshace con Undo y Remove all lo quita en una sola Operation.",
+          "instructions": [
+            "Ve a Projects & homes y abre la pestaña Agent homes.",
+            "Pulsa Add Agent home, elige Claude Desktop, elige la carpeta E:\\cd-throwaway\\claude-desktop-stranded-home y pulsa Add.",
+            "En la fila de E:\\cd-throwaway\\claude-desktop-stranded-home, pulsa Show in Inventory.",
+            "Elige el servidor cd-throwaway-stranded y pulsa Disable en Details.",
+            "En el diálogo, marca los avisos si los hay, pulsa Disable y luego Done.",
+            "Vuelve a Projects & homes, abre la pestaña Agent homes y, en la fila de E:\\cd-throwaway\\claude-desktop-stranded-home, pulsa Remove from list.",
+            "Abre la pestaña Projects y baja hasta el grupo Stranded.",
+            "Abre una ventana de PowerShell y ejecuta la orden.",
+            "En la fila de cd-throwaway-stranded, pulsa Remove.",
+            "Mira el diálogo, pulsa Remove y luego Done.",
+            "Ve a History · Undo, elige la Operation «Remove 1 Entry» de arriba, pulsa Undo, luego Undo en el diálogo y Done.",
+            "Vuelve a Projects & homes, abre la pestaña Projects y baja hasta el grupo Stranded.",
+            "Pulsa Remove all, luego Remove en el diálogo y Done."
+          ],
+          "commands": [
+            {
+              "label": "Listar los leftovers y las Entries Stranded",
+              "shell": "powershell",
+              "text": "config-digger list --leftovers --wide"
+            }
+          ],
+          "expect": [
+            "Tras Remove from list, el grupo «Stranded · 1» muestra «cd-throwaway-stranded».",
+            "Su fila dice «MCP server · Claude Desktop» y la fecha en que se aparcó.",
+            "Su fila dice «the Claude Desktop home `E:\\cd-throwaway\\claude-desktop-stranded-home` is not found».",
+            "Su fila tiene un botón «Remove» rojo, y el grupo un botón «Remove all».",
+            "La orden imprime, tras los leftovers, el grupo «Stranded parked Entries» con una fila de «cd-throwaway-stranded» y «Claude Desktop».",
+            "El diálogo de Remove se titula «Remove 1 Entry».",
+            "El diálogo dice «Removes the Stranded Entry `cd-throwaway-stranded` of Claude Desktop».",
+            "Tras Remove, el grupo «Stranded» ya no sale.",
+            "Tras el Undo, el grupo «Stranded · 1» vuelve con «cd-throwaway-stranded».",
+            "Tras Remove all, el grupo «Stranded» ya no sale."
+          ],
+          "covers": ["#126"]
         }
       ]
     },

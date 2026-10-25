@@ -3,7 +3,8 @@ import { cleanup, render, screen as rendered } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, test } from "vitest";
-import type { Entry, Home, Item, Places, Project } from "./bindings";
+import type { Entry, Home, Item, Places, Project, StoreReadFailure, Stranded } from "./bindings";
+import { STRANDED_ROW } from "./acting";
 import { rowOf } from "./places";
 import { Loading } from "./Loading";
 import { HomesTab, ProjectsScreen, ProjectsTab, type Tab } from "./ProjectsScreen";
@@ -91,6 +92,8 @@ const places: Places = {
   read_at: "2026-10-20T09:00:00Z",
   projects: [project(), project({ path: KEEP }), project({ path: GONE, missing: true }), project({ path: DELETED, missing: true })],
   leftovers: [{ project: GONE, items: [leftover("old")] }],
+  stranded: [],
+  store_read_failures: [],
   agents: [
     {
       id: "claude-code",
@@ -128,7 +131,7 @@ const expectDisabled = (markup: string, rows: [name: string, disabled: boolean][
 describe("a row of the Projects tab", () => {
   test("disables its buttons while an action runs on it, and only its own", () => {
     const markup = renderToStaticMarkup(
-      <ProjectsTab places={places} search="" busy={[HIDE, GONE]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+      <ProjectsTab places={places} search="" busy={[HIDE, GONE]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />,
     );
 
     expectDisabled(markup, [
@@ -140,7 +143,7 @@ describe("a row of the Projects tab", () => {
 
   test("draws Remove leftovers of a missing Project in the style of a button that deletes, and Show leftovers not", () => {
     const markup = renderToStaticMarkup(
-      <ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+      <ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />,
     );
 
     expect(classesOf(markup, GONE)).toEqual([
@@ -158,6 +161,7 @@ describe("a row of the Projects tab", () => {
         onShow={() => {}}
         onChange={() => {}}
         onRemoveLeftovers={() => {}}
+        onRemoveStranded={() => {}}
       />,
     );
 
@@ -171,7 +175,7 @@ describe("a row of the Projects tab", () => {
 describe("the search of the Projects tab", () => {
   const tab = (search: string) =>
     renderToStaticMarkup(
-      <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />,
+      <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />,
     );
 
   test("is a box at the top of the Projects tab only, outside the rows that scroll", () => {
@@ -197,7 +201,7 @@ describe("the search of the Projects tab", () => {
 describe("the group of missing Projects without leftovers", () => {
   /** The Projects tab, searching for `search`. */
   const tab = (search = "") => (
-    <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} />
+    <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />
   );
   const titles = () => rendered.getAllByRole("heading").map((heading) => heading.textContent);
   const listed = (path: string) => rendered.queryByText(path) !== null;
@@ -212,7 +216,7 @@ describe("the group of missing Projects without leftovers", () => {
 
   test("offers Hide on each of its rows once opened", async () => {
     const changes: unknown[] = [];
-    render(<ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={(change) => changes.push(change)} onRemoveLeftovers={() => {}} />);
+    render(<ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={(change) => changes.push(change)} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />);
 
     await userEvent.click(rendered.getByRole("button", { name: "▸ Missing, no leftovers · 1" }));
     const row = rendered.getByText(DELETED).closest(".place-row") as HTMLElement;
@@ -262,5 +266,91 @@ describe("a row of the Agent homes tab", () => {
       expect(classes, label).toBe(label === "Remove from list" ? "cta small danger" : "cta small secondary");
     }
     expect(classesOf(markup, PORTABLE).map(([label]) => label)).toContain("Remove from list");
+  });
+});
+
+const STORE = String.raw`C:\Users\me\AppData\Local\config-digger\parked\manifest.json`;
+
+/** `name`, parked from a Claude Desktop home that is gone. */
+function stranded(name: string): Stranded {
+  const config = String.raw`E:\cd-throwaway\claude-desktop-stranded-home\claude_desktop_config.json`;
+  return {
+    name,
+    kind: "mcp",
+    agent: "claude-desktop",
+    agent_name: "Claude Desktop",
+    origin: {
+      home: String.raw`E:\cd-throwaway\claude-desktop-stranded-home`,
+      location: "user-mcp",
+      project: null,
+      path: config,
+      key_path: ["mcpServers", name],
+      locator: `${config}#mcpServers.${name}`,
+    },
+    reason: "home_not_found",
+    sentence: `Stranded: the Claude Desktop home is not found, so config-digger cannot put \`${name}\` back.`,
+    parked_at: "2026-10-01T12:00:00Z",
+    path: STORE,
+    key_path: ["entries", name],
+    locator: `${STORE}#entries.${name}`,
+    config: {},
+    masked: [],
+  };
+}
+
+describe("the Stranded group of the Projects tab", () => {
+  const withStranded: Places = { ...places, stranded: [stranded("cd-throwaway-stranded"), stranded("cd-throwaway-other")] };
+  const tab = (busy: string[] = [], onRemoveStranded: (locator: string | null) => void = () => {}, shown: Places = withStranded) => (
+    <ProjectsTab places={shown} search="" busy={busy} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={onRemoveStranded} />
+  );
+
+  test("lists each Stranded Entry with why it is Stranded and a Remove that deletes", () => {
+    const markup = renderToStaticMarkup(tab());
+
+    expect(markup).toContain("Stranded · 2");
+    const row = rowMarkup(markup, "cd-throwaway-stranded");
+    expect(row).toContain("MCP server · Claude Desktop");
+    expect(row).toContain("cannot put `cd-throwaway-stranded` back");
+    expect(row).toContain(`${STORE}#entries.cd-throwaway-stranded`);
+    expect(classesOf(markup, "cd-throwaway-stranded")).toEqual([["Remove", "cta small danger"]]);
+  });
+
+  test("Removes one by its locator in the store, and all of them in one Operation", async () => {
+    const removed: (string | null)[] = [];
+    render(tab([], (locator) => removed.push(locator)));
+
+    const row = rendered.getByText("cd-throwaway-other").closest(".place-row") as HTMLElement;
+    await userEvent.click(row.querySelector("button") as HTMLElement);
+    await userEvent.click(rendered.getByRole("button", { name: "Remove all" }));
+
+    expect(removed).toEqual([`${STORE}#entries.cd-throwaway-other`, null]);
+  });
+
+  test("disables a row while its Remove runs, and every row while Remove all runs", () => {
+    expectDisabled(renderToStaticMarkup(tab([`${STORE}#entries.cd-throwaway-stranded`])), [
+      ["cd-throwaway-stranded", true],
+      ["cd-throwaway-other", false],
+    ]);
+    expectDisabled(renderToStaticMarkup(tab([STRANDED_ROW])), [
+      ["cd-throwaway-stranded", true],
+      ["cd-throwaway-other", true],
+    ]);
+  });
+
+  test("shows the Read failures of the parked-Entry store, and no group without either", () => {
+    const failure: StoreReadFailure = {
+      path: STORE,
+      entry: "broken",
+      kind: "shape",
+      position: null,
+      sentence: "The Entry `broken` of config-digger's parked-Entry store does not read as a parked Entry.",
+    };
+
+    const markup = renderToStaticMarkup(tab([], () => {}, { ...places, store_read_failures: [failure] }));
+
+    expect(markup).toContain("Stranded · 0");
+    expect(markup).toContain("The Entry `broken` of config-digger&#x27;s parked-Entry store does not read as a parked Entry.");
+    expect(markup).not.toContain("Remove all");
+    expect(renderToStaticMarkup(tab([], () => {}, places))).not.toContain("Stranded ·");
   });
 });
