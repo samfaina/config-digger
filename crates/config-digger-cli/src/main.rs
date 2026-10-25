@@ -1265,8 +1265,22 @@ fn render_list(inventory: &Inventory, selected: bool, width: Option<usize>) -> S
             out.push('\n');
         }
         first = false;
+        let last_opened = context_project(inventory).is_some_and(|project| {
+            project
+                .last_opened
+                .iter()
+                .any(|opened| opened.agent == home.agent && opened.home == home.home)
+        });
+        let mark = if last_opened {
+            ", last opened here"
+        } else {
+            ""
+        };
         let mut title = Line::default();
-        title.push(format!("{} (home: {})", home.agent_name, home.home), BOLD);
+        title.push(
+            format!("{} (home: {}{mark})", home.agent_name, home.home),
+            BOLD,
+        );
         out.push_str(&title.fit(width).render());
         if rows.is_empty() {
             out.push_str(&plain_line("  No Items.", width));
@@ -1335,17 +1349,21 @@ fn last_column_width<const N: usize>(widths: &[usize; N], width: Option<usize>) 
 
 /// The first line of `list` and `show`: the Project the States are resolved for.
 fn project_line(inventory: &Inventory, width: Option<usize>) -> String {
-    let missing = inventory.project.as_ref().is_some_and(|project| {
-        inventory
-            .projects
-            .iter()
-            .any(|known| known.path == *project && known.missing)
-    });
+    let missing = context_project(inventory).is_some_and(|project| project.missing);
     let Some(project) = &inventory.project else {
         return context_line(None, width);
     };
     let suffix = if missing { " (missing)" } else { "" };
     plain_line(&format!("Project: {}{suffix}", project.display()), width)
+}
+
+/// The context's Project, as the inventory lists it.
+fn context_project(inventory: &Inventory) -> Option<&api::Project> {
+    let project = inventory.project.as_ref()?;
+    inventory
+        .projects
+        .iter()
+        .find(|known| known.path == *project)
 }
 
 /// The line naming a Project, or saying there is none.

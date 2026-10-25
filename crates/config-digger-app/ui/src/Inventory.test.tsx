@@ -1,10 +1,10 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
-import type { Entry, Home, Inventory, Item, LinkKind, Project, State } from "./bindings";
+import type { Entry, Home, Inventory, Item, LastOpened, LinkKind, Project, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
 import { EntryCard } from "./EntryCard";
-import { Banner, projectField, StateBars } from "./Inventory";
+import { Banner, homeLabel, HomesPane, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
 import { LinkTag } from "./Location";
 import { applyReaction } from "./Select";
@@ -101,9 +101,76 @@ function home(overrides: Partial<Home> = {}): Home {
   };
 }
 
-function project(path: string, missing = false): Project {
-  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0 };
+function project(path: string, missing = false, last_opened: LastOpened[] = []): Project {
+  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened };
 }
+
+/** VS Code's Last-opened home `home`, the profile Work. */
+function lastOpened(home: string, overrides: Partial<LastOpened> = {}): LastOpened {
+  return {
+    agent: "vscode",
+    home,
+    name: "Work",
+    shares_home: false,
+    hidden: false,
+    sentence: "VS Code last opened this Project in Work.",
+    ...overrides,
+  };
+}
+
+describe("choosing a Project VS Code last opened in a profile", () => {
+  const work = String.raw`C:\Users\me\AppData\Roaming\Code\User\profiles\-5a1b2c3d`;
+  const vscode = { agent: "vscode", agent_name: "VS Code" };
+  const homes = [home(), home({ ...vscode }), home({ ...vscode, home: work, folder: work, source: { kind: "known_location" } })];
+  const opened = String.raw`E:\cd-throwaway\project`;
+  const other = String.raw`E:\cd-throwaway\project-extra`;
+  const inWork = [lastOpened(work)];
+  const projects = [project(opened, false, inWork), project(other)];
+  const earlier = withHomeChosen(withHomeChosen(homeChoices(), "vscode", "default"), "codex", "default");
+
+  test("opens that Agent on its Last-opened home, over a home chosen earlier, and keeps the other Agents on theirs", () => {
+    const chosen = withProjectChosen(earlier, projects, opened);
+
+    expect(chosenHomes(homes, chosen, [], inWork)).toEqual({ codex: "default", vscode: work });
+  });
+
+  test("keeps a home the user then chooses until another Project is chosen", () => {
+    const switched = withHomeChosen(withProjectChosen(earlier, projects, opened), "vscode", "default");
+    const again = withProjectChosen(switched, projects, opened);
+
+    expect(chosenHomes(homes, switched, [], inWork)).toEqual({ codex: "default", vscode: "default" });
+    expect(chosenHomes(homes, again, [], inWork)).toEqual({ codex: "default", vscode: work });
+  });
+
+  test("changes nothing for a Project with no Last-opened home, nor for no Project", () => {
+    const fromWork = withProjectChosen(earlier, projects, opened);
+
+    expect(chosenHomes(homes, withProjectChosen(fromWork, projects, other), [], [])).toEqual({ codex: "default", vscode: "default" });
+    expect(chosenHomes(homes, withProjectChosen(fromWork, projects, null), [], [])).toEqual({ codex: "default", vscode: "default" });
+  });
+
+  test("never opens a hidden Last-opened home, and follows the rule before it instead", () => {
+    const shown = homes.filter((listed) => listed.home !== work);
+    const hidden = [lastOpened(work, { hidden: true })];
+    const chosen = withProjectChosen(homeChoices(), projects, opened);
+
+    expect(chosenHomes(shown, chosen, [], hidden)).toEqual({ codex: "default", vscode: "default" });
+    expect(chosenHomes(homes, chosen, [], hidden)).toEqual({ codex: "default", vscode: "default" });
+  });
+
+  test("opens a missing Project on the home holding its leftovers first", () => {
+    const gone = String.raw`E:\cd-throwaway\project-gone`;
+    const leftover = item({
+      agent: "vscode",
+      home: "default",
+      state: "unread",
+      entries: [entry({ state: "unread", reason: { code: "project_missing", effective: null, switch: null, sentence: "Its Project is missing." } })],
+    });
+    const chosen = withProjectChosen(homeChoices(), [project(gone, true, inWork)], gone);
+
+    expect(chosenHomes(homes, chosen, [leftover], inWork)).toEqual({ codex: "default", vscode: "default" });
+  });
+});
 
 describe("choosing a Project", () => {
   const codexHome = String.raw`E:\cd-throwaway\codex-home`;
@@ -172,6 +239,64 @@ describe("choosing a Project", () => {
 function inventory(overrides: Partial<Inventory> = {}): Inventory {
   return { read_at: "2026-10-20T09:30:00Z", project: null, projects: [], homes: [home()], items: [], read_failures: [], store_read_failures: [], agent_flags: [], ...overrides };
 }
+
+describe("the Agent home pane of a Project VS Code last opened in a profile", () => {
+  const work = String.raw`C:\Users\me\AppData\Roaming\Code\User\profiles\-5a1b2c3d`;
+  const vscode = { agent: "vscode", agent_name: "VS Code" };
+  const homes = [home(), home({ ...vscode }), home({ ...vscode, home: work, folder: work, source: { kind: "known_location" } })];
+  const path = String.raw`E:\cd-throwaway\project`;
+  const pane = (agent: string, shown: string, opened: LastOpened, listed = homes) =>
+    renderToStaticMarkup(
+      <HomesPane
+        inventory={inventory({ project: path, projects: [project(path, false, [opened])], homes: listed })}
+        selection={{ agent, homes: { codex: "default", vscode: shown } }}
+        onHome={() => {}}
+      />,
+    );
+  const note = (markup: string) => markup.match(/<p class="home-note">(.*?)<\/p>/g) ?? [];
+  const inWork = lastOpened(work);
+
+  test("marks the Last-opened home in the select of All Agents", () => {
+    expect(homeLabel(homes[2], 0, true)).toBe(`${work} · last opened here`);
+    expect(homeLabel(homes[1], 0, false)).toBe("default");
+    expect(pane("all", work, inWork)).toContain(`<span class="select-value">${work} · last opened here</span>`);
+  });
+
+  test("marks the Last-opened home's tile among one Agent's", () => {
+    const tiles = pane("vscode", "default", inWork).match(/<button[^>]*class="tile home-tile[\s\S]*?<\/button>/g) ?? [];
+
+    expect(tiles).toHaveLength(2);
+    expect(tiles[0]).not.toContain("last opened here");
+    expect(tiles[1]).toContain('<span class="tag">last opened here</span>');
+  });
+
+  test("says where VS Code last opened the Project while another home is shown", () => {
+    expect(note(pane("vscode", "default", inWork))).toEqual(['<p class="home-note">VS Code last opened this Project in Work.</p>']);
+    expect(note(pane("all", "default", inWork))).toEqual(['<p class="home-note">VS Code last opened this Project in Work.</p>']);
+  });
+
+  test("says when the profile reads Default's MCP servers, or the home is hidden", () => {
+    const shared = lastOpened("default", {
+      name: "Shared",
+      shares_home: true,
+      sentence: "VS Code last opened this Project in Shared, which reads Default's MCP servers.",
+    });
+    const hidden = lastOpened(work, { hidden: true, sentence: "VS Code last opened this Project in Work, which is hidden." });
+
+    expect(note(pane("vscode", work, shared))).toEqual([
+      `<p class="home-note">VS Code last opened this Project in Shared, which reads Default&#x27;s MCP servers.</p>`,
+    ]);
+    expect(note(pane("vscode", "default", hidden, homes.slice(0, 2)))).toEqual([
+      '<p class="home-note">VS Code last opened this Project in Work, which is hidden.</p>',
+    ]);
+  });
+
+  test("says nothing while the Last-opened home itself is shown, nor of the Agents not selected", () => {
+    expect(note(pane("vscode", work, inWork))).toEqual([]);
+    expect(note(pane("all", work, inWork))).toEqual([]);
+    expect(note(pane("codex", "default", inWork))).toEqual([]);
+  });
+});
 
 describe("a key on the closed Project field", () => {
   const first = String.raw`E:\cd-throwaway\project-a`;

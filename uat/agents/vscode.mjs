@@ -10,7 +10,8 @@
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
 // `files`, `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
-// `experiments`, `trust`, `nonce`, `enablement`, `skills` and `policy`.
+// `experiments`, `trust`, `nonce`, `enablement`, `skills`, `profiles` and
+// `policy`.
 //
 // VS Code starts an MCP server only when asked. A probe extension, loaded
 // with `--extensionDevelopmentPath`, asks it to start every server it
@@ -811,6 +812,58 @@ if (runs("skills")) {
   );
   await p.check("items.skill.disable[0]", "a skill turned off there, with a description, stays in `chat.getSkills`, the list VS Code builds its model's `<skills>` from", async () =>
     same(named(seen.done.skills, "cd-throwaway-off").length, 1),
+  );
+}
+
+// ---------------------------------------------------------------- the profile a workspace was last opened in
+
+// Opens `target` in a launch in `dir` as a user would, without the probe
+// extension, and stops it once its `storage.json` holds `until`, or after
+// `seconds`. It resolves to what `storage.json` then holds.
+async function open(dir, target, { args: extra = [], until, seconds = 90 }) {
+  const d = folders(dir);
+  fs.mkdirSync(d.home, { recursive: true });
+  const args = [...profileArgs(dir), "--disable-workspace-trust", "--skip-welcome", "--skip-release-notes", ...extra, "--new-window", target];
+  spawn(bin, args, { detached: true, stdio: "ignore", env: { ...process.env, USERPROFILE: d.home, APPDATA: d.appData } }).unref();
+  const file = path.join(d.user, "globalStorage", "storage.json");
+  const read = () => (fs.existsSync(file) ? json(file) : {});
+  const end = Date.now() + seconds * 1000;
+  while (!until(read()) && Date.now() < end) await sleep(1000);
+  await sleep(2000);
+  await stop(d.data);
+  return read();
+}
+
+// A folder and a `.code-workspace` file, each opened with `--profile Work`,
+// which creates the profile: `storage.json` then associates each with it
+// under `profileAssociations.workspaces`, keyed by the workspace's URI. An
+// extension development window, as the probe extension's, is associated
+// with nothing.
+if (runs("profiles")) {
+  const dir = fresh("profiles", base);
+  const d = folders(dir);
+  const proj = path.join(dir, "proj");
+  fs.mkdirSync(proj, { recursive: true });
+  fs.mkdirSync(path.join(dir, "member"), { recursive: true });
+  const workspace = path.join(dir, "multi.code-workspace");
+  write(workspace, { folders: [{ path: "member" }] });
+  await launch(dir, proj, { args: ["--profile", "Work"] });
+  const developed = json(path.join(d.user, "globalStorage", "storage.json")).profileAssociations?.workspaces ?? {};
+  const associated = (uri) => (storage) => Boolean(storage.profileAssociations?.workspaces?.[uri]);
+  await open(dir, proj, { args: ["--profile", "Work"], until: associated(vscodeUri(proj)) });
+  const storage = await open(dir, workspace, { args: ["--profile", "Work"], until: associated(vscodeUri(workspace)) });
+  const work = (storage.userDataProfiles ?? []).find((profile) => profile.name === "Work");
+  const associations = storage.profileAssociations?.workspaces ?? {};
+
+  await p.check("projects", "an extension development window opened with `--profile Work` associates its folder with no profile", async () => same(developed, {}));
+  await p.check("projects", "`profileAssociations.workspaces` keys a folder by its URI and a `.code-workspace` file by the file's URI, as VS Code spells a URI as text", async () =>
+    same(Object.keys(associations).sort(), [vscodeUri(proj), vscodeUri(workspace)].sort()),
+  );
+  await p.check("projects", "the value of a workspace opened with `--profile Work` is the id of the profile `userDataProfiles` names Work, its `location`", async () =>
+    same(
+      { location: typeof work?.location === "string" && !work.location.includes("/"), values: Object.values(associations) },
+      { location: true, values: [work?.location, work?.location] },
+    ),
   );
 }
 

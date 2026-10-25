@@ -99,6 +99,32 @@ pub(crate) fn resolve(
             entries: count_entries(snapshot, |entry| {
                 entry.project.as_ref() == Some(&project.key)
             }),
+            last_opened: project
+                .last_opened
+                .iter()
+                .map(|opened| {
+                    let agent = &definitions[opened.agent_index].agent;
+                    let hidden = snapshot.homes.iter().any(|home| {
+                        home.agent_index == opened.agent_index
+                            && home.home == opened.home
+                            && home.hidden
+                    });
+                    api::LastOpened {
+                        agent: agent.id.clone(),
+                        home: opened.home.clone(),
+                        name: opened.name.clone(),
+                        shares_home: opened.shares_home,
+                        hidden,
+                        sentence: explain::last_opened(
+                            &agent.name,
+                            opened.name.as_deref(),
+                            &opened.home,
+                            opened.shares_home,
+                            hidden,
+                        ),
+                    }
+                })
+                .collect(),
         })
         .collect();
 

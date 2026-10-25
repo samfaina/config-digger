@@ -33,10 +33,13 @@ import {
   groupItems,
   homeChoices,
   homeFailures,
+  isLastOpened,
   itemKey,
   itemsShown,
   KIND_NAMES,
   KIND_TITLES,
+  lastOpenedHomes,
+  lastOpenedNotes,
   leftoversNotShown,
   projectFailures,
   readerItem,
@@ -96,7 +99,10 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   // The Item another screen opened it on, selected once the inventory is read.
   const startItem = useRef(start?.item ?? null);
 
-  const homes = useMemo(() => chosenHomes(inventory?.homes ?? [], homeChoice, inventory?.items ?? []), [inventory, homeChoice]);
+  const homes = useMemo(
+    () => chosenHomes(inventory?.homes ?? [], homeChoice, inventory?.items ?? [], lastOpenedHomes(inventory)),
+    [inventory, homeChoice],
+  );
   const selection: Selection = { agent, homes };
   const shown = useMemo(() => itemsShown(inventory?.items ?? [], { agent, homes }), [inventory, agent, homes]);
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
@@ -511,10 +517,16 @@ type HomesPaneProps = {
   onHome: (agent: string, home: string) => void;
 };
 
-/** A selector per Agent under All Agents, or one Agent's homes as tiles. */
-function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
+/**
+ * A selector per Agent under All Agents, or one Agent's homes as tiles, with
+ * the Project's Last-opened homes marked, and where the Agents shown last
+ * opened it when they show another home.
+ */
+export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const all = inventory?.homes ?? [];
   const failuresOf = (home: Home) => homeFailures(inventory?.read_failures ?? [], home);
+  const lastOpened = lastOpenedHomes(inventory);
+  const opened = (home: Home) => isLastOpened(lastOpened, home);
   // Another tool copies a Mirrored home, so config-digger only reads it.
   const mirrored = (home: Home) =>
     home.mirror && (
@@ -551,7 +563,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               label={`${agentName} home`}
               value={chosen.home}
               tooltip={chosen.folder}
-              options={own.map((home) => ({ value: home.home, label: homeLabel(home, failuresOf(home)) }))}
+              options={own.map((home) => ({ value: home.home, label: homeLabel(home, failuresOf(home), opened(home)) }))}
               onChange={(home) => onHome(agent, home)}
             />
           ) : (
@@ -578,6 +590,7 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
             >
               <span className="home-name">{home.home}</span>
               <span className="grow" />
+              {opened(home) && <span className="tag">{LAST_OPENED}</span>}
               {mirrored(home)}
               {notRead(home)}
               <FailureBadge count={failuresOf(home)} where="this home" />
@@ -589,13 +602,25 @@ function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   return (
     <section className="panel homes">
       <h2 className="panel-title">Agent home</h2>
-      <div className="home-list">{body}</div>
+      <div className="home-list">
+        {body}
+        {lastOpenedNotes(lastOpened, selection).map((note) => (
+          <p key={note} className="home-note">
+            {note}
+          </p>
+        ))}
+      </div>
     </section>
   );
 }
 
-function homeLabel(home: Home, failed: number): string {
+/** The mark of a Project's Last-opened home. */
+const LAST_OPENED = "last opened here";
+
+/** A home as the select of All Agents lists it, with its marks and how many locations couldn't be read in it. */
+export function homeLabel(home: Home, failed: number, lastOpened: boolean): string {
   let label = home.home;
+  if (lastOpened) label += ` · ${LAST_OPENED}`;
   if (home.mirror) label += ` · ${home.mirror.label}`;
   if (home.not_read) label += " · not read";
   if (failed > 0) label += ` · ${couldNotBeRead(failed)}`;

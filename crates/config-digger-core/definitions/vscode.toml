@@ -70,11 +70,29 @@ state = "globalStorage/state.vscdb"
 # per workspace in `User\workspaceStorage`, whose `workspace.json` names its
 # folder or its `.code-workspace` file, and the workspaces `storage.json`
 # associates with a profile. Both spell them as URIs; a remote one is no
-# Project here. Which profile a workspace was last opened in is not read.
+# Project here.
+#
+# `profileAssociations.workspaces` keeps one key per workspace, its
+# `URI.toString()`: a folder's URI, or a `.code-workspace` file's [test].
+# Its value is the id of the profile VS Code last opened the workspace in
+# [test]. VS Code writes it on every window open and on every profile
+# switch, one entry per workspace, and `--profile` overwrites it [docs]; an
+# extension development window writes none [test]. A profile's id is the
+# last segment of its `location` [docs], the whole `location` of a profile
+# VS Code creates [test], and the default profile's `__default__profile__`
+# [disk], which `userDataProfiles` never lists [docs]. The built-in Agents
+# profile can never be associated: VS Code throws [docs]. A value naming no
+# profile is skipped, and the next save drops it [docs]. That profile is
+# the Project's Last-opened home: a profile that shares its MCP servers
+# reads the default profile's [docs], so its Projects are last opened in
+# `default`, under its name. Where VS Code opens a workspace with no entry, per
+# `--profile`, then `window.newWindowProfile`, then the active window's
+# profile, then Default, is not read: it says where the next open goes
+# [docs].
 [projects]
 registries = [
   { block = "json-folders", anchor = { block = "machine", path = "%APPDATA%/Code/User/workspaceStorage" }, file = "workspace.json", fields = ["folder", "workspace"], spelling = "file-uri" },
-  { block = "json-keys", anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/storage.json" }, root = ["profileAssociations", "workspaces"], spelling = "file-uri" },
+  { block = "json-keys", anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/storage.json" }, root = ["profileAssociations", "workspaces"], spelling = "file-uri", last_opened = { named = { "__default__profile__" = "default" }, listed = "profile", name = "name", left_out = "default" } },
 ]
 # A `.code-workspace` file VS Code opens is a Project of its own, with a
 # collection in its `settings` and those of each of its folders [docs]. The

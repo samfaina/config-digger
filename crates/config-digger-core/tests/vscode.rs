@@ -362,6 +362,144 @@ fn projects_come_from_workspace_storage_and_the_profiles_workspaces() {
     );
 }
 
+/// Each Agent home VS Code last opened the Project at `path` in, as the
+/// inventory lists it.
+fn last_opened(inventory: &Inventory, path: &Path) -> Value {
+    let project = listed(inventory, path).expect("the Project is listed");
+    json(&project.last_opened)
+}
+
+#[test]
+fn a_workspace_last_opened_in_a_profile_of_its_own_is_last_opened_in_that_profile_s_home() {
+    let fs = with_project(vscode(), "app");
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        last_opened(&inventory, &project("app")),
+        serde_json::json!([{
+            "agent": "vscode",
+            "home": profile("-5a1b2c3d"),
+            "name": "Work",
+            "shares_home": false,
+            "hidden": false,
+            "sentence": "VS Code last opened this Project in Work.",
+        }])
+    );
+}
+
+#[test]
+fn a_hidden_last_opened_home_is_still_the_project_s_and_says_it_is_hidden() {
+    let fs = with_project(vscode(), "app");
+    let core = core(&fs);
+    core.hide_home(&profile("-5a1b2c3d"), Some("vscode"))
+        .unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core
+        .resolve(&snapshot, &Context::default())
+        .without_hidden();
+
+    let opened = &last_opened(&inventory, &project("app"))[0];
+    assert_eq!(opened["home"], profile("-5a1b2c3d"));
+    assert_eq!(opened["hidden"], true);
+    assert_eq!(
+        opened["sentence"],
+        "VS Code last opened this Project in Work, which is hidden."
+    );
+}
+
+#[test]
+fn a_workspace_last_opened_in_the_default_profile_is_last_opened_in_default() {
+    let fs = vscode().with_folder(project("registered"));
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        last_opened(&inventory, &project("registered")),
+        serde_json::json!([{
+            "agent": "vscode",
+            "home": "default",
+            "name": null,
+            "shares_home": false,
+            "hidden": false,
+            "sentence": "VS Code last opened this Project in Default.",
+        }])
+    );
+}
+
+#[test]
+fn a_workspace_last_opened_in_a_profile_that_shares_mcp_is_last_opened_in_default_under_its_name() {
+    let fs = with_project(vscode(), "shared");
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        last_opened(&inventory, &project("shared")),
+        serde_json::json!([{
+            "agent": "vscode",
+            "home": "default",
+            "name": "Shared",
+            "shares_home": true,
+            "hidden": false,
+            "sentence": "VS Code last opened this Project in Shared, which reads Default's MCP servers.",
+        }])
+    );
+}
+
+#[test]
+fn a_workspace_associated_with_no_profile_or_only_in_workspace_storage_has_no_last_opened_home() {
+    let fs = with_project(with_project(vscode(), "bare"), "multi");
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        last_opened(&inventory, &project("bare")),
+        serde_json::json!([])
+    );
+    assert_eq!(last_opened(&inventory, &workspace()), serde_json::json!([]));
+}
+
+#[test]
+fn a_last_opened_home_changes_no_state_in_any_home_or_project() {
+    let fs = ["app", "shared", "bare", "multi"]
+        .into_iter()
+        .fold(vscode(), with_project)
+        .with_folder(project("registered"));
+    // The same workspaces, associated with no profile.
+    let storage = Path::new(USER).join(r"globalStorage\storage.json");
+    let mut associated: Value = serde_json::from_slice(
+        &std::fs::read(fixture_folder(r"user\globalStorage\storage.json")).unwrap(),
+    )
+    .unwrap();
+    for value in associated["profileAssociations"]["workspaces"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+    {
+        *value = Value::from("no-such-profile");
+    }
+    let unassociated = fs.clone().with_file(&storage, associated.to_string());
+    assert!(
+        inventory(&unassociated)
+            .projects
+            .iter()
+            .all(|project| project.last_opened.is_empty())
+    );
+
+    let contexts = [
+        None,
+        Some(project("app")),
+        Some(project("shared")),
+        Some(project("bare")),
+        Some(project("registered")),
+        Some(workspace()),
+    ];
+    for project in contexts {
+        let context = Context { project };
+        assert_eq!(
+            inventory_in(&fs, &context).items,
+            inventory_in(&unassociated, &context).items,
+            "{context:?}"
+        );
+    }
+}
+
 /// The fixture multi-root workspace file.
 fn workspace() -> PathBuf {
     project(r"multi\multi.code-workspace")

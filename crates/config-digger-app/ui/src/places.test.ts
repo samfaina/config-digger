@@ -14,6 +14,7 @@ function project(overrides: Partial<Project> = {}): Project {
     added: false,
     hidden: false,
     entries: 0,
+    last_opened: [],
     ...overrides,
   };
 }

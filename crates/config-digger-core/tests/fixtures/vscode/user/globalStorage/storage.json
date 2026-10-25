@@ -15,6 +15,9 @@
   "profileAssociations": {
     "workspaces": {
       "file:///e%3A/projects/registered": "__default__profile__",
+      "file:///e%3A/projects/app": "-5a1b2c3d",
+      "file:///e%3A/projects/shared": "6e7f",
+      "file:///e%3A/projects/bare": "-0f9e8d7c",
       "vscode-remote://wsl%2Bubuntu/home/fixture/remote": "__default__profile__"
     },
     "emptyWindows": {}
