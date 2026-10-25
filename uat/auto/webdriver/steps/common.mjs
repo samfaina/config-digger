@@ -289,3 +289,35 @@ export async function withClaudeDesktop(t, body) {
   }
   return true;
 }
+
+// Runs `body(close)` while a Claude Desktop started with
+// `--user-data-dir=<folder>` runs, as the step's command starts it; `close`
+// stops that one only, every process of which names `folder` in the switch,
+// and the walk stops it after `body` if it is still running. Without Claude
+// Desktop installed, the step is Blocked.
+export async function withClaudeDesktopIn(t, folder, body) {
+  // The walk's own LOCALAPPDATA is the tester's, where the classic app is;
+  // its PowerShell gets the throwaway profile's.
+  const exe = t.ps(
+    `@(Get-ChildItem '${process.env.LOCALAPPDATA}\\AnthropicClaude\\app-*\\claude.exe' -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName) + @(Get-AppxPackage | Where-Object { $_.Name -in 'Claude', 'AnthropicPBC.Claude' } | ForEach-Object { Join-Path $_.InstallLocation 'app\\claude.exe' }) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1`,
+  );
+  if (!exe) {
+    t.blocked = "Claude Desktop no está instalado en este PC";
+    return false;
+  }
+  const naming = `Get-CimInstance Win32_Process -Filter "Name='claude.exe'" | Where-Object { $_.CommandLine -like '*--user-data-dir=*${folder}*' }`;
+  const running = () => Number(t.ps(`@(${naming}).Count`));
+  const close = async () => {
+    t.ps(`${naming} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+    await t.s.until(async () => running() === 0, { what: "that Claude Desktop closed", timeout: 30000 });
+  };
+  t.ps(`Start-Process '${exe}' -ArgumentList '--user-data-dir=${folder}'`);
+  await t.s.until(async () => running() > 0, { what: "Claude Desktop open on the home", timeout: 30000 });
+  await wait(3000);
+  try {
+    await body(close);
+  } finally {
+    if (running()) await close();
+  }
+  return true;
+}

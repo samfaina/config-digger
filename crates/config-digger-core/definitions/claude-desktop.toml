@@ -69,6 +69,13 @@ paths = [
   "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*/app/claude.exe",
   "%LOCALAPPDATA%/AnthropicClaude/app-*/claude.exe",
 ]
+# Its Chromium child processes name the data folder it reads, `<userData>`,
+# as `--user-data-dir=<folder>`, quoted on some and not on others [disk].
+# Started with `--user-data-dir=<folder>`, it reads that folder, which every
+# process names, the main one too; the signed app ignores
+# `CLAUDE_USER_DATA_DIR` [test]. So a running Claude Desktop reads a home the
+# user added only while one of its processes names its folder (#211).
+data_folder_switch = "--user-data-dir"
 
 [[homes]]
 id = "user-data-dir"

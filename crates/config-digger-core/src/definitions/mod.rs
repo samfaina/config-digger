@@ -562,6 +562,14 @@ pub(crate) struct ProcessDefinition {
     /// path, it narrows down images such as `node.exe` that run much else.
     #[serde(default)]
     pub cmdline_contains: Vec<String>,
+    /// The switch through which a process names the data folder it reads,
+    /// such as Electron's `--user-data-dir`, written `<switch>=<folder>`
+    /// with the folder quoted or not. When set, the Agent runs for a home
+    /// the user added outside the definition's homes, which no launch reads
+    /// by lookup order, only while a matching process names that home's
+    /// folder through it. A process whose command line the OS hides names
+    /// none.
+    pub data_folder_switch: Option<String>,
     /// Files the Agent keeps per running session, each naming a PID that
     /// counts only while it is alive.
     pub session_files: Option<SessionFiles>,
@@ -572,8 +580,22 @@ impl Validate for ProcessDefinition {
         if self.images.is_empty() && self.session_files.is_none() {
             return Err("process needs images or session_files".into());
         }
-        if self.images.is_empty() && !(self.paths.is_empty() && self.cmdline_contains.is_empty()) {
-            return Err("process paths and cmdline_contains need images".into());
+        if self.images.is_empty()
+            && !(self.paths.is_empty()
+                && self.cmdline_contains.is_empty()
+                && self.data_folder_switch.is_none())
+        {
+            return Err(
+                "process paths, cmdline_contains and data_folder_switch need images".into(),
+            );
+        }
+        if let Some(switch) = &self.data_folder_switch
+            && (!switch.starts_with('-')
+                || switch.contains(|c: char| c.is_whitespace() || c == '=' || c == '"'))
+        {
+            return Err(format!(
+                "process data_folder_switch `{switch}` must start with `-` and hold no space, `=` or `\"`"
+            ));
         }
         for text in self.images.iter().chain(&self.cmdline_contains) {
             non_empty("process image or cmdline_contains", text)?;
@@ -2517,6 +2539,40 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
     fn a_process_needs_images_or_session_files() {
         let text = with_process("cmdline_contains = [\"x\"]");
         assert!(error(&text).contains("images"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_data_folder_switch_loads() {
+        let text = with_process("images = [\"x.exe\"]\ndata_folder_switch = \"--user-data-dir\"");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_data_folder_switch_is_one_switch_without_its_value() {
+        for switch in [
+            "user-data-dir",
+            "--user-data-dir=",
+            "--user data dir",
+            "\"--x\"",
+        ] {
+            let text = with_process(&format!(
+                "images = [\"x.exe\"]\ndata_folder_switch = '{switch}'"
+            ));
+            assert!(
+                error(&text).contains("data_folder_switch"),
+                "{switch}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn a_data_folder_switch_needs_images() {
+        let text = with_process(
+            r#"data_folder_switch = "--user-data-dir"
+session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }, extension = "json" }"#,
+        );
+        assert!(error(&text).contains("need images"), "{}", error(&text));
     }
 
     #[test]

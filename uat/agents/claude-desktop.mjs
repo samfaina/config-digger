@@ -10,7 +10,9 @@
 // dialog, "Some MCP servers couldn't be loaded". So each config declares a
 // server it skips, a `url` alone, named after the config's folder, and the
 // probe reads the dialog with UI Automation. The data folder the app chose
-// is also on its Chromium processes, as `--user-data-dir`.
+// is also on its Chromium processes, as `--user-data-dir`, which
+// config-digger reads to tell whether a running app reads a home the user
+// added (#211).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,7 +20,7 @@ import { fresh, probe, run, same, sandboxOnly, write } from "./lib.mjs";
 
 sandboxOnly();
 const installers = process.argv.includes("--installers") ? process.argv[process.argv.indexOf("--installers") + 1] : ".";
-fresh("claude-desktop");
+const probeDir = fresh("claude-desktop");
 const appData = process.env.APPDATA;
 const localAppData = process.env.LOCALAPPDATA;
 const classicData = path.join(appData, "Claude");
@@ -38,7 +40,7 @@ async function waitFor(fn, seconds) {
   return null;
 }
 const stop = () => run("taskkill.exe", ["/im", "claude.exe", "/t", "/f"]);
-const detached = (command, args) => spawn(command, args, { detached: true, stdio: "ignore" }).unref();
+const detached = (command, args, env = process.env) => spawn(command, args, { detached: true, stdio: "ignore", env }).unref();
 
 // A config whose one server, `cd-throwaway-<tag>`, the app skips.
 const config = (tag) => ({ mcpServers: { [`cd-throwaway-${tag}`]: { url: "http://127.0.0.1:9/mcp" } } });
@@ -56,17 +58,24 @@ foreach ($w in $windows) {
   return [...new Set(texts.match(/cd-throwaway-[a-z]+/g) ?? [])].map((n) => n.slice("cd-throwaway-".length)).sort();
 }
 
-// The executables the app runs as, and the data folder its Chromium
-// processes were given.
+// The folder a command line's `--user-data-dir` names, the whole argument
+// quoted, the value quoted, or neither; null when it has none.
+const switchDir = (line) =>
+  (line.match(/"--user-data-dir=([^"]*)"/) ?? line.match(/--user-data-dir="([^"]*)"/) ?? line.match(/--user-data-dir=(\S+)/))?.[1] ?? null;
+
+// The executables the app runs as, the data folder its Chromium processes
+// were given, and the folder each process's `--user-data-dir` names.
 async function processes() {
   const paths = await powershell("Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | ForEach-Object { $_.ExecutablePath }");
   const lines = await powershell("Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | ForEach-Object { $_.CommandLine }");
   const images = [...new Set(paths.split(/\r?\n/).filter(Boolean))].sort();
-  return { images, dir: lines.match(/--user-data-dir="?([^"\r\n]+?)"?(?= --| \/|\r?$)/m)?.[1] ?? null };
+  const dirs = lines.split(/\r?\n/).filter(Boolean).map(switchDir);
+  return { images, dir: lines.match(/--user-data-dir="?([^"\r\n]+?)"?(?= --| \/|\r?$)/m)?.[1] ?? null, dirs };
 }
 
 // Starts the app with `launch`, waits for its dialog, and stops it: the
-// folders its dialog named, and the data folder it chose.
+// folders its dialog named, the data folder it chose, and the folder each
+// of its processes' `--user-data-dir` names.
 async function started(launch, seconds = 90) {
   await stop();
   launch();
@@ -74,9 +83,9 @@ async function started(launch, seconds = 90) {
     const tags = await named();
     return tags.length ? tags : null;
   }, seconds)) ?? [];
-  const { images, dir } = await processes();
+  const { images, dir, dirs } = await processes();
   await stop();
-  return { tags, images, dir };
+  return { tags, images, dir, dirs };
 }
 
 // ---------------------------------------------------------------- the classic installer
@@ -108,8 +117,34 @@ await p.check("(top)", "the classic installer puts the app in `%LOCALAPPDATA%\\A
 
 await p.check("(top)", "the classic app runs from `app-<version>` and reads `%APPDATA%\\Claude`", async () => {
   write(path.join(classicData, "claude_desktop_config.json"), config("classic"));
-  const seen = await started(() => detached(classicExe, []));
-  return same(seen, { tags: ["classic"], images: [path.join(localAppData, "AnthropicClaude", `app-${version}`, "claude.exe")], dir: classicData });
+  const { tags, images, dir } = await started(() => detached(classicExe, []));
+  return same({ tags, images, dir }, { tags: ["classic"], images: [path.join(localAppData, "AnthropicClaude", `app-${version}`, "claude.exe")], dir: classicData });
+});
+
+// A data folder the user picks, which config-digger can know only from the
+// running app's processes (#211): a space in it shows how the switch quotes
+// it. Both checks start the app itself, not the launcher, and say how many
+// of its processes name no folder.
+const appExe = () => path.join(localAppData, "AnthropicClaude", `app-${version}`, "claude.exe");
+const switches = (seen, folder) => {
+  const named = seen.dirs.filter(Boolean);
+  return { tags: seen.tags, named: named.length > 0, every: named.every((dir) => dir === folder), unnamed: seen.dirs.length - named.length };
+};
+
+await p.check("(top)", "the signed app ignores `CLAUDE_USER_DATA_DIR`: it reads `%APPDATA%\\Claude`, which its children name in `--user-data-dir`", async () => {
+  const userDataDir = path.join(probeDir, "user data dir");
+  write(path.join(userDataDir, "claude_desktop_config.json"), config("userdatadir"));
+  write(path.join(classicData, "claude_desktop_config.json"), config("ignored"));
+  const seen = await started(() => detached(appExe(), [], { ...process.env, CLAUDE_USER_DATA_DIR: userDataDir }));
+  return { ...same(switches(seen, classicData), { tags: ["ignored"], named: true, every: true, unnamed: 1 }), observed: JSON.stringify(seen) };
+});
+
+await p.check("(top)", "the app started with `--user-data-dir=<folder>` reads that folder, and each of its processes names it there, the main one too", async () => {
+  const userDataDir = path.join(probeDir, "switch data dir");
+  write(path.join(userDataDir, "claude_desktop_config.json"), config("switch"));
+  write(path.join(classicData, "claude_desktop_config.json"), config("notswitch"));
+  const seen = await started(() => detached(appExe(), [`--user-data-dir=${userDataDir}`]));
+  return { ...same(switches(seen, userDataDir), { tags: ["switch"], named: true, every: true, unnamed: 0 }), observed: JSON.stringify(seen) };
 });
 
 // ---------------------------------------------------------------- the MSIX package
