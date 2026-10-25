@@ -1521,12 +1521,20 @@ fn location(entry: &api::Entry, width: Option<usize>) -> String {
 /// What follows the locator of an Entry in a git-versioned file.
 const GIT_VERSIONED_TAG: &str = " [git-versioned]";
 
-/// What follows the locator of a Linked Entry: its location is a junction
-/// or symlink.
+/// What follows the locator of a Linked Entry whose location is a junction.
 const JUNCTION_TAG: &str = " [junction]";
 
-/// What follows the locator of a Linked Entry whose target is gone.
+/// What follows the locator of a Linked Entry whose location is a junction
+/// and whose target is gone.
 const BROKEN_JUNCTION_TAG: &str = " [junction, broken]";
+
+/// What follows the locator of a Linked Entry whose location is a symlink,
+/// to a folder or a file.
+const SYMLINK_TAG: &str = " [symlink]";
+
+/// What follows the locator of a Linked Entry whose location is a symlink
+/// and whose target is gone.
+const BROKEN_SYMLINK_TAG: &str = " [symlink, broken]";
 
 /// An Entry's location column: its locator, shortened to `width` as
 /// [`location`] does, then a tag when its file is git-versioned and one
@@ -1538,8 +1546,12 @@ fn location_cell(entry: &api::Entry, width: Option<usize>) -> String {
         ""
     };
     let link = match &entry.link {
-        Some(link) if link.broken => BROKEN_JUNCTION_TAG,
-        Some(_) => JUNCTION_TAG,
+        Some(link) => match (link.kind.is_symlink(), link.broken) {
+            (false, false) => JUNCTION_TAG,
+            (false, true) => BROKEN_JUNCTION_TAG,
+            (true, false) => SYMLINK_TAG,
+            (true, true) => BROKEN_SYMLINK_TAG,
+        },
         None => "",
     };
     let tags = format!("{git}{link}");

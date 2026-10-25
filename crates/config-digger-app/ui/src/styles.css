@@ -592,7 +592,7 @@ p {
   color: var(--tag-git-text);
 }
 
-.tag.junction {
+.tag.linked {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

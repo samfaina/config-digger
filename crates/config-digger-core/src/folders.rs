@@ -3,8 +3,8 @@
 //! for Verify, and the file system as it will be once they are done, which
 //! a plan scans to predict the States after.
 
-use crate::api::{Error, FolderChange, FolderChangeKind};
-use crate::ports::{FileSystem, HeldLock};
+use crate::api::{Error, FolderChange, FolderChangeKind, LinkKind};
+use crate::ports::{FileSystem, HeldLock, WrittenLink};
 use crate::scan::LocationReader;
 use crate::{explain, paths, skill};
 use serde::{Deserialize, Serialize};
@@ -42,18 +42,70 @@ pub(crate) fn measure_target(
     }
 }
 
+/// A link as Remove finds it and Undo creates it again (ADR 0008).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Link {
+    /// A junction, a folder symlink or a file symlink.
+    pub kind: LinkKind,
+    /// Its target as written: relative to the folder the link is in, or
+    /// absolute.
+    pub written: PathBuf,
+    /// Its target, made absolute.
+    pub target: PathBuf,
+}
+
+impl Link {
+    /// A junction to `target`, which is absolute.
+    pub fn junction(target: PathBuf) -> Self {
+        Self {
+            kind: LinkKind::Junction,
+            written: target.clone(),
+            target,
+        }
+    }
+}
+
+/// How the Undo of a link's removal would create it again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ComesBack {
+    /// As it was.
+    AsItWas,
+    /// As a junction to its target made absolute: it is a folder symlink,
+    /// and symlinks cannot be created.
+    AsJunction,
+    /// Not at all: it is a file symlink, and symlinks cannot be created.
+    Refused,
+}
+
+impl ComesBack {
+    /// How a link of `kind` would come back, `symlinks` saying whether
+    /// symlinks can be created.
+    pub fn of(kind: LinkKind, symlinks: bool) -> Self {
+        match kind {
+            LinkKind::FolderSymlink if !symlinks => Self::AsJunction,
+            LinkKind::FileSymlink if !symlinks => Self::Refused,
+            _ => Self::AsItWas,
+        }
+    }
+}
+
 /// What an Operation does at one skill folder's location.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FolderOp {
     /// Moves the folder into the Operation's backup.
     MoveToBackup,
-    /// Removes the link there, which points to `target`, and never `target`.
-    RemoveLink { target: PathBuf },
+    /// Removes the link there, and never its target.
+    RemoveLink { link: Link, comes_back: ComesBack },
     /// Moves the folder back from `from`, its copy in an earlier
     /// Operation's backup.
     MoveBack { from: PathBuf },
-    /// Creates the link to `target` there again.
-    CreateLink { target: PathBuf },
+    /// Creates the link there again; `instead_of` is the folder symlink it
+    /// was, when symlinks cannot be created and `link` is a junction to the
+    /// same target.
+    CreateLink {
+        link: Link,
+        instead_of: Option<Link>,
+    },
     /// Moves the folder into config-digger's parked-Entry store, at `to`.
     Park { to: PathBuf },
     /// Moves the folder back from `from`, where the parked-Entry store
@@ -80,17 +132,17 @@ impl PlannedFolder {
     pub fn change(&self) -> FolderChange {
         let (change, target) = match &self.op {
             FolderOp::MoveToBackup => (FolderChangeKind::MovedToBackup, None),
-            FolderOp::RemoveLink { target } => (FolderChangeKind::LinkRemoved, Some(target)),
+            FolderOp::RemoveLink { link, .. } => (FolderChangeKind::LinkRemoved, Some(link)),
             FolderOp::MoveBack { .. } => (FolderChangeKind::MovedBack, None),
-            FolderOp::CreateLink { target } => (FolderChangeKind::LinkCreated, Some(target)),
+            FolderOp::CreateLink { link, .. } => (FolderChangeKind::LinkCreated, Some(link)),
             FolderOp::Park { .. } => (FolderChangeKind::Parked, None),
             FolderOp::Unpark { .. } => (FolderChangeKind::PutBack, None),
         };
         FolderChange {
-            sentence: explain::folder_change(change, &self.path, target, self.size),
+            sentence: explain::folder_change(&self.op, &self.path, self.size),
             path: self.path.clone(),
             change,
-            target: target.cloned(),
+            target: target.map(|link| link.target.clone()),
             files: self.size.files,
             size: self.size.bytes,
             git_versioned: self.git_versioned,
@@ -114,9 +166,10 @@ pub(crate) struct AsIf<'f> {
 /// A path of an [`AsIf`] view that shows another path.
 struct Shown {
     at: PathBuf,
-    /// The copy moved back, or the link's target.
+    /// The copy moved back, or the link's target made absolute.
     from: PathBuf,
-    link: bool,
+    /// The link created, if it is one.
+    link: Option<WrittenLink>,
 }
 
 /// Where a path of an [`AsIf`] view is read.
@@ -139,19 +192,29 @@ impl<'f> AsIf<'f> {
                     shown.push(Shown {
                         at: folder.path.clone(),
                         from: from.clone(),
-                        link: false,
+                        link: None,
                     });
                 }
-                FolderOp::CreateLink { target } => {
+                FolderOp::CreateLink { link, .. } => {
                     shown.push(Shown {
                         at: folder.path.clone(),
-                        from: target.clone(),
-                        link: true,
+                        from: link.target.clone(),
+                        link: Some(WrittenLink {
+                            kind: link.kind,
+                            target: link.written.clone(),
+                        }),
                     });
                 }
             }
         }
         Self { fs, gone, shown }
+    }
+
+    /// The link created at `path` itself, if one is.
+    fn created_link(&self, path: &Path) -> Option<&Shown> {
+        self.shown
+            .iter()
+            .find(|shown| shown.link.is_some() && is_at(path, &shown.at))
     }
 
     fn seen(&self, path: &Path) -> Seen {
@@ -193,10 +256,20 @@ pub(crate) fn taken(fs: &dyn FileSystem, path: &Path) -> bool {
     fs.exists(path) || fs.link_target(path).is_some()
 }
 
-/// Whether the link at `path` points to `target`.
-pub(crate) fn links_to(fs: &dyn FileSystem, path: &Path, target: &Path) -> bool {
-    fs.link_target(path)
-        .is_some_and(|now| is_at(&paths::lexical(&now), target))
+/// Whether the link at `path` is `link`: of its kind, holding its target as
+/// written, separators aside.
+pub(crate) fn is_link(fs: &dyn FileSystem, path: &Path, link: &Link) -> bool {
+    fs.written_link(path).is_some_and(|now| {
+        same_kind(now.kind, link.kind)
+            && paths::lexical_key(&now.target) == paths::lexical_key(&link.written)
+    })
+}
+
+/// Whether a link found of kind `found` is one of kind `expected`. Outside
+/// Windows a junction is created as a symlink, and reads as one.
+fn same_kind(found: LinkKind, expected: LinkKind) -> bool {
+    found == expected
+        || (!cfg!(windows) && expected == LinkKind::Junction && found == LinkKind::FolderSymlink)
 }
 
 /// Whether the folder at `path`, which is no link, has `size`.
@@ -262,7 +335,7 @@ impl FileSystem for AsIf<'_> {
         let moved_back = self
             .shown
             .iter()
-            .any(|shown| !shown.link && below(path, &shown.at).is_some());
+            .any(|shown| shown.link.is_none() && below(path, &shown.at).is_some());
         match self.seen(path) {
             Seen::Gone => None,
             // A folder moved back is real where it lands.
@@ -272,17 +345,27 @@ impl FileSystem for AsIf<'_> {
     }
 
     fn link_target(&self, path: &Path) -> Option<PathBuf> {
-        let created = self
-            .shown
-            .iter()
-            .find(|shown| shown.link && is_at(path, &shown.at));
-        if let Some(shown) = created {
+        if let Some(shown) = self.created_link(path) {
             return Some(shown.from.clone());
         }
         if self.gone.iter().any(|gone| is_at(path, gone)) {
             return None;
         }
         self.fs.link_target(path)
+    }
+
+    fn written_link(&self, path: &Path) -> Option<WrittenLink> {
+        if let Some(shown) = self.created_link(path) {
+            return shown.link.clone();
+        }
+        if self.gone.iter().any(|gone| is_at(path, gone)) {
+            return None;
+        }
+        self.fs.written_link(path)
+    }
+
+    fn can_create_symlinks(&self, folder: &Path) -> bool {
+        self.fs.can_create_symlinks(folder)
     }
 
     fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
@@ -328,7 +411,7 @@ impl FileSystem for AsIf<'_> {
         Err(read_only())
     }
 
-    fn create_link(&self, _: &Path, _: &Path) -> io::Result<()> {
+    fn create_link(&self, _: &Path, _: LinkKind, _: &Path) -> io::Result<()> {
         Err(read_only())
     }
 

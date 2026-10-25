@@ -3107,6 +3107,95 @@ fn junctioned_deploy() -> Harness {
     harness
 }
 
+/// The tag `show deploy` puts after the row of `.claude/skills/deploy`.
+#[cfg(windows)]
+fn deploy_tag(harness: &Harness) -> String {
+    let run = harness.run(&["show", "deploy"]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let link = real_path(&harness.path(".claude/skills"))
+        .join("deploy")
+        .display()
+        .to_string();
+    let row = run
+        .stdout
+        .lines()
+        .find(|line| line.contains(&link))
+        .unwrap_or_else(|| panic!("no row for the link:\n{}", run.stdout));
+    row[row.find(&link).unwrap() + link.len()..]
+        .trim()
+        .to_owned()
+}
+
+/// The written target of git's `core.symlinks` checkout of `deploy`.
+#[cfg(windows)]
+const RELATIVE_DEPLOY: &str = r"..\..\.agents\skills\deploy";
+
+/// A home where `deploy` is committed in a repo with git's `core.symlinks`:
+/// its folder in `~/.agents/skills`, and a relative folder symlink to it in
+/// `~/.claude/skills`. `None` when this machine cannot create symlinks,
+/// which takes Developer Mode or admin rights.
+#[cfg(windows)]
+fn symlinked_deploy() -> Option<Harness> {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_file(".agents/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+    std::fs::create_dir_all(harness.path(".claude/skills")).unwrap();
+    match std::os::windows::fs::symlink_dir(RELATIVE_DEPLOY, harness.path(".claude/skills/deploy"))
+    {
+        Ok(()) => Some(harness),
+        Err(error) => {
+            eprintln!("skipped: this machine cannot create symlinks: {error}");
+            None
+        }
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn show_tags_a_symlinked_skill_as_a_symlink() {
+    let Some(harness) = symlinked_deploy() else {
+        return;
+    };
+
+    assert_eq!(deploy_tag(&harness), "[symlink]");
+}
+
+#[cfg(windows)]
+#[test]
+fn remove_of_a_relative_folder_symlink_and_its_undo_create_it_again_as_it_was() {
+    let Some(harness) = symlinked_deploy() else {
+        return;
+    };
+    let link = harness.path(".claude/skills/deploy");
+    let selector = real_path(&harness.path(".claude/skills"))
+        .join("deploy")
+        .display()
+        .to_string();
+
+    let removed = harness.run(&["remove", &selector, "--yes", "--json"]);
+
+    assert_eq!(removed.code, 0, "{}", removed.stdout);
+    let document = removed.document();
+    let sentence = document["plan"]["folders"][0]["sentence"].as_str().unwrap();
+    assert!(
+        sentence.starts_with(&format!("Removes the folder symlink {selector} only;")),
+        "{sentence}"
+    );
+    assert_eq!(document["result"]["verify"], "verified");
+    assert!(std::fs::symlink_metadata(&link).is_err());
+
+    let operation = document["result"]["operation"].as_str().unwrap();
+    let undone = harness.run(&["undo", operation, "--yes"]);
+
+    assert_eq!(undone.code, 0, "{}{}", undone.stdout, undone.stderr);
+    assert_eq!(
+        std::fs::read_link(&link).unwrap(),
+        Path::new(RELATIVE_DEPLOY)
+    );
+    assert!(link.join("SKILL.md").exists());
+    assert_eq!(deploy_tag(&harness), "[symlink]");
+}
+
 #[cfg(windows)]
 #[test]
 fn show_tags_a_junctioned_skill_and_names_its_skill_manager() {
@@ -3171,6 +3260,7 @@ fn remove_of_a_junctioned_skill_removes_the_junction_only_and_undo_creates_it_ag
             .is_symlink()
     );
     assert!(link.join("SKILL.md").exists());
+    assert_eq!(deploy_tag(&harness), "[junction]");
 }
 
 #[test]

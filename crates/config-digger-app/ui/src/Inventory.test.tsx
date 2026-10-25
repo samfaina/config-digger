@@ -1,11 +1,12 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
-import type { Entry, Home, Inventory, Item, Project, State } from "./bindings";
+import type { Entry, Home, Inventory, Item, LinkKind, Project, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
 import { EntryCard } from "./EntryCard";
 import { Banner, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
+import { LinkTag } from "./Location";
 import { applyReaction } from "./Select";
 import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
 
@@ -262,6 +263,22 @@ const actionButtons = (busy: boolean) => {
     buttons: row.match(/<button[^>]*class="cta[^>]*>/g) ?? [],
   };
 };
+
+describe("the tag of a Linked Entry", () => {
+  const tag = (kind: LinkKind, broken: boolean, withTarget = false) =>
+    renderToStaticMarkup(<LinkTag link={{ target: String.raw`C:\skills\x`, kind, broken }} withTarget={withTarget} />);
+
+  test("names a junction or a symlink as the CLI does, and when its target is gone", () => {
+    expect(tag("junction", false)).toBe('<span class="tag linked">junction</span>');
+    expect(tag("junction", true)).toBe('<span class="tag linked">junction, broken</span>');
+    expect(tag("folder_symlink", false)).toBe('<span class="tag linked">symlink</span>');
+    expect(tag("file_symlink", true)).toBe('<span class="tag linked">symlink, broken</span>');
+  });
+
+  test("shows where it points beside its kind on an Entry card", () => {
+    expect(tag("folder_symlink", false, true)).toBe(String.raw`<span class="tag linked">symlink → C:\skills\x</span>`);
+  });
+});
 
 describe("an Entry card", () => {
   test("disables Disable and Remove while its Entry is read again, and shows it is being read beside its State", () => {

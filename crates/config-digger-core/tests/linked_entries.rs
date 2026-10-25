@@ -5,10 +5,11 @@
 //! each back.
 
 use config_digger_core::api::{
-    Action, Advice, Context, Core, Entry, Error, Inventory, Item, Outcome, Plan, ScanOptions,
-    Targets, WarningClass,
+    Action, Advice, Context, Core, Entry, Error, Inventory, Item, LinkKind, Outcome, Plan,
+    ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+use config_digger_core::ports::{FileSystem, WrittenLink};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -136,7 +137,11 @@ fn a_junction_at_a_skills_own_location_is_a_linked_entry_apart_from_its_target()
     assert_eq!(entry["state"], "effective");
     assert_eq!(
         entry["link"],
-        json!({ "target": r"C:\Users\fixture\.agents\skills\deploy", "broken": false })
+        json!({
+            "target": r"C:\Users\fixture\.agents\skills\deploy",
+            "kind": "junction",
+            "broken": false
+        })
     );
     assert_eq!(
         entry["config"],
@@ -146,6 +151,34 @@ fn a_junction_at_a_skills_own_location_is_a_linked_entry_apart_from_its_target()
     let entry = entry_json(&target.entries[0]);
     assert_eq!(entry["path"], r"C:\Users\fixture\.agents\skills\deploy");
     assert_eq!(entry["link"], Value::Null);
+}
+
+/// `deploy` committed in a repo with git's `core.symlinks`, as git checks
+/// it out: a relative folder symlink in `~/.claude/skills` to its folder in
+/// `~/.agents/skills`.
+fn symlinked_deploy() -> FakeFileSystem {
+    with_skill(claude_home(), agents_skill("deploy"), "deploy")
+        .with_folder(in_home(r".claude\skills"))
+        .with_symlink(claude_skill("deploy"), r"..\..\.agents\skills\deploy")
+}
+
+#[test]
+fn a_relative_folder_symlink_is_a_linked_entry_with_its_target_made_absolute() {
+    let fs = symlinked_deploy();
+
+    let inventory = inventory(&core(&fs));
+
+    let linked = skill(&inventory, "claude-code", "deploy");
+    let entry = entry_json(&linked.entries[0]);
+    assert_eq!(entry["state"], "effective");
+    assert_eq!(
+        entry["link"],
+        json!({
+            "target": r"C:\Users\fixture\.agents\skills\deploy",
+            "kind": "folder_symlink",
+            "broken": false
+        })
+    );
 }
 
 #[test]
@@ -169,7 +202,11 @@ fn a_link_whose_target_is_gone_is_an_unread_linked_entry_named_by_its_folder() {
     );
     assert_eq!(
         entry_json(entry)["link"],
-        json!({ "target": r"C:\Users\fixture\.agents\skills\deploy", "broken": true })
+        json!({
+            "target": r"C:\Users\fixture\.agents\skills\deploy",
+            "kind": "junction",
+            "broken": true
+        })
     );
     assert_eq!(code(entry_json(entry)["disable"]["code"].clone()), "unread");
 }
@@ -253,7 +290,7 @@ fn remove_of_a_linked_entry_removes_the_link_and_never_its_target() {
     );
     assert_eq!(
         preview["folders"][0]["sentence"],
-        r"Removes the link C:\Users\fixture\.claude\skills\deploy only; its target C:\Users\fixture\.agents\skills\deploy (2 files, 80 bytes) stays as it is."
+        r"Removes the junction C:\Users\fixture\.claude\skills\deploy only; its target C:\Users\fixture\.agents\skills\deploy (2 files, 80 bytes) stays as it is."
     );
     // Only the link's own Entry changes: its target stays Effective.
     let changed: Vec<(&str, &str)> = plan
@@ -468,7 +505,7 @@ fn undo_of_a_linked_entry_remove_creates_the_link_again() {
 
     assert_eq!(
         serde_json::to_value(undo.preview()).unwrap()["folders"][0]["sentence"],
-        r"Creates the link C:\Users\fixture\.claude\skills\deploy to C:\Users\fixture\.agents\skills\deploy again."
+        r"Creates the junction C:\Users\fixture\.claude\skills\deploy to C:\Users\fixture\.agents\skills\deploy again."
     );
     let undone = execute(&core, undo);
     assert_eq!(code(undone.verify), "verified");
@@ -563,4 +600,286 @@ fn a_link_to_a_link_is_removed_as_it_holds_it_and_undone_to_the_same_target() {
         .find(|entry| entry.path == claude_skill("deploy"))
         .unwrap();
     assert_eq!(again.link.as_ref().unwrap().target, dev);
+}
+
+/// The link at `path`, with its kind and its target as written.
+fn written_link(fs: &FakeFileSystem, path: &Path) -> Option<WrittenLink> {
+    fs.written_link(path)
+}
+
+/// Each kind of link Remove finds at `~/.claude/skills/deploy`, with the
+/// file system it is in.
+fn each_kind_of_link() -> Vec<(&'static str, FakeFileSystem, WrittenLink)> {
+    let skills = || with_skill(claude_home(), agents_skill("deploy"), "deploy");
+    let link = |kind, target: &str| WrittenLink {
+        kind,
+        target: PathBuf::from(target),
+    };
+    vec![
+        (
+            "a junction",
+            junctioned_deploy(),
+            link(
+                LinkKind::Junction,
+                r"C:\Users\fixture\.agents\skills\deploy",
+            ),
+        ),
+        (
+            "a relative folder symlink",
+            symlinked_deploy(),
+            link(LinkKind::FolderSymlink, r"..\..\.agents\skills\deploy"),
+        ),
+        (
+            "an absolute folder symlink",
+            skills()
+                .with_folder(in_home(r".claude\skills"))
+                .with_symlink(claude_skill("deploy"), agents_skill("deploy")),
+            link(
+                LinkKind::FolderSymlink,
+                r"C:\Users\fixture\.agents\skills\deploy",
+            ),
+        ),
+        (
+            "a broken file symlink",
+            claude_home()
+                .with_folder(in_home(r".claude\skills"))
+                .with_file_symlink(claude_skill("deploy"), r"..\..\deploy.md"),
+            link(LinkKind::FileSymlink, r"..\..\deploy.md"),
+        ),
+    ]
+}
+
+#[test]
+fn remove_then_undo_of_each_kind_of_link_leaves_the_same_kind_with_the_same_written_target() {
+    for (what, fs, before) in each_kind_of_link() {
+        let core = core(&fs);
+        let link = claude_skill("deploy");
+        assert_eq!(written_link(&fs, &link), Some(before.clone()), "{what}");
+
+        let removed = execute(&core, remove(&core, &link.display().to_string()));
+        assert_eq!(written_link(&fs, &link), None, "{what}");
+        let undone = execute(&core, core.plan_undo(&removed.operation).unwrap());
+
+        assert_eq!(code(undone.verify), "verified", "{what}");
+        assert_eq!(written_link(&fs, &link), Some(before), "{what}");
+    }
+}
+
+/// The sentence of the one folder change in `plan`'s preview.
+fn folder_sentence(plan: &Plan) -> String {
+    plan.preview().folders[0].sentence.clone()
+}
+
+#[test]
+fn without_symlinks_the_remove_preview_of_a_folder_symlink_says_it_may_come_back_as_a_junction() {
+    let fs = symlinked_deploy().without_symlinks();
+    let core = core(&fs);
+
+    let plan = remove(&core, &claude_skill("deploy").display().to_string());
+
+    assert_eq!(
+        folder_sentence(&plan),
+        r"Removes the folder symlink C:\Users\fixture\.claude\skills\deploy only; its target C:\Users\fixture\.agents\skills\deploy (2 files, 80 bytes) stays as it is. Its Undo may create a junction to C:\Users\fixture\.agents\skills\deploy in its place: config-digger cannot create symlinks here, which takes Developer Mode or admin rights."
+    );
+}
+
+#[test]
+fn the_remove_preview_of_a_junction_or_of_a_creatable_symlink_says_nothing_of_how_it_comes_back() {
+    let junction = junctioned_deploy().without_symlinks();
+    let symlink = symlinked_deploy();
+
+    for fs in [junction, symlink] {
+        let core = core(&fs);
+        let plan = remove(&core, &claude_skill("deploy").display().to_string());
+
+        assert!(
+            folder_sentence(&plan).ends_with("stays as it is."),
+            "{}",
+            folder_sentence(&plan)
+        );
+    }
+}
+
+#[test]
+fn without_symlinks_undo_creates_a_junction_in_place_of_a_folder_symlink_and_says_so() {
+    let fs = symlinked_deploy().without_symlinks();
+    let core = core(&fs);
+    let link = claude_skill("deploy");
+    let removed = execute(&core, remove(&core, &link.display().to_string()));
+
+    let undo = core.plan_undo(&removed.operation).unwrap();
+
+    assert_eq!(
+        folder_sentence(&undo),
+        r"Creates a junction C:\Users\fixture\.claude\skills\deploy to C:\Users\fixture\.agents\skills\deploy, in place of the folder symlink to ..\..\.agents\skills\deploy it was: config-digger cannot create symlinks here, which takes Developer Mode or admin rights."
+    );
+    let undone = execute(&core, undo);
+    assert_eq!(code(undone.verify), "verified");
+    assert_eq!(
+        written_link(&fs, &link),
+        Some(WrittenLink {
+            kind: LinkKind::Junction,
+            target: agents_skill("deploy"),
+        })
+    );
+    assert!(
+        undone.sentence.ends_with(
+            r"It created a junction C:\Users\fixture\.claude\skills\deploy to C:\Users\fixture\.agents\skills\deploy, in place of the folder symlink to ..\..\.agents\skills\deploy it was: config-digger cannot create symlinks here, which takes Developer Mode or admin rights."
+        ),
+        "{}",
+        undone.sentence
+    );
+    // Undo of that Undo removes the junction it created.
+    let again = execute(&core, core.plan_undo(&undone.operation).unwrap());
+    assert_eq!(code(again.verify), "verified");
+    assert_eq!(written_link(&fs, &link), None);
+}
+
+#[test]
+fn undo_of_that_undo_is_refused_once_the_link_is_not_what_it_created() {
+    let fs = symlinked_deploy().without_symlinks();
+    let core = core(&fs);
+    let link = claude_skill("deploy");
+    let removed = execute(&core, remove(&core, &link.display().to_string()));
+    let undone = execute(&core, core.plan_undo(&removed.operation).unwrap());
+    fs.remove_link(&link).unwrap();
+    let fs = fs.with_symlink(&link, r"..\..\.agents\skills\deploy");
+
+    let refused = core.plan_undo(&undone.operation).err().unwrap();
+
+    assert_eq!(code(refused.code), "undo_refused");
+    assert!(
+        refused.message.starts_with(
+            r"the link C:\Users\fixture\.claude\skills\deploy changed since the Operation"
+        ),
+        "{}",
+        refused.message
+    );
+    assert!(fs.is_link(&link));
+}
+
+/// `deploy` as a file symlink whose target is gone.
+fn broken_file_symlink() -> FakeFileSystem {
+    claude_home()
+        .with_folder(in_home(r".claude\skills"))
+        .with_file_symlink(claude_skill("deploy"), r"..\..\deploy.md")
+}
+
+#[test]
+fn without_symlinks_undo_of_a_file_symlink_remove_is_refused_with_the_reason() {
+    let fs = broken_file_symlink().without_symlinks();
+    let core = core(&fs);
+    let plan = remove(&core, &claude_skill("deploy").display().to_string());
+    assert_eq!(
+        folder_sentence(&plan),
+        r"Removes the file symlink C:\Users\fixture\.claude\skills\deploy only; its target C:\Users\fixture\deploy.md (0 files, 0 bytes) stays as it is. Its Undo cannot create it again: config-digger cannot create symlinks here, which takes Developer Mode or admin rights."
+    );
+    let removed = execute(&core, plan);
+
+    let refused = core.plan_undo(&removed.operation).err().unwrap();
+
+    assert_eq!(code(refused.code), "undo_refused");
+    assert!(
+        refused.message.starts_with(
+            r"the file symlink C:\Users\fixture\.claude\skills\deploy cannot be created again: config-digger cannot create symlinks here, which takes Developer Mode or admin rights, and a file has no junction to take its place, so the Undo is refused"
+        ),
+        "{}",
+        refused.message
+    );
+    assert!(!core.history().unwrap()[0].undoable);
+}
+
+#[test]
+fn verify_after_undo_fails_when_the_link_created_is_of_another_kind() {
+    let fs = with_skill(claude_home(), agents_skill("deploy"), "deploy")
+        .with_folder(in_home(r".claude\skills"))
+        .with_symlink(claude_skill("deploy"), agents_skill("deploy"))
+        .creating_junctions_for_symlinks();
+    let core = core(&fs);
+    let removed = execute(
+        &core,
+        remove(&core, &claude_skill("deploy").display().to_string()),
+    );
+
+    let error = core
+        .execute(core.plan_undo(&removed.operation).unwrap(), &[])
+        .unwrap_err();
+
+    assert_eq!(code(error.code), "verify_failed");
+    assert!(
+        error.message.starts_with(
+            r"C:\Users\fixture\.claude\skills\deploy is not the folder symlink to C:\Users\fixture\.agents\skills\deploy it should be"
+        ),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn verify_after_undo_fails_when_the_link_created_holds_another_written_target() {
+    let fs = symlinked_deploy().creating_links_with_absolute_targets();
+    let core = core(&fs);
+    let removed = execute(
+        &core,
+        remove(&core, &claude_skill("deploy").display().to_string()),
+    );
+
+    let error = core
+        .execute(core.plan_undo(&removed.operation).unwrap(), &[])
+        .unwrap_err();
+
+    assert_eq!(code(error.code), "verify_failed");
+    assert!(
+        error.message.starts_with(
+            r"C:\Users\fixture\.claude\skills\deploy is not the folder symlink to ..\..\.agents\skills\deploy it should be"
+        ),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn verify_takes_a_written_target_with_other_separators_as_the_same() {
+    let fs = with_skill(claude_home(), agents_skill("deploy"), "deploy")
+        .with_folder(in_home(r".claude\skills"))
+        .with_symlink(claude_skill("deploy"), "../../.agents/skills/deploy");
+    let core = core(&fs);
+    let removed = execute(
+        &core,
+        remove(&core, &claude_skill("deploy").display().to_string()),
+    );
+
+    let undone = execute(&core, core.plan_undo(&removed.operation).unwrap());
+
+    assert_eq!(code(undone.verify), "verified");
+}
+
+#[test]
+fn a_history_record_with_no_link_kind_is_undone_as_a_junction_to_its_absolute_target() {
+    let fs = symlinked_deploy();
+    let core = core(&fs);
+    let removed = execute(
+        &core,
+        remove(&core, &claude_skill("deploy").display().to_string()),
+    );
+    // As config-digger recorded a removed link before ADR 0008.
+    let manifest = removed.backup.join("manifest.json");
+    let mut record: Value = serde_json::from_slice(&fs.contents(&manifest).unwrap()).unwrap();
+    let folder = record["folders"][0]["op"].as_object_mut().unwrap();
+    assert_eq!(folder["link"], "folder_symlink");
+    assert_eq!(folder["written"], r"..\..\.agents\skills\deploy");
+    folder.remove("link");
+    folder.remove("written");
+    fs.put_file(&manifest, serde_json::to_vec(&record).unwrap());
+
+    let undone = execute(&core, core.plan_undo(&removed.operation).unwrap());
+
+    assert_eq!(code(undone.verify), "verified");
+    assert_eq!(
+        written_link(&fs, &claude_skill("deploy")),
+        Some(WrittenLink {
+            kind: LinkKind::Junction,
+            target: agents_skill("deploy"),
+        })
+    );
 }

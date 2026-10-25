@@ -6,6 +6,12 @@ import { KEY, ref, unwrap } from "./driver.mjs";
 
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The switches a step's setup gives the data script besides -Root and
+// -Reset, such as -Symlink, each with the space before it.
+export function setupSwitches(text) {
+  return (text.match(/ -(?!Root\b|Reset\b)[A-Za-z]+\b/g) ?? []).join("");
+}
+
 // The rail's screens, by the tooltip the tester sees on each button.
 export async function go(s, screen) {
   const el = await s.waitFor(`.rail button[aria-label='${screen}']`);

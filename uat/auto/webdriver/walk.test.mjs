@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { profileEnv, ref, Session } from "./driver.mjs";
+import { setupSwitches } from "./lib.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
 import { openGroup } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
@@ -48,6 +49,12 @@ test("step 1.1 fails when the setup script does not list the home whose Project 
   };
   assert.deepEqual(await walk([...listed, "claude-code-shape-home\\.claude.json"]), []);
   assert.deepEqual(await walk(listed), ["lista «claude-code-shape-home\\.claude.json»"]);
+});
+
+test("a step's setup runs the data script with the switches the plan adds to -Reset", () => {
+  assert.equal(setupSwitches(String.raw`.\uat\data\cd-throwaway-setup.ps1 -Reset`), "");
+  assert.equal(setupSwitches(String.raw`.\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink`), " -Symlink");
+  assert.equal(setupSwitches(String.raw`.\uat\data\cd-throwaway-setup.ps1 -Root D:\x\cd-throwaway -Reset -Symlink`), " -Symlink");
 });
 
 test("a step that leaves something to a person says what", () => {

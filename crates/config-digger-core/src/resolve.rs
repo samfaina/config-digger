@@ -1571,6 +1571,7 @@ pub(crate) fn context_project(snapshot: &Snapshot, context: &Context) -> Option<
 fn link(entry: &ScannedEntry) -> Option<api::Link> {
     entry.link.as_ref().map(|link| api::Link {
         target: link.target.clone(),
+        kind: link.kind,
         broken: link.broken(),
     })
 }

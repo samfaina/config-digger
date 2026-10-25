@@ -2085,9 +2085,31 @@ impl Entry {
 pub struct Link {
     /// The path the link holds, made absolute.
     pub target: PathBuf,
+    /// A junction, a folder symlink or a file symlink: what Undo of its
+    /// Remove creates again.
+    pub kind: LinkKind,
     /// The target is gone, so the Agent reads nothing there and the Entry
     /// is Unread.
     pub broken: bool,
+}
+
+/// What kind of link a Linked Entry's location is, which Undo of its
+/// Remove creates again (ADR 0008).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkKind {
+    /// A Windows junction, which points to a folder by its absolute path.
+    Junction,
+    /// A symlink to a folder, its target absolute or relative.
+    FolderSymlink,
+    /// A symlink to a file, its target absolute or relative.
+    FileSymlink,
+}
+
+impl LinkKind {
+    pub fn is_symlink(self) -> bool {
+        self != Self::Junction
+    }
 }
 
 /// The State a Disabled Entry would have once Enabled.

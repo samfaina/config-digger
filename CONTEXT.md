@@ -69,7 +69,7 @@ One declaration at one concrete location — a key inside a configuration file, 
 _Avoid_: Record, definition, setting
 
 **Linked Entry**:
-An Entry whose location is a junction or symlink to another location. It is its own Entry, separate from its target: taking it away removes the link, not what it points to.
+An Entry whose location is a junction or symlink to another location. It is its own Entry, separate from its target: taking it away removes the link, not what it points to. Its link kind is a junction, a folder symlink or a file symlink, and Undo of its Remove creates the same kind with the same target as written (ADR 0008).
 _Avoid_: Alias, shortcut, mirror
 
 **Git-versioned**:

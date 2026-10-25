@@ -1,6 +1,7 @@
 //! The core's I/O ports. The core ships the real implementations in [`real`];
 //! tests swap in the fakes from [`fake`].
 
+use crate::api::LinkKind;
 use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -69,6 +70,11 @@ pub trait FileSystem: Send + Sync {
     /// its parent folders are followed and do not count.
     fn link_target(&self, path: &Path) -> Option<PathBuf>;
 
+    /// The kind of the link or junction at `path` itself and its target as
+    /// written, relative if it was written relative; `None` when `path` is
+    /// no link. Links in its parent folders are followed and do not count.
+    fn written_link(&self, path: &Path) -> Option<WrittenLink>;
+
     /// The paths of the files and folders directly in a folder, links
     /// included, in no particular order. A missing folder is an error of
     /// kind `NotFound`.
@@ -87,10 +93,17 @@ pub trait FileSystem: Send + Sync {
     /// to. Anything else at `path` is an error of kind `InvalidInput`.
     fn remove_link(&self, path: &Path) -> io::Result<()>;
 
-    /// Creates a link to the folder `target` at `link`, where nothing is,
-    /// in an existing folder: a junction on Windows, which needs no
-    /// privilege, and a symlink elsewhere.
-    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()>;
+    /// Creates a link of `kind` at `link`, where nothing is, in an existing
+    /// folder, holding `target` as written: a relative target is relative
+    /// to the folder `link` is in. A junction is a symlink outside Windows.
+    /// A symlink fails where [`can_create_symlinks`](Self::can_create_symlinks)
+    /// is false.
+    fn create_link(&self, link: &Path, kind: LinkKind, target: &Path) -> io::Result<()>;
+
+    /// Whether symlinks can be created, which on Windows takes Developer
+    /// Mode or admin rights: found by creating one in `folder`,
+    /// config-digger's data folder, and deleting it, once per session.
+    fn can_create_symlinks(&self, folder: &Path) -> bool;
 
     /// Moves the folder at `from`, and everything below it, to `to`, where
     /// nothing is, in an existing folder.
@@ -104,6 +117,16 @@ pub trait FileSystem: Send + Sync {
     /// Takes an exclusive OS lock on the file at `path`, creating the file if
     /// needed, without waiting: `None` when someone else holds it.
     fn try_lock(&self, path: &Path) -> io::Result<Option<HeldLock>>;
+}
+
+/// A link as it is on disk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WrittenLink {
+    /// A junction, a folder symlink or a file symlink.
+    pub kind: LinkKind,
+    /// The target it holds, as written: relative to the folder the link is
+    /// in, or absolute.
+    pub target: PathBuf,
 }
 
 /// A process running on this machine, as far as process detection needs it.

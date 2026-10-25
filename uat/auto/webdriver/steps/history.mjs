@@ -60,6 +60,13 @@ function detail(s) {
 
 const resultLine = (text, re) => text.split("\n").find((l) => re.test(l));
 
+// Opens the one folder of the dialog's Files section and returns what it says.
+async function folderNote(s) {
+  const head = await s.waitFor(".dialog .file-block .file-head");
+  if ((await s.attr(head, "aria-expanded")) !== "true") await s.click(head);
+  return s.until(() => s.exec("return document.querySelector('.dialog .file-block .file-note')?.textContent.trim() ?? null"), { what: "the folder's sentence" });
+}
+
 export default [
   {
     id: "11.1",
@@ -531,6 +538,45 @@ export default [
       const state = await s.exec("return { box: document.querySelector('input[aria-label=\"Search Entry names\"]').value, verb: document.querySelector('[role=combobox][aria-label=Verb]').textContent.trim(), status: document.querySelector('[role=combobox][aria-label=Status]').textContent.trim() }");
       t.check(state.box === "" && state.verb === "Any verb" && state.status === "Any status", "tras Clear filter, la caja está vacía y los desplegables dicen «Any verb» y «Any status»", JSON.stringify(state));
       t.eq(await title(), `${n} Operations`, `tras Clear filter, el título vuelve a «${n} Operations»`);
+    },
+  },
+  {
+    id: "11.12",
+    async run(t) {
+      const { s } = t;
+      const link = `${t.root}\\claude-code-home\\.claude\\skills\\cd-throwaway-linked-skill`;
+      const target = `${t.root}\\linked\\cd-throwaway-linked-skill`;
+      const written = String.raw`..\..\..\linked\cd-throwaway-linked-skill`;
+      await inventoryOf(t, "Claude Code", "claude-code-home");
+      await openItem(t, "cd-throwaway-linked-skill");
+      const entry = await s.exec(`
+        const c = document.querySelector(".panel.detail .entry-card");
+        return { tag: c?.querySelector(".tag.linked")?.textContent.trim(), note: [...(c?.querySelectorAll(".action-note") ?? [])].map((e) => e.textContent.trim()) };`);
+      t.eq(entry.tag, `symlink → ${target}`, `la tarjeta tiene la etiqueta «symlink → ${target}»`);
+      t.check(entry.note.some((n) => n.endsWith("It removes the symlink only, never its target.")), "la nota bajo Remove dice «It removes the symlink only, never its target.»", entry.note.join(" | "));
+      await press(s, "Remove", ".panel.detail .entry-card");
+      await waitPreview(s);
+      const removes = await folderNote(s);
+      const says = removes.startsWith(`Removes the folder symlink ${link} only; its target ${target} (1 file, `) && removes.endsWith(") stays as it is.");
+      t.check(says,`la carpeta del Remove dice «Removes the folder symlink ${link} only; its target ${target} (1 file, …) stays as it is.»`, removes);
+      const result = await confirm(s, "Remove");
+      const line = resultLine(result.text, /^Removed 1 Entry\. Operation \S+: verified\.$/);
+      t.check(line, "el resultado del Remove dice «Removed 1 Entry. Operation <id>: verified.»", result.text.split("\n").slice(0, 6).join(" | "));
+      const id = operationId(line ?? "");
+      await done(s);
+      await go(s, "History · Undo");
+      await pickOperation(s, id);
+      await press(s, "Undo", ".history-detail .dialog-foot");
+      await waitPreview(s);
+      const creates = await folderNote(s);
+      t.eq(creates, `Creates the folder symlink ${link} to ${written} again.`, `la carpeta del Undo dice «Creates the folder symlink ${link} to ${written} again.»`);
+      const undone = await confirm(s, "Undo");
+      const undid = resultLine(undone.text, new RegExp(`^Undid ${id}\\. Operation \\S+: verified\\.$`));
+      t.check(undid, "el resultado del Undo dice «Undid <id>. Operation <id nuevo>: verified.»", undone.text.split("\n").slice(0, 6).join(" | "));
+      await done(s);
+      const [kind, holds] = t.ps(`$link = Get-Item '${link}'; $link.LinkType; $link.Target`).split(/\r?\n/);
+      t.eq(kind, "SymbolicLink", "la orden muestra primero «SymbolicLink»");
+      t.eq(holds, written, `la orden muestra después «${written}», sin «E:\\»`);
     },
   },
 ];

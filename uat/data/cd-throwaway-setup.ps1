@@ -6,9 +6,11 @@
 #   .\uat\data\cd-throwaway-setup.ps1          creates E:\cd-throwaway
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset   deletes E:\cd-throwaway and creates it again
 #   .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   adds a skill behind a relative folder symlink
 param(
     [string]$Root = "E:\cd-throwaway",
-    [switch]$Reset
+    [switch]$Reset,
+    [switch]$Symlink
 )
 $ErrorActionPreference = "Stop"
 
@@ -188,6 +190,25 @@ $manyProjects
   }
 }
 "@
+
+# With -Symlink, a skill committed in a repo with git's core.symlinks, as git
+# checks it out: its folder outside any Agent home, and a relative folder
+# symlink to it in the Claude Code home. Creating a symlink takes Developer
+# Mode or admin rights, so the default data has none.
+if ($Symlink) {
+    Write-TestFile "$Root\linked\cd-throwaway-linked-skill\SKILL.md" @"
+---
+name: cd-throwaway-linked-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    # mklink keeps the target as written; New-Item makes it absolute in
+    # Windows PowerShell 5.1.
+    cmd /c mklink /D "$Root\claude-code-home\.claude\skills\cd-throwaway-linked-skill" "..\..\..\linked\cd-throwaway-linked-skill" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot create the symlink: turn on Developer Mode in Settings > System > For developers, or run PowerShell as an administrator."
+    }
+}
 
 Write-Host "Created the throwaway homes and Projects in $Root"
 Get-ChildItem $Root -Recurse -File | ForEach-Object { "  " + $_.FullName.Substring($Root.Length + 1) }
