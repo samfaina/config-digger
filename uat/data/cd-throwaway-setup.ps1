@@ -143,6 +143,32 @@ Write-TestFile "$Root\claude-code-shape-home\.claude.json" @"
 }
 "@
 
+# A Claude Code home with a plugin synced from claude.ai, which Claude Code
+# keeps in a folder per account and names by its manifest, and the plugin
+# sync gate cached on, on 2 Oct 2026 at 07:40 UTC.
+Write-TestFile "$Root\claude-code-synced-home\.claude.json" @"
+{
+  "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
+  "cachedGrowthBookFeaturesAt": 1790926800000
+}
+"@
+$synced = "$Root\claude-code-synced-home\.claude\plugins\synced\cd-org_cd-acct"
+Write-TestFile "$synced\manifest.json" @"
+{ "lastUpdated": 1790926800000, "plugins": [{ "name": "cd-throwaway-synced", "generation": 1, "installationPreference": "available" }] }
+"@
+Write-TestFile "$synced\cd-throwaway-synced~g1.meta.json" @"
+{ "server_plugin_id": "cd-throwaway", "marketplace_name": "cd-throwaway", "installation_preference": "available" }
+"@
+Write-TestFile "$synced\cd-throwaway-synced~g1\.claude-plugin\plugin.json" @"
+{ "name": "cd-throwaway-synced", "version": "1.0.0", "description": "Throwaway plugin for testing config-digger." }
+"@
+Write-TestFile "$synced\cd-throwaway-synced~g1\skills\cd-throwaway-synced-skill\SKILL.md" @"
+---
+name: cd-throwaway-synced-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+
 # A second Claude Code home with 30 user servers and 30 Projects, so that the
 # Items, the Projects and the Project dropdown scroll in the smallest window,
 # and a missing Project with 12 leftovers, so that the What changes of their

@@ -670,3 +670,82 @@ fn a_variable_in_the_remote_settings_env_bypasses_the_cache() {
         bypassed_by("DISABLE_TELEMETRY")
     );
 }
+
+const PLUGIN_SYNC_GATE: &str = "tengu_claudeai_plugins_sync_enabled";
+
+/// A Claude Code home whose `~/.claude.json` is `state`, with the plugin
+/// `demo` synced from claude.ai, carrying the skill `notes` and the server
+/// `docs`.
+fn synced_plugin_home(state: &Value) -> FakeFileSystem {
+    let plugin = in_home(r".claude\plugins\synced\org1_acct1\demo~g3");
+    let fs = FakeFileSystem::new()
+        .with_file(in_home(".claude.json"), state.to_string())
+        .with_file(
+            plugin.join(r".claude-plugin\plugin.json"),
+            json!({ "name": "demo" }).to_string(),
+        )
+        .with_file(
+            plugin.join(".mcp.json"),
+            json!({ "mcpServers": { "docs": { "url": "https://docs.example.com/mcp" } } })
+                .to_string(),
+        );
+    with_skill(fs, plugin.join(r"skills\notes"), &skill_md("notes"))
+}
+
+/// A `~/.claude.json` that cached the plugin sync gate as `value`.
+fn cached_plugin_gate(value: Value) -> Value {
+    json!({
+        "cachedGrowthBookFeatures": { PLUGIN_SYNC_GATE: value, SYNC_GATE: true },
+        "cachedGrowthBookFeaturesAt": CACHED_AT,
+    })
+}
+
+#[test]
+fn the_plugin_sync_gate_is_a_caveat_on_synced_plugins_that_stay_read() {
+    let gate = PLUGIN_SYNC_GATE;
+    let growthbook_off = FakeEnvironment::with_home(HOME).with_var("DISABLE_GROWTHBOOK", "1");
+    for (state, env, code, sentence) in [
+        (
+            cached_plugin_gate(json!(true)),
+            FakeEnvironment::with_home(HOME),
+            "gate_cached",
+            format!("Depends on Claude Code gate `{gate}`: on as of 2 Oct 2026 07:40 UTC."),
+        ),
+        (
+            cached_plugin_gate(json!(false)),
+            FakeEnvironment::with_home(HOME),
+            "gate_cached",
+            format!("Depends on Claude Code gate `{gate}`: off as of 2 Oct 2026 07:40 UTC."),
+        ),
+        (
+            json!({ "cachedGrowthBookFeatures": {}, "cachedGrowthBookFeaturesAt": CACHED_AT }),
+            FakeEnvironment::with_home(HOME),
+            "gate_assumed",
+            format!("Depends on Claude Code gate `{gate}`: assumed off; cannot be read."),
+        ),
+        (
+            cached_plugin_gate(json!(true)),
+            growthbook_off,
+            "gate_assumed",
+            format!(
+                "Depends on Claude Code gate `{gate}`: assumed off; Claude Code ignores its cached value while `DISABLE_GROWTHBOOK` is set."
+            ),
+        ),
+    ] {
+        let inventory = inventory_with(&synced_plugin_home(&state), env);
+
+        for name in ["demo:notes", "plugin:demo:docs"] {
+            let entry = entry_json(&skill(&inventory, name).entries[0]);
+            assert_eq!(entry["state"], "effective", "{name}: {entry}");
+            assert_eq!(
+                entry["caveats"],
+                json!([{
+                    "code": code,
+                    "path": r"C:\Users\fixture\.claude.json",
+                    "sentence": sentence,
+                }]),
+                "{name}"
+            );
+        }
+    }
+}

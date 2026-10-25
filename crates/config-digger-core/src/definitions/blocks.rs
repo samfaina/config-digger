@@ -1930,6 +1930,12 @@ impl ProjectPluginKeys {
 pub(crate) struct PluginFolders {
     /// The folder the plugins' folders are in.
     pub anchor: Anchor,
+    /// How many folders below the anchor each plugin's folder sits, at
+    /// least 1: 1 is its direct subfolders, and 2 the subfolders of each,
+    /// such as Claude Code's synced plugins in a folder per account.
+    /// Folders above that depth whose name starts with `.` are not read.
+    #[serde(default = "one_folder_down")]
+    pub depth: usize,
     /// A `/`-separated path relative to a plugin's folder, or several, any
     /// of which makes the folder a plugin's.
     pub marker: Option<RelativePaths>,
@@ -1990,6 +1996,9 @@ pub(crate) struct InstallRecords {
 
 impl Validate for PluginFolders {
     fn validate(&self) -> Result<(), String> {
+        if self.depth == 0 {
+            return Err("plugin folders' depth must be at least 1".into());
+        }
         for anchor in self.anchors() {
             anchor.validate()?;
             anchor.one_file()?;

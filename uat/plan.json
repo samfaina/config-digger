@@ -293,6 +293,38 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#123"]
+        },
+        {
+          "id": "1.4",
+          "title": "Un plugin sincronizado desde claude.ai",
+          "goal": "Un plugin que Claude Code sincroniza desde claude.ai sale como cloud mirror de solo lectura, con el aviso de la gate de sincronización de plugins y sin Disable.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-synced-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario y elige ese home.",
+            "Elige la skill cd-throwaway-synced:cd-throwaway-synced-skill y mira su tarjeta."
+          ],
+          "commands": [],
+          "expect": [
+            "El Inventario de ese home muestra la skill «cd-throwaway-synced:cd-throwaway-synced-skill».",
+            "La tarjeta tiene la etiqueta «cloud mirror».",
+            "La tarjeta dice «Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC.».",
+            "El botón Disable está desactivado.",
+            "Bajo los botones dice «Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.».",
+            "El botón Remove está desactivado."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#113"]
         }
       ]
     },

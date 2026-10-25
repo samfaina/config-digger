@@ -39,7 +39,7 @@ The Agent rewrites `.claude.json` constantly while it runs: on this machine it c
 | project | `<project root>\.mcp.json` | `mcpServers.<name>` | [disk] e.g. `E:\projects\claudio\stint\.mcp.json` |
 | user | `%USERPROFILE%\.claude.json` | top-level `mcpServers.<name>` | [docs]. This machine has no top-level `mcpServers` key [disk] |
 | plugin | `<installPath>\.mcp.json` and/or whatever `mcpServers` points to in `<installPath>\.claude-plugin\plugin.json` | `mcpServers.<name>` | [disk] (see §5) |
-| claude.ai connectors | Not on disk. Fetched from claude.ai when signed in | n/a | [docs]. On disk only as names in `disabledMcpServers`, e.g. `claude.ai Linear` [disk] |
+| claude.ai connectors | Not on disk. Fetched from claude.ai when signed in | n/a | [docs]. On disk only as names in `disabledMcpServers`, e.g. `claude.ai Linear` [disk]. With no config on disk, config-digger cannot see a connector's endpoint, so in v0.1 connectors are no Entries and do not compete by endpoint with plugin servers; the definition carries the Agent note `cloud_connectors_not_on_disk`, as Claude Desktop's does (#113) |
 | session only | `--mcp-config <file>` flag | `mcpServers` | [docs] |
 
 Sources: [MCP scopes](https://code.claude.com/docs/en/mcp), [managed MCP](https://code.claude.com/docs/en/managed-mcp).
@@ -159,7 +159,7 @@ The plugins root is `%USERPROFILE%\.claude\plugins`, overridable with `CLAUDE_CO
 | `cache\…\<version>\.in_use\<pid>` | **undocumented**. JSON `{pid, procStartFt}` for every running Agent process that has the version loaded |
 | `data\<id>\` | `${CLAUDE_PLUGIN_DATA}`, named `<name>-<marketplace>`, e.g. `superpowers-claude-plugins-official`, `ponytail-inline` |
 | `marketplaces\<name>\` | marketplace clones |
-| `synced\<uuid>_<uuid>\<plugin>\` | plugins synced from claude.ai, with `<plugin>.meta.json`, `manifest.json`, `.marketplaces.json` |
+| `synced\<uuid>_<uuid>\<plugin>~g<n>\` | plugins synced from claude.ai, with `<plugin>~g<n>.meta.json`, `manifest.json`, `.marketplaces.json`; see "Synced plugins" below |
 | `store\`, `plugin-catalog-cache.json`, `.last_inuse_sweep` | undocumented internals |
 
 Enabled state is recorded only in the settings files' `enabledPlugins` map, whose keys are `name@origin`. The origin is a marketplace name, or one of `inline`, `skills-dir`, `synced` ([plugin loading](https://code.claude.com/docs/en/plugins/loading)) [docs, disk]. User `settings.json` here contains `superpowers@claude-plugins-official: false` and four `true` values. `stint\.claude\settings.local.json` contains `ponytail@ponytail: true` [disk]. **An entry in `installed_plugins.json` does not mean the plugin is enabled.** Always cross-check `enabledPlugins`.
@@ -178,6 +178,36 @@ Plugin structure ([plugins reference](https://code.claude.com/docs/en/plugins-re
    - MCP: `plugin:<plugin-name>:<server>`. This exact string is what `/mcp` writes into `disabledMcpServers`, e.g. `plugin:supabase:supabase` [disk].
    - skill: `<plugin-name>:<skill>`.
 4. Add synced plugins (`plugins\synced\…`) and skills-dir plugins (`skills\<x>\.claude-plugin\plugin.json`). `--plugin-dir` plugins exist only for their session and leave no trace on disk.
+
+### Synced plugins
+
+Claude Code downloads the plugins of the signed-in claude.ai account into `plugins\synced\` (Claude Code 2.1.310, Max account) [disk]:
+
+```
+plugins\synced\
+  .bucket-<org>_<account>                    empty file, not a folder
+  <org>_<account>\
+    manifest.json                            {lastUpdated, plugins: [{pluginId, name, description, version, updatedAt, marketplaceName, installationPreference, generation}]}
+    .marketplaces.json                       claude.ai marketplaces (etag, rows, parserVersion)
+    .last-complete-round                     a round id
+    <name>~g<generation>.meta.json           {server_plugin_id, marketplace_name, installation_preference}
+    <name>~g<generation>\                    a normal plugin root
+      .claude-plugin\plugin.json             {name, version, description, author}
+      skills\<skill>\SKILL.md
+      .in_use\<pid>
+```
+
+How a synced plugin differs from an installed one:
+
+- **Name.** It is named by the `name` of its `.claude-plugin\plugin.json`, not by its folder: `cowork-plugin-management~g2` loads as `cowork-plugin-management`, its skills offered as `cowork-plugin-management:<skill>` [disk]. The `~g<n>` suffix is a generation, not part of the name. What Claude Code names a synced folder with no manifest `name` is not known; config-digger takes the folder's name up to `~g`.
+- **No registry.** No `installed_plugins.json` record lists it: the folder is all there is [disk].
+- **On by default.** No settings file names it in `enabledPlugins`, and it loads anyway [disk], where an installed plugin no settings file names is off [test]. Its `enabledPlugins` key is `<name>@synced` ([plugin loading](https://code.claude.com/docs/en/plugins/loading)) [docs]; `false` there is taken to turn it off, merged as any plugin key is.
+- **`syncClaudeAiPlugins: false`** in user, local or managed settings turns off every synced plugin ([plugin loading](https://code.claude.com/docs/en/plugins/loading)) [docs].
+- **Same-named plugins.** Of plugins with one manifest name, an installed marketplace plugin beats a skills-dir plugin, which beats a synced one ([plugin loading](https://code.claude.com/docs/en/plugins/loading)) [docs]. config-digger ranks a synced plugin's servers and skills below an installed plugin's, so the ones both carry are Shadowed; a whole synced plugin is not Shadowed yet.
+- **`installation_preference`.** `"available"` in the `.meta.json`, and the plugin loads [disk]. What other values do is not known.
+- **The sync gate.** `tengu_claudeai_plugins_sync_enabled` is `true` in `cachedGrowthBookFeatures` here [disk]. Like the skill sync gate, it is taken to decide whether Claude Code downloads the plugins, not whether it reads the folder; untested.
+
+config-digger reads each `<name>~g<n>` folder as a plugin with `cloud-mirror` Provenance at user Scope, read-only: its servers and skills, as for an installed plugin, and nothing else of `synced\` (#113).
 
 "Extensions": Claude Code has no separate extension concept. The nearest thing is `.mcpb`/`.dxt` bundles referenced from a plugin, which are extracted to `.mcpb-cache\` inside the plugin root ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. In 2.1.310's code, `.mcpb-cache\<hash>.metadata.json` records each bundle it extracted: `source`, the value that names it, `extractedPath`, `.mcpb-cache\<content hash>`, which holds the bundle's `manifest.json`, and when it was cached. The bundle's one server is named by the manifest's `name`, from its `server.mcp_config` with `${__dirname}` standing for that folder [binary].
 
@@ -301,4 +331,4 @@ The release gate (#80) ran Claude Code on throwaway homes with `uat/agents/claud
 5. **Sanitization rule for `~/.claude/projects/<name>`** with long paths. Some Agents truncate and hash; this wasn't observed here.
 6. **The WinGet install's binary path.** Not documented and not present on this machine.
 7. **The exact secure-storage backend on Windows** for OAuth tokens and `sensitive` plugin `userConfig` values. `.credentials.json` exists, but the docs don't say whether Windows Credential Manager is used as well.
-8. **The meaning of `plugins\store\` and `plugins\synced\<uuid>_<uuid>`**: is the pair account and organization? Undocumented. For `skills\synced\` it is `<organizationUuid>_<accountUuid>`, the ids of `oauthAccount` in `~/.claude.json`, and Claude Code reads only the signed-in account's folder ([release gate](release-gate.md)).
+8. **The meaning of `plugins\store\` and `plugins\synced\<uuid>_<uuid>`**: is the pair account and organization? Undocumented. For `skills\synced\` it is `<organizationUuid>_<accountUuid>`, the ids of `oauthAccount` in `~/.claude.json`, and Claude Code reads only the signed-in account's folder ([release gate](release-gate.md)). **Partly answered (#113):** `plugins\synced\<uuid>_<uuid>\` holds the claude.ai account's synced plugins, one `<name>~g<generation>` folder each (see "Synced plugins" in §5), and its pair is presumably the same `<organizationUuid>_<accountUuid>` as for `skills\synced\`; config-digger reads every pair's folder (#308). `plugins\store\` is still unexplained.
