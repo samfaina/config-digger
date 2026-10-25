@@ -121,3 +121,33 @@ fn symlink_adds_a_skill_behind_a_relative_folder_symlink_and_reset_keeps_working
     assert!(again.status.success(), "{}", stderr(&again));
     assert!(link.join("SKILL.md").is_file());
 }
+
+#[test]
+fn cursor_adds_its_own_appdata_and_a_git_project_with_a_nested_skill() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("cd-throwaway");
+
+    let output = setup_with(&root, false, &["-Cursor"]);
+
+    assert!(output.status.success(), "{}", stderr(&output));
+    let user = root.join(r"cursor-appdata\Cursor\User");
+    assert!(user.join("settings.json").is_file());
+    let workspace =
+        std::fs::read_to_string(user.join(r"workspaceStorage\cd-throwaway\workspace.json"))
+            .unwrap();
+    assert!(
+        workspace.contains("/cd-throwaway/cursor-project\""),
+        "{workspace}"
+    );
+    let project = root.join("cursor-project");
+    assert!(project.join(".git").is_dir());
+    assert!(
+        project
+            .join(r"packages\app\.cursor\skills\cd-throwaway-nested-skill\SKILL.md")
+            .is_file()
+    );
+
+    let again = setup_with(&root, true, &["-Cursor"]);
+
+    assert!(again.status.success(), "{}", stderr(&again));
+}

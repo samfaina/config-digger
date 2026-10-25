@@ -9,8 +9,8 @@
 //   node uat/agents/cursor.mjs [--bin <Cursor.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=plugins,broken-user` runs those launches only: `plugins`,
-// `broken-<user|project>`, `project-plugins`, `sign-in`, `gates` and
-// `skills`.
+// `broken-<user|project>`, `project-plugins`, `sign-in`, `gates`, `skills`
+// and `nested-skills`.
 //
 // Cursor takes a Statsig gate from the account's cache, or signed out from
 // its code's default, unless an override in the profile's
@@ -40,7 +40,7 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { fresh, json, probe, root, run, same, skill, write } from "./lib.mjs";
+import { fresh, gitInit, json, probe, root, run, same, skill, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -799,14 +799,22 @@ if (runs("gates")) {
 // Cursor's code takes a skill under `<drive>:\Users\<name>` for a user's,
 // so the launch's home folder is `<drive>:\Users\cd-throwaway`, on a drive
 // `subst` maps to a folder of the launch, which the probe takes off again.
-if (runs("skills")) {
-  const dir = fresh("skills", base);
+//
+// The letter of a drive mapped to a folder of the launch in `dir`, and the
+// home folder on it.
+async function usersDrive(dir) {
   const letter = [..."ZYXWVUTSRQPONMLKJIHG"].find((l) => !fs.existsSync(`${l}:\\`));
   const drive = path.join(dir, "drive");
   fs.mkdirSync(path.join(drive, "Users", "cd-throwaway"), { recursive: true });
   const mapped = await run("subst.exe", [`${letter}:`, drive]);
   if (mapped.code !== 0) throw new Error(`subst ${letter}: failed: ${mapped.stdout}${mapped.stderr}`);
-  const home = `${letter}:\\Users\\cd-throwaway`;
+  return { letter, home: `${letter}:\\Users\\cd-throwaway` };
+}
+const unmap = (letter) => run("subst.exe", [`${letter}:`, "/d"]);
+
+if (runs("skills")) {
+  const dir = fresh("skills", base);
+  const { letter, home } = await usersDrive(dir);
   const d = folders(dir, home);
   const userSkills = path.join(d.cursor, "skills");
   const skillAt = (folder, text) => write(path.join(folder, "SKILL.md"), text);
@@ -852,7 +860,7 @@ if (runs("skills")) {
       },
     });
   } finally {
-    await run("subst.exe", [`${letter}:`, "/d"]);
+    await unmap(letter);
   }
   const picked = stored(globalState(d), "cursor.skills.recentlyUsed");
   // Customize's line below each skill of `names`, by folder.
@@ -885,6 +893,185 @@ if (runs("skills")) {
         userName: [["/cd-throwaway-user-name", "user named"]],
         projectName: [],
         customize: [["cd-throwaway-folder", "user named"], ["cd-throwaway-path", "user agents"]],
+      },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- nested skills
+
+// Skills folders deeper in a Project than its own `.cursor\skills`: one
+// git Project, launched with Include Third-Party Plugins, Skills, and
+// Other Configs on, as Cursor has it unless told, and again with it off,
+// and a Project in no git work tree. Each nested skill is named after the
+// case it tests; the `/` menu is queried one name at a time and Customize
+// read once. The home folder is on a mapped drive, as for `skills`, so
+// that Cursor takes `~\.cursor\skills` for the user's.
+if (runs("nested-skills")) {
+  const dir = fresh("nested-skills", base);
+  const { letter, home } = await usersDrive(dir);
+  const d = folders(dir, home);
+  const at = (folder, name, description) => skill(path.join(d.proj, ...folder.split("/"), name), [`name: ${name}`, `description: ${description}`]);
+  at("sub/.cursor/skills", "cd-throwaway-n-cursor-1", "cursor depth 1");
+  at("sub/deep/er/.cursor/skills", "cd-throwaway-n-cursor-3", "cursor depth 3");
+  at("a/.agents/skills", "cd-throwaway-n-agents-1", "agents depth 1");
+  at("sub/deep/er/.agents/skills", "cd-throwaway-n-agents-3", "agents depth 3");
+  at("sub/.claude/skills", "cd-throwaway-n-claude", "claude depth 1");
+  at("sub/.codex/skills", "cd-throwaway-n-codex", "codex depth 1");
+  at("sub/.grok/skills", "cd-throwaway-n-grok", "grok depth 1");
+  // A junction below the Project's folder to a folder outside it.
+  const elsewhere = path.join(dir, "elsewhere");
+  skill(path.join(elsewhere, ".cursor", "skills", "cd-throwaway-n-linked"), ["name: cd-throwaway-n-linked", "description: through a junction"]);
+  fs.symlinkSync(elsewhere, path.join(d.proj, "linked"), "junction");
+  at("node_modules/pkg/.cursor/skills", "cd-throwaway-n-node-modules", "excluded");
+  at("dist/.cursor/skills", "cd-throwaway-n-dist", "excluded");
+  // A `.gitignore` that leaves out a folder holding a skills folder, one
+  // that leaves out the skills folder itself, and one its `.cursor` folder;
+  // an `.ignore` as the first.
+  write(path.join(d.proj, ".gitignore"), "gi-folder/\ngi-skills/.cursor/skills/\ngi-marker/.cursor/\n");
+  write(path.join(d.proj, ".ignore"), "ig-folder/\n");
+  at("gi-folder/.cursor/skills", "cd-throwaway-n-ignored-folder", "gitignored folder");
+  at("gi-skills/.cursor/skills", "cd-throwaway-n-ignored-skills", "gitignored skills folder");
+  at("gi-marker/.cursor/skills", "cd-throwaway-n-ignored-marker", "gitignored marker folder");
+  at("ig-folder/.cursor/skills", "cd-throwaway-n-dot-ignore", "ignored by .ignore");
+  // One path below the marker folder: the root's and a nested one, the
+  // user's and a nested one, and two nested ones.
+  at(".cursor/skills", "cd-throwaway-n-root", "root");
+  at("sub/.cursor/skills", "cd-throwaway-n-root", "nested");
+  skill(path.join(d.cursor, "skills", "cd-throwaway-n-user"), ["name: cd-throwaway-n-user", "description: user"]);
+  at("sub/.agents/skills", "cd-throwaway-n-user", "nested");
+  at("x/.cursor/skills", "cd-throwaway-n-pair", "x");
+  at("y/.cursor/skills", "cd-throwaway-n-pair", "y");
+  // Two nested ones whose folders' order and paths' order disagree, and one
+  // deeper whose path comes first.
+  at("x/.agents/skills", "cd-throwaway-n-kinds", "x agents");
+  at("y/.cursor/skills", "cd-throwaway-n-kinds", "y cursor");
+  at("x/.cursor/skills", "cd-throwaway-n-holder", "x cursor");
+  at("x/.agents/skills", "cd-throwaway-n-holder", "x agents");
+  at("b/.cursor/skills", "cd-throwaway-n-deep", "b");
+  at("a/b/c/.cursor/skills", "cd-throwaway-n-deep", "a/b/c");
+  // An excluded name below the skills folder.
+  at("sub/.cursor/skills/build", "cd-throwaway-n-below-build", "below build");
+  await gitInit(d.proj);
+
+  const names = [
+    "cd-throwaway-n-cursor-1",
+    "cd-throwaway-n-cursor-3",
+    "cd-throwaway-n-agents-1",
+    "cd-throwaway-n-agents-3",
+    "cd-throwaway-n-claude",
+    "cd-throwaway-n-codex",
+    "cd-throwaway-n-grok",
+    "cd-throwaway-n-linked",
+    "cd-throwaway-n-node-modules",
+    "cd-throwaway-n-dist",
+    "cd-throwaway-n-ignored-folder",
+    "cd-throwaway-n-ignored-skills",
+    "cd-throwaway-n-dot-ignore",
+    "cd-throwaway-n-root",
+    "cd-throwaway-n-user",
+    "cd-throwaway-n-pair",
+    "cd-throwaway-n-kinds",
+    "cd-throwaway-n-holder",
+    "cd-throwaway-n-deep",
+    "cd-throwaway-n-below-build",
+    "cd-throwaway-n-ignored-marker",
+    "cd-throwaway-n-nogit",
+    "cd-throwaway-n-home",
+  ];
+  // The `/` menu for each name, and Customize's rows of the nested skills.
+  const read = async (win) => {
+    const slash = {};
+    for (const name of names) slash[name] = await win.slash(`/${name}`);
+    const customize = (await win.skills()).filter(([n]) => n.startsWith("cd-throwaway-n-"));
+    return { slash, customize };
+  };
+  const seen = {};
+  try {
+    await launch(dir, { home, during: async (win) => (seen.on = await read(win)) });
+    store(globalState(d), "cursor/thirdPartyExtensibilityEnabled", false);
+    await launch(dir, { home, during: async (win) => (seen.off = await read(win)) });
+  } finally {
+    await unmap(letter);
+  }
+  const noGit = fresh("nested-skills-no-git", base);
+  const n = folders(noGit);
+  skill(path.join(n.proj, "sub", ".cursor", "skills", "cd-throwaway-n-nogit"), ["name: cd-throwaway-n-nogit", "description: no git"]);
+  await launch(noGit, { during: async (win) => (seen.noGit = await read(win)) });
+  // A git Project that is the user's home folder.
+  const atHome = fresh("nested-skills-home", base);
+  const h = folders(atHome, path.join(atHome, "proj"));
+  skill(path.join(h.proj, "sub", ".cursor", "skills", "cd-throwaway-n-home"), ["name: cd-throwaway-n-home", "description: at home"]);
+  await gitInit(h.proj);
+  await launch(atHome, { home: h.home, during: async (win) => (seen.home = await read(win)) });
+
+  // What the `/` menu listed under `/name` itself, each entry's
+  // description: the menu also lists names close to the query.
+  const listed = (s, name) => s?.slash[name]?.filter(([entry]) => entry === `/${name}`).map(([, description]) => description);
+  const cases = (s, list) => Object.fromEntries(list.map((name) => [name, listed(s, name)]));
+  const rows = (s, list) => s?.customize.filter(([name]) => list.includes(name));
+  const depths = ["cd-throwaway-n-cursor-1", "cd-throwaway-n-cursor-3", "cd-throwaway-n-agents-1", "cd-throwaway-n-agents-3"];
+  await p.check("locations[nested-cursor-skills]", "In a git Project, Cursor lists the skills of a `.cursor\\skills` and an `.agents\\skills` folder one folder below the Project's and three, in the `/` menu and in Customize", async () =>
+    same(
+      { slash: cases(seen.on, depths), customize: rows(seen.on, depths) },
+      {
+        slash: { "cd-throwaway-n-cursor-1": ["cursor depth 1"], "cd-throwaway-n-cursor-3": ["cursor depth 3"], "cd-throwaway-n-agents-1": ["agents depth 1"], "cd-throwaway-n-agents-3": ["agents depth 3"] },
+        customize: [["cd-throwaway-n-agents-1", "agents depth 1"], ["cd-throwaway-n-agents-3", "agents depth 3"], ["cd-throwaway-n-cursor-1", "cursor depth 1"], ["cd-throwaway-n-cursor-3", "cursor depth 3"]],
+      },
+    ),
+  );
+  const thirdParty = ["cd-throwaway-n-claude", "cd-throwaway-n-codex", "cd-throwaway-n-grok"];
+  await p.check("locations[nested-claude-skills]", "Cursor lists the skills of nested `.claude\\skills`, `.codex\\skills` and `.grok\\skills` folders while Include Third-Party Plugins, Skills, and Other Configs is on, and not while it is off", async () =>
+    same(
+      { on: [cases(seen.on, thirdParty), rows(seen.on, thirdParty)], off: [cases(seen.off, thirdParty), rows(seen.off, thirdParty)] },
+      {
+        on: [
+          { "cd-throwaway-n-claude": ["claude depth 1"], "cd-throwaway-n-codex": ["codex depth 1"], "cd-throwaway-n-grok": ["grok depth 1"] },
+          [["cd-throwaway-n-claude", "claude depth 1"], ["cd-throwaway-n-codex", "codex depth 1"], ["cd-throwaway-n-grok", "grok depth 1"]],
+        ],
+        off: [Object.fromEntries(thirdParty.map((name) => [name, []])), []],
+      },
+    ),
+  );
+  await p.check("locations[nested-cursor-skills]", "Cursor lists a nested skill reached through a junction below the Project's folder", async () =>
+    same({ slash: listed(seen.on, "cd-throwaway-n-linked"), customize: rows(seen.on, ["cd-throwaway-n-linked"]) }, { slash: ["through a junction"], customize: [["cd-throwaway-n-linked", "through a junction"]] }),
+  );
+  const excluded = ["cd-throwaway-n-node-modules", "cd-throwaway-n-dist", "cd-throwaway-n-below-build"];
+  await p.check("locations[nested-cursor-skills]", "Cursor lists no nested skill whose path passes through a `node_modules`, a `dist` or a `build` folder, above its skills folder or below it", async () =>
+    same({ slash: cases(seen.on, excluded), customize: rows(seen.on, excluded) }, { slash: Object.fromEntries(excluded.map((name) => [name, []])), customize: [] }),
+  );
+  await p.check("locations[nested-cursor-skills]", "Cursor lists no nested skill of a Project in no git work tree", async () =>
+    same({ slash: listed(seen.noGit, "cd-throwaway-n-nogit"), customize: rows(seen.noGit, ["cd-throwaway-n-nogit"]) }, { slash: [], customize: [] }),
+  );
+  // Its code means to skip a workspace folder that is the user's home
+  // folder, comparing the two paths as spelled.
+  await p.check("locations[nested-cursor-skills]", "Cursor lists the nested skills of a git Project that is the user's home folder too", async () =>
+    same({ slash: listed(seen.home, "cd-throwaway-n-home"), customize: rows(seen.home, ["cd-throwaway-n-home"]) }, { slash: ["at home"], customize: [["cd-throwaway-n-home", "at home"]] }),
+  );
+  const ignored = ["cd-throwaway-n-ignored-folder", "cd-throwaway-n-ignored-skills", "cd-throwaway-n-ignored-marker", "cd-throwaway-n-dot-ignore"];
+  await p.check("locations[nested-cursor-skills]", "Cursor lists no skill of a nested skills folder below a folder that a `.gitignore` or an `.ignore` leaves out, nor in a `.cursor` folder one leaves out, but lists one whose skills folder itself a `.gitignore` leaves out", async () =>
+    same(
+      { slash: cases(seen.on, ignored), customize: rows(seen.on, ignored) },
+      {
+        slash: { "cd-throwaway-n-ignored-folder": [], "cd-throwaway-n-ignored-skills": ["gitignored skills folder"], "cd-throwaway-n-ignored-marker": [], "cd-throwaway-n-dot-ignore": [] },
+        customize: [["cd-throwaway-n-ignored-skills", "gitignored skills folder"]],
+      },
+    ),
+  );
+  const paths = ["cd-throwaway-n-root", "cd-throwaway-n-user"];
+  await p.check("items.skill", "Of a nested skill at the same path below its marker folder as the Project's own or a user's skill, Cursor lists the nested one only, in the `/` menu and in Customize", async () =>
+    same(
+      { slash: cases(seen.on, paths), customize: rows(seen.on, paths) },
+      { slash: { "cd-throwaway-n-root": ["nested"], "cd-throwaway-n-user": ["nested"] }, customize: [["cd-throwaway-n-root", "nested"], ["cd-throwaway-n-user", "nested"]] },
+    ),
+  );
+  const nested = ["cd-throwaway-n-pair", "cd-throwaway-n-kinds", "cd-throwaway-n-holder", "cd-throwaway-n-deep"];
+  await p.check("items.skill", "Of two nested skills at the same path below their marker folders, Cursor lists one only: the one whose folder holding the marker comes first by path, whatever the markers, and of one folder's, the `.cursor` one over the `.agents` one", async () =>
+    same(
+      { slash: cases(seen.on, nested), customize: rows(seen.on, nested) },
+      {
+        slash: { "cd-throwaway-n-pair": ["x"], "cd-throwaway-n-kinds": ["x agents"], "cd-throwaway-n-holder": ["x cursor"], "cd-throwaway-n-deep": ["a/b/c"] },
+        customize: [["cd-throwaway-n-deep", "a/b/c"], ["cd-throwaway-n-holder", "x cursor"], ["cd-throwaway-n-kinds", "x agents"], ["cd-throwaway-n-pair", "x"]],
       },
     ),
   );

@@ -17,6 +17,7 @@ Each fact is tagged:
 - **[disk]**: verified read-only on this machine, in config files, state databases, logs or running processes.
 - **[code]**: read from Cursor's shipped JavaScript.
 - **[docs]**: stated on cursor.com/docs and not observable here.
+- **[test]**: tested on the real Cursor by the release gate's probe, `uat/agents/cursor.mjs` (`docs/research/release-gate.md`).
 - **[contradicts docs]**: the code or disk differs from the docs, or goes beyond them.
 
 Secret values are never reproduced. Where one would appear, the text shows only the key name or `***`.
@@ -97,7 +98,7 @@ Skill folders are defined as a single list [code] [X]: `Bt=[{configDir:".cursor"
 | project | `<folder>\.agents\skills\` | no | [docs]; [code] |
 | project | `<folder>\.claude\skills\`, `<folder>\.codex\skills\` | yes | [docs] "for compatibility"; [code] |
 | project | `<folder>\.grok\skills\` | yes | [code] only. **[contradicts docs]**: not listed in [D-skills] |
-| project (nested) | any `.cursor/skills` or `.agents/skills` deeper in the repo, auto-scoped to that subtree | — | [docs] [D-skills] "Nested skill directories" |
+| project (nested) | any `.cursor/skills` or `.agents/skills` deeper in the repo, auto-scoped to that subtree | — | [docs] [D-skills] "Nested skill directories". **[contradicts docs]**: the five folders, and no subtree scope (below) |
 | user | `~\.cursor\skills\`, `~\.agents\skills\` | no | [docs]; [disk] `~\.cursor\skills\context7-mcp` |
 | user | `~\.claude\skills\`, `~\.codex\skills\`, `~\.grok\skills\` | yes | [docs] (not `.grok`); [disk]: Customize lists 16 skills from `~\.claude\skills`, including the Claude-Desktop-synced `~\.claude\skills\synced\<uuid>\…` |
 | built-in | `~\.cursor\skills-cursor\` (26 folders here, plus `.sync-manifest.json`) | no | [code] `Jt`; [disk]. Managed by Cursor, see §7 |
@@ -107,6 +108,20 @@ Skill folders are defined as a single list [code] [X]: `Bt=[{configDir:".cursor"
 - Paths with a dot-folder below `…/skills/` are skipped, so `~\.claude\skills\.trash\` is ignored here [disk]. So are Codex system skills under `.codex/skills` (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) [code] [X] `Dt=new Set(["imagegen","openai-docs",…])`.
 - Frontmatter: `name` (must match the folder), `description`, `paths` (legacy `globs`), `disable-model-invocation`, `icon`, `color`, `metadata` [docs] [D-skills].
 - The third-party folders load only while **Include Third-Party Plugins, Skills, and Other Configs** is on [code] [X] `function Ut(e){return Bt.filter(t=>!t.builtin&&(e||!t.thirdParty))}`.
+
+#### Nested skills folders
+
+Read in the 3.27.12 bundle, `NestedExtensibilityService.discover` and `AgentSkillsCursorRulesService.loadAll` [X], and tested with the release gate's probe, `uat/agents/cursor.mjs`, its `nested-skills` launches (**[test]**, see `docs/research/release-gate.md`):
+
+- The IDE builds its skills service with nested skills on, in its code: `loadNestedSkills` is `true`, and no feature gate or setting turns it off [code] [X] `loadNestedSkills:s`.
+- For each workspace folder, Cursor runs ripgrep from the folder with `--files --hidden --no-require-git --follow` and the include globs `*/**/.cursor/**`, `*/**/.agents/**`, and while third-party configs are on `*/**/.claude/**`, `*/**/.codex/**` and `*/**/.grok/**` [code] [X] `buildIncludeGlobs(e){const t=["*/**/.cursor/**","*/**/.agents/**","*/**/AGENTS.md"]`, `followSymlinks:!0,source:"nested_extensibility"`. The leading `*/` keeps the folder's own `.cursor` and the like out, which are read as root folders [code]. Skills one folder down and three are listed, in the `/` menu and in Customize, and one reached through a junction [test].
+- A `SKILL.md` found this way is a skill when its path holds `/<configDir>/skills/` for one of the five folders, case aside; the third-party three count only while the switch is on [code] [X] `new RegExp(\`[/\\\\]${ny(e)}[/\\\\]${ny(t)}[/\\\\]\`,"i")`, `if(n&&!t)continue;return"skills"`. Nested `.claude\skills`, `.codex\skills` and `.grok\skills` skills are listed with the switch on and not with it off [test]. **[contradicts docs]**: [D-skills] names only `.cursor/skills` and `.agents/skills`.
+- Excluded at any depth, below a skills folder too: `node_modules`, `.git`, `.turbo`, `.next`, `.cache`, `.pnpm`, `.yarn`, `dist`, `build`, `out`, `target`, `.vscode`, `.idea`, `venv`, `__pycache__`, `logs`, `tmp`, `temp` [code] [X] `excludeGlobs:Hr`. A skill below `node_modules` or `dist`, and one at `<skills>\build\<skill>`, are not listed [test]. There is no depth limit [code].
+- Ignore files apply, those of the folders above the workspace folder too, as ripgrep reads them, since `--no-ignore-vcs` is not passed [code]. A skills folder below a folder that a `.gitignore` or an `.ignore` leaves out is not listed, nor one in a `.cursor` folder a `.gitignore` leaves out; one whose skills folder itself a `.gitignore` leaves out is listed, since the include globs match what lies below `.cursor` [test].
+- No search runs when `git rev-parse --show-toplevel` fails in the workspace folder, so the folder must be in a git work tree, at its root or below it [code] [X] `if(!await Gr(e,this.gitExecutor,(0,v.resolve)(this.root)))`; nor, as written, when the folder is the user's home folder [code] [X] `if(s===o||wt(s,{platform:process.platform,homeDirectory:o}).length>0)`, the second test for macOS only. A Project in no git work tree lists no nested skill, but a git Project that is the home folder lists them [test]: on Windows the first test, which compares the two paths as spelled, did not skip it.
+- Nested skills are parsed and filtered as the root ones, by the same code: frontmatter, dot folders below `skills`, Codex's reserved names [code] [X]. `loadAll` appends them after the root and user ones, leaving out only a skill whose real path was already read [code] [X] `u.has(r)||(u.add(r),m.push(t))`.
+- **[contradicts docs]**: there is no subtree scope. `scopedTo` comes only from a frontmatter's `metadata.scopedTo` [code].
+- A nested skill at the same path below its marker folder as the workspace folder's own skill or a user's is the one listed; of two nested ones, the one whose folder holding the marker comes first by path, whatever the markers, and of one folder's, the `.cursor` one over the `.agents` one [test].
 - Cursor's other kinds are separate and not skills: rules (`.cursor/rules/*.mdc`, `~/.cursor/rules/`), subagents (`.cursor/agents`, `.claude/agents`, `.codex/agents`), commands and hooks [docs] [D-subagents], [D-hooks]. **[contradicts docs]**: [D-skills] says user rules "are not stored on the file system". Yet `~\.cursor\rules\context7.mdc` exists [disk], and Cursor's managed `.gitignore` lists `!rules/` as "User-level cursor rules" [disk].
 
 ---

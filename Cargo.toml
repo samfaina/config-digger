@@ -18,6 +18,9 @@ base64 = "0.22"
 clap = { version = "4.6", features = ["derive"] }
 clap_complete = "4.6"
 humantime = "2.4"
+# The `.gitignore` and `.ignore` files a walk down from a Project folder
+# reads, matched by ripgrep's own matcher: Cursor searches with ripgrep.
+ignore = "0.4"
 # Pre-1.0, and its CST API changes between minor releases: upgrade deliberately.
 jsonc-parser = { version = "=0.34.0", features = ["cst", "serde", "serde_json"] }
 # The UAT plan's check against its JSON Schema. No remote references, so no

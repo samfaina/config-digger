@@ -449,8 +449,8 @@ pub(crate) trait Anchored {
     /// `path` is given, under that text.
     fn machine(&self) -> Option<&str>;
 
-    /// How far up from the Project folder the location is read.
-    fn walk(&self) -> ProjectWalk;
+    /// Which folders above or below the Project folder the location is read in.
+    fn walk(&self) -> &ProjectWalk;
 }
 
 /// What a location's path is relative to.
@@ -535,7 +535,7 @@ impl Anchored for Anchor {
         }
     }
 
-    fn walk(&self) -> ProjectWalk {
+    fn walk(&self) -> &ProjectWalk {
         match self {
             Anchor::Home(block) => block.walk(),
             Anchor::Project(block) => block.walk(),
@@ -589,8 +589,8 @@ impl Anchored for EntryAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -601,8 +601,9 @@ impl EntryAnchor {
     }
 }
 
-/// How far up from the Project folder a location in a Project is read.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+/// Which folders above or below the Project folder a location in a Project
+/// is read in.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ProjectWalk {
     /// In the Project folder only.
@@ -612,6 +613,65 @@ pub(crate) enum ProjectWalk {
     /// repo, the folder holding `.git`. Outside a repo, in the Project
     /// folder only.
     UpToRepoRoot,
+    /// In every folder below the Project folder, at any depth, that holds
+    /// the path, such as `sub\.cursor\skills` for `.cursor/skills`, each
+    /// its own location, and not in the Project folder itself, by the
+    /// walk's rules.
+    Down(DownWalk),
+}
+
+impl Validate for ProjectWalk {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            ProjectWalk::Down(walk) => walk.validate(),
+            ProjectWalk::None | ProjectWalk::UpToRepoRoot => Ok(()),
+        }
+    }
+}
+
+/// The rules of a walk down from the Project folder, as the Agent searches
+/// it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DownWalk {
+    /// Whether the walk runs only when the Project folder is in a git work
+    /// tree, at or below a folder holding `.git`. Outside one, nothing is
+    /// read below it.
+    pub needs_git: bool,
+    /// Folder names, compared without regard to case, that the walk never
+    /// enters at any depth, nor reads a path through, below the path it
+    /// finds too, such as `node_modules`.
+    pub skip: Vec<String>,
+    /// Whether the `.gitignore` and `.ignore` files of the folders the walk
+    /// enters and of those above the Project folder leave out the folders
+    /// they match, as git reads their patterns, the deepest file deciding
+    /// and an `.ignore` over a `.gitignore`. They apply to the folders the
+    /// walk passes through on the way to the path and to the path's first
+    /// folder, such as `.cursor`, not below it. A repo's
+    /// `.git\info\exclude` and git's global excludes are not read.
+    pub ignore_files: bool,
+    /// Whether the walk enters links and junctions to folders.
+    pub follow_links: bool,
+}
+
+impl DownWalk {
+    /// Whether the walk never enters a folder named `name`.
+    pub fn skips(&self, name: &str) -> bool {
+        self.skip.iter().any(|skip| skip.eq_ignore_ascii_case(name))
+    }
+}
+
+impl Validate for DownWalk {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(name) = self
+            .skip
+            .iter()
+            .find(|name| name.is_empty() || name.contains(['/', '\\']))
+        {
+            return Err(format!("skipped folder `{name}` must be one folder name"));
+        }
+        Ok(())
+    }
 }
 
 /// A root of the Agent home, or a path below it.
@@ -671,26 +731,28 @@ impl Anchored for HomeAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
-/// A path in the Project folder, and with `walk`, in its parents too.
+/// A path in the Project folder, and with `walk`, in its parents or the
+/// folders below it too.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProjectAnchor {
     /// A `/`-separated path relative to the Project folder.
     pub path: String,
-    /// Which folders the path is read in, from the Project folder up.
-    /// Only a location can walk.
+    /// Which folders the path is read in, from the Project folder up, or
+    /// below it. Only a location can walk.
     #[serde(default)]
     pub walk: ProjectWalk,
 }
 
 impl Validate for ProjectAnchor {
     fn validate(&self) -> Result<(), String> {
-        validate_relative(&self.path)
+        validate_relative(&self.path)?;
+        self.walk.validate()
     }
 }
 
@@ -713,8 +775,8 @@ impl Anchored for ProjectAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        self.walk
+    fn walk(&self) -> &ProjectWalk {
+        &self.walk
     }
 }
 
@@ -748,8 +810,8 @@ impl Anchored for ProjectFileAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -788,8 +850,8 @@ impl Anchored for ProjectStorageAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -835,8 +897,8 @@ impl Anchored for MachineAnchor {
         Some(&self.path)
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -878,8 +940,8 @@ impl Anchored for SettingsAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -932,8 +994,8 @@ impl Anchored for PluginAnchor {
         None
     }
 
-    fn walk(&self) -> ProjectWalk {
-        ProjectWalk::None
+    fn walk(&self) -> &ProjectWalk {
+        &ProjectWalk::None
     }
 }
 
@@ -1000,6 +1062,18 @@ impl Anchor {
             | Anchor::Entry(_)
             | Anchor::ProjectFile(_)
             | Anchor::ProjectStorage(_) => false,
+        }
+    }
+
+    /// The rules of its walk down from the Project folder, and the path it
+    /// reads below, if it walks down.
+    pub fn walks_down(&self) -> Option<(&DownWalk, &str)> {
+        match self {
+            Anchor::Project(ProjectAnchor {
+                path,
+                walk: ProjectWalk::Down(down),
+            }) => Some((down, path)),
+            _ => None,
         }
     }
 
@@ -1965,8 +2039,8 @@ impl Validate for ProjectPluginKeys {
         if !self.anchor.in_project() || self.anchor.project_file() {
             return Err("a Project's plugin keys lie in a file of the Project folder".into());
         }
-        if self.anchor.walk() != ProjectWalk::None {
-            return Err("a Project's plugin keys cannot walk up from the Project folder".into());
+        if self.anchor.walk() != &ProjectWalk::None {
+            return Err("a Project's plugin keys cannot walk from the Project folder".into());
         }
         self.cache.validate()?;
         if self.cache.machine().is_none() {
@@ -5734,8 +5808,8 @@ impl Validate for Switch {
                 "`{PLUGIN_KEY}` must come before `{NAME_KEY}` in a switch key path"
             ));
         }
-        if self.anchor.walk() != ProjectWalk::None {
-            return Err("a switch cannot walk up from the Project folder".into());
+        if self.anchor.walk() != &ProjectWalk::None {
+            return Err("a switch cannot walk from the Project folder".into());
         }
         if position(super::PROJECT_KEY).is_some() && self.anchor.in_project() {
             return Err(format!(
@@ -5902,8 +5976,8 @@ impl Validate for SettingPlace {
         if !self.key_path.is_empty() || self.sqlite || self.fragments.is_some() {
             validate_key_path(&self.key_path)?;
         }
-        if self.anchor.walk() != ProjectWalk::None {
-            return Err("a setting cannot walk up from the Project folder".into());
+        if self.anchor.walk() != &ProjectWalk::None {
+            return Err("a setting cannot walk from the Project folder".into());
         }
         if self.highest_source && self.anchor.settings().is_none() {
             return Err("highest_source needs a settings anchor".into());
@@ -7408,7 +7482,7 @@ impl Validate for EnvBypass {
             if map.every_source && map.anchor.settings().is_none() {
                 return Err(context("every_source needs a settings anchor".into()));
             }
-            if map.anchor.walk() != ProjectWalk::None
+            if map.anchor.walk() != &ProjectWalk::None
                 || map.anchor.project_storage().is_some()
                 || map.anchor.project_file()
             {

@@ -4,12 +4,13 @@
 
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
-    Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect, JsonFormat,
-    JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, ManifestSkills,
-    McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders, PluginRecord,
-    PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths,
-    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
+    self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, DownWalk,
+    EnvMap, FindsBy, Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect,
+    JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp,
+    ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
+    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
+    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
+    is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -22,7 +23,7 @@ use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
 use crate::store::Written;
 use crate::user_list::{self, UserList};
-use crate::{mask, park, paths, skill, version};
+use crate::{mask, park, paths, skill, version, walk};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -1173,6 +1174,7 @@ fn read_as_if(
         storage: Vec::new(),
         cached: BTreeMap::new(),
         opened_in: Vec::new(),
+        walk_below: None,
     };
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
 
@@ -1293,19 +1295,21 @@ fn read_as_if(
             .or_default()
             .extend(plugins);
     }
+    let mut walks = walk::WalksDown::default();
     for home in &found {
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
             if !location.anchor.in_project() {
                 continue;
             }
-            let walk = location.anchor.walk();
             // Each folder or file read, with the key of its Project and how
             // far it ranks below the Project's own.
             let mut read: Vec<(PathBuf, &String, usize)> = Vec::new();
             if !location.anchor.project_file() {
                 for (project_folder, key) in &folders {
-                    for (folder, depth) in folders_read(ports, project_folder, walk) {
+                    for (folder, depth) in
+                        folders_read(ports, project_folder, &location.anchor, &mut walks)
+                    {
                         read.push((folder, key, depth));
                     }
                 }
@@ -1317,7 +1321,9 @@ fn read_as_if(
                         continue;
                     }
                     for (index, member) in members.iter().enumerate() {
-                        for (folder, depth) in folders_read(ports, member, walk) {
+                        for (folder, depth) in
+                            folders_read(ports, member, &location.anchor, &mut walks)
+                        {
                             read.push((folder, key, index * MEMBER_RANKS + depth));
                         }
                     }
@@ -1334,9 +1340,17 @@ fn read_as_if(
                 if let Some(path) = location.anchor.path(&home.roots, Some(&folder))
                     && !own.contains(&paths::canonical_key(ports.fs.as_ref(), &path))
                 {
+                    // Of the folders a walk down enters, those holding the
+                    // path only, read by the walk's rules below it too.
+                    let down = location.anchor.walks_down().map(|(down, _)| down);
+                    if down.is_some() && !ports.fs.exists(&path) {
+                        continue;
+                    }
                     let key = Some(key.clone());
                     let start = scanner.entries.len();
+                    scanner.walk_below = down.cloned();
                     scanner.read_location(home, definition, location, path, key, depth);
+                    scanner.walk_below = None;
                     let name = folder.file_name().unwrap_or_default().to_string_lossy();
                     let parts = NameParts {
                         plugin: None,
@@ -2777,12 +2791,26 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The folders a location in the Project folder `folder` is read in, with
-/// how many levels up each one is.
-fn folders_read(ports: &Ports, folder: &Path, walk: ProjectWalk) -> Vec<(PathBuf, usize)> {
+/// The folders the location anchored at `anchor` in the Project folder
+/// `folder` is read in, with how many levels up each one is: 0 for a
+/// folder below it.
+fn folders_read(
+    ports: &Ports,
+    folder: &Path,
+    anchor: &Anchor,
+    walks: &mut walk::WalksDown,
+) -> Vec<(PathBuf, usize)> {
     let fs = ports.fs.as_ref();
-    match walk {
+    match anchor.walk() {
         ProjectWalk::None => vec![(folder.to_path_buf(), 0)],
+        ProjectWalk::Down(down) => {
+            let path = anchor.walks_down().map_or("", |(_, path)| path);
+            walks
+                .holders(fs, folder, down, path)
+                .into_iter()
+                .map(|holder| (holder, 0))
+                .collect()
+        }
         ProjectWalk::UpToRepoRoot => {
             let up: Vec<&Path> = folder.ancestors().collect();
             match up.iter().position(|parent| fs.exists(&parent.join(".git"))) {
@@ -2917,6 +2945,9 @@ struct Scanner<'p> {
     /// Each value a registry keeps for a Project that names where the Agent
     /// last opened it.
     opened_in: Vec<OpenedIn>,
+    /// The rules of the walk down that found the location being read, if
+    /// one did: no folder they skip is read below it either.
+    walk_below: Option<DownWalk>,
 }
 
 /// A value the registry at `registry` of the Agent at `agent_index` keeps
@@ -4242,7 +4273,12 @@ impl Scanner<'_> {
                 let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
                     continue;
                 };
-                if name.starts_with('.') {
+                if name.starts_with('.')
+                    || self
+                        .walk_below
+                        .as_ref()
+                        .is_some_and(|walk| walk.skips(name))
+                {
                     continue;
                 }
                 if above {

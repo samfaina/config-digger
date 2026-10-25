@@ -449,7 +449,7 @@
           ]
         },
         {
-          "description": "A path in the Project folder, and with `walk`, in its parents too.",
+          "description": "A path in the Project folder, and with `walk`, in its parents or the\nfolders below it too.",
           "type": "object",
           "properties": {
             "path": {
@@ -457,7 +457,7 @@
               "type": "string"
             },
             "walk": {
-              "description": "Which folders the path is read in, from the Project folder up.\nOnly a location can walk.",
+              "description": "Which folders the path is read in, from the Project folder up, or\nbelow it. Only a location can walk.",
               "$ref": "#/$defs/ProjectWalk"
             },
             "block": {
@@ -616,7 +616,7 @@
       ]
     },
     "ProjectWalk": {
-      "description": "How far up from the Project folder a location in a Project is read.",
+      "description": "Which folders above or below the Project folder a location in a Project\nis read in.",
       "oneOf": [
         {
           "description": "In the Project folder only.",
@@ -627,7 +627,58 @@
           "description": "In the Project folder and each parent up to the root of its git\nrepo, the folder holding `.git`. Outside a repo, in the Project\nfolder only.",
           "type": "string",
           "const": "up-to-repo-root"
+        },
+        {
+          "description": "In every folder below the Project folder, at any depth, that holds\nthe path, such as `sub\\.cursor\\skills` for `.cursor/skills`, each\nits own location, and not in the Project folder itself, by the\nwalk's rules.",
+          "type": "object",
+          "properties": {
+            "down": {
+              "$ref": "#/$defs/DownWalk"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "required": [
+            "down"
+          ],
+          "additionalProperties": false
         }
+      ]
+    },
+    "DownWalk": {
+      "description": "The rules of a walk down from the Project folder, as the Agent searches\nit.",
+      "type": "object",
+      "properties": {
+        "needs_git": {
+          "description": "Whether the walk runs only when the Project folder is in a git work\ntree, at or below a folder holding `.git`. Outside one, nothing is\nread below it.",
+          "type": "boolean"
+        },
+        "skip": {
+          "description": "Folder names, compared without regard to case, that the walk never\nenters at any depth, nor reads a path through, below the path it\nfinds too, such as `node_modules`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignore_files": {
+          "description": "Whether the `.gitignore` and `.ignore` files of the folders the walk\nenters and of those above the Project folder leave out the folders\nthey match, as git reads their patterns, the deepest file deciding\nand an `.ignore` over a `.gitignore`. They apply to the folders the\nwalk passes through on the way to the path and to the path's first\nfolder, such as `.cursor`, not below it. A repo's\n`.git\\info\\exclude` and git's global excludes are not read.",
+          "type": "boolean"
+        },
+        "follow_links": {
+          "description": "Whether the walk enters links and junctions to folders.",
+          "type": "boolean"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "needs_git",
+        "skip",
+        "ignore_files",
+        "follow_links"
       ]
     },
     "PluginIds": {
