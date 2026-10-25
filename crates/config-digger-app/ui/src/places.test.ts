@@ -431,6 +431,18 @@ describe("the Agent homes tab", () => {
 
     expect(group.homes.map((row) => row.agent)).toEqual([null, "Claude Code"]);
   });
+
+  test("notes on its own row a home whose last-ran version cannot be read", () => {
+    const unreadable = {
+      code: "last_ran_unreadable" as const,
+      installation: null,
+      sentence: String.raw`The version of Claude Code that last ran against this Agent home could not be read from C:\Users\me\.claude.json.`,
+    };
+    const [group] = homeGroups(places({ agents: [agent({ homes: [home({ notes: [unreadable] }), home({ home: "alt" })] })] }));
+
+    expect(group.notes).toEqual([]);
+    expect(group.homes.map((row) => row.notes)).toEqual([[unreadable.sentence], []]);
+  });
 });
 
 describe("what the Inventory opens on", () => {

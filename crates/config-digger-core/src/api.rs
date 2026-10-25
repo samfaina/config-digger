@@ -982,7 +982,8 @@ impl AgentNoteCode {
             AgentNoteCode::NoInstallationFound => Some(InfoCode::NoInstallationFound),
             AgentNoteCode::DefinitionUntested => Some(InfoCode::DefinitionUntested),
             AgentNoteCode::CloudConnectorsNotOnDisk
-            | AgentNoteCode::MarketplacePluginsNotOnDisk => None,
+            | AgentNoteCode::MarketplacePluginsNotOnDisk
+            | AgentNoteCode::LastRanUnreadable => None,
         }
     }
 }
@@ -1887,6 +1888,9 @@ pub enum AgentNoteCode {
     /// marketplace live in the user's account, with no install record on
     /// disk, so they are not listed.
     MarketplacePluginsNotOnDisk,
+    /// The file the Agent records the version that last ran in exists but
+    /// cannot be used, so that version is not shown.
+    LastRanUnreadable,
 }
 
 /// The versions an Agent definition was tested with, both ends included.

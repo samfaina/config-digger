@@ -10,9 +10,10 @@ use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
-    FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, ListPlugins, Locate,
-    Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
-    SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, JsonDialect,
+    JsonFormat, ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk,
+    Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape,
+    StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -474,8 +475,17 @@ pub(crate) struct InstallationDefinition {
 pub(crate) struct LastRan {
     /// A JSON file of the Agent home.
     pub anchor: Anchor,
+    /// The dialect the Agent reads the file in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
     /// The key path of the string, one key per segment.
     pub key_path: Vec<String>,
+}
+
+impl LastRan {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -2827,6 +2837,25 @@ homes = ["default"]"#;
             "{VALID}\n[last_ran]\nanchor = {{ block = \"project\", path = \".x.json\" }}\nkey_path = [\"v\"]\n"
         );
         assert!(error(&text).contains("not a Project"), "{}", error(&text));
+    }
+
+    #[test]
+    fn last_ran_accepts_only_a_known_dialect() {
+        let last_ran = |dialect: &str| {
+            format!(
+                "{VALID}\n[last_ran]\nanchor = {{ block = \"home\", root = \"state\" }}\nkey_path = [\"v\"]\ndialect = \"{dialect}\"\n"
+            )
+        };
+        for dialect in ["strict", "with-comments", "jsonc"] {
+            let text = last_ran(dialect);
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        }
+        let text = last_ran("json5");
+        assert!(
+            error(&text).contains("unknown variant `json5`"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

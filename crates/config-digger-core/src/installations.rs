@@ -11,7 +11,7 @@ use crate::api;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
 use crate::definitions::{AgentDefinition, DefinitionNote};
 use crate::ports::Ports;
-use crate::scan::{Mirror, ScannedHome, Snapshot};
+use crate::scan::{LastRanReading, Mirror, ScannedHome, Snapshot};
 use crate::version::{Standing, Version};
 use crate::{explain, paths};
 use std::collections::BTreeSet;
@@ -31,7 +31,8 @@ pub(crate) struct ScannedInstallation {
 }
 
 /// The Installations among `installations` that read `home`, and what to
-/// note about their versions there.
+/// note about their versions there, a last-ran file that cannot be used
+/// included.
 pub(crate) fn of_home(
     definition: &AgentDefinition,
     installations: &[ScannedInstallation],
@@ -118,6 +119,13 @@ pub(crate) fn of_home(
             version_from: installation.version.as_ref().map(|read| read.from.clone()),
             out_of_range,
         });
+    }
+    if let LastRanReading::Unreadable(path) = &home.last_ran {
+        notes.push(note(
+            api::AgentNoteCode::LastRanUnreadable,
+            None,
+            explain::last_ran_unreadable(agent_name, path),
+        ));
     }
     (listed, notes)
 }

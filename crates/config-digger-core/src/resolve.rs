@@ -37,7 +37,7 @@ pub(crate) fn resolve(
                     .iter()
                     .any(|installation| installation.out_of_range),
                 installations,
-                last_ran: home.last_ran.clone(),
+                last_ran: home.last_ran.version().map(str::to_owned),
                 entries: count_entries(snapshot, |entry| {
                     entry.agent_index == home.agent_index && entry.home == home.home
                 }),

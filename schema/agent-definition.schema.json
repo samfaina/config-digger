@@ -388,6 +388,17 @@
           "description": "A JSON file of the Agent home.",
           "$ref": "#/$defs/Anchor"
         },
+        "dialect": {
+          "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "key_path": {
           "description": "The key path of the string, one key per segment.",
           "type": "array",
@@ -648,6 +659,26 @@
           "items": {
             "type": "string"
           }
+        }
+      ]
+    },
+    "JsonDialect": {
+      "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
+      "oneOf": [
+        {
+          "description": "No comments, no trailing commas.",
+          "type": "string",
+          "const": "strict"
+        },
+        {
+          "description": "`//` and `/* */` comments, and no trailing comma, such as Gemini\nCLI's settings.",
+          "type": "string",
+          "const": "with-comments"
+        },
+        {
+          "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
+          "type": "string",
+          "const": "jsonc"
         }
       ]
     },
@@ -1813,26 +1844,6 @@
         "folder",
         "kind_field",
         "kind"
-      ]
-    },
-    "JsonDialect": {
-      "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
-      "oneOf": [
-        {
-          "description": "No comments, no trailing commas.",
-          "type": "string",
-          "const": "strict"
-        },
-        {
-          "description": "`//` and `/* */` comments, and no trailing comma, such as Gemini\nCLI's settings.",
-          "type": "string",
-          "const": "with-comments"
-        },
-        {
-          "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
-          "type": "string",
-          "const": "jsonc"
-        }
       ]
     },
     "PluginNames": {

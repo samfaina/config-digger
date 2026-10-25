@@ -735,3 +735,124 @@ versions = [{ block = "exe-version" }]"#,
         "This definition of Test Agent has no tested version range, so what it says may not match how Test Agent behaves."
     );
 }
+
+/// The test Agent with its last-ran version at the key `version` of each home's
+/// `last.json`, read in the dialect `dialect` names, if any.
+fn last_ran_agent(dialect: Option<&str>) -> String {
+    let dialect = dialect.map_or(String::new(), |dialect| {
+        format!("dialect = \"{dialect}\"\n")
+    });
+    test_agent("")
+        .replace(
+            "roots.state = \".test/state.json\"\n",
+            "roots.state = \".test/state.json\"\nroots.last = \".test/last.json\"\n",
+        )
+        .replace(
+            "roots.state = \".test-insiders/state.json\"\n",
+            "roots.state = \".test-insiders/state.json\"\nroots.last = \".test-insiders/last.json\"\n",
+        )
+        .replace(
+            "[[scopes]]",
+            &format!(
+                "[last_ran]\nanchor = {{ block = \"home\", root = \"last\" }}\nkey_path = [\"version\"]\n{dialect}\n[[scopes]]"
+            ),
+        )
+}
+
+/// The default home's last-ran file.
+fn last_json() -> PathBuf {
+    PathBuf::from(HOME).join(r".test\last.json")
+}
+
+/// The test Agent's homes, the default one's last-ran file holding `last`,
+/// if anything.
+fn last_ran_fixture(last: Option<&str>) -> FakeFileSystem {
+    let fs = test_fixture(&[]);
+    if let Some(last) = last {
+        fs.put_file(last_json(), last.as_bytes().to_vec());
+    }
+    fs
+}
+
+/// The default home of the test Agent read with `definition`, its
+/// last-ran file holding `last`, if anything.
+fn last_ran_home(definition: &str, last: Option<&str>) -> Home {
+    let fs = last_ran_fixture(last);
+    let core = test_core(&fs, FakeEnvironment::with_home(HOME), definition);
+    let agents = agents(&core);
+    let agent = agents
+        .iter()
+        .find(|agent| agent.id == "test-agent")
+        .unwrap();
+    agent
+        .homes
+        .iter()
+        .find(|home| home.home == "default")
+        .unwrap()
+        .clone()
+}
+
+/// A last-ran file with comments and a trailing comma.
+const JSONC_LAST: &str = "{\n  // written by the Agent\n  \"version\": \"1.3.0\",\n}\n";
+
+#[test]
+fn the_last_ran_version_is_read_in_the_dialect_the_agent_reads_its_file_in() {
+    let home = last_ran_home(&last_ran_agent(Some("jsonc")), Some(JSONC_LAST));
+
+    assert_eq!(home.last_ran.as_deref(), Some("1.3.0"));
+}
+
+#[test]
+fn a_last_ran_file_that_does_not_parse_in_the_agents_dialect_is_noted() {
+    let home = last_ran_home(&last_ran_agent(None), Some(JSONC_LAST));
+
+    assert_eq!(home.last_ran, None);
+    let note = home
+        .notes
+        .iter()
+        .find(|note| note.code == AgentNoteCode::LastRanUnreadable)
+        .expect("a LastRanUnreadable note");
+    assert_eq!(note.installation, None);
+    assert!(
+        note.sentence.contains(&last_json().display().to_string()),
+        "{}",
+        note.sentence
+    );
+}
+
+#[test]
+fn a_missing_last_ran_file_or_key_is_no_version_and_no_note() {
+    for last in [None, Some("{ \"other\": \"1.3.0\" }")] {
+        let home = last_ran_home(&last_ran_agent(None), last);
+
+        assert_eq!(home.last_ran, None, "{last:?}");
+        assert!(
+            !note_codes(&home).contains(&AgentNoteCode::LastRanUnreadable),
+            "{last:?}: {:?}",
+            home.notes
+        );
+    }
+}
+
+#[test]
+fn a_last_ran_value_that_is_not_a_string_is_noted() {
+    let home = last_ran_home(&last_ran_agent(None), Some("{ \"version\": 13 }"));
+
+    assert_eq!(home.last_ran, None);
+    assert!(note_codes(&home).contains(&AgentNoteCode::LastRanUnreadable));
+}
+
+#[test]
+fn the_last_ran_note_stays_out_of_operation_previews() {
+    let fs = last_ran_fixture(Some(JSONC_LAST));
+    fs.put_file(
+        PathBuf::from(HOME).join(r".test\state.json"),
+        br#"{ "servers": { "notes": { "command": "notes-mcp" } } }"#.to_vec(),
+    );
+    let core = test_core(&fs, FakeEnvironment::with_home(HOME), &last_ran_agent(None));
+
+    let plan = remove_notes(&core);
+
+    let codes: Vec<InfoCode> = plan.preview().info.iter().map(|info| info.code).collect();
+    assert_eq!(codes, [InfoCode::NoInstallationFound]);
+}

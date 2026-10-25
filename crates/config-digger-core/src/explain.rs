@@ -1798,6 +1798,15 @@ pub(crate) fn version_unreadable(agent_name: &str, executable: &Path) -> String 
     )
 }
 
+/// The note for an Agent home of `agent_name` whose last-ran file at `path`
+/// exists but cannot be used.
+pub(crate) fn last_ran_unreadable(agent_name: &str, path: &Path) -> String {
+    format!(
+        "The version of {agent_name} that last ran against this Agent home could not be read from {}.",
+        path.display()
+    )
+}
+
 /// The note for an Agent home of `agent_name` that no Installation found reads.
 pub(crate) fn no_installation_found(agent_name: &str) -> String {
     format!(
