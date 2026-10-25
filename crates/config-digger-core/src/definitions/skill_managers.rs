@@ -180,6 +180,11 @@ pub(crate) struct LockFileEntry {
     pub key_path: Vec<String>,
     /// How the manager turns a key into a folder name, if it does.
     pub sanitize: Option<KeySanitize>,
+    /// The id of the Scope whose skills the lock file covers, such as
+    /// `user` or `project`, compared with the Scope its Agent definition
+    /// gives the skill folder's location. Without it, the lock file covers
+    /// skills in every Scope.
+    pub scope: Option<String>,
     pub strength: Strength,
 }
 
@@ -187,6 +192,9 @@ impl Validate for LockFileEntry {
     fn validate(&self) -> Result<(), String> {
         if self.file.is_empty() {
             return Err("lock file must not be empty".into());
+        }
+        if let Some(scope) = &self.scope {
+            super::non_empty("lock file Scope", scope)?;
         }
         super::blocks::validate_key_path(&self.key_path)
     }
@@ -262,11 +270,16 @@ mod tests {
         assert_eq!(ids, ["npx-skills", "skillfish", "openskills"]);
     }
 
-    fn error(detector: &str) -> String {
+    /// A definition with the one detector `detector`.
+    fn with_detector(detector: &str) -> Result<SkillManagerDefinition, DefinitionError> {
         let text = format!(
             "format_version = 1\nmanager = {{ id = \"m\", name = \"M\" }}\n[[detectors]]\n{detector}\n"
         );
-        parse("m.toml", &text).unwrap_err().message
+        parse("m.toml", &text)
+    }
+
+    fn error(detector: &str) -> String {
+        with_detector(detector).unwrap_err().message
     }
 
     #[test]
@@ -286,6 +299,22 @@ mod tests {
     fn a_marker_file_is_one_file_name() {
         let message = error("block = \"marker-file\"\nfile = \"a/.marker\"\nstrength = \"strong\"");
         assert!(message.contains("one file name"), "{message}");
+    }
+
+    fn lock_file_entry(scope: &str) -> String {
+        format!(
+            "block = \"lock-file-entry\"\nfile = \"~/lock.json\"\nkey_path = [\"skills\"]\n{scope}strength = \"weak\""
+        )
+    }
+
+    #[test]
+    fn a_lock_file_entry_scope_is_a_scope_id() {
+        for scope in ["\"\"", "\" \""] {
+            let message = error(&lock_file_entry(&format!("scope = {scope}\n")));
+            assert!(message.contains("Scope"), "{scope}: {message}");
+        }
+        with_detector(&lock_file_entry("scope = \"user\"\n")).unwrap();
+        with_detector(&lock_file_entry("")).unwrap();
     }
 
     #[test]

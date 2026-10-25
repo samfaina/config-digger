@@ -531,7 +531,7 @@ docs.windsurf.com redirects to docs.devin.ai/desktop. Source: https://docs.devin
 **Fits**
 - skillfish and openskills Provenance: `marker-file` with `.skillfish.json` and `.openskills.json`. graphify also fits, with `.graphify_version`.
 - `npx skills` linked Entry: `link-target-glob` with `**/.agents/skills/*`. It must match the resolved target (an absolute junction on Windows, a relative symlink on POSIX) whether or not the target exists.
-- `npx skills` copy mode or copy fallback: `lock-file-entry` on `~/.agents/.skill-lock.json` (root `skills`) and on `<project>/skills-lock.json` (root `skills`). Format `json`.
+- `npx skills` copy mode or copy fallback: `lock-file-entry` on `~/.agents/.skill-lock.json` (root `skills`) and on `<project>/skills-lock.json` (root `skills`). Format `json`. Each lock covers one Scope, so the detector's optional `scope` names the id of a Scope, `user` for the user lock and `project` for the project lock (#117). It matches only a skill whose location the Agent definition gives that Scope id, and without it the lock covers every Scope.
 - `~/.agents/skills` read by Codex, Gemini CLI, Cursor, Copilot and Zed: this is a shared location that each Agent definition declares itself. The core computes the reach.
 - Lock files: store_class `plain`.
 - None needed: process detection, gates, feature gates, merge mode, invalid detection, Scopes, project registries. `npx` runs briefly and has no persistent process.

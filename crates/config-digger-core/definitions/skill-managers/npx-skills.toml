@@ -24,12 +24,14 @@ block = "location-glob"
 glob = ".agents/skills/*"
 strength = "weak"
 
-# User Scope installs from a remote source.
+# User Scope installs from a remote source. The lock covers user skills
+# only, so it says nothing of a skill of another Scope named like one.
 [[detectors]]
 block = "lock-file-entry"
 file = "~/.agents/.skill-lock.json"
 key_path = ["skills"]
 sanitize = "lowercase-hyphens-dots"
+scope = "user"
 strength = "weak"
 
 # The same, when `XDG_STATE_HOME` moves the user lock.
@@ -38,13 +40,16 @@ block = "lock-file-entry"
 file = "%XDG_STATE_HOME%/skills/.skill-lock.json"
 key_path = ["skills"]
 sanitize = "lowercase-hyphens-dots"
+scope = "user"
 strength = "weak"
 
 # Project Scope installs, locked in the Project folder, three folders up
-# from a skill in `.agents/skills` or `.claude/skills`.
+# from a skill in `.agents/skills` or `.claude/skills`. It covers project
+# skills only.
 [[detectors]]
 block = "lock-file-entry"
 file = "../../../skills-lock.json"
 key_path = ["skills"]
 sanitize = "lowercase-hyphens-dots"
+scope = "project"
 strength = "weak"

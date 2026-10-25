@@ -1388,6 +1388,7 @@ fn read_as_if(
                 &mut scanner.reader,
                 ports,
                 entry,
+                &location.scope,
             );
         }
     }
@@ -4312,12 +4313,14 @@ struct SkillAt<'a> {
 }
 
 /// The skill manager whose detectors match the skill folder of `entry`
-/// most strongly, the first one loaded among equals.
+/// most strongly, the first one loaded among equals. `scope` is the id of
+/// the Scope of the location `entry` was read from.
 fn manager_of(
     managers: &[SkillManagerDefinition],
     reader: &mut Reader,
     ports: &Ports,
     entry: &ScannedEntry,
+    scope: &str,
 ) -> Option<ManagerMatch> {
     let mut best: Option<ManagerMatch> = None;
     for definition in managers {
@@ -4326,7 +4329,7 @@ fn manager_of(
             if best.as_ref().is_some_and(|best| best.strength >= strength) {
                 continue;
             }
-            if detects(detector, reader, ports, entry) {
+            if detects(detector, reader, ports, entry, scope) {
                 best = Some(ManagerMatch {
                     id: definition.manager.id.clone(),
                     name: definition.manager.name.clone(),
@@ -4338,8 +4341,15 @@ fn manager_of(
     best
 }
 
-/// Whether `detector` matches the skill folder of `entry`.
-fn detects(detector: &Detector, reader: &mut Reader, ports: &Ports, entry: &ScannedEntry) -> bool {
+/// Whether `detector` matches the skill folder of `entry`, read from a
+/// location of the Scope `scope`.
+fn detects(
+    detector: &Detector,
+    reader: &mut Reader,
+    ports: &Ports,
+    entry: &ScannedEntry,
+    scope: &str,
+) -> bool {
     match detector {
         Detector::LinkTargetGlob(block) => entry.link.as_ref().is_some_and(|link| {
             let real = link.real.iter();
@@ -4350,6 +4360,13 @@ fn detects(detector: &Detector, reader: &mut Reader, ports: &Ports, entry: &Scan
         Detector::MarkerFile(block) => reader.fs.exists(&entry.path.join(&block.file)),
         Detector::LocationGlob(block) => paths::tail_matches(&block.glob, &entry.path),
         Detector::LockFileEntry(block) => {
+            if block
+                .scope
+                .as_deref()
+                .is_some_and(|covered| covered != scope)
+            {
+                return false;
+            }
             let anchored = block.file.starts_with("~/") || block.file.starts_with('%');
             let lock = if anchored {
                 paths::expand(&block.file, ports.env.as_ref())
