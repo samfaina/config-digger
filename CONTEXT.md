@@ -46,6 +46,10 @@ _Avoid_: Flag, experiment, rollout
 An Agent home whose content another tool copies from a source Agent home, such as the Codex home Orca keeps in sync with `~/.codex`. config-digger never writes to it: actions on its Entries go to the Entry they were copied from.
 _Avoid_: Managed home, runtime home, shadow home
 
+**Last-opened home**:
+The Agent home an Agent last opened a Project in, as the Agent itself records it, such as the VS Code profile a workspace was last opened in. config-digger shows that Project in this home first. The Agent can open the Project in another home next time, so the Entries of its other homes are not Unread for it.
+_Avoid_: Default home, preferred home, profile association
+
 **Project**:
 What an Agent can be started on — a folder or a workspace file. Which locations around it contribute Entries is up to each Agent (Codex reads every folder from the repository root down; Gemini CLI reads only the folder itself). A Project whose folder no longer exists is missing, but Entries keyed to it in user files still exist.
 _Avoid_: Workspace, repository, folder
