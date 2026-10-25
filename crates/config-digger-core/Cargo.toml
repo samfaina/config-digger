@@ -10,6 +10,7 @@ repository.workspace = true
 humantime.workspace = true
 ignore.workspace = true
 jsonc-parser.workspace = true
+regex.workspace = true
 regex-lite.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true

@@ -39,6 +39,9 @@ rfd = { version = "0.16", default-features = false }
 # SQLite stores such as `state.vscdb`, read-only. Bundled, so no system
 # library is needed.
 rusqlite = { version = "0.40", features = ["bundled"] }
+# The Unicode classes of Claude Code's skill name rule, which `regex-lite`
+# does not know.
+regex = "1.13"
 # The regexes of Codex's `requirements.toml` matchers, read with the
 # engine Codex compiles them with.
 regex-lite = "0.1"

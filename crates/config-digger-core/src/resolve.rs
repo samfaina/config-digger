@@ -17,6 +17,7 @@ use crate::scan::{
     ScannedReadFailure, SettingOwner, Snapshot,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -167,11 +168,16 @@ pub(crate) fn resolve(
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
-    let in_context: Vec<&ScannedEntry> = snapshot
+    let in_context: Vec<Cow<ScannedEntry>> = snapshot
         .entries
         .iter()
         .filter(|entry| entry.project.is_none() || entry.project.as_ref() == project_key)
+        .map(|entry| {
+            let definition = &definitions[entry.agent_index];
+            under_name_rule(definition, snapshot, entry, project_key.map(String::as_str))
+        })
         .collect();
+    let in_context: Vec<&ScannedEntry> = in_context.iter().map(AsRef::as_ref).collect();
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
     for &entry in &in_context {
         let definition = &definitions[entry.agent_index];
@@ -2030,6 +2036,31 @@ pub(crate) fn gate_on(
     })
 }
 
+/// `entry` as its Agent reads it in the context of the Project with the
+/// key `project`: a skill its location's name rule changes, as read
+/// without the rule while the rule's gate does not hold there.
+fn under_name_rule<'e>(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &'e ScannedEntry,
+    project: Option<&str>,
+) -> Cow<'e, ScannedEntry> {
+    let Some(unruled) = &entry.unruled else {
+        return Cow::Borrowed(entry);
+    };
+    let gate_on = |name: &str| gate_on(definition, snapshot, entry, name, project);
+    let when = definition.location(&entry.location).name_rule_when.as_ref();
+    if when.is_none_or(|when| when.holds(&gate_on, &|_| None)) {
+        return Cow::Borrowed(entry);
+    }
+    // It keeps `unruled`, which says that the rule changes it.
+    Cow::Owned(ScannedEntry {
+        name: unruled.name.clone(),
+        defect: unruled.defect,
+        ..entry.clone()
+    })
+}
+
 /// The Feature gate `name` of the Agent home of `entry` as it reads in the
 /// context of the Project with the key `project`: as it reads there, or
 /// else everywhere.
@@ -2125,6 +2156,12 @@ fn gate_caveats(
         .iter()
         .enumerate()
         .filter(|(_, gate)| gate.affects.contains(&entry.location))
+        // A gate that only turns the location's name rule on matters to the
+        // skills the rule changes.
+        .filter(|(_, gate)| {
+            let location = definition.location(&entry.location);
+            !location.only_rules_names_by(&gate.name) || entry.unruled.is_some()
+        })
         .filter_map(|(index, gate)| {
             // The Agent fetches the gate, and caches it nowhere to read.
             if let Some(when) = &gate.when {

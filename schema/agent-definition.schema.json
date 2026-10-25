@@ -2117,6 +2117,17 @@
             "$ref": "#/$defs/Condition"
           }
         },
+        "name_rule_when": {
+          "description": "The Feature gate under which the Agent applies the name rule of the\nlocation's skill folders. Without it, the rule always applies.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GateCondition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name_template": {
           "description": "The name the Agent gives an Entry of the location, made of `{name}`,\nthe Entry's own name; in plugins, `{plugin}`, the plugin's name, such\nas `{plugin}:{name}`; and in a Project, `{folder_index}`, the\nposition of the Entry's folder among those of the Project, 0 for a\nfolder Project, and `{folder}`, that folder's name, such as Cursor's\n`project-{folder_index}-{folder}-{name}`. Without it, an Entry goes\nby its own name.",
           "type": [
@@ -2245,6 +2256,17 @@
               "anyOf": [
                 {
                   "$ref": "#/$defs/Sanitize"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name_rule": {
+              "description": "The rule a skill's folder name and frontmatter `name` must keep, if\nthe Agent has one: a skill whose folder name breaks it is skipped,\nand a `name` that breaks it counts as no `name`. The location's\n`name_rule_when` says when the Agent applies it.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NameRule"
                 },
                 {
                   "type": "null"
@@ -2476,6 +2498,16 @@
         }
       ]
     },
+    "NameRule": {
+      "description": "A rule an Agent's skill names must keep.",
+      "oneOf": [
+        {
+          "description": "Names without hidden, direction-changing or blank-like characters,\nas Claude Code names a skill since 2.1.299. A folder name keeps it\nwith no space at either end or next to a `:`, no `:` at either end,\nno two spaces in a row, no `<` or `>`, and at most 256 UTF-16 code\nunits. A frontmatter `name` keeps it with letters, marks, digits,\n`_`, `:`, `.` and `-` alone, no character the folder name may not\nhold, and at most 256 UTF-16 code units.",
+          "type": "string",
+          "const": "visible-chars"
+        }
+      ]
+    },
     "SkillFallback": {
       "description": "What an Agent does with a skill whose `SKILL.md` it cannot fully read.",
       "oneOf": [
@@ -2516,6 +2548,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/Sanitize"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name_rule": {
+          "description": "The rule a skill's folder name and frontmatter `name` must keep, if\nthe Agent has one: a skill whose folder name breaks it is skipped,\nand a `name` that breaks it counts as no `name`. The location's\n`name_rule_when` says when the Agent applies it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NameRule"
             },
             {
               "type": "null"
@@ -3027,6 +3070,28 @@
       "required": [
         "lists",
         "contents"
+      ]
+    },
+    "GateCondition": {
+      "description": "Holds while a Feature gate of the same definition is on, or with\n`is = false`, while it is off.",
+      "type": "object",
+      "properties": {
+        "gate": {
+          "description": "The name of a declared Feature gate.",
+          "type": "string"
+        },
+        "is": {
+          "description": "The value the gate must have. Omitted for on.",
+          "type": "boolean",
+          "default": true
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "gate"
       ]
     },
     "References": {

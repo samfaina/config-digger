@@ -9,12 +9,14 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   adds a skill behind a relative folder symlink
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    adds Cursor in cursor-appdata and a git Project with a nested skill
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
     [switch]$Symlink,
     [switch]$VsCode,
-    [switch]$Cursor
+    [switch]$Cursor,
+    [switch]$NameRule
 )
 $ErrorActionPreference = "Stop"
 
@@ -296,6 +298,25 @@ description: Throwaway skill for testing config-digger. Does nothing.
     cmd /c mklink /D "$Root\claude-code-home\.claude\skills\cd-throwaway-linked-skill" "..\..\..\linked\cd-throwaway-linked-skill" | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Cannot create the symlink: turn on Developer Mode in Settings > System > For developers, or run PowerShell as an administrator."
+    }
+}
+
+# With -NameRule, Claude Code skills whose folder names break its name rule,
+# one with a leading space and one with a zero-width space, and one with a
+# space inside its name, which the rule keeps. The default data has none, so that
+# no other step counts them.
+if ($NameRule) {
+    $skills = "$Root\claude-code-home\.claude\skills"
+    foreach ($folder in @(" cd-throwaway-name-lead", "cd-throwaway-name$([char]0x200B)zwsp", "cd-throwaway-name inner")) {
+        # `\\?\` keeps a space Windows would otherwise trim from a folder name.
+        $path = "\\?\$skills\$folder"
+        [IO.Directory]::CreateDirectory($path) | Out-Null
+        [IO.File]::WriteAllText("$path\SKILL.md", @"
+---
+name: cd-throwaway-name-rule
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@, [Text.UTF8Encoding]::new($false))
     }
 }
 

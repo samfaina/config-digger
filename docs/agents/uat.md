@@ -47,7 +47,10 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   # adds a skill behind a relative folder symlink
 .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    # adds VS Code profiles in vscode-appdata
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    # adds Cursor in cursor-appdata, and a git Project with a nested skill
+.\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  # adds Claude Code skills whose folder names break its name rule
 ```
+
+`-NameRule` adds three skills to the Claude Code home: one whose folder name starts with a space, one with a zero-width space in it, and one with a space inside it, which the rule keeps, all named `cd-throwaway-name…`. They stay out of the default data, so that no other step counts them; step 19.1 walks them.
 
 `-Cursor` writes Cursor's files as they would be in an `%APPDATA%` of their own, `cursor-appdata`: Cursor has run and opened `cursor-project`, a git repo, made with `git init`, whose `packages\app\.cursor\skills` holds a skill. A step that needs them starts the app with `APPDATA` set to that folder, as step 17.1 does.
 

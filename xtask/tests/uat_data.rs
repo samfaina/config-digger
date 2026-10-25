@@ -151,3 +151,25 @@ fn cursor_adds_its_own_appdata_and_a_git_project_with_a_nested_skill() {
 
     assert!(again.status.success(), "{}", stderr(&again));
 }
+
+#[test]
+fn name_rule_adds_claude_code_skills_whose_folder_names_break_its_name_rule() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("cd-throwaway");
+
+    let output = setup_with(&root, false, &["-NameRule"]);
+
+    assert!(output.status.success(), "{}", stderr(&output));
+    let skills = root.join(r"claude-code-home\.claude\skills");
+    for folder in [
+        " cd-throwaway-name-lead",
+        "cd-throwaway-name\u{200B}zwsp",
+        "cd-throwaway-name inner",
+    ] {
+        assert!(skills.join(folder).join("SKILL.md").is_file(), "{folder:?}");
+    }
+
+    let again = setup_with(&root, true, &["-NameRule"]);
+
+    assert!(again.status.success(), "{}", stderr(&again));
+}

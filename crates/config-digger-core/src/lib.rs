@@ -14,6 +14,7 @@ mod history;
 mod installations;
 mod locator;
 mod mask;
+mod name_rule;
 mod park;
 mod paths;
 mod plan;

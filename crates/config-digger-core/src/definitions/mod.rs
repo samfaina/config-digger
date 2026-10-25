@@ -10,10 +10,10 @@ use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
-    FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, JsonDialect,
-    JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry,
-    ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf, SettingsSource,
-    Shape, StoreClass, Validate, VersionSource,
+    FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, Interpolation,
+    JsonDialect, JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, Merge,
+    PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf,
+    SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -817,6 +817,9 @@ pub(crate) struct LocationDefinition {
     /// them. While one does not hold, its Entries are Unread.
     #[serde(default)]
     pub when: Vec<Condition>,
+    /// The Feature gate under which the Agent applies the name rule of the
+    /// location's skill folders. Without it, the rule always applies.
+    pub name_rule_when: Option<GateCondition>,
     /// The name the Agent gives an Entry of the location, made of `{name}`,
     /// the Entry's own name; in plugins, `{plugin}`, the plugin's name, such
     /// as `{plugin}:{name}`; and in a Project, `{folder_index}`, the
@@ -1066,6 +1069,20 @@ impl Validate for SecretFields {
 }
 
 impl LocationDefinition {
+    /// Whether the Feature gate `gate` changes nothing of the location but
+    /// whether its name rule applies.
+    pub fn only_rules_names_by(&self, gate: &str) -> bool {
+        let rules = self
+            .name_rule_when
+            .as_ref()
+            .is_some_and(|when| when.gate == gate);
+        rules
+            && !self
+                .when
+                .iter()
+                .any(|condition| condition.gate() == Some(gate))
+    }
+
     /// Whether the location's Entries are keyed by Project inside the file.
     pub fn keyed_by_project(&self) -> bool {
         self.root.iter().any(|key| key == PROJECT_KEY)
@@ -1719,18 +1736,19 @@ impl AgentDefinition {
                 {
                     self.validate_setting(&source.anchor).map_err(context)?;
                 }
-                let Some(name) = condition.gate() else {
-                    continue;
-                };
-                match self.feature_gate(name) {
-                    None => return Err(context(format!("undeclared feature gate `{name}`"))),
-                    Some(gate) if !gate.affects.contains(&location.id) => {
-                        return Err(context(format!(
-                            "feature gate `{name}` does not list it in `affects`"
-                        )));
-                    }
-                    Some(_) => {}
+                if let Some(name) = condition.gate() {
+                    self.validate_gate_of(location, name).map_err(context)?;
                 }
+            }
+            if let Some(when) = &location.name_rule_when {
+                when.validate().map_err(context)?;
+                if !location.format.name_ruled() {
+                    return Err(context(
+                        "name_rule_when needs a skill folder format with a name_rule".into(),
+                    ));
+                }
+                self.validate_gate_of(location, &when.gate)
+                    .map_err(context)?;
             }
             if !self.items.contains_key(&location.kind) {
                 return Err(context(format!(
@@ -2182,6 +2200,18 @@ impl AgentDefinition {
             ));
         }
         Ok(())
+    }
+
+    /// A condition of `location` must name a declared Feature gate that
+    /// lists it in `affects`.
+    fn validate_gate_of(&self, location: &LocationDefinition, name: &str) -> Result<(), String> {
+        match self.feature_gate(name) {
+            None => Err(format!("undeclared feature gate `{name}`")),
+            Some(gate) if !gate.affects.contains(&location.id) => Err(format!(
+                "feature gate `{name}` does not list it in `affects`"
+            )),
+            Some(_) => Ok(()),
+        }
     }
 
     /// Every home must declare the root an anchor needs.
@@ -3056,6 +3086,62 @@ checks = {checks}
     }
 
     #[test]
+    fn every_format_of_skill_folders_takes_a_name_rule_and_no_unknown_one() {
+        let rule = r#", name_rule = "visible-chars" }"#;
+        let folder = SKILL_FORMAT.replace(" }", rule);
+        let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
+        let text = with_skills(anchor, &folder, CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let unknown = SKILL_FORMAT.replace(" }", r#", name_rule = "no-such-rule" }"#);
+        let text = with_skills(anchor, &unknown, CHECKS);
+        assert!(
+            error(&text).contains("unknown variant `no-such-rule`"),
+            "{}",
+            error(&text)
+        );
+
+        let skills = r#"{ name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }"#;
+        let list = format!(
+            r#"{{ block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = {skills} }}"#
+        );
+        let text = with_skills(r#"{ block = "home", root = "state" }"#, &list, CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_name_rule_condition_needs_a_name_rule_and_a_gate_that_affects_its_location() {
+        let ruled = SKILL_FORMAT.replace(" }", r#", name_rule = "visible-chars" }"#);
+        let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
+        let when = |format: &str, gate: &str| {
+            let when = format!("name_rule_when = {{ gate = \"{gate}\" }}\nkind = \"skill\"");
+            with_skills(anchor, format, CHECKS).replace("kind = \"skill\"", &when)
+                + "\n[[feature_gates]]\nname = \"rule\"\nassumed = true\naffects = [\"user-skills\"]\n"
+        };
+        let text = when(&ruled, "rule");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = when(SKILL_FORMAT, "rule");
+        assert!(
+            error(&text).contains("name_rule_when needs a skill folder format with a name_rule"),
+            "{}",
+            error(&text)
+        );
+        let text = when(&ruled, "other");
+        assert!(
+            error(&text).contains("undeclared feature gate `other`"),
+            "{}",
+            error(&text)
+        );
+        let text = when(&ruled, "rule")
+            .replace(r#"affects = ["user-skills"]"#, r#"affects = ["user-mcp"]"#);
+        assert!(
+            error(&text).contains("does not list it in `affects`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn a_disable_switch_cannot_walk() {
         for walk in [r#""up-to-repo-root""#, DOWN] {
             let text = with_disable(&name_list(false, "").replace(
@@ -3557,6 +3643,40 @@ checks = {CHECKS}
             "{}",
             error(&in_home)
         );
+    }
+
+    #[test]
+    fn manifest_skills_take_a_name_rule_on_their_skills_and_one_skill() {
+        let ruled = r#"no_name = "folder-name", name_rule = "visible-chars" }"#;
+        let format = MANIFEST_SKILLS
+            .replace(r#"no_name = "folder-name" }"#, ruled)
+            .replace(
+                " } }",
+                &format!(
+                    r#" }}, one_skill = {{ name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", {ruled} }}"#
+                ),
+            );
+        let text = with_plugins("")
+            + &format!(
+                r#"
+[[locations]]
+id = "plugin-skills"
+anchor = {{ block = "plugin", plugins = ["installed"], path = ["plugin.json"] }}
+format = {format}
+kind = "skill"
+scope = "user"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["plugin-skills"]
+competition = {{ block = "exact-name" }}
+checks = {CHECKS}
+"#
+            );
+        assert!(text.contains("one_skill"), "{text}");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
     #[test]

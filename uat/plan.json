@@ -1486,6 +1486,42 @@
       ]
     },
     {
+      "id": "19",
+      "title": "La regla de nombres de skills de Claude Code",
+      "steps": [
+        {
+          "id": "19.1",
+          "title": "Skills de Claude Code cuyo nombre de carpeta rompe la regla",
+          "goal": "Una skill de Claude Code cuya carpeta empieza por un espacio o tiene un carácter oculto sale Invalid con la regla de nombres como razón, y una con un espacio dentro de su nombre sale Effective.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "Elige el home E:\\cd-throwaway\\claude-code-home.",
+            "Busca cd-throwaway-name en la lista Items.",
+            "Abre el Item cd-throwaway-name-lead.",
+            "Lee la razón y los avisos de su Entry.",
+            "Abre el Item que se lee cd-throwaway-namezwsp, cuyo nombre lleva un espacio de ancho cero entre name y zwsp.",
+            "Abre el Item cd-throwaway-name inner."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «cd-throwaway-name-lead» sale «Invalid».",
+            "Su Entry da la razón «Claude Code skips this skill: its folder's name breaks Claude Code's name rule, which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters.».",
+            "Su Entry tiene el aviso «Depends on Claude Code gate `tengu_slate_wicket`: assumed on; cannot be read.».",
+            "El Item «cd-throwaway-name\u200bzwsp» sale «Invalid», con la misma razón.",
+            "El Item «cd-throwaway-name inner» sale «Effective».",
+            "La Entry de «cd-throwaway-name inner» no tiene el aviso de «tengu_slate_wicket»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con la regla de nombres",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -NameRule"
+          },
+          "covers": ["#171"]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [
