@@ -3029,6 +3029,11 @@
           },
           "default": []
         },
+        "plain_string_name": {
+          "description": "Of an approval-list gate's source, whether the Agent reads a list\nwritten as one plain-string name as a one-item list, such as Claude\nCode's `enabledMcpjsonServers` since 2.1.299. Only a name of letters,\ndigits, `-` or `_` counts; any other string names nothing.",
+          "type": "boolean",
+          "default": false
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -3663,6 +3668,11 @@
             },
             "ignore_case": {
               "description": "Whether the Agent compares the names in the list without regard to\ncase, such as Gemini CLI's `skills.disabled`.",
+              "type": "boolean",
+              "default": false
+            },
+            "plain_string_name": {
+              "description": "Whether the Agent reads the list written as one plain-string name as\na one-item list, such as Claude Code's `disabledMcpjsonServers` in a\nsettings file since 2.1.299. Only a name of letters, digits, `-` or\n`_` counts; any other string names nothing. Disable writes a list\nover the string, holding it and the name, and Enable of the name it\nholds deletes the key.",
               "type": "boolean",
               "default": false
             },

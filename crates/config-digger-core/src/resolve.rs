@@ -1759,7 +1759,7 @@ pub(crate) fn gates(
                     snapshot
                         .settings_for(entry, location.kind, owner, project)
                         .filter_map(|value| value.value.as_ref())
-                        .any(|value| block.approves(value, &entry.name))
+                        .any(|value| block.approves(source, value, &entry.name))
                 });
                 let reason =
                     explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);

@@ -4945,6 +4945,14 @@ pub(crate) struct JsonNameList {
     /// case, such as Gemini CLI's `skills.disabled`.
     #[serde(default)]
     pub ignore_case: bool,
+    /// Whether the Agent reads the list written as one plain-string name as
+    /// a one-item list, such as Claude Code's `disabledMcpjsonServers` in a
+    /// settings file since 2.1.299. Only a name of letters, digits, `-` or
+    /// `_` counts; any other string names nothing. Disable writes a list
+    /// over the string, holding it and the name, and Enable of the name it
+    /// holds deletes the key.
+    #[serde(default)]
+    pub plain_string_name: bool,
 }
 
 impl Validate for JsonNameList {
@@ -5014,20 +5022,29 @@ impl Disables for JsonNameList {
         false
     }
 
-    /// An append, which creates the list when it is missing.
+    /// An append, which creates the list when it is missing. Over a list
+    /// written as one plain string, a list holding the string, then `name`.
     fn disable_edits(
         &self,
         key_path: Vec<String>,
-        _value: Option<&Value>,
+        value: Option<&Value>,
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
+        if let Some(plain) = value.filter(|value| self.plain_string_name && value.is_string()) {
+            return vec![Edit::Set {
+                key_path,
+                value: Value::Array(vec![plain.clone(), Value::from(name)]),
+            }];
+        }
         vec![Edit::Append {
             key_path,
             value: Value::from(name),
         }]
     }
 
+    /// Over a list written as the plain string `name`, deleting the key,
+    /// which leaves the file as a missing list does.
     fn enable_edits(
         &self,
         key_path: Vec<String>,
@@ -5035,6 +5052,12 @@ impl Disables for JsonNameList {
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
+        if value.is_some_and(Value::is_string) {
+            return match self.held(value, name).next() {
+                Some(_) => vec![Edit::Remove { key_path }],
+                None => Vec::new(),
+            };
+        }
         self.held(value, name)
             .map(|held| Edit::RemoveItem {
                 key_path: key_path.clone(),
@@ -5053,8 +5076,10 @@ impl JsonNameList {
     /// The items of the list `value` that hold `name`, as the Agent
     /// compares names.
     fn held<'v>(&self, value: Option<&'v Value>, name: &str) -> impl Iterator<Item = &'v Value> {
+        let plain =
+            value.filter(|value| self.plain_string_name && plain_string_name(value).is_some());
         let names = value.and_then(Value::as_array).into_iter().flatten();
-        names.filter(move |item| {
+        names.chain(plain).filter(move |item| {
             item.as_str().is_some_and(|held| {
                 if self.ignore_case {
                     held.to_lowercase() == name.to_lowercase()
@@ -5989,6 +6014,12 @@ pub(crate) struct SettingPlace {
     /// Omitted, the value is read as it is.
     #[serde(default)]
     pub map: Vec<(Value, Value)>,
+    /// Of an approval-list gate's source, whether the Agent reads a list
+    /// written as one plain-string name as a one-item list, such as Claude
+    /// Code's `enabledMcpjsonServers` since 2.1.299. Only a name of letters,
+    /// digits, `-` or `_` counts; any other string names nothing.
+    #[serde(default)]
+    pub plain_string_name: bool,
 }
 
 impl SettingPlace {
@@ -6018,6 +6049,16 @@ impl SettingPlace {
 
 impl Validate for SettingPlace {
     fn validate(&self) -> Result<(), String> {
+        if self.plain_string_name {
+            return Err("plain_string_name is read only on an approval-list gate's sources".into());
+        }
+        self.validate_place()
+    }
+}
+
+impl SettingPlace {
+    /// Checks it, whatever reads it, `plain_string_name` aside.
+    fn validate_place(&self) -> Result<(), String> {
         self.anchor.validate()?;
         if self.toml && (self.sqlite || self.dialect.is_some()) {
             return Err("a TOML setting takes no dialect and is no SQLite store".into());
@@ -7128,7 +7169,14 @@ impl Validate for ApprovalList {
         if self.locations.is_empty() {
             return Err("an approval list needs locations".into());
         }
-        validate_sources(&self.sources)?;
+        if self.sources.is_empty() {
+            return Err("sources needs at least one setting".into());
+        }
+        for (index, source) in self.sources.iter().enumerate() {
+            source
+                .validate_place()
+                .map_err(|e| format!("sources[{index}]: {e}"))?;
+        }
         if self.sources.iter().any(|source| source.policy) {
             return Err("an approval is no policy".into());
         }
@@ -7137,14 +7185,27 @@ impl Validate for ApprovalList {
 }
 
 impl ApprovalList {
-    /// Whether `value`, what a source holds, approves the Entry named `name`.
-    pub fn approves(&self, value: &Value, name: &str) -> bool {
+    /// Whether `value`, what the source at `source` holds, approves the
+    /// Entry named `name`.
+    pub fn approves(&self, source: usize, value: &Value, name: &str) -> bool {
         match value {
             Value::Bool(all) => *all,
             Value::Array(names) => names.iter().any(|known| known.as_str() == Some(name)),
+            _ if self.sources[source].plain_string_name => plain_string_name(value) == Some(name),
             _ => false,
         }
     }
+}
+
+/// The name `value` holds as a list written as one plain string, as Claude
+/// Code reads one since 2.1.299: a name of letters, digits, `-` or `_`.
+fn plain_string_name(value: &Value) -> Option<&str> {
+    value.as_str().filter(|name| {
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    })
 }
 
 /// A managed file that takes exclusive control while it exists, even

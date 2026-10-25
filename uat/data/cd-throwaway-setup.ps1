@@ -10,13 +10,15 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    adds Cursor in cursor-appdata and a git Project with a nested skill
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
     [switch]$Symlink,
     [switch]$VsCode,
     [switch]$Cursor,
-    [switch]$NameRule
+    [switch]$NameRule,
+    [switch]$PlainString
 )
 $ErrorActionPreference = "Stop"
 
@@ -318,6 +320,35 @@ description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@, [Text.UTF8Encoding]::new($false))
     }
+}
+
+# With -PlainString, a Project whose Claude Code settings hold
+# `enabledMcpjsonServers` and `disabledMcpjsonServers` as plain strings, which
+# Claude Code reads as one-item lists since 2.1.299. Claude Code has not
+# recorded it, so that Disable writes its local settings; the tester adds it
+# by hand. The default data has none, so that no other step counts it.
+if ($PlainString) {
+    Write-TestFile "$Root\project-plain\.mcp.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-plain-on": { "command": "npx", "args": ["-y", "cd-throwaway-plain"] },
+    "cd-throwaway-plain-off": { "command": "npx", "args": ["-y", "cd-throwaway-plain"] },
+    "cd-throwaway-plain-listed": { "command": "npx", "args": ["-y", "cd-throwaway-plain"] },
+    "cd-throwaway-plain-other": { "command": "npx", "args": ["-y", "cd-throwaway-plain"] }
+  }
+}
+"@
+    Write-TestFile "$Root\project-plain\.claude\settings.json" @"
+{
+  "enabledMcpjsonServers": ["cd-throwaway-plain-off", "cd-throwaway-plain-listed"]
+}
+"@
+    Write-TestFile "$Root\project-plain\.claude\settings.local.json" @"
+{
+  "enabledMcpjsonServers": "cd-throwaway-plain-on",
+  "disabledMcpjsonServers": "cd-throwaway-plain-off"
+}
+"@
 }
 
 Write-Host "Created the throwaway homes and Projects in $Root"
