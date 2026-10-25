@@ -7,5 +7,6 @@ Parking never applies to an Entry in a git-versioned file or folder: moving it w
 ## Consequences
 
 - The parking store is part of the inventory, not a cache: parked Entries are never pruned with backups.
+- A parked Entry whose origin is no longer found (its Agent's definition, its Agent home or its location) is still listed, as Stranded, and can only be Removed; it is never dropped from view in silence.
 - Enable of a parked Entry refuses rather than overwrite when a same-named Entry has appeared in the meantime, or when the Project folder is gone.
 - Parking in Claude Desktop needs the app closed, since it rewrites its config from memory while running. An Agent home the user added outside its definition's homes is read by no launch, so parking there does not.
