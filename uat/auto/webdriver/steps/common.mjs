@@ -261,8 +261,9 @@ export function operationId(text) {
   return /\b(\d{8}-\d{6}-[0-9a-f]{3,})\b/.exec(text ?? "")?.[1];
 }
 
-// Runs `body` with Claude Desktop open, as 7.2 and 13.1 ask, opening it when
-// it is closed and closing it again after. Claude Desktop keeps the tester's
+// Runs `body` with Claude Desktop open, as 7.2 and 13.1 ask (7.6 opens its
+// own with withClaudeDesktopIn), opening it when it is closed and closing it
+// again after. Claude Desktop keeps the tester's
 // own configuration: config-digger runs on the throwaway profile, so nothing
 // of it changes. Returns false, with the step Blocked, when it isn't installed.
 export async function withClaudeDesktop(t, body) {

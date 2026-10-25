@@ -30,14 +30,14 @@ pub(crate) struct RunningHomes {
     /// through the data folder switch of its process. A home added in the
     /// folder of a definition's home, however spelled, is that home and not
     /// one of them.
-    pub read_by_no_launch: BTreeMap<(usize, String), PathBuf>,
+    pub added_outside_lookup_order: BTreeMap<(usize, String), PathBuf>,
 }
 
 impl RunningHomes {
     pub fn of(definitions: &[AgentDefinition], snapshot: &Snapshot) -> RunningHomes {
         RunningHomes {
             installed: installations::installed_homes(definitions, snapshot),
-            read_by_no_launch: snapshot
+            added_outside_lookup_order: snapshot
                 .homes
                 .iter()
                 .filter(|home| {
@@ -105,8 +105,8 @@ struct Touched<'a> {
 
 /// Checks the readers of `files` and `folders`, and the Agents with
 /// switches in `files`, against the processes running now. An Agent runs
-/// for a home of `homes` that no launch reads only while one of its
-/// processes names the home's folder. Only an Agent running
+/// for a home of `homes` added outside its lookup order only while one of
+/// its processes names the home's folder. Only an Agent running
 /// for an installed home of `homes` gets the warning and the hints; any
 /// running Agent blocks a write to a SQLite store it holds.
 pub(crate) fn check<'a>(
@@ -166,16 +166,19 @@ pub(crate) fn check<'a>(
         let definition = &definitions[agent_index];
         let running = *detected.entry((agent_index, home)).or_insert_with(|| {
             definition.process(home).is_some_and(|process| {
-                let added = homes.read_by_no_launch.get(&key);
-                if added.is_some() && process.data_folder_switch.is_none() {
-                    return false;
-                }
-                let processes = processes.get_or_insert_with(|| ports.processes.running());
-                match added.zip(process.data_folder_switch.as_deref()) {
-                    Some((folder, switch)) => {
-                        names_folder(process, switch, processes, folder, ports)
-                    }
-                    None => is_running(process, processes, ports),
+                match (
+                    homes.added_outside_lookup_order.get(&key),
+                    process.data_folder_switch.as_deref(),
+                ) {
+                    (None, _) => is_running(process, listed(&mut processes, ports), ports),
+                    (Some(folder), Some(switch)) => names_folder(
+                        process,
+                        switch,
+                        listed(&mut processes, ports),
+                        folder,
+                        ports,
+                    ),
+                    (Some(_), None) => false,
                 }
             })
         });
@@ -272,6 +275,14 @@ fn is_running(process: &ProcessDefinition, running: &[RunningProcess], ports: &P
             .iter()
             .any(|pid| running.iter().any(|candidate| candidate.pid == *pid))
     })
+}
+
+/// The processes running now, listed the first time a check needs them.
+fn listed<'p>(
+    processes: &'p mut Option<Vec<RunningProcess>>,
+    ports: &Ports,
+) -> &'p [RunningProcess] {
+    processes.get_or_insert_with(|| ports.processes.running())
 }
 
 /// Whether a process that matches `process` names `folder` through

@@ -476,17 +476,7 @@ fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
 /// A core over `fs` while a `claude.exe` runs from `path`, `None` when the
 /// OS hides it.
 fn core_while_claude_runs(fs: &FakeFileSystem, path: Option<PathBuf>) -> Core {
-    let mut ports = fake::ports(
-        fs.clone(),
-        env().with_var("ProgramFiles", r"C:\Program Files"),
-    );
-    ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
-        pid: 5151,
-        image: "claude.exe".to_owned(),
-        path,
-        cmdline: String::new(),
-    }));
-    Core::new(ports).unwrap()
+    core_while_claude_runs_with(fs, path, &[""])
 }
 
 #[test]
