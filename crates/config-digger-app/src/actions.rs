@@ -27,6 +27,9 @@ pub enum ActionRequest {
     /// The Remove of every leftover of the missing Project `project`, in
     /// its context.
     Leftovers { project: PathBuf },
+    /// The Remove of every Stranded Entry, with no Project. One alone is
+    /// Removed as an `Entry`, by its locator in the store.
+    Stranded,
     /// The Undo of the Operation `operation` in History.
     Undo { operation: String },
     /// The deletion of the backup of the Operation `operation` in History.
@@ -153,6 +156,10 @@ impl Actions {
             ActionRequest::Leftovers { project } => {
                 let snapshot = self.core.scan(&ScanOptions::default())?;
                 self.core.plan_remove_leftovers(&snapshot, project)
+            }
+            ActionRequest::Stranded => {
+                let snapshot = self.core.scan(&ScanOptions::default())?;
+                self.core.plan_remove_stranded(&snapshot)
             }
             ActionRequest::Undo { operation } => self.core.plan_undo(operation),
             ActionRequest::DeleteBackup { operation } => self.core.plan_delete_backup(operation),
@@ -483,6 +490,32 @@ mod tests {
         actions.execute(&planned.plan_id, &[]).unwrap();
         let text = String::from_utf8(fs.contents(claude_json()).unwrap()).unwrap();
         assert!(!text.contains("command"), "{text}");
+    }
+
+    #[test]
+    fn every_stranded_entry_is_removed_through_one_plan() {
+        let store =
+            PathBuf::from(r"C:\Users\fixture\AppData\Local\config-digger\parked\manifest.json");
+        let parked = |name: &str| {
+            serde_json::json!({
+                "agent": "gone-agent", "home": "default", "location": "user",
+                "name": name, "path": r"C:\Users\fixture\.gone.json",
+                "key_path": ["mcpServers", name],
+                "parked_at": "2026-10-01T14:30:12Z", "entry": { "command": name }
+            })
+        };
+        let manifest = serde_json::json!({ "entries": { "a": parked("a"), "b": parked("b") } });
+        let fs = fixture().with_file(&store, manifest.to_string());
+        let mut actions = actions(&fs);
+
+        let planned = actions.plan(&ActionRequest::Stranded).unwrap();
+
+        assert_eq!(planned.preview.action, Action::Remove);
+        assert_eq!(planned.preview.title, "Remove 2 Entries");
+        actions.execute(&planned.plan_id, &[]).unwrap();
+        let left: serde_json::Value =
+            serde_json::from_slice(&fs.contents(&store).unwrap()).unwrap();
+        assert_eq!(left["entries"], serde_json::json!({}));
     }
 
     #[test]

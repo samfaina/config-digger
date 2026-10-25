@@ -13,13 +13,18 @@ export type Rereading = {
   notify: (notice: Notice | null) => void;
 };
 
-/** The row an action runs on: the Entry's locator, the missing Project, or the Operation. */
+/** What the Stranded group is known by, while its Remove all runs. */
+export const STRANDED_ROW = "\u0000stranded";
+
+/** The row an action runs on: the Entry's locator, the missing Project, the Stranded group, or the Operation. */
 function rowOfRequest(request: ActionRequest): string {
   switch (request.kind) {
     case "entry":
       return request.locator;
     case "leftovers":
       return request.project;
+    case "stranded":
+      return STRANDED_ROW;
     case "undo":
     case "delete_backup":
       return request.operation;

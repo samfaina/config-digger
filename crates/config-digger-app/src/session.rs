@@ -4,7 +4,7 @@
 
 use config_digger_core::api::{
     Agent, Backup, Context, Core, Error, Inventory, ItemKind, Leftovers, Parked, Project,
-    ProjectCheck, ScanOptions, Snapshot,
+    ProjectCheck, ScanOptions, Snapshot, StoreReadFailure, Stranded,
 };
 use serde::Serialize;
 use std::cell::Cell;
@@ -24,6 +24,11 @@ pub struct Places {
     pub projects: Vec<Project>,
     /// The leftovers of each missing Project that has any.
     pub leftovers: Vec<Leftovers>,
+    /// The parked Entries whose origin is not found, listed apart from the
+    /// leftovers, and Removed by their locators in the store.
+    pub stranded: Vec<Stranded>,
+    /// The Read failures of the parked-Entry store.
+    pub store_read_failures: Vec<StoreReadFailure>,
     /// Every loaded Agent definition, with each of its Agent homes.
     pub agents: Vec<Agent>,
 }
@@ -174,12 +179,15 @@ impl Session {
     }
 
     /// Every Project and Agent home of the last scan, hidden ones included,
-    /// with the leftovers of the missing Projects. It never reads the disk.
+    /// with the leftovers of the missing Projects and the Stranded Entries.
+    /// It never reads the disk.
     pub fn places(&self) -> Places {
         let inventory = self.core.resolve(&self.snapshot, &Context::default());
         Places {
             agents: self.core.agents(&inventory),
             leftovers: self.leftovers().to_vec(),
+            stranded: self.core.stranded(&self.snapshot),
+            store_read_failures: inventory.store_read_failures,
             read_at: inventory.read_at,
             projects: inventory.projects,
         }
@@ -545,5 +553,38 @@ mod tests {
             .find(|agent| agent.id == "claude-code")
             .unwrap();
         assert!(claude_code.homes[0].hidden);
+    }
+
+    #[test]
+    fn places_lists_the_stranded_entries_and_the_read_failures_of_the_store() {
+        let store =
+            PathBuf::from(r"C:\Users\fixture\AppData\Local\config-digger\parked\manifest.json");
+        let manifest = serde_json::json!({
+            "entries": {
+                "linear": {
+                    "agent": "gone-agent", "home": "default", "location": "user",
+                    "name": "linear", "path": r"C:\Users\fixture\.gone.json",
+                    "key_path": ["mcpServers", "linear"],
+                    "parked_at": "2026-10-01T14:30:12Z", "entry": { "url": "https://x" }
+                },
+                "broken": { "name": 3 }
+            }
+        });
+        let fs = fixture().with_file(store, manifest.to_string());
+
+        let places = session(&fs).places();
+
+        let stranded: Vec<&str> = places
+            .stranded
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect();
+        assert_eq!(stranded, ["linear"]);
+        let failures: Vec<Option<&str>> = places
+            .store_read_failures
+            .iter()
+            .map(|failure| failure.entry.as_deref())
+            .collect();
+        assert_eq!(failures, [Some("broken")]);
     }
 }

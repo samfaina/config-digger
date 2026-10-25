@@ -111,6 +111,7 @@ function inventory(overrides: Partial<Inventory> = {}): Inventory {
     homes: [home()],
     items: [item()],
     read_failures: [],
+    store_read_failures: [],
     agent_flags: [],
     ...overrides,
   };

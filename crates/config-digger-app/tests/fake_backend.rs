@@ -183,4 +183,13 @@ fn every_screen_has_what_it_shows() {
             .is_empty()
     );
     assert!(fixtures["about"]["version"].is_string());
+    let stranded = fixtures["places"]["stranded"].as_array().unwrap();
+    assert_eq!(stranded[0]["name"], "cd-throwaway-stranded", "{stranded:?}");
+    let previews = fixtures["previews"].as_array().unwrap();
+    assert!(
+        previews
+            .iter()
+            .any(|preview| preview["request"]["kind"] == "stranded"),
+        "{previews:?}"
+    );
 }

@@ -3,7 +3,7 @@ import type { ActionRequest, OperationSummary } from "./bindings";
 import { createBusy, type BusyAction } from "./busy";
 import type { CommandResult } from "./desktop";
 import type { Notice } from "./Notice";
-import { dismissOperation, rereadAfter } from "./acting";
+import { dismissOperation, rereadAfter, STRANDED_ROW } from "./acting";
 
 const LOCATOR = String.raw`C:\Users\me\.claude.json#mcpServers.cd-throwaway-notes`;
 const OPERATION = "20261002-095812-a3f";
@@ -59,6 +59,16 @@ describe("the read after Remove leftovers' dialog closes", () => {
     void rereadAfter({ kind: "leftovers", project: path }, { ...reading, text: "Reading the Projects and Agent homes again…" });
 
     expect(busy()).toEqual([{ text: "Reading the Projects and Agent homes again…", row: path }]);
+  });
+});
+
+describe("the read after Remove all Stranded Entries' dialog closes", () => {
+  test("shows as busy on the Stranded group", () => {
+    const { reading, busy } = screen();
+
+    void rereadAfter({ kind: "stranded" }, { ...reading, text: "Reading the Projects and Agent homes again…" });
+
+    expect(busy()).toEqual([{ text: "Reading the Projects and Agent homes again…", row: STRANDED_ROW }]);
   });
 });
 

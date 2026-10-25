@@ -8,16 +8,18 @@
 //! The recording does what the UAT does by hand: it adds the Claude Desktop
 //! home, the second Claude Code home and the extra Project, hides a Project,
 //! and disables two servers, so that History holds Operations and Settings a
-//! parked Entry. Every path under the folder is then written as under
+//! parked Entry. It then parks the server of a second Claude Desktop home
+//! and forgets the home, so that Projects & homes lists a Stranded Entry.
+//! Every path under the folder is then written as under
 //! [`UAT_ROOT`], where the UAT's steps have it.
 
 use crate::about::About;
 use crate::actions::{ActionRequest, Actions, Executed, Verb};
 use crate::commands::{self, DataFolder};
 use crate::lists::{self, ListChange, ListChanged};
-use crate::session::{Scans, Session, SessionState};
+use crate::session::{Places, Scans, Session, SessionState};
 use crate::updates::UpdateStatus;
-use config_digger_core::api::{Core, Error, Inventory, Leftovers, OperationSummary, WarningClass};
+use config_digger_core::api::{Core, Error, Inventory, OperationSummary, WarningClass};
 use config_digger_core::ports::Ports;
 use config_digger_core::ports::fake::{FakeClock, FakeEnvironment, FakeGitIndex, FakeProcesses};
 use config_digger_core::ports::real::RealFileSystem;
@@ -45,6 +47,7 @@ pub fn record(root: &Path) -> Result<Value, Error> {
     core()?.record_update_check()?;
     let mut actions = Actions::new(core()?);
     let executed = disable_servers(&mut actions, &Session::scan(core()?)?.resolve(None))?;
+    strand_server(&root, &mut actions)?;
 
     let mut session = Session::scan(core()?)?;
     let places = session.places();
@@ -62,7 +65,7 @@ pub fn record(root: &Path) -> Result<Value, Error> {
         .iter()
         .map(|operation| actions.detail(&operation.id))
         .collect::<Result<Vec<_>, _>>()?;
-    let previews: Vec<Value> = requests(&inventories, &places.leftovers, &history)
+    let previews: Vec<Value> = requests(&inventories, &places, &history)
         .iter()
         // An action the Entry does not offer is not planned.
         .filter_map(|request| {
@@ -156,13 +159,46 @@ fn disable_servers(actions: &mut Actions, inventory: &Inventory) -> Result<Execu
     Ok(executed.swap_remove(0))
 }
 
+/// Adds the second Claude Desktop home, Disables its server, which parks
+/// it, then forgets the home, as the UAT does, so that the server is
+/// Stranded.
+fn strand_server(root: &Path, actions: &mut Actions) -> Result<(), Error> {
+    let kept = SessionState::default();
+    let scanned = root.to_path_buf();
+    let scans = Scans::new(move || Session::scan(Core::new(ports(&scanned))?));
+    let folder = root.join("claude-desktop-stranded-home");
+    let agent = "claude-desktop".to_owned();
+    let added = ListChange::AddHome {
+        folder: folder.clone(),
+        agent: agent.clone(),
+    };
+    lists::change_list(&kept, &added, &scans)?;
+    let inventory = Session::scan(Core::new(ports(root))?)?.resolve(None);
+    let request = ActionRequest::Entry {
+        verb: Verb::Disable,
+        locator: locator(&inventory, "cd-throwaway-stranded")?,
+        project: None,
+    };
+    let preview = actions.plan(&request)?;
+    let acknowledged: Vec<WarningClass> = preview
+        .warnings
+        .iter()
+        .map(|warning| warning.class)
+        .collect();
+    actions.execute(&preview.plan_id, &acknowledged)?;
+    let home = folder.display().to_string();
+    lists::change_list(&kept, &ListChange::ForgetHome { agent, home }, &scans)?;
+    Ok(())
+}
+
 /// Every action to preview: each verb on each Entry, once, in the first
 /// context that lists it, since its preview differs little from one context
-/// to another; the Remove of each missing Project's leftovers; and the Undo
-/// and Delete backup of each Operation.
+/// to another; the Remove of each missing Project's leftovers, of each
+/// Stranded Entry and of all of them; and the Undo and Delete backup of each
+/// Operation.
 fn requests(
     inventories: &[Inventory],
-    leftovers: &[Leftovers],
+    places: &Places,
     history: &[OperationSummary],
 ) -> Vec<ActionRequest> {
     let mut requests = Vec::new();
@@ -179,9 +215,22 @@ fn requests(
             }
         }
     }
-    requests.extend(leftovers.iter().map(|leftovers| ActionRequest::Leftovers {
-        project: leftovers.project.clone(),
+    requests.extend(
+        places
+            .leftovers
+            .iter()
+            .map(|leftovers| ActionRequest::Leftovers {
+                project: leftovers.project.clone(),
+            }),
+    );
+    requests.extend(places.stranded.iter().map(|stranded| ActionRequest::Entry {
+        verb: Verb::Remove,
+        locator: stranded.locator.clone(),
+        project: None,
     }));
+    if !places.stranded.is_empty() {
+        requests.push(ActionRequest::Stranded);
+    }
     for operation in history {
         requests.push(ActionRequest::Undo {
             operation: operation.id.clone(),

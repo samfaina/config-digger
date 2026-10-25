@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { rereadAfter } from "./acting";
+import { rereadAfter, STRANDED_ROW } from "./acting";
 import {
   ADD_LABELS,
   addHomeOffer,
@@ -20,6 +20,7 @@ import {
   homeGroups,
   projectSections,
   rowOf,
+  strandedRows,
   type HiddenRow,
   type HomeGroup,
   type HomeRow,
@@ -135,6 +136,9 @@ export function ProjectsScreen({ onShow, onOpenHistory, start }: Props) {
                 onShow={onShow}
                 onChange={act}
                 onRemoveLeftovers={(path) => dialog.open({ kind: "leftovers", project: path })}
+                onRemoveStranded={(locator) =>
+                  dialog.open(locator === null ? { kind: "stranded" } : { kind: "entry", verb: "remove", locator, project: null })
+                }
               />
             ) : (
               <HomesTab places={places} busy={busyRows} onShow={onShow} onChange={act} />
@@ -165,15 +169,17 @@ type ProjectsTabProps = {
   onShow: (show: ShowInInventory) => void;
   onChange: (change: ListChange) => void;
   onRemoveLeftovers: (path: string) => void;
+  /** Removes the Stranded Entry at a locator in the store, or every one for `null`. */
+  onRemoveStranded: (locator: string | null) => void;
 };
 
 /**
  * The Projects, No Project, the missing Projects with leftovers (open by
  * default), those without (collapsed, open while the search finds one of
- * them) and the hidden ones (collapsed), narrowed to the search; No Project
- * shows without one.
+ * them), the Stranded Entries and the hidden Projects (collapsed), narrowed
+ * to the search; No Project and the Stranded Entries show without one.
  */
-export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLeftovers }: ProjectsTabProps) {
+export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLeftovers, onRemoveStranded }: ProjectsTabProps) {
   const [missingOpen, setMissingOpen] = useState(true);
   const [noLeftoversOpen, setNoLeftoversOpen] = useState(false);
   const [hiddenOpen, setHiddenOpen] = useState(false);
@@ -244,6 +250,8 @@ export function ProjectsTab({ places, search, busy, onShow, onChange, onRemoveLe
             ))}
         </>
       )}
+
+      {search === "" && <StrandedGroup places={places} busy={busy} onRemove={onRemoveStranded} />}
 
       {hidden.length > 0 && (
         <>
@@ -420,6 +428,78 @@ function MissingLine({ row, busy, onShow, onHide, onRemoveLeftovers }: MissingLi
   );
 }
 
+/**
+ * The parked Entries whose origin is not found, each with a Remove, and a
+ * Remove all that is one Operation, after the Read failures of the
+ * parked-Entry store, if it has any. Nothing shows without either.
+ */
+function StrandedGroup({ places, busy, onRemove }: { places: Places; busy: string[]; onRemove: (locator: string | null) => void }) {
+  const rows = strandedRows(places);
+  if (rows.length === 0 && places.store_read_failures.length === 0) return null;
+  const all = busy.includes(STRANDED_ROW);
+  return (
+    <>
+      <h3 className="place-group">
+        Stranded · {rows.length}
+        <span className="place-group-line" />
+        {rows.length > 0 && (
+          <SmallButton
+            danger
+            disabled={all || rows.some((row) => busy.includes(row.locator))}
+            label={
+              <>
+                <Icon name="trash" small />
+                Remove all
+              </>
+            }
+            onClick={() => onRemove(null)}
+          />
+        )}
+      </h3>
+      {places.store_read_failures.map((failure) => (
+        <div key={failure.entry ?? ""} className="alert" role="alert">
+          <Icon name="flag" small />
+          {failure.sentence}
+        </div>
+      ))}
+      {rows.map((row) => {
+        const rowBusy = all || busy.includes(row.locator);
+        return (
+          <PlaceRow
+            key={row.locator}
+            icon="flag"
+            warn
+            busy={rowBusy}
+            actions={
+              <SmallButton
+                danger
+                disabled={rowBusy}
+                label={
+                  <>
+                    <Icon name="trash" small />
+                    Remove
+                  </>
+                }
+                onClick={() => onRemove(row.locator)}
+              />
+            }
+          >
+            <div className="place-name mono">{row.name}</div>
+            <div className="place-sub">
+              {row.sub} · parked {new Date(row.parkedAt).toLocaleString()}
+            </div>
+            <div className="place-sub">{row.sentence}</div>
+            <ul className="place-leftovers mono">
+              <li>{row.origin}</li>
+              <li>In the store: {row.locator}</li>
+            </ul>
+          </PlaceRow>
+        );
+      })}
+    </>
+  );
+}
+
 /** A hidden Project, dimmed: Unhide, and Remove from list for the user's own. */
 function HiddenLine({
   row,
@@ -577,8 +657,12 @@ function ProjectsSide({ places }: { places: Places | null }) {
           touched.
         </p>
         <p className="side-note">
+          A Stranded Entry is one config-digger parked whose Agent home, Agent definition or location is gone, so it can't be
+          put back. It is listed again as parked once what it came from is back; meanwhile it can only be removed.
+        </p>
+        <p className="side-note">
           Your additions and hides live in %APPDATA%\config-digger\. Nothing on this screen writes Agent configuration,
-          except Remove leftovers, which is an Operation with its own preview, backup and Undo.
+          except Remove leftovers and the Remove of a Stranded Entry, each an Operation with its own preview, backup and Undo.
         </p>
       </div>
     </aside>

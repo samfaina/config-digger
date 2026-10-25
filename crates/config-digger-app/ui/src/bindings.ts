@@ -184,6 +184,11 @@ locator: string; project: string | null } |
  *  its context.
  */
 { kind: "leftovers"; project: string } | 
+/**
+ *  The Remove of every Stranded Entry, with no Project. One alone is
+ *  Removed as an `Entry`, by its locator in the store.
+ */
+{ kind: "stranded" } | 
 /**  The Undo of the Operation `operation` in History. */
 { kind: "undo"; operation: string } | 
 /**  The deletion of the backup of the Operation `operation` in History. */
@@ -970,7 +975,12 @@ export type InfoCode =
  *  were copied from instead: the change reaches the Mirrored home through
  *  the tool that copies it. Its path is the Mirrored home's folder.
  */
-"reaches_mirrored_home";
+"reaches_mirrored_home" | 
+/**
+ *  It Removes a Stranded Entry, which has no State to change. Its path
+ *  is the parked-Entry store.
+ */
+"removes_stranded";
 
 /**  A launchable copy of an Agent, with its own version. */
 export type Installation = {
@@ -999,6 +1009,11 @@ export type Inventory = {
 	items: Item[],
 	/**  Every Read failure the scan met, in any context. */
 	read_failures: ReadFailure[],
+	/**
+	 *  The Read failures of config-digger's parked-Entry store, which
+	 *  belongs to no Agent.
+	 */
+	store_read_failures: StoreReadFailure[],
 	/**  The problems of Agent homes in the context, such as one that cannot start. */
 	agent_flags: AgentFlag[],
 };
@@ -1312,6 +1327,13 @@ export type Places = {
 	projects: Project[],
 	/**  The leftovers of each missing Project that has any. */
 	leftovers: Leftovers[],
+	/**
+	 *  The parked Entries whose origin is not found, listed apart from the
+	 *  leftovers, and Removed by their locators in the store.
+	 */
+	stranded: Stranded[],
+	/**  The Read failures of the parked-Entry store. */
+	store_read_failures: StoreReadFailure[],
 	/**  Every loaded Agent definition, with each of its Agent homes. */
 	agents: Agent[],
 };
@@ -1800,6 +1822,95 @@ export type StoreClass =
 "rewritten-while-running" | 
 /**  A SQLite database the Agent holds open. */
 "sqlite";
+
+/**
+ *  A Read failure of config-digger's parked-Entry store: its manifest
+ *  cannot be opened or parsed, or an Entry in it does not read as a parked
+ *  Entry. config-digger never writes to the store because of one: the user
+ *  fixes the file by hand.
+ */
+export type StoreReadFailure = {
+	/**  The store's manifest. */
+	path: string,
+	/**
+	 *  The id of the Entry that does not read as a parked Entry, `None`
+	 *  when the whole manifest fails.
+	 */
+	entry: string | null,
+	kind: ReadFailureKind,
+	/**
+	 *  Where a parse error is, when the parser knows. It never quotes the
+	 *  manifest, which can hold a Secret.
+	 */
+	position: Position | null,
+	/**  The failure as a sentence, rendered by the core. */
+	sentence: string,
+};
+
+/**
+ *  A parked Entry whose origin config-digger cannot find (ADR 0002). It has
+ *  no State and belongs to no Item, so only its locator in the store names
+ *  it, and it can only be Removed. It is Parked again once its origin is
+ *  found.
+ */
+export type Stranded = {
+	name: string,
+	kind: ItemKind,
+	/**  The id of the Agent it was parked from. */
+	agent: string,
+	/**  That Agent's name, or its id when no loaded definition is of it. */
+	agent_name: string,
+	/**  Where it was parked from. */
+	origin: StrandedOrigin,
+	/**  The first part of its origin that is not found. */
+	reason: StrandedReason,
+	/**  The reason as a sentence naming what is not found, rendered by the core. */
+	sentence: string,
+	/**  When it was parked, in RFC 3339. */
+	parked_at: string,
+	/**  The parked-Entry store, and its key path there. */
+	path: string,
+	key_path: string[],
+	/**  `<path>#<key path>` of where it is in the store. */
+	locator: string,
+	/**
+	 *  Its value as parked, with every Secret masked as `••••`: as its
+	 *  location masks it when the location is loaded, and else every text.
+	 */
+	config: JsonValue,
+	/**
+	 *  The key paths in `config`, relative to the Entry, whose values were
+	 *  masked.
+	 */
+	masked: string[][],
+};
+
+/**  Where a Stranded Entry was parked from. */
+export type StrandedOrigin = {
+	/**  The id of the Agent home. */
+	home: string,
+	/**  The id of the location in the Agent's definition. */
+	location: string,
+	/**  The Project it applied in, `None` when it applied in every context. */
+	project: string | null,
+	/**  The file or skill folder it was parked from, and its key path there. */
+	path: string,
+	key_path: string[],
+	/**  `<path>#<key path>` of where it was. */
+	locator: string,
+};
+
+/**
+ *  Which part of a Stranded Entry's origin is not found, the first that
+ *  applies in this order.
+ */
+export type StrandedReason = 
+/**  No loaded definition is of its Agent. */
+"no_definition" | 
+/**  Its Agent home is not found. */
+"home_not_found" | 
+/**  Its location id is no longer in its Agent's definition. */
+"location_gone";
 
 /**  An update a check found, as its notice shows it. */
 export type UpdateNotice = {

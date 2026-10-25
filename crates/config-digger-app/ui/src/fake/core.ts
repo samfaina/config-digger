@@ -112,6 +112,8 @@ function previewOf(request: ActionRequest): ActionPreview {
         return known.kind === "entry" && known.verb === request.verb && known.locator === request.locator;
       case "leftovers":
         return known.kind === "leftovers" && samePath(known.project, request.project);
+      case "stranded":
+        return true;
       default:
         return "operation" in known && known.operation === request.operation;
     }
