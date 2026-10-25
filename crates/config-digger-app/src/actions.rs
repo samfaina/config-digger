@@ -25,7 +25,7 @@ pub enum ActionRequest {
         project: Option<PathBuf>,
     },
     /// The Remove of every leftover of the missing Project `project`, in
-    /// its context.
+    /// its context, but those in the Agent homes the user hid.
     Leftovers { project: PathBuf },
     /// The Remove of every Stranded Entry, with no Project. One alone is
     /// Removed as an `Entry`, by its locator in the store.

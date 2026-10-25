@@ -39,7 +39,9 @@ pub(crate) fn resolve(
                 installations,
                 last_ran: home.last_ran.version().map(str::to_owned),
                 entries: count_entries(snapshot, |entry| {
-                    entry.agent_index == home.agent_index && entry.home == home.home
+                    entry.agent_index == home.agent_index
+                        && entry.home == home.home
+                        && entry.project.is_none()
                 }),
                 notes,
                 agent: definition.agent.id.clone(),

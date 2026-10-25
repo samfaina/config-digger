@@ -149,6 +149,22 @@ Write-TestFile "$Root\claude-code-shape-home\.claude.json" @"
 }
 "@
 
+# A user folder whose default Claude Code home holds a second leftover of the
+# missing Project. Step 18.1 starts the app with USERPROFILE set to it and
+# hides that home, which Remove leftovers then leaves out: only a home the
+# app discovers can be hidden.
+Write-TestFile "$Root\claude-code-profile\.claude.json" @"
+{
+  "projects": {
+    "$slash/project-gone": {
+      "mcpServers": {
+        "cd-throwaway-second-leftover": { "command": "npx", "args": ["-y", "cd-throwaway-second-leftover"] }
+      }
+    }
+  }
+}
+"@
+
 # A Claude Code home with a plugin synced from claude.ai, which Claude Code
 # keeps in a folder per account and names by its manifest, and the plugin
 # sync gate cached on, on 2 Oct 2026 at 07:40 UTC.

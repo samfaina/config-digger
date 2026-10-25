@@ -562,8 +562,9 @@ fn list_json_prints_one_document_with_schema_version() {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            // Its two user servers, and `dart`, keyed to a Project.
-            "entries": 3,
+            // Its two user servers: `dart`, keyed to a Project, counts on
+            // that Project.
+            "entries": 2,
             "notes": [{
                 "code": "cloud_connectors_not_on_disk",
                 "installation": null,

@@ -181,7 +181,7 @@ export type ActionRequest =
 locator: string; project: string | null } | 
 /**
  *  The Remove of every leftover of the missing Project `project`, in
- *  its context.
+ *  its context, but those in the Agent homes the user hid.
  */
 { kind: "leftovers"; project: string } | 
 /**
@@ -881,7 +881,11 @@ export type Home = {
 	out_of_range: boolean,
 	/**  The version that last ran against it, as the Agent records it. */
 	last_ran: string | null,
-	/**  How many Entries it holds, in any context. */
+	/**
+	 *  How many Entries it holds with no Project: those the inventory lists
+	 *  for it with no Project picked, each once. Its Project Entries count
+	 *  on their Projects.
+	 */
 	entries: number,
 	/**
 	 *  What to know about the Agent's versions here, such as one outside

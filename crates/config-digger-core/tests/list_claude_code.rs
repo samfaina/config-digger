@@ -48,8 +48,9 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            // Its two user servers, and `dart`, keyed to a Project.
-            "entries": 3,
+            // Its two user servers: `dart`, keyed to a Project, counts on
+            // that Project.
+            "entries": 2,
             "notes": [{
                 "code": "cloud_connectors_not_on_disk",
                 "installation": null,

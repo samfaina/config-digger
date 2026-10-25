@@ -251,8 +251,10 @@ impl Core {
     }
 
     /// Plans the Remove of every leftover of the missing Project `project`,
-    /// in any spelling, as one Operation in that Project's context. It fails
-    /// with `NoMatch` when the Project is not missing or has no leftovers.
+    /// in any spelling, as one Operation in that Project's context, but those
+    /// in the Agent homes the user hid, as the leftovers are listed by
+    /// default. It fails with `NoMatch` when the Project is not missing or
+    /// has no leftovers outside the hidden homes.
     pub fn plan_remove_leftovers(
         &self,
         snapshot: &Snapshot,
@@ -1803,7 +1805,9 @@ pub struct Home {
     pub out_of_range: bool,
     /// The version that last ran against it, as the Agent records it.
     pub last_ran: Option<String>,
-    /// How many Entries it holds, in any context.
+    /// How many Entries it holds with no Project: those the inventory lists
+    /// for it with no Project picked, each once. Its Project Entries count
+    /// on their Projects.
     pub entries: u32,
     /// What to know about the Agent's versions here, such as one outside
     /// the definition's tested range. None of them changes a State or

@@ -53,6 +53,8 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 `-VsCode` writes VS Code's files as they would be in an `%APPDATA%` of their own, `vscode-appdata`: the default profile, a profile Work with its own `mcp.json`, and a profile Shared that shares the default profile's MCP servers, with the Project last opened in Work and the extra Project in Shared. A step that needs them starts the app with `APPDATA` set to that folder, as step 16.1 does, so that the app never reads the tester's own VS Code profiles.
 
+`claude-code-profile`, in the default data, stands for a user folder: its `.claude.json` holds a second leftover of `project-gone`. Step 18.1 starts the app with `USERPROFILE` set to it, so that it is Claude Code's default home, which the app discovers and the tester can hide; a home the user added can't be hidden.
+
 `-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 
 The script refuses any `-Root` not named `cd-throwaway`, so `-Reset` can never delete another folder. It refuses an existing folder without `-Reset`. `cargo test -p xtask --test uat_data` checks both, on Windows.

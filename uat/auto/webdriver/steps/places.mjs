@@ -2,7 +2,7 @@
 // throwaway profile.
 import { dirname, join } from "node:path";
 import { KEY, unwrap } from "../driver.mjs";
-import { buttonEl, choose, go, notices, panel, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
+import { buttonEl, choose, fieldValue, go, notices, panel, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
 import { act, addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
 
@@ -30,6 +30,13 @@ export function projectGroups(s) {
 }
 
 const inGroup = (groups, title, name) => groups.find((g) => g.title.startsWith(title))?.rows.find((r) => r.name === name);
+
+// The count on the row named `name` of the open tab, such as "2 Entries" or "1 leftover".
+const rowCount = (s, name) =>
+  s.exec(
+    `return [...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0])?.querySelector(".place-count")?.textContent.trim() ?? null;`,
+    name,
+  );
 
 // The Missing group, of the missing Projects with leftovers, and the one of those without.
 const missingGroup = (groups) => groups.find((g) => /Missing · \d/.test(g.title));
@@ -159,6 +166,29 @@ export default [
       const [cr, cg, cb] = rgb(style.color);
       t.check(cr > 200 && cg > 200 && cb > 200, "el texto de cada etiqueta es casi blanco", style.color);
       await t.shot("etiquetas", "las etiquetas son píldoras grises con borde gris claro y texto casi blanco");
+    },
+  },
+  {
+    id: "10.19",
+    async run(t) {
+      const { s } = t;
+      const home = `${t.root}\\claude-code-home`;
+      await go(s, "Projects & homes");
+      await tab(s, "Agent homes");
+      const count = await s.until(() => rowCount(s, home), { what: `the count of ${home}` }).catch(() => null);
+      t.eq(count, "2 Entries", `la fila de «${home}» dice «2 Entries»`);
+      await s.click(await s.until(() => rowButton(s, home, "Show in Inventory"), { what: "Show in Inventory" }));
+      await s.until(() => s.exec("return !!document.querySelector('.inventory') && !document.querySelector('.loading')"), { what: "the Inventory" });
+      await wait(300);
+      const state = await s.exec(`return {
+        home: [...document.querySelectorAll(".home-tile")].find((b) => b.getAttribute("aria-pressed") === "true")?.querySelector(".home-name")?.textContent.trim() ?? null,
+        items: [...document.querySelectorAll(".item-row .item-name")].map((e) => e.textContent.trim()),
+      };`);
+      const project = await fieldValue(s, "Project");
+      t.eq(project, "No Project", "el campo Project del Inventario dice «No Project»");
+      t.check(state.home?.endsWith("claude-code-home"), `la ficha elegida del panel Agent home es «${home}»`, state.home);
+      t.eq([...state.items].sort().join(", "), "cd-throwaway-user, cd-throwaway-user-skill", "la lista de Items muestra «cd-throwaway-user» y «cd-throwaway-user-skill», y ningún otro Item");
+      t.check(!state.items.some((name) => name === "cd-throwaway-local" || name === "cd-throwaway-leftover"), "«cd-throwaway-local» y «cd-throwaway-leftover» no salen en la lista", state.items.join(", "));
     },
   },
   {

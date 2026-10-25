@@ -299,7 +299,8 @@ fn redirected<'i, 's>(
 }
 
 /// Plans the Remove of every leftover of the missing Project `project`, in
-/// any spelling, as one Operation in that Project's context.
+/// any spelling, as one Operation in that Project's context, but those in
+/// the Agent homes the user hid.
 pub(crate) fn plan_remove_leftovers(
     definitions: &Definitions,
     ports: &Ports,
@@ -310,10 +311,19 @@ pub(crate) fn plan_remove_leftovers(
     let context = Context {
         project: Some(project.to_path_buf()),
     };
+    let hidden_home = |item: &api::Item| {
+        snapshot.homes.iter().any(|home| {
+            home.hidden
+                && definitions[home.agent_index].agent.id == item.agent
+                && home.home == item.home
+        })
+    };
     let found = resolve::context_project(snapshot, &context).and_then(|(path, _)| {
-        resolve::leftovers(definitions, snapshot)
+        let mut found = resolve::leftovers(definitions, snapshot)
             .into_iter()
-            .find(|leftovers| leftovers.project == path)
+            .find(|leftovers| leftovers.project == path)?;
+        found.items.retain(|item| !hidden_home(item));
+        (!found.items.is_empty()).then_some(found)
     });
     let Some(found) = found else {
         return Err(Error::no_leftovers(project));
