@@ -697,11 +697,16 @@ fn verbose_logs_go_to_stderr_without_configuration_values() {
     }
 }
 
-/// The `scan started` and `scan finished` lines of a run's log, in order.
+/// The `scan started`, `scan finished` and `scan failed` lines of a run's
+/// log, in order.
 fn scan_lines(run: &Run) -> Vec<&str> {
     run.stderr
         .lines()
-        .filter(|line| line.contains("scan started") || line.contains("scan finished"))
+        .filter(|line| {
+            ["scan started", "scan finished", "scan failed"]
+                .iter()
+                .any(|scan| line.contains(scan))
+        })
         .collect()
 }
 
@@ -721,6 +726,47 @@ fn list_verbose_logs_one_scan_with_its_time_and_the_paths_it_checked() {
     assert!(lines[1].contains("elapsed_ms="), "{}", lines[1]);
     // `.claude.json` is the one location of the home that exists.
     assert!(lines[1].contains("paths=1"), "{}", lines[1]);
+}
+
+/// Checks that a run's log holds one scan, started at INFO and failed at
+/// WARN with its time, the paths it checked and the error the run reported.
+fn assert_one_failed_scan(run: &Run) {
+    assert_eq!(run.code, 1, "{}", run.stderr);
+    let message = run.document()["error"]["message"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let lines = scan_lines(run);
+    assert_eq!(lines.len(), 2, "{}", run.stderr);
+    assert!(lines[0].contains(" INFO "), "{}", lines[0]);
+    assert!(lines[0].contains("scan started"), "{}", run.stderr);
+    assert!(lines[1].contains(" WARN "), "{}", lines[1]);
+    assert!(lines[1].contains("scan failed"), "{}", run.stderr);
+    assert!(lines[1].contains("elapsed_ms="), "{}", lines[1]);
+    assert!(lines[1].contains("paths=0"), "{}", lines[1]);
+    assert!(lines[1].contains(&message), "{message} not in {}", lines[1]);
+}
+
+#[test]
+fn list_verbose_logs_a_scan_that_cannot_read_the_user_list_as_failed() {
+    let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
+    let list = harness
+        .roaming_app_data()
+        .join("config-digger")
+        .join("homes-and-projects.json");
+    std::fs::create_dir_all(list.parent().unwrap()).unwrap();
+    std::fs::write(&list, "{ not json").unwrap();
+
+    let run = harness.run(&["list", "--json", "-v"]);
+
+    assert_one_failed_scan(&run);
+}
+
+#[test]
+fn list_verbose_logs_a_scan_without_a_home_folder_as_failed() {
+    let run = Harness::new().run_without_home(&["list", "--json", "-v"]);
+
+    assert_one_failed_scan(&run);
 }
 
 #[test]
@@ -1387,11 +1433,12 @@ fn undo_dry_run_prints_the_plan_and_writes_nothing() {
 }
 
 /// How many scans a run logged, after checking that each `scan started`
-/// line is followed by its `scan finished` line.
+/// line is followed by its `scan finished` or `scan failed` line.
 fn logged_scans(run: &Run) -> usize {
     let lines = scan_lines(run);
     let paired = lines.chunks(2).all(|pair| {
-        matches!(pair, [started, finished] if started.contains("started") && finished.contains("finished"))
+        matches!(pair, [started, ended] if started.contains("started")
+            && (ended.contains("finished") || ended.contains("failed")))
     });
     assert!(paired, "{}", run.stderr);
     lines.len() / 2

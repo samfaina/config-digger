@@ -1173,7 +1173,9 @@ pub(crate) fn scan_as_if(
 
 /// The scan of [`scan`] and [`scan_as_if`], with the Installations found
 /// again when `known_installations` is `None`, logged with how long it took
-/// and how many paths it asked the git index about.
+/// and how many paths it asked the git index about, whether it finished or
+/// failed. A failed scan is a warning: the caller decides whether it is an
+/// error.
 fn timed_scan(
     definitions: &Definitions,
     ports: &Ports,
@@ -1185,7 +1187,7 @@ fn timed_scan(
     let started = Instant::now();
     tracing::info!("scan started");
     let mut asks = GitAsks::default();
-    let snapshot = read_as_if(
+    let read = read_as_if(
         definitions,
         ports,
         extra_projects,
@@ -1193,10 +1195,13 @@ fn timed_scan(
         written,
         folders,
         &mut asks,
-    )?;
+    );
     let elapsed_ms = started.elapsed().as_millis();
-    tracing::info!(elapsed_ms, paths = asks.paths, "scan finished");
-    Ok(snapshot)
+    match &read {
+        Ok(_) => tracing::info!(elapsed_ms, paths = asks.paths, "scan finished"),
+        Err(error) => tracing::warn!(elapsed_ms, paths = asks.paths, %error, "scan failed"),
+    }
+    read
 }
 
 /// The scan of [`timed_scan`], with the Installations found again when
