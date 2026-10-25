@@ -13,6 +13,7 @@ import type {
   Inventory,
   Item,
   ItemKind,
+  LastOpened,
   Link,
   Project,
   ReadFailure,
@@ -37,20 +38,21 @@ export function agentsOf(homes: Home[]): { agent: string; agentName: string }[] 
 }
 
 /**
- * The home the user chose for each Agent, and, while the Project chosen is
- * missing, those chosen since: until the user chooses one, each Agent opens
- * on the home holding the Project's leftovers.
+ * The home the user chose for each Agent, those chosen since the Project was
+ * chosen, and whether that Project is missing: until the user chooses one,
+ * each Agent opens on the home holding a missing Project's leftovers, or on
+ * the Project's Last-opened home.
  */
-export type HomeChoices = { choice: HomeChoice; sinceMissing: HomeChoice | null };
+export type HomeChoices = { choice: HomeChoice; sinceProject: HomeChoice; missing: boolean };
 
 /** The homes chosen in `choice`, with no missing Project chosen. */
 export function homeChoices(choice: HomeChoice = {}): HomeChoices {
-  return { choice, sinceMissing: null };
+  return { choice, sinceProject: {}, missing: false };
 }
 
 /** `choices` once the user chooses `home` for `agent`. */
-export function withHomeChosen({ choice, sinceMissing }: HomeChoices, agent: string, home: string): HomeChoices {
-  return { choice: { ...choice, [agent]: home }, sinceMissing: sinceMissing && { ...sinceMissing, [agent]: home } };
+export function withHomeChosen({ choice, sinceProject, missing }: HomeChoices, agent: string, home: string): HomeChoices {
+  return { choice: { ...choice, [agent]: home }, sinceProject: { ...sinceProject, [agent]: home }, missing };
 }
 
 /**
@@ -59,23 +61,38 @@ export function withHomeChosen({ choice, sinceMissing }: HomeChoices, agent: str
  */
 export function withProjectChosen({ choice }: HomeChoices, projects: Project[], project: string | null): HomeChoices {
   const missing = project !== null && projects.some((p) => p.missing && samePath(p.path, project));
-  return { choice, sinceMissing: missing ? {} : null };
+  return { choice, sinceProject: {}, missing };
+}
+
+/** The Last-opened homes of the inventory's Project, none without one. */
+export function lastOpenedHomes(inventory: Inventory | null): LastOpened[] {
+  const project = inventory?.project;
+  if (!inventory || project === null || project === undefined) return [];
+  return inventory.projects.find((p) => samePath(p.path, project))?.last_opened ?? [];
 }
 
 /**
- * The home shown for each Agent: the one the user chose while it is listed,
- * otherwise the first one among `items` holding a leftover, otherwise the
- * first one the Agent reads, otherwise its first. While a missing Project is
- * chosen, the home holding a leftover comes before one chosen earlier.
+ * The home shown for each Agent: one the user chose since the Project was
+ * chosen, otherwise, for a missing Project, the first one among `items`
+ * holding a leftover, otherwise the Project's Last-opened home among
+ * `lastOpened` unless it is hidden, otherwise the one the user chose while it
+ * is listed, otherwise the first one holding a leftover, otherwise the first
+ * one the Agent reads, otherwise its first.
  */
-export function chosenHomes(homes: Home[], { choice, sinceMissing }: HomeChoices, items: Item[]): HomeChoice {
+export function chosenHomes(
+  homes: Home[],
+  { choice, sinceProject, missing }: HomeChoices,
+  items: Item[],
+  lastOpened: LastOpened[] = [],
+): HomeChoice {
   const chosen: HomeChoice = {};
   for (const { agent } of agentsOf(homes)) {
     const own = homes.filter((home) => home.agent === agent);
     const listed = (name: string | undefined) => own.find((home) => home.home === name);
-    const kept = listed(choice[agent]);
     const holding = own.find((home) => leftoversIn(items, home).length > 0);
-    const preferred = sinceMissing ? (listed(sinceMissing[agent]) ?? holding ?? kept) : (kept ?? holding);
+    const opened = listed(lastOpened.find((home) => home.agent === agent && !home.hidden)?.home);
+    const since = listed(sinceProject[agent]) ?? (missing ? holding : undefined);
+    const preferred = since ?? opened ?? listed(choice[agent]) ?? holding;
     chosen[agent] = (preferred ?? own.find((home) => home.not_read === null) ?? own[0]).home;
   }
   return chosen;
@@ -105,6 +122,16 @@ function isSelected(agent: string, selection: Selection): boolean {
 /** Whether the selection shows what the Agent home `home` of `agent` holds. */
 function isShown({ agent, home }: { agent: string; home: string }, selection: Selection): boolean {
   return isSelected(agent, selection) && selection.homes[agent] === home;
+}
+
+/** Whether `home` is a Last-opened home among `lastOpened`. */
+export function isLastOpened(lastOpened: LastOpened[], { agent, home }: { agent: string; home: string }): boolean {
+  return lastOpened.some((opened) => opened.agent === agent && opened.home === home);
+}
+
+/** Where each selected Agent last opened the Project, for those showing another of their homes. */
+export function lastOpenedNotes(lastOpened: LastOpened[], selection: Selection): string[] {
+  return lastOpened.filter((opened) => isSelected(opened.agent, selection) && !isShown(opened, selection)).map((opened) => opened.sentence);
 }
 
 /** The Items of the selected Agents, each in its chosen home. */

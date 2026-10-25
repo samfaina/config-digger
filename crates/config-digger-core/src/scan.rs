@@ -6,10 +6,10 @@ use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
     Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect, JsonFormat,
-    JsonPluginRecords, ListPlugins, Locate, LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom,
-    PLUGIN_KEY, Parse, PluginCache, PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys,
-    ProjectWalk, Register, Registry, RelativePaths, SettingsSource, SkillDefect, SkillFolder,
-    SkillList, Spelling, StoreClass, is_entry_key,
+    JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, ManifestSkills,
+    McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders, PluginRecord,
+    PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths,
+    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -823,6 +823,23 @@ pub(crate) struct ScannedProject {
     pub added: bool,
     /// The user hid it.
     pub hidden: bool,
+    /// The Agent home each Agent last opened it in, as the Agent records it,
+    /// at most one per Agent.
+    pub last_opened: Vec<ScannedLastOpened>,
+}
+
+/// The Agent home an Agent last opened a Project in.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ScannedLastOpened {
+    pub agent_index: usize,
+    pub home: String,
+    /// The name the Agent gives where it opened the Project, when it is not
+    /// the home's id, such as a VS Code profile's.
+    pub name: Option<String>,
+    /// Where it opened the Project is no home of its own, and reads the
+    /// files of `home`, such as a VS Code profile that shares the default
+    /// profile's MCP servers.
+    pub shares_home: bool,
 }
 
 impl ScannedProject {
@@ -1155,6 +1172,7 @@ fn read_as_if(
         readers: Vec::new(),
         storage: Vec::new(),
         cached: BTreeMap::new(),
+        opened_in: Vec::new(),
     };
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
 
@@ -1342,6 +1360,8 @@ fn read_as_if(
             .hidden_projects
             .iter()
             .any(|hidden| project.spellings.contains(&paths::lexical_key(hidden)));
+        project.last_opened =
+            last_opened(definitions, ports, &found, &scanner.opened_in, &project.key);
     }
     let (switches, unreadable_switches) = read_switches(
         definitions,
@@ -2894,6 +2914,19 @@ struct Scanner<'p> {
     /// Each file read for a location that is a copy the Agent caches, with
     /// when it cached it, when the file says.
     cached: BTreeMap<PathBuf, Option<SystemTime>>,
+    /// Each value a registry keeps for a Project that names where the Agent
+    /// last opened it.
+    opened_in: Vec<OpenedIn>,
+}
+
+/// A value the registry at `registry` of the Agent at `agent_index` keeps
+/// for a Project, which names the Agent home the Agent last opened it in.
+struct OpenedIn {
+    agent_index: usize,
+    registry: usize,
+    /// The Project's key.
+    project: String,
+    value: String,
 }
 
 /// The folders of `folder` that hold `marker`, or with no marker those
@@ -2938,6 +2971,88 @@ fn storage_paths<'s>(
         })
 }
 
+/// The Agent home each Agent last opened the Project `key` in, as the values
+/// in `opened_in` name them, at most one per Agent: the first value that
+/// names a found home.
+fn last_opened(
+    definitions: &[AgentDefinition],
+    ports: &Ports,
+    found: &[FoundHome],
+    opened_in: &[OpenedIn],
+    key: &str,
+) -> Vec<ScannedLastOpened> {
+    let mut homes: Vec<ScannedLastOpened> = Vec::new();
+    for opened in opened_in.iter().filter(|opened| opened.project == key) {
+        if homes
+            .iter()
+            .any(|home| home.agent_index == opened.agent_index)
+        {
+            continue;
+        }
+        let definition = &definitions[opened.agent_index];
+        let Some(block) = definition.projects.registries[opened.registry].last_opened() else {
+            continue;
+        };
+        if let Some(home) = home_opened_in(definition, ports, found, opened, block) {
+            homes.push(home);
+        }
+    }
+    homes
+}
+
+/// The found Agent home the value of `opened` names, as `block` maps it:
+/// `None` when it names none.
+fn home_opened_in(
+    definition: &AgentDefinition,
+    ports: &Ports,
+    found: &[FoundHome],
+    opened: &OpenedIn,
+    block: &LastOpenedHomes,
+) -> Option<ScannedLastOpened> {
+    let fs = ports.fs.as_ref();
+    // The home found as the definition's `declared`, at `folder` when given.
+    let found_as = |declared: &str, folder: Option<&Path>| {
+        found.iter().find(|home| {
+            home.agent_index == opened.agent_index
+                && home.declared.as_deref() == Some(declared)
+                && folder.is_none_or(|folder| {
+                    paths::canonical_key(fs, folder) == paths::canonical_key(fs, &home.folder)
+                })
+        })
+    };
+    if let Some(id) = block.named.get(&opened.value) {
+        let home = found_as(id, None)?;
+        return Some(ScannedLastOpened {
+            agent_index: opened.agent_index,
+            home: home.home.clone(),
+            name: None,
+            shares_home: false,
+        });
+    }
+    let listed = definition
+        .homes
+        .iter()
+        .find(|home| home.id == block.listed)?;
+    let Locator::JsonList(list) = &listed.folder else {
+        return None;
+    };
+    let item = list
+        .items(ports.env.as_ref(), fs, block.name.as_deref())
+        .into_iter()
+        .find(|item| item.field == opened.value)?;
+    let home = if item.left_out {
+        found_as(block.left_out.as_deref()?, None)?
+    } else {
+        found_as(&block.listed, Some(item.folder.as_deref()?))?
+    };
+    Some(ScannedLastOpened {
+        agent_index: opened.agent_index,
+        home: home.home.clone(),
+        name: item.name.filter(|name| *name != home.home),
+        shares_home: item.left_out,
+    })
+}
+
 /// The folder an Agent home keeps what it stores for one Project in, such as
 /// VS Code's `workspaceStorage\<id>`.
 #[derive(Clone)]
@@ -2952,7 +3067,7 @@ pub(crate) struct StorageFolder {
 impl Scanner<'_> {
     /// Adds the Projects an Agent home's registries record.
     fn read_registries(&mut self, home: &FoundHome, definition: &AgentDefinition) {
-        for registry in &definition.projects.registries {
+        for (index, registry) in definition.projects.registries.iter().enumerate() {
             let Some(path) = registry.anchor().path(&home.roots, None) else {
                 continue;
             };
@@ -2964,8 +3079,18 @@ impl Scanner<'_> {
                     };
                     match block.spellings(text) {
                         Ok(spellings) => {
-                            for text in spellings {
-                                self.add_spelling(home, spelling, &text);
+                            for (text, value) in spellings {
+                                let project = self.add_spelling(home, spelling, &text);
+                                if let (Some(project), Some(value), Some(_)) =
+                                    (project, value, &block.last_opened)
+                                {
+                                    self.opened_in.push(OpenedIn {
+                                        agent_index: home.agent_index,
+                                        registry: index,
+                                        project,
+                                        value,
+                                    });
+                                }
                             }
                         }
                         Err(error) => self.reader.fail(
@@ -4843,6 +4968,7 @@ impl<'p> Projects<'p> {
                             members: Vec::new(),
                             repo_root: None,
                             main_checkout: None,
+                            last_opened: Vec::new(),
                         });
                         self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1

@@ -7,10 +7,12 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset   deletes E:\cd-throwaway and creates it again
 #   .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   adds a skill behind a relative folder symlink
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
-    [switch]$Symlink
+    [switch]$Symlink,
+    [switch]$VsCode
 )
 $ErrorActionPreference = "Stop"
 
@@ -190,6 +192,48 @@ $manyProjects
   }
 }
 "@
+
+# With -VsCode, VS Code's files as they would be in an %APPDATA% of their
+# own, vscode-appdata, which the app reads when started with APPDATA set to
+# it: the default profile, a profile Work with its own mcp.json, and a
+# profile Shared that shares the default profile's MCP servers. VS Code last
+# opened the Project in Work and the extra Project in Shared.
+if ($VsCode) {
+    $user = "$Root\vscode-appdata\Code\User"
+    Write-TestFile "$user\mcp.json" @"
+{
+  "servers": {
+    "cd-throwaway-vscode-default": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-default"] }
+  }
+}
+"@
+    Write-TestFile "$user\profiles\-c0ffee01\mcp.json" @"
+{
+  "servers": {
+    "cd-throwaway-vscode-work": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-work"] }
+  }
+}
+"@
+    New-Item -ItemType Directory -Force "$user\profiles\-c0ffee02" | Out-Null
+    # VS Code keys a workspace by its URI, the drive in lower case and its
+    # colon encoded.
+    $uri = "file:///" + $Root.Substring(0, 1).ToLower() + "%3A" + ($Root.Substring(2) -replace '\\', '/' -replace ' ', '%20')
+    Write-TestFile "$user\globalStorage\storage.json" @"
+{
+  "userDataProfiles": [
+    { "location": "-c0ffee01", "name": "Work" },
+    { "location": "-c0ffee02", "name": "Shared", "useDefaultFlags": { "mcp": true } }
+  ],
+  "profileAssociations": {
+    "workspaces": {
+      "$uri/project": "-c0ffee01",
+      "$uri/project-extra": "-c0ffee02"
+    },
+    "emptyWindows": {}
+  }
+}
+"@
+}
 
 # With -Symlink, a skill committed in a repo with git's core.symlinks, as git
 # checks it out: its folder outside any Agent home, and a relative folder

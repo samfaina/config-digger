@@ -11,9 +11,9 @@ use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateLookup, Holds, HomeCondition, Interpolation, JsonDialect,
-    JsonFormat, ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk,
-    Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape,
-    StoreClass, Validate, VersionSource,
+    JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry,
+    ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf, SettingsSource,
+    Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -1393,6 +1393,10 @@ impl AgentDefinition {
             registry.validate().map_err(context)?;
             self.validate_home_root(registry.anchor())
                 .map_err(context)?;
+            if let Some(last_opened) = registry.last_opened() {
+                self.validate_last_opened(last_opened)
+                    .map_err(|e| context(format!("last_opened: {e}")))?;
+            }
         }
 
         unique(
@@ -2159,6 +2163,25 @@ impl AgentDefinition {
             Some(id) => self.declared_settings(id).map(|_| ()),
             None => Ok(()),
         }
+    }
+
+    /// The homes `last_opened` names are declared, and its `listed` one is
+    /// found through a `json-list`.
+    fn validate_last_opened(&self, last_opened: &LastOpenedHomes) -> Result<(), String> {
+        if let Some(id) = last_opened
+            .homes()
+            .find(|id| !self.homes.iter().any(|home| home.id == **id))
+        {
+            return Err(format!("undeclared home `{id}`"));
+        }
+        let listed = self.homes.iter().find(|home| home.id == last_opened.listed);
+        if !matches!(listed.map(|home| &home.folder), Some(Locator::JsonList(_))) {
+            return Err(format!(
+                "home `{}` is not found through a json-list",
+                last_opened.listed
+            ));
+        }
+        Ok(())
     }
 
     /// Every home must declare the root an anchor needs.
@@ -3937,6 +3960,44 @@ registries = [{ block = "json-folders", anchor = { block = "home", root = "state
             "{}",
             error(&text)
         );
+    }
+
+    #[test]
+    fn a_registry_s_last_opened_homes_are_declared_and_list_their_folders() {
+        let text = |listed: &str, left_out: &str, value: &str| {
+            VALID.replace(
+                "[[scopes]]",
+                &format!(
+                    r#"[[homes]]
+id = "profile"
+folder = {{ block = "json-list", file = "%APPDATA%/Test/storage.json", key_path = ["profiles"], field = "location", base = "%APPDATA%/Test/profiles" }}
+roots.state = ".test.json"
+
+[projects]
+registries = [{{ block = "json-keys", anchor = {{ block = "machine", path = "%APPDATA%/Test/storage.json" }}, root = ["opened"], last_opened = {{ named = {{ "{value}" = "default" }}, listed = "{listed}", name = "name", left_out = "{left_out}" }} }}]
+
+[[scopes]]"#
+                ),
+            )
+        };
+        let valid = text("profile", "default", "__default__");
+        assert!(parse("test.toml", &valid).is_ok(), "{}", error(&valid));
+        for (text, message) in [
+            (
+                text("profile", "other", "__default__"),
+                "last_opened: undeclared home `other`",
+            ),
+            (
+                text("default", "default", "__default__"),
+                "last_opened: home `default` is not found through a json-list",
+            ),
+            (
+                text("profile", "default", " "),
+                "last_opened must have no empty value, home or field",
+            ),
+        ] {
+            assert!(error(&text).contains(message), "{}", error(&text));
+        }
     }
 
     #[test]

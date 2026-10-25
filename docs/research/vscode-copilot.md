@@ -9,6 +9,7 @@ Each fact is tagged:
 - **[disk]**: verified read-only on this machine. This includes reading the installed app's own shipped code under `resources\app\out\` and its `package.json`/`product.json` files.
 - **[docs]**: stated by a primary source (code.visualstudio.com, docs.github.com, or the `microsoft/vscode` source) and not observable on this machine.
 - **[contradicts docs]**: what's on disk or in the source differs from, or goes beyond, what the docs say.
+- **[test]**: tested against the real VS Code by the release gate's probe, `uat/agents/vscode.mjs`, on 1.129.1, 1.135.0 and 1.141.0 (see [`release-gate.md`](release-gate.md)).
 
 Secret values are never reproduced. Where one would appear, the text shows only the key name or `***`.
 
@@ -219,6 +220,11 @@ Default folders, from [S-locations] L172–179 [docs], are also present as a lit
 
 - `%APPDATA%\Code\User\workspaceStorage\<id>\workspace.json` holds `{"folder": "<uri>"}` or `{"workspace": "<.code-workspace uri>"}`. There are 12 folders here. They include `file:///e%3A/projects/claudio/petme`, a WSL remote `vscode-remote://wsl%2Bubuntu/...`, and the Agents `agent-sessions.code-workspace` [disk]. Map `<id>` → project by reading this file. Do not try to recompute the hash.
 - `%APPDATA%\Code\User\globalStorage\storage.json` holds `profileAssociations.workspaces` (folder URI → profile id; here every folder is `__default__profile__`), `backupWorkspaces.folders`, `windowsState`, and `userDataProfiles` (id, relative `location`, `useDefaultFlags`) [disk].
+- Which profile a workspace was last opened in, which config-digger reads as the Project's Last-opened home (#128):
+  - The value of `profileAssociations.workspaces` is the profile's id, which is the basename of the profile's stored `location`, such as `-5a1b2c3d` [test] ([S-profile]). The default profile's id is `__default__profile__` [disk], and `userDataProfiles` never lists the default profile ([S-profile]) [docs]. The built-in Agents profile (`builtin/agents`, id `agents`) can never be associated: VS Code throws ([S-profile]) [docs].
+  - The key is the workspace's `URI.toString()`: the folder's URI for a folder, and the `.code-workspace` file's URI for a multi-root workspace, its drive in lower case and its `:` encoded, as `file:///e%3A/projects/app` [test]. None of this machine's entries is a workspace file [disk]. Empty windows go to `emptyWindows` ([S-profile]) [docs].
+  - VS Code writes the entry on every window open and on every profile switch, and keeps one entry per workspace; `--profile <name>` overwrites it ([S-windows], [S-profile]) [docs]. An extension development window writes none [test].
+  - An entry whose id names no profile is skipped, and the next save drops it ([S-profile]) [docs]. A workspace with no entry opens per `--profile`, then `window.newWindowProfile` (a profile name), then the active window's profile, then Default ([S-windows]) [docs]. config-digger reads none of these: they say where the next open goes, not where the last one went.
 - The recently-opened list is stored under global state key `history.recentlyOpenedPathsList` ([S-history]). The key is in the installed `out\main.js`, but **it is absent from this machine's `state.vscdb`** [disk]. See Open questions.
 
 ---
@@ -295,6 +301,7 @@ Source (`microsoft/vscode` @ `64e91bc`):
 - [S-cfgkeys](https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/config/config.ts): https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/config/config.ts
 - [S-prompts-svc](https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/service/promptsServiceImpl.ts): https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/service/promptsServiceImpl.ts
 - [S-history](https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts): https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
+- [S-windows](https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/windows/electron-main/windowsMainService.ts): https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/windows/electron-main/windowsMainService.ts
 
 On-disk evidence (read-only): `%APPDATA%\Code\User\` (`settings.json`, `globalStorage\state.vscdb`, `globalStorage\storage.json`, `workspaceStorage\*\{workspace.json,state.vscdb}`, `profiles\builtin\agents\`), `%USERPROFILE%\.vscode\extensions\extensions.json`, `%LOCALAPPDATA%\Programs\Microsoft VS Code\8a7abeba6e\{policies\VSCode.admx, resources\app\product.json, resources\app\out\main.js, resources\app\out\vs\workbench\workbench.desktop.main.js, resources\app\extensions\copilot\package.json}`, `%USERPROFILE%\.copilot\`, `%USERPROFILE%\.agents\skills\`, `E:\projects\claudio\{petme,stint}\.mcp.json`.
 
@@ -345,3 +352,4 @@ On-disk evidence (read-only): `%APPDATA%\Code\User\` (`settings.json`, `globalSt
 [S-cfgkeys]: https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/config/config.ts
 [S-prompts-svc]: https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/workbench/contrib/chat/common/promptSyntax/service/promptsServiceImpl.ts
 [S-history]: https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
+[S-windows]: https://github.com/microsoft/vscode/blob/64e91bc28bed22fb021da2cbb776de8f37e3463d/src/vs/platform/windows/electron-main/windowsMainService.ts

@@ -1925,6 +1925,33 @@ pub(crate) fn read_only_remove_option() -> String {
     format!("Remove is not offered: {READ_ONLY}.")
 }
 
+/// Where `agent_name` last opened the context's Project: in the Agent home
+/// `home`, under the name `name` it gives it, or, when it `shares_home`, in
+/// `name`, which reads `home`'s MCP servers. The user may have `hidden` the
+/// home. A home's id names it with a capital, as in `Default`.
+pub(crate) fn last_opened(
+    agent_name: &str,
+    name: Option<&str>,
+    home: &str,
+    shares_home: bool,
+    hidden: bool,
+) -> String {
+    let mut letters = home.chars();
+    let home: String = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default();
+    let place = name.unwrap_or(&home);
+    let opened = format!("{agent_name} last opened this Project in {place}");
+    if hidden {
+        format!("{opened}, which is hidden.")
+    } else if shares_home {
+        format!("{opened}, which reads {home}'s MCP servers.")
+    } else {
+        format!("{opened}.")
+    }
+}
+
 /// The label of an Agent home `owner` copies from another.
 pub(crate) fn mirror_label(owner: &str) -> String {
     format!("Mirrored by {owner}")

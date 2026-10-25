@@ -282,7 +282,7 @@ docs.windsurf.com redirects to docs.devin.ai/desktop. Source: https://docs.devin
 - Skills: six `skill-folder` locations (`.agents`/`.github`/`.claude` under project, `.agents`/`.copilot`/`.claude` under `~`). Extension skills come from `manifest` `contributes.chatSkills[].path` over `json-registry` `extensions.json`. Provenance through skill manager detectors (`.skillfish.json` is a `marker-file`).
 - Projects:
   - `sqlite-row` on `history.recentlyOpenedPathsList` with a JSON path.
-  - `json-keys` on `storage.json` `profileAssociations.workspaces`.
+  - `json-keys` on `storage.json` `profileAssociations.workspaces`. Its optional `last_opened` maps each key's value, the profile VS Code last opened the workspace in, to the Project's Last-opened home (#128): `named` gives the values that name a home themselves (`__default__profile__` names `default`), `listed` the `json-list` home whose item a value names by its field (`profile`, by `location`), `name` the item's field shown to the user, and `left_out` the home an item left out by the list's `unless` reads (`default`, for a profile that shares MCP). A value naming no item names no home. It changes no State.
   - Spelling `file-uri`. Walk `folder-only`, plus `workspace-members` for `.code-workspace`.
 - MCP precedence: `.vscode` (0) > `.mcp.json` (1) > `.code-workspace` (100) > user (200) > extension (300) > plugin (350) > discovery (400). Competition `case-insensitive-name` when `collisionBehavior = "disable"`, otherwise `never`.
 - Skill precedence: workspace > personal > plugin > extension; list order inside each group; `first-loaded`.

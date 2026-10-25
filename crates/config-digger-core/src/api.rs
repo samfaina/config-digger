@@ -1633,6 +1633,30 @@ pub struct Project {
     /// How many Entries apply in it alone: in files inside it, or keyed to
     /// its path in user files. Each counts once, however many Agents read it.
     pub entries: u32,
+    /// Its Last-opened home for each Agent that records one, in definition
+    /// order. Nothing it says changes a State.
+    pub last_opened: Vec<LastOpened>,
+}
+
+/// The Agent home an Agent last opened a Project in, as the Agent itself
+/// records it: its Last-opened home.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct LastOpened {
+    pub agent: String,
+    /// The home's id.
+    pub home: String,
+    /// The name the Agent gives where it opened the Project, when it is not
+    /// the home's id, such as a VS Code profile's.
+    pub name: Option<String>,
+    /// Where it opened the Project is no home of its own, and reads the MCP
+    /// servers of `home`, such as a VS Code profile that shares the default
+    /// profile's.
+    pub shares_home: bool,
+    /// The user hid the home.
+    pub hidden: bool,
+    /// Where the Agent last opened the Project, as a sentence, rendered by
+    /// the core.
+    pub sentence: String,
 }
 
 /// The leftovers of one missing Project: its Unread Entries.

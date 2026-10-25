@@ -45,7 +45,10 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset   # deletes it and creates it again
 .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   # adds a skill behind a relative folder symlink
+.\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    # adds VS Code profiles in vscode-appdata
 ```
+
+`-VsCode` writes VS Code's files as they would be in an `%APPDATA%` of their own, `vscode-appdata`: the default profile, a profile Work with its own `mcp.json`, and a profile Shared that shares the default profile's MCP servers, with the Project last opened in Work and the extra Project in Shared. A step that needs them starts the app with `APPDATA` set to that folder, as step 16.1 does, so that the app never reads the tester's own VS Code profiles.
 
 `-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 

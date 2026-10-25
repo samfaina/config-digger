@@ -3826,3 +3826,126 @@ fn an_unreadable_parked_entry_store_is_a_warning_on_stderr() {
     assert_eq!(run.document()["store_read_failures"][0]["kind"], "parse");
     assert_eq!(read(&store), "{ not json");
 }
+
+/// A VS Code default profile and a `Work` profile with its own `mcp.json`,
+/// the home `profile`, in the binary's `%APPDATA%`, with the folder the
+/// binary runs in last opened in `Work`.
+fn with_project_last_opened_in_work() -> Harness {
+    let harness = Harness::new();
+    let user = harness.roaming_app_data().join(r"Code\User");
+    let work = user.join(r"profiles\-5a1b2c3d");
+    let uri = format!(
+        "file:///{}",
+        harness
+            .cwd()
+            .display()
+            .to_string()
+            .replace('\\', "/")
+            .replacen(':', "%3A", 1)
+            .replace(' ', "%20")
+    );
+    let storage = json!({
+        "userDataProfiles": [{ "location": "-5a1b2c3d", "name": "Work" }],
+        "profileAssociations": { "workspaces": { uri: "-5a1b2c3d" } }
+    });
+    for (path, contents) in [
+        (
+            user.join("mcp.json"),
+            r#"{"servers": {"fetch": {"command": "fetch"}}}"#.to_owned(),
+        ),
+        (
+            work.join("mcp.json"),
+            r#"{"servers": {"work-only": {"command": "w"}}}"#.to_owned(),
+        ),
+        (
+            user.join(r"globalStorage\storage.json"),
+            storage.to_string(),
+        ),
+    ] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
+    harness
+}
+
+#[test]
+fn list_marks_the_table_of_the_project_s_last_opened_home() {
+    let harness = with_project_last_opened_in_work();
+
+    let run = harness.run(&["list", "--wide"]);
+    let without = harness.run(&["list", "--wide", "--no-project"]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(
+        run.stdout
+            .contains("VS Code (home: profile, last opened here)\n"),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("VS Code (home: default)\n"),
+        "{}",
+        run.stdout
+    );
+    assert!(
+        without.stdout.contains("VS Code (home: profile)\n"),
+        "{}",
+        without.stdout
+    );
+}
+
+#[test]
+fn projects_list_names_each_project_s_last_opened_home_hidden_or_not() {
+    let harness = with_project_last_opened_in_work();
+    let cwd = harness.cwd().display().to_string();
+
+    let json = harness.run(&["projects", "list", "--json"]);
+    let text = harness.run(&["projects", "list", "--wide"]);
+    let hide = harness.run(&["homes", "hide", "profile", "--agent", "vscode"]);
+    let hidden = harness.run(&["projects", "list", "--wide"]);
+    let hidden_json = harness.run(&["projects", "list", "--json"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let project = json.document()["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|project| project["path"] == cwd.as_str())
+        .cloned()
+        .unwrap();
+    assert_eq!(
+        project["last_opened"],
+        json!([{
+            "agent": "vscode",
+            "home": "profile",
+            "name": "Work",
+            "shares_home": false,
+            "hidden": false,
+            "sentence": "VS Code last opened this Project in Work.",
+        }])
+    );
+    assert!(
+        text.stdout.contains(&format!(
+            "{cwd}\n    VS Code last opened this Project in Work.\n"
+        )),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(hide.code, 0, "{}", hide.stderr);
+    assert!(
+        hidden
+            .stdout
+            .contains("    VS Code last opened this Project in Work, which is hidden.\n"),
+        "{}",
+        hidden.stdout
+    );
+    let document = hidden_json.document();
+    let opened = &document["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|project| project["path"] == cwd.as_str())
+        .unwrap()["last_opened"][0];
+    assert_eq!(opened["home"], "profile");
+    assert_eq!(opened["hidden"], true);
+}

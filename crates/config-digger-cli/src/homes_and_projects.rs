@@ -458,7 +458,8 @@ fn left_out_sentence(count: usize) -> String {
     }
 }
 
-/// One table of Projects: where each came from, then its path.
+/// One table of Projects: where each came from, then its path, and under
+/// it where each Agent last opened it.
 fn render_projects(
     projects: &[api::Project],
     agents: &[api::Agent],
@@ -517,6 +518,12 @@ fn render_projects(
                 .fit(width)
                 .render(),
         );
+        for opened in &project.last_opened {
+            out.push_str(&plain_line(
+                &format!("{INDENT}{INDENT}{}", opened.sentence),
+                width,
+            ));
+        }
     }
     out
 }

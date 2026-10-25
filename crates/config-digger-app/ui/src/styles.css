@@ -1026,6 +1026,14 @@ p {
   font-size: 12.5px;
 }
 
+/* Where an Agent last opened the Project, while another of its homes is shown */
+.home-note {
+  margin: 2px 4px 0;
+  color: var(--grey);
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
 .home-name {
   overflow: hidden;
   text-overflow: ellipsis;

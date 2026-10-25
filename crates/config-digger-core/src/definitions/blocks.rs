@@ -149,8 +149,27 @@ impl Validate for JsonListLocator {
     }
 }
 
-impl Locate for JsonListLocator {
-    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
+/// One item of the list a [`JsonListLocator`] reads.
+pub(crate) struct ListedItem {
+    /// What its `field` holds, as written.
+    pub field: String,
+    /// The folder it names, `None` when that is not a relative path.
+    pub folder: Option<PathBuf>,
+    /// Its `unless` holds `true`, so it names no home of its own.
+    pub left_out: bool,
+    /// What a field of it, asked for by name, holds, such as a profile's `name`.
+    pub name: Option<String>,
+}
+
+impl JsonListLocator {
+    /// Each item of the list that holds its `field`, in order, with what
+    /// its `name` field holds. None when the file cannot be read or parsed.
+    pub fn items(
+        &self,
+        env: &dyn Environment,
+        fs: &dyn FileSystem,
+        name: Option<&str>,
+    ) -> Vec<ListedItem> {
         let (Some(file), Some(base)) = (
             paths::expand(&self.file, env),
             paths::expand(&self.base, env),
@@ -173,20 +192,36 @@ impl Locate for JsonListLocator {
         items
             .into_iter()
             .flatten()
-            .filter(|item| {
+            .filter_map(|item| {
+                let field = item.get(&self.field)?.as_str()?;
                 let flag = self
                     .unless
                     .iter()
-                    .try_fold(*item, |value, key| value.get(key));
-                flag != Some(&Value::Bool(true))
+                    .try_fold(item, |value, key| value.get(key));
+                let relative = validate_relative(field).is_ok() && !field.contains(':');
+                Some(ListedItem {
+                    field: field.to_owned(),
+                    folder: relative.then(|| join_relative(&base, field)),
+                    left_out: flag == Some(&Value::Bool(true)),
+                    name: name
+                        .and_then(|name| item.get(name)?.as_str())
+                        .map(str::to_owned),
+                })
             })
+            .collect()
+    }
+}
+
+impl Locate for JsonListLocator {
+    fn folders(&self, env: &dyn Environment, fs: &dyn FileSystem) -> Vec<PathBuf> {
+        self.items(env, fs, None)
+            .into_iter()
+            .filter(|item| !item.left_out)
             .filter_map(|item| {
-                let relative = item.get(&self.field)?.as_str()?;
-                if validate_relative(relative).is_err() || relative.contains(':') {
-                    tracing::debug!(folder = %relative, "not a relative folder");
-                    return None;
+                if item.folder.is_none() {
+                    tracing::debug!(folder = %item.field, "not a relative folder");
                 }
-                Some(join_relative(&base, relative))
+                item.folder
             })
             .collect()
     }
@@ -1270,6 +1305,17 @@ impl Validate for Registry {
     }
 }
 
+impl Registry {
+    /// How its values name the Agent home the Agent last opened a Project
+    /// in, when they do.
+    pub fn last_opened(&self) -> Option<&LastOpenedHomes> {
+        match self {
+            Registry::JsonKeys(block) => block.last_opened.as_ref(),
+            _ => None,
+        }
+    }
+}
+
 impl Register for Registry {
     fn anchor(&self) -> &Anchor {
         match self {
@@ -1343,6 +1389,10 @@ pub(crate) struct JsonKeys {
     /// How the keys spell a Project. Omitted for paths.
     #[serde(default)]
     pub spelling: Spelling,
+    /// How a key's value names the Agent home the Agent last opened its
+    /// Project in, such as the VS Code profile `profileAssociations` names.
+    /// Omitted when the values say nothing of it.
+    pub last_opened: Option<LastOpenedHomes>,
 }
 
 impl Validate for JsonKeys {
@@ -1351,7 +1401,63 @@ impl Validate for JsonKeys {
         if self.root.iter().any(String::is_empty) {
             return Err("a project registry root must have no empty key".into());
         }
+        if let Some(last_opened) = &self.last_opened {
+            last_opened.validate()?;
+        }
         Ok(())
+    }
+}
+
+/// How a registry's value names the Agent home of its definition the Agent
+/// last opened a Project in: a value `named` lists names that home itself,
+/// and any other one names the item of the `json-list` home `listed` whose
+/// field holds it, and so the home found at that item's folder, or, for an
+/// item the list's `unless` leaves out, the home `left_out`. A value naming
+/// neither names no home.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LastOpenedHomes {
+    /// Each value that names a home itself, such as VS Code's
+    /// `__default__profile__`, and that home's id.
+    #[serde(default)]
+    pub named: BTreeMap<String, String>,
+    /// The id of the home whose `json-list` folder lists the items a value
+    /// names by their field.
+    pub listed: String,
+    /// The field of an item that names it for the user, such as a profile's
+    /// `name`.
+    pub name: Option<String>,
+    /// The id of the home whose files an item the list's `unless` leaves
+    /// out reads, such as the default profile's for a profile that shares
+    /// its MCP servers.
+    pub left_out: Option<String>,
+}
+
+impl Validate for LastOpenedHomes {
+    fn validate(&self) -> Result<(), String> {
+        let ids = self
+            .named
+            .iter()
+            .flat_map(|(value, home)| [value, home])
+            .chain([&self.listed])
+            .chain(&self.name)
+            .chain(&self.left_out);
+        for id in ids {
+            if id.trim().is_empty() {
+                return Err("last_opened must have no empty value, home or field".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl LastOpenedHomes {
+    /// Every home id it names.
+    pub fn homes(&self) -> impl Iterator<Item = &String> {
+        self.named
+            .values()
+            .chain([&self.listed])
+            .chain(&self.left_out)
     }
 }
 
@@ -1366,15 +1472,19 @@ impl Register for JsonKeys {
 }
 
 impl JsonKeys {
-    /// The Projects the registry's text records, as spelled there.
-    pub fn spellings(&self, text: &str) -> Result<Vec<String>, ParseError> {
+    /// The Projects the registry's text records, as spelled there, each
+    /// with its value when that is a string.
+    pub fn spellings(&self, text: &str) -> Result<Vec<(String, Option<String>)>, ParseError> {
         let document = JsonFormat::STRICT.parse(text)?;
         let root = self
             .root
             .iter()
             .try_fold(&document, |value, key| value.get(key));
         Ok(match root {
-            Some(serde_json::Value::Object(projects)) => projects.keys().cloned().collect(),
+            Some(serde_json::Value::Object(projects)) => projects
+                .iter()
+                .map(|(key, value)| (key.clone(), value.as_str().map(str::to_owned)))
+                .collect(),
             None => Vec::new(),
             // It records no Project, though the file is still read.
             Some(_) => {

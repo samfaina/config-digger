@@ -1246,6 +1246,17 @@
               "description": "How the keys spell a Project. Omitted for paths.",
               "$ref": "#/$defs/Spelling"
             },
+            "last_opened": {
+              "description": "How a key's value names the Agent home the Agent last opened its\nProject in, such as the VS Code profile `profileAssociations` names.\nOmitted when the values say nothing of it.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LastOpenedHomes"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "json-keys"
@@ -1465,6 +1476,50 @@
           "type": "string",
           "const": "file-uri"
         }
+      ]
+    },
+    "LastOpenedHomes": {
+      "description": "How a registry's value names the Agent home of its definition the Agent\nlast opened a Project in: a value `named` lists names that home itself,\nand any other one names the item of the `json-list` home `listed` whose\nfield holds it, and so the home found at that item's folder, or, for an\nitem the list's `unless` leaves out, the home `left_out`. A value naming\nneither names no home.",
+      "type": "object",
+      "properties": {
+        "named": {
+          "description": "Each value that names a home itself, such as VS Code's\n`__default__profile__`, and that home's id.",
+          "type": "object",
+          "properties": {
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "listed": {
+          "description": "The id of the home whose `json-list` folder lists the items a value\nnames by their field.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The field of an item that names it for the user, such as a profile's\n`name`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "left_out": {
+          "description": "The id of the home whose files an item the list's `unless` leaves\nout reads, such as the default profile's for a profile that shares\nits MCP servers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "listed"
       ]
     },
     "PluginsDefinition": {

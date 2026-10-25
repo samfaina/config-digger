@@ -17,6 +17,7 @@ const project: Project = {
   added: false,
   hidden: true,
   entries: 0,
+  last_opened: [],
 };
 const places: Places = { read_at: "2026-10-20T09:00:00Z", projects: [project], leftovers: [], stranded: [], store_read_failures: [], agents: [] };
 

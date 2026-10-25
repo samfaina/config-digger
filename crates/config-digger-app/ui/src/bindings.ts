@@ -1051,6 +1051,34 @@ export type ItemKind = "mcp" | "skill";
  */
 export type JsonValue = null | boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
+/**
+ *  The Agent home an Agent last opened a Project in, as the Agent itself
+ *  records it: its Last-opened home.
+ */
+export type LastOpened = {
+	agent: string,
+	/**  The home's id. */
+	home: string,
+	/**
+	 *  The name the Agent gives where it opened the Project, when it is not
+	 *  the home's id, such as a VS Code profile's.
+	 */
+	name: string | null,
+	/**
+	 *  Where it opened the Project is no home of its own, and reads the MCP
+	 *  servers of `home`, such as a VS Code profile that shares the default
+	 *  profile's.
+	 */
+	shares_home: boolean,
+	/**  The user hid the home. */
+	hidden: boolean,
+	/**
+	 *  Where the Agent last opened the Project, as a sentence, rendered by
+	 *  the core.
+	 */
+	sentence: string,
+};
+
 /**  The leftovers of one missing Project: its Unread Entries. */
 export type Leftovers = {
 	/**  The missing Project, as [`Project::path`] has it. */
@@ -1442,6 +1470,11 @@ export type Project = {
 	 *  its path in user files. Each counts once, however many Agents read it.
 	 */
 	entries: number,
+	/**
+	 *  Its Last-opened home for each Agent that records one, in definition
+	 *  order. Nothing it says changes a State.
+	 */
+	last_opened: LastOpened[],
 };
 
 /**  A folder or `.code-workspace` file checked as a Project, before it is added. */

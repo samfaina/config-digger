@@ -1378,6 +1378,52 @@
       ]
     },
     {
+      "id": "16",
+      "title": "Perfiles de VS Code",
+      "steps": [
+        {
+          "id": "16.1",
+          "title": "Abrir un Project en el perfil de VS Code donde se abrió por última vez",
+          "goal": "Al elegir un Project, VS Code abre en su Last-opened home, que lleva una marca, y el panel Agent home dice dónde lo abrió VS Code por última vez mientras se muestra otro home.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el APPDATA de prueba».",
+            "En el panel Agents, elige VS Code.",
+            "En el desplegable Project, elige E:\\cd-throwaway\\project.",
+            "Mira las fichas del panel Agent home.",
+            "Haz clic en la ficha default.",
+            "Lee la nota bajo las fichas.",
+            "En el desplegable Project, elige E:\\cd-throwaway\\project-extra.",
+            "Haz clic en la ficha profile.",
+            "Lee la nota bajo las fichas.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el APPDATA de prueba",
+              "shell": "powershell",
+              "text": "$env:APPDATA = 'E:\\cd-throwaway\\vscode-appdata'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            }
+          ],
+          "expect": [
+            "Al elegir E:\\cd-throwaway\\project, la ficha seleccionada es «profile».",
+            "La ficha «profile» lleva la marca «last opened here».",
+            "Mientras la ficha «profile» está seleccionada, no sale ninguna nota bajo las fichas.",
+            "Con la ficha «default» seleccionada, bajo las fichas sale «VS Code last opened this Project in Work.».",
+            "Al elegir E:\\cd-throwaway\\project-extra, la ficha seleccionada es «default».",
+            "La ficha «default» lleva la marca «last opened here».",
+            "Con la ficha «profile» seleccionada, bajo las fichas sale «VS Code last opened this Project in Shared, which reads Default's MCP servers.»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con perfiles de VS Code",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -VsCode"
+          },
+          "covers": ["#128"]
+        }
+      ]
+    },
+    {
       "id": "7",
       "title": "Diálogo de una acción",
       "steps": [
