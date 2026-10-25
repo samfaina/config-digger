@@ -517,6 +517,7 @@ fn a_manifest_entry_that_does_not_read_as_a_parked_entry_is_a_read_failure_of_th
 
     let inventory = inventory(&core);
 
+    assert_eq!(fs.contents(store()), Some(bytes));
     let failures = to_json(&inventory.store_read_failures);
     assert_eq!(failures.as_array().unwrap().len(), 1, "{failures}");
     assert_eq!(failures[0]["path"], to_json(store()));
@@ -560,4 +561,18 @@ fn a_manifest_that_does_not_hold_its_entries_as_an_object_is_a_read_failure_of_t
     let failures = to_json(&inventory.store_read_failures);
     assert_eq!(failures[0]["entry"], Value::Null);
     assert_eq!(failures[0]["kind"], "shape");
+}
+
+#[test]
+fn a_manifest_that_cannot_be_opened_is_a_read_failure_of_the_store() {
+    let fs = store_of_a_gone_agent().denying_reads_of(store());
+
+    let inventory = inventory(&core(&fs));
+
+    let failures = to_json(&inventory.store_read_failures);
+    assert_eq!(failures.as_array().unwrap().len(), 1, "{failures}");
+    assert_eq!(failures[0]["entry"], Value::Null);
+    assert_eq!(failures[0]["kind"], "permission");
+    let sentence = failures[0]["sentence"].as_str().unwrap();
+    assert!(sentence.contains("no permission to read"), "{sentence}");
 }

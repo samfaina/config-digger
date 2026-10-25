@@ -1056,9 +1056,7 @@ pub(crate) fn stranded(definitions: &[AgentDefinition], snapshot: &Snapshot) -> 
                     location: origin.location.clone(),
                     project: origin.project.as_ref().map(|key| {
                         snapshot
-                            .projects
-                            .iter()
-                            .find(|project| project.key == *key)
+                            .project(key)
                             .map_or_else(|| PathBuf::from(key), |project| project.path.clone())
                     }),
                     path: origin.path.clone(),
