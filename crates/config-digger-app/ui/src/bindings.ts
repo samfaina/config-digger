@@ -283,7 +283,12 @@ export type AgentNoteCode =
  *  marketplace live in the user's account, with no install record on
  *  disk, so they are not listed.
  */
-"marketplace_plugins_not_on_disk";
+"marketplace_plugins_not_on_disk" | 
+/**
+ *  The file the Agent records the version that last ran in exists but
+ *  cannot be used, so that version is not shown.
+ */
+"last_ran_unreadable";
 
 /**  Another Agent home that reads an Entry, and the State the Entry has there. */
 export type AlsoReadBy = {

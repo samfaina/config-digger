@@ -717,11 +717,36 @@ pub(crate) struct ScannedHome {
     /// The user hid it.
     pub hidden: bool,
     /// The version that last ran against it, as the Agent records it.
-    pub last_ran: Option<String>,
+    pub last_ran: LastRanReading,
     /// When the Agent's lookup order skips it, what it reads instead.
     pub skipped: Option<Skipped>,
     /// For a home another tool copies from one of the Agent's, which.
     pub mirror: Option<Mirror>,
+}
+
+/// What config-digger reads of the version that last ran against an Agent
+/// home, from the file its definition's `last_ran` points to.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum LastRanReading {
+    /// No version is recorded: the definition has no `last_ran`, or the
+    /// Agent has not written it yet, its file or key path missing.
+    NotRecorded,
+    /// The version, as the Agent records it.
+    Recorded(String),
+    /// The file at this path exists but cannot be used: it cannot be read
+    /// or decoded, does not parse in the dialect the Agent reads it in, or
+    /// holds something other than a string at the key path.
+    Unreadable(PathBuf),
+}
+
+impl LastRanReading {
+    /// The version recorded, if any.
+    pub fn version(&self) -> Option<&str> {
+        match self {
+            LastRanReading::Recorded(version) => Some(version),
+            LastRanReading::NotRecorded | LastRanReading::Unreadable(_) => None,
+        }
+    }
 }
 
 /// An Agent home another tool copies from a source Agent home of the same
@@ -1352,7 +1377,7 @@ fn read_as_if(
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
     let versioned = versioned(ports, locations.chain(switch_files), asked);
-    let last_ran: Vec<Option<String>> = found
+    let last_ran: Vec<LastRanReading> = found
         .iter()
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
         .collect();
@@ -1622,14 +1647,28 @@ fn exclusive_files(
 }
 
 /// The version that last ran against `home`, as the string its definition's
-/// `last_ran` points to; `None` when there is none or it cannot be read.
-fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader) -> Option<String> {
-    let last_ran = definition.last_ran.as_ref()?;
-    let path = last_ran.anchor.path(&home.roots, None)?;
-    let text = reader.peek(&path).ok()??;
-    let document = JsonFormat::STRICT.parse(text).ok()?;
-    let value = lookup(&document, &last_ran.key_path)?;
-    Some(value.as_str()?.to_owned())
+/// `last_ran` points to, read in the dialect the Agent reads the file in and
+/// never more leniently. The file is no Read failure: it holds no Entries.
+fn last_ran(definition: &AgentDefinition, home: &FoundHome, reader: &mut Reader) -> LastRanReading {
+    let Some(last_ran) = &definition.last_ran else {
+        return LastRanReading::NotRecorded;
+    };
+    let Some(path) = last_ran.anchor.path(&home.roots, None) else {
+        return LastRanReading::NotRecorded;
+    };
+    let text = match reader.peek(&path) {
+        Ok(Some(text)) => text,
+        Ok(None) => return LastRanReading::NotRecorded,
+        Err(_) => return LastRanReading::Unreadable(path),
+    };
+    let Ok(document) = JsonFormat::of(last_ran.dialect).parse(text) else {
+        return LastRanReading::Unreadable(path);
+    };
+    match lookup(&document, &last_ran.key_path) {
+        None => LastRanReading::NotRecorded,
+        Some(serde_json::Value::String(version)) => LastRanReading::Recorded(version.clone()),
+        Some(_) => LastRanReading::Unreadable(path),
+    }
 }
 
 /// Each Feature gate of each found Agent home: bypassed when a variable

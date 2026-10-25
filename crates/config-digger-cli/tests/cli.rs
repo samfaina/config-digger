@@ -2638,6 +2638,36 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
 }
 
 #[test]
+fn agents_notes_a_last_ran_version_that_cannot_be_read() {
+    let harness = Harness::new().with_file(
+        ".claude.json",
+        r#"{ "lastReleaseNotesSeen": 2, "mcpServers": {} }"#,
+    );
+
+    let json = harness.run(&["agents", "--json"]);
+    let text = harness.run(&["agents", "--wide"]);
+
+    assert_eq!(json.code, 0, "{}", json.stderr);
+    let home = &json.document()["agents"][0]["homes"][0];
+    assert_eq!(home["last_ran"], Value::Null);
+    let codes: Vec<&Value> = home["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|note| &note["code"])
+        .collect();
+    assert!(codes.contains(&&json!("last_ran_unreadable")), "{codes:?}");
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    let sentence = format!(
+        "The version of Claude Code that last ran against this Agent home could not be read from {}.",
+        harness.path(".claude.json").display()
+    );
+    assert!(text.stdout.contains(&sentence), "{}", text.stdout);
+    assert!(!text.stdout.contains("Last ran with"), "{}", text.stdout);
+}
+
+#[test]
 fn agents_says_when_no_installation_is_found_and_still_exits_0() {
     let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
 
