@@ -507,6 +507,27 @@
           "covers": ["#232"]
         },
         {
+          "id": "10.19",
+          "title": "La cuenta de Entries de un Agent home",
+          "goal": "La cuenta de Entries de la fila de un home es la de las Entries que lista Show in Inventory, sin las de sus Projects.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Mira la cuenta de la fila de E:\\cd-throwaway\\claude-code-home, a la derecha.",
+            "En esa fila, pulsa Show in Inventory.",
+            "Cuenta los Items de la lista de Items."
+          ],
+          "commands": [],
+          "expect": [
+            "La fila de «E:\\cd-throwaway\\claude-code-home» dice «2 Entries».",
+            "El campo Project del Inventario dice «No Project».",
+            "La ficha elegida del panel Agent home es «E:\\cd-throwaway\\claude-code-home».",
+            "La lista de Items muestra «cd-throwaway-user» y «cd-throwaway-user-skill», y ningún otro Item.",
+            "«cd-throwaway-local» y «cd-throwaway-leftover», que son de Projects, no salen en la lista."
+          ],
+          "covers": ["#153"]
+        },
+        {
           "id": "10.5",
           "title": "La pestaña Projects",
           "goal": "La pestaña Projects lista los Projects que conoce Claude Code y, aparte, los que faltan con sus leftovers y, cerrados, los que faltan sin leftovers.",
@@ -1461,6 +1482,77 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Cursor"
           },
           "covers": ["#134"]
+        }
+      ]
+    },
+    {
+      "id": "18",
+      "title": "Leftovers en un Agent home oculto",
+      "steps": [
+        {
+          "id": "18.1",
+          "title": "Remove leftovers deja fuera el leftover de un home oculto",
+          "goal": "Con un leftover en un Agent home oculto, la cuenta de la fila, Show leftovers y lo que cambia Remove leftovers son el mismo leftover, y el fichero del home oculto no cambia.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el USERPROFILE de prueba».",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "Mira la cuenta de la fila de E:/cd-throwaway/project-gone.",
+            "Abre la pestaña Agent homes.",
+            "En la fila default, bajo Claude Code, pulsa Hide.",
+            "Abre la pestaña Projects.",
+            "Mira la cuenta de la fila de E:/cd-throwaway/project-gone.",
+            "En esa fila, pulsa Show leftovers.",
+            "Mira la lista de Items.",
+            "Vuelve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "En la fila de E:/cd-throwaway/project-gone, pulsa Remove leftovers.",
+            "Mira el título, la sección Files y el botón que confirma.",
+            "Marca las casillas, si las hay.",
+            "Pulsa Remove 1 leftover.",
+            "Pulsa Done.",
+            "Ejecuta en PowerShell la orden «Buscar el leftover del home oculto».",
+            "Abre la pestaña Agent homes.",
+            "En la fila default, bajo Claude Code, pulsa Unhide.",
+            "Abre la pestaña Projects.",
+            "Mira la cuenta de la fila de E:/cd-throwaway/project-gone.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el USERPROFILE de prueba",
+              "shell": "powershell",
+              "text": "$env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-profile'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            },
+            {
+              "label": "Buscar el leftover del home oculto",
+              "shell": "powershell",
+              "text": "Select-String -Path 'E:\\cd-throwaway\\claude-code-profile\\.claude.json' -Pattern 'cd-throwaway-second-leftover' -Quiet"
+            }
+          ],
+          "expect": [
+            "Antes de Hide, la fila de project-gone dice «2 leftovers».",
+            "Hide da el aviso «Hid default of Claude Code: its Items leave the Inventory.».",
+            "Tras Hide, la fila de project-gone dice «1 leftover».",
+            "Show leftovers lista «cd-throwaway-leftover».",
+            "Show leftovers no lista «cd-throwaway-second-leftover».",
+            "El diálogo se titula «Remove 1 Entry».",
+            "La sección Files dice «Files · 1».",
+            "El único fichero de la sección Files es «E:\\cd-throwaway\\claude-code-home\\.claude.json».",
+            "El diálogo no nombra «E:\\cd-throwaway\\claude-code-profile\\.claude.json».",
+            "El botón que confirma dice «Remove 1 leftover».",
+            "El resultado dice «Removed 1 Entry. Operation <id>: verified.».",
+            "La orden «Buscar el leftover del home oculto» imprime «True».",
+            "Unhide da el aviso «default of Claude Code is listed again.».",
+            "Tras Unhide, la fila de project-gone dice «1 leftover»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#153", "#319"]
         }
       ]
     },

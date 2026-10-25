@@ -100,8 +100,9 @@ enum Command {
     /// Prints the preview, asks for confirmation, then backs up each touched
     /// file, writes, verifies and records the Operation in History. With
     /// --leftovers --project <PATH>, it Removes every leftover of that
-    /// missing Project as one Operation; with --stranded, every Stranded
-    /// Entry `list --leftovers` lists.
+    /// missing Project but those in the Agent homes the user hid, as
+    /// `list --leftovers` lists them, in one Operation; with --stranded,
+    /// every Stranded Entry `list --leftovers` lists.
     Remove(RemoveWrite),
     /// Disable Entries through each Agent's own machine-local switch, keeping them.
     ///
@@ -196,7 +197,8 @@ struct RemoveWrite {
     /// Target every Entry of the one Item each selector names.
     #[arg(long)]
     all: bool,
-    /// Target every leftover of the missing Project --project names.
+    /// Target every leftover of the missing Project --project names, but
+    /// those in the Agent homes the user hid.
     #[arg(long, conflicts_with_all = ["selectors", "all"])]
     leftovers: bool,
     /// Target every Stranded Entry: those config-digger parked whose

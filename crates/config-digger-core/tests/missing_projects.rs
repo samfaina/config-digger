@@ -7,6 +7,7 @@ use config_digger_core::api::{
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 const HOME: &str = r"C:\Users\fixture";
@@ -444,6 +445,95 @@ fn remove_leftovers_is_refused_for_a_project_that_exists_or_has_none() {
     }
 }
 
+/// A Claude Code home the user added, whose `.claude.json` holds a leftover
+/// `alt` of [`GONE`].
+const ALT: &str = r"D:\alt-claude";
+const ALT_CLAUDE_JSON: &str = r#"{
+  "projects": {
+    "E:/projects/gone": {
+      "mcpServers": {
+        "alt": { "command": "alt-mcp" }
+      }
+    }
+  }
+}
+"#;
+const ALT_LEFTOVER: &str = r"D:\alt-claude\.claude.json#projects.E:/projects/gone.mcpServers.alt";
+
+fn alt_claude_json() -> PathBuf {
+    Path::new(ALT).join(".claude.json")
+}
+
+/// The [`fixture`] with the leftovers of [`GONE`] in a second home of
+/// Claude Code, [`ALT`], which the user hid.
+fn leftovers_in_a_hidden_home(fs: FakeFileSystem) -> (FakeFileSystem, Core) {
+    let fs = fs.with_file(alt_claude_json(), ALT_CLAUDE_JSON);
+    let core = core(&fs);
+    core.add_home(Path::new(ALT), "claude-code").unwrap();
+    core.hide_home(ALT, Some("claude-code")).unwrap();
+    (fs, core)
+}
+
+#[test]
+fn remove_leftovers_leaves_out_those_in_a_hidden_home() {
+    let (fs, core) = leftovers_in_a_hidden_home(fixture());
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    // The hidden home is read: its leftover is one of the Project's.
+    assert!(
+        core.leftovers(&snapshot)
+            .iter()
+            .flat_map(|leftovers| leftovers.entries())
+            .any(|entry| entry.locator == ALT_LEFTOVER)
+    );
+
+    let plan = core
+        .plan_remove_leftovers(&snapshot, Path::new(GONE))
+        .unwrap();
+
+    let mut locators: Vec<&str> = plan
+        .preview()
+        .changes
+        .iter()
+        .map(|change| change.locator.as_str())
+        .collect();
+    locators.sort_unstable();
+    assert_eq!(locators, [LOCAL_LINEAR, OLD]);
+    let removed = core.execute(plan, &[]).unwrap();
+    assert_eq!(removed.verify, Verify::Verified);
+    let after: Value = serde_json::from_str(&text(&fs)).unwrap();
+    assert_eq!(
+        after["projects"]["E:/projects/gone"],
+        json!({ "hasTrustDialogAccepted": true, "mcpServers": {} })
+    );
+    let alt = String::from_utf8(fs.contents(alt_claude_json()).unwrap()).unwrap();
+    assert_eq!(alt, ALT_CLAUDE_JSON);
+
+    let undo = core.plan_undo(&removed.operation).unwrap();
+    let undone = core.execute(undo, &[]).unwrap();
+    assert_eq!(undone.verify, Verify::Verified);
+    let restored: Value = serde_json::from_str(&text(&fs)).unwrap();
+    assert_eq!(
+        restored,
+        serde_json::from_str::<Value>(CLAUDE_JSON).unwrap()
+    );
+}
+
+#[test]
+fn remove_leftovers_is_refused_when_every_leftover_is_in_a_hidden_home() {
+    let user_only = r#"{ "mcpServers": { "linear": { "url": "https://user" } } }"#;
+    let fs = FakeFileSystem::new().with_file(claude_json(), user_only);
+    let (_, core) = leftovers_in_a_hidden_home(fs);
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+
+    let error = core
+        .plan_remove_leftovers(&snapshot, Path::new(GONE))
+        .err()
+        .unwrap();
+
+    assert_eq!(error.code, ErrorCode::NoMatch);
+    assert!(error.message.contains(GONE), "{}", error.message);
+}
+
 #[test]
 fn the_undo_of_a_leftover_removed_from_another_context_predicts_it_back_in_its_project() {
     let fs = fixture();
@@ -538,7 +628,7 @@ fn the_missing_projects_without_leftovers_can_be_left_out_of_the_inventory() {
 }
 
 #[test]
-fn each_project_and_home_counts_its_entries_once_in_any_context() {
+fn each_project_counts_its_entries_once_in_any_context() {
     let fs = fixture().with_file(
         Path::new(PETME).join(".mcp.json"),
         r#"{ "mcpServers": { "shared": { "command": "shared-mcp" } } }"#,
@@ -558,6 +648,30 @@ fn each_project_and_home_counts_its_entries_once_in_any_context() {
     // The local `dart` and `.mcp.json`'s `shared`, and the two leftovers.
     assert_eq!(count("projects", "path", PETME), json!(2));
     assert_eq!(count("projects", "path", GONE), json!(2));
-    // The user `linear`, and those of both Projects.
-    assert_eq!(count("homes", "agent", "claude-code"), json!(5));
+}
+
+#[test]
+fn a_home_counts_the_entries_the_inventory_lists_for_it_with_no_project() {
+    let fs = fixture().with_file(
+        Path::new(PETME).join(".mcp.json"),
+        r#"{ "mcpServers": { "shared": { "command": "shared-mcp" } } }"#,
+    );
+
+    let inventory = inventory(&fs, None);
+
+    let home = &inventory["homes"][0];
+    assert_eq!(home["agent"], "claude-code");
+    let listed: BTreeSet<&str> = inventory["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item["agent"] == "claude-code" && item["home"] == home["home"])
+        .flat_map(|item| item["entries"].as_array().unwrap())
+        .map(|entry| entry["locator"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        listed,
+        BTreeSet::from([r"C:\Users\fixture\.claude.json#mcpServers.linear"])
+    );
+    assert_eq!(home["entries"], json!(listed.len()));
 }

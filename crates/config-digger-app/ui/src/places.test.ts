@@ -175,6 +175,21 @@ describe("the Projects tab", () => {
     expect(noLeftovers).toEqual([]);
   });
 
+  test("counts the leftovers of a missing Project in a shown home of an Agent but not those in its hidden home", () => {
+    const ALT = String.raw`D:\alt-claude`;
+    const { missing } = projectSections(
+      places({
+        projects: [project({ path: GONE, missing: true })],
+        leftovers: [leftovers([{ ...leftover("alt"), home: ALT }, leftover("old")])],
+        agents: [agent({ homes: [home(), home({ home: ALT, folder: ALT, hidden: true })] })],
+      }),
+    );
+
+    expect(missing.map(({ leftovers, count }) => ({ leftovers, count }))).toEqual([
+      { leftovers: [`${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.old`], count: "1 leftover" },
+    ]);
+  });
+
   test("moves a missing Project whose leftovers are all in hidden Agent homes to those without leftovers", () => {
     const { missing, noLeftovers } = projectSections(
       places({
