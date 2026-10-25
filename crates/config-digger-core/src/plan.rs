@@ -20,7 +20,6 @@ use crate::running::RunningHomes;
 use crate::scan::{GitAsks, LocationReader, ScannedEntry, ScannedStranded, Snapshot, SwitchStore};
 use crate::store::{self, Medium, Written};
 use crate::{explain, history, park, resolve, rules, running, scan, select};
-use std::cell::Cell;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -198,11 +197,12 @@ pub(crate) fn plan(
         leftovers: &leftovers,
         entries: &targeted,
         stranded: &stranded,
-        git_asks: Cell::default(),
     };
+    // What the plan asks the git index outside its scans.
+    let mut git_asks = GitAsks::default();
     let mut planned = match action {
         Action::Remove => targeted_entries.remove(),
-        Action::Disable | Action::Enable => targeted_entries.switch(),
+        Action::Disable | Action::Enable => targeted_entries.switch(&mut git_asks),
         Action::Undo => Err(Error::unexpected(
             "an Undo targets an Operation, not Entries: plan it with plan_undo",
         )),
@@ -210,7 +210,7 @@ pub(crate) fn plan(
             "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
         )),
     }?;
-    log_git_asks(targeted_entries.git_asks.get());
+    log_git_asks(git_asks);
     for home in mirrored {
         let mirror = home.mirror.as_ref().expect("a Mirrored home has a mirror");
         // What it writes outside the home it copies, such as a Project's
@@ -407,8 +407,6 @@ struct Targeted<'a> {
     entries: &'a [&'a api::Entry],
     /// The Stranded Entries it Removes, which no Item holds.
     stranded: &'a [&'a ScannedStranded],
-    /// What its plan asked the git index outside its scans.
-    git_asks: Cell<GitAsks>,
 }
 
 impl Targeted<'_> {
@@ -644,8 +642,9 @@ impl Targeted<'_> {
 
     /// A Disable or an Enable: each Entry's switch is set or lifted, or the
     /// Entry parked or put back, which can reach other Entries and Projects
-    /// than those targeted.
-    fn switch(&self) -> Result<Planned, Error> {
+    /// than those targeted. What it asks the git index is counted in
+    /// `git_asks`.
+    fn switch(&self, git_asks: &mut GitAsks) -> Result<Planned, Error> {
         let project = resolve::context_project(self.snapshot, self.context);
         let context_project = project
             .as_ref()
@@ -754,7 +753,13 @@ impl Targeted<'_> {
                         )));
                     }
                     if parked.is_some() {
-                        self.put_back(&mut by_file, &mut planned_folders, entry, scanned)?;
+                        self.put_back(
+                            &mut by_file,
+                            &mut planned_folders,
+                            entry,
+                            scanned,
+                            git_asks,
+                        )?;
                     }
                     for hit in lifts {
                         // Entries Disabled by one name share its switch.
@@ -942,13 +947,15 @@ impl Targeted<'_> {
     /// or a skill's folder or link back where it was, and the Entry out of
     /// the store. Refused when an Entry is at its key or folder again, which
     /// it would overwrite, or when the folder it goes in is gone. A missing
-    /// file whose folder exists is created with the minimal structure.
+    /// file whose folder exists is created with the minimal structure. What
+    /// it asks the git index is counted in `git_asks`.
     fn put_back(
         &self,
         by_file: &mut Vec<FileEdits>,
         planned_folders: &mut Vec<PlannedFolder>,
         entry: &api::Entry,
         scanned: &ScannedEntry,
+        git_asks: &mut GitAsks,
     ) -> Result<(), Error> {
         let store = &entry.path;
         let bytes = read(self.ports, store)?;
@@ -970,7 +977,7 @@ impl Targeted<'_> {
             .file()
             .is_none()
         {
-            planned_folders.push(self.unparked_folder(entry, scanned, &parked)?);
+            planned_folders.push(self.unparked_folder(entry, scanned, &parked, git_asks)?);
             add_edit(by_file, store.clone(), Syntax::Jsonc, remove_record, false);
             return Ok(());
         }
@@ -1016,12 +1023,14 @@ impl Targeted<'_> {
     /// as the store holds it: it moves the folder back from the store, or
     /// creates the link again. Refused when something is at the folder
     /// again, when the Project it applies in is gone, or when the store no
-    /// longer keeps the folder.
+    /// longer keeps the folder. What it asks the git index is counted in
+    /// `git_asks`.
     fn unparked_folder(
         &self,
         entry: &api::Entry,
         scanned: &ScannedEntry,
         parked: &park::ParkedEntry,
+        git_asks: &mut GitAsks,
     ) -> Result<PlannedFolder, Error> {
         let fs = self.ports.fs.as_ref();
         let origin = &parked.origin.path;
@@ -1069,10 +1078,8 @@ impl Targeted<'_> {
                 )));
             }
         };
-        let mut asks = self.git_asks.get();
         let versioned =
-            scan::versioned_paths(self.ports, std::iter::once(origin.as_path()), &mut asks);
-        self.git_asks.set(asks);
+            scan::versioned_paths(self.ports, std::iter::once(origin.as_path()), git_asks);
         Ok(PlannedFolder {
             path: origin.clone(),
             op,
