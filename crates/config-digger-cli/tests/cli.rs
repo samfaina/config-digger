@@ -2953,6 +2953,44 @@ fn list_leftovers_lists_every_missing_project_and_remove_takes_their_locators_in
 }
 
 #[test]
+fn the_preview_and_history_name_the_missing_project_of_each_leftover_removed_from_no_project() {
+    let harness = with_missing_projects();
+    let locators = leftover_locators(&harness.run(&["list", "--leftovers", "--json"]).document());
+    let (legacy, old) = (&locators[0], &locators[2]);
+    let archive = harness.cwd().join("archive").display().to_string();
+    let gone = harness.cwd().join("gone").display().to_string();
+
+    let run = harness.run(&["remove", legacy, old, "--no-project", "--yes"]);
+    assert_eq!(run.code, 0, "{}\n{}", run.stdout, run.stderr);
+    let operation = harness.run(&["history", "--json"]).document()["operations"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let history = harness.run(&["history", "show", &operation]);
+
+    assert_eq!(history.code, 0, "{}", history.stderr);
+    for stdout in [&run.stdout, &history.stdout] {
+        let rows: Vec<Vec<&str>> = [legacy, old]
+            .iter()
+            .flat_map(|locator| {
+                stdout
+                    .lines()
+                    .filter(|line| line.ends_with(locator.as_str()))
+            })
+            .map(|row| row.split_whitespace().skip(2).take(4).collect())
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                vec!["legacy", "Unread", "removed", &archive],
+                vec!["old", "Unread", "removed", &gone],
+            ],
+            "{stdout}"
+        );
+    }
+}
+
+#[test]
 fn remove_leftovers_removes_every_leftover_of_one_missing_project_and_keeps_it_listed() {
     let harness = with_missing_projects();
     let gone = harness.cwd().join("gone").display().to_string();
