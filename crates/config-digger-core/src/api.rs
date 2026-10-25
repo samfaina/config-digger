@@ -2085,6 +2085,8 @@ impl Entry {
 pub struct Link {
     /// The path the link holds, made absolute.
     pub target: PathBuf,
+    /// A junction, a folder symlink or a file symlink: what Undo of its
+    /// Remove creates again.
     pub kind: LinkKind,
     /// The target is gone, so the Agent reads nothing there and the Entry
     /// is Unread.

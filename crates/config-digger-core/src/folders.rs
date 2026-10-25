@@ -45,6 +45,7 @@ pub(crate) fn measure_target(
 /// A link as Remove finds it and Undo creates it again (ADR 0008).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Link {
+    /// A junction, a folder symlink or a file symlink.
     pub kind: LinkKind,
     /// Its target as written: relative to the folder the link is in, or
     /// absolute.
@@ -73,7 +74,7 @@ pub(crate) enum ComesBack {
     /// and symlinks cannot be created.
     AsJunction,
     /// Not at all: it is a file symlink, and symlinks cannot be created.
-    Not,
+    Refused,
 }
 
 impl ComesBack {
@@ -82,7 +83,7 @@ impl ComesBack {
     pub fn of(kind: LinkKind, symlinks: bool) -> Self {
         match kind {
             LinkKind::FolderSymlink if !symlinks => Self::AsJunction,
-            LinkKind::FileSymlink if !symlinks => Self::Not,
+            LinkKind::FileSymlink if !symlinks => Self::Refused,
             _ => Self::AsItWas,
         }
     }

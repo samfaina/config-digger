@@ -1733,7 +1733,7 @@ pub(crate) fn undo_folders(
                 (FolderOp::MoveBack { from }, record.size)
             }
             FolderOpRecord::LinkRemoved { target, link } => {
-                let link = link.with(target);
+                let link = link.link_to(target);
                 let op = match comes_back(ports, link.kind) {
                     ComesBack::AsItWas => FolderOp::CreateLink {
                         link,
@@ -1743,7 +1743,7 @@ pub(crate) fn undo_folders(
                         link: Link::junction(link.target.clone()),
                         instead_of: Some(link),
                     },
-                    ComesBack::Not => {
+                    ComesBack::Refused => {
                         return Err(refused(explain::file_symlink_not_creatable(path)));
                     }
                 };
@@ -1759,7 +1759,7 @@ pub(crate) fn undo_folders(
                 (FolderOp::MoveToBackup, record.size)
             }
             FolderOpRecord::LinkCreated { target, link } => {
-                let link = link.with(target);
+                let link = link.link_to(target);
                 if !folders::is_link(fs, path, &link) {
                     return Err(refused(format!(
                         "the link {} changed since the Operation",

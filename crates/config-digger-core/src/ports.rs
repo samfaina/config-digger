@@ -122,6 +122,7 @@ pub trait FileSystem: Send + Sync {
 /// A link as it is on disk.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WrittenLink {
+    /// A junction, a folder symlink or a file symlink.
     pub kind: LinkKind,
     /// The target it holds, as written: relative to the folder the link is
     /// in, or absolute.

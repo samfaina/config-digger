@@ -250,8 +250,9 @@ pub(crate) enum FolderOpRecord {
 /// target, which is absolute: what Undo created then.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct RecordedLink {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub link: Option<LinkKind>,
+    /// Recorded as `link`: the record's `kind` names what it did.
+    #[serde(rename = "link", default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<LinkKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub written: Option<PathBuf>,
 }
@@ -259,15 +260,15 @@ pub(crate) struct RecordedLink {
 impl RecordedLink {
     fn of(link: &Link) -> Self {
         Self {
-            link: Some(link.kind),
+            kind: Some(link.kind),
             written: Some(link.written.clone()),
         }
     }
 
-    /// The link recorded, pointing to `target`.
-    pub fn with(&self, target: &Path) -> Link {
+    /// The link recorded, whose target made absolute is `target`.
+    pub fn link_to(&self, target: &Path) -> Link {
         Link {
-            kind: self.link.unwrap_or(LinkKind::Junction),
+            kind: self.kind.unwrap_or(LinkKind::Junction),
             written: self.written.clone().unwrap_or_else(|| target.to_path_buf()),
             target: target.to_path_buf(),
         }

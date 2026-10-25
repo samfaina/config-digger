@@ -894,6 +894,7 @@ impl ScannedEntry {
 /// Where the link or junction at a Linked Entry's location points.
 #[derive(Clone)]
 pub(crate) struct ScannedLink {
+    /// A junction, a folder symlink or a file symlink.
     pub kind: LinkKind,
     /// The path the link holds, as written: what Remove checks it still
     /// holds, and Undo writes in it again.

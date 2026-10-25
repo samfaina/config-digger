@@ -1063,6 +1063,10 @@ export type Leftovers = {
 export type Link = {
 	/**  The path the link holds, made absolute. */
 	target: string,
+	/**
+	 *  A junction, a folder symlink or a file symlink: what Undo of its
+	 *  Remove creates again.
+	 */
 	kind: LinkKind,
 	/**
 	 *  The target is gone, so the Agent reads nothing there and the Entry

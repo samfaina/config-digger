@@ -2055,7 +2055,7 @@ pub(crate) fn folder_change(op: &FolderOp, path: &Path, size: FolderSize) -> Str
                     "{removes} Its Undo may create a junction to {} in its place: {NO_SYMLINKS}.",
                     link.target.display()
                 ),
-                ComesBack::Not => {
+                ComesBack::Refused => {
                     format!("{removes} Its Undo cannot create it again: {NO_SYMLINKS}.")
                 }
             }
@@ -2074,12 +2074,7 @@ pub(crate) fn folder_change(op: &FolderOp, path: &Path, size: FolderSize) -> Str
         FolderOp::CreateLink {
             link,
             instead_of: Some(symlink),
-        } => format!(
-            "Creates a junction {path} to {}, in place of the {} to {} it was: {NO_SYMLINKS}.",
-            link.target.display(),
-            link_kind(symlink.kind),
-            symlink.written.display()
-        ),
+        } => format!("Creates {}", junction_instead(&path, link, symlink)),
         FolderOp::Park { .. } => format!(
             "Moves the skill folder {path} ({size}) into config-digger's parked-Entry store."
         ),
@@ -2106,8 +2101,16 @@ pub(crate) fn link_kind(kind: LinkKind) -> &'static str {
 /// `junction`'s target in place of the folder symlink `symlink`.
 pub(crate) fn created_junction_instead(path: &Path, junction: &Link, symlink: &Link) -> String {
     format!(
-        "It created a junction {} to {}, in place of the {} to {} it was: {NO_SYMLINKS}.",
-        path.display(),
+        "It created {}",
+        junction_instead(&path.display(), junction, symlink)
+    )
+}
+
+/// "a junction <path> to <target>, in place of the folder symlink to
+/// <written target> it was", and why.
+fn junction_instead(path: &impl std::fmt::Display, junction: &Link, symlink: &Link) -> String {
+    format!(
+        "a junction {path} to {}, in place of the {} to {} it was: {NO_SYMLINKS}.",
         junction.target.display(),
         link_kind(symlink.kind),
         symlink.written.display()
