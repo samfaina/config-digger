@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { Agent, Entry, Home, Inventory, Item, ReadFailure } from "./bindings";
+import type { Agent, Home, Inventory, Item, ReadFailure } from "./bindings";
 import { inventoryStart } from "./places";
+import { entry } from "./testData";
 import {
   agentStats,
   chosenHomes,
@@ -20,35 +21,6 @@ import {
   readerItem,
   stateCounts,
 } from "./view";
-
-function entry(overrides: Partial<Entry> = {}): Entry {
-  return {
-    path: String.raw`C:\Users\me\.claude.json`,
-    key_path: ["mcpServers", "notes"],
-    locator: String.raw`C:\Users\me\.claude.json#mcpServers.notes`,
-    scope: "user",
-    provenance: "file",
-    skill_manager: null,
-    plugin: null,
-    git_versioned: false,
-    link: null,
-    parked: null,
-    state: "effective",
-    reason: null,
-    secondary: [],
-    what_if: null,
-    notes: [],
-    config: { command: "notes-mcp" },
-    masked: [],
-    disable: { status: "offered", path: String.raw`C:\Users\me\.claude.json`, sentence: "Disable adds `notes` to `disabledMcpServers`." },
-    enable: null,
-    remove: { status: "offered" },
-    caveats: [],
-    also_read_by: [],
-    copied_from: null,
-    ...overrides,
-  };
-}
 
 function item(overrides: Partial<Item> = {}): Item {
   return {

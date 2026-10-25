@@ -1,7 +1,7 @@
 // Section 3: the app's tooltips, by mouse and by keyboard.
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { focused, go, hoverFresh, press, tabTo, tooltip, wait } from "../lib.mjs";
-import { act, confirm, done, inventoryOf, openItem, waitPreview } from "./common.mjs";
+import { act, dialog, done, inventoryOf, openItem, project, waitPreview } from "./common.mjs";
 
 const inside = (tip) => tip && tip.rect.left >= 0 && tip.rect.top >= 0 && tip.rect.right <= tip.vw && tip.rect.bottom <= tip.vh;
 
@@ -97,12 +97,12 @@ export default [
     async run(t) {
       const { s } = t;
       const rings = [];
-      // Tabs to the first element `css` matches, and returns its tooltip, or
-      // null when no tab stop matches.
-      const read = async (css) => {
-        if (!(await tabToMatch(s, css))) return null;
+      // Tabs to the first element `css` matches, whose text holds `text`, and
+      // returns its tooltip, or null when no tab stop matches.
+      const read = async (css, text = "") => {
+        if (!(await tabToMatch(s, css, text))) return null;
         await wait(150);
-        rings.push(`${css}: ${(await focused(s))?.outline}`);
+        rings.push({ css, outline: (await focused(s))?.outline });
         return tooltip(s);
       };
       const desktopRow = (state) =>
@@ -112,6 +112,7 @@ export default [
             state,
           )
           .then(unwrap);
+      const reread = () => s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
 
       await go(s, "Inventory");
       await s.click(await s.waitText(".agent-tile .agent-name", "All Agents"));
@@ -119,53 +120,85 @@ export default [
       await s.hover({ x: 600, y: 4 });
       await s.exec("document.activeElement?.blur()");
       const time = await read(".banner-value");
-      t.check(time && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time.text), "en la hora de «Inventory read» sale un tooltip con la fecha y la hora exactas, con segundos", time?.text);
+      t.check(time && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time.text), "en la hora de «Inventory read» sale al momento un tooltip con la fecha y la hora exactas, con segundos", time?.text);
       const folder = await read(".single-home");
       t.check(folder && /^[A-Za-z]:\\/.test(folder.text), "en el nombre del home sale un tooltip con su carpeta entera", folder?.text ?? "ningún Agent tiene un solo home");
 
-      const config = `${t.root}\\claude-desktop-home\\claude_desktop_config.json`;
-      await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
-      const effective = await s.until(() => desktopRow("Effective"), { what: "cd-throwaway-desktop Effective" });
-      await s.click(effective);
-      await wait(400);
-      await press(s, "Disable", ".panel.detail");
+      const mcpJson = `${t.root}\\project\\.mcp.json`;
+      await inventoryOf(t, "Claude Code", "claude-code-home");
+      await project(t, `${t.root}\\project`);
+      await openItem(t, "cd-throwaway-project");
+      await press(s, "Remove", ".panel.detail");
       await waitPreview(s);
       const file = await read(".change-file-name .mono");
-      t.eq(file?.text, config, `en «claude_desktop_config.json» sale un tooltip con «${config}»`);
-      if (await s.exec("return !!document.querySelector('.dialog .check.info')")) {
-        const info = await read(".check.info");
-        t.check(info && /^[A-Za-z]:\\/.test(info.text), "si hay una nota de información, sale en ella un tooltip con una ruta entera", info?.text);
-      }
-      await confirm(s, "Disable");
-      await done(s);
-      await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
-      const disabled = await s.until(() => desktopRow("Disabled"), { what: "cd-throwaway-desktop Disabled" });
-      await s.click(disabled);
-      await wait(400);
-      const parked = await read(".panel.detail .tag[tabindex]");
-      const [from, on] = parked?.text.split("\n") ?? [];
-      t.eq(from, `Parked from ${config}#mcpServers.cd-throwaway-desktop`, `en la etiqueta sale un tooltip que empieza por «Parked from ${config}#mcpServers.cd-throwaway-desktop»`);
-      t.check(on?.startsWith("on "), "la segunda línea de ese tooltip empieza por «on » y sigue con la fecha en que se aparcó", on);
-      await act(t, "Enable");
-      await done(s);
-      await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
-      t.check(await desktopRow("Effective"), "tras Enable, cd-throwaway-desktop vuelve a salir como «Effective»");
+      t.eq(file?.text, mcpJson, `en «.mcp.json» sale un tooltip con «${mcpJson}»`);
+      const approval = await read(".check.info", "approval");
+      t.eq(approval?.text, mcpJson, `en la nota de la aprobación sale un tooltip con «${mcpJson}»`);
+      await press(s, "Cancel", ".dialog");
+      await s.until(() => s.exec("return !document.querySelector('.dialog')"), { what: "the dialog closed" });
 
-      t.check(rings.every((ring) => ring.includes("solid")), "cada elemento al que llega el foco tiene un anillo violeta", rings.join("; "));
+      const config = `${t.root}\\claude-desktop-home\\claude_desktop_config.json`;
+      await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
+      await s.click(await s.until(() => desktopRow("Effective"), { what: "cd-throwaway-desktop Effective" }));
+      await wait(400);
+      await act(t, "Disable");
+      await done(s);
+      await reread();
+      let enabled = false;
+      try {
+        await s.click(await s.until(() => desktopRow("Disabled"), { what: "cd-throwaway-desktop Disabled" }));
+        await wait(400);
+        const parked = await read(".panel.detail .tag[tabindex]");
+        const [from, on] = parked?.text.split("\n") ?? [];
+        t.eq(from, `Parked from ${config}#mcpServers.cd-throwaway-desktop`, `en la etiqueta sale un tooltip que empieza por «Parked from ${config}#mcpServers.cd-throwaway-desktop»`);
+        t.check(on?.startsWith("on "), "la segunda línea de ese tooltip empieza por «on » y sigue con la fecha en que se aparcó", on);
+        await t.shot("parked", "la etiqueta «parked from» tiene un anillo violeta y su tooltip encima o debajo");
+        await act(t, "Enable");
+        await done(s);
+        enabled = true;
+        await reread();
+        t.check(await desktopRow("Effective"), "tras Enable, cd-throwaway-desktop vuelve a salir como «Effective»");
+      } finally {
+        // A parking left behind would count once more in 13.1 and 13.3.
+        if (!enabled) await enableDisabled(t, desktopRow).catch(() => {});
+      }
+
+      const notViolet = rings.filter((ring) => !violet(ring.outline?.split(" ").slice(1).join(" ")));
+      t.check(rings.length === 5 && notViolet.length === 0, "cada elemento al que llega el foco tiene un anillo violeta", rings.map((ring) => `${ring.css}: ${ring.outline}`).join("; "));
       await inventoryOf(t, "Claude Code", "claude-code-synced-home");
       await openItem(t, "cd-throwaway-synced:cd-throwaway-synced-skill");
       const notes = await s.exec(`return [...document.querySelectorAll(".panel.detail .action-note")].map((e) => e.textContent.trim());`);
       const why = "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.";
-      t.check(notes.includes(why), `bajo los botones de la skill dice «${why}»`, notes.join(" | "));
+      t.check(notes.includes(why), `bajo los botones de la skill dice «${why}», sin pasar el ratón por ningún sitio`, notes.join(" | "));
     },
   },
 ];
 
-// Presses Tab until the focused element matches `css`, at most `max` times.
-async function tabToMatch(s, css, max = 60) {
+const rgb = (c) => (c?.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+const violet = (c) => {
+  const [r, g, b] = rgb(c);
+  return b > g + 40 && r > g;
+};
+
+// Presses Tab until the focused element matches `css` and its text holds
+// `text`, at most `max` times.
+async function tabToMatch(s, css, text, max = 60) {
   for (let i = 0; i < max; i++) {
-    if (await s.exec("return document.activeElement?.matches(arguments[0]) ?? false;", css)) return true;
+    if (await s.exec("const e = document.activeElement; return !!e?.matches(arguments[0]) && e.textContent.includes(arguments[1]);", css, text)) return true;
     await s.keys(KEY.Tab);
   }
   return false;
+}
+
+// Enables the Disabled cd-throwaway-desktop that 3.4 parked, when the step
+// stopped before its own Enable.
+async function enableDisabled(t, desktopRow) {
+  const { s } = t;
+  if (await dialog(s)) await press(s, "Cancel", ".dialog").catch(() => press(s, "Done", ".dialog"));
+  const row = await desktopRow("Disabled");
+  if (!row) return;
+  await s.click(row);
+  await wait(400);
+  await act(t, "Enable");
+  await done(s);
 }

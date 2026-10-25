@@ -373,4 +373,24 @@ describe("an Entry card", () => {
     const { buttons } = actionButtons(false);
     expect(buttons.map((button) => button.match(/class="([^"]*)"/)?.[1])).toEqual(["cta", "cta danger"]);
   });
+
+  test("says why Remove is not offered under its buttons, not only in the disabled button's tooltip", () => {
+    const why = "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.";
+    const markup = renderToStaticMarkup(
+      <EntryCard
+        entry={entry({ remove: { status: "not_offered", code: "read_only", sentence: why, how_to_remove: null } })}
+        rank={1}
+        agentName="Claude Code"
+        flash={false}
+        busy={false}
+        inItem={() => true}
+        onShowWinner={() => {}}
+        onReader={null}
+        onAction={() => {}}
+        notify={() => {}}
+      />,
+    );
+    expect(markup).toMatch(/<button type="button" class="cta danger" disabled="">/);
+    expect(markup).toContain(`<p class="action-note">${why.replace("'", "&#x27;")}</p>`);
+  });
 });

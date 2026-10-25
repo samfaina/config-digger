@@ -29,6 +29,7 @@ async function tabTo(target: string | Element) {
 /** The text of the one tooltip shown. */
 const shownTooltip = () => screen.getByRole("tooltip").textContent;
 
+const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
 const orca = String.raw`E:\cd-throwaway\orca-codex-home`;
 const mirror: Mirror = {
   owner: "Orca",
@@ -117,18 +118,10 @@ describe("a keyboard user on an Entry card", () => {
     );
 
   test("reads when a parked Entry was parked on its parked from tag", async () => {
-    const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
     const locator = `${claudeJson}#mcpServers.cd-throwaway-desktop`;
     card(entry({ state: "disabled", parked: { path: claudeJson, key_path: ["mcpServers", "cd-throwaway-desktop"], locator, parked_at: "2026-10-20T09:30:12Z" } }));
     await tabTo(`parked from ${locator}`);
     expect(shownTooltip()).toBe(`Parked from ${locator}\non 2026-10-20T09:30:12Z`);
-  });
-
-  test("reads why Remove is not offered under the buttons, not only in the disabled button's tooltip", () => {
-    const why = "Mirrored by Orca: config-digger only reads this home.";
-    card(entry({ remove: { status: "not_offered", code: "mirrored", sentence: why, how_to_remove: null } }));
-    expect(screen.getByRole("button", { name: "Remove" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(why, { ignore: '[role="tooltip"]' }).className).toBe("action-note");
   });
 });
 
@@ -145,8 +138,6 @@ describe("a keyboard user on the Items list", () => {
 });
 
 describe("a keyboard user in the action dialog", () => {
-  const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
-
   test("reads the path behind an info line of Before you apply", async () => {
     const claude = String.raw`E:\cd-throwaway\bin\claude.exe`;
     const sentence = "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.286 to 2.1.302).";

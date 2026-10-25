@@ -528,20 +528,20 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
   const lastOpened = lastOpenedHomes(inventory);
   const opened = (home: Home) => isLastOpened(lastOpened, home);
   // Another tool copies a Mirrored home, so config-digger only reads it.
-  // A tag is a tab stop, for the keyboard to show its tooltip, except inside
-  // a tile's button, whose own tooltip then says it.
-  const mirrored = (home: Home, tabStop: boolean) =>
+  // A tag is a tab stop, `tabIndex` 0, for the keyboard to show its tooltip,
+  // except inside a tile's button, whose own tooltip then says it.
+  const mirrored = (home: Home, tabIndex?: number) =>
     home.mirror && (
       <Tooltip text={home.mirror.sentence}>
-        <span className="tag read-only" tabIndex={tabStop ? 0 : undefined}>
+        <span className="tag read-only" tabIndex={tabIndex}>
           {home.mirror.label}
         </span>
       </Tooltip>
     );
-  const notRead = (home: Home, tabStop: boolean) =>
+  const notRead = (home: Home, tabIndex?: number) =>
     home.not_read && (
       <Tooltip text={home.not_read.sentence}>
-        <span className="tag" tabIndex={tabStop ? 0 : undefined}>
+        <span className="tag" tabIndex={tabIndex}>
           not read
         </span>
       </Tooltip>
@@ -560,8 +560,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
         <div className="home-row" key={agent}>
           <span>{agentName}</span>
           <span className="grow" />
-          {mirrored(chosen, true)}
-          {notRead(chosen, true)}
+          {mirrored(chosen, 0)}
+          {notRead(chosen, 0)}
           <FailureBadge count={failuresOf(chosen)} where="this home" />
           {own.length > 1 ? (
             <Select
@@ -588,10 +588,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
       .filter((home) => home.agent === agent)
       .map((home) => {
         const selected = selection.homes[agent] === home.home;
-        // The tags inside the button take no focus, so its tooltip says them too.
-        const tooltip = [home.no_configuration ?? home.folder, home.mirror?.sentence, home.not_read?.sentence].filter(Boolean).join("\n");
         return (
-          <Tooltip key={home.home} text={tooltip}>
+          <Tooltip key={home.home} text={homeTileTooltip(home)}>
             <button
               type="button"
               className={`tile home-tile${selected ? " selected" : ""}`}
@@ -601,8 +599,8 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               <span className="home-name">{home.home}</span>
               <span className="grow" />
               {opened(home) && <span className="tag">{LAST_OPENED}</span>}
-              {mirrored(home, false)}
-              {notRead(home, false)}
+              {mirrored(home)}
+              {notRead(home)}
               <FailureBadge count={failuresOf(home)} where="this home" />
             </button>
           </Tooltip>
@@ -626,6 +624,15 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
 
 /** The mark of a Project's Last-opened home. */
 const LAST_OPENED = "last opened here";
+
+/**
+ * The tooltip of a home's tile: its folder, or that it has no configuration,
+ * then the sentence of its Mirrored or not read tag, which takes no focus
+ * inside the tile's button.
+ */
+function homeTileTooltip(home: Home): string {
+  return [home.no_configuration ?? home.folder, home.mirror?.sentence, home.not_read?.sentence].filter(Boolean).join("\n");
+}
 
 /** A home as the select of All Agents lists it, with its marks and how many locations couldn't be read in it. */
 export function homeLabel(home: Home, failed: number, lastOpened: boolean): string {
