@@ -3,7 +3,7 @@
 //! can only be Removed.
 
 use config_digger_core::api::{
-    Action, Context, Core, ErrorCode, ScanOptions, State, StateAfter, Targets, Verify,
+    Action, Context, Core, ErrorCode, Plan, ScanOptions, State, StateAfter, Targets, Verify,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -293,22 +293,9 @@ fn leftovers_are_the_unread_entries_of_every_missing_project() {
 
 const LEGACY: &str = r"C:\Users\fixture\.claude.json#projects.e:\archive\legacy.mcpServers.legacy";
 
-#[test]
-fn the_leftovers_of_several_missing_projects_are_removed_in_one_operation_from_any_context() {
-    let fs = two_missing_projects();
-    let core = core(&fs);
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
-
-    let plan = core
-        .plan(
-            &snapshot,
-            &context(Some(PETME)),
-            Action::Remove,
-            &targets(&[OLD, LEGACY]),
-        )
-        .unwrap();
-    let changes: Vec<(String, Option<PathBuf>, StateAfter, StateAfter)> = plan
-        .preview()
+/// `(locator, project, before, after)` per change of `plan`'s preview.
+fn change_projects(plan: &Plan) -> Vec<(String, Option<PathBuf>, StateAfter, StateAfter)> {
+    plan.preview()
         .changes
         .iter()
         .map(|change| {
@@ -319,36 +306,79 @@ fn the_leftovers_of_several_missing_projects_are_removed_in_one_operation_from_a
                 change.after,
             )
         })
-        .collect();
-    assert_eq!(
-        changes,
-        [
-            (
-                LEGACY.to_owned(),
-                Some(PathBuf::from(r"E:\archive\legacy")),
-                StateAfter::Unread,
-                StateAfter::Removed
-            ),
-            (
-                OLD.to_owned(),
-                Some(PathBuf::from(GONE)),
-                StateAfter::Unread,
-                StateAfter::Removed
-            ),
-        ]
-    );
-    let outcome = core.execute(plan, &[]).unwrap();
+        .collect()
+}
 
-    assert_eq!(outcome.verify, Verify::Verified);
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    let left: Vec<String> = core
-        .leftovers(&snapshot)
-        .iter()
-        .flat_map(|leftovers| &leftovers.items)
-        .flat_map(|item| &item.entries)
-        .map(|entry| entry.locator.clone())
-        .collect();
-    assert_eq!(left, [LOCAL_LINEAR]);
+#[test]
+fn the_leftovers_of_several_missing_projects_are_removed_in_one_operation_from_any_context() {
+    for project in [Some(PETME), None] {
+        let fs = two_missing_projects();
+        let core = core(&fs);
+        let snapshot = core.scan(&ScanOptions::default()).unwrap();
+
+        let plan = core
+            .plan(
+                &snapshot,
+                &context(project),
+                Action::Remove,
+                &targets(&[OLD, LEGACY]),
+            )
+            .unwrap();
+        // Each change names the missing Project of its leftover, not the context.
+        assert_eq!(
+            change_projects(&plan),
+            [
+                (
+                    LEGACY.to_owned(),
+                    Some(PathBuf::from(r"E:\archive\legacy")),
+                    StateAfter::Unread,
+                    StateAfter::Removed
+                ),
+                (
+                    OLD.to_owned(),
+                    Some(PathBuf::from(GONE)),
+                    StateAfter::Unread,
+                    StateAfter::Removed
+                ),
+            ],
+            "{project:?}"
+        );
+        let outcome = core.execute(plan, &[]).unwrap();
+
+        assert_eq!(outcome.verify, Verify::Verified, "{project:?}");
+        let snapshot = core.scan(&ScanOptions::default()).unwrap();
+        let left: Vec<String> = core
+            .leftovers(&snapshot)
+            .iter()
+            .flat_map(|leftovers| &leftovers.items)
+            .flat_map(|item| &item.entries)
+            .map(|entry| entry.locator.clone())
+            .collect();
+        assert_eq!(left, [LOCAL_LINEAR], "{project:?}");
+
+        let undo = core.plan_undo(&outcome.operation).unwrap();
+
+        assert_eq!(
+            change_projects(&undo),
+            [
+                (
+                    LEGACY.to_owned(),
+                    Some(PathBuf::from(r"E:\archive\legacy")),
+                    StateAfter::Removed,
+                    StateAfter::Unread
+                ),
+                (
+                    OLD.to_owned(),
+                    Some(PathBuf::from(GONE)),
+                    StateAfter::Removed,
+                    StateAfter::Unread
+                ),
+            ],
+            "{project:?}"
+        );
+        let undone = core.execute(undo, &[]).unwrap();
+        assert_eq!(undone.verify, Verify::Verified, "{project:?}");
+    }
 }
 
 #[test]
