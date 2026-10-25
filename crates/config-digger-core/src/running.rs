@@ -90,6 +90,7 @@ impl RunningReader<'_> {
 /// A written file or a moved folder that an Agent home reads, or keeps a
 /// Disable switch in.
 struct Touched<'a> {
+    /// Where the Agent home reads it, or the file it keeps the switch in.
     path: &'a PathBuf,
     /// An Entry is parked out of the file or put back into it.
     parking: bool,
@@ -115,35 +116,38 @@ pub(crate) fn check<'a>(
     // Whether the Agent of each home runs, since a home may override its process.
     let mut detected: BTreeMap<(usize, &str), bool> = BTreeMap::new();
     let mut readers: BTreeMap<usize, RunningReader> = BTreeMap::new();
-    let located = |reader: &'a LocationReader| {
+    let located = |reader: &'a LocationReader, path: &'a PathBuf| {
         let class = reader.location(definitions).store_class;
-        (reader.agent_index, reader.home.as_str(), class)
+        (path, reader.agent_index, reader.home.as_str(), class)
     };
     // Each Agent home that reads a written file, or keeps a Disable switch
     // in it, then each that reads a moved folder.
-    let in_files =
-        files.iter().flat_map(|file| {
-            let switches = file
-                .switches
-                .iter()
-                .map(|store| (store.agent_index, store.home.as_str(), store.store_class));
-            file.readers.iter().map(located).chain(switches).map(
-                move |(agent_index, home, class)| Touched {
-                    path: &file.path,
-                    parking: file.parking,
-                    agent_index,
-                    home,
-                    class,
-                },
-            )
+    let in_files = files.iter().flat_map(|file| {
+        let switches = file.switches.iter().map(|store| {
+            let (home, class) = (store.home.as_str(), store.store_class);
+            (&file.path, store.agent_index, home, class)
         });
+        let readers = file
+            .readers
+            .iter()
+            .map(|reader| located(reader, &reader.path));
+        readers
+            .chain(switches)
+            .map(move |(path, agent_index, home, class)| Touched {
+                path,
+                parking: file.parking,
+                agent_index,
+                home,
+                class,
+            })
+    });
     let in_folders = folders.iter().flat_map(|folder| {
         folder
             .readers
             .iter()
-            .map(located)
-            .map(move |(agent_index, home, class)| Touched {
-                path: &folder.path,
+            .map(|reader| located(&reader.reader, &reader.at))
+            .map(move |(path, agent_index, home, class)| Touched {
+                path,
                 parking: false,
                 agent_index,
                 home,

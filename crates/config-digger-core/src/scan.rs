@@ -494,7 +494,10 @@ pub(crate) struct LocationReader {
     pub agent_index: usize,
     pub home: String,
     pub location: String,
+    /// The location's path as the Agent spells it.
     pub path: PathBuf,
+    /// `path` with the links in it resolved, as an Entry's path is.
+    pub real: PathBuf,
 }
 
 impl LocationReader {
@@ -502,6 +505,29 @@ impl LocationReader {
     pub fn location<'d>(&self, definitions: &'d [AgentDefinition]) -> &'d LocationDefinition {
         definitions[self.agent_index].location(&self.location)
     }
+
+    /// The path it reads the skill folder or link at `at` by, when its
+    /// folder holds it: `at` itself when it holds it as spelled, or the
+    /// same place below its own path when it holds it through a link.
+    fn reads_at(&self, at: &Path) -> Option<PathBuf> {
+        if folders::below(at, &self.path).is_some() {
+            return Some(at.to_path_buf());
+        }
+        let rest = folders::below(at, &self.real)?;
+        Some(
+            rest.iter()
+                .fold(self.path.clone(), |path, part| path.join(part)),
+        )
+    }
+}
+
+/// A location that reads a skill folder, and the path it reads it at.
+#[derive(Clone)]
+pub(crate) struct FolderReader {
+    pub reader: LocationReader,
+    /// Below the location's path as the Agent spells it, or the path of
+    /// the Linked Entry it reads the folder through.
+    pub at: PathBuf,
 }
 
 /// The definitions of the locations of `readers` that read the file at
@@ -519,18 +545,25 @@ pub(crate) fn locations_reading<'d>(
 }
 
 impl Snapshot {
-    /// The locations that read the file at `path`.
+    /// The locations that read the file at `path`, whether either spells
+    /// it through a link or not.
     pub fn readers_of(&self, path: &Path) -> Vec<LocationReader> {
+        let real = self
+            .readers
+            .iter()
+            .find(|reader| reader.path == path)
+            .map_or(path, |reader| reader.real.as_path());
         self.readers
             .iter()
-            .filter(|reader| reader.path == path)
+            .filter(|reader| reader.path == path || folders::is_at(&reader.real, real))
             .cloned()
             .collect()
     }
 
-    /// The locations that read the skill folder or link at `path`: those
-    /// whose folder holds it, or holds a link that leads into it.
-    pub fn readers_of_folder(&self, path: &Path) -> Vec<LocationReader> {
+    /// The locations that read the skill folder or link at `path`, each
+    /// with the path it reads it at: those whose folder holds it, or holds
+    /// a link that leads into it, as spelled or through a link.
+    pub fn readers_of_folder(&self, path: &Path) -> Vec<FolderReader> {
         let links = self.entries.iter().filter_map(|entry| {
             let real = entry.link.as_ref()?.real.as_deref()?;
             folders::below(real, path).map(|_| entry.path.as_path())
@@ -538,12 +571,13 @@ impl Snapshot {
         let reached: Vec<&Path> = std::iter::once(path).chain(links).collect();
         self.readers
             .iter()
-            .filter(|reader| {
-                reached
-                    .iter()
-                    .any(|at| folders::below(at, &reader.path).is_some())
+            .filter_map(|reader| {
+                let at = reached.iter().find_map(|at| reader.reads_at(at))?;
+                Some(FolderReader {
+                    reader: reader.clone(),
+                    at,
+                })
             })
-            .cloned()
             .collect()
     }
 
@@ -4121,6 +4155,7 @@ impl Scanner<'_> {
             home: home.home.clone(),
             location: location.id.clone(),
             path: path.to_path_buf(),
+            real: paths::resolved(self.reader.fs, path),
         };
         if !self.readers.contains(&reader) {
             self.readers.push(reader);

@@ -81,6 +81,19 @@ pub(crate) fn canonical_key(fs: &dyn FileSystem, spelling: &Path) -> String {
     key(&canonical(fs, spelling).0)
 }
 
+/// The path a spelling names with the links in it resolved: the real path
+/// of its longest part that exists, followed by the rest as spelled, or its
+/// lexical normalisation when no part of it exists.
+pub(crate) fn resolved(fs: &dyn FileSystem, spelling: &Path) -> PathBuf {
+    let lexical = lexical(spelling);
+    let found = lexical.ancestors().find_map(|part| {
+        let real = fs.real_path(part)?;
+        let rest = lexical.strip_prefix(part).ok()?;
+        Some(self::lexical(&real.join(rest)))
+    });
+    found.unwrap_or(lexical)
+}
+
 /// The key two normalised paths are compared by.
 pub(crate) fn key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
