@@ -17,9 +17,10 @@ use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
 use crate::running::RunningHomes;
-use crate::scan::{LocationReader, ScannedEntry, ScannedStranded, Snapshot, SwitchStore};
+use crate::scan::{GitAsks, LocationReader, ScannedEntry, ScannedStranded, Snapshot, SwitchStore};
 use crate::store::{self, Medium, Written};
 use crate::{explain, history, park, resolve, rules, running, scan, select};
+use std::cell::Cell;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -197,6 +198,7 @@ pub(crate) fn plan(
         leftovers: &leftovers,
         entries: &targeted,
         stranded: &stranded,
+        git_asks: Cell::default(),
     };
     let mut planned = match action {
         Action::Remove => targeted_entries.remove(),
@@ -208,6 +210,7 @@ pub(crate) fn plan(
             "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
         )),
     }?;
+    log_git_asks(targeted_entries.git_asks.get());
     for home in mirrored {
         let mirror = home.mirror.as_ref().expect("a Mirrored home has a mirror");
         // What it writes outside the home it copies, such as a Project's
@@ -231,6 +234,18 @@ pub(crate) fn plan(
         });
     }
     Ok(planned)
+}
+
+/// Logs, once for a plan, what it asked the git index outside its scans,
+/// when it asked about any path.
+fn log_git_asks(asks: GitAsks) {
+    if asks.paths > 0 {
+        tracing::info!(
+            paths = asks.paths,
+            git_calls = asks.calls,
+            "plan asked the git index"
+        );
+    }
 }
 
 /// The Entries an action on `selected` goes to, each once: each Entry
@@ -392,6 +407,8 @@ struct Targeted<'a> {
     entries: &'a [&'a api::Entry],
     /// The Stranded Entries it Removes, which no Item holds.
     stranded: &'a [&'a ScannedStranded],
+    /// What its plan asked the git index outside its scans.
+    git_asks: Cell<GitAsks>,
 }
 
 impl Targeted<'_> {
@@ -1052,12 +1069,15 @@ impl Targeted<'_> {
                 )));
             }
         };
+        let mut asks = self.git_asks.get();
+        let versioned =
+            scan::versioned_paths(self.ports, std::iter::once(origin.as_path()), &mut asks);
+        self.git_asks.set(asks);
         Ok(PlannedFolder {
             path: origin.clone(),
             op,
             size,
-            git_versioned: !scan::versioned_paths(self.ports, std::iter::once(origin.as_path()))
-                .is_empty(),
+            git_versioned: !versioned.is_empty(),
             readers: self.snapshot.readers_of_folder(origin),
         })
     }
@@ -1344,7 +1364,8 @@ pub(crate) fn plan_undo(
         scan::scan(definitions, ports, &scan_options.projects).map_err(Error::unexpected)?;
     let mut files = undo_files(ports, manifest)
         .map_err(|blocked| blocked.into_error(definitions, &snapshot))?;
-    let mut folders = undo_folders(ports, manifest)?;
+    let mut git_asks = GitAsks::default();
+    let mut folders = undo_folders(ports, manifest, &mut git_asks)?;
     for file in &mut files {
         file.readers = snapshot.readers_of(&file.path);
         file.switches = snapshot.switch_stores_of(&file.path);
@@ -1400,6 +1421,7 @@ pub(crate) fn plan_undo(
     )?;
     let homes = RunningHomes::of(definitions, &snapshot);
     let running = running::check(definitions, ports, &homes, &files, &folders);
+    log_git_asks(git_asks);
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
@@ -1632,7 +1654,7 @@ pub(crate) fn undo_refusal(
 ) -> Option<Error> {
     match undo_files(ports, manifest) {
         Err(blocked) => Some(blocked.into_error(definitions, snapshot)),
-        Ok(_) => undo_folders(ports, manifest).err(),
+        Ok(_) => undo_folders(ports, manifest, &mut GitAsks::default()).err(),
     }
 }
 
@@ -1720,10 +1742,12 @@ fn comes_back(ports: &Ports, kind: LinkKind) -> ComesBack {
 /// what it did there, last first, or why its Undo is refused: something is
 /// at a location it emptied, its copy in the backup or the parked-Entry
 /// store is gone, or what it put back changed since. History runs the same
-/// check. The folders' readers are left for the caller to fill in.
+/// check. The folders' readers are left for the caller to fill in. What it
+/// asks the git index is counted in `asks`.
 pub(crate) fn undo_folders(
     ports: &Ports,
     manifest: &history::Manifest,
+    asks: &mut GitAsks,
 ) -> Result<Vec<PlannedFolder>, Error> {
     let fs = ports.fs.as_ref();
     let folder = history::operation_folder(ports, &manifest.id)?;
@@ -1823,8 +1847,11 @@ pub(crate) fn undo_folders(
             size,
         });
     }
-    let versioned =
-        scan::versioned_paths(ports, planned.iter().map(|folder| folder.path.as_path()));
+    let versioned = scan::versioned_paths(
+        ports,
+        planned.iter().map(|folder| folder.path.as_path()),
+        asks,
+    );
     for folder in &mut planned {
         folder.git_versioned = versioned.contains(&folder.path);
     }

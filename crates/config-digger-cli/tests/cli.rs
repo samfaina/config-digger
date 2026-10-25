@@ -1413,6 +1413,112 @@ fn each_scan_of_a_preview_and_of_an_undo_logs_its_own_pair() {
     assert_eq!(logged_scans(&undo), 2, "{}", undo.stderr);
 }
 
+/// The lines a run logged of the git index asks its plan made outside its
+/// scans.
+fn plan_git_lines(run: &Run) -> Vec<&str> {
+    run.stderr
+        .lines()
+        .filter(|line| line.contains("plan asked the git index"))
+        .collect()
+}
+
+/// A Cursor home with its user skill `review`, in the git repo of the
+/// folder the binary runs in, which does not version the skill.
+fn with_review_in_git_repo() -> Harness {
+    let harness =
+        Harness::new().with_file(".cursor/skills/review/SKILL.md", "---\nname: review\n---\n");
+    let user = harness.roaming_app_data().join(r"Cursor\User");
+    std::fs::create_dir_all(&user).unwrap();
+    std::fs::write(user.join("settings.json"), "{}").unwrap();
+    in_git_repo(&harness, &[]);
+    harness
+}
+
+#[test]
+fn the_preview_of_an_enable_that_brings_back_a_parked_skill_folder_logs_its_git_asks() {
+    let harness = with_review_in_git_repo();
+    let review = harness.path(r".cursor\skills\review").display().to_string();
+    let parked = harness.run(&[
+        "disable",
+        &review,
+        "--no-project",
+        "--yes",
+        "--ack",
+        "wide-reach",
+    ]);
+    assert_eq!(parked.code, 0, "{}{}", parked.stdout, parked.stderr);
+    let in_store = locator(&parked_store(&harness), "entries.review");
+
+    let run = harness.run(&["enable", &in_store, "--no-project", "--dry-run", "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    let lines = plan_git_lines(&run);
+    assert_eq!(lines.len(), 1, "{}", run.stderr);
+    assert!(lines[0].contains(" INFO "), "{}", lines[0]);
+    // The folder it moves back, asked about in one `git ls-files`.
+    assert!(lines[0].contains("paths=1"), "{}", lines[0]);
+    assert!(lines[0].contains("git_calls=1"), "{}", lines[0]);
+    let plan_line = run.stderr.find("plan asked the git index").unwrap();
+    assert!(
+        run.stderr.rfind("scan finished").unwrap() < plan_line,
+        "{}",
+        run.stderr
+    );
+}
+
+#[test]
+fn the_undo_of_a_remove_of_a_skill_folder_logs_its_git_asks() {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+    in_git_repo(&harness, &[]);
+    let removed = harness.removed("deploy");
+
+    let run = harness.run(&["undo", &removed, "--dry-run", "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    let lines = plan_git_lines(&run);
+    assert_eq!(lines.len(), 1, "{}", run.stderr);
+    assert!(lines[0].contains(" INFO "), "{}", lines[0]);
+    // The folder it moves back, asked about in one `git ls-files`.
+    assert!(lines[0].contains("paths=1"), "{}", lines[0]);
+    assert!(lines[0].contains("git_calls=1"), "{}", lines[0]);
+}
+
+#[test]
+fn a_plan_that_asks_the_git_index_about_no_folder_logs_no_line_of_it() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    in_git_repo(&harness, &[]);
+    let removed = harness.removed("linear");
+
+    let preview = harness.run(&["remove", "notes", "--no-project", "--dry-run", "-v"]);
+    let undo = harness.run(&["undo", &removed, "--dry-run", "-v"]);
+
+    assert_eq!(preview.code, 0, "{}{}", preview.stdout, preview.stderr);
+    assert_eq!(logged_scans(&preview), 1, "{}", preview.stderr);
+    assert!(plan_git_lines(&preview).is_empty(), "{}", preview.stderr);
+    assert_eq!(undo.code, 0, "{}{}", undo.stdout, undo.stderr);
+    assert_eq!(logged_scans(&undo), 2, "{}", undo.stderr);
+    assert!(plan_git_lines(&undo).is_empty(), "{}", undo.stderr);
+}
+
+#[test]
+fn reading_history_logs_no_plan_line_of_the_git_asks_of_an_undo() {
+    let harness = Harness::new()
+        .with_file(".claude.json", "{}")
+        .with_file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+    in_git_repo(&harness, &[]);
+    let removed = harness.removed("deploy");
+
+    let history = harness.run(&["history", "-v"]);
+    let show = harness.run(&["history", "show", &removed, "-v"]);
+
+    assert_eq!(history.code, 0, "{}{}", history.stdout, history.stderr);
+    assert!(plan_git_lines(&history).is_empty(), "{}", history.stderr);
+    assert_eq!(show.code, 0, "{}{}", show.stdout, show.stderr);
+    assert!(plan_git_lines(&show).is_empty(), "{}", show.stderr);
+}
+
 #[test]
 fn undo_refused_because_the_entry_changed_exits_8_with_the_backup_and_a_diff() {
     let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);

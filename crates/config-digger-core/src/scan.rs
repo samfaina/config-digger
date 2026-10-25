@@ -1184,7 +1184,7 @@ fn timed_scan(
 ) -> Result<Snapshot, ScanError> {
     let started = Instant::now();
     tracing::info!("scan started");
-    let mut asked = 0;
+    let mut asks = GitAsks::default();
     let snapshot = read_as_if(
         definitions,
         ports,
@@ -1192,16 +1192,16 @@ fn timed_scan(
         known_installations,
         written,
         folders,
-        &mut asked,
+        &mut asks,
     )?;
     let elapsed_ms = started.elapsed().as_millis();
-    tracing::info!(elapsed_ms, paths = asked, "scan finished");
+    tracing::info!(elapsed_ms, paths = asks.paths, "scan finished");
     Ok(snapshot)
 }
 
 /// The scan of [`timed_scan`], with the Installations found again when
-/// `known_installations` is `None`, counting in `asked` each path it asks
-/// the git index about.
+/// `known_installations` is `None`, counting in `asks` what it asks the git
+/// index.
 fn read_as_if(
     definitions: &Definitions,
     ports: &Ports,
@@ -1209,7 +1209,7 @@ fn read_as_if(
     known_installations: Option<&[ScannedInstallation]>,
     written: &[Written],
     folders: &[PlannedFolder],
-    asked: &mut usize,
+    asks: &mut GitAsks,
 ) -> Result<Snapshot, ScanError> {
     let as_if = AsIf::new(ports.fs.as_ref(), folders);
     let read_at = ports.clock.now();
@@ -1494,7 +1494,7 @@ fn read_as_if(
         .iter()
         .map(PathBuf::as_path)
         .filter(|path| path.parent().is_some_and(|folder| ports.fs.exists(folder)));
-    let versioned = versioned(ports, locations.chain(switch_files), asked);
+    let versioned = versioned(ports, locations.chain(switch_files), asks);
     let last_ran: Vec<LastRanReading> = found
         .iter()
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
@@ -2426,16 +2426,25 @@ fn switch_files(
     files
 }
 
+/// What a scan or a plan asked the git index: how many paths, and in how
+/// many calls, one per repo the paths are in.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct GitAsks {
+    pub paths: usize,
+    pub calls: usize,
+}
+
 /// The files among `paths` that are in the index of their git repo, asking
-/// once per repo and counting each path asked about in `asked`. Ignored and
-/// untracked files are not, nor is a path outside any repo.
+/// once per repo and counting in `asks` the paths asked about and the
+/// calls. Ignored and untracked files are not, nor is a path outside any
+/// repo.
 fn versioned<'a>(
     ports: &Ports,
     paths: impl Iterator<Item = &'a Path>,
-    asked: &mut usize,
+    asks: &mut GitAsks,
 ) -> BTreeSet<PathBuf> {
     let paths: BTreeSet<&Path> = paths.collect();
-    *asked += paths.len();
+    asks.paths += paths.len();
     // The repo of a path is the one its folder is in, as `git -C` finds it.
     let mut repositories: BTreeMap<PathBuf, Vec<&Path>> = BTreeMap::new();
     for path in paths {
@@ -2446,6 +2455,7 @@ fn versioned<'a>(
             repositories.entry(repository).or_default().push(path);
         }
     }
+    asks.calls += repositories.len();
     repositories
         .iter()
         .flat_map(|(repository, paths)| ports.git.versioned_in(repository, paths))
@@ -2453,12 +2463,14 @@ fn versioned<'a>(
 }
 
 /// The files and folders among `paths` that are in the index of their git
-/// repo, as a scan finds them, asking once per repo.
+/// repo, as a scan finds them, asking once per repo and counting in `asks`
+/// what it asked.
 pub(crate) fn versioned_paths<'a>(
     ports: &Ports,
     paths: impl Iterator<Item = &'a Path>,
+    asks: &mut GitAsks,
 ) -> BTreeSet<PathBuf> {
-    versioned(ports, paths, &mut 0)
+    versioned(ports, paths, asks)
 }
 
 fn find_homes(
