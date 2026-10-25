@@ -1304,6 +1304,54 @@
       ]
     },
     {
+      "id": "21",
+      "title": "Texto",
+      "steps": [
+        {
+          "id": "21.1",
+          "title": "El texto en un monitor de alta resolución y en la ventana más pequeña",
+          "goal": "En un monitor de alta resolución al 100 % de escala, el texto de config-digger se lee bien en cada pantalla, cada tamaño guarda su proporción con el texto de las filas, y en la ventana más pequeña las pantallas siguen cabiendo sin que un texto se monte sobre otro.",
+          "instructions": [
+            "Usa un monitor de alta resolución, de 2560 píxeles de ancho o más; si no tienes ninguno, marca el paso como bloqueado.",
+            "En la Configuración de Windows, en Sistema > Pantalla, pon la escala de ese monitor al 100 %.",
+            "Abre config-digger en ese monitor, con la ventana del tamaño con que se abre.",
+            "En el Inventario, elige el servidor cd-throwaway-user de la lista de Items.",
+            "Mira el texto de las filas, del panel de la derecha y de la cabecera.",
+            "En el panel de la derecha, pulsa Remove.",
+            "Mira el texto del diálogo.",
+            "Pulsa Cancel.",
+            "Ve a Projects & homes.",
+            "Ve a History · Undo.",
+            "Ve a Settings.",
+            "Ve a About.",
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "Vuelve al Inventario.",
+            "Desplázate hasta abajo dentro del panel de la derecha, que aún muestra cd-throwaway-user.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "Abre la pestaña Agent homes.",
+            "Ve a History · Undo.",
+            "Elige la primera Operation de la lista.",
+            "Ve a Settings.",
+            "Ve a About."
+          ],
+          "commands": [],
+          "expect": [
+            "En cada pantalla, el texto de las filas y las descripciones se lee sin acercarse al monitor.",
+            "El texto del diálogo de Remove se lee sin acercarse al monitor.",
+            "Los títulos siguen siendo más grandes que el texto de las filas.",
+            "Las etiquetas y los rótulos en mayúsculas siguen siendo más pequeños que el texto de las filas.",
+            "En la ventana más pequeña, ningún texto se monta sobre otro en ninguna de las cinco pantallas.",
+            "Ningún texto queda cortado por el borde de su bloque, salvo los que acaban en «…».",
+            "En el Inventario, el panel de la derecha se desplaza dentro de sí hasta sus botones «Disable» y «Remove».",
+            "En Projects & homes, el nombre y la ruta de cada fila ocupan el ancho de la fila.",
+            "En Projects & homes, el número de Entries y los botones de cada fila van en una línea bajo el nombre y la ruta."
+          ],
+          "covers": ["#231"]
+        }
+      ]
+    },
+    {
       "id": "5",
       "title": "Avisos",
       "steps": [

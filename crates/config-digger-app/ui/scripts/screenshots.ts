@@ -182,6 +182,19 @@ const SHOTS: Shot[] = [
   },
 ];
 
+/** Each main screen again in the smallest window, where the text has the least room, as `smallest-<name>`. */
+const SMALLEST_SHOTS: Shot[] = ["inventory-item", "projects", "projects-homes", "history-operation", "settings", "about"].map((name) => {
+  const shot = SHOTS.find((each) => each.name === name);
+  if (shot === undefined) throw new Error(`No shot named ${name}.`);
+  return {
+    name: `smallest-${name}`,
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await shot.steps?.(page);
+    },
+  };
+});
+
 /** Once every animation that ends has ended, such as a notice sliding in; a spinner never does. */
 async function settled(page: Page) {
   await page.evaluate(() =>
@@ -216,7 +229,7 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   const failed: string[] = [];
   try {
-    for (const shot of SHOTS) {
+    for (const shot of [...SHOTS, ...SMALLEST_SHOTS]) {
       const page = await browser.newPage({ viewport: WINDOW, colorScheme: "dark" });
       try {
         await page.goto(`${url}${shot.query ?? ""}`);

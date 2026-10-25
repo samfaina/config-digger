@@ -260,6 +260,42 @@ describe("the action dialog", () => {
   });
 });
 
+/** The browser's default text size, `medium`, that the root's base is a share of. */
+const MEDIUM_PX = 16;
+
+/** A text size in rem, in pixels at 100 % scale, from the root's one base. */
+const textPx = (size: string | undefined) => {
+  const base = rootValues.get("font-size");
+  expect(base, "the root's base, a share of the browser's default").toMatch(/^\d+(\.\d+)?%$/);
+  expect(size, "a text size in rem").toMatch(/^\d+(\.\d+)?rem$/);
+  return (MEDIUM_PX * parseFloat(base as string)) / 100 * parseFloat(size as string);
+};
+
+/** Each text size the stylesheet sets: every `font-size`, and the size a `font` shorthand starts with. */
+const textSizes = allRules.flatMap((found) =>
+  ["font-size", "font"].flatMap((name) => {
+    const value = found.declarations.get(name);
+    return value === undefined ? [] : [{ where: `${found.selector} ${name}`, size: name === "font" ? value.split(/[\s/]/)[0] : value }];
+  }),
+);
+
+describe("the app's text sizes", () => {
+  test("are each a rem of the root's one base, so that changing it changes them all, never a px", () => {
+    // Every one the stylesheet declares, as a plain search finds them.
+    expect(textSizes.length).toBe(css.replace(/\/\*[\s\S]*?\*\//g, "").match(/\bfont(-size)?\s*:/g)?.length);
+    for (const { where, size } of textSizes) {
+      expect(size, where).not.toMatch(/px$/);
+      if (!where.startsWith(":root ") && size !== "inherit") expect(size, where).toMatch(/^\d+(\.\d+)?rem$/);
+    }
+  });
+
+  test("render body text, a row's location, a description or a dialog's note, at 14px or more at 100 % scale", () => {
+    for (const selector of [".item-location", ".bar-label", ".detail-context", ".operation-meta", ".place-sub", ".side-note"]) {
+      expect(textPx(styled(selector).get("font-size")), selector).toBeGreaterThanOrEqual(14);
+    }
+  });
+});
+
 const smallestWindow = JSON.parse(readFileSync(new URL("../../tauri.conf.json", import.meta.url), "utf8")).app.windows[0] as { minWidth: number; minHeight: number };
 
 /** A length in pixels, such as `10px`. */
@@ -365,6 +401,20 @@ describe("the Projects & homes banner at the smallest window", () => {
     for (const selector of [".banner-title", ".places-tabs button", ".banner .cta"]) {
       expect(styled(selector).get("white-space"), selector).toBe("nowrap");
     }
+  });
+
+  test("puts a row's Entry count and buttons under its name and path in a narrow list, so the name keeps the row's width", () => {
+    expect(styled(".places-list").get("container")).toBe("places / inline-size");
+    const narrow = /^@container places \(max-width: \d+px\)$/;
+    expect(styled(".place-row", narrow).get("flex-wrap")).toBe("wrap");
+    // The name and path take the rest of the first line, after the icon and the row's gap.
+    const indent = px(styled(".place-icon").get("width")) + px(styled(".place-row").get("gap"));
+    expect(styled(".place-text", narrow).get("flex-basis")).toBe(`calc(100% - ${indent}px)`);
+    // The count starts the next line under the name; the buttons end it on the right.
+    const count = styled(".place-count", narrow);
+    expect(count.get("width")).toBe("auto");
+    expect(count.get("margin-left")).toBe(`${indent}px`);
+    expect(styled(".place-actions", narrow).get("margin-left")).toBe("auto");
   });
 });
 
@@ -672,11 +722,11 @@ describe("a hint in a dialog", () => {
     }
   });
 
-  test("is at a readable size, no smaller than 12.5px", () => {
+  test("is at a readable size, no smaller than 14.5px at 100 % scale", () => {
     for (const selector of HINTS) {
-      const size = styled(selector).get("font-size");
-      // A hint without a size of its own takes the app's 13px.
-      if (size !== undefined) expect(px(size), selector).toBeGreaterThanOrEqual(12.5);
+      // A hint without a size of its own takes the app's.
+      const size = styled(selector).get("font-size") ?? styled("body").get("font-size");
+      expect(textPx(size), selector).toBeGreaterThanOrEqual(14.5);
     }
   });
 });
