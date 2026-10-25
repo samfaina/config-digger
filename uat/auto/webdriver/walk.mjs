@@ -19,7 +19,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
-import { refocus, wait } from "./lib.mjs";
+import { refocus, setupSwitches, wait } from "./lib.mjs";
 import sections from "./steps/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -130,8 +130,10 @@ const ctx = {
       encoding: "utf8",
     });
   },
-  setup() {
-    return ctx.ps(`& .\\uat\\data\\cd-throwaway-setup.ps1 -Root '${opt.root}' -Reset`);
+  // With a step, its plan's setup may add switches, such as -Symlink.
+  setup(step) {
+    const more = step?.setup ? setupSwitches(step.setup.text) : "";
+    return ctx.ps(`& .\\uat\\data\\cd-throwaway-setup.ps1 -Root '${opt.root}' -Reset${more}`);
   },
   // Closes the app's window and opens it again, as the tester does with the X
   // and the Start menu: the session ends and a new one starts.
@@ -193,7 +195,7 @@ for (const id of ids) {
     error = undefined;
     try {
       if (step.setup) {
-        ctx.setup();
+        ctx.setup(step);
         // The tester runs the setup in PowerShell and comes back to the
         // window, whose focus reads the files again.
         await refocus(s).catch(() => {});

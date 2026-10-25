@@ -2,15 +2,15 @@
 //! Definitions carry codes and pointers only, never free text.
 
 use crate::api::{
-    Action, Advice, FolderChangeKind, OperationStatus, ReadFailureKind, Reason, ReasonCode,
-    RiskCode, State, StrandedReason, Verify,
+    Action, Advice, LinkKind, OperationStatus, ReadFailureKind, Reason, ReasonCode, RiskCode,
+    State, StrandedReason, Verify,
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
     ApprovalPrompt, FieldType, Malformed, MatchedBy, SettingIs, SkillDefect, UnseenServers,
 };
 use crate::edit::Edit;
-use crate::folders::{FolderOp, FolderSize};
+use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
 use crate::scan::{Expected, ScannedShape, ValueType};
 use crate::{locator, park};
 use serde_json::Value;
@@ -2036,33 +2036,91 @@ pub(crate) fn read_only_remove(locator: &str) -> String {
 
 /// What an Operation does at the skill folder's location `path`, whose
 /// folder, or the link's `target`, has `size`.
-pub(crate) fn folder_change(
-    change: FolderChangeKind,
-    path: &Path,
-    target: Option<&PathBuf>,
-    size: FolderSize,
-) -> String {
-    let target = target.map_or_else(String::new, |target| target.display().to_string());
+pub(crate) fn folder_change(op: &FolderOp, path: &Path, size: FolderSize) -> String {
     let size = folder_size(size);
     let path = path.display();
-    match change {
-        FolderChangeKind::MovedToBackup => {
+    match op {
+        FolderOp::MoveToBackup => {
             format!("Moves the skill folder {path} ({size}) into the backup.")
         }
-        FolderChangeKind::LinkRemoved => {
-            format!("Removes the link {path} only; its target {target} ({size}) stays as it is.")
+        FolderOp::RemoveLink { link, comes_back } => {
+            let removes = format!(
+                "Removes the {} {path} only; its target {} ({size}) stays as it is.",
+                link_kind(link.kind),
+                link.target.display()
+            );
+            match comes_back {
+                ComesBack::AsItWas => removes,
+                ComesBack::AsJunction => format!(
+                    "{removes} Its Undo may create a junction to {} in its place: {NO_SYMLINKS}.",
+                    link.target.display()
+                ),
+                ComesBack::Not => {
+                    format!("{removes} Its Undo cannot create it again: {NO_SYMLINKS}.")
+                }
+            }
         }
-        FolderChangeKind::MovedBack => {
+        FolderOp::MoveBack { .. } => {
             format!("Moves the skill folder {path} ({size}) back from the backup.")
         }
-        FolderChangeKind::LinkCreated => format!("Creates the link {path} to {target} again."),
-        FolderChangeKind::Parked => format!(
+        FolderOp::CreateLink {
+            link,
+            instead_of: None,
+        } => format!(
+            "Creates the {} {path} to {} again.",
+            link_kind(link.kind),
+            link.written.display()
+        ),
+        FolderOp::CreateLink {
+            link,
+            instead_of: Some(symlink),
+        } => format!(
+            "Creates a junction {path} to {}, in place of the {} to {} it was: {NO_SYMLINKS}.",
+            link.target.display(),
+            link_kind(symlink.kind),
+            symlink.written.display()
+        ),
+        FolderOp::Park { .. } => format!(
             "Moves the skill folder {path} ({size}) into config-digger's parked-Entry store."
         ),
-        FolderChangeKind::PutBack => format!(
+        FolderOp::Unpark { .. } => format!(
             "Moves the skill folder {path} ({size}) back from config-digger's parked-Entry store."
         ),
     }
+}
+
+/// Why config-digger cannot create a symlink.
+const NO_SYMLINKS: &str =
+    "config-digger cannot create symlinks here, which takes Developer Mode or admin rights";
+
+/// A kind of link, as a sentence names it.
+pub(crate) fn link_kind(kind: LinkKind) -> &'static str {
+    match kind {
+        LinkKind::Junction => "junction",
+        LinkKind::FolderSymlink => "folder symlink",
+        LinkKind::FileSymlink => "file symlink",
+    }
+}
+
+/// What an Undo's result adds when it created a junction at `path` to
+/// `junction`'s target in place of the folder symlink `symlink`.
+pub(crate) fn created_junction_instead(path: &Path, junction: &Link, symlink: &Link) -> String {
+    format!(
+        "It created a junction {} to {}, in place of the {} to {} it was: {NO_SYMLINKS}.",
+        path.display(),
+        junction.target.display(),
+        link_kind(symlink.kind),
+        symlink.written.display()
+    )
+}
+
+/// Why the Undo that would create the file symlink at `path` again is
+/// refused.
+pub(crate) fn file_symlink_not_creatable(path: &Path) -> String {
+    format!(
+        "the file symlink {} cannot be created again: {NO_SYMLINKS}, and a file has no junction to take its place",
+        path.display()
+    )
 }
 
 /// A folder's size as "2 files, 80 bytes".
@@ -2134,9 +2192,13 @@ pub(crate) fn folder_failed(op: &FolderOp, path: &Path, error: &std::io::Error) 
     let path = path.display();
     match op {
         FolderOp::MoveToBackup => format!("cannot move {path} into the backup: {error}"),
-        FolderOp::RemoveLink { .. } => format!("cannot remove the link {path}: {error}"),
+        FolderOp::RemoveLink { link, .. } => {
+            format!("cannot remove the {} {path}: {error}", link_kind(link.kind))
+        }
         FolderOp::MoveBack { .. } => format!("cannot move {path} back: {error}"),
-        FolderOp::CreateLink { .. } => format!("cannot create the link {path}: {error}"),
+        FolderOp::CreateLink { link, .. } => {
+            format!("cannot create the {} {path}: {error}", link_kind(link.kind))
+        }
         FolderOp::Park { .. } => {
             format!("cannot move {path} into the parked-Entry store: {error}")
         }

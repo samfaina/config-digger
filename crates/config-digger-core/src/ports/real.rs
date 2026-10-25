@@ -2,8 +2,9 @@
 
 use super::{
     Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Processes, RegistryData,
-    RunningProcess,
+    RunningProcess, WrittenLink,
 };
+use crate::api::LinkKind;
 use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{self, Write};
@@ -286,45 +287,104 @@ foreach ($path in ($env:CONFIG_DIGGER_ACL_PATHS -split "`n")) {
         }
     }
 
-    /// The standard library creates no junction, and this crate forbids
-    /// the unsafe code that would, so `mklink /J` creates it. Each path is
-    /// quoted for `cmd`, which then takes `&` or `^` in it literally; one
-    /// holding `"` or `%`, which quotes do not protect, is refused.
+    /// The standard library cannot tell a junction from a folder symlink
+    /// with an absolute target, so the `junction` crate reads a junction,
+    /// and the standard library what is left.
     #[cfg(windows)]
-    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+    fn written_link(&self, path: &Path) -> Option<WrittenLink> {
+        use std::os::windows::fs::FileTypeExt;
+
+        let file_type = std::fs::symlink_metadata(path).ok()?.file_type();
+        if !file_type.is_symlink() {
+            return None;
+        }
+        if let Ok(target) = junction::get_target(path) {
+            return Some(WrittenLink {
+                kind: LinkKind::Junction,
+                target: without_verbatim_prefix(target),
+            });
+        }
+        let kind = if file_type.is_symlink_dir() {
+            LinkKind::FolderSymlink
+        } else {
+            LinkKind::FileSymlink
+        };
+        Some(WrittenLink {
+            kind,
+            target: without_verbatim_prefix(std::fs::read_link(path).ok()?),
+        })
+    }
+
+    /// A symlink here is a folder symlink when it leads to a folder.
+    #[cfg(not(windows))]
+    fn written_link(&self, path: &Path) -> Option<WrittenLink> {
+        if !std::fs::symlink_metadata(path)
+            .ok()?
+            .file_type()
+            .is_symlink()
+        {
+            return None;
+        }
+        let kind = if std::fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
+            LinkKind::FolderSymlink
+        } else {
+            LinkKind::FileSymlink
+        };
+        Some(WrittenLink {
+            kind,
+            target: std::fs::read_link(path).ok()?,
+        })
+    }
+
+    /// The standard library creates no junction, and this crate forbids
+    /// the unsafe code that would, so the `junction` crate creates it.
+    #[cfg(windows)]
+    fn create_link(&self, link: &Path, kind: LinkKind, target: &Path) -> io::Result<()> {
         if std::fs::symlink_metadata(link).is_ok() {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
-        use std::os::windows::process::CommandExt;
-
-        // `mklink` reads a `/` as the start of a switch.
-        let quoted = |path: &Path| {
-            let text = path.as_os_str().to_string_lossy().replace('/', "\\");
-            if text.contains(['"', '%']) {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("cannot create a junction at or to {text}"),
-                ));
+        match kind {
+            LinkKind::Junction => {
+                // A junction's target is absolute: the crate would resolve
+                // a relative one against the current folder.
+                let target = match link.parent() {
+                    Some(parent) if target.is_relative() => parent.join(target),
+                    _ => target.to_path_buf(),
+                };
+                junction::create(target, link)
             }
-            Ok(format!("\"{text}\""))
-        };
-        let output = background_command("cmd")
-            .args(["/D", "/C"])
-            .raw_arg(format!("mklink /J {} {}", quoted(link)?, quoted(target)?))
-            .stdin(Stdio::null())
-            .output()?;
-        if output.status.success() && self.link_target(link).is_some() {
-            return Ok(());
+            LinkKind::FolderSymlink => std::os::windows::fs::symlink_dir(target, link),
+            LinkKind::FileSymlink => std::os::windows::fs::symlink_file(target, link),
         }
-        Err(io::Error::other(format!(
-            "mklink /J failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )))
     }
 
     #[cfg(not(windows))]
-    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+    fn create_link(&self, link: &Path, _: LinkKind, target: &Path) -> io::Result<()> {
         std::os::unix::fs::symlink(target, link)
+    }
+
+    /// Asked once per session: what lets this process create a symlink
+    /// does not change while it runs. When the data folder does not exist
+    /// yet, the probe goes in the system's temporary folder rather than
+    /// creating it.
+    fn can_create_symlinks(&self, folder: &Path) -> bool {
+        static CAN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *CAN.get_or_init(|| {
+            let folder = if folder.is_dir() {
+                folder.to_path_buf()
+            } else {
+                std::env::temp_dir()
+            };
+            let probe = folder.join(format!(".symlink-probe-{}", std::process::id()));
+            let created = self
+                .create_link(&probe, LinkKind::FolderSymlink, Path::new("."))
+                .is_ok();
+            if created && let Err(error) = self.remove_link(&probe) {
+                tracing::warn!(probe = %probe.display(), %error, "cannot delete the symlink probe");
+            }
+            tracing::info!(created, "probed whether symlinks can be created");
+            created
+        })
     }
 
     /// A rename. Across volumes, where no rename works, the folder is first

@@ -224,15 +224,30 @@ pub(crate) fn execute(
         tracing::error!(operation = %id, %error, "cannot record the applied Operation");
     }
     tracing::info!(operation = %id, files = writes.len(), ?verify, "operation applied");
+    let mut sentence = explain::outcome(
+        planned.action,
+        planned.entries,
+        planned.preview.undo_of.as_deref(),
+        &id,
+        verify,
+    );
+    for folder in &planned.folders {
+        if let FolderOp::CreateLink {
+            link,
+            instead_of: Some(symlink),
+        } = &folder.op
+        {
+            sentence.push(' ');
+            sentence.push_str(&explain::created_junction_instead(
+                &folder.path,
+                link,
+                symlink,
+            ));
+        }
+    }
     Ok(Outcome {
         verify,
-        sentence: explain::outcome(
-            planned.action,
-            planned.entries,
-            planned.preview.undo_of.as_deref(),
-            &id,
-            verify,
-        ),
+        sentence,
         operation: id,
         differences,
         backup: folder,
@@ -316,7 +331,7 @@ fn check_folder(ports: &Ports, folder: &PlannedFolder) -> Result<(), Error> {
     let path = &folder.path;
     let unchanged = match &folder.op {
         FolderOp::MoveToBackup => folders::holds(fs, path, folder.size),
-        FolderOp::RemoveLink { target } => folders::links_to(fs, path, target),
+        FolderOp::RemoveLink { link, .. } => folders::is_link(fs, path, link),
         FolderOp::MoveBack { from } | FolderOp::Unpark { from } => {
             !folders::taken(fs, path) && fs.exists(from)
         }
@@ -343,8 +358,8 @@ fn do_folder(ports: &Ports, touched: &PendingFolder) -> io::Result<()> {
         (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _) => {
             parent(fs, path).and_then(|()| fs.move_folder(from, path))
         }
-        (FolderOp::CreateLink { target }, _) => {
-            parent(fs, path).and_then(|()| fs.create_link(path, target))
+        (FolderOp::CreateLink { link, .. }, _) => {
+            parent(fs, path).and_then(|()| fs.create_link(path, link.kind, &link.written))
         }
         (FolderOp::Park { to }, _) => parent(fs, to).and_then(|()| fs.move_folder(path, to)),
     }
@@ -359,8 +374,8 @@ fn parent(fs: &dyn FileSystem, path: &Path) -> io::Result<()> {
 /// Verify of one skill folder's location: a folder moved into the backup
 /// or the parked-Entry store is gone and its copy holds as many files of the
 /// same total size; a link removed is gone and its target is intact; a
-/// folder moved back holds its files again; a link created points to its
-/// target.
+/// folder moved back holds its files again; a link created is of its kind
+/// and holds its target as written.
 fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> {
     let fs = ports.fs.as_ref();
     let folder = touched.folder;
@@ -383,14 +398,14 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
                 path.display()
             ))
         }
-        (FolderOp::RemoveLink { target }, _)
+        (FolderOp::RemoveLink { link, .. }, _)
             // The target may be a link itself, measured through.
             if folder.size.files > 0
-                && folders::measure(fs, target).ok() != Some(folder.size) =>
+                && folders::measure(fs, &link.target).ok() != Some(folder.size) =>
         {
             failed(format!(
                 "the target {} of the link {} no longer holds its {size}",
-                target.display(),
+                link.target.display(),
                 path.display()
             ))
         }
@@ -402,11 +417,14 @@ fn verify_folder(ports: &Ports, touched: &PendingFolder) -> Result<(), Failure> 
                 path.display()
             ))
         }
-        (FolderOp::CreateLink { target }, _) if !folders::links_to(fs, path, target) => failed(format!(
-            "the link {} does not point to {}",
-            path.display(),
-            target.display()
-        )),
+        (FolderOp::CreateLink { link, .. }, _) if !folders::is_link(fs, path, link) => {
+            failed(format!(
+                "{} is not the {} to {} it should be",
+                path.display(),
+                explain::link_kind(link.kind),
+                link.written.display()
+            ))
+        }
         _ => Ok(()),
     }
 }
@@ -453,8 +471,8 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
             parent(fs, path).and_then(|()| fs.move_folder(backup, path))
         }
         (FolderOp::MoveToBackup, None) => return (RollbackOutcome::NotWritten, None),
-        (FolderOp::RemoveLink { target }, _) => {
-            parent(fs, path).and_then(|()| fs.create_link(path, target))
+        (FolderOp::RemoveLink { link, .. }, _) => {
+            parent(fs, path).and_then(|()| fs.create_link(path, link.kind, &link.written))
         }
         (FolderOp::MoveBack { from } | FolderOp::Unpark { from }, _)
             if folders::taken(fs, from) =>
@@ -465,7 +483,7 @@ fn restore_folder(ports: &Ports, touched: &PendingFolder) -> (RollbackOutcome, O
             parent(fs, from).and_then(|()| fs.move_folder(path, from))
         }
         (FolderOp::Park { to }, _) => parent(fs, path).and_then(|()| fs.move_folder(to, path)),
-        (FolderOp::CreateLink { target }, _) if folders::links_to(fs, path, target) => {
+        (FolderOp::CreateLink { link, .. }, _) if folders::is_link(fs, path, link) => {
             fs.remove_link(path)
         }
         (FolderOp::CreateLink { .. }, _) => {

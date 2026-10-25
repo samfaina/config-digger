@@ -682,7 +682,7 @@ describe("a hint in a dialog", () => {
 });
 
 /** Each tone of a tag, by what it tells: plain, git-versioned, a Linked Entry, read-only. */
-const TAGS = [".tag", ".tag.git", ".tag.junction", ".tag.read-only"];
+const TAGS = [".tag", ".tag.git", ".tag.linked", ".tag.read-only"];
 
 /** The declarations of a tag of the tone `selector`, over those of every tag. */
 const tone = (selector: string) => new Map([...styled(".tag"), ...styled(selector)]);

@@ -1063,12 +1063,25 @@ export type Leftovers = {
 export type Link = {
 	/**  The path the link holds, made absolute. */
 	target: string,
+	kind: LinkKind,
 	/**
 	 *  The target is gone, so the Agent reads nothing there and the Entry
 	 *  is Unread.
 	 */
 	broken: boolean,
 };
+
+/**
+ *  What kind of link a Linked Entry's location is, which Undo of its
+ *  Remove creates again (ADR 0008).
+ */
+export type LinkKind = 
+/**  A Windows junction, which points to a folder by its absolute path. */
+"junction" | 
+/**  A symlink to a folder, its target absolute or relative. */
+"folder_symlink" | 
+/**  A symlink to a file, its target absolute or relative. */
+"file_symlink";
 
 /**  What the webview asks to change in config-digger's lists. */
 export type ListChange = 

@@ -44,7 +44,10 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1          # creates E:\cd-throwaway
 .\uat\data\cd-throwaway-setup.ps1 -Reset   # deletes it and creates it again
 .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
+.\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   # adds a skill behind a relative folder symlink
 ```
+
+`-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 
 The script refuses any `-Root` not named `cd-throwaway`, so `-Reset` can never delete another folder. It refuses an existing folder without `-Reset`. `cargo test -p xtask --test uat_data` checks both, on Windows.
 

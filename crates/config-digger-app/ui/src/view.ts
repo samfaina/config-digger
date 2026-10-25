@@ -13,6 +13,7 @@ import type {
   Inventory,
   Item,
   ItemKind,
+  Link,
   Project,
   ReadFailure,
   State,
@@ -268,8 +269,13 @@ function removeReach(entry: Entry, agentName: string): string {
   const agents = [...new Set([agentName, ...entry.also_read_by.map((reader) => reader.agent_name)])];
   let note = `Remove reaches ${agents.join(", ")}.`;
   if (entry.git_versioned) note += " It is git-versioned, so it needs its own confirmation.";
-  if (entry.link) note += " It removes the junction only, never its target.";
+  if (entry.link) note += ` It removes the ${linkName(entry.link)} only, never its target.`;
   return note;
+}
+
+/** A Linked Entry's kind of link, as its tag and the note of its Remove name it. */
+export function linkName(link: Link): string {
+  return link.kind === "junction" ? "junction" : "symlink";
 }
 
 /** The Item of another Agent home that holds the Entry at `locator`, when that home is listed. */

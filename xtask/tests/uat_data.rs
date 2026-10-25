@@ -13,6 +13,11 @@ fn script() -> PathBuf {
 
 /// The script run with `-Root root`, and `-Reset` when `reset` is set.
 fn setup(root: &Path, reset: bool) -> Output {
+    setup_with(root, reset, &[])
+}
+
+/// The script run as [`setup`] runs it, with the switches `more` too.
+fn setup_with(root: &Path, reset: bool, more: &[&str]) -> Output {
     let mut command = Command::new("powershell");
     command
         .args([
@@ -28,6 +33,7 @@ fn setup(root: &Path, reset: bool) -> Output {
     if reset {
         command.arg("-Reset");
     }
+    command.args(more);
     command.output().expect("Windows PowerShell runs")
 }
 
@@ -88,4 +94,30 @@ fn reset_creates_the_test_data_again() {
         root.join("claude-desktop-home/claude_desktop_config.json")
             .is_file()
     );
+}
+
+#[test]
+fn symlink_adds_a_skill_behind_a_relative_folder_symlink_and_reset_keeps_working() {
+    let temp = tempfile::tempdir().unwrap();
+    let probe = temp.path().join("probe");
+    if let Err(error) = std::os::windows::fs::symlink_dir(".", &probe) {
+        eprintln!("skipped: this machine cannot create symlinks: {error}");
+        return;
+    }
+    let root = temp.path().join("cd-throwaway");
+
+    let output = setup_with(&root, false, &["-Symlink"]);
+
+    assert!(output.status.success(), "{}", stderr(&output));
+    let link = root.join(r"claude-code-home\.claude\skills\cd-throwaway-linked-skill");
+    assert_eq!(
+        std::fs::read_link(&link).unwrap(),
+        Path::new(r"..\..\..\linked\cd-throwaway-linked-skill")
+    );
+    assert!(link.join("SKILL.md").is_file());
+
+    let again = setup_with(&root, true, &["-Symlink"]);
+
+    assert!(again.status.success(), "{}", stderr(&again));
+    assert!(link.join("SKILL.md").is_file());
 }

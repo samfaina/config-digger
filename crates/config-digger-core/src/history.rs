@@ -3,12 +3,13 @@
 //! JSON manifest with the edits, their inverses and the keys they depend on.
 
 use crate::api::{
-    Action, Backup, Change, Difference, EditSummary, Error, OperationDetail, OperationLocation,
-    OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation, Verify,
+    Action, Backup, Change, Difference, EditSummary, Error, LinkKind, OperationDetail,
+    OperationLocation, OperationStatus, OperationSummary, Outcome, Preview, RollbackLocation,
+    Verify,
 };
 use crate::definitions::Definitions;
 use crate::edit::{Dependency, Edit, Syntax};
-use crate::folders::{FolderOp, FolderSize};
+use crate::folders::{FolderOp, FolderSize, Link};
 use crate::ports::{Environment, HeldLock, Ports};
 use crate::store::Medium;
 use crate::{explain, paths, plan, scan};
@@ -224,16 +225,53 @@ pub(crate) enum FolderOpRecord {
     /// It moved the folder into its backup, under the name `backup`.
     MovedToBackup { backup: String },
     /// It removed the link, which pointed to `target`.
-    LinkRemoved { target: PathBuf },
+    LinkRemoved {
+        target: PathBuf,
+        #[serde(flatten)]
+        link: RecordedLink,
+    },
     /// It moved the folder back from `from`, in an earlier Operation's backup.
     MovedBack { from: PathBuf },
     /// It created the link to `target`.
-    LinkCreated { target: PathBuf },
+    LinkCreated {
+        target: PathBuf,
+        #[serde(flatten)]
+        link: RecordedLink,
+    },
     /// It moved the folder to `to`, in config-digger's parked-Entry store.
     Parked { to: PathBuf },
     /// It moved the folder back from `from`, in config-digger's parked-Entry
     /// store.
     Unparked { from: PathBuf },
+}
+
+/// The kind of a link a record names and its target as written (ADR 0008).
+/// A record written before them has neither, and names a junction to its
+/// target, which is absolute: what Undo created then.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct RecordedLink {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<LinkKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written: Option<PathBuf>,
+}
+
+impl RecordedLink {
+    fn of(link: &Link) -> Self {
+        Self {
+            link: Some(link.kind),
+            written: Some(link.written.clone()),
+        }
+    }
+
+    /// The link recorded, pointing to `target`.
+    pub fn with(&self, target: &Path) -> Link {
+        Link {
+            kind: self.link.unwrap_or(LinkKind::Junction),
+            written: self.written.clone().unwrap_or_else(|| target.to_path_buf()),
+            target: target.to_path_buf(),
+        }
+    }
 }
 
 impl FolderRecord {
@@ -244,12 +282,14 @@ impl FolderRecord {
             FolderOp::MoveToBackup => FolderOpRecord::MovedToBackup {
                 backup: backup.to_owned(),
             },
-            FolderOp::RemoveLink { target } => FolderOpRecord::LinkRemoved {
-                target: target.clone(),
+            FolderOp::RemoveLink { link, .. } => FolderOpRecord::LinkRemoved {
+                target: link.target.clone(),
+                link: RecordedLink::of(link),
             },
             FolderOp::MoveBack { from } => FolderOpRecord::MovedBack { from: from.clone() },
-            FolderOp::CreateLink { target } => FolderOpRecord::LinkCreated {
-                target: target.clone(),
+            FolderOp::CreateLink { link, .. } => FolderOpRecord::LinkCreated {
+                target: link.target.clone(),
+                link: RecordedLink::of(link),
             },
             FolderOp::Park { to } => FolderOpRecord::Parked { to: to.clone() },
             FolderOp::Unpark { from } => FolderOpRecord::Unparked { from: from.clone() },

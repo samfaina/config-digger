@@ -2,7 +2,7 @@
 //! an immutable snapshot of Projects, Entries and Read failures. Nothing here
 //! decides a State.
 
-use crate::api::{ReadFailureKind, StrandedReason};
+use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, EnvMap, FindsBy,
     Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect, JsonFormat,
@@ -894,8 +894,11 @@ impl ScannedEntry {
 /// Where the link or junction at a Linked Entry's location points.
 #[derive(Clone)]
 pub(crate) struct ScannedLink {
-    /// The path the link holds, made absolute: what Remove checks it still
-    /// points to, and Undo points it to again.
+    pub kind: LinkKind,
+    /// The path the link holds, as written: what Remove checks it still
+    /// holds, and Undo writes in it again.
+    pub written: PathBuf,
+    /// The path the link holds, made absolute.
     pub target: PathBuf,
     /// The real path the link leads to, through any further links; `None`
     /// when the target is gone, so the Agent reads nothing there.
@@ -903,8 +906,34 @@ pub(crate) struct ScannedLink {
 }
 
 impl ScannedLink {
+    /// The link at `path`, `None` when it is no link, with the real path
+    /// `real` resolves.
+    fn at(
+        fs: &dyn FileSystem,
+        path: &Path,
+        real: impl FnOnce() -> Option<PathBuf>,
+    ) -> Option<Self> {
+        let written = fs.written_link(path)?;
+        let target = fs.link_target(path)?;
+        Some(Self {
+            kind: written.kind,
+            written: written.target,
+            target: paths::lexical(&target),
+            real: real(),
+        })
+    }
+
     pub fn broken(&self) -> bool {
         self.real.is_none()
+    }
+
+    /// The link as Remove takes it away.
+    pub fn link(&self) -> folders::Link {
+        folders::Link {
+            kind: self.kind,
+            written: self.written.clone(),
+            target: self.target.clone(),
+        }
     }
 }
 
@@ -4097,7 +4126,7 @@ impl Scanner<'_> {
                 }
                 // A link whose target is gone is still an Entry, which
                 // only Remove takes away.
-                if let Some(target) = fs.link_target(&child)
+                if let Some(link) = ScannedLink::at(fs, &child, || None)
                     && !fs.exists(&child)
                 {
                     self.entries.push(ScannedEntry {
@@ -4112,10 +4141,7 @@ impl Scanner<'_> {
                         masked: Vec::new(),
                         depth,
                         defect: None,
-                        link: Some(ScannedLink {
-                            target: paths::lexical(&target),
-                            real: None,
-                        }),
+                        link: Some(link),
                         manager: None,
                         plugin: None,
                         switch_id: None,
@@ -4161,9 +4187,8 @@ impl Scanner<'_> {
         let read = read_skill(format, skill.name, text);
         tracing::debug!(location = %location.id, skill = %read.name, "read skill");
         // A link at the skill's own location is an Entry apart from its target.
-        let link = fs.link_target(skill.folder).map(|target| ScannedLink {
-            target: paths::lexical(&target),
-            real: fs.real_path(skill.folder).map(|real| paths::lexical(&real)),
+        let link = ScannedLink::at(fs, skill.folder, || {
+            fs.real_path(skill.folder).map(|real| paths::lexical(&real))
         });
         self.entries.push(ScannedEntry {
             agent_index: home.agent_index,

@@ -400,13 +400,22 @@ describe("entry actions", () => {
 
   test("note when Remove reaches clones or removes a link only", () => {
     const actions = entryActions(
-      entry({ git_versioned: true, link: { target: String.raw`C:\skills\x`, broken: false } }),
+      entry({ git_versioned: true, link: { target: String.raw`C:\skills\x`, kind: "junction", broken: false } }),
       "Claude Code",
     );
 
     expect(actions.remove.note).toBe(
       "Remove reaches Claude Code. It is git-versioned, so it needs its own confirmation. It removes the junction only, never its target.",
     );
+  });
+
+  test("note of Remove names a symlink as a symlink", () => {
+    const actions = entryActions(
+      entry({ link: { target: String.raw`C:\skills\x`, kind: "folder_symlink", broken: false } }),
+      "Claude Code",
+    );
+
+    expect(actions.remove.note).toBe("Remove reaches Claude Code. It removes the symlink only, never its target.");
   });
 
   test("offer Enable for a Disabled Entry, or say why not", () => {

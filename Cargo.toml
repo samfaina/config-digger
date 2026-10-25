@@ -23,6 +23,10 @@ jsonc-parser = { version = "=0.34.0", features = ["cst", "serde", "serde_json"] 
 # The UAT plan's check against its JSON Schema. No remote references, so no
 # HTTP client.
 jsonschema = { version = "0.59", default-features = false }
+# Tells a junction from a folder symlink, and creates one, on Windows: the
+# standard library does neither, and the unsafe code it takes stays in the
+# crate (ADR 0008).
+junction = "2.1"
 # The release verifies the updater's signature as `tauri-plugin-updater`
 # does.
 minisign-verify = "0.2"

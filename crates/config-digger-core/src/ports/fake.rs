@@ -2,8 +2,9 @@
 
 use super::{
     Clock, Environment, FileSystem, GitIndex, HeldLock, Hive, Ports, Processes, RegistryData,
-    RunningProcess,
+    RunningProcess, WrittenLink,
 };
+use crate::api::LinkKind;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -41,8 +42,16 @@ struct FakeFiles {
     /// Keyed by the path as spelled on disk.
     files: BTreeMap<PathBuf, Vec<u8>>,
     folders: BTreeSet<PathBuf>,
-    /// Link or junction → target.
-    links: Vec<(PathBuf, PathBuf)>,
+    links: Vec<FakeLink>,
+    /// Symlinks cannot be created, as on Windows without Developer Mode or
+    /// admin rights.
+    no_symlinks: bool,
+    /// A symlink created through this file system comes out a junction to
+    /// its target made absolute.
+    junctions_for_created_symlinks: bool,
+    /// A link created through this file system holds its target made
+    /// absolute.
+    absolute_created_links: bool,
     /// The lowercased paths of the files locked through this file system.
     locked: BTreeSet<String>,
     /// The lowercased paths of the files someone else holds a lock on.
@@ -68,6 +77,28 @@ struct FakeFiles {
     /// How many times each file was read, whole or in part, by its
     /// lowercased path.
     reads: BTreeMap<String, usize>,
+}
+
+/// A link or junction.
+#[derive(Debug)]
+struct FakeLink {
+    at: PathBuf,
+    kind: LinkKind,
+    /// Its target as written: relative to the folder the link is in, or
+    /// absolute.
+    written: PathBuf,
+}
+
+impl FakeLink {
+    /// Its target, made absolute.
+    fn target(&self) -> PathBuf {
+        match self.at.parent() {
+            Some(parent) if self.written.is_relative() => {
+                crate::paths::lexical(&parent.join(&self.written))
+            }
+            _ => self.written.clone(),
+        }
+    }
 }
 
 impl FakeFileSystem {
@@ -151,9 +182,53 @@ impl FakeFileSystem {
         self
     }
 
-    /// A link or junction at `link` that points to the folder `target`.
+    /// A junction at `link` that points to the folder `target`.
     pub fn with_link(self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
-        self.files().links.push((link.into(), target.into()));
+        self.with_link_of(LinkKind::Junction, link, target)
+    }
+
+    /// A symlink at `link` to the folder `target`, as written: relative to
+    /// the folder `link` is in, or absolute.
+    pub fn with_symlink(self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
+        self.with_link_of(LinkKind::FolderSymlink, link, target)
+    }
+
+    /// A symlink at `link` to the file `target`, as written.
+    pub fn with_file_symlink(self, link: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
+        self.with_link_of(LinkKind::FileSymlink, link, target)
+    }
+
+    fn with_link_of(
+        self,
+        kind: LinkKind,
+        link: impl Into<PathBuf>,
+        target: impl Into<PathBuf>,
+    ) -> Self {
+        self.files().links.push(FakeLink {
+            at: link.into(),
+            kind,
+            written: target.into(),
+        });
+        self
+    }
+
+    /// Symlinks cannot be created, as on Windows without Developer Mode or
+    /// admin rights.
+    pub fn without_symlinks(self) -> Self {
+        self.files().no_symlinks = true;
+        self
+    }
+
+    /// Each symlink the core creates comes out a junction to its target
+    /// made absolute.
+    pub fn creating_junctions_for_symlinks(self) -> Self {
+        self.files().junctions_for_created_symlinks = true;
+        self
+    }
+
+    /// Each link the core creates holds its target made absolute.
+    pub fn creating_links_with_absolute_targets(self) -> Self {
+        self.files().absolute_created_links = true;
         self
     }
 
@@ -270,11 +345,11 @@ impl FakeFiles {
         let mut path = path.to_path_buf();
         // A loop of links would never end.
         for _ in 0..32 {
-            let Some(followed) = self.links.iter().find_map(|(link, target)| {
-                let rest = strip_prefix(&path, link)?;
+            let Some(followed) = self.links.iter().find_map(|link| {
+                let rest = strip_prefix(&path, &link.at)?;
                 Some(
                     rest.iter()
-                        .fold(target.clone(), |path, part| path.join(part)),
+                        .fold(link.target(), |path, part| path.join(part)),
                 )
             }) else {
                 break;
@@ -291,7 +366,7 @@ impl FakeFiles {
         let at = self.follow(parent).join(name);
         self.links
             .iter()
-            .position(|(link, _)| strip_prefix(&at, link).is_some_and(|rest| rest.is_empty()))
+            .position(|link| strip_prefix(&at, &link.at).is_some_and(|rest| rest.is_empty()))
     }
 
     /// `path` with its parent folders followed and not itself, in a folder
@@ -475,9 +550,16 @@ impl FileSystem for FakeFileSystem {
     fn link_target(&self, path: &Path) -> Option<PathBuf> {
         self.count_access();
         let files = self.files();
-        files
-            .link_at(path)
-            .map(|index| files.links[index].1.clone())
+        files.link_at(path).map(|index| files.links[index].target())
+    }
+
+    fn written_link(&self, path: &Path) -> Option<WrittenLink> {
+        self.count_access();
+        let files = self.files();
+        files.link_at(path).map(|index| WrittenLink {
+            kind: files.links[index].kind,
+            target: files.links[index].written.clone(),
+        })
     }
 
     fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
@@ -491,7 +573,7 @@ impl FileSystem for FakeFileSystem {
             return Err(io::ErrorKind::NotFound.into());
         }
         let mut children: Vec<PathBuf> = Vec::new();
-        let links = files.links.iter().map(|(link, _)| link);
+        let links = files.links.iter().map(|link| &link.at);
         for known in files.files.keys().chain(&files.folders).chain(links) {
             let Some(rest) = strip_prefix(known, &followed) else {
                 continue;
@@ -560,15 +642,35 @@ impl FileSystem for FakeFileSystem {
         }
     }
 
-    fn create_link(&self, link: &Path, target: &Path) -> io::Result<()> {
+    fn create_link(&self, link: &Path, kind: LinkKind, target: &Path) -> io::Result<()> {
         self.count_access();
         let mut files = self.files();
         let at = files.unfollowed(link)?;
         if files.link_at(link).is_some() || files.real_path(&at).is_some() {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
-        files.links.push((at, target.to_path_buf()));
+        if kind.is_symlink() && files.no_symlinks {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "a symlink takes Developer Mode or admin rights",
+            ));
+        }
+        let junction = kind.is_symlink() && files.junctions_for_created_symlinks;
+        let mut created = FakeLink {
+            at,
+            kind: if junction { LinkKind::Junction } else { kind },
+            written: target.to_path_buf(),
+        };
+        if junction || files.absolute_created_links {
+            created.written = created.target();
+        }
+        files.links.push(created);
         Ok(())
+    }
+
+    fn can_create_symlinks(&self, _: &Path) -> bool {
+        self.count_access();
+        !self.files().no_symlinks
     }
 
     fn move_folder(&self, from: &Path, to: &Path) -> io::Result<()> {
@@ -589,7 +691,7 @@ impl FileSystem for FakeFileSystem {
             || files
                 .links
                 .iter()
-                .any(|(link, _)| strip_prefix(link, &to).is_some_and(|rest| rest.is_empty()))
+                .any(|link| strip_prefix(&link.at, &to).is_some_and(|rest| rest.is_empty()))
         {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
@@ -614,9 +716,9 @@ impl FileSystem for FakeFileSystem {
             .into_iter()
             .map(|path| moved(&path).unwrap_or(path))
             .collect();
-        for (link, _) in &mut files.links {
-            if let Some(path) = moved(link) {
-                *link = path;
+        for link in &mut files.links {
+            if let Some(path) = moved(&link.at) {
+                link.at = path;
             }
         }
         // The folder it leaves stays, as on a disk.

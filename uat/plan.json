@@ -1933,6 +1933,53 @@
             "Tras Clear filter, el título vuelve a «N Operations»."
           ],
           "covers": ["#228"]
+        },
+        {
+          "id": "11.12",
+          "title": "Remove y Undo de un symlink relativo",
+          "goal": "El Undo de un Remove crea otra vez el symlink relativo tal como era, no un junction a una ruta absoluta.",
+          "instructions": [
+            "Si la orden de preparación dice «Cannot create the symlink», marca el paso como Blocked: este PC no tiene el Modo de desarrollador.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-home.",
+            "En la lista Items, elige cd-throwaway-linked-skill.",
+            "Mira la tarjeta de la Entry.",
+            "Pulsa Remove.",
+            "En la sección Files · 1, abre la carpeta.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Remove.",
+            "Pulsa Done.",
+            "Ve a History y elige la fila de arriba, «Remove 1 Entry».",
+            "Pulsa Undo.",
+            "En la sección Files · 1, abre la carpeta.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
+            "Ejecuta la orden, que muestra el tipo del enlace y su destino."
+          ],
+          "commands": [
+            {
+              "label": "Ver el tipo y el destino del enlace",
+              "shell": "powershell",
+              "text": "$link = Get-Item E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-linked-skill; $link.LinkType; $link.Target"
+            }
+          ],
+          "expect": [
+            "La tarjeta tiene la etiqueta «symlink → E:\\cd-throwaway\\linked\\cd-throwaway-linked-skill».",
+            "La nota bajo Remove dice «It removes the symlink only, never its target.».",
+            "La carpeta del Remove dice «Removes the folder symlink E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-linked-skill only; its target E:\\cd-throwaway\\linked\\cd-throwaway-linked-skill (1 file, …) stays as it is.».",
+            "El resultado del Remove dice «Removed 1 Entry. Operation <id>: verified.».",
+            "La carpeta del Undo dice «Creates the folder symlink E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-linked-skill to ..\\..\\..\\linked\\cd-throwaway-linked-skill again.».",
+            "El resultado del Undo dice «Undid <id>. Operation <id nuevo>: verified.».",
+            "La orden muestra primero «SymbolicLink».",
+            "La orden muestra después «..\\..\\..\\linked\\cd-throwaway-linked-skill», sin «E:\\»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba, con un symlink relativo",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Symlink"
+          },
+          "covers": ["#116"]
         }
       ]
     },

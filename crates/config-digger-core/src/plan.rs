@@ -4,15 +4,15 @@
 
 use crate::api::{
     self, Action, Block, Change, Context, DiffUnavailable, EditSummary, EffectiveChange, Error,
-    FileChange, FileDiff, Home, Info, InfoCode, Inventory, Leftovers, Preview, ReadFailure,
-    ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
+    FileChange, FileDiff, Home, Info, InfoCode, Inventory, Leftovers, LinkKind, Preview,
+    ReadFailure, ReadFailureKind, ScanOptions, State, StateAfter, Targets, Warning, WarningClass,
 };
 use crate::definitions::blocks::{Disables, Gate, StoreClass};
 use crate::definitions::{AgentDefinition, Definitions};
 use crate::disable::{self, Choice, ContextProject, Hit};
 use crate::edit::{Dependency, Edit, EditError, EditableFile, ReadOnly, Syntax};
 use crate::explain::Reached;
-use crate::folders::{self, FolderOp, PlannedFolder};
+use crate::folders::{self, ComesBack, FolderOp, Link, PlannedFolder};
 use crate::history::FolderOpRecord;
 use crate::mask::{self, Side};
 use crate::ports::Ports;
@@ -569,8 +569,7 @@ impl Targeted<'_> {
         let (op, size) = match &scanned.link {
             Some(link) => {
                 let size = folders::measure_target(fs, link.real.as_deref())?;
-                let target = link.target.clone();
-                (FolderOp::RemoveLink { target }, size)
+                (removed_link(self.ports, link.link()), size)
             }
             None => (FolderOp::MoveToBackup, folders::measure(fs, &entry.path)?),
         };
@@ -876,10 +875,9 @@ impl Targeted<'_> {
             let (kept, op, size) = match &entry.link {
                 Some(link) => {
                     let size = folders::measure_target(fs, link.real.as_deref())?;
-                    let target = link.target.clone();
                     (
-                        park::Kept::Link(target.clone()),
-                        FolderOp::RemoveLink { target },
+                        park::Kept::Link(link.target.clone()),
+                        removed_link(self.ports, link.link()),
                         size,
                     )
                 }
@@ -1025,8 +1023,12 @@ impl Targeted<'_> {
         let (op, size) = match (&parked.link, kept) {
             (Some(target), _) => {
                 let size = folders::measure_target(fs, fs.real_path(target).as_deref())?;
-                let target = target.clone();
-                (FolderOp::CreateLink { target }, size)
+                let link = Link::junction(target.clone());
+                let op = FolderOp::CreateLink {
+                    link,
+                    instead_of: None,
+                };
+                (op, size)
             }
             (None, Some(from)) if fs.exists(from) => {
                 let size = folders::measure(fs, from)?;
@@ -1688,6 +1690,22 @@ pub(crate) fn undo_files<'m>(
     Ok(files)
 }
 
+/// The removal of `link`, saying how its Undo would create it again.
+fn removed_link(ports: &Ports, link: Link) -> FolderOp {
+    let comes_back = comes_back(ports, link.kind);
+    FolderOp::RemoveLink { link, comes_back }
+}
+
+/// How the Undo of a removed link of `kind` would create it again: only a
+/// symlink asks whether symlinks can be created, which the file system
+/// finds in config-digger's data folder.
+fn comes_back(ports: &Ports, kind: LinkKind) -> ComesBack {
+    let symlinks = !kind.is_symlink()
+        || history::data_folder(ports.env.as_ref())
+            .is_ok_and(|data| ports.fs.can_create_symlinks(&data));
+    ComesBack::of(kind, symlinks)
+}
+
 /// The skill folders and links of an Operation, each with the inverse of
 /// what it did there, last first, or why its Undo is refused: something is
 /// at a location it emptied, its copy in the backup or the parked-Entry
@@ -1714,12 +1732,23 @@ pub(crate) fn undo_folders(
                 }
                 (FolderOp::MoveBack { from }, record.size)
             }
-            FolderOpRecord::LinkRemoved { target } => (
-                FolderOp::CreateLink {
-                    target: target.clone(),
-                },
-                record.size,
-            ),
+            FolderOpRecord::LinkRemoved { target, link } => {
+                let link = link.with(target);
+                let op = match comes_back(ports, link.kind) {
+                    ComesBack::AsItWas => FolderOp::CreateLink {
+                        link,
+                        instead_of: None,
+                    },
+                    ComesBack::AsJunction => FolderOp::CreateLink {
+                        link: Link::junction(link.target.clone()),
+                        instead_of: Some(link),
+                    },
+                    ComesBack::Not => {
+                        return Err(refused(explain::file_symlink_not_creatable(path)));
+                    }
+                };
+                (op, record.size)
+            }
             FolderOpRecord::MovedBack { .. } => {
                 if !folders::holds(fs, path, record.size) {
                     return Err(refused(format!(
@@ -1729,15 +1758,15 @@ pub(crate) fn undo_folders(
                 }
                 (FolderOp::MoveToBackup, record.size)
             }
-            FolderOpRecord::LinkCreated { target } => {
-                if !folders::links_to(fs, path, target) {
+            FolderOpRecord::LinkCreated { target, link } => {
+                let link = link.with(target);
+                if !folders::is_link(fs, path, &link) {
                     return Err(refused(format!(
                         "the link {} changed since the Operation",
                         path.display()
                     )));
                 }
-                let target = target.clone();
-                (FolderOp::RemoveLink { target }, record.size)
+                (removed_link(ports, link), record.size)
             }
             FolderOpRecord::Parked { to } => {
                 if !fs.exists(to) {
