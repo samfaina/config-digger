@@ -160,7 +160,7 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # makes a synced plugin's servers and skills rank below an installed
 # plugin's, so each of them that an installed plugin of its name also
 # carries is Shadowed; one only the synced plugin carries stays Effective
-# (#113).
+# (#354).
 [[plugins]]
 id = "synced"
 unverified = [
