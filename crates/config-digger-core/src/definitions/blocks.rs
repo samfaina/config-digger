@@ -5031,7 +5031,7 @@ impl Disables for JsonNameList {
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
-        if let Some(plain) = value.filter(|value| self.plain_string_name && value.is_string()) {
+        if let Some(plain) = self.plain(value) {
             return vec![Edit::Set {
                 key_path,
                 value: Value::Array(vec![plain.clone(), Value::from(name)]),
@@ -5052,7 +5052,7 @@ impl Disables for JsonNameList {
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
-        if value.is_some_and(Value::is_string) {
+        if self.plain(value).is_some() {
             return match self.held(value, name).next() {
                 Some(_) => vec![Edit::Remove { key_path }],
                 None => Vec::new(),
@@ -5073,13 +5073,17 @@ fn offered() -> bool {
 }
 
 impl JsonNameList {
+    /// `value`, when the Agent reads it as a list written as one
+    /// plain-string name.
+    fn plain<'v>(&self, value: Option<&'v Value>) -> Option<&'v Value> {
+        value.filter(|value| self.plain_string_name && plain_string_name(value).is_some())
+    }
+
     /// The items of the list `value` that hold `name`, as the Agent
     /// compares names.
     fn held<'v>(&self, value: Option<&'v Value>, name: &str) -> impl Iterator<Item = &'v Value> {
-        let plain =
-            value.filter(|value| self.plain_string_name && plain_string_name(value).is_some());
         let names = value.and_then(Value::as_array).into_iter().flatten();
-        names.chain(plain).filter(move |item| {
+        names.chain(self.plain(value)).filter(move |item| {
             item.as_str().is_some_and(|held| {
                 if self.ignore_case {
                     held.to_lowercase() == name.to_lowercase()
@@ -6045,19 +6049,9 @@ impl SettingPlace {
             Box::new(JsonFormat::of(self.dialect))
         }
     }
-}
 
-impl Validate for SettingPlace {
-    fn validate(&self) -> Result<(), String> {
-        if self.plain_string_name {
-            return Err("plain_string_name is read only on an approval-list gate's sources".into());
-        }
-        self.validate_place()
-    }
-}
-
-impl SettingPlace {
-    /// Checks it, whatever reads it, `plain_string_name` aside.
+    /// Checks it as `validate` does, but lets `plain_string_name` through:
+    /// an approval-list gate's sources are the one setting that reads it.
     fn validate_place(&self) -> Result<(), String> {
         self.anchor.validate()?;
         if self.toml && (self.sqlite || self.dialect.is_some()) {
@@ -6135,6 +6129,15 @@ impl SettingPlace {
             }
         }
         Ok(())
+    }
+}
+
+impl Validate for SettingPlace {
+    fn validate(&self) -> Result<(), String> {
+        if self.plain_string_name {
+            return Err("plain_string_name is read only on an approval-list gate's sources".into());
+        }
+        self.validate_place()
     }
 }
 
@@ -6598,13 +6601,19 @@ impl Validate for GlobalSwitch {
 
 /// A rule or gate reads at least one source.
 fn validate_sources(sources: &[SettingPlace]) -> Result<(), String> {
+    validate_sources_by(sources, SettingPlace::validate)
+}
+
+/// Checks that there are `sources`, each by `check`.
+fn validate_sources_by(
+    sources: &[SettingPlace],
+    check: impl Fn(&SettingPlace) -> Result<(), String>,
+) -> Result<(), String> {
     if sources.is_empty() {
         return Err("sources needs at least one setting".into());
     }
     for (index, source) in sources.iter().enumerate() {
-        source
-            .validate()
-            .map_err(|e| format!("sources[{index}]: {e}"))?;
+        check(source).map_err(|e| format!("sources[{index}]: {e}"))?;
     }
     Ok(())
 }
@@ -7169,14 +7178,7 @@ impl Validate for ApprovalList {
         if self.locations.is_empty() {
             return Err("an approval list needs locations".into());
         }
-        if self.sources.is_empty() {
-            return Err("sources needs at least one setting".into());
-        }
-        for (index, source) in self.sources.iter().enumerate() {
-            source
-                .validate_place()
-                .map_err(|e| format!("sources[{index}]: {e}"))?;
-        }
+        validate_sources_by(&self.sources, SettingPlace::validate_place)?;
         if self.sources.iter().any(|source| source.policy) {
             return Err("an approval is no policy".into());
         }

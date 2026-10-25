@@ -264,3 +264,27 @@ fn enable_of_the_name_a_plain_string_holds_deletes_the_key_and_undo_puts_it_back
         PLAIN_A
     );
 }
+
+#[test]
+fn disable_over_a_plain_string_with_any_other_character_is_refused_and_writes_nothing() {
+    let local =
+        "{\n  \"permissions\": { \"allow\": [] },\n  \"disabledMcpjsonServers\": \"a b\"\n}\n";
+    let fs = unrecorded_home(local);
+    let core = core(&fs);
+    let snapshot = core.scan(&scan_petme()).unwrap();
+    let targets = Targets {
+        selectors: vec![format!("{}#mcpServers.b", mcp_json().display())],
+        all: false,
+    };
+
+    let error = core
+        .plan(&snapshot, &in_petme(), Action::Disable, &targets)
+        .err()
+        .expect("a string that names nothing is no list to add to");
+
+    assert!(error.message.contains("is not a list"), "{}", error.message);
+    assert_eq!(
+        String::from_utf8(fs.contents(settings_local()).unwrap()).unwrap(),
+        local
+    );
+}

@@ -1542,8 +1542,10 @@
             "Elige el home E:\\cd-throwaway\\claude-code-home.",
             "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project-plain.",
             "Busca cd-throwaway-plain en la lista Items.",
-            "Abre el Item cd-throwaway-plain-off y lee la razón de su Entry.",
-            "Abre el Item cd-throwaway-plain-other y lee la razón de su Entry."
+            "Abre el Item cd-throwaway-plain-off.",
+            "Lee la razón de su Entry.",
+            "Abre el Item cd-throwaway-plain-other.",
+            "Lee la razón de su Entry."
           ],
           "commands": [],
           "expect": [
@@ -1574,7 +1576,8 @@
             "Ejecuta en PowerShell la orden «Ver settings.local.json».",
             "Pulsa Undo.",
             "Si hay casillas de aviso, márcalas.",
-            "Pulsa Undo y luego Done.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
             "Ejecuta la orden «Ver settings.local.json» otra vez.",
             "Abre el Item cd-throwaway-plain-off.",
             "Pulsa Enable.",
@@ -1583,9 +1586,11 @@
             "Ejecuta la orden «Ver settings.local.json» otra vez.",
             "Pulsa Undo.",
             "Si hay casillas de aviso, márcalas.",
-            "Pulsa Undo y luego Done.",
+            "Pulsa Undo.",
+            "Pulsa Done.",
             "Ejecuta la orden «Ver settings.local.json» una última vez.",
-            "Ve a Projects & homes y pulsa Remove from list en la fila de E:\\cd-throwaway\\project-plain."
+            "Ve a Projects & homes.",
+            "Pulsa Remove from list en la fila de E:\\cd-throwaway\\project-plain."
           ],
           "commands": [
             {
