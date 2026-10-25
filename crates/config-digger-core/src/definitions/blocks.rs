@@ -2637,6 +2637,20 @@ impl Format {
             | Format::SqliteJson(_) => None,
         }
     }
+
+    /// Whether any skill folder of the format, a manifest's one skill
+    /// included, reads names under a name rule.
+    pub fn name_ruled(&self) -> bool {
+        let one_skill = if let Format::ManifestSkills(block) = self {
+            block.one_skill.as_ref()
+        } else {
+            None
+        };
+        self.skill_folder()
+            .into_iter()
+            .chain(one_skill)
+            .any(|folder| folder.name_rule.is_some())
+    }
 }
 
 /// The skills a plugin's manifest declares in a field,
@@ -2907,6 +2921,11 @@ pub(crate) struct SkillFolder {
     pub name_from: NameFrom,
     /// How the Agent rewrites a name into the one it uses, if it does.
     pub sanitize: Option<Sanitize>,
+    /// The rule a skill's folder name and frontmatter `name` must keep, if
+    /// the Agent has one: a skill whose folder name breaks it is skipped,
+    /// and a `name` that breaks it counts as no `name`. The location's
+    /// `name_rule_when` says when the Agent applies it.
+    pub name_rule: Option<NameRule>,
     /// Folder names the Agent never loads a skill from, compared
     /// case-insensitively, such as a name it keeps for itself.
     #[serde(default)]
@@ -2974,6 +2993,36 @@ pub(crate) enum Sanitize {
     PathChars,
 }
 
+/// A rule an Agent's skill names must keep.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum NameRule {
+    /// Names without hidden, direction-changing or blank-like characters,
+    /// as Claude Code names a skill since 2.1.299. A folder name keeps it
+    /// with no space at either end or next to a `:`, no `:` at either end,
+    /// no two spaces in a row, no `<` or `>`, and at most 256 UTF-16 code
+    /// units. A frontmatter `name` keeps it with letters, marks, digits,
+    /// `_`, `:`, `.` and `-` alone, no character the folder name may not
+    /// hold, and at most 256 UTF-16 code units.
+    VisibleChars,
+}
+
+impl NameRule {
+    /// Whether the folder name `folder` keeps the rule.
+    pub fn takes_folder(self, folder: &str) -> bool {
+        match self {
+            NameRule::VisibleChars => crate::name_rule::takes_folder_name(folder),
+        }
+    }
+
+    /// Whether the frontmatter `name` keeps the rule.
+    pub fn takes_name(self, name: &str) -> bool {
+        match self {
+            NameRule::VisibleChars => crate::name_rule::takes_frontmatter_name(name),
+        }
+    }
+}
+
 /// What an Agent does with a skill whose `SKILL.md` it cannot fully read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -2996,6 +3045,11 @@ pub(crate) enum SkillDefect {
     NoName,
     /// Its folder has a name the Agent keeps for itself.
     Reserved,
+    /// Its folder's name breaks the Agent's name rule.
+    FolderName(NameRule),
+    /// Its frontmatter's `name` breaks the Agent's name rule, so that the
+    /// Agent reads it as a frontmatter without a `name`.
+    RefusedName(NameRule),
 }
 
 /// What a skill folder's `depth` is when a definition leaves it out.
@@ -3031,7 +3085,8 @@ impl SkillFolder {
             SkillDefect::NoFrontmatter => self.no_frontmatter,
             SkillDefect::MalformedFrontmatter => self.malformed_frontmatter,
             SkillDefect::NoName => self.no_name,
-            SkillDefect::Reserved => SkillFallback::Skip,
+            SkillDefect::Reserved | SkillDefect::FolderName(_) => SkillFallback::Skip,
+            SkillDefect::RefusedName(_) => self.no_name,
         }
     }
 

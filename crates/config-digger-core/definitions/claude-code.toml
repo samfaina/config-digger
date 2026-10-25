@@ -622,7 +622,8 @@ sources = [
 [[locations]]
 id = "managed-skills"
 anchor = { block = "machine", path = "%ProgramFiles%/ClaudeCode/.claude/skills" }
-format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
+name_rule_when = { gate = "tengu_slate_wicket" }
 kind = "skill"
 scope = "managed"
 provenance = "managed"
@@ -632,7 +633,8 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-skills"
 anchor = { block = "home", root = "skills" }
-format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
+name_rule_when = { gate = "tengu_slate_wicket" }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -645,7 +647,8 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-skills"
 anchor = { block = "project", path = ".claude/skills", walk = "up-to-repo-root" }
-format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
+name_rule_when = { gate = "tengu_slate_wicket" }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -665,9 +668,13 @@ on_read_failure = "ignores_file"
 # at the plugin's root, with no `skills` folder or field, is not read.
 [[locations]]
 id = "plugin-skills"
-unverified = "A folder the manifest's `skills` declares that holds a `SKILL.md` is taken to be one skill named by its frontmatter `name`, as Claude Code's code names it."
+unverified = [
+  "A folder the manifest's `skills` declares that holds a `SKILL.md` is taken to be one skill named by its frontmatter `name`, as Claude Code's code names it.",
+  "The name rule is taken to apply to a plugin's skills as it does to local ones: a folder name that breaks it skips the skill, and a frontmatter `name` that breaks it counts as no `name`.",
+]
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
-format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
+name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
 kind = "skill"
 scope = "plugin"
@@ -679,8 +686,10 @@ on_read_failure = "ignores_file"
 # Scope.
 [[locations]]
 id = "synced-plugin-skills"
+unverified = "The name rule is taken to apply to a synced plugin's skills as it does to an installed plugin's."
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
-format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
+name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
 kind = "skill"
 scope = "user"
@@ -704,8 +713,10 @@ on_read_failure = "ignores_file"
 # know how Claude Code is signed in (#308). Tested with a Max account.
 [[locations]]
 id = "synced-skills"
+unverified = "The name rule is taken to apply to a synced skill's folder name as it does to a local skill's."
 anchor = { block = "home", root = "skills", path = "synced" }
-format = { block = "skill-folder", depth = 2, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", depth = 2, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
+name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "anthropic-skills:{name}"
 kind = "skill"
 scope = "user"
@@ -719,15 +730,29 @@ on_read_failure = "ignores_file"
 # no local skill takes it [test]. Claude Code skips a skill it cannot
 # load before they compete. Names are used as written, capitals and `_`
 # included [test]. Since 2.1.299 a name rule applies, behind the gate
-# `tengu_slate_wicket`, on by default [docs, binary]. It skips a skill whose
-# folder name starts or ends with a space, or holds a hidden,
-# direction-changing or blank-like character, but takes a space inside it
-# [test]. It refuses a frontmatter `name` as an alias when it holds any
-# blank, `/`, `<` or `>`, a hidden or direction-changing character, or is
-# over 256 characters, and takes capitals, `_`, `.`, `:` anywhere and
-# letters outside ASCII [test]. config-digger does not check the rule yet
-# (#171).
+# `tengu_slate_wicket`, on by default [docs, binary]: `visible-chars`, on
+# every skill location. It skips a skill whose folder name starts or ends
+# with a space, or holds a hidden, direction-changing or blank-like
+# character, but takes a space inside it, `.`, capitals and letters outside
+# ASCII [test]. It refuses a frontmatter `name` as an alias when it holds
+# any blank, `/`, `<` or `>`, a hidden or direction-changing character, or
+# is over 256 characters, and takes 256 characters, capitals, `_`, `.`, `:`
+# anywhere and letters outside ASCII [test]: a location that names a skill
+# by its frontmatter then names it by its folder. The full classes are the
+# 2.1.302 binary's: a folder name may not hold a control character, a
+# format, private-use, unassigned or default-ignorable character, U+2800, a
+# space separator other than the space, U+FFFC, two spaces in a row, a mark
+# no letter carries, `<` or `>`, nor have a space at either end or next to a
+# `:` or a `:` at either end; a frontmatter `name` holds letters, marks,
+# digits, `_`, `:`, `.` and `-` alone, and none of those; both count at most
+# 256 UTF-16 code units, as JavaScript's `length` does [binary]. The marks
+# say which of these were tested.
 [items.skill]
+unverified = [
+  "The name rule's classes are taken from the 2.1.302 binary beyond what was tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E, U+00A0 and the length of an ASCII `name` in a frontmatter `name`.",
+  "`<` and `>` in a folder name, which a Windows folder name cannot hold, are taken to break the name rule, as the binary says.",
+  "Claude Code keeps a joiner or a variation selector inside an emoji sequence on Unicode's recommended list; config-digger takes any well-formed emoji sequence for one.",
+]
 precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
 competition = { block = "exact-name" }
 checks = ["frontmatter", "disable", "precedence", "rules"]
@@ -933,6 +958,39 @@ name = "tengu_claudeai_plugins_sync_enabled"
 unverified = "Claude Code is taken to read its synced plugins whatever the plugin sync gate holds, and to take the gate as off without a cached value, as it does with the skill sync gate."
 assumed = false
 affects = ["synced-plugin-manifest-mcp", "synced-plugin-mcp", "synced-plugin-skills"]
+lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
+
+[feature_gates.bypass]
+block = "env"
+variables = [
+  { name = "DISABLE_GROWTHBOOK", values = "truthy" },
+  { name = "DISABLE_TELEMETRY", values = "non-empty" },
+  { name = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", values = "non-empty" },
+  { name = "DO_NOT_TRACK", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_BEDROCK", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_MANTLE", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_ANTHROPIC_AWS", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_VERTEX", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+  { name = "CLAUDE_CODE_USE_FOUNDRY", values = "truthy", unless = ["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] },
+]
+env_maps = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["env"], every_source = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["env"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["env"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["env"] },
+]
+
+# This gate turns the 2.1.299 skill name rule on: Claude Code applies the
+# rule while it is on, and without a value, whose default is on [binary].
+# It is absent from the cache of the Max account tested [disk]. While it is
+# cached off, Claude Code applies a looser check, which config-digger does
+# not model: no rule applies. It skips the cache under the same variables
+# as the other gates [docs], and then takes its default.
+[[feature_gates]]
+name = "tengu_slate_wicket"
+unverified = "While the gate is off, Claude Code applies a looser check that is not known; config-digger applies no name rule."
+assumed = true
+affects = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
 lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
 
 [feature_gates.bypass]

@@ -911,6 +911,9 @@ pub(crate) struct ScannedEntry {
     pub depth: usize,
     /// For a skill, why the Agent may not read its `SKILL.md` as written.
     pub defect: Option<SkillDefect>,
+    /// For a skill read under its location's name rule, its name and defect
+    /// while the rule does not apply, when they differ.
+    pub unruled: Option<Box<Unruled>>,
     /// For a Linked Entry, where its link points.
     pub link: Option<ScannedLink>,
     /// For a skill, the skill manager that installed it, as far as one's
@@ -936,6 +939,15 @@ pub(crate) struct ManagerMatch {
 }
 
 impl ScannedEntry {
+    /// Names the Entry, and its reading while its name rule does not
+    /// apply, with what `name` makes of the name each has.
+    pub fn rename(&mut self, name: impl Fn(&str) -> String) {
+        self.name = name(&self.name);
+        if let Some(unruled) = &mut self.unruled {
+            unruled.name = name(&unruled.name);
+        }
+    }
+
     /// The file `anchor` names for this Entry, as [`Anchor::path_for`]
     /// finds it, given the roots of its Agent home and the Project folder.
     pub fn file_of(
@@ -3745,6 +3757,7 @@ impl Scanner<'_> {
                 masked: masked.key_paths,
                 depth: 0,
                 defect: None,
+                unruled: None,
                 link: None,
                 manager: None,
                 plugin: None,
@@ -3810,6 +3823,7 @@ impl Scanner<'_> {
                     masked: Vec::new(),
                     depth,
                     defect: None,
+                    unruled: None,
                     link: None,
                     manager: None,
                     plugin: None,
@@ -3899,15 +3913,17 @@ impl Scanner<'_> {
             }
         }
         for entry in &mut self.entries[start..] {
-            entry.name = if location.one_entry {
-                plugin.name.clone()
-            } else {
-                let parts = NameParts {
-                    plugin: Some(&plugin.name),
-                    folder: None,
-                };
-                location.entry_name(&entry.name, &parts)
-            };
+            entry.rename(|name| {
+                if location.one_entry {
+                    plugin.name.clone()
+                } else {
+                    let parts = NameParts {
+                        plugin: Some(&plugin.name),
+                        folder: None,
+                    };
+                    location.entry_name(name, &parts)
+                }
+            });
             if let Some(root) = &location.plugin_root {
                 root.expand(&mut entry.config, &plugin.folder);
             }
@@ -4130,7 +4146,7 @@ impl Scanner<'_> {
     /// `name_template` of `location` makes of theirs and `parts`.
     fn name_entries(&mut self, start: usize, location: &LocationDefinition, parts: &NameParts) {
         for entry in &mut self.entries[start..] {
-            entry.name = location.entry_name(&entry.name, parts);
+            entry.rename(|name| location.entry_name(name, parts));
         }
     }
 
@@ -4254,6 +4270,7 @@ impl Scanner<'_> {
                     masked: Vec::new(),
                     depth,
                     defect: None,
+                    unruled: None,
                     link: None,
                     manager: None,
                     plugin: None,
@@ -4345,6 +4362,7 @@ impl Scanner<'_> {
                         masked: Vec::new(),
                         depth,
                         defect: None,
+                        unruled: None,
                         link: Some(link),
                         manager: None,
                         plugin: None,
@@ -4406,6 +4424,7 @@ impl Scanner<'_> {
             masked: Vec::new(),
             depth,
             defect: read.defect,
+            unruled: read.unruled,
             link,
             manager: None,
             plugin: None,
@@ -4604,13 +4623,25 @@ struct ReadSkill {
     config: serde_json::Value,
     /// Why the Agent may not read its `SKILL.md` as written.
     defect: Option<SkillDefect>,
+    /// How the Agent reads it while its name rule does not apply, when
+    /// that differs.
+    unruled: Option<Box<Unruled>>,
+}
+
+/// The name and defect of a skill as its Agent reads it while the name
+/// rule of its location does not apply.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Unruled {
+    pub name: String,
+    pub defect: Option<SkillDefect>,
 }
 
 /// The skill in the folder named `folder`, whose `SKILL.md` holds `text`,
-/// as an Agent that reads skill folders as `format` says reads it.
+/// as an Agent that reads skill folders as `format` says reads it, under
+/// its name rule.
 fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
     let mut config = serde_json::Map::new();
-    let mut defect = None;
+    let mut found = None;
     let mut named = None;
     match skill::frontmatter(text) {
         Ok(keys) => {
@@ -4621,23 +4652,49 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
             }
             named = keys.get("name").filter(|name| !name.is_empty()).cloned();
         }
-        Err(found) => defect = Some(found),
+        Err(defect) => found = Some(defect),
     }
-    let name = match (format.name_from, named) {
-        (NameFrom::Frontmatter, Some(name)) => name,
-        (NameFrom::Frontmatter, None) => {
-            defect.get_or_insert(SkillDefect::NoName);
-            folder.to_owned()
+    // `refused` is the defect of a `name` the rule refuses, which then
+    // counts as none, and `folder_breaks` that of a folder name it refuses.
+    let read = |named: Option<&String>, refused: Option<SkillDefect>, folder_breaks| {
+        let mut defect = found;
+        let name = match (format.name_from, named) {
+            (NameFrom::Frontmatter, Some(name)) => name.clone(),
+            (NameFrom::Frontmatter, None) => {
+                defect.get_or_insert(refused.unwrap_or(SkillDefect::NoName));
+                folder.to_owned()
+            }
+            (NameFrom::Folder, _) => folder.to_owned(),
+        };
+        if format.is_reserved(folder) {
+            defect = Some(SkillDefect::Reserved);
+        } else if let Some(breaks) = folder_breaks {
+            defect = Some(breaks);
         }
-        (NameFrom::Folder, _) => folder.to_owned(),
+        Unruled {
+            name: format.sanitize(&name),
+            defect,
+        }
     };
-    if format.is_reserved(folder) {
-        defect = Some(SkillDefect::Reserved);
-    }
+    let unruled = read(named.as_ref(), None, None);
+    let Some(rule) = format.name_rule else {
+        return ReadSkill {
+            name: unruled.name,
+            config: config.into(),
+            defect: unruled.defect,
+            unruled: None,
+        };
+    };
+    let kept = named.as_ref().filter(|name| rule.takes_name(name));
+    let refused = (named.is_some() && kept.is_none()).then_some(SkillDefect::RefusedName(rule));
+    let folder_breaks = (!rule.takes_folder(folder)).then_some(SkillDefect::FolderName(rule));
+    let ruled = read(kept, refused, folder_breaks);
+    let unruled = (ruled != unruled).then(|| Box::new(unruled));
     ReadSkill {
-        name: format.sanitize(&name),
+        name: ruled.name,
         config: config.into(),
-        defect,
+        defect: ruled.defect,
+        unruled,
     }
 }
 

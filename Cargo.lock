@@ -540,6 +540,7 @@ dependencies = [
  "ignore",
  "jsonc-parser",
  "junction",
+ "regex",
  "regex-lite",
  "rusqlite",
  "schemars 1.2.2",

@@ -7,7 +7,8 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, SettingIs, SkillDefect, UnseenServers,
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameRule, SettingIs, SkillDefect,
+    UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
@@ -1882,6 +1883,12 @@ fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
         }
         SkillDefect::NoName => "its SKILL.md frontmatter has no `name`".to_owned(),
         SkillDefect::Reserved => format!("{agent_name} keeps its folder's name for itself"),
+        SkillDefect::FolderName(NameRule::VisibleChars) => format!(
+            "its folder's name breaks {agent_name}'s name rule, which refuses a space at either end and hidden, direction-changing or blank-like characters, `<` and `>`"
+        ),
+        SkillDefect::RefusedName(NameRule::VisibleChars) => format!(
+            "its SKILL.md frontmatter `name` breaks {agent_name}'s name rule, which refuses blanks, `/`, `<`, `>`, hidden and direction-changing characters and names over 256 characters"
+        ),
     }
 }
 
