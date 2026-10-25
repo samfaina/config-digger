@@ -729,7 +729,8 @@ fn list_verbose_logs_one_scan_with_its_time_and_the_paths_it_checked() {
 }
 
 /// Checks that a run's log holds one scan, started at INFO and failed at
-/// WARN with its time, the paths it checked and the error the run reported.
+/// WARN with its time, the error the run reported and no path checked, as a
+/// scan that fails before it asks the git index about any path.
 fn assert_one_failed_scan(run: &Run) {
     assert_eq!(run.code, 1, "{}", run.stderr);
     let message = run.document()["error"]["message"]
@@ -750,10 +751,7 @@ fn assert_one_failed_scan(run: &Run) {
 #[test]
 fn list_verbose_logs_a_scan_that_cannot_read_the_user_list_as_failed() {
     let harness = Harness::new().with_file(".claude.json", CLAUDE_JSON);
-    let list = harness
-        .roaming_app_data()
-        .join("config-digger")
-        .join("homes-and-projects.json");
+    let list = harness.user_list_file();
     std::fs::create_dir_all(list.parent().unwrap()).unwrap();
     std::fs::write(&list, "{ not json").unwrap();
 
@@ -2475,13 +2473,16 @@ impl Harness {
         real_path(&folder)
     }
 
+    /// The file of the list of homes and Projects the user added or hid.
+    fn user_list_file(&self) -> PathBuf {
+        self.roaming_app_data()
+            .join("config-digger")
+            .join("homes-and-projects.json")
+    }
+
     /// The list of homes and Projects the user added or hid.
     fn user_list(&self) -> Value {
-        let file = self
-            .roaming_app_data()
-            .join("config-digger")
-            .join("homes-and-projects.json");
-        serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap()
+        serde_json::from_slice(&std::fs::read(self.user_list_file()).unwrap()).unwrap()
     }
 }
 

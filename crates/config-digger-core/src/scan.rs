@@ -1187,7 +1187,7 @@ fn timed_scan(
     let started = Instant::now();
     tracing::info!("scan started");
     let mut asks = GitAsks::default();
-    let read = read_as_if(
+    let result = read_as_if(
         definitions,
         ports,
         extra_projects,
@@ -1197,11 +1197,11 @@ fn timed_scan(
         &mut asks,
     );
     let elapsed_ms = started.elapsed().as_millis();
-    match &read {
+    match &result {
         Ok(_) => tracing::info!(elapsed_ms, paths = asks.paths, "scan finished"),
         Err(error) => tracing::warn!(elapsed_ms, paths = asks.paths, %error, "scan failed"),
     }
-    read
+    result
 }
 
 /// The scan of [`timed_scan`], with the Installations found again when
