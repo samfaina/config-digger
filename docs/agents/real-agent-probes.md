@@ -17,6 +17,8 @@ Each child ticket of #80 tests some of the definitions' `unverified` marks again
 4. Remove the mark. The fact then carries `[test]` in the definition: as the mark assumed (Confirmed), corrected (Corrected), or stated with a new ticket when the format or the core cannot express it yet (Ticket).
 5. Record the outcome in your Agent's table in `release-gate.md`, and take the mark out of "What is left".
 
+A Ticket outcome's new issue starts with the label `needs-triage`, not `ready-for-agent`: its "What to build" decides how config-digger shows what the Agent does, and the owner has not taken that decision yet. `/triage` moves it on. Its "Parent" is #80, and it names the probe check that found it, as #341 does.
+
 When every check passes on a version, it can join the definition's `verified` range. Each probe must pass on every version in the range.
 
 ## What cost time before
