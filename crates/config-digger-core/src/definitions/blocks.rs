@@ -1935,6 +1935,7 @@ pub(crate) struct PluginFolders {
     /// such as Claude Code's synced plugins in a folder per account.
     /// Folders above that depth whose name starts with `.` are not read.
     #[serde(default = "one_folder_down")]
+    #[schemars(range(min = 1))]
     pub depth: usize,
     /// A `/`-separated path relative to a plugin's folder, or several, any
     /// of which makes the folder a plugin's.

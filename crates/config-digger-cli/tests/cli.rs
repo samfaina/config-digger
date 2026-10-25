@@ -2610,7 +2610,16 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     assert_eq!(home["installations"][0]["version"], "2.1.310");
     assert_eq!(home["installations"][0]["out_of_range"], true);
     assert_eq!(home["last_ran"], "2.1.284");
-    assert_eq!(home["notes"][1]["code"], "version_outside_tested_range");
+    let codes: Vec<&Value> = home["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|note| &note["code"])
+        .collect();
+    assert!(
+        codes.contains(&&json!("version_outside_tested_range")),
+        "{codes:?}"
+    );
 
     assert_eq!(text.code, 0, "{}", text.stderr);
     let lines: Vec<&str> = text.stdout.lines().collect();

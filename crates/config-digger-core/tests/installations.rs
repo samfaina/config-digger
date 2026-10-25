@@ -40,14 +40,19 @@ fn agents(core: &Core) -> Vec<Agent> {
     core.agents(&core.resolve(&snapshot, &Context::default()))
 }
 
-/// The one home of the Agent `id`.
+/// The one home of the Agent `id`, with only the notes about its
+/// Installations: the note that its connectors are not on disk, which
+/// every Claude Code home carries, is left out.
 fn home(core: &Core, id: &str) -> Home {
     let agents = agents(core);
     let agent = agents.iter().find(|agent| agent.id == id).unwrap();
     let [home] = agent.homes.as_slice() else {
         panic!("one home: {:?}", agent.homes);
     };
-    home.clone()
+    let mut home = home.clone();
+    home.notes
+        .retain(|note| note.code != AgentNoteCode::CloudConnectorsNotOnDisk);
+    home
 }
 
 #[test]

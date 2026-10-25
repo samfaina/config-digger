@@ -51,6 +51,10 @@ fn each_user_server_is_an_effective_item_of_the_default_home() {
             // Its two user servers, and `dart`, keyed to a Project.
             "entries": 3,
             "notes": [{
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+            }, {
                 "code": "no_installation_found",
                 "installation": null,
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."

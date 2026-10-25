@@ -150,8 +150,8 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # and the empty file `synced/.bucket-<org>_<account>` [disk]. Claude Code
 # owns this copy and loads it with no `enabledPlugins` key [disk]. A synced
 # plugin is named by its manifest's `name`, not by its folder [disk], and
-# its switches know it as `<name>@synced` [docs]. Its Entries are read
-# read-only: Claude Code downloads it again from claude.ai. Like
+# its switches know it as `<name>@synced` [docs]. Its Entries are
+# read-only, being a copy of the account's configuration. Like
 # `synced-skills`, every account's folder is read, though Claude Code
 # reads only the signed-in account's (#308).
 #
@@ -165,7 +165,7 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 id = "synced"
 unverified = [
   "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
-  "An installed plugin of the same name is taken to Shadow only the synced plugin's servers and skills it carries too, and not to Shadow it while that installed plugin is Disabled.",
+  "While an installed plugin of the same name loads, Claude Code loads nothing of the synced one, the docs say; config-digger Shadows only the synced servers and skills the installed plugin carries too, leaving the others Effective, and takes a Disabled installed plugin to leave the synced one loaded.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
 ]
 registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2 }
@@ -845,7 +845,8 @@ reason = "plugin_disabled"
 layered = true
 locations = ["plugin-skills"]
 
-# A synced plugin's switches, as for its servers above.
+# A synced plugin's switches, as for its servers above, whose marks cover
+# these too.
 [[items.skill.disable]]
 block = "json-field"
 switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
@@ -923,11 +924,10 @@ env_maps = [
 
 # This gate turns the claude.ai plugin sync on, as the one above does for
 # skills: on a Max account it is on and `plugins/synced` holds the
-# account's plugins [disk]. Claude Code is taken to read that folder
-# whatever the gate, as it reads `synced-skills`, so the gate closes no
+# account's plugins [disk]. Like the skill sync gate, it closes no
 # location: its caveat says whether Claude Code keeps the copy in step with
-# claude.ai. Without a value it is taken to be off, as the skill sync gate
-# is.
+# claude.ai, and it is off without a value. Its mark says what that rests
+# on.
 [[feature_gates]]
 name = "tengu_claudeai_plugins_sync_enabled"
 unverified = "Claude Code is taken to read its synced plugins whatever the plugin sync gate holds, and to take the gate as off without a cached value, as it does with the skill sync gate."

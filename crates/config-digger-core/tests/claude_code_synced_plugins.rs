@@ -210,7 +210,7 @@ fn an_installed_plugin_of_the_same_name_shadows_the_synced_one() {
     let inventory = inventory(&with_installed_demo(synced_home()));
 
     for name in ["plugin:demo:docs", "demo:notes"] {
-        let provenances: Vec<(String, String)> = item(&inventory, name)
+        let provenances_and_states: Vec<(String, String)> = item(&inventory, name)
             .entries
             .iter()
             .map(|entry| {
@@ -222,7 +222,7 @@ fn an_installed_plugin_of_the_same_name_shadows_the_synced_one() {
             })
             .collect();
         assert_eq!(
-            provenances,
+            provenances_and_states,
             [
                 ("plugin".to_owned(), "effective".to_owned()),
                 ("cloud_mirror".to_owned(), "shadowed".to_owned()),
@@ -257,7 +257,7 @@ fn states(inventory: &Inventory) -> Vec<(String, String, String)> {
         .collect()
 }
 
-fn pair(name: &str, state: &str, code: &str) -> (String, String, String) {
+fn state_of(name: &str, state: &str, code: &str) -> (String, String, String) {
     (name.to_owned(), state.to_owned(), code.to_owned())
 }
 
@@ -273,8 +273,8 @@ fn enabled_plugins_off_for_name_at_synced_disables_the_plugin_and_all_it_carries
     assert_eq!(
         states(&inventory),
         [
-            pair("plugin:demo:docs", "disabled", "plugin_disabled"),
-            pair("demo:notes", "disabled", "plugin_disabled"),
+            state_of("plugin:demo:docs", "disabled", "plugin_disabled"),
+            state_of("demo:notes", "disabled", "plugin_disabled"),
         ]
     );
     for item in &inventory.items {
@@ -296,8 +296,8 @@ fn a_synced_plugin_no_settings_file_names_is_on() {
     assert_eq!(
         states(&inventory),
         [
-            pair("plugin:demo:docs", "effective", ""),
-            pair("demo:notes", "effective", ""),
+            state_of("plugin:demo:docs", "effective", ""),
+            state_of("demo:notes", "effective", ""),
         ]
     );
 }
@@ -311,8 +311,8 @@ fn sync_claude_ai_plugins_off_disables_every_synced_plugin_globally() {
     assert_eq!(
         states(&inventory),
         [
-            pair("plugin:demo:docs", "disabled", "disabled_globally"),
-            pair("demo:notes", "disabled", "disabled_globally"),
+            state_of("plugin:demo:docs", "disabled", "disabled_globally"),
+            state_of("demo:notes", "disabled", "disabled_globally"),
         ]
     );
     for item in &inventory.items {
