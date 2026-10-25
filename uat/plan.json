@@ -1805,6 +1805,59 @@
           "covers": ["#188"]
         },
         {
+          "id": "7.6",
+          "title": "Disable en un home de Claude Desktop añadido, con un Claude Desktop abierto sobre él",
+          "goal": "Un Claude Desktop abierto con --user-data-dir en un home añadido bloquea aparcar una Entry de ese home, y cerrado ya no.",
+          "instructions": [
+            "Ejecuta en PowerShell el comando «Abrir Claude Desktop sobre el home de prueba».",
+            "Espera a que se abra su ventana.",
+            "En config-digger, ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Si E:\\cd-throwaway\\claude-desktop-home no está en la lista, pulsa Add Agent home.",
+            "En ese caso, elige Claude Desktop como Agent.",
+            "En ese caso, en el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "Vuelve al Inventario.",
+            "Elige ese home.",
+            "Elige el servidor cd-throwaway-desktop.",
+            "Pulsa Disable.",
+            "Lee el diálogo.",
+            "En el diálogo, pulsa Cancel.",
+            "Ejecuta en PowerShell el comando «Cerrar ese Claude Desktop».",
+            "Pulsa Disable otra vez.",
+            "Lee el diálogo.",
+            "Si tiene avisos con casilla, márcalas.",
+            "En el diálogo, pulsa Disable.",
+            "Pulsa Done."
+          ],
+          "commands": [
+            {
+              "label": "Abrir Claude Desktop sobre el home de prueba",
+              "shell": "powershell",
+              "text": "$exe = @(Get-ChildItem \"$env:LOCALAPPDATA\\AnthropicClaude\\app-*\\claude.exe\" -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName) + @(Get-AppxPackage | Where-Object { $_.Name -in 'Claude', 'AnthropicPBC.Claude' } | ForEach-Object { Join-Path $_.InstallLocation 'app\\claude.exe' }) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1\nStart-Process $exe -ArgumentList '--user-data-dir=E:\\cd-throwaway\\claude-desktop-home'"
+            },
+            {
+              "label": "Cerrar ese Claude Desktop",
+              "shell": "powershell",
+              "text": "Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | Where-Object { $_.CommandLine -like '*--user-data-dir=*cd-throwaway\\claude-desktop-home*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+            }
+          ],
+          "expect": [
+            "Con ese Claude Desktop abierto, el diálogo tiene un bloqueo que empieza por «Claude Desktop is running and rewrites».",
+            "Ese bloqueo dice «Close Claude Desktop and retry.».",
+            "Ese bloqueo nombra «E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json».",
+            "Su botón «Disable» no se puede pulsar.",
+            "Cerrado ese Claude Desktop, el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running».",
+            "Entonces su botón «Disable» se puede pulsar.",
+            "Tras Done, «cd-throwaway-desktop» sale como «Disabled» en ese home."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#211"]
+        },
+        {
           "id": "7.3",
           "title": "El resultado de Delete backup",
           "goal": "Tras Delete backup, el resultado nombra la Operation, dice que su backup se borró y que ya no se puede deshacer, sin un id vacío.",

@@ -761,6 +761,13 @@
           },
           "default": []
         },
+        "data_folder_switch": {
+          "description": "The switch through which a process names the data folder it reads,\nsuch as Electron's `--user-data-dir`, written `<switch>=<folder>`\nwith the folder quoted or not. When set, the Agent runs for a home\nthe user added outside the definition's homes, which no launch reads\nby lookup order, only while a matching process names that home's\nfolder through it. A process whose command line the OS hides names\nnone.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "session_files": {
           "description": "Files the Agent keeps per running session, each naming a PID that\ncounts only while it is alive.",
           "anyOf": [

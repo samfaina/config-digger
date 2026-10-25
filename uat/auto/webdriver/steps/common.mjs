@@ -261,8 +261,9 @@ export function operationId(text) {
   return /\b(\d{8}-\d{6}-[0-9a-f]{3,})\b/.exec(text ?? "")?.[1];
 }
 
-// Runs `body` with Claude Desktop open, as 7.2 and 13.1 ask, opening it when
-// it is closed and closing it again after. Claude Desktop keeps the tester's
+// Runs `body` with Claude Desktop open, as 7.2 and 13.1 ask (7.6 opens its
+// own with withClaudeDesktopIn), opening it when it is closed and closing it
+// again after. Claude Desktop keeps the tester's
 // own configuration: config-digger runs on the throwaway profile, so nothing
 // of it changes. Returns false, with the step Blocked, when it isn't installed.
 export async function withClaudeDesktop(t, body) {
@@ -286,6 +287,38 @@ export async function withClaudeDesktop(t, body) {
   } finally {
     if (!before)
       t.ps("Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Path -notlike '*\\.local\\bin\\*' } | ForEach-Object { [void]$_.CloseMainWindow() }");
+  }
+  return true;
+}
+
+// Runs `body(close)` while a Claude Desktop started with
+// `--user-data-dir=<folder>` runs, as the step's command starts it; `close`
+// stops that one only, every process of which names `folder` in the switch,
+// and the walk stops it after `body` if it is still running. Without Claude
+// Desktop installed, the step is Blocked.
+export async function withClaudeDesktopIn(t, folder, body) {
+  // The walk's own LOCALAPPDATA is the tester's, where the classic app is;
+  // its PowerShell gets the throwaway profile's.
+  const exe = t.ps(
+    `@(Get-ChildItem '${process.env.LOCALAPPDATA}\\AnthropicClaude\\app-*\\claude.exe' -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName) + @(Get-AppxPackage | Where-Object { $_.Name -in 'Claude', 'AnthropicPBC.Claude' } | ForEach-Object { Join-Path $_.InstallLocation 'app\\claude.exe' }) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1`,
+  );
+  if (!exe) {
+    t.blocked = "Claude Desktop no está instalado en este PC";
+    return false;
+  }
+  const naming = `Get-CimInstance Win32_Process -Filter "Name='claude.exe'" | Where-Object { $_.CommandLine -like '*--user-data-dir=*${folder}*' }`;
+  const running = () => Number(t.ps(`@(${naming}).Count`));
+  const close = async () => {
+    t.ps(`${naming} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+    await t.s.until(async () => running() === 0, { what: "that Claude Desktop closed", timeout: 30000 });
+  };
+  t.ps(`Start-Process '${exe}' -ArgumentList '--user-data-dir=${folder}'`);
+  await t.s.until(async () => running() > 0, { what: "Claude Desktop open on the home", timeout: 30000 });
+  await wait(3000);
+  try {
+    await body(close);
+  } finally {
+    if (running()) await close();
   }
   return true;
 }

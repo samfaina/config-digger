@@ -23,25 +23,28 @@ use std::path::{Path, PathBuf};
 pub(crate) struct RunningHomes {
     /// Those an Installation found reads: an Agent can run only for them.
     pub installed: BTreeSet<(usize, String)>,
-    /// Those no launch of their Agent reads: homes the user added outside
-    /// the definition's homes of an Agent that picks its home by lookup
-    /// order, such as Claude Desktop. A home added in the folder of a
-    /// definition's home, however spelled, is that home and not one of them.
-    pub read_by_no_launch: BTreeSet<(usize, String)>,
+    /// Those no launch of their Agent reads by lookup order, with their
+    /// folders: homes the user added outside the definition's homes of an
+    /// Agent that picks its home by lookup order, such as Claude Desktop.
+    /// An Agent runs for one only while a matching process names its folder
+    /// through the data folder switch of its process. A home added in the
+    /// folder of a definition's home, however spelled, is that home and not
+    /// one of them.
+    pub added_outside_lookup_order: BTreeMap<(usize, String), PathBuf>,
 }
 
 impl RunningHomes {
     pub fn of(definitions: &[AgentDefinition], snapshot: &Snapshot) -> RunningHomes {
         RunningHomes {
             installed: installations::installed_homes(definitions, snapshot),
-            read_by_no_launch: snapshot
+            added_outside_lookup_order: snapshot
                 .homes
                 .iter()
                 .filter(|home| {
                     home.declared.is_none()
                         && !definitions[home.agent_index].lookup_orders.is_empty()
                 })
-                .map(|home| (home.agent_index, home.home.clone()))
+                .map(|home| ((home.agent_index, home.home.clone()), home.folder.clone()))
                 .collect(),
         }
     }
@@ -101,8 +104,9 @@ struct Touched<'a> {
 }
 
 /// Checks the readers of `files` and `folders`, and the Agents with
-/// switches in `files`, against the processes running now. An Agent never
-/// runs for a home of `homes` that no launch reads. Only an Agent running
+/// switches in `files`, against the processes running now. An Agent runs
+/// for a home of `homes` added outside its lookup order only while one of
+/// its processes names the home's folder. Only an Agent running
 /// for an installed home of `homes` gets the warning and the hints; any
 /// running Agent blocks a write to a SQLite store it holds.
 pub(crate) fn check<'a>(
@@ -159,14 +163,23 @@ pub(crate) fn check<'a>(
     } in in_files.chain(in_folders)
     {
         let key = (agent_index, home.to_owned());
-        if homes.read_by_no_launch.contains(&key) {
-            continue;
-        }
         let definition = &definitions[agent_index];
         let running = *detected.entry((agent_index, home)).or_insert_with(|| {
             definition.process(home).is_some_and(|process| {
-                let processes = processes.get_or_insert_with(|| ports.processes.running());
-                is_running(process, processes, ports)
+                match (
+                    homes.added_outside_lookup_order.get(&key),
+                    process.data_folder_switch.as_deref(),
+                ) {
+                    (None, _) => is_running(process, listed(&mut processes, ports), ports),
+                    (Some(folder), Some(switch)) => names_folder(
+                        process,
+                        switch,
+                        listed(&mut processes, ports),
+                        folder,
+                        ports,
+                    ),
+                    (Some(_), None) => false,
+                }
             })
         });
         if !running {
@@ -262,6 +275,58 @@ fn is_running(process: &ProcessDefinition, running: &[RunningProcess], ports: &P
             .iter()
             .any(|pid| running.iter().any(|candidate| candidate.pid == *pid))
     })
+}
+
+/// The processes running now, listed the first time a check needs them.
+fn listed<'p>(
+    processes: &'p mut Option<Vec<RunningProcess>>,
+    ports: &Ports,
+) -> &'p [RunningProcess] {
+    processes.get_or_insert_with(|| ports.processes.running())
+}
+
+/// Whether a process that matches `process` names `folder` through
+/// `switch`, compared by the canonical key of the folders.
+fn names_folder(
+    process: &ProcessDefinition,
+    switch: &str,
+    running: &[RunningProcess],
+    folder: &Path,
+    ports: &Ports,
+) -> bool {
+    let fs = ports.fs.as_ref();
+    let key = paths::canonical_key(fs, folder);
+    running
+        .iter()
+        .filter(|candidate| matches(process, candidate, ports))
+        .flat_map(|candidate| switch_values(&candidate.cmdline, switch))
+        .any(|named| paths::canonical_key(fs, Path::new(named)) == key)
+}
+
+/// The values a command line gives `switch` in the arguments it starts, as
+/// `<switch>=<value>`: the value quoted or not, or the whole argument quoted.
+fn switch_values<'c>(cmdline: &'c str, switch: &str) -> Vec<&'c str> {
+    let prefix = format!("{switch}=");
+    let mut values = Vec::new();
+    let mut rest = cmdline;
+    while let Some(at) = rest.find(&prefix) {
+        let before = rest[..at].chars().next_back();
+        let after = &rest[at + prefix.len()..];
+        rest = after;
+        if !before.is_none_or(|c| c.is_whitespace() || c == '"') {
+            continue;
+        }
+        let (value, end) = match after.strip_prefix('"') {
+            Some(quoted) => quoted.split_once('"').unwrap_or((quoted, "")),
+            None if before == Some('"') => after.split_once('"').unwrap_or((after, "")),
+            None => after.split_once(char::is_whitespace).unwrap_or((after, "")),
+        };
+        rest = end;
+        if !value.is_empty() {
+            values.push(value);
+        }
+    }
+    values
 }
 
 /// Whether one process has one of the images, a path that matches one of

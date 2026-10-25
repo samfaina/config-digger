@@ -18,7 +18,7 @@ Settled decisions this catalog must respect:
 - Precedence is ordered by **location** (or group of locations with a tie-break rule), not by Scope. Scope is a per-Agent label (name + display order).
 - Each location maps its fields onto a common server model (transport, command, args, env, url, headers, cwd) with a transport-detection primitive; unmapped fields are kept as "other".
 - Secret masking: core defaults on the common model (env and header values, URL userinfo/query, args after --token/--api-key-like flags); definitions add Agent-specific extra secret fields.
-- Process detection per Agent: image names, optional path glob, optional cmdline_contains, optional session files with PID (valid only if the PID is alive). Each writable location has a store_class: sqlite | rewritten-while-running | plain.
+- Process detection per Agent: image names, optional path glob, optional cmdline_contains, optional data_folder_switch (the switch through which a process names the data folder it reads, which tells whether it reads a home the user added), optional session files with PID (valid only if the PID is alive). Each writable location has a store_class: sqlite | rewritten-while-running | plain.
 - Definitions carry an optional `verified` version range and per-mechanism `unverified` marks; no version-conditional variants in v0.1.
 - Definitions carry no free text for users; mechanisms and gates map to closed reason codes (shadowed_by_precedence, disabled_by_name, parked, disabled_by_rule, disabled_globally, untrusted_folder, not_approved, policy, lookup_order_skips_home, project_missing, transport_conflict, …) and note codes.
 - Versioned (git index) detection is done by the core for every Entry, never declared.
@@ -26,7 +26,7 @@ Settled decisions this catalog must respect:
 ### Skeleton of one Agent definition
 
 - `[agent]` id, format_version, verified range, item kinds
-- `[process]` images[], path_glob?, cmdline_contains?, session_files?
+- `[process]` images[], path_glob?, cmdline_contains?, data_folder_switch?, session_files?
 - `[[homes]]` id, named roots (a home may have several roots, e.g. config dir + data dir), locator, lookup order; `[[mirrored_homes]]` owner tool, path, source home
 - `[[scopes]]` id, display order
 - `[projects]` registries[], walk

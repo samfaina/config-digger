@@ -476,17 +476,7 @@ fn core_while_desktop_runs(fs: &FakeFileSystem) -> Core {
 /// A core over `fs` while a `claude.exe` runs from `path`, `None` when the
 /// OS hides it.
 fn core_while_claude_runs(fs: &FakeFileSystem, path: Option<PathBuf>) -> Core {
-    let mut ports = fake::ports(
-        fs.clone(),
-        env().with_var("ProgramFiles", r"C:\Program Files"),
-    );
-    ports.processes = Box::new(FakeProcesses::default().with_process(RunningProcess {
-        pid: 5151,
-        image: "claude.exe".to_owned(),
-        path,
-        cmdline: String::new(),
-    }));
-    Core::new(ports).unwrap()
+    core_while_claude_runs_with(fs, path, &[""])
 }
 
 #[test]
@@ -542,6 +532,11 @@ const ADDED: &str = r"E:\cd-throwaway\claude-desktop-home";
 /// The Store package's data folder and its install folder, an Installation
 /// that reads an added home, and a classic data folder at `ADDED`.
 fn desktop_and_added() -> FakeFileSystem {
+    desktop_and_added_at(ADDED)
+}
+
+/// [`desktop_and_added`] with the classic data folder at `added`.
+fn desktop_and_added_at(added: &str) -> FakeFileSystem {
     let fixture =
         Path::new(env!("CARGO_MANIFEST_DIR")).join(r"tests\fixtures\claude-desktop\classic");
     let installed = desktop()
@@ -557,7 +552,7 @@ fn desktop_and_added() -> FakeFileSystem {
             PathBuf::from(PACKAGE).join(r"app\claude.exe"),
             fake::executable(Some([2, 16120, 0, 0])),
         );
-    load(installed, &fixture, Path::new(ADDED))
+    load(installed, &fixture, Path::new(added))
 }
 
 fn assert_parking_blocked(plan: &Plan) {
@@ -605,6 +600,137 @@ fn a_claude_exe_whose_path_is_hidden_blocks_parking_in_the_definition_s_home_onl
 
     assert_parking_blocked(&in_definition_home);
     assert_desktop_reads_none_of(&in_added_home);
+}
+
+/// A core over `fs` while each command line runs as a `claude.exe` from
+/// `path`, `None` when the OS hides it.
+fn core_while_claude_runs_with(
+    fs: &FakeFileSystem,
+    path: Option<PathBuf>,
+    cmdlines: &[&str],
+) -> Core {
+    let mut ports = fake::ports(
+        fs.clone(),
+        env().with_var("ProgramFiles", r"C:\Program Files"),
+    );
+    let mut processes = FakeProcesses::default();
+    for (pid, cmdline) in (7000..).zip(cmdlines) {
+        processes = processes.with_process(RunningProcess {
+            pid,
+            image: "claude.exe".to_owned(),
+            path: path.clone(),
+            cmdline: (*cmdline).to_owned(),
+        });
+    }
+    ports.processes = Box::new(processes);
+    Core::new(ports).unwrap()
+}
+
+/// The command line of a Chromium child of the Store package's Claude
+/// Desktop whose data folder switch is `switch`.
+fn desktop_child(switch: &str) -> String {
+    format!(
+        r#""{PACKAGE}\app\claude.exe" --type=gpu-process {switch} --gpu-preferences=WAAAAAAAAAA --field-trial-handle=1,i,1,2,3"#
+    )
+}
+
+/// A core over `fs` with `added` added as a Claude Desktop home, while the
+/// Store package's Claude Desktop runs one process per command line.
+fn added_while_desktop_runs(fs: &FakeFileSystem, added: &str, cmdlines: &[&str]) -> Core {
+    let core = core_while_claude_runs_with(
+        fs,
+        Some(PathBuf::from(PACKAGE).join(r"app\claude.exe")),
+        cmdlines,
+    );
+    core.add_home(Path::new(added), "claude-desktop").unwrap();
+    core
+}
+
+#[test]
+fn parking_in_an_added_home_is_blocked_while_a_claude_desktop_child_names_its_folder() {
+    let fs = desktop_and_added();
+    let child = desktop_child(&format!("--user-data-dir={ADDED}"));
+    let core = added_while_desktop_runs(&fs, ADDED, &[&child]);
+
+    let plan = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+    assert_parking_blocked(&plan);
+}
+
+#[test]
+fn a_claude_desktop_child_naming_the_added_folder_in_another_case_blocks_parking() {
+    let fs = desktop_and_added();
+    let child = desktop_child(&format!("--user-data-dir={}", ADDED.to_uppercase()));
+    let core = added_while_desktop_runs(&fs, ADDED, &[&child]);
+
+    assert_parking_blocked(&plan_with(&core, Action::Disable, "filesystem").unwrap());
+}
+
+#[test]
+fn a_claude_desktop_child_naming_the_added_folder_quoted_blocks_parking() {
+    let added = r"E:\cd-throwaway\claude desktop home";
+    let fs = desktop_and_added_at(added);
+    for switch in [
+        format!(r#"--user-data-dir="{added}""#),
+        format!(r#""--user-data-dir={added}""#),
+    ] {
+        let child = desktop_child(&switch);
+        let core = added_while_desktop_runs(&fs, added, &[&child]);
+
+        let plan = plan_with(&core, Action::Disable, "filesystem").unwrap();
+
+        assert_parking_blocked(&plan);
+    }
+}
+
+#[test]
+fn a_remove_in_an_added_home_warns_while_a_claude_desktop_child_names_its_folder() {
+    let fs = desktop_and_added();
+    let child = desktop_child(&format!("--user-data-dir={ADDED}"));
+    let core = added_while_desktop_runs(&fs, ADDED, &[&child]);
+
+    let plan = plan_with(&core, Action::Remove, "filesystem").unwrap();
+
+    assert_eq!(plan.blocks(), &[], "{:?}", plan.blocks());
+    let warning = plan
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::RunningAgent)
+        .unwrap_or_else(|| panic!("no running-agent warning: {:?}", plan.warnings()));
+    let file = Path::new(ADDED).join("claude_desktop_config.json");
+    assert_eq!(
+        warning.advice[0].paths,
+        [file.display().to_string()],
+        "{warning:?}"
+    );
+}
+
+#[test]
+fn a_claude_desktop_child_naming_another_folder_does_not_block_parking_in_an_added_home() {
+    let fs = desktop_and_added();
+    let child = desktop_child(r"--user-data-dir=E:\cd-throwaway\claude-desktop-home-2");
+    let core = added_while_desktop_runs(&fs, ADDED, &[&child]);
+
+    assert_desktop_reads_none_of(&plan_with(&core, Action::Disable, "filesystem").unwrap());
+}
+
+#[test]
+fn a_claude_desktop_whose_command_line_is_hidden_does_not_block_parking_in_an_added_home() {
+    let fs = desktop_and_added();
+    let core = added_while_desktop_runs(&fs, ADDED, &[""]);
+
+    assert_desktop_reads_none_of(&plan_with(&core, Action::Disable, "filesystem").unwrap());
+}
+
+#[test]
+fn a_claude_code_cli_naming_the_added_folder_does_not_block_parking_in_it() {
+    let fs = desktop_and_added();
+    let cli = PathBuf::from(HOME).join(r".local\bin\claude.exe");
+    let cmdline = format!(r#""{}" --user-data-dir={ADDED}"#, cli.display());
+    let core = core_while_claude_runs_with(&fs, Some(cli), &[&cmdline]);
+    core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+
+    assert_desktop_reads_none_of(&plan_with(&core, Action::Disable, "filesystem").unwrap());
 }
 
 // An added home in the folder of a definition's home is that home, so

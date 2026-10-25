@@ -1,7 +1,7 @@
 // Section 7: the action dialog and the buttons that delete.
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { buttonEl, fieldValue, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, confirm, dialog, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview, withClaudeDesktop } from "./common.mjs";
+import { act, addHome, confirm, dialog, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
 
 // Claude Code Disables a user Entry per Project, so Disable is offered only
 // with a Project chosen. The steps that Disable cd-throwaway-user name none:
@@ -136,6 +136,39 @@ export default [
         await tickAll(s);
         const disable = await buttonEl(s, "Disable", ".dialog .dialog-foot");
         t.check(disable && (await s.attr(disable, "disabled")) === null, "su botón «Disable» se puede pulsar");
+        await confirm(s, "Disable");
+        await done(s);
+        await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });
+        const states = await s.exec(`return [...document.querySelectorAll(".item-row")].filter((r) => r.querySelector(".item-name")?.textContent.trim() === "cd-throwaway-desktop").map((r) => r.querySelector(".state-pill").firstChild.textContent.trim());`);
+        t.check(states.includes("Disabled"), "tras Done, «cd-throwaway-desktop» sale como «Disabled» en ese home", states.join(", "));
+      });
+    },
+  },
+  {
+    id: "7.6",
+    note: "Claude Desktop de verdad, abierto con --user-data-dir en el home de prueba, y cerrado solo ese. Otro Claude Desktop abierto en este PC no lee ese home.",
+    async run(t) {
+      const { s } = t;
+      const home = `${t.root}\\claude-desktop-home`;
+      await withClaudeDesktopIn(t, home, async (close) => {
+        await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
+        await openItem(t, "cd-throwaway-desktop");
+        await press(s, "Disable", ".panel.detail");
+        const blocked = await waitPreview(s);
+        t.check(/Claude Desktop is running and rewrites/.test(blocked.text), "con ese Claude Desktop abierto, el diálogo tiene un bloqueo que empieza por «Claude Desktop is running and rewrites»", blocked.text.slice(0, 400));
+        t.check(blocked.text.includes("Close Claude Desktop and retry."), "ese bloqueo dice «Close Claude Desktop and retry.»");
+        const file = `${home}\\claude_desktop_config.json`;
+        t.check(blocked.text.includes(file), `ese bloqueo nombra «${file}»`);
+        const off = await buttonEl(s, "Disable", ".dialog .dialog-foot");
+        t.check(off && (await s.attr(off, "disabled")) !== null, "su botón «Disable» no se puede pulsar");
+        await press(s, "Cancel", ".dialog");
+        await close();
+        await press(s, "Disable", ".panel.detail");
+        const d = await waitPreview(s);
+        t.check(!/Claude Desktop is running/.test(d.text), "cerrado ese Claude Desktop, el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running»", d.text.match(/Claude Desktop is running[^\n]*/)?.[0]);
+        await tickAll(s);
+        const disable = await buttonEl(s, "Disable", ".dialog .dialog-foot");
+        t.check(disable && (await s.attr(disable, "disabled")) === null, "entonces su botón «Disable» se puede pulsar");
         await confirm(s, "Disable");
         await done(s);
         await s.until(() => s.exec("return !document.querySelector('.notice.busy, .read-progress')"), { what: "the re-read" });

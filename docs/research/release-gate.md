@@ -166,6 +166,8 @@ Tested on 3.6556.2, the version claude.ai served on 2026-10-23, in Windows Sandb
 | `:9` (top): where the classic installer puts the app | Squirrel installs for the user in `%LOCALAPPDATA%\AnthropicClaude`: a launcher `claude.exe` with the app's version, `Update.exe`, and `app-<version>\claude.exe`, which runs the app. The uninstall key is `HKCU\…\Uninstall\AnthropicClaude`. The classic app reads `%APPDATA%\Claude` | Corrected: a `classic` Installation, and its process path |
 | `:234`, `:280` | Not tested | Pending: `:234` needs a deployment for a third-party provider; `:280` needs the app's windows driven, signed in |
 
+Three more checks, behind no mark, test the data folder switch the definition's `[process]` reads (#211): the signed app ignores `CLAUDE_USER_DATA_DIR`, and the classic and packaged apps started with `--user-data-dir=<folder>` read that folder, which each of their processes names, quoted when it holds a space (`claude-desktop.md` §1.1).
+
 ### VS Code
 
 The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. A file VS Code cannot parse holds `,,` between two servers, which no JSON parser accepts, and each such launch keeps a server in two other files.
