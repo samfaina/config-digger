@@ -2160,15 +2160,7 @@ fn gate_caveats(
         // skills the rule changes.
         .filter(|(_, gate)| {
             let location = definition.location(&entry.location);
-            let ruled = location
-                .name_rule_when
-                .as_ref()
-                .is_some_and(|when| when.gate == gate.name);
-            let closes = location
-                .when
-                .iter()
-                .any(|condition| condition.gate() == Some(gate.name.as_str()));
-            !ruled || closes || entry.unruled.is_some()
+            !location.only_rules_names_by(&gate.name) || entry.unruled.is_some()
         })
         .filter_map(|(index, gate)| {
             // The Agent fetches the gate, and caches it nowhere to read.

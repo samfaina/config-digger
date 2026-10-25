@@ -12,7 +12,7 @@ const HOME: &str = r"C:\Users\fixture";
 const LOCAL_APP_DATA: &str = r"C:\Users\fixture\AppData\Local";
 
 /// The reason of a skill whose folder name breaks the rule.
-const FOLDER_BREAKS_RULE: &str = "Claude Code skips this skill: its folder's name breaks Claude Code's name rule, which refuses a space at either end and hidden, direction-changing or blank-like characters, `<` and `>`.";
+const FOLDER_BREAKS_RULE: &str = "Claude Code skips this skill: its folder's name breaks Claude Code's name rule, which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters.";
 
 fn in_home(relative: &str) -> PathBuf {
     PathBuf::from(HOME).join(relative)
@@ -393,4 +393,22 @@ fn while_claude_code_skips_its_cached_gates_the_name_rule_applies() {
     let inventory = inventory_with(&fs, env);
 
     assert_eq!(state(&inventory, " cd-throwaway-lead").0, "invalid");
+}
+
+#[test]
+fn a_skill_invalid_by_the_name_rule_lists_the_other_checks_it_fails_as_secondary_reasons() {
+    let folder = " cd-throwaway-lead";
+    let overrides = json!({ "skillOverrides": { folder: "off" } }).to_string();
+    let fs = with_user_skill(claude_home(json!({})), folder)
+        .with_file(in_home(r".claude\settings.json"), overrides);
+
+    let inventory = inventory(&fs);
+
+    let (state, reason) = state(&inventory, folder);
+    assert_eq!(state, "invalid");
+    assert_eq!(reason, FOLDER_BREAKS_RULE);
+    let entry = serde_json::to_value(&skill(&inventory, folder).entries[0]).unwrap();
+    let secondary = entry["secondary"].as_array().unwrap();
+    assert_eq!(secondary.len(), 1, "{secondary:?}");
+    assert_eq!(secondary[0]["code"], "disabled_by_name");
 }

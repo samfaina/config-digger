@@ -25,19 +25,31 @@ pub(crate) fn takes_frontmatter_name(name: &str) -> bool {
     name.chars().all(|c| is(&WORD, c)) && visible(name)
 }
 
+/// What a frontmatter `name` may hold.
 static WORD: LazyLock<Regex> = LazyLock::new(|| class(r"[\p{L}\p{M}\p{N}_:.-]"));
+/// What shows as nothing: controls, formats, private use, unassigned and
+/// default-ignorable characters, and the blank braille pattern.
 static HIDDEN: LazyLock<Regex> =
     LazyLock::new(|| class(r"[\p{Cc}\p{Cf}\p{Co}\p{Cn}  \p{Default_Ignorable_Code_Point}⠀]"));
+/// What may carry a mark.
 static LETTER_NUMBER_MARK: LazyLock<Regex> = LazyLock::new(|| class(r"[\p{L}\p{N}\p{M}]"));
 /// A mark, Hangul jamo included, which a letter must carry.
 static MARK_LIKE: LazyLock<Regex> = LazyLock::new(|| class(r"[\p{M}ᅠ-ᇿힰ-퟿]"));
+/// A combining mark.
 static MARK: LazyLock<Regex> = LazyLock::new(|| class(r"\p{M}"));
+/// A space separator, the space among them.
 static SPACE_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| class(r"\p{Zs}"));
+/// A letter whose dot a combining dot above would double, such as `i`.
 static SOFT_DOTTED: LazyLock<Regex> = LazyLock::new(|| class(r"\p{Soft_Dotted}"));
+/// A character of the Latin script or of none in particular.
 static LATIN_OR_COMMON: LazyLock<Regex> = LazyLock::new(|| class(r"[\p{sc=Latin}\p{sc=Common}]"));
+/// A mark that takes the script of the letter it is on.
 static INHERITED: LazyLock<Regex> = LazyLock::new(|| class(r"\p{sc=Inherited}"));
+/// A character an emoji starts with.
 static PICTOGRAPHIC: LazyLock<Regex> = LazyLock::new(|| class(r"\p{Extended_Pictographic}"));
+/// A skin tone an emoji may take.
 static SKIN_TONE: LazyLock<Regex> = LazyLock::new(|| class(r"\p{Emoji_Modifier}"));
+/// A letter of a flag.
 static REGIONAL: LazyLock<Regex> = LazyLock::new(|| class(r"\p{Regional_Indicator}"));
 /// An Arabic mark a ZWNJ may follow between two joining letters.
 static ARABIC_MARK: LazyLock<Regex> = LazyLock::new(|| {
@@ -50,18 +62,23 @@ static JOINS_FORWARD: LazyLock<Regex> =
 static JOINS_BACK: LazyLock<Regex> =
     LazyLock::new(|| class(r"[ؠآ-ؿف-يٮٯٱ-ٳٵ-ۓەۮۯۺ-ۼۿݐ-ݿࡰ-ࢂࢆࢉ-࢏ࢠ-ࢬࢮ-ࣈ]"));
 
+/// The class `pattern` as a regex that matches one character of it.
 fn class(pattern: &str) -> Regex {
     Regex::new(&format!("^{pattern}$")).expect("a valid class")
 }
 
+/// Whether `c` is of the class `class`.
 fn is(class: &Regex, c: char) -> bool {
     class.is_match(c.encode_utf8(&mut [0; 4]))
 }
 
+/// The joiners, the presentation selector and the tag that ends a tag
+/// sequence, which a name holds only inside what they join.
 const ZWNJ: char = '\u{200C}';
 const ZWJ: char = '\u{200D}';
 const VS16: char = '\u{FE0F}';
 const CANCEL_TAG: char = '\u{E007F}';
+/// What makes a keycap of a digit.
 const KEYCAP: char = '\u{20E3}';
 /// What an emoji sequence counts as once found.
 const SMILEY: char = '\u{263A}';
@@ -73,7 +90,7 @@ fn visible(name: &str) -> bool {
     if name.is_empty() || length > MAX_LENGTH || name.chars().any(control_or_bracket) {
         return false;
     }
-    if name.contains("  ") || blank_like(name) || name_skin_tone_after_vs16(name) {
+    if name.contains("  ") || blank_like(name) || skin_tone_after_vs16(name) {
         return false;
     }
     let seen = as_seen(name);
@@ -104,7 +121,8 @@ fn blank_like(name: &str) -> bool {
         })
 }
 
-fn name_skin_tone_after_vs16(name: &str) -> bool {
+/// A skin tone right after a presentation selector, which no emoji holds.
+fn skin_tone_after_vs16(name: &str) -> bool {
     let chars: Vec<char> = name.chars().collect();
     chars
         .windows(2)

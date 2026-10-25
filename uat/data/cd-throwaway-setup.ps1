@@ -303,11 +303,11 @@ description: Throwaway skill for testing config-digger. Does nothing.
 
 # With -NameRule, Claude Code skills whose folder names break its name rule,
 # one with a leading space and one with a zero-width space, and one with a
-# space inside its name, which keeps it. The default data has none, so that
+# space inside its name, which the rule keeps. The default data has none, so that
 # no other step counts them.
 if ($NameRule) {
     $skills = "$Root\claude-code-home\.claude\skills"
-    foreach ($folder in @(" cd-throwaway-name-lead", "cd-throwaway-name$([char]0x200B)zwsp", "cd-throwaway name inner")) {
+    foreach ($folder in @(" cd-throwaway-name-lead", "cd-throwaway-name$([char]0x200B)zwsp", "cd-throwaway-name inner")) {
         # `\\?\` keeps a space Windows would otherwise trim from a folder name.
         $path = "\\?\$skills\$folder"
         [IO.Directory]::CreateDirectory($path) | Out-Null

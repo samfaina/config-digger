@@ -164,7 +164,7 @@ fn name_rule_adds_claude_code_skills_whose_folder_names_break_its_name_rule() {
     for folder in [
         " cd-throwaway-name-lead",
         "cd-throwaway-name\u{200B}zwsp",
-        "cd-throwaway name inner",
+        "cd-throwaway-name inner",
     ] {
         assert!(skills.join(folder).join("SKILL.md").is_file(), "{folder:?}");
     }

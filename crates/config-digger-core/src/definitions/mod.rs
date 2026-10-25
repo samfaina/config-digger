@@ -1069,6 +1069,20 @@ impl Validate for SecretFields {
 }
 
 impl LocationDefinition {
+    /// Whether the Feature gate `gate` changes nothing of the location but
+    /// whether its name rule applies.
+    pub fn only_rules_names_by(&self, gate: &str) -> bool {
+        let rules = self
+            .name_rule_when
+            .as_ref()
+            .is_some_and(|when| when.gate == gate);
+        rules
+            && !self
+                .when
+                .iter()
+                .any(|condition| condition.gate() == Some(gate))
+    }
+
     /// Whether the location's Entries are keyed by Project inside the file.
     pub fn keyed_by_project(&self) -> bool {
         self.root.iter().any(|key| key == PROJECT_KEY)

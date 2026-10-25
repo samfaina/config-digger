@@ -1497,19 +1497,20 @@
             "Abre config-digger.",
             "Ve al Inventario.",
             "Elige el home E:\\cd-throwaway\\claude-code-home.",
-            "Busca cd-throwaway-name-lead en la lista Items y ábrelo.",
+            "Busca cd-throwaway-name en la lista Items.",
+            "Abre el Item cd-throwaway-name-lead.",
             "Lee la razón y los avisos de su Entry.",
-            "Busca cd-throwaway-namezwsp en la lista Items y ábrelo.",
-            "Busca cd-throwaway name inner en la lista Items y ábrelo."
+            "Abre el Item que se lee cd-throwaway-namezwsp, cuyo nombre lleva un espacio de ancho cero entre name y zwsp.",
+            "Abre el Item cd-throwaway-name inner."
           ],
           "commands": [],
           "expect": [
             "El Item «cd-throwaway-name-lead» sale «Invalid».",
-            "Su Entry da la razón «Claude Code skips this skill: its folder's name breaks Claude Code's name rule, which refuses a space at either end and hidden, direction-changing or blank-like characters, `<` and `>`.».",
+            "Su Entry da la razón «Claude Code skips this skill: its folder's name breaks Claude Code's name rule, which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters.».",
             "Su Entry tiene el aviso «Depends on Claude Code gate `tengu_slate_wicket`: assumed on; cannot be read.».",
-            "El Item «cd-throwaway-namezwsp» sale «Invalid», con la misma razón.",
-            "El Item «cd-throwaway name inner» sale «Effective».",
-            "La Entry de «cd-throwaway name inner» no tiene el aviso de «tengu_slate_wicket»."
+            "El Item «cd-throwaway-name\u200bzwsp» sale «Invalid», con la misma razón.",
+            "El Item «cd-throwaway-name inner» sale «Effective».",
+            "La Entry de «cd-throwaway-name inner» no tiene el aviso de «tengu_slate_wicket»."
           ],
           "setup": {
             "label": "Crear los datos de prueba con la regla de nombres",

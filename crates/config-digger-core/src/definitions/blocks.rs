@@ -2641,10 +2641,14 @@ impl Format {
     /// Whether any skill folder of the format, a manifest's one skill
     /// included, reads names under a name rule.
     pub fn name_ruled(&self) -> bool {
-        let one_skill = if let Format::ManifestSkills(block) = self {
-            block.one_skill.as_ref()
-        } else {
-            None
+        let one_skill = match self {
+            Format::ManifestSkills(block) => block.one_skill.as_ref(),
+            Format::Json(_)
+            | Format::Toml(_)
+            | Format::TomlFragments(_)
+            | Format::SkillFolder(_)
+            | Format::SkillList(_)
+            | Format::SqliteJson(_) => None,
         };
         self.skill_folder()
             .into_iter()

@@ -913,7 +913,7 @@ pub(crate) struct ScannedEntry {
     pub defect: Option<SkillDefect>,
     /// For a skill read under its location's name rule, its name and defect
     /// while the rule does not apply, when they differ.
-    pub unruled: Option<Box<Unruled>>,
+    pub unruled: Option<Box<SkillReading>>,
     /// For a Linked Entry, where its link points.
     pub link: Option<ScannedLink>,
     /// For a skill, the skill manager that installed it, as far as one's
@@ -4625,13 +4625,13 @@ struct ReadSkill {
     defect: Option<SkillDefect>,
     /// How the Agent reads it while its name rule does not apply, when
     /// that differs.
-    unruled: Option<Box<Unruled>>,
+    unruled: Option<Box<SkillReading>>,
 }
 
-/// The name and defect of a skill as its Agent reads it while the name
-/// rule of its location does not apply.
+/// The name and defect a skill's Agent reads it with, under its location's
+/// name rule or without it.
 #[derive(Clone, PartialEq)]
-pub(crate) struct Unruled {
+pub(crate) struct SkillReading {
     pub name: String,
     pub defect: Option<SkillDefect>,
 }
@@ -4671,7 +4671,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
         } else if let Some(breaks) = folder_breaks {
             defect = Some(breaks);
         }
-        Unruled {
+        SkillReading {
             name: format.sanitize(&name),
             defect,
         }

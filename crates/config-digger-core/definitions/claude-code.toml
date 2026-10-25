@@ -749,7 +749,7 @@ on_read_failure = "ignores_file"
 # say which of these were tested.
 [items.skill]
 unverified = [
-  "The name rule's classes are taken from the 2.1.302 binary beyond what was tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E, U+00A0 and the length of an ASCII `name` in a frontmatter `name`.",
+  "Every character the name rule refuses is taken from the 2.1.302 binary, with config-digger's Unicode tables, but for those the probe tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E and U+00A0 in a frontmatter `name`, and the length of an ASCII `name`. Among the rest, a frontmatter `name` holding any character but letters, marks, digits, `_`, `:`, `.` and `-`, such as `+` or `@`, is taken to be refused.",
   "`<` and `>` in a folder name, which a Windows folder name cannot hold, are taken to break the name rule, as the binary says.",
   "Claude Code keeps a joiner or a variation selector inside an emoji sequence on Unicode's recommended list; config-digger takes any well-formed emoji sequence for one.",
 ]
