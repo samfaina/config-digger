@@ -28,3 +28,4 @@ mod store;
 mod updates;
 mod user_list;
 mod version;
+mod walk;

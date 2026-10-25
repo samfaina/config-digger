@@ -465,8 +465,28 @@ sources = [
 # Cursor reads the `.cursor`, `.claude`, `.codex`, `.grok` and `.agents`
 # skills folders, in that order, in the user's home folder and at the root
 # of each folder of the Project [code]. The `.claude`, `.codex` and `.grok`
-# ones are other Agents' [code]. It also reads every `.cursor\skills` and
-# `.agents\skills` deeper in the Project [docs], which are not read here.
+# ones are other Agents' [code].
+#
+# The IDE also reads the same five skills folders deeper in each folder of
+# the Project, below its own folders, at any depth, always: no gate or
+# setting turns it off [code, test]. It searches the folder with ripgrep,
+# hidden files included and links followed, for each `SKILL.md` whose path
+# holds `.cursor\skills\`, `.agents\skills\`, and while third-party configs
+# are on `.claude\skills\`, `.codex\skills\` or `.grok\skills\`, case aside
+# [code, test]. Cursor's docs name only `.cursor\skills` and `.agents\skills`
+# [docs]: the other three contradict them. It searches only a folder in a
+# git work tree, at its root or below it [code, test], the user's home
+# folder too, though its code means to skip that one [code, test]. It never
+# reads a path through a folder named in `skip`, at any depth, below a
+# skills folder too [code, test]. The ignore files of the folders it
+# enters, and of those above it, apply as ripgrep reads them [code]: a
+# skills folder below a folder a `.gitignore` or an `.ignore` leaves out is
+# not read, nor one in a `.cursor` folder a `.gitignore` leaves out, but
+# one the `.gitignore` leaves out itself is [test]. A nested skill is read
+# by the code that reads the root ones, and once by its real path [code].
+# The docs say it is scoped to its folder's subtree [docs], which
+# contradicts the code: there is no such scope, but for a frontmatter's
+# `metadata.scopedTo` [code], which is not read.
 
 [[locations]]
 id = "user-cursor-skills"
@@ -569,6 +589,57 @@ provenance = "file"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+[[locations]]
+id = "nested-cursor-skills"
+anchor = { block = "project", path = ".cursor/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "nested-claude-skills"
+anchor = { block = "project", path = ".claude/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+# Cursor never loads the skills Codex ships under these names [code].
+[[locations]]
+id = "nested-codex-skills"
+anchor = { block = "project", path = ".codex/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "nested-grok-skills"
+anchor = { block = "project", path = ".grok/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[[locations]]
+id = "nested-agents-skills"
+anchor = { block = "project", path = ".agents/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
 # The skills Cursor ships, which it syncs into `~\.cursor\skills-cursor`
 # while it runs [code, disk].
 [[locations]]
@@ -613,7 +684,12 @@ on_read_failure = "ignores_file"
 # at the same path below their `.cursor`, `.claude`, `.codex`, `.grok` or
 # `.agents` folder, whatever folder holds it, such as `~\.claude\skills\review`,
 # `~\.agents\skills\review` and a Project's `.cursor\skills\review`; the
-# first in this order wins, a user's skill over a Project's [test].
+# first in this order wins, a user's skill over a Project's [test]. A nested
+# skill wins over both [test]. Of two nested ones, the one whose folder
+# holding the marker comes first by path wins, and of one folder's, the
+# first marker in the order above [test]; config-digger ranks the markers
+# first instead, so of `x\.agents\skills\k` and `y\.cursor\skills\k` it
+# shows the second Effective, where Cursor uses the first (#359).
 #
 # Cursor lists a `SKILL.md` without a frontmatter, one whose YAML does not
 # parse or never closes, under its folder's name in the `/` menu, where the
@@ -627,7 +703,7 @@ on_read_failure = "ignores_file"
 # before a Project's until one is picked, after which the order follows
 # that record, which can match either path [test].
 [items.skill]
-precedence = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
+precedence = ["nested-cursor-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "nested-agents-skills", "user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
 checks = ["frontmatter", "rules", "disable", "precedence"]
 
@@ -637,7 +713,7 @@ checks = ["frontmatter", "rules", "disable", "precedence"]
 # Parking a skill of another Agent's folder takes it from that Agent too.
 [[items.skill.disable]]
 block = "park"
-locations = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills"]
+locations = ["user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "nested-cursor-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "nested-agents-skills"]
 
 # The `enabled` of a Project's plugin, as for servers above.
 [[items.skill.disable]]
@@ -767,7 +843,7 @@ sources = [
 [[items.skill.rules]]
 block = "global-switch"
 off = false
-locations = ["user-claude-skills", "user-codex-skills", "user-grok-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "claude-plugin-skills"]
+locations = ["user-claude-skills", "user-codex-skills", "user-grok-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "claude-plugin-skills"]
 sources = [
   { anchor = { block = "home", root = "state" }, key_path = ["cursor/thirdPartyExtensibilityEnabled"], sqlite = true },
 ]

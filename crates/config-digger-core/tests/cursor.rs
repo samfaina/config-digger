@@ -1052,6 +1052,299 @@ fn third_party_configs_are_on_unless_turned_off() {
     assert_eq!(code(item(&inventory(&fs), "review").state), "effective");
 }
 
+/// The Project `app` as a git repo, holding a skill at each of `skills`,
+/// relative to its folder.
+fn git_app_with_skills(skills: &[&str]) -> FakeFileSystem {
+    let fs = cursor().with_folder(project(r"app\.git"));
+    skills.iter().fold(fs, |fs, skill| {
+        with_skill(fs, project(&format!(r"app\{skill}")))
+    })
+}
+
+/// The locators of the Cursor skill Entries of `inventory`, sorted.
+fn skill_locators(inventory: &Inventory) -> Vec<String> {
+    let mut locators: Vec<String> = cursor_items(inventory)
+        .filter(|item| code(item.kind) == "skill")
+        .flat_map(|item| item.entries.iter().map(|entry| entry.locator.clone()))
+        .collect();
+    locators.sort();
+    locators
+}
+
+#[test]
+fn a_git_project_reads_the_skills_folders_below_its_folder() {
+    let fs = git_app_with_skills(&[
+        r"sub\.cursor\skills\a",
+        r"sub\deep\er\.agents\skills\b",
+        r"sub\.claude\skills\c",
+    ]);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    for (name, path) in [
+        ("a", r"app\sub\.cursor\skills\a"),
+        ("b", r"app\sub\deep\er\.agents\skills\b"),
+        ("c", r"app\sub\.claude\skills\c"),
+    ] {
+        let skill = item(&inventory, name);
+        assert_eq!(code(skill.state), "effective", "{name}");
+        let entry = &skill.entries[0];
+        assert_eq!(entry.scope, "project", "{name}");
+        assert_eq!(entry.locator, project(path).display().to_string());
+    }
+}
+
+#[test]
+fn third_party_configs_off_turn_off_the_nested_claude_skills_too() {
+    let fs = with_third_party(git_app_with_skills(&[r"sub\.claude\skills\c"]), false);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let entry = &item(&inventory, "c").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        code(entry.reason.as_ref().unwrap().code),
+        "disabled_globally"
+    );
+}
+
+#[test]
+fn nothing_is_read_below_a_skipped_folder_name_at_any_depth() {
+    let fs = git_app_with_skills(&[
+        r"node_modules\pkg\.cursor\skills\in-node-modules",
+        r"sub\dist\.agents\skills\in-dist",
+        r"sub\.cursor\skills\build\below-build",
+        r"sub\.cursor\skills\kept",
+    ]);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [project(r"app\sub\.cursor\skills\kept")
+            .display()
+            .to_string()]
+    );
+}
+
+#[test]
+fn a_project_outside_a_git_work_tree_reads_no_nested_skills() {
+    let fs = git_app_with_skills(&[r".cursor\skills\root", r"sub\.cursor\skills\nested"]);
+    let fs = {
+        fs.delete_folder(project(r"app\.git"));
+        fs
+    };
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [project(r"app\.cursor\skills\root").display().to_string()]
+    );
+}
+
+#[test]
+fn a_project_below_the_root_of_its_repo_reads_the_folders_below_it_only() {
+    let fs = cursor().with_folder(project(r"repo\.git"));
+    let fs = with_skill(fs, project(r"repo\other\.cursor\skills\beside"));
+    let fs = with_skill(fs, project(r"repo\app\sub\.cursor\skills\below"));
+
+    let inventory = inventory_at(&fs, &project(r"repo\app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [project(r"repo\app\sub\.cursor\skills\below")
+            .display()
+            .to_string()]
+    );
+}
+
+#[test]
+fn a_nested_skill_wins_over_the_project_s_own_and_the_user_s_at_its_path() {
+    let fs = git_app_with_skills(&[
+        r".cursor\skills\review",
+        r"sub\.cursor\skills\review",
+        r"sub\.agents\skills\triage",
+    ]);
+    let fs = with_skill(fs, in_home(r".cursor\skills\triage"));
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skills_named(&inventory, "review")[0].1,
+        [
+            (
+                "effective".to_owned(),
+                project(r"app\sub\.cursor\skills\review")
+                    .display()
+                    .to_string()
+            ),
+            (
+                "shadowed".to_owned(),
+                project(r"app\.cursor\skills\review").display().to_string()
+            ),
+        ]
+    );
+    assert_eq!(
+        skills_named(&inventory, "triage")[0].1,
+        [
+            (
+                "effective".to_owned(),
+                project(r"app\sub\.agents\skills\triage")
+                    .display()
+                    .to_string()
+            ),
+            (
+                "shadowed".to_owned(),
+                in_home(r".cursor\skills\triage").display().to_string()
+            ),
+        ]
+    );
+}
+
+#[test]
+fn of_two_nested_skills_at_one_path_the_first_folder_s_wins_and_in_one_folder_cursor_s() {
+    let fs = git_app_with_skills(&[
+        r"y\.cursor\skills\pair",
+        r"x\.cursor\skills\pair",
+        r"b\.cursor\skills\deep",
+        r"a\b\c\.cursor\skills\deep",
+        r"x\.agents\skills\holder",
+        r"x\.cursor\skills\holder",
+    ]);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    for (name, effective, shadowed) in [
+        (
+            "pair",
+            r"app\x\.cursor\skills\pair",
+            r"app\y\.cursor\skills\pair",
+        ),
+        (
+            "deep",
+            r"app\a\b\c\.cursor\skills\deep",
+            r"app\b\.cursor\skills\deep",
+        ),
+        (
+            "holder",
+            r"app\x\.cursor\skills\holder",
+            r"app\x\.agents\skills\holder",
+        ),
+    ] {
+        assert_eq!(
+            skills_named(&inventory, name)[0].1,
+            [
+                (
+                    "effective".to_owned(),
+                    project(effective).display().to_string()
+                ),
+                (
+                    "shadowed".to_owned(),
+                    project(shadowed).display().to_string()
+                ),
+            ],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn ignore_files_leave_out_the_folders_down_to_the_marker_not_the_skills_folder() {
+    let fs = git_app_with_skills(&[
+        r"gi-folder\.cursor\skills\ignored-folder",
+        r"gi-skills\.cursor\skills\ignored-skills",
+        r"gi-marker\.cursor\skills\ignored-marker",
+        r"ig-folder\.cursor\skills\dot-ignore",
+        r"sub\kept\.cursor\skills\kept-again",
+    ])
+    .with_file(
+        project(r"app\.gitignore"),
+        "gi-folder/\ngi-skills/.cursor/skills/\ngi-marker/.cursor/\n# a comment\n",
+    )
+    .with_file(project(r"app\.ignore"), "ig-folder/\n")
+    .with_file(project(r"app\sub\.gitignore"), "/*\n!/kept/\n");
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [
+            project(r"app\gi-skills\.cursor\skills\ignored-skills")
+                .display()
+                .to_string(),
+            project(r"app\sub\kept\.cursor\skills\kept-again")
+                .display()
+                .to_string(),
+        ]
+    );
+}
+
+#[test]
+fn the_ignore_files_above_the_project_folder_apply_too() {
+    let fs = cursor()
+        .with_folder(project(r"repo\.git"))
+        .with_file(project(r"repo\.gitignore"), "app/generated/\n");
+    let fs = with_skill(fs, project(r"repo\app\generated\.cursor\skills\left-out"));
+    let fs = with_skill(fs, project(r"repo\app\sub\.cursor\skills\kept"));
+
+    let inventory = inventory_at(&fs, &project(r"repo\app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [project(r"repo\app\sub\.cursor\skills\kept")
+            .display()
+            .to_string()]
+    );
+}
+
+#[test]
+fn the_walk_follows_links_to_folders() {
+    let fs = with_skill(
+        git_app_with_skills(&[]),
+        project(r"shared\.cursor\skills\linked"),
+    )
+    .with_link(project(r"app\shared"), project("shared"));
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(code(item(&inventory, "linked").state), "effective");
+}
+
+#[test]
+fn a_project_at_the_user_s_home_folder_reads_its_nested_skills_too() {
+    let fs = with_skill(
+        cursor().with_folder(in_home(".git")),
+        in_home(r"dotfiles\.cursor\skills\nested"),
+    );
+
+    let inventory = inventory_at(&fs, Path::new(HOME));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [in_home(r"dotfiles\.cursor\skills\nested")
+            .display()
+            .to_string()]
+    );
+}
+
+#[test]
+fn the_project_s_own_skills_folders_are_read_once() {
+    let fs = git_app_with_skills(&[r".cursor\skills\root", r".agents\skills\agents-root"]);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skill_locators(&inventory),
+        [
+            project(r"app\.agents\skills\agents-root")
+                .display()
+                .to_string(),
+            project(r"app\.cursor\skills\root").display().to_string(),
+        ]
+    );
+}
+
 /// Whether the Projects of `inventory` hold `path`, recorded by Cursor.
 fn recorded_by_cursor(inventory: &Inventory, path: &Path) -> bool {
     inventory

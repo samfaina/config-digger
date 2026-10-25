@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 humantime.workspace = true
+ignore.workspace = true
 jsonc-parser.workspace = true
 regex-lite.workspace = true
 rusqlite.workspace = true

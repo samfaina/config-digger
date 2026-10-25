@@ -1676,7 +1676,7 @@ impl AgentDefinition {
                     "a location in a Project cannot be keyed by `{PROJECT_KEY}`"
                 )));
             }
-            if location.anchor.walk() != ProjectWalk::None && location.keyed_by_project() {
+            if location.anchor.walk() != &ProjectWalk::None && location.keyed_by_project() {
                 return Err(context(format!(
                     "a location that walks cannot be keyed by `{PROJECT_KEY}`"
                 )));
@@ -2945,6 +2945,42 @@ checks = {checks}
         }
     }
 
+    const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = true, follow_links = false } }"#;
+
+    #[test]
+    fn a_folder_of_skill_folders_can_walk_down_from_the_project_folder() {
+        let anchor = format!(r#"{{ block = "project", path = ".test/skills", walk = {DOWN} }}"#);
+        let text = with_skills(&anchor, SKILL_FORMAT, CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_downward_walk_states_each_rule_and_no_other() {
+        for (walk, message) in [
+            (
+                DOWN.replace("follow_links = false", "follow_links = false, depth = 3"),
+                "unknown field `depth`",
+            ),
+            (
+                DOWN.replace(", ignore_files = true", ""),
+                "missing field `ignore_files`",
+            ),
+            (
+                DOWN.replace(r#"".git""#, r#""a/b""#),
+                "`a/b` must be one folder name",
+            ),
+            (
+                DOWN.replace(r#"".git""#, r#""""#),
+                "must be one folder name",
+            ),
+        ] {
+            let anchor =
+                format!(r#"{{ block = "project", path = ".test/skills", walk = {walk} }}"#);
+            let text = with_skills(&anchor, SKILL_FORMAT, CHECKS);
+            assert!(error(&text).contains(message), "{walk}: {}", error(&text));
+        }
+    }
+
     #[test]
     fn a_machine_path_starts_from_the_home_folder_a_variable_or_a_drive_without_wildcards() {
         for (path, message) in [
@@ -3021,11 +3057,13 @@ checks = {checks}
 
     #[test]
     fn a_disable_switch_cannot_walk() {
-        let text = with_disable(&name_list(false, "").replace(
-            r#"{ block = "home", root = "state" }"#,
-            r#"{ block = "project", path = ".test.json", walk = "up-to-repo-root" }"#,
-        ));
-        assert!(error(&text).contains("cannot walk"), "{}", error(&text));
+        for walk in [r#""up-to-repo-root""#, DOWN] {
+            let text = with_disable(&name_list(false, "").replace(
+                r#"{ block = "home", root = "state" }"#,
+                &format!(r#"{{ block = "project", path = ".test.json", walk = {walk} }}"#),
+            ));
+            assert!(error(&text).contains("cannot walk"), "{}", error(&text));
+        }
     }
 
     /// `VALID` with `lookup` as the lookup of a gate affecting its servers,

@@ -8,11 +8,13 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   adds a skill behind a relative folder symlink
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    adds Cursor in cursor-appdata and a git Project with a nested skill
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
     [switch]$Symlink,
-    [switch]$VsCode
+    [switch]$VsCode,
+    [switch]$Cursor
 )
 $ErrorActionPreference = "Stop"
 
@@ -233,6 +235,33 @@ if ($VsCode) {
   }
 }
 "@
+}
+
+# With -Cursor, Cursor's files as they would be in an %APPDATA% of their own,
+# cursor-appdata, which the app reads when started with APPDATA set to it:
+# Cursor has run, and opened cursor-project, a git repo with a skill in a
+# .cursor\skills folder deeper than its own.
+if ($Cursor) {
+    $user = "$Root\cursor-appdata\Cursor\User"
+    Write-TestFile "$user\settings.json" "{}`n"
+    # Cursor keys a workspace by its URI, the drive in lower case and its
+    # colon encoded.
+    $uri = "file:///" + $Root.Substring(0, 1).ToLower() + "%3A" + ($Root.Substring(2) -replace '\\', '/' -replace ' ', '%20')
+    Write-TestFile "$user\workspaceStorage\cd-throwaway\workspace.json" @"
+{
+  "folder": "$uri/cursor-project"
+}
+"@
+    Write-TestFile "$Root\cursor-project\packages\app\.cursor\skills\cd-throwaway-nested-skill\SKILL.md" @"
+---
+name: cd-throwaway-nested-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    git init -q "$Root\cursor-project"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot run git init in $Root\cursor-project: install Git for Windows."
+    }
 }
 
 # With -Symlink, a skill committed in a repo with git's core.symlinks, as git
