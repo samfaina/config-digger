@@ -407,7 +407,7 @@ fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> Operat
             .err()
             .map(|blocked| blocked.message())
             .or_else(|| {
-                plan::undo_folders(ports, manifest)
+                plan::undo_folders(ports, manifest, &mut scan::GitAsks::default())
                     .err()
                     .map(|error| error.message)
             })
