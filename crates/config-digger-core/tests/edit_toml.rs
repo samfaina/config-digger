@@ -346,14 +346,19 @@ fn edits_keep_a_missing_final_newline() {
 const NO_FINAL_NEWLINE: &[u8] =
     b"model = \"gpt-5\"\n\n[mcp_servers.x]\ncommand = \"node\"\nargs = [\"x\"]";
 
-#[test]
-fn undoing_a_disable_in_a_file_without_a_final_newline_gives_back_the_original_bytes() {
-    let disable = Edit::Set {
+/// Codex's Disable of the server in [`NO_FINAL_NEWLINE`], which appends a key
+/// on a new last line.
+fn disable_x() -> Edit {
+    Edit::Set {
         key_path: key("mcp_servers.x.enabled"),
         value: json!(false),
-    };
+    }
+}
+
+#[test]
+fn undoing_a_disable_in_a_file_without_a_final_newline_gives_back_the_original_bytes() {
     for original in [NO_FINAL_NEWLINE.to_vec(), crlf(NO_FINAL_NEWLINE)] {
-        let disabled = apply(&original, &disable);
+        let disabled = apply(&original, &disable_x());
 
         assert_eq!(apply(&disabled.bytes, &disabled.inverse).bytes, original);
     }
@@ -361,13 +366,7 @@ fn undoing_a_disable_in_a_file_without_a_final_newline_gives_back_the_original_b
 
 #[test]
 fn an_enable_that_deletes_the_key_after_a_disable_gives_back_the_original_bytes() {
-    let disabled = apply(
-        NO_FINAL_NEWLINE,
-        &Edit::Set {
-            key_path: key("mcp_servers.x.enabled"),
-            value: json!(false),
-        },
-    );
+    let disabled = apply(NO_FINAL_NEWLINE, &disable_x());
     let enable = Edit::Remove {
         key_path: key("mcp_servers.x.enabled"),
     };

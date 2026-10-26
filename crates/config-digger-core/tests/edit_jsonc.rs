@@ -435,32 +435,20 @@ fn inverses_and_dependencies_of_set_and_list_edits() {
 fn an_edit_that_would_change_lines_outside_its_span_is_refused() {
     // jsonc-parser drops the blank line under `{` of an object it appends to,
     // which is not part of the gap the new server goes in.
-    let text = b"{\n  \"mcpServers\": {\n\n    \"a\": { \"command\": \"x\" },\n    \"b\": { \"command\": \"y\" }\n  }\n}\n";
-    let file = EditableFile::decode(text, Syntax::Jsonc).unwrap();
+    // The same without a final newline, which the line check makes up for.
+    let text = "{\n  \"mcpServers\": {\n\n    \"a\": { \"command\": \"x\" },\n    \"b\": { \"command\": \"y\" }\n  }\n}";
+    for text in [format!("{text}\n"), text.to_owned()] {
+        let file = EditableFile::decode(text.as_bytes(), Syntax::Jsonc).unwrap();
 
-    let error = file
-        .apply(&Edit::Set {
-            key_path: key("mcpServers.c"),
-            value: json!({ "command": "z" }),
-        })
-        .unwrap_err();
+        let error = file
+            .apply(&Edit::Set {
+                key_path: key("mcpServers.c"),
+                value: json!({ "command": "z" }),
+            })
+            .unwrap_err();
 
-    assert_eq!(error, EditError::OutsideEntry { line: 3 });
-}
-
-#[test]
-fn an_edit_that_would_change_lines_outside_its_span_is_refused_without_a_final_newline() {
-    let text = b"{\n  \"mcpServers\": {\n\n    \"a\": { \"command\": \"x\" },\n    \"b\": { \"command\": \"y\" }\n  }\n}";
-    let file = EditableFile::decode(text, Syntax::Jsonc).unwrap();
-
-    let error = file
-        .apply(&Edit::Set {
-            key_path: key("mcpServers.c"),
-            value: json!({ "command": "z" }),
-        })
-        .unwrap_err();
-
-    assert_eq!(error, EditError::OutsideEntry { line: 3 });
+        assert_eq!(error, EditError::OutsideEntry { line: 3 });
+    }
 }
 
 #[test]

@@ -17,6 +17,7 @@ mod toml;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use similar::{Algorithm, DiffTag, TextDiff};
+use std::borrow::Cow;
 use std::ops::Range;
 
 /// The syntax a file is edited in.
@@ -269,7 +270,7 @@ impl EditableFile {
     /// Puts back what editing an LF copy loses: the final newline's absence
     /// and the line endings of every line the edit kept.
     fn with_own_line_endings(&self, lf_before: &str, mut lf_after: String) -> String {
-        if !self.text.is_empty() && !self.text.ends_with('\n') && lf_after.ends_with('\n') {
+        if lacks_final_newline(&self.text) && lf_after.ends_with('\n') {
             lf_after.pop();
         }
         let endings = line_endings(&self.text);
@@ -411,13 +412,12 @@ fn remove_empty_objects(value: &mut Value) {
 /// Blank lines next to a range count as part of it.
 fn check_lines(before: &str, after: &str, allowed: &[Range<usize>]) -> Result<(), EditError> {
     // In a file without a final newline, a line that becomes the last one, or
-    // stops being it, gains or loses its newline without being changed.
-    let (before, after) = if before.is_empty() || before.ends_with('\n') {
-        (before.to_owned(), after.to_owned())
-    } else if after.is_empty() {
-        (format!("{before}\n"), String::new())
+    // stops being it, gains or loses its newline without being changed, so
+    // both texts are compared with one. A file the edit empties stays empty.
+    let (before, after) = if lacks_final_newline(before) {
+        (with_final_newline(before), with_final_newline(after))
     } else {
-        (format!("{before}\n"), format!("{after}\n"))
+        (Cow::Borrowed(before), Cow::Borrowed(after))
     };
     let before = lines(&before);
     let after = lines(&after);
@@ -465,6 +465,18 @@ fn check_lines(before: &str, after: &str, allowed: &[Range<usize>]) -> Result<()
 
 fn lines(text: &str) -> Vec<&str> {
     text.split_inclusive('\n').collect()
+}
+
+fn lacks_final_newline(text: &str) -> bool {
+    !text.is_empty() && !text.ends_with('\n')
+}
+
+fn with_final_newline(text: &str) -> Cow<'_, str> {
+    if lacks_final_newline(text) {
+        Cow::Owned(format!("{text}\n"))
+    } else {
+        Cow::Borrowed(text)
+    }
 }
 
 /// The 0-based lines from the one that holds byte `start` of `text` to the
@@ -550,6 +562,19 @@ mod tests {
             Some("\"t\"")
         );
         assert_eq!(spanned(Syntax::Jsonc, text, &["s", "env"]), None);
+    }
+
+    #[test]
+    fn the_line_check_lets_a_line_become_the_last_one_but_not_change() {
+        // Removing the last line of a file without a final newline.
+        let before = "[t]\nx = 1\ny = 2";
+        let last_line = [line_range(before, 10, 10)];
+
+        assert_eq!(check_lines(before, "[t]\nx = 1", &last_line), Ok(()));
+        assert_eq!(
+            check_lines(before, "[t]\nx = 9", &last_line),
+            Err(EditError::OutsideEntry { line: 2 })
+        );
     }
 
     #[test]
