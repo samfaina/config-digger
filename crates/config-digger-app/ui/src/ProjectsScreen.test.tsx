@@ -107,9 +107,12 @@ const places: Places = {
   ],
 };
 
+/** `markup` without the pieces a path is drawn in, so that the path reads whole. */
+const unpieced = (markup: string) => markup.replace(/<span class="path-piece">([^<]*)<\/span><wbr\/>/g, "$1");
+
 /** The markup of the row named `name`, up to the next row or group title. */
 const rowMarkup = (markup: string, name: string) =>
-  (markup.split('<div class="place-row').find((each) => each.includes(`>${name}</div>`)) ?? "").split("<h3")[0];
+  (markup.split('<div class="place-row').find((each) => unpieced(each).includes(`>${name}</div>`)) ?? "").split("<h3")[0];
 
 /** The opening tag of each button of the row named `name`. */
 const buttonsOf = (markup: string, name: string) => rowMarkup(markup, name).match(/<button[^>]*>/g) ?? [];
@@ -187,7 +190,7 @@ describe("the search of the Projects tab", () => {
   });
 
   test("narrows the rows to the Projects whose path holds it, and leaves out No Project", () => {
-    const markup = tab("KEEP");
+    const markup = unpieced(tab("KEEP"));
     expect(markup).toContain(`>${KEEP}</div>`);
     expect(markup).not.toContain(`>${HIDE}</div>`);
     expect(markup).not.toContain(`>${GONE}</div>`);
@@ -205,7 +208,9 @@ describe("the group of missing Projects without leftovers", () => {
     <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />
   );
   const titles = () => rendered.getAllByRole("heading").map((heading) => heading.textContent);
-  const listed = (path: string) => rendered.queryByText(path) !== null;
+  /** The name of the row of `path`, whose text is split in the pieces it wraps between. */
+  const named = (path: string) => (_: string, element: Element | null) => element?.classList.contains("place-name") === true && element.textContent === path;
+  const listed = (path: string) => rendered.queryByText(named(path)) !== null;
 
   test("follows Missing, closed, with its count, and leaves its rows out of Missing", () => {
     render(tab());
@@ -220,7 +225,7 @@ describe("the group of missing Projects without leftovers", () => {
     render(<ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={(change) => changes.push(change)} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />);
 
     await userEvent.click(rendered.getByRole("button", { name: "▸ Missing, no leftovers · 1" }));
-    const row = rendered.getByText(DELETED).closest(".place-row") as HTMLElement;
+    const row = rendered.getByText(named(DELETED)).closest(".place-row") as HTMLElement;
     expect([...row.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["Hide"]);
     expect(row.textContent).toContain("No leftovers");
     await userEvent.click(row.querySelector("button") as HTMLElement);
@@ -267,6 +272,31 @@ describe("a row of the Agent homes tab", () => {
       expect(classes, label).toBe(label === "Remove from list" ? "cta small danger" : "cta small secondary");
     }
     expect(classesOf(markup, PORTABLE).map(([label]) => label)).toContain("Remove from list");
+  });
+});
+
+describe("a path on a row of Projects & homes", () => {
+  test("wraps a Project's path only right after a \\ or a /, each folder's name kept whole", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectsTab places={places} search="" busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />,
+    );
+    for (const name of ["project-keep", "project-gone", "project-hide"]) {
+      expect(markup, name).toContain(
+        String.raw`<div class="place-name mono"><span class="path-piece">E:\</span><wbr/><span class="path-piece">cd-throwaway\</span><wbr/><span class="path-piece">` +
+          `${name}</span><wbr/></div>`,
+      );
+    }
+  });
+
+  test("wraps an Agent home's folder only right after a \\ or a /, and the name of a home the user added, which is its folder", () => {
+    const markup = renderToStaticMarkup(<HomesTab places={places} busy={[]} onShow={() => {}} onChange={() => {}} />);
+    expect(markup).toContain(String.raw`<div class="place-name"><span class="path-piece">D:\</span><wbr/><span class="path-piece">portable</span><wbr/></div>`);
+    // The default home's name is no path.
+    expect(markup).toContain('<div class="place-name">default</div>');
+    expect(markup).toContain(String.raw`<div class="place-sub mono"><span class="path-piece">D:\</span><wbr/><span class="path-piece">portable</span><wbr/></div>`);
+    expect(markup).toContain(
+      String.raw`<div class="place-sub mono"><span class="path-piece">C:\</span><wbr/><span class="path-piece">Users\</span><wbr/><span class="path-piece">me</span><wbr/></div>`,
+    );
   });
 });
 

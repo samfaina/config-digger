@@ -420,10 +420,11 @@
           "title": "La primera lectura de las otras pantallas",
           "goal": "Projects & homes, History y Settings enseñan que están leyendo hasta que tienen sus datos.",
           "instructions": [
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
             "Abre Projects & homes en la barra de la izquierda.",
             "Mira enseguida la lista, bajo la descripción de la pestaña.",
             "Abre History.",
-            "Mira enseguida la lista Operations.",
+            "Mira enseguida el título grande de la cabecera y la lista Operations.",
             "Abre Settings.",
             "Mira enseguida el panel Data on this computer."
           ],
@@ -432,11 +433,13 @@
             "Cada lista empieza con un aviso con una rueda que gira y filas grises que laten debajo, aunque dure menos de un segundo.",
             "En Projects & homes, el aviso dice «Reading the Projects and Agent homes…».",
             "En History, el aviso dice «Reading History…».",
+            "En History, mientras sale el aviso, el título de la cabecera dice «Operations», sin ningún número.",
             "En Settings, el aviso dice «Reading where config-digger keeps its data…».",
             "Luego salen sus datos.",
+            "Cuando salen los datos de History, su título dice cuántas Operations hay, con el número delante, como «3 Operations».",
             "En ningún momento sale una línea de texto suelta en lugar del aviso."
           ],
-          "covers": ["#180"],
+          "covers": ["#180", "#289"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/loading.mjs > 15.3" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/loading.mjs > 15.3" }
@@ -948,8 +951,10 @@
             "Ve a Projects & homes.",
             "Abre la pestaña Projects.",
             "Mira la cabecera y el principio de la lista.",
+            "Desplázate por la lista hasta E:\\cd-throwaway\\project-extra y mira dónde se parten las rutas que ocupan más de una línea.",
             "Abre la pestaña Agent homes.",
-            "Mira la cabecera y el principio de la lista."
+            "Mira la cabecera y el principio de la lista.",
+            "Mira dónde se parten el nombre y la carpeta de cada home que ocupan más de una línea."
           ],
           "commands": [],
           "expect": [
@@ -958,9 +963,12 @@
             "El botón «Add Project» o «Add Agent home» ocupa una línea.",
             "La descripción sale encima de la lista, no en la cabecera.",
             "En Projects, la descripción dice «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.».",
-            "En Agent homes, la descripción dice «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.»."
+            "En Agent homes, la descripción dice «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.».",
+            "En Projects, cada ruta que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta.",
+            "En Agent homes, cada carpeta o nombre de home que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta.",
+            "Ninguna ruta se sale de su fila ni hace que la página se desplace de lado."
           ],
-          "covers": ["#221"],
+          "covers": ["#221", "#289"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.10" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.10" }
@@ -1503,6 +1511,7 @@
             "Desplázate hasta abajo dentro del bloque Agent home.",
             "En Agents, elige Claude Code.",
             "En Agent home, elige claude-code-many-home, el home que añade el paso 4.1.",
+            "Sin dejar el ratón encima, lee el nombre de cada ficha del bloque Agent home.",
             "En el campo Project de la cabecera, elige E:\\cd-throwaway\\many\\project-01.",
             "Deja el ratón sobre el campo Project.",
             "Elige el servidor cd-throwaway-many-01 de la lista de Items.",
@@ -1515,6 +1524,9 @@
             "«Entries by State» y «Agent home» muestran cada uno su título y al menos una fila.",
             "Al desplazarte dentro de un bloque llegas a su última fila, y los otros dos bloques no se mueven.",
             "«Claude Code» y «claude-code-many-home» se eligen con un clic.",
+            "Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra.",
+            "Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.",
+            "Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».",
             "La lista de Items y el panel de la derecha tienen más o menos el mismo ancho.",
             "La columna de la izquierda es algo más estrecha que cada uno de ellos.",
             "Ningún texto se monta sobre otro.",
@@ -1523,7 +1535,7 @@
             "La ubicación acaba en «…» y su tooltip muestra la ruta entera.",
             "El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero."
           ],
-          "covers": ["#221"],
+          "covers": ["#221", "#289"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" }

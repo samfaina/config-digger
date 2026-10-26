@@ -332,6 +332,30 @@ uatStep("4.6", async ({ page, open, check }) => {
     await home.click();
     await expect(home).toHaveAttribute("aria-pressed", "true");
   });
+  // Each Claude Code tile's name: its parts' text, and whether each shows whole or is cut.
+  const tiles = await blocks.homes.locator(".home-name").evaluateAll((names) =>
+    names.map((name) => {
+      const part = (css: string) => {
+        const element = name.querySelector<HTMLElement>(css);
+        return element && { text: element.textContent!, cut: element.scrollWidth > element.clientWidth, ellipsis: getComputedStyle(element).textOverflow };
+      };
+      return { head: part(".home-name-head"), tail: part(".home-name-tail")! };
+    }),
+  );
+  await check("Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra.", async () => {
+    expect(tiles.length).toBeGreaterThanOrEqual(2);
+    for (const { tail } of tiles) expect(tail.cut, tail.text).toBe(false);
+    expect(tiles.map(({ tail }) => tail.text)).toContain(String.raw`\claude-code-many-home`);
+    expect(new Set(tiles.map(({ tail }) => tail.text)).size).toBe(tiles.length);
+  });
+  await check("Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.", async () => {
+    const many = tiles.find(({ tail }) => tail.text === String.raw`\claude-code-many-home`)!;
+    expect(many.head).toEqual({ text: ROOT, cut: true, ellipsis: "ellipsis" });
+  });
+  await check("Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».", async () => {
+    // The fixtures' default Claude Code home is named default.
+    expect(tiles.find(({ tail }) => tail.text === "default")).toEqual({ head: null, tail: { text: "default", cut: false, ellipsis: "ellipsis" } });
+  });
 
   const project = page.getByRole("combobox", { name: "Project" });
   await project.click();

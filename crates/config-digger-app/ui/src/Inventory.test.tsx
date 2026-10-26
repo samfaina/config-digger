@@ -245,6 +245,25 @@ describe("the Agent home pane of a Project VS Code last opened in a profile", ()
   });
 });
 
+describe("the name on an Agent home's tile", () => {
+  const added = (folder: string) => home({ home: folder, folder, source: { kind: "added" } });
+  const names = (homes: ReturnType<typeof home>[]) =>
+    renderToStaticMarkup(<HomesPane inventory={inventory({ homes })} selection={{ agent: "codex", homes: { codex: "default" } }} onHome={() => {}} />).match(
+      /<span class="home-name">[\s\S]*?<\/span><\/span>/g,
+    ) ?? [];
+
+  test("keeps a folder's last part apart from the rest, so that a name too long for its tile is cut before it", () => {
+    expect(names([added(String.raw`E:\cd-throwaway\claude-code-many-home`), added("/home/me/.codex-work")])).toEqual([
+      String.raw`<span class="home-name"><span class="home-name-head">E:\cd-throwaway</span><span class="home-name-tail">\claude-code-many-home</span></span>`,
+      '<span class="home-name"><span class="home-name-head">/home/me</span><span class="home-name-tail">/.codex-work</span></span>',
+    ]);
+  });
+
+  test("is one part when it has no folder to cut, such as the default home", () => {
+    expect(names([home()])).toEqual(['<span class="home-name"><span class="home-name-tail">default</span></span>']);
+  });
+});
+
 describe("a key on the closed Project field", () => {
   const first = String.raw`E:\cd-throwaway\project-a`;
   const second = String.raw`E:\cd-throwaway\project-b`;

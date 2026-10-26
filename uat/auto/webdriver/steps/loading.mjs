@@ -91,6 +91,7 @@ export default [
     note: "La app se abre recargando su página, con las lecturas retenidas 3 s, para ver cada pantalla mientras lee.",
     async run(t) {
       const { s } = t;
+      await s.setWindow(1100, 640);
       await s.instrument();
       await s.delay({ read_places: 4000, read_history: 4000, read_settings: 4000, read_about: 4000 });
       await s.reload();
@@ -100,6 +101,7 @@ export default [
         ["History · Undo", "Reading History…"],
         ["Settings", "Reading where config-digger keeps its data…"],
       ];
+      const historyTitle = () => s.exec(`return document.querySelector(".history .banner-title")?.textContent;`);
       for (const [screen, text] of screens) {
         await go(s, screen);
         const state = await s.until(async () => {
@@ -114,6 +116,10 @@ export default [
           const owner = loading?.parentElement;
           return owner ? [...owner.children].filter((e) => e !== loading && e.matches("p") && e.textContent.trim()).map((e) => e.textContent.trim()) : [];`);
         t.check(stray.length === 0, `en ${screen}, no sale una línea de texto suelta en lugar del aviso`, stray.join(" | "));
+        if (screen === "History · Undo") {
+          const title = await historyTitle();
+          t.eq(title, "Operations", "en History, mientras sale el aviso, el título de la cabecera dice «Operations», sin ningún número");
+        }
       }
       await s.delay({});
       await wait(4500);
@@ -121,6 +127,10 @@ export default [
         await go(s, screen);
         const done = await s.until(async () => !(await loadingState(s)).loading, { what: `${screen} read`, timeout: 8000 }).catch(() => false);
         t.check(done, `luego salen los datos de ${screen}`);
+        if (screen === "History · Undo") {
+          const title = await historyTitle();
+          t.check(/^\d+ Operations?$/.test(title ?? ""), "cuando salen los datos de History, su título dice cuántas Operations hay, con el número delante", title);
+        }
       }
       await go(s, "Inventory");
     },

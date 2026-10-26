@@ -2,6 +2,7 @@
 // fake backend answers at once, so each step holds the read's answer with the
 // page's delay parameter while it looks at the state.
 import { expect, type Page } from "@playwright/test";
+import { SMALLEST } from "../scripts/fakeUi.ts";
 import { inventoryShown, rail } from "./app";
 import { uatStep } from "./step";
 
@@ -75,6 +76,7 @@ async function runsUnderTheHeader(page: Page) {
 }
 
 uatStep("15.3", async ({ page, open, check }) => {
+  await page.setViewportSize(SMALLEST);
   // Each screen reads once it opens; the inventory answers at once.
   await open({ delay: { read_places: 3000, read_history: 3000, read_settings: 3000 } });
   await inventoryShown(page);
@@ -84,9 +86,12 @@ uatStep("15.3", async ({ page, open, check }) => {
     { screen: "Settings", text: "Reading where config-digger keeps its data…", data: page.locator(".settings-data .place-row").first() },
   ];
   const seen: ({ screen: string } & Awaited<ReturnType<typeof loadingState>>)[] = [];
+  const historyTitle = page.locator(".history .banner-title");
+  let titleWhileReading = "";
   for (const { screen } of screens) {
     await rail(page, screen);
     seen.push({ screen, ...(await loadingState(page)) });
+    if (screen === "History · Undo") titleWhileReading = (await historyTitle.textContent())!;
   }
 
   await check("Cada lista empieza con un aviso con una rueda que gira y filas grises que laten debajo, aunque dure menos de un segundo.", async () => {
@@ -106,12 +111,20 @@ uatStep("15.3", async ({ page, open, check }) => {
       expect(seen[at].text).toBe(screens[at].text);
     });
   }
+  await check("En History, mientras sale el aviso, el título de la cabecera dice «Operations», sin ningún número.", async () => {
+    expect(titleWhileReading).toBe("Operations");
+  });
   await check("Luego salen sus datos.", async () => {
     for (const { screen, data } of screens) {
       await rail(page, screen);
       await expect(data, screen).toBeVisible({ timeout: 10_000 });
       await expect(page.locator("main .loading"), screen).toHaveCount(0);
     }
+  });
+  await check("Cuando salen los datos de History, su título dice cuántas Operations hay, con el número delante, como «3 Operations».", async () => {
+    await rail(page, "History · Undo");
+    await expect(page.locator(".operation-row").first()).toBeVisible();
+    await expect(historyTitle).toHaveText(`${await page.locator(".operation-row").count()} Operations`);
   });
   await check("En ningún momento sale una línea de texto suelta en lugar del aviso.", async () => {
     for (const state of seen) expect(state.stray, state.screen).toEqual([]);

@@ -28,6 +28,7 @@ import {
 import { undoRefusal, type UndoRefusal } from "./history";
 import { Icon } from "./icons";
 import { Loading } from "./Loading";
+import { Pieces } from "./Pieces";
 import { StatePill } from "./StatePill";
 import { Tooltip } from "./Tooltip";
 
@@ -484,12 +485,7 @@ function ChangeRow({ line: { change, keyPieces }, notify }: { line: ChangeLine; 
         <ChangePart label="Key" className="change-locator">
           <Tooltip text={change.locator}>
             <span className="mono dim change-key">
-              {keyPieces.map((piece, index) => (
-                <Fragment key={index}>
-                  <span className="change-key-piece">{piece}</span>
-                  <wbr />
-                </Fragment>
-              ))}
+              <Pieces pieces={keyPieces} className="change-key-piece" />
             </span>
           </Tooltip>
           <CopyButton text={change.locator} what="locator" notify={notify} />

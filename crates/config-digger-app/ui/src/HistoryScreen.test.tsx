@@ -15,6 +15,11 @@ describe("History before its first read is done", () => {
     expect(list).toContain(renderToStaticMarkup(<Loading text="Reading History…" rows={6} />));
     expect(list).not.toContain('<p class="empty">');
   });
+
+  test("states no count of Operations in its banner's title, as it has none yet", () => {
+    const title = renderToStaticMarkup(<HistoryScreen />).match(/<div class="banner-title">([\s\S]*?)<\/div>/)?.[1];
+    expect(title).toBe("Operations");
+  });
 });
 
 /** An applied Operation whose Rollback is incomplete, so Undo, Delete backup and Dismiss are all offered. */

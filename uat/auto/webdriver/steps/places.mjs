@@ -522,6 +522,30 @@ export default [
         t.eq(layout.add, 1, `en ${name}, el botón «${add}» ocupa una línea`);
         t.check(layout.aboutInHeader === false && layout.aboutAboveList, `en ${name}, la descripción sale encima de la lista, no en la cabecera`);
         t.eq(layout.about, about, `en ${name}, la descripción dice «${about}»`);
+        const paths = await s.exec(`
+          const linesOf = (el) => {
+            const lines = [], range = document.createRange(), walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              for (let at = 0; at < node.textContent.length; at++) {
+                range.setStart(node, at); range.setEnd(node, at + 1);
+                const top = Math.round(range.getBoundingClientRect().top), line = lines.at(-1);
+                if (line && Math.abs(line.top - top) <= 2) line.text += node.textContent[at]; else lines.push({ top, text: node.textContent[at] });
+              }
+            }
+            return lines.map((line) => line.text);
+          };
+          const css = ${JSON.stringify(name === "Projects" ? ".places-list .place-name.mono" : ".places-list .place-name, .places-list .place-sub.mono")};
+          const midWord = [...document.querySelectorAll(css)].map(linesOf).filter((lines) => lines.slice(0, -1).some((line) => !/[\\\\/]$/.test(line))).map((lines) => lines.join(" ⏎ "));
+          const out = [...document.querySelectorAll(".places-list .place-row")].flatMap((row) => [...row.querySelectorAll(".mono")].filter((p) => p.getBoundingClientRect().right > row.getBoundingClientRect().right + 1).map((p) => p.textContent));
+          return { midWord, out, sideways: document.scrollingElement.scrollWidth > innerWidth };`);
+        t.check(
+          paths.midWord.length === 0,
+          name === "Projects"
+            ? "en Projects, cada ruta que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta"
+            : "en Agent homes, cada carpeta o nombre de home que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta",
+          paths.midWord.join(" | "),
+        );
+        t.check(paths.out.length === 0 && !paths.sideways, `en ${name}, ninguna ruta se sale de su fila ni hace que la página se desplace de lado`, JSON.stringify(paths));
         t.shared.viewport = layout.vp;
         await t.shot(name.replace(" ", "-").toLowerCase(), `en ${name}, nada se parte ni se monta a 1100 × 640`);
       }
