@@ -1,8 +1,13 @@
+// @vitest-environment happy-dom
+import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { OperationSummary } from "./bindings";
+import type { UndoRefusal } from "./history";
 import { HistoryScreen, OperationPane } from "./HistoryScreen";
 import { Loading } from "./Loading";
+
+afterEach(cleanup);
 
 describe("History before its first read is done", () => {
   test("fills its list of Operations with the loading state", () => {
@@ -33,22 +38,25 @@ const summary: OperationSummary = {
   not_undoable: null,
 };
 
+/** The pane of `summary`, showing `refusal` and whether an action on it runs. */
+const pane = ({ refusal = null, busy = false }: { refusal?: UndoRefusal | null; busy?: boolean }) => (
+  <OperationPane
+    summary={summary}
+    detail={null}
+    detailError={null}
+    time="09:58"
+    refusal={refusal}
+    busy={busy}
+    onUndo={() => {}}
+    onDeleteBackup={() => {}}
+    onDismiss={() => {}}
+    notify={() => {}}
+  />
+);
+
 /** The opening tag of each button in the footer of the Operation's pane. */
 const footerButtons = (busy: boolean) => {
-  const markup = renderToStaticMarkup(
-    <OperationPane
-      summary={summary}
-      detail={null}
-      detailError={null}
-      time="09:58"
-      refusal={null}
-      busy={busy}
-      onUndo={() => {}}
-      onDeleteBackup={() => {}}
-      onDismiss={() => {}}
-      notify={() => {}}
-    />,
-  );
+  const markup = renderToStaticMarkup(pane({ busy }));
   return markup.slice(markup.indexOf('<footer class="dialog-foot">')).match(/<button[^>]*>/g) ?? [];
 };
 
@@ -68,5 +76,19 @@ describe("the pane of an Operation", () => {
   test("draws Delete backup in the style of a button that deletes, and Dismiss and Undo not", () => {
     const classes = footerButtons(false).map((button) => button.match(/class="([^"]*)"/)?.[1]);
     expect(classes).toEqual(["cta secondary", "cta danger", "cta"]);
+  });
+});
+
+describe("the pane of an Operation whose Undo was refused", () => {
+  /** A refused Undo, whose Can't undo block scrolls into view. */
+  const refusal: UndoRefusal = { reason: "The file changed since the Operation.", backup: String.raw`C:\Users\me\.config-digger\backups\20261002-095812-a3f`, diffs: [] };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  test("unmounts without an error when scrollIntoView returns a Promise", () => {
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => Promise.resolve() as unknown as void);
+    const { unmount } = render(pane({ refusal }));
+    expect(scroll).toHaveBeenCalled();
+    expect(unmount).not.toThrow();
   });
 });
