@@ -294,9 +294,9 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # Project layer's server stops it in every other folder. So an Entry of a
 # git-versioned Project layer has no Disable (#297). Enable deletes
 # `enabled = false` from the highest layer that sets it and from each lower
-# one down to the first `true`, whoever wrote it, and leaves the table even
-# when it is empty; it is not offered while one of them is in a
-# git-versioned or managed layer (#287).
+# one down to the first that sets it otherwise, whoever wrote it, and
+# leaves the table even when it is empty; it is not offered while one of
+# them is in a git-versioned or managed layer (#287).
 [[items.mcp.disable]]
 block = "merged-field"
 locations = ["project-mcp", "user-mcp"]

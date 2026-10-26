@@ -122,16 +122,18 @@ describe("the fake backend", () => {
     const executed = await commands.executePlan("plan-1", []);
 
     const config = String.raw`E:\cd-throwaway\codex-home\config.toml`;
+    // The recorded Operation, whose id each recording draws anew.
+    const { operation, backup } = fixtures.executed.outcome;
     expect(executed).toEqual({
       status: "error",
       error: {
         code: "write_failed",
         message: `cannot write ${config}: Access is denied. (os error 5)`,
         candidates: [],
-        backup: String.raw`E:\cd-throwaway\localappdata\config-digger\backups\20261001-120000-b01`,
+        backup,
         diffs: [],
         failed: {
-          operation: "20261001-120000-b01",
+          operation,
           failure: null,
           rollback: [config, String.raw`E:\cd-throwaway\many\project-01\.mcp.json`, String.raw`E:\cd-throwaway\many\project-02\.mcp.json`].map((path) => ({
             path,

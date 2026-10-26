@@ -323,11 +323,15 @@ fn enable_removes_every_enabled_false_that_keeps_the_server_off() {
 
     let before = inventory(&core, &in_app());
     assert_eq!(code(item(&before, "docs").state), "disabled");
+    // Both Entries of the server, which share what Enable deletes.
     let plan = plan(
         &core,
         &in_app(),
         Action::Enable,
-        &[&server(&user_config(), "docs")],
+        &[
+            &server(&user_config(), "docs"),
+            &server(&layer("app"), "docs"),
+        ],
     )
     .unwrap();
     core.execute(plan, &[WarningClass::WideReach]).unwrap();
@@ -343,6 +347,61 @@ fn enable_removes_every_enabled_false_that_keeps_the_server_off() {
     for entry in &item(&after, "docs").entries {
         assert_eq!(code(entry.state), "merged", "{}", entry.locator);
     }
+}
+
+// A lower `false` under the `true` that decides is not what turns it off.
+#[test]
+fn enable_stops_at_the_first_layer_that_sets_enabled_true() {
+    let system = Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\config.toml");
+    let fs = app(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = true\n",
+        "[mcp_servers.docs]\nenabled = false\n",
+    )
+    .with_file(&system, "[mcp_servers.docs]\nenabled = false\n");
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(text(&fs, &layer("app")), "[mcp_servers.docs]\n");
+    assert_eq!(text(&fs, &system), "[mcp_servers.docs]\nenabled = false\n");
+    let after = inventory(&core, &in_app());
+    assert_eq!(code(item(&after, "docs").state), "merged");
+}
+
+// The user's `false` turns off the server built in the untrusted Project
+// too, but the Project's own Entry is Blocked, which Enable never lifts.
+#[test]
+fn enable_of_an_entry_of_an_untrusted_layer_deletes_nothing() {
+    let user = "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = false\n";
+    let fs = FakeFileSystem::new()
+        .with_folder(project(r"app\.git"))
+        .with_file(user_config(), user)
+        .with_file(layer("app"), "[mcp_servers.docs]\nargs = [\"--fast\"]\n");
+    let core = core(&fs);
+
+    let inventory = inventory(&core, &in_app());
+    let blocked = item(&inventory, "docs")
+        .entries
+        .iter()
+        .find(|entry| entry.path == layer("app"))
+        .unwrap();
+    assert_eq!(code(blocked.state), "blocked");
+
+    let planned = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&layer("app"), "docs")],
+    );
+    assert!(planned.is_err(), "an Enable of a Blocked Entry is planned");
+    assert_eq!(text(&fs, &user_config()), user);
 }
 
 #[test]

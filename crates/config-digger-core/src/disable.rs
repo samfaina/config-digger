@@ -605,7 +605,7 @@ fn through_merged_field(
     let field = merge
         .enabled()
         .expect("validation gives a merged field's merge an `enabled` field");
-    let rank = |entry: &ScannedEntry| rank(definition, entry);
+    let rank = |entry: &ScannedEntry| layer_rank(definition, entry);
     let setters = setters(
         definition,
         snapshot,
@@ -670,15 +670,10 @@ fn through_merged_field(
             explain::disable_switch(&edits, &entry.name, &path, false),
             explain::turns_off_built(&definition.agent.name, &entry.name)
         );
-        let syntax = layer
-            .format
-            .file()
-            .expect("validation merges Entries of files only")
-            .syntax();
         return Ok(Choice::Switch {
             path,
             edits,
-            syntax,
+            syntax: merged_syntax(layer),
             sqlite: false,
             by_name_everywhere: false,
             sentence,
@@ -687,9 +682,7 @@ fn through_merged_field(
     let agent = &definition.agent.name;
     Err(match set_above {
         Some(above) => {
-            let mut key_path = above.key_path.clone();
-            key_path.push(field.to_owned());
-            let at = locator::render(&above.path, &key_path);
+            let at = locator::render(&above.path, &field_of(above, field));
             let code = if snapshot.versioned.contains(&above.path) {
                 DisableNotOffered::GitVersioned
             } else {
@@ -714,7 +707,7 @@ fn through_merged_field(
 
 /// How the Agent ranks the layer of `entry`, as a merge orders Entries:
 /// lower is higher, the deepest Project layer first.
-fn rank(definition: &AgentDefinition, entry: &ScannedEntry) -> (usize, usize) {
+fn layer_rank(definition: &AgentDefinition, entry: &ScannedEntry) -> (usize, usize) {
     let location = definition.location(&entry.location);
     (definition.rank(location), entry.depth)
 }
@@ -744,20 +737,36 @@ fn setters<'s>(
                 && resolve::gates(definition, snapshot, other, project).is_empty()
         })
         .collect();
-    setters.sort_by_key(|setter| rank(definition, setter));
+    setters.sort_by_key(|setter| layer_rank(definition, setter));
     setters
 }
 
+/// The key path of `field` in the table of `entry`.
+fn field_of(entry: &ScannedEntry, field: &str) -> Vec<String> {
+    let mut key_path = entry.key_path.clone();
+    key_path.push(field.to_owned());
+    key_path
+}
+
+/// The syntax a file of `layer` is edited in, which merges its Entries.
+fn merged_syntax(layer: &LocationDefinition) -> Syntax {
+    layer
+        .format
+        .file()
+        .expect("validation merges Entries of files only")
+        .syntax()
+}
+
 /// A `false` of the field that turns off the server an Agent builds from
-/// same-named Entries, which Enable removes.
-pub(crate) struct OffField {
+/// same-named Entries, which Enable deletes.
+pub(crate) struct FalseField {
     pub path: PathBuf,
     /// The field's key path in its file.
     pub key_path: Vec<String>,
     pub syntax: Syntax,
 }
 
-impl OffField {
+impl FalseField {
     pub fn edit(&self) -> Edit {
         Edit::Remove {
             key_path: self.key_path.clone(),
@@ -765,56 +774,57 @@ impl OffField {
     }
 }
 
-/// The `false` values of the field that turns off the server the Agent
-/// builds from the Entries of `entry` in the context of the Project with
-/// the key `project`, which Enable removes so that none turns it off again:
+/// The `false` values of the field a merged-field Disable writes that
+/// Enable deletes for `entry` in the context of the Project with the key
+/// `project`, so that none turns the server its Agent builds off again:
 /// that of the highest layer that sets the field, and each lower one down to
-/// the first that sets it otherwise. None when the server is not turned off.
-/// Or why Enable is not offered: one of them is in a git-versioned file, or
-/// in a layer config-digger only reads, or it only reads `entry` itself.
-pub(crate) fn lifted_off(
+/// the first that sets it otherwise. Empty when the server is not turned
+/// off. Or why Enable is not offered: one of them is in a git-versioned
+/// file, or in a layer config-digger only reads, or it only reads `entry`.
+pub(crate) fn deleted_by_enable(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
-) -> Result<Vec<OffField>, String> {
+) -> Result<Vec<FalseField>, String> {
     let location = definition.location(&entry.location);
-    let Some((merge, field)) = definition
-        .rules(location.kind)
+    let rules = definition.rules(location.kind);
+    let Some((merge, field)) = rules
         .merge
         .as_ref()
         .filter(|merge| merge.covers(&entry.location))
+        .filter(|_| {
+            rules
+                .disable
+                .iter()
+                .any(|block| block.merged_field().is_some())
+        })
         .and_then(|merge| Some((merge, merge.enabled()?)))
     else {
         return Ok(Vec::new());
     };
-    let mut lifted = Vec::new();
+    let mut deleted = Vec::new();
     for setter in setters(definition, snapshot, entry, project, merge, field) {
         if setter.config.get(field) != Some(&Value::Bool(false)) {
             break;
         }
         let layer = definition.location(&setter.location);
-        let mut key_path = setter.key_path.clone();
-        key_path.push(field.to_owned());
+        let key_path = field_of(setter, field);
         let versioned = snapshot.versioned.contains(&setter.path);
         if versioned || layer.provenance.read_only() {
             let at = locator::render(&setter.path, &key_path);
             return Err(explain::turned_off_enable(field, &at, versioned));
         }
-        lifted.push(OffField {
+        deleted.push(FalseField {
             path: setter.path.clone(),
             key_path,
-            syntax: layer
-                .format
-                .file()
-                .expect("validation merges Entries of files only")
-                .syntax(),
+            syntax: merged_syntax(layer),
         });
     }
-    if !lifted.is_empty() && location.provenance.read_only() {
+    if !deleted.is_empty() && location.provenance.read_only() {
         return Err(explain::read_only_enable());
     }
-    Ok(lifted)
+    Ok(deleted)
 }
 
 /// The files of the switches that could Disable `entry` in the context of

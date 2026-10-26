@@ -817,13 +817,17 @@ impl Targeted<'_> {
                     }
                     let parked = self.snapshot.parked_of(scanned);
                     let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
-                    let lifted_off =
-                        disable::lifted_off(definition, self.snapshot, scanned, project).map_err(
-                            |sentence| {
+                    // A field that turns the built server off, for an Entry
+                    // it Disables rather than one a gate Blocks first.
+                    let deleted = if entry.state == State::Disabled {
+                        disable::deleted_by_enable(definition, self.snapshot, scanned, project)
+                            .map_err(|sentence| {
                                 Error::blocked(explain::enable_refused(&entry.locator, &sentence))
-                            },
-                        )?;
-                    if disabling.is_empty() && parked.is_none() && lifted_off.is_empty() {
+                            })?
+                    } else {
+                        Vec::new()
+                    };
+                    if disabling.is_empty() && parked.is_none() && deleted.is_empty() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
                     // Every layer's switch, or a later one would Disable it again.
@@ -847,14 +851,14 @@ impl Targeted<'_> {
                             git_asks,
                         )?;
                     }
-                    for off in lifted_off {
+                    for field in deleted {
                         // Entries of one server share its field.
-                        let edit = off.edit();
+                        let edit = field.edit();
                         let shared = by_file
                             .iter()
-                            .any(|file| file.path == off.path && file.edits.contains(&edit));
+                            .any(|file| file.path == field.path && file.edits.contains(&edit));
                         if !shared {
-                            add_switch_edit(&mut by_file, off.path, off.syntax, false, edit);
+                            add_switch_edit(&mut by_file, field.path, field.syntax, false, edit);
                         }
                     }
                     for hit in lifts {
