@@ -115,7 +115,6 @@ uatStep("7.1", async ({ page, open, check }) => {
   });
 });
 
-// At 1100 × 640 with Before you apply shown, the dialog scrolls as a whole and its buttons leave the view (#378).
 uatStep("7.4", async ({ page, open, check }) => {
   await page.setViewportSize(SMALLEST);
   await open();
@@ -197,4 +196,4 @@ uatStep("7.4", async ({ page, open, check }) => {
     await page.keyboard.press("ArrowDown");
     await expect.poll(() => changes.evaluate((c) => c.scrollTop)).toBeGreaterThan(0);
   });
-}, { bug: "#378" });
+});

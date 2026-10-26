@@ -1628,12 +1628,16 @@ p {
 }
 
 /* Shrinking takes height in proportion to each block's own, so each keeps a
-   fifth of the window, or all of its height when shorter. `min-height: 0` is
-   for a WebView2 before Chromium 129, which has no calc-size(). */
+   fifth of the window, or all of its height when shorter, but no more than
+   half of what the dialog's 88vh leaves after 30rem, its other parts with a
+   short Before you apply: below a window about 875px high, two fifths no
+   longer fit, and the dialog would scroll its buttons out of view.
+   `min-height: 0` is for a WebView2 before Chromium 129, which has no
+   calc-size(). */
 .dialog-section.scrolls {
   flex: 0 1 auto;
   min-height: 0;
-  min-height: calc-size(max-content, min(size, 20vh));
+  min-height: calc-size(max-content, min(size, 20vh, (88vh - 30rem) / 2));
   display: flex;
   flex-direction: column;
 }
