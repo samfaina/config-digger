@@ -139,6 +139,23 @@ export async function walkStep(ctx, step, runner, { shots, ci }) {
   };
 }
 
+// The result of a step the walk never reached, because the app's session did
+// not open: Blocked, with why, in the shape walkStep gives.
+export function unwalkedStep(ctx, runner, why, { ci }) {
+  return {
+    id: runner.id,
+    status: "blocked",
+    notes: `Bloqueado: la sesión de WebDriver no se abrió: ${why}`,
+    time: new Date().toISOString(),
+    version: ctx.version,
+    by: ci ? "ci" : "local",
+    evidence: ci ? ci.evidence : `uat/auto/webdriver/steps · ${runner.id}`,
+    checks: [],
+    looks: [],
+    manual: runner.manual,
+  };
+}
+
 // A result as it reaches a run, here uat-results.json on CI: the runner's
 // fields, `by` and `evidence`, without the local-only `checks`, `looks` and
 // `manual` (docs/agents/uat.md).

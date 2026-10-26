@@ -41,8 +41,11 @@ export async function startTauriDriver({ nativeDriver, env, port = 4444 }) {
     stdio: "ignore",
     windowsHide: true,
   });
+  let failed;
+  child.once("error", (e) => (failed = e));
   const end = Date.now() + 15000;
   for (;;) {
+    if (failed) throw new Error(`tauri-driver did not start: ${failed.message}`);
     try {
       const res = await fetch(`http://127.0.0.1:${port}/status`);
       if (res.ok) return child;

@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
-import { jobSummary, reason, resultDocument, walkStep } from "./step.mjs";
+import { jobSummary, reason, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import sections from "./steps/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -99,10 +99,17 @@ const before = realData();
 const port = Number(opt.port);
 let driver;
 let s;
+// A session that does not open leaves every step Blocked, in the results all
+// the same, and the walk breaking.
+let unopened;
 if (opt.attach) s = Session.attach(opt.attach, port);
 else {
-  driver = await startTauriDriver({ nativeDriver: opt.driver, env, port });
-  s = await Session.open({ app: opt.app, port });
+  try {
+    driver = await startTauriDriver({ nativeDriver: opt.driver, env, port });
+    s = await Session.open({ app: opt.app, port });
+  } catch (e) {
+    unopened = e;
+  }
 }
 
 const results = existsSync(opt.out) ? JSON.parse(readFileSync(opt.out, "utf8")) : [];
@@ -157,21 +164,29 @@ const ctx = {
   },
 };
 
-for (const id of ids) {
-  const started = Date.now();
-  const result = await walkStep(ctx, planSteps.get(id), runners.get(id), { shots: opt.shots, ci });
-  save(result);
-  writeFileSync(sharedFile, JSON.stringify(shared, null, 2) + "\n");
-  console.log(`${id} ${result.status} ${Math.round((Date.now() - started) / 100) / 10}s${result.status === "ok" ? "" : ` · ${reason(result)}`}`);
+if (unopened) {
+  for (const id of ids) save(unwalkedStep(ctx, runners.get(id), unopened.message, { ci }));
+} else {
+  for (const id of ids) {
+    const started = Date.now();
+    const result = await walkStep(ctx, planSteps.get(id), runners.get(id), { shots: opt.shots, ci });
+    save(result);
+    writeFileSync(sharedFile, JSON.stringify(shared, null, 2) + "\n");
+    console.log(`${id} ${result.status} ${Math.round((Date.now() - started) / 100) / 10}s${result.status === "ok" ? "" : ` · ${reason(result)}`}`);
+  }
 }
 if (opt.summary) appendFileSync(opt.summary, jobSummary(results));
 
 // A driver that stopped on the way leaves every later step Blocked: that is
 // the walk breaking, not a verdict.
-const driverStopped = driver && (driver.exitCode !== null || driver.signalCode !== null);
+const driverStopped = !unopened && driver && (driver.exitCode !== null || driver.signalCode !== null);
 if (!opt.attach) {
-  await s.close().catch(() => {});
+  await s?.close().catch(() => {});
   driver?.kill();
+}
+if (unopened) {
+  console.error(`The app's session did not open, so every step is Blocked: ${unopened.stack}`);
+  process.exitCode = 4;
 }
 if (driverStopped) {
   console.error(`tauri-driver stopped during the walk, with ${driver.signalCode ?? `exit code ${driver.exitCode}`}`);

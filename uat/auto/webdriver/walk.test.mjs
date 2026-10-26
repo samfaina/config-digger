@@ -3,7 +3,7 @@
 // Projects tab, confirming an action dialog up to its result, reading an
 // Operation id, step 11.11's command that marks an Operation, and the walk's
 // CI mode: no screenshot, the steps a runner can't do, uat-results.json and
-// the job summary.
+// the job summary, written too when the app's session does not open.
 // Run them with `node --test uat/auto/webdriver/walk.test.mjs`.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -11,9 +11,10 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
-import { jobSummary, resultDocument, walkStep } from "./step.mjs";
+import { jobSummary, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
 import { openGroup } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
@@ -417,4 +418,37 @@ test("an Operation id is read from the lines that name one", () => {
   assert.equal(operationId("Operation 20261023-172530-c63 · backup kept"), "20261023-172530-c63");
   assert.equal(operationId("Nothing of this Operation was kept\nOperation 20261023-172614-84d"), "20261023-172614-84d");
   assert.equal(operationId("Nothing of this Operation was kept"), undefined);
+});
+
+test("a step the walk never reached, its session unopened, is Blocked with why", () => {
+  const result = unwalkedStep({ version: "0.1.0" }, { id: "1.1" }, "POST /session: 500 session not created", { ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.notes, "Bloqueado: la sesión de WebDriver no se abrió: POST /session: 500 session not created");
+  assert.deepEqual(resultDocument(result), { id: "1.1", status: "blocked", notes: result.notes, time: result.time, version: "0.1.0", by: "ci", evidence: "https://github.com/o/r/actions/runs/1" });
+});
+
+test("on CI, a session that does not open still writes uat-results.json and the summary, every step Blocked, and the walk exits with 4", () => {
+  const dir = mkdtempSync(join(tmpdir(), "uat-unopened-"));
+  // No tauri-driver on the PATH, so the session can't open.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== "PATH"));
+  env.PATH = dir;
+  const out = join(dir, "uat-results.json");
+  const summary = join(dir, "summary.md");
+  try {
+    const args = [fileURLToPath(new URL("./walk.mjs", import.meta.url)), "--app", join(dir, "config-digger-app.exe"), "--driver", join(dir, "msedgedriver.exe"), "--profile", join(dir, "cd-throwaway-profile"), "--out", out, "--only", "1.1,1.2", "--ci", "--evidence", "https://github.com/o/r/actions/runs/1", "--summary", summary, "--version", "0.1.0", "--port", "4479"];
+    let code = 0;
+    try {
+      execFileSync(process.execPath, args, { env, stdio: "pipe" });
+    } catch (e) {
+      code = e.status;
+    }
+    assert.equal(code, 4);
+    const results = JSON.parse(readFileSync(out, "utf8"));
+    assert.deepEqual(results.map((r) => [r.id, r.status, r.by]), [["1.1", "blocked", "ci"], ["1.2", "blocked", "ci"]]);
+    assert.match(results[0].notes, /^Bloqueado: la sesión de WebDriver no se abrió: tauri-driver did not start/);
+    assert.deepEqual(Object.keys(results[0]).sort(), ["by", "evidence", "id", "notes", "status", "time", "version"]);
+    assert.match(readFileSync(summary, "utf8"), /\| 1\.2 \| blocked \| Bloqueado: la sesión de WebDriver no se abrió/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
