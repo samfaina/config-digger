@@ -20,6 +20,8 @@ use crate::running::RunningHomes;
 use crate::scan::{GitAsks, LocationReader, ScannedEntry, ScannedStranded, Snapshot, SwitchStore};
 use crate::store::{self, Medium, Written};
 use crate::{explain, history, park, resolve, rules, running, scan, select};
+use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -153,10 +155,83 @@ pub(crate) fn plan(
     action: Action,
     targets: &Targets,
 ) -> Result<Planned, Error> {
-    let before = resolve::resolve(definitions, snapshot, context);
-    // The leftovers of the context's own Project are in it already.
-    let mut leftovers = resolve::leftovers(definitions, snapshot);
-    leftovers.retain(|leftovers| before.project.as_ref() != Some(&leftovers.project));
+    let befores = BeforeInventories::new(definitions, snapshot, context);
+    plan_with(&befores, ports, scan_options, context, action, targets)
+}
+
+/// The Items of each context before an Operation, on the Snapshot its plan
+/// was handed: the context's own, each other Project's and no Project's.
+/// Each is resolved once, when the plan first needs it.
+struct BeforeInventories<'a> {
+    definitions: &'a Definitions,
+    snapshot: &'a Snapshot,
+    /// The Items in the context of the plan.
+    own: Inventory,
+    /// The Items in the context of each Project of the Snapshot, in its order.
+    projects: Vec<OnceCell<Inventory>>,
+    /// The Items with no Project.
+    no_project: OnceCell<Inventory>,
+}
+
+impl<'a> BeforeInventories<'a> {
+    fn new(definitions: &'a Definitions, snapshot: &'a Snapshot, context: &Context) -> Self {
+        Self {
+            definitions,
+            snapshot,
+            own: resolve::resolve(definitions, snapshot, context),
+            projects: snapshot.projects.iter().map(|_| OnceCell::new()).collect(),
+            no_project: OnceCell::new(),
+        }
+    }
+
+    /// The Items in the context of `project`, a Project of the Snapshot, or
+    /// of no Project.
+    fn of(&self, project: Option<&Path>) -> &Inventory {
+        if project == self.own.project.as_deref() {
+            return &self.own;
+        }
+        let cell = match project {
+            None => &self.no_project,
+            Some(path) => {
+                let index = self
+                    .snapshot
+                    .projects
+                    .iter()
+                    .position(|known| known.path == path)
+                    .expect("a context of the plan is a Project of the Snapshot");
+                &self.projects[index]
+            }
+        };
+        cell.get_or_init(|| {
+            let context = Context {
+                project: project.map(Path::to_path_buf),
+            };
+            resolve::resolve(self.definitions, self.snapshot, &context)
+        })
+    }
+
+    /// The leftovers of every missing Project but the context's own, which
+    /// are in its Items already.
+    fn leftovers(&self) -> Vec<Leftovers> {
+        let mut leftovers = resolve::leftovers_from(self.snapshot, |project| {
+            Cow::Borrowed(self.of(Some(project)))
+        });
+        leftovers.retain(|leftovers| self.own.project.as_ref() != Some(&leftovers.project));
+        leftovers
+    }
+}
+
+/// The plan of [`plan`], on the Items `befores` holds.
+fn plan_with(
+    befores: &BeforeInventories,
+    ports: &Ports,
+    scan_options: &ScanOptions,
+    context: &Context,
+    action: Action,
+    targets: &Targets,
+) -> Result<Planned, Error> {
+    let (definitions, snapshot, before) = (befores.definitions, befores.snapshot, &befores.own);
+    let leftovers = befores.leftovers();
     // A Stranded Entry is in no Item, so only its locator names it.
     let mut stranded: Vec<&ScannedStranded> = Vec::new();
     let mut selectors: Vec<String> = Vec::new();
@@ -184,8 +259,8 @@ pub(crate) fn plan(
             &first.origin,
         )));
     }
-    let selected = select::select_entries(&before, &leftovers, &selectors, targets.all)?;
-    let (targeted, mirrored) = redirected(definitions, snapshot, &before, selected, action)?;
+    let selected = select::select_entries(before, &leftovers, &selectors, targets.all)?;
+    let (targeted, mirrored) = redirected(definitions, snapshot, before, selected, action)?;
     let targeted_entries = Targeted {
         definitions,
         ports,
@@ -193,7 +268,8 @@ pub(crate) fn plan(
         scan_options,
         context,
         action,
-        before: &before,
+        before,
+        befores,
         leftovers: &leftovers,
         entries: &targeted,
         stranded: &stranded,
@@ -333,10 +409,12 @@ pub(crate) fn plan_remove_leftovers(
                 && home.home == item.home
         })
     };
+    let befores = BeforeInventories::new(definitions, snapshot, &context);
     let found = resolve::context_project(snapshot, &context).and_then(|(path, _)| {
-        let mut found = resolve::leftovers(definitions, snapshot)
-            .into_iter()
-            .find(|leftovers| leftovers.project == path)?;
+        let mut found =
+            resolve::leftovers_from(snapshot, |project| Cow::Borrowed(befores.of(Some(project))))
+                .into_iter()
+                .find(|leftovers| leftovers.project == path)?;
         found.items.retain(|item| !hidden_home(item));
         (!found.items.is_empty()).then_some(found)
     });
@@ -350,10 +428,9 @@ pub(crate) fn plan_remove_leftovers(
     let context = Context {
         project: Some(found.project),
     };
-    plan(
-        definitions,
+    plan_with(
+        &befores,
         ports,
-        snapshot,
         scan_options,
         &context,
         Action::Remove,
@@ -402,6 +479,9 @@ struct Targeted<'a> {
     action: Action,
     /// The Items in the context before the Operation.
     before: &'a Inventory,
+    /// The Items in each context before the Operation, the context's own
+    /// `before` among them.
+    befores: &'a BeforeInventories<'a>,
     /// The leftovers of the missing Projects other than the context's.
     leftovers: &'a [Leftovers],
     entries: &'a [&'a api::Entry],
@@ -527,9 +607,9 @@ impl Targeted<'_> {
             let context = Context {
                 project: Some(leftovers.project.clone()),
             };
-            let before = resolve::resolve(self.definitions, self.snapshot, &context);
+            let before = self.befores.of(Some(&leftovers.project));
             let after = resolve::resolve(self.definitions, &without, &context);
-            changes.extend(predict(&before, &after).0);
+            changes.extend(predict(before, &after).0);
         }
         let breaks = self.breaks_links(&planned_folders);
         let mut planned = self.planned(files, planned_folders, changes, effective, breaks)?;
@@ -1105,10 +1185,9 @@ impl Targeted<'_> {
             .chain([None])
             .filter(|project| *project != self.before.project);
         for project in others {
-            let context = Context { project };
-            let before = resolve::resolve(self.definitions, self.snapshot, &context);
-            let after = resolve::resolve(self.definitions, after, &context);
-            changes.extend(predict(&before, &after).0);
+            let before = self.befores.of(project.as_deref());
+            let after = resolve::resolve(self.definitions, after, &Context { project });
+            changes.extend(predict(before, &after).0);
         }
         (changes, effective)
     }

@@ -39,11 +39,11 @@ pub(crate) fn resolve(
                     .any(|installation| installation.out_of_range),
                 installations,
                 last_ran: home.last_ran.version().map(str::to_owned),
-                entries: count_entries(snapshot, |entry| {
+                entries: count_entries(snapshot.entries.iter().filter(|entry| {
                     entry.agent_index == home.agent_index
                         && entry.home == home.home
                         && entry.project.is_none()
-                }),
+                })),
                 notes,
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
@@ -84,6 +84,13 @@ pub(crate) fn resolve(
         })
         .collect();
 
+    // The Entries of each Project, by its key.
+    let mut by_project: BTreeMap<&str, Vec<&ScannedEntry>> = BTreeMap::new();
+    for entry in &snapshot.entries {
+        if let Some(key) = &entry.project {
+            by_project.entry(key).or_default().push(entry);
+        }
+    }
     let projects = snapshot
         .projects
         .iter()
@@ -99,9 +106,9 @@ pub(crate) fn resolve(
                 .collect(),
             added: project.added,
             hidden: project.hidden,
-            entries: count_entries(snapshot, |entry| {
-                entry.project.as_ref() == Some(&project.key)
-            }),
+            entries: by_project
+                .get(project.key.as_str())
+                .map_or(0, |entries| count_entries(entries.iter().copied())),
             last_opened: project
                 .last_opened
                 .iter()
@@ -1112,13 +1119,10 @@ pub(crate) fn stranded(definitions: &[AgentDefinition], snapshot: &Snapshot) -> 
     stranded
 }
 
-/// How many distinct Entries `counted` keeps: one an Agent home of each of
+/// How many distinct Entries `entries` holds: one an Agent home of each of
 /// several Agents reads counts once.
-fn count_entries(snapshot: &Snapshot, counted: impl Fn(&ScannedEntry) -> bool) -> u32 {
-    let entries = snapshot
-        .entries
-        .iter()
-        .filter(|entry| counted(entry))
+fn count_entries<'s>(entries: impl Iterator<Item = &'s ScannedEntry>) -> u32 {
+    let entries = entries
         .map(|entry| (&entry.path, &entry.key_path))
         .collect::<BTreeSet<_>>();
     u32::try_from(entries.len()).unwrap_or(u32::MAX)
@@ -1130,28 +1134,45 @@ pub(crate) fn leftovers(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,
 ) -> Vec<api::Leftovers> {
+    leftovers_from(snapshot, |project| {
+        let context = Context {
+            project: Some(project.to_path_buf()),
+        };
+        Cow::Owned(resolve(definitions, snapshot, &context))
+    })
+}
+
+/// The leftovers of [`leftovers`], each from `inventory`, which gives the
+/// Items in a missing Project's context.
+pub(crate) fn leftovers_from<'i>(
+    snapshot: &Snapshot,
+    inventory: impl Fn(&Path) -> Cow<'i, api::Inventory>,
+) -> Vec<api::Leftovers> {
+    // A plugin bound to the Project is no leftover: only the Agent
+    // uninstalls it.
+    let leftover = |entry: &api::Entry| {
+        entry.plugin.is_none()
+            && entry
+                .reason
+                .as_ref()
+                .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
+    };
     snapshot
         .projects
         .iter()
         .filter(|project| !project.exists)
         .filter_map(|project| {
-            let context = Context {
-                project: Some(project.path.clone()),
-            };
-            let mut items = resolve(definitions, snapshot, &context).items;
-            // A plugin bound to the Project is no leftover: only the Agent
-            // uninstalls it.
-            for item in &mut items {
-                item.entries.retain(|entry| {
-                    entry.plugin.is_none()
-                        && entry
-                            .reason
-                            .as_ref()
-                            .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
-                });
-                item.state = api::State::Unread;
-            }
-            items.retain(|item| !item.entries.is_empty());
+            let items: Vec<api::Item> = inventory(&project.path)
+                .items
+                .iter()
+                .filter(|item| item.entries.iter().any(leftover))
+                .map(|item| {
+                    let mut item = item.clone();
+                    item.entries.retain(leftover);
+                    item.state = api::State::Unread;
+                    item
+                })
+                .collect();
             (!items.is_empty()).then(|| api::Leftovers {
                 project: project.path.clone(),
                 items,
@@ -2320,6 +2341,12 @@ fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut
         else {
             continue;
         };
+        let mirrored = snapshot.homes.iter().any(|home| {
+            home.agent_index == agent && home.home == item.home && home.mirror.is_some()
+        });
+        if !mirrored {
+            continue;
+        }
         for (index, entry) in item.entries.iter().enumerate() {
             let source = snapshot
                 .entry_in(agent, &item.home, &entry.path, &entry.key_path)
@@ -2351,7 +2378,7 @@ fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut
 /// whose Items hold the same Entry, with its State there.
 fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
     // Every Entry once per Agent home that holds it, by its locator.
-    let mut readers: Vec<(String, api::AlsoReadBy)> = Vec::new();
+    let mut readers: BTreeMap<String, Vec<api::AlsoReadBy>> = BTreeMap::new();
     for item in items.iter() {
         let agent_name = definitions
             .iter()
@@ -2365,16 +2392,21 @@ fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
                 state: entry.state,
                 sentence: explain::also_read_by(agent_name, &item.home, entry.state),
             };
-            readers.push((entry.locator.clone(), reader));
+            readers
+                .entry(entry.locator.clone())
+                .or_default()
+                .push(reader);
         }
     }
-    readers.sort_by(|(_, a), (_, b)| (&a.agent, &a.home).cmp(&(&b.agent, &b.home)));
+    for readers in readers.values_mut() {
+        readers.sort_by(|a, b| (&a.agent, &a.home).cmp(&(&b.agent, &b.home)));
+    }
     for item in items.iter_mut() {
         for entry in &mut item.entries {
-            entry.also_read_by = readers
+            entry.also_read_by = readers[&entry.locator]
                 .iter()
-                .filter(|(locator, reader)| *locator == entry.locator && reader.agent != item.agent)
-                .map(|(_, reader)| reader.clone())
+                .filter(|reader| reader.agent != item.agent)
+                .cloned()
                 .collect();
         }
     }
