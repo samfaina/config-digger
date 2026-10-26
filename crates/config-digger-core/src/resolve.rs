@@ -84,6 +84,17 @@ pub(crate) fn resolve(
         })
         .collect();
 
+    // The distinct Entries of each Project, by its key, as `count_entries`
+    // counts them.
+    let mut by_project: BTreeMap<&str, BTreeSet<(&PathBuf, &Vec<String>)>> = BTreeMap::new();
+    for entry in &snapshot.entries {
+        if let Some(key) = &entry.project {
+            by_project
+                .entry(key)
+                .or_default()
+                .insert((&entry.path, &entry.key_path));
+        }
+    }
     let projects = snapshot
         .projects
         .iter()
@@ -99,8 +110,8 @@ pub(crate) fn resolve(
                 .collect(),
             added: project.added,
             hidden: project.hidden,
-            entries: count_entries(snapshot, |entry| {
-                entry.project.as_ref() == Some(&project.key)
+            entries: by_project.get(project.key.as_str()).map_or(0, |entries| {
+                u32::try_from(entries.len()).unwrap_or(u32::MAX)
             }),
             last_opened: project
                 .last_opened
@@ -2337,6 +2348,12 @@ fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut
         else {
             continue;
         };
+        let mirrored = snapshot.homes.iter().any(|home| {
+            home.agent_index == agent && home.home == item.home && home.mirror.is_some()
+        });
+        if !mirrored {
+            continue;
+        }
         for (index, entry) in item.entries.iter().enumerate() {
             let source = snapshot
                 .entry_in(agent, &item.home, &entry.path, &entry.key_path)
@@ -2368,7 +2385,7 @@ fn from_copied(definitions: &[AgentDefinition], snapshot: &Snapshot, items: &mut
 /// whose Items hold the same Entry, with its State there.
 fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
     // Every Entry once per Agent home that holds it, by its locator.
-    let mut readers: Vec<(String, api::AlsoReadBy)> = Vec::new();
+    let mut readers: BTreeMap<String, Vec<api::AlsoReadBy>> = BTreeMap::new();
     for item in items.iter() {
         let agent_name = definitions
             .iter()
@@ -2382,16 +2399,21 @@ fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
                 state: entry.state,
                 sentence: explain::also_read_by(agent_name, &item.home, entry.state),
             };
-            readers.push((entry.locator.clone(), reader));
+            readers
+                .entry(entry.locator.clone())
+                .or_default()
+                .push(reader);
         }
     }
-    readers.sort_by(|(_, a), (_, b)| (&a.agent, &a.home).cmp(&(&b.agent, &b.home)));
+    for readers in readers.values_mut() {
+        readers.sort_by(|a, b| (&a.agent, &a.home).cmp(&(&b.agent, &b.home)));
+    }
     for item in items.iter_mut() {
         for entry in &mut item.entries {
-            entry.also_read_by = readers
+            entry.also_read_by = readers[&entry.locator]
                 .iter()
-                .filter(|(locator, reader)| *locator == entry.locator && reader.agent != item.agent)
-                .map(|(_, reader)| reader.clone())
+                .filter(|reader| reader.agent != item.agent)
+                .cloned()
                 .collect();
         }
     }
