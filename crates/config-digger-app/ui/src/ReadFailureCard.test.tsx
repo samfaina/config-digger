@@ -5,7 +5,7 @@ import { commands, type Backup, type ReadFailure } from "./bindings";
 import { ReadFailureCard } from "./ReadFailureCard";
 
 const CONFIG = String.raw`E:\cd-throwaway\codex-home\config.toml`;
-const BACKUP: Backup = {
+const backup: Backup = {
   operation: "20260101T000000Z-disable",
   created_at: "2026-01-01T00:00:00Z",
   title: "Disable 1 Entry",
@@ -19,7 +19,7 @@ vi.mock("./bindings", async (importOriginal) => {
     ...actual,
     commands: {
       ...actual.commands,
-      backupsOf: vi.fn(async () => ({ status: "ok" as const, data: [BACKUP] })),
+      backupsOf: vi.fn(async () => ({ status: "ok" as const, data: [backup] })),
       openBackupFolder: vi.fn(done),
       revealLocation: vi.fn(done),
     },
@@ -49,7 +49,7 @@ describe("a Read failure's backups in History", () => {
 
     (await screen.findByRole("button", { name: /Disable 1 Entry/ })).click();
 
-    expect(commands.revealLocation).toHaveBeenCalledWith(BACKUP.copy);
+    expect(commands.revealLocation).toHaveBeenCalledWith(backup.copy);
     expect(commands.openBackupFolder).not.toHaveBeenCalled();
   });
 });

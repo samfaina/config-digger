@@ -33,8 +33,9 @@ export const commands = {
 	revealLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("reveal_location", { path })),
 	/**
 	 *  Opens Explorer inside `path`, the backup folder of an Operation the
-	 *  dialog executed or History reported, to recover from it by hand. A
-	 *  location the inventory shows is opened as Windows opens it.
+	 *  dialog executed or History reported, to recover from it by hand. It
+	 *  takes a location the inventory shows too, but shows it selected unless
+	 *  it is a folder: it never starts a file nor follows a link.
 	 */
 	openBackupFolder: (path: string) => typedError<null, Error>(__TAURI_INVOKE("open_backup_folder", { path })),
 	/**
