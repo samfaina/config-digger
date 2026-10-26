@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { keyPieces, pathPieces } from "./wrap";
+import { keyPieces, lastPart, pathPieces } from "./wrap";
 
 describe("a path in pieces that each end where its line may wrap", () => {
   test("ends a piece after each backslash of a Windows path", () => {
@@ -25,6 +25,22 @@ describe("a path in pieces that each end where its line may wrap", () => {
 
   test("has no piece for an empty path", () => {
     expect(pathPieces("")).toEqual([]);
+  });
+});
+
+describe("a path's last part apart from the rest", () => {
+  test("starts the last part at the separator before it", () => {
+    expect(lastPart(String.raw`E:\cd-throwaway\claude-code-many-home`)).toEqual({ rest: String.raw`E:\cd-throwaway`, last: String.raw`\claude-code-many-home` });
+    expect(lastPart("/home/me/.codex-work")).toEqual({ rest: "/home/me", last: "/.codex-work" });
+  });
+
+  test("keeps a trailing separator with the last part", () => {
+    expect(lastPart("E:\\cd-throwaway\\")).toEqual({ rest: "E:", last: "\\cd-throwaway\\" });
+  });
+
+  test("is all last part when there is no folder before it", () => {
+    expect(lastPart("default")).toEqual({ rest: "", last: "default" });
+    expect(lastPart("/srv")).toEqual({ rest: "", last: "/srv" });
   });
 });
 

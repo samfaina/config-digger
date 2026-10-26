@@ -19,7 +19,6 @@ describe("History before its first read is done", () => {
   test("states no count of Operations in its banner's title, as it has none yet", () => {
     const title = renderToStaticMarkup(<HistoryScreen />).match(/<div class="banner-title">([\s\S]*?)<\/div>/)?.[1];
     expect(title).toBe("Operations");
-    expect(title).not.toMatch(/\d/);
   });
 });
 

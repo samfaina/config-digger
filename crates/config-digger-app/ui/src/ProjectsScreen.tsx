@@ -617,9 +617,8 @@ function HomeLine({
   };
   return (
     <PlaceRow icon="folder" dim={row.hidden} busy={busy} count={row.entries} actions={row.actions.map((action) => buttons[action])}>
-      <div className="place-name">
-        <PathPieces path={row.label} />
-      </div>
+      {/* A home the user added is named by its folder. */}
+      <div className="place-name">{row.label === row.path ? <PathPieces path={row.label} /> : row.label}</div>
       <div className="place-sub mono">
         <PathPieces path={row.path} />
       </div>

@@ -193,8 +193,10 @@ export default [
       t.check(true, "«Claude Code» y «claude-code-many-home» se eligen con un clic");
       const tiles = await s.exec(`
         return [...document.querySelectorAll(".panel.homes .home-name")].map((name) => {
-          const part = (css) => { const e = name.querySelector(css); return e && { text: e.textContent, cut: e.scrollWidth > e.clientWidth }; };
-          return { head: part(".home-name-head"), tail: part(".home-name-tail") };
+          const part = (css) => { const e = name.querySelector(css); return e && { text: e.textContent, cut: e.scrollWidth > e.clientWidth, width: e.scrollWidth, ellipsis: getComputedStyle(e).textOverflow }; };
+          const head = part(".home-name-head"), tail = part(".home-name-tail");
+          // The name fits when its parts' own widths fit the room the tile gives it.
+          return { head, tail, fits: (head?.width ?? 0) + (tail?.width ?? 0) <= name.clientWidth };
         });`);
       const tails = tiles.map((x) => x.tail?.text);
       t.check(
@@ -203,11 +205,15 @@ export default [
         JSON.stringify(tiles),
       );
       const many = tiles.find((x) => x.tail?.text === "\\claude-code-many-home");
-      t.check(many?.head?.cut === true, "un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final", JSON.stringify(many));
       t.check(
-        tiles.filter((x) => !x.head?.cut).every((x) => !x.tail.cut),
+        tiles.filter((x) => !x.fits).every((x) => x.head?.cut && x.head.ellipsis === "ellipsis") && many?.fits === false,
+        "un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final",
+        JSON.stringify(tiles.filter((x) => !x.fits)),
+      );
+      t.check(
+        tiles.filter((x) => x.fits).every((x) => !x.head?.cut && !x.tail.cut),
         "un nombre que cabe en su ficha se ve entero, sin «…»",
-        JSON.stringify(tiles.filter((x) => !x.head?.cut)),
+        JSON.stringify(tiles.filter((x) => x.fits)),
       );
       await project(t, `${t.root}\\many\\project-01`);
       const projectField = await s.find("[role=combobox][aria-label=Project]");

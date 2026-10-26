@@ -291,7 +291,8 @@ describe("a path on a row of Projects & homes", () => {
   test("wraps an Agent home's folder only right after a \\ or a /, and the name of a home the user added, which is its folder", () => {
     const markup = renderToStaticMarkup(<HomesTab places={places} busy={[]} onShow={() => {}} onChange={() => {}} />);
     expect(markup).toContain(String.raw`<div class="place-name"><span class="path-piece">D:\</span><wbr/><span class="path-piece">portable</span><wbr/></div>`);
-    expect(markup).toContain('<div class="place-name"><span class="path-piece">default</span><wbr/></div>');
+    // The default home's name is no path.
+    expect(markup).toContain('<div class="place-name">default</div>');
     expect(markup).toContain(String.raw`<div class="place-sub mono"><span class="path-piece">D:\</span><wbr/><span class="path-piece">portable</span><wbr/></div>`);
     expect(markup).toContain(
       String.raw`<div class="place-sub mono"><span class="path-piece">C:\</span><wbr/><span class="path-piece">Users\</span><wbr/><span class="path-piece">me</span><wbr/></div>`,

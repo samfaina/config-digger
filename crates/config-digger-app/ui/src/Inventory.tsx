@@ -53,6 +53,7 @@ import {
   type Selection,
 } from "./view";
 import { Tooltip } from "./Tooltip";
+import { lastPart } from "./wrap";
 
 /** What the detail panel shows: an Item's Entries, or the Read failures in the context. */
 type Detail = { kind: "item"; key: string } | { kind: "failures" } | null;
@@ -640,11 +641,11 @@ function homeTileTooltip(home: Home): string {
  * long for the tile, so that two homes of one Agent under one folder read apart.
  */
 function HomeName({ home }: { home: string }) {
-  const [, head = "", tail = home] = /^(.*?)([\\/][^\\/]+[\\/]?)$/.exec(home) ?? [];
+  const { rest, last } = lastPart(home);
   return (
     <span className="home-name">
-      {head && <span className="home-name-head">{head}</span>}
-      <span className="home-name-tail">{tail}</span>
+      {rest && <span className="home-name-head">{rest}</span>}
+      <span className="home-name-tail">{last}</span>
     </span>
   );
 }

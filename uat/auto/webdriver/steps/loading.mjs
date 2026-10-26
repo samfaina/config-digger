@@ -101,6 +101,7 @@ export default [
         ["History · Undo", "Reading History…"],
         ["Settings", "Reading where config-digger keeps its data…"],
       ];
+      const historyTitle = () => s.exec(`return document.querySelector(".history .banner-title")?.textContent;`);
       for (const [screen, text] of screens) {
         await go(s, screen);
         const state = await s.until(async () => {
@@ -116,7 +117,7 @@ export default [
           return owner ? [...owner.children].filter((e) => e !== loading && e.matches("p") && e.textContent.trim()).map((e) => e.textContent.trim()) : [];`);
         t.check(stray.length === 0, `en ${screen}, no sale una línea de texto suelta en lugar del aviso`, stray.join(" | "));
         if (screen === "History · Undo") {
-          const title = await s.exec(`return document.querySelector(".history .banner-title")?.textContent;`);
+          const title = await historyTitle();
           t.eq(title, "Operations", "en History, mientras sale el aviso, el título de la cabecera dice «Operations», sin ningún número");
         }
       }
@@ -127,7 +128,7 @@ export default [
         const done = await s.until(async () => !(await loadingState(s)).loading, { what: `${screen} read`, timeout: 8000 }).catch(() => false);
         t.check(done, `luego salen los datos de ${screen}`);
         if (screen === "History · Undo") {
-          const title = await s.exec(`return document.querySelector(".history .banner-title")?.textContent;`);
+          const title = await historyTitle();
           t.check(/^\d+ Operations?$/.test(title ?? ""), "cuando salen los datos de History, su título dice cuántas Operations hay, con el número delante", title);
         }
       }

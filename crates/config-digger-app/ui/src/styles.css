@@ -1063,19 +1063,21 @@ p {
 
 /* A name too long for its tile is cut in the rest of its folder first, as
    `E:\cd-thr…\claude-code-many-home`: flex shrinks each part by its shrink
-   times its width, so the head gives up its width long before the tail. */
+   times its width, so the head gives up its width long before the tail. The
+   head keeps room for its «…», so that a cut name always shows it was cut. */
 .home-name-head,
 .home-name-tail {
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .home-name-head {
+  min-width: 1em;
   flex: 0 1000000 auto;
 }
 
 .home-name-tail {
+  min-width: 0;
   flex: 0 1 auto;
 }
 

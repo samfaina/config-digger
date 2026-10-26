@@ -392,9 +392,11 @@ describe("the Inventory at the smallest window the app allows", () => {
 
   test("cuts an Agent home's name too long for its tile before its folder's last part, and only then that part", () => {
     expect(styled(".home-name").get("display")).toBe("flex");
+    // The rest keeps room for its «…», so that a cut name always shows it was cut.
+    expect(styled(".home-name-head").get("min-width")).toBe("1em");
+    expect(styled(".home-name-tail").get("min-width")).toBe("0");
     for (const part of [".home-name-head", ".home-name-tail"]) {
       const declarations = styled(part);
-      expect(declarations.get("min-width"), part).toBe("0");
       expect(declarations.get("overflow"), part).toBe("hidden");
       expect(declarations.get("text-overflow"), part).toBe("ellipsis");
     }
