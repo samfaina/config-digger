@@ -343,7 +343,10 @@ function UndoButton({ undo, disabled, onUndo }: { undo: UndoAction; disabled: bo
 function RefusalBlock({ refusal, notify }: { refusal: UndoRefusal; notify: Notify }) {
   const block = useRef<HTMLDivElement>(null);
   // Each refusal is brought into view, such as one the dialog closed on while the detail was scrolled down.
-  useEffect(() => block.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [refusal]);
+  // A block body: WebView2's scrollIntoView returns a Promise, which React would call as the effect's cleanup.
+  useEffect(() => {
+    block.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [refusal]);
   return (
     <>
       <div ref={block} className="dialog-callout danger" role="alert">
