@@ -341,6 +341,51 @@ fn edits_keep_a_missing_final_newline() {
     );
 }
 
+/// A Codex `config.toml` whose last line, in the server's table, has no
+/// newline, as `uat/data/cd-throwaway-setup.ps1` writes it.
+const NO_FINAL_NEWLINE: &[u8] =
+    b"model = \"gpt-5\"\n\n[mcp_servers.x]\ncommand = \"node\"\nargs = [\"x\"]";
+
+/// Codex's Disable of the server in [`NO_FINAL_NEWLINE`], which appends a key
+/// on a new last line.
+fn disable_x() -> Edit {
+    Edit::Set {
+        key_path: key("mcp_servers.x.enabled"),
+        value: json!(false),
+    }
+}
+
+#[test]
+fn undoing_a_disable_in_a_file_without_a_final_newline_gives_back_the_original_bytes() {
+    for original in [NO_FINAL_NEWLINE.to_vec(), crlf(NO_FINAL_NEWLINE)] {
+        let disabled = apply(&original, &disable_x());
+
+        assert_eq!(apply(&disabled.bytes, &disabled.inverse).bytes, original);
+    }
+}
+
+#[test]
+fn an_enable_that_deletes_the_key_after_a_disable_gives_back_the_original_bytes() {
+    let disabled = apply(NO_FINAL_NEWLINE, &disable_x());
+    let enable = Edit::Remove {
+        key_path: key("mcp_servers.x.enabled"),
+    };
+
+    assert_eq!(apply(&disabled.bytes, &enable).bytes, NO_FINAL_NEWLINE);
+}
+
+#[test]
+fn remove_of_a_key_on_the_last_line_keeps_the_final_newline_missing() {
+    let edit = Edit::Remove {
+        key_path: key("mcp_servers.x.args"),
+    };
+
+    assert_eq!(
+        text(NO_FINAL_NEWLINE, &edit),
+        "model = \"gpt-5\"\n\n[mcp_servers.x]\ncommand = \"node\""
+    );
+}
+
 #[test]
 fn the_undo_of_a_remove_is_an_insert_that_brings_back_the_table() {
     let edit = Edit::Remove {
