@@ -30,9 +30,9 @@ fn read_json(path: &str) -> Value {
     serde_json::from_str(&read_text(path).unwrap()).unwrap()
 }
 
-/// The text of the file a `<file> > <step id>` test names, when the file is
-/// in `folder`, and the step id.
-fn file_test(test: &str, folder: &str) -> Option<(String, String)> {
+/// The text of the file a `<file> > <step id>` test names, and the step id,
+/// when the file is in `folder`.
+fn named_file(test: &str, folder: &str) -> Option<(String, String)> {
     let (file, id) = test.split_once(" > ")?;
     if !file.starts_with(folder) || file.contains("..") {
         return None;
@@ -42,14 +42,14 @@ fn file_test(test: &str, folder: &str) -> Option<(String, String)> {
 
 /// Whether a `webdriver` test names a step module of the WebDriver walk.
 fn names_a_step_module(test: &str) -> bool {
-    file_test(test, "uat/auto/webdriver/steps/")
+    named_file(test, "uat/auto/webdriver/steps/")
         .is_some_and(|(text, id)| text.contains(&format!("id: \"{id}\"")))
 }
 
 /// Whether a `sandbox` test names a `Step` block of the Sandbox walk, or the
 /// verdict `run.ps1` writes itself, as for 9.1.
 fn names_a_step_block(test: &str) -> bool {
-    file_test(test, "uat/auto/sandbox/").is_some_and(|(text, id)| {
+    named_file(test, "uat/auto/sandbox/").is_some_and(|(text, id)| {
         text.contains(&format!("Step \"{id}\" {{")) || text.contains(&format!("id = \"{id}\""))
     })
 }
@@ -190,13 +190,13 @@ fn problems(plan: &Value) -> Vec<String> {
             // exist.
             for automation in step["automation"].as_array().into_iter().flatten() {
                 let test = automation["test"].as_str().unwrap_or("");
-                let missing = match automation["tool"].as_str() {
-                    Some("webdriver") if !names_a_step_module(test) => "step module",
-                    Some("sandbox") if !names_a_step_block(test) => "Step block",
-                    Some("visual") if !shots.iter().any(|shot| shot == test) => "shot",
+                let tool = automation["tool"].as_str().unwrap_or("");
+                let missing = match tool {
+                    "webdriver" if !names_a_step_module(test) => "step module",
+                    "sandbox" if !names_a_step_block(test) => "Step block",
+                    "visual" if !shots.iter().any(|shot| shot == test) => "shot",
                     _ => continue,
                 };
-                let tool = automation["tool"].as_str().unwrap_or("");
                 problems.push(format!(
                     "step {id} has a {tool} test that names no {missing}: {test:?}"
                 ));
@@ -354,8 +354,14 @@ fn an_unknown_tool_or_place_fails() {
     );
     let found = problems(&plan);
     assert_eq!(found.len(), 2, "{found:?}");
-    assert!(found[0].starts_with(&format!("/sections/{at}/steps/0/automation/0/tool: ")), "{found:?}");
-    assert!(found[1].starts_with(&format!("/sections/{at}/steps/0/automation/1/where: ")), "{found:?}");
+    assert!(
+        found[0].starts_with(&format!("/sections/{at}/steps/0/automation/0/tool: ")),
+        "{found:?}"
+    );
+    assert!(
+        found[1].starts_with(&format!("/sections/{at}/steps/0/automation/1/where: ")),
+        "{found:?}"
+    );
 }
 
 #[test]

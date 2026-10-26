@@ -111,7 +111,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, .step-link:fo
 /* What wrote a tool's verdict, and a step a tool walks: outlined, so they
    read apart from a verdict. */
 .chip.by, .chip.auto { color: var(--accent); border-color: var(--accent); }
-.chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+/* Stacked, so a step with three chips keeps the width of its title. */
+.chips { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .counts .unrun { color: var(--blocked); font-weight: 600; }
 .run-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 #review[aria-pressed="true"] { border-color: var(--accent); }
@@ -234,6 +235,12 @@ const Uat = (() => {
     return WRITERS[result?.by] ?? null;
   }
 
+  /** The status of `result` when it is the tester's own, one with no
+   * `by`; a tool's verdict is not one the tester chose. */
+  function ownStatus(result) {
+    return result && !result.by ? result.status : undefined;
+  }
+
   /** The database document of a tester's result, which has no `by`.
    * Throws when the status needs notes and there are none. When `saved`,
    * the step's stored result, is the agent judge's verdict, or a tester's
@@ -351,7 +358,7 @@ const Uat = (() => {
       .filter((part) => part.ui || part.text);
   }
 
-  return { STATUSES, result, byLabel, choose, look, steps, automated, progress, nextStep, firstStep, exportMarkdown, toReview, checkParts };
+  return { STATUSES, result, byLabel, ownStatus, choose, look, steps, automated, progress, nextStep, firstStep, exportMarkdown, toReview, checkParts };
 })();
 </script>
 <script>
@@ -373,8 +380,9 @@ const Uat = (() => {
     // The notes typed in Revisar so far, by step: a write from another tab
     // re-renders the list.
     reviewNotes: {},
-    // Whether the step on screen is the first one shown, so the walk may
-    // move it to the first in the queue once the results are in.
+    // Whether the step on screen was picked by the page, with no step in the
+    // address or remembered, so the results may move it to the first one
+    // in the queue once they are in.
     firstShown: false,
     // A KO or Blocked picked on the current step before its notes: chosen,
     // not stored yet.
@@ -448,12 +456,21 @@ const Uat = (() => {
     return label ? el("span", { class: "chip by", title: `Veredicto de: ${label}` }, label) : null;
   }
 
-  /** A step's chips in the list: its verdict and what wrote it, or, for a
-   * step a tool walks that has no result yet, that it is automated. */
+  /** A step's chips in the list: that a tool walks it, what wrote its
+   * verdict, and the verdict, or "Automático" alone while it has none. */
   function stepChips(step) {
     const saved = state.results[step.id];
-    if (!saved && Uat.automated(step)) return el("span", { class: "chips" }, el("span", { class: "chip auto" }, "Automático"));
-    return el("span", { class: "chips" }, byChip(saved), chip(saved?.status));
+    const automated = Uat.automated(step);
+    if (!saved && automated) return el("span", { class: "chips" }, el("span", { class: "chip auto" }, "Automático"));
+    return el("span", { class: "chips" },
+      automated ? el("span", { class: "chip auto", title: "Automático", "aria-label": "Automático" }, "Auto") : null,
+      byChip(saved),
+      chip(saved?.status));
+  }
+
+  /** The problem of the last save, on the step it is about. */
+  function problemLine(id) {
+    return state.problem && state.problemStep === id ? el("p", { class: "problem", role: "alert" }, state.problem) : null;
   }
 
   function renderProgress() {
@@ -502,13 +519,16 @@ const Uat = (() => {
     const old = $("notes")?.dataset.step === step.id ? $("notes") : null;
     const typing = old !== null && document.activeElement === old;
     const draft = old?.value;
+    // A tool's verdict is not the tester's: its notes show apart, and its
+    // status neither shows as chosen nor drops a pending one.
+    const own = Uat.ownStatus(saved);
     const notes = el("textarea", { id: "notes", "data-step": step.id });
-    notes.value = draft ?? saved?.notes ?? "";
+    notes.value = draft ?? (own ? saved.notes : "");
     // Another tab may have stored the pending verdict meanwhile.
-    if (state.pending === saved?.status) state.pending = null;
+    if (state.pending === own) state.pending = null;
     const locked = !state.canWrite || state.saving;
     const verdict = (status) => {
-      const look = Uat.look(status, state.pending, saved?.status);
+      const look = Uat.look(status, state.pending, own);
       const { label } = Uat.STATUSES[status];
       const button = el("button", { type: "button", class: status, "aria-pressed": String(look !== null) }, label);
       if (look === "pending") {
@@ -517,7 +537,7 @@ const Uat = (() => {
       }
       button.disabled = locked;
       button.addEventListener("click", () => {
-        const { save, pending } = Uat.choose(status, notes.value, saved?.status);
+        const { save, pending } = Uat.choose(status, notes.value, own);
         state.pending = pending;
         if (save) {
           record(step.id, save, notes.value);
@@ -591,6 +611,10 @@ const Uat = (() => {
       el("div", { class: "block expect" }, el("h3", {}, "Resultado esperado"),
         el("ul", { class: "checks" }, ...step.expect.map(check)),
         el("p", { class: "hint", id: "checks-hint" }, "Marca cada punto en cuanto lo veas. Las marcas solo te guían: no se guardan.")),
+      saved?.by
+        ? el("div", { class: "block" }, el("h3", {}, `Veredicto de ${Uat.byLabel(saved)}: ${Uat.STATUSES[saved.status].label}`),
+          el("p", { class: "judge-notes" }, saved.notes || "Sin notas."))
+        : null,
       el("div", { class: "verdict" },
         el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
         el("label", { for: "notes" }, "Notas"),
@@ -599,7 +623,7 @@ const Uat = (() => {
           ? el("div", { class: "pending-save" }, saveButton, missing)
           : missing,
         el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK."),
-        state.problem && state.problemStep === step.id ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
+        problemLine(step.id),
         el("p", { class: "saved" }, savedLine, " ", byChip(saved))),
       el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])),
     ].filter((block) => block != null));
@@ -636,20 +660,20 @@ const Uat = (() => {
           chip(result.status)),
         el("h2", {}, step.title),
         el("div", { class: "block" }, el("h3", {}, "Notas del agente juez"), el("p", { class: "judge-notes" }, result.notes)),
-        el("div", { class: "block" }, el("h3", {}, "Captura, en el PC del walk local"),
+        el("div", { class: "block" }, el("h3", {}, "Captura, en el PC del recorrido local"),
           el("div", { class: "code-row" }, path, copyButton)),
         el("div", { class: "verdict" },
           el("label", { for: `review-notes-${step.id}` }, "Tus notas"),
           notes,
           el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
-          state.problem && state.problemStep === step.id ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
+          problemLine(step.id),
           el("div", { class: "nav" }, el("button", { type: "button", onclick: () => show(step.id) }, "Abrir el paso"))));
     };
     const list = Uat.toReview(state.plan, state.results);
     $("step").replaceChildren(
       el("div", { class: "block" },
         el("h2", {}, "Revisar los KO del agente juez"),
-        el("p", { class: "hint", id: "review-hint" }, "El agente juez los marcó KO al mirar las capturas del walk local. Abre la captura en ese PC y guarda tu veredicto: sustituye al del juez, que queda guardado aparte. KO y Bloqueado necesitan notas.")),
+        el("p", { class: "hint", id: "review-hint" }, "El agente juez los marcó KO al mirar las capturas del recorrido local. Abre la captura en ese PC y guarda tu veredicto: sustituye al del juez, que queda guardado aparte. KO y Bloqueado necesitan notas.")),
       list.length
         ? el("ol", { class: "review-list" }, ...list.map(item))
         : el("p", {}, "Ningún KO del agente juez por revisar."),
@@ -755,7 +779,10 @@ const Uat = (() => {
         state.results = Object.fromEntries(snap.docs.map((doc) => [doc.id, doc.data()]));
         // A walk not started on a chosen step starts on the first step of
         // the queue, which the results decide.
-        if (state.firstShown) state.current = Uat.firstStep(state.plan, state.results);
+        if (state.firstShown) {
+          state.current = Uat.firstStep(state.plan, state.results);
+          remember(state.current);
+        }
         state.firstShown = false;
         // Export only once the results are in: before, it would read as a
         // run with nothing to report.

@@ -324,6 +324,14 @@ test("a step a tool walks says it is out of the tester's walk, and may still be 
 test("Revisar says the tester's verdict replaces the judge's, and what it needs", () => {
   assert.equal(
     pageText("review-hint"),
-    "El agente juez los marcó KO al mirar las capturas del walk local. Abre la captura en ese PC y guarda tu veredicto: sustituye al del juez, que queda guardado aparte. KO y Bloqueado necesitan notas.",
+    "El agente juez los marcó KO al mirar las capturas del recorrido local. Abre la captura en ese PC y guarda tu veredicto: sustituye al del juez, que queda guardado aparte. KO y Bloqueado necesitan notas.",
   );
+});
+
+test("a tool's verdict is not the tester's own, so a KO over a tool's KO still waits for notes", () => {
+  const tool = { ...Uat.result("1.2", "ko", "Sale vacío", "0.1.0-rc.2", NOW), by: "local" };
+  assert.equal(Uat.ownStatus(tool), undefined);
+  assert.equal(Uat.ownStatus(Uat.result("1.2", "ko", "Sale vacío", "0.1.0-rc.2", NOW)), "ko");
+  assert.equal(Uat.ownStatus(undefined), undefined);
+  assert.deepEqual(Uat.choose("ko", "", Uat.ownStatus(tool)), { save: null, pending: "ko" });
 });

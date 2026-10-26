@@ -230,7 +230,7 @@ const manifestOf = (local, id) => readFileSync(join(local, "config-digger", "bac
 
 // Runs step 11.11's command as the tester pastes it, on that LOCALAPPDATA.
 function markNewest(local) {
-  const step = plan.sections.flatMap((section) => section.steps).find((s) => s.id === "11.11");
+  const step = planStep("11.11");
   return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", step.commands[0].text], {
     env: { ...process.env, LOCALAPPDATA: local },
     encoding: "utf8",
@@ -404,7 +404,7 @@ test("a document of uat-results.json has the runner's fields, by and evidence, a
   assert.match(doc.notes, /Queda para una persona: Que el aviso entre/);
 });
 
-test("the notes of 5.1, 11.10 and 9.2 say what the plan leaves to a person", async () => {
+test("the notes of 5.1 and 11.10 end with what the plan leaves to a person, and the plan leaves 9.2's SmartScreen to one", async () => {
   for (const id of ["5.1", "11.10"]) {
     const { result } = await walkOnCi({ id, async run(t) { t.check(true, "sale"); } }, {}, { id, manual: planStep(id).manual });
     assert.ok(result.notes.endsWith(`Queda para una persona: ${planStep(id).manual}`), id);
