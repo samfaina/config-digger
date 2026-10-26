@@ -9,14 +9,17 @@ import { go, press, wait } from "../lib.mjs";
 import { confirm, done, inventoryOf, openItem, project, waitPreview, withClaudeDesktop } from "./common.mjs";
 import { unwrap } from "../driver.mjs";
 
-// The scan lines since the last "app started", as the steps' command prints them.
-function scanLines(t) {
+// The app's log lines since the last "app started" that `pattern` matches,
+// as the steps' commands print them.
+function logLines(t, pattern) {
   const dir = join(t.env.LOCALAPPDATA, "config-digger", "logs");
   const file = readdirSync(dir).filter((f) => f.startsWith("config-digger-app.")).sort().at(-1);
   const lines = readFileSync(join(dir, file), "utf8").split(/\r?\n/);
   const start = lines.findLastIndex((l) => l.includes("app started"));
-  return lines.slice(start).filter((l) => /app started|scan started|scan finished|inventory read/.test(l));
+  return lines.slice(start).filter((l) => pattern.test(l));
 }
+
+const scanLines = (t) => logLines(t, /app started|scan started|scan finished|inventory read/);
 
 const kind = (l) => (l.includes("app started") ? "app" : l.includes("scan started") ? "start" : l.includes("scan finished") ? "finish" : "read");
 
@@ -78,6 +81,36 @@ export default [
       t.check(startup.length >= 1 && preview.length >= 2, "salen al menos tres líneas «scan finished elapsed_ms=<n> paths=<n>»: la del arranque y las dos de la preview del Disable", `${startup.length} + ${preview.length}`);
       const ms = all.map((l) => Number(/elapsed_ms=(\d+)/.exec(l)?.[1]));
       t.check(ms.length > 0 && ms.every((n) => n < 5000), "en cada una, «elapsed_ms» es menor que 5000", ms.join(", "));
+    },
+  },
+  {
+    id: "14.3",
+    note: "La pareja sale del log de la app; el tiempo del plan, del CLI que va junto a la app, sobre tus homes reales y sin escribir, como en 14.2.",
+    async run(t) {
+      const { s } = t;
+      await t.restart();
+      await s.waitFor(".panel.items .scroll", { timeout: 20000 });
+      await wait(1000);
+      await codexDisablePreview(t, { apply: false });
+      await wait(500);
+      const lines = logLines(t, /plan started|plan finished|plan failed/);
+      const pair = lines.map((l) => (l.includes("plan started") ? "start" : l.includes("plan finished") ? "finish" : "failed"));
+      t.check(
+        pair.join(",") === "start,finish" && lines.every((l) => l.includes(" INFO ")) && /plan finished elapsed_ms=\d+/.test(lines[1]),
+        "la orden imprime dos líneas INFO, en este orden: «plan started» y «plan finished elapsed_ms=<n>»",
+        lines.join(" | "),
+      );
+      t.check(!pair.includes("failed"), "no sale ninguna línea «plan failed»", lines.join(" | "));
+      // The step's goal is the plan on the tester's own homes, which the
+      // throwaway profile hides from the app. The CLI plans as the app does
+      // and logs the same line; the preview writes nothing.
+      const cli = join(dirname(t.app), "config-digger.exe");
+      const args = ["--color", "never", "-v", "--project", `${t.root}\\project`, "disable", "--dry-run", "cd-throwaway-codex"];
+      const finished = spawnSync(cli, args, { encoding: "utf8", env: { ...process.env, CODEX_HOME: `${t.root}\\codex-home` } })
+        .stderr.split(/\r?\n/)
+        .find((l) => l.includes("plan finished"));
+      const ms = Number(/elapsed_ms=(\d+)/.exec(finished ?? "")?.[1]);
+      t.check(ms < 2000, "en «plan finished», «elapsed_ms» es menor que 2000", finished ?? "no «plan finished» line");
     },
   },
   {
