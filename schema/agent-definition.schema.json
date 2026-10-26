@@ -3907,7 +3907,7 @@
           ]
         },
         {
-          "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one. Enable is left to the merge's own\nrules.",
+          "description": "Disables a server the Agent builds from same-named Entries by writing\n`false` to the field its merge turns servers off by, such as Codex's\n`enabled`, in the Entry's own table. The field merges like any other, so\nwhat it Disables is every Entry of the Item, and a higher layer that sets\nthe field decides over a lower one. Enable of a server the field turns\noff, by whoever wrote it, deletes its `false` from the highest layer\nthat sets it and from each lower one down to the first that sets it\notherwise, and never writes `true`.",
           "type": "object",
           "properties": {
             "locations": {

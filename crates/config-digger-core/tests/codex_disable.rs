@@ -1,11 +1,12 @@
 //! Codex's Disable through the core `api`, with fake ports over fixture
 //! Codex homes and layers: `enabled = false` in a server's own layer, or in
 //! the user's `config.toml` for a server of a git-versioned layer, as long
-//! as no higher layer sets `enabled`; `[[skills.config]]` path rules in the
-//! user's `config.toml`; the `enabled` of a plugin and of a plugin's
-//! server under `[plugins."<id>"]`; the server Codex builds before and
-//! after a Remove; and actions on an Entry of Orca's Mirrored home, which go
-//! to the Entry it was copied from.
+//! as no higher layer sets `enabled`, and Enable deleting every
+//! `enabled = false` that keeps the server off; `[[skills.config]]` path
+//! rules in the user's `config.toml`; the `enabled` of a plugin and of a
+//! plugin's server under `[plugins."<id>"]`; the server Codex builds before
+//! and after a Remove; and actions on an Entry of Orca's Mirrored home,
+//! which go to the Entry it was copied from.
 
 use config_digger_core::api::{
     Action, Context, Core, Error, ErrorCode, Inventory, Item, Plan, ScanOptions, Targets,
@@ -165,6 +166,38 @@ fn disable_of_a_server_writes_enabled_false_in_its_own_table() {
     assert_eq!(code(item(&after, "docs").state), "effective");
 }
 
+#[test]
+fn enable_of_a_server_disable_turned_off_removes_its_enabled_and_gives_the_file_back() {
+    let original = "# My servers.\n[mcp_servers.fetch]\ncommand = \"uvx\"\n\n[mcp_servers.docs]\ncommand = \"docs-mcp\"\n";
+    let fs = FakeFileSystem::new().with_file(user_config(), original);
+    let core = core(&fs);
+    let fetch = server(&user_config(), "fetch");
+    let disable = plan(&core, &context(None), Action::Disable, &[&fetch]).unwrap();
+    core.execute(disable, &[]).unwrap();
+
+    let disabled = inventory(&core, &context(None));
+    let entry = &item(&disabled, "fetch").entries[0];
+    let enable = json_of(&entry.enable);
+    assert_eq!(enable["status"], "offered", "{enable}");
+    let sentence = enable["sentence"].as_str().unwrap();
+    assert!(
+        sentence.contains("`mcp_servers.fetch.enabled`"),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains(&user_config().display().to_string()),
+        "{sentence}"
+    );
+    assert_eq!(code(entry.what_if.as_ref().unwrap().state), "effective");
+
+    let enable = plan(&core, &context(None), Action::Enable, &[&fetch]).unwrap();
+    core.execute(enable, &[]).unwrap();
+
+    assert_eq!(text(&fs, &user_config()), original);
+    let after = inventory(&core, &context(None));
+    assert_eq!(code(item(&after, "fetch").state), "effective");
+}
+
 /// The Project app, a git repository the user trusts, whose
 /// `.codex\config.toml` holds `layer`, under the user's `config.toml`
 /// holding `user`.
@@ -277,6 +310,132 @@ fn disable_is_not_offered_when_a_git_versioned_project_layer_sets_enabled_true()
         panic!("a Disable the Project's `enabled = true` overrides is planned");
     };
     assert!(error.message.contains("`enabled`"), "{}", error.message);
+}
+
+// A lower `false` would turn the server off again once the higher one goes.
+#[test]
+fn enable_removes_every_enabled_false_that_keeps_the_server_off() {
+    let fs = app(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = false\n",
+        "[mcp_servers.docs]\nenabled = false\n",
+    );
+    let core = core(&fs);
+
+    let before = inventory(&core, &in_app());
+    assert_eq!(code(item(&before, "docs").state), "disabled");
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&user_config(), "docs")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(text(&fs, &layer("app")), "[mcp_servers.docs]\n");
+    assert_eq!(
+        text(&fs, &user_config()),
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n"
+    );
+    // The Project's table, now empty, still takes part in the server Codex
+    // builds, which is on again.
+    let after = inventory(&core, &in_app());
+    for entry in &item(&after, "docs").entries {
+        assert_eq!(code(entry.state), "merged", "{}", entry.locator);
+    }
+}
+
+#[test]
+fn enable_is_not_offered_when_a_git_versioned_project_layer_sets_enabled_false() {
+    let fs = app(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        "[mcp_servers.docs]\nenabled = false\n",
+    );
+    let core = core_versioning(&fs, &[layer("app")]);
+
+    let inventory = inventory(&core, &in_app());
+    for entry in &item(&inventory, "docs").entries {
+        let enable = json_of(&entry.enable);
+        assert_eq!(enable["status"], "not_offered", "{enable}");
+        let sentence = enable["sentence"].as_str().unwrap();
+        assert!(
+            sentence.contains(&layer("app").display().to_string()),
+            "{sentence}"
+        );
+        assert!(sentence.contains("git-versioned"), "{sentence}");
+    }
+
+    let Err(error) = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&user_config(), "docs")],
+    ) else {
+        panic!("an Enable that writes a git-versioned layer is planned");
+    };
+    assert_eq!(code(error.code), "blocked");
+    assert_eq!(
+        text(&fs, &layer("app")),
+        "[mcp_servers.docs]\nenabled = false\n"
+    );
+}
+
+#[test]
+fn enable_is_not_offered_when_the_machine_s_managed_layer_sets_enabled_false() {
+    let system = Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\config.toml");
+    let fs = FakeFileSystem::new()
+        .with_file(
+            user_config(),
+            "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        )
+        .with_file(&system, "[mcp_servers.docs]\nenabled = false\n");
+    let core = core(&fs);
+
+    let inventory = inventory(&core, &context(None));
+    let user = item(&inventory, "docs")
+        .entries
+        .iter()
+        .find(|entry| entry.path == user_config())
+        .unwrap();
+    assert_eq!(code(user.state), "disabled");
+    let enable = json_of(&user.enable);
+    assert_eq!(enable["status"], "not_offered", "{enable}");
+    let sentence = enable["sentence"].as_str().unwrap();
+    assert!(
+        sentence.contains(&system.display().to_string()),
+        "{sentence}"
+    );
+    assert!(sentence.contains("only reads"), "{sentence}");
+}
+
+#[test]
+fn enable_keeps_a_table_that_held_enabled_alone_and_undo_puts_it_back() {
+    let user = "[mcp_servers.docs]\nenabled = false\n";
+    let fs = app(user, "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n");
+    let core = core(&fs);
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    let enable = core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    let trust = "\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n";
+    assert_eq!(
+        text(&fs, &user_config()),
+        format!("[mcp_servers.docs]\n{trust}")
+    );
+    let after = inventory(&core, &in_app());
+    assert_eq!(item(&after, "docs").entries.len(), 2);
+
+    let undo = core.plan_undo(&enable.operation).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(text(&fs, &user_config()), format!("{user}{trust}"));
+    let undone = inventory(&core, &in_app());
+    assert_eq!(code(item(&undone, "docs").state), "disabled");
 }
 
 /// A `SKILL.md` naming its skill `name`.

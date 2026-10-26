@@ -4830,8 +4830,10 @@ impl Validate for Park {
 /// `false` to the field its merge turns servers off by, such as Codex's
 /// `enabled`, in the Entry's own table. The field merges like any other, so
 /// what it Disables is every Entry of the Item, and a higher layer that sets
-/// the field decides over a lower one. Enable is left to the merge's own
-/// rules.
+/// the field decides over a lower one. Enable of a server the field turns
+/// off, by whoever wrote it, deletes its `false` from the highest layer
+/// that sets it and from each lower one down to the first that sets it
+/// otherwise, and never writes `true`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MergedField {

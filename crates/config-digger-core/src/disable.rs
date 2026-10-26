@@ -6,7 +6,7 @@
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
-    MechanismTarget, MergedField, Switched,
+    MechanismTarget, Merge, MergedField, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
@@ -605,27 +605,15 @@ fn through_merged_field(
     let field = merge
         .enabled()
         .expect("validation gives a merged field's merge an `enabled` field");
-    let project_key = project.map(|project| project.key);
-    // Lower is higher: the deepest Project layer first.
-    let rank = |entry: &ScannedEntry| {
-        let location = definition.location(&entry.location);
-        (definition.rank(location), entry.depth)
-    };
-    // The Entries of the Item the Agent merges in the context that set the field.
-    let setters: Vec<&ScannedEntry> = snapshot
-        .entries
-        .iter()
-        .filter(|other| {
-            other.agent_index == entry.agent_index
-                && other.home == entry.home
-                && other.name == entry.name
-                && definition.location(&other.location).kind == location.kind
-                && merge.covers(&other.location)
-                && (other.project.is_none() || other.project.as_deref() == project_key)
-                && other.config.get(field).is_some()
-                && resolve::gates(definition, snapshot, other, project_key).is_empty()
-        })
-        .collect();
+    let rank = |entry: &ScannedEntry| rank(definition, entry);
+    let setters = setters(
+        definition,
+        snapshot,
+        entry,
+        project.map(|project| project.key),
+        merge,
+        field,
+    );
     let highest_above = |at: (usize, usize)| {
         setters
             .iter()
@@ -722,6 +710,111 @@ fn through_merged_field(
             explain::disable_only_in_versioned(agent, &versioned, false),
         ),
     })
+}
+
+/// How the Agent ranks the layer of `entry`, as a merge orders Entries:
+/// lower is higher, the deepest Project layer first.
+fn rank(definition: &AgentDefinition, entry: &ScannedEntry) -> (usize, usize) {
+    let location = definition.location(&entry.location);
+    (definition.rank(location), entry.depth)
+}
+
+/// The Entries of the Item of `entry` that `merge` merges in the context of
+/// the Project with the key `project` and that set `field`, highest first.
+fn setters<'s>(
+    definition: &AgentDefinition,
+    snapshot: &'s Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+    merge: &Merge,
+    field: &str,
+) -> Vec<&'s ScannedEntry> {
+    let kind = definition.location(&entry.location).kind;
+    let mut setters: Vec<&ScannedEntry> = snapshot
+        .entries
+        .iter()
+        .filter(|other| {
+            other.agent_index == entry.agent_index
+                && other.home == entry.home
+                && other.name == entry.name
+                && definition.location(&other.location).kind == kind
+                && merge.covers(&other.location)
+                && (other.project.is_none() || other.project.as_deref() == project)
+                && other.config.get(field).is_some()
+                && resolve::gates(definition, snapshot, other, project).is_empty()
+        })
+        .collect();
+    setters.sort_by_key(|setter| rank(definition, setter));
+    setters
+}
+
+/// A `false` of the field that turns off the server an Agent builds from
+/// same-named Entries, which Enable removes.
+pub(crate) struct OffField {
+    pub path: PathBuf,
+    /// The field's key path in its file.
+    pub key_path: Vec<String>,
+    pub syntax: Syntax,
+}
+
+impl OffField {
+    pub fn edit(&self) -> Edit {
+        Edit::Remove {
+            key_path: self.key_path.clone(),
+        }
+    }
+}
+
+/// The `false` values of the field that turns off the server the Agent
+/// builds from the Entries of `entry` in the context of the Project with
+/// the key `project`, which Enable removes so that none turns it off again:
+/// that of the highest layer that sets the field, and each lower one down to
+/// the first that sets it otherwise. None when the server is not turned off.
+/// Or why Enable is not offered: one of them is in a git-versioned file, or
+/// in a layer config-digger only reads, or it only reads `entry` itself.
+pub(crate) fn lifted_off(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Result<Vec<OffField>, String> {
+    let location = definition.location(&entry.location);
+    let Some((merge, field)) = definition
+        .rules(location.kind)
+        .merge
+        .as_ref()
+        .filter(|merge| merge.covers(&entry.location))
+        .and_then(|merge| Some((merge, merge.enabled()?)))
+    else {
+        return Ok(Vec::new());
+    };
+    let mut lifted = Vec::new();
+    for setter in setters(definition, snapshot, entry, project, merge, field) {
+        if setter.config.get(field) != Some(&Value::Bool(false)) {
+            break;
+        }
+        let layer = definition.location(&setter.location);
+        let mut key_path = setter.key_path.clone();
+        key_path.push(field.to_owned());
+        let versioned = snapshot.versioned.contains(&setter.path);
+        if versioned || layer.provenance.read_only() {
+            let at = locator::render(&setter.path, &key_path);
+            return Err(explain::turned_off_enable(field, &at, versioned));
+        }
+        lifted.push(OffField {
+            path: setter.path.clone(),
+            key_path,
+            syntax: layer
+                .format
+                .file()
+                .expect("validation merges Entries of files only")
+                .syntax(),
+        });
+    }
+    if !lifted.is_empty() && location.provenance.read_only() {
+        return Err(explain::read_only_enable());
+    }
+    Ok(lifted)
 }
 
 /// The files of the switches that could Disable `entry` in the context of

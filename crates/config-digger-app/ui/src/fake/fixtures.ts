@@ -474,7 +474,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 7,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -574,7 +574,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 45,
+            "entries": 30,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -2327,7 +2327,7 @@ export const fixtures: Fixtures = {
                 "what_if": {
                   "state": "effective",
                   "effective": null,
-                  "sentence": "Disabled: would otherwise be Effective."
+                  "sentence": "Disabled: would be Effective once Enabled."
                 },
                 "notes": [],
                 "config": {
@@ -2352,8 +2352,8 @@ export const fixtures: Fixtures = {
                   "sentence": "Disable is not offered: the Entry is Disabled already."
                 },
                 "enable": {
-                  "status": "not_offered",
-                  "sentence": "Enable is not offered: config-digger does not write `enabled` of a merged server; change it at E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled by hand."
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
                 },
                 "remove": {
                   "status": "offered"
@@ -2842,7 +2842,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 7,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -2942,7 +2942,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 45,
+            "entries": 30,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -4959,7 +4959,7 @@ export const fixtures: Fixtures = {
                 "what_if": {
                   "state": "effective",
                   "effective": null,
-                  "sentence": "Disabled: would otherwise be Effective."
+                  "sentence": "Disabled: would be Effective once Enabled."
                 },
                 "notes": [],
                 "config": {
@@ -4984,8 +4984,8 @@ export const fixtures: Fixtures = {
                   "sentence": "Disable is not offered: the Entry is Disabled already."
                 },
                 "enable": {
-                  "status": "not_offered",
-                  "sentence": "Enable is not offered: config-digger does not write `enabled` of a merged server; change it at E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled by hand."
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
                 },
                 "remove": {
                   "status": "offered"
@@ -5474,7 +5474,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 7,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -5574,7 +5574,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 45,
+            "entries": 30,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -7447,7 +7447,7 @@ export const fixtures: Fixtures = {
                 "what_if": {
                   "state": "effective",
                   "effective": null,
-                  "sentence": "Disabled: would otherwise be Effective."
+                  "sentence": "Disabled: would be Effective once Enabled."
                 },
                 "notes": [],
                 "config": {
@@ -7472,8 +7472,8 @@ export const fixtures: Fixtures = {
                   "sentence": "Disable is not offered: the Entry is Disabled already."
                 },
                 "enable": {
-                  "status": "not_offered",
-                  "sentence": "Enable is not offered: config-digger does not write `enabled` of a merged server; change it at E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled by hand."
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
                 },
                 "remove": {
                   "status": "offered"
@@ -8807,7 +8807,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 7,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -8843,7 +8843,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 45,
+            "entries": 30,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -10276,7 +10276,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 7,
+              "entries": 2,
               "notes": [
                 {
                   "code": "cloud_connectors_not_on_disk",
@@ -10312,7 +10312,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 45,
+              "entries": 30,
               "notes": [
                 {
                   "code": "cloud_connectors_not_on_disk",
@@ -10478,7 +10478,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-eda",
+      "id": "20261001-120000-a02",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10504,7 +10504,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-10b",
+      "id": "20261001-120000-137",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10527,10 +10527,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137"
     },
     {
-      "id": "20261001-120000-2b4",
+      "id": "20261001-120000-b01",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10551,14 +10551,14 @@ export const fixtures: Fixtures = {
       "locations": [
         "E:\\cd-throwaway\\codex-home\\config.toml"
       ],
-      "undoable": false,
-      "not_undoable": "cannot edit E:\\cd-throwaway\\codex-home\\config.toml safely: the edit would change line 3, outside what it targets"
+      "undoable": true,
+      "not_undoable": null
     }
   ],
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-eda",
+        "id": "20261001-120000-a02",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -10996,7 +10996,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11016,7 +11016,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -11035,7 +11035,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -11044,7 +11044,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-10b",
+        "id": "20261001-120000-137",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11067,7 +11067,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137"
       },
       "project": null,
       "changes": [
@@ -11482,7 +11482,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11520,16 +11520,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -11544,7 +11544,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-2b4",
+        "id": "20261001-120000-b01",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11565,8 +11565,8 @@ export const fixtures: Fixtures = {
         "locations": [
           "E:\\cd-throwaway\\codex-home\\config.toml"
         ],
-        "undoable": false,
-        "not_undoable": "cannot edit E:\\cd-throwaway\\codex-home\\config.toml safely: the edit would change line 3, outside what it targets"
+        "undoable": true,
+        "not_undoable": null
       },
       "project": null,
       "changes": [
@@ -11981,7 +11981,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -12001,19 +12001,12 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
-      "undo_refusal": {
-        "code": "blocked",
-        "message": "cannot edit E:\\cd-throwaway\\codex-home\\config.toml safely: the edit would change line 3, outside what it targets",
-        "candidates": [],
-        "backup": null,
-        "diffs": [],
-        "failed": null
-      }
+      "undo_refusal": null
     }
   ],
   "backups": [
@@ -12021,10 +12014,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-2b4",
+          "operation": "20261001-120000-b01",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml"
         }
       ]
     },
@@ -12032,10 +12025,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-eda",
+          "operation": "20261001-120000-a02",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json"
         }
       ]
     }
@@ -14684,12 +14677,499 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "entry",
-        "verb": "remove",
+        "verb": "enable",
         "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
         "project": null
       },
       "preview": {
         "plan_id": "plan-38",
+        "preview": {
+          "action": "enable",
+          "title": "Enable 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": null,
+          "changes": [
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": null,
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-01",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-02",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-03",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-04",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-05",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-06",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-07",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-08",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-09",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-10",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-11",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-12",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-13",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-14",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-15",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-16",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-17",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-18",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-19",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-20",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-21",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-22",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-23",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-24",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-25",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-26",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-27",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-28",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-29",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-30",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-deleted",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-hide",
+              "before": "disabled",
+              "after": "effective"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "before": null,
+              "after": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "sentence": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex becomes Effective for cd-throwaway-codex in Codex.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\codex-home",
+              "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "git_versioned": false,
+              "store_class": "rewritten-while-running",
+              "edits": [
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "mcp_servers",
+                    "cd-throwaway-codex",
+                    "enabled"
+                  ]
+                }
+              ],
+              "diff": "--- a/E:\\cd-throwaway\\codex-home\\config.toml\n+++ b/E:\\cd-throwaway\\codex-home\\config.toml\n@@ -1,4 +1,3 @@\n [mcp_servers.cd-throwaway-codex]\n command = \"npx\"\n-args = [\"-y\", \"cd-throwaway-codex\", \"--api-key\", \"••••\"]\n-enabled = false\n\\ No newline at end of file\n+args = [\"-y\", \"cd-throwaway-codex\", \"--api-key\", \"••••\"]\n\\ No newline at end of file\n",
+              "diff_unavailable": null,
+              "diff_note": null,
+              "changed_lines": 2
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [
+          {
+            "class": "wide-reach",
+            "sentence": "This Enable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex in all projects and with no Project.",
+            "advice": [
+              {
+                "todo": "Check that everything it reaches should change.",
+                "why": "This Enable reaches more than what it targets: what it writes also changes the State of this Entry.",
+                "paths": [
+                  "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex in all projects and with no Project"
+                ]
+              }
+            ]
+          }
+        ],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "entry",
+        "verb": "remove",
+        "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+        "project": null
+      },
+      "preview": {
+        "plan_id": "plan-39",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14754,7 +15234,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-39",
+        "plan_id": "plan-40",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -14831,7 +15311,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-40",
+        "plan_id": "plan-41",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -14912,7 +15392,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-41",
+        "plan_id": "plan-42",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -15008,7 +15488,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-42",
+        "plan_id": "plan-43",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15075,7 +15555,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-43",
+        "plan_id": "plan-44",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -15152,7 +15632,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-44",
+        "plan_id": "plan-45",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15219,7 +15699,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-45",
+        "plan_id": "plan-46",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -15315,7 +15795,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-46",
+        "plan_id": "plan-47",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15389,7 +15869,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\many\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-47",
+        "plan_id": "plan-48",
         "preview": {
           "action": "remove",
           "title": "Remove 12 Entries",
@@ -15674,7 +16154,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-48",
+        "plan_id": "plan-49",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15741,7 +16221,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-49",
+        "plan_id": "plan-50",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15791,7 +16271,7 @@ export const fixtures: Fixtures = {
         "kind": "stranded"
       },
       "preview": {
-        "plan_id": "plan-50",
+        "plan_id": "plan-51",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -15839,14 +16319,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-eda"
+        "operation": "20261001-120000-a02"
       },
       "preview": {
-        "plan_id": "plan-51",
+        "plan_id": "plan-52",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-eda \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-eda",
+          "title": "Undo 20261001-120000-a02 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-a02",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -15902,44 +16382,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-eda"
-      },
-      "preview": {
-        "plan_id": "plan-52",
-        "preview": {
-          "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-eda \"Disable 1 Entry\"",
-          "undo_of": null,
-          "backup_of": "20261001-120000-eda",
-          "project": null,
-          "changes": [],
-          "effective": [],
-          "info": [],
-          "files": [],
-          "folders": [],
-          "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda\\2-manifest.json"
-          ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-eda",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-eda can no longer be undone."
-        },
-        "warnings": [],
-        "blocks": []
-      }
-    },
-    {
-      "request": {
-        "kind": "delete_backup",
-        "operation": "20261001-120000-10b"
+        "operation": "20261001-120000-a02"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-10b \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-a02 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-10b",
+          "backup_of": "20261001-120000-a02",
           "project": null,
           "changes": [],
           "effective": [],
@@ -15947,10 +16398,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-10b",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-10b can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a02 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -15959,15 +16411,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-2b4"
+        "operation": "20261001-120000-137"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-2b4 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-137 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-2b4",
+          "backup_of": "20261001-120000-137",
           "project": null,
           "changes": [],
           "effective": [],
@@ -15975,10 +16427,509 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-2b4 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-137 can no longer be undone."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "undo",
+        "operation": "20261001-120000-b01"
+      },
+      "preview": {
+        "plan_id": "plan-55",
+        "preview": {
+          "action": "undo",
+          "title": "Undo 20261001-120000-b01 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-b01",
+          "backup_of": null,
+          "project": null,
+          "changes": [
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": null,
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-01",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-02",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-03",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-04",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-05",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-06",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-07",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-08",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-09",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-10",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-11",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-12",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-13",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-14",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-15",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-16",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-17",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-18",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-19",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-20",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-21",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-22",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-23",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-24",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-25",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-26",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-27",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-28",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-29",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-30",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-deleted",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\project-hide",
+              "before": "disabled",
+              "after": "effective"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "before": null,
+              "after": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "sentence": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex becomes Effective for cd-throwaway-codex in Codex.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\codex-home",
+              "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "git_versioned": false,
+              "store_class": "rewritten-while-running",
+              "edits": [
+                {
+                  "op": "remove",
+                  "key_path": [
+                    "mcp_servers",
+                    "cd-throwaway-codex",
+                    "enabled"
+                  ]
+                }
+              ],
+              "diff": "--- a/E:\\cd-throwaway\\codex-home\\config.toml\n+++ b/E:\\cd-throwaway\\codex-home\\config.toml\n@@ -1,4 +1,3 @@\n [mcp_servers.cd-throwaway-codex]\n command = \"npx\"\n-args = [\"-y\", \"cd-throwaway-codex\", \"--api-key\", \"••••\"]\n-enabled = false\n\\ No newline at end of file\n+args = [\"-y\", \"cd-throwaway-codex\", \"--api-key\", \"••••\"]\n\\ No newline at end of file\n",
+              "diff_unavailable": null,
+              "diff_note": null,
+              "changed_lines": 2
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "delete_backup",
+        "operation": "20261001-120000-b01"
+      },
+      "preview": {
+        "plan_id": "plan-56",
+        "preview": {
+          "action": "delete_backup",
+          "title": "Delete the backup of 20261001-120000-b01 \"Disable 1 Entry\"",
+          "undo_of": null,
+          "backup_of": "20261001-120000-b01",
+          "project": null,
+          "changes": [],
+          "effective": [],
+          "info": [],
+          "files": [],
+          "folders": [],
+          "deleted": [
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml"
+          ],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-b01 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -15988,11 +16939,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-2b4",
+      "operation": "20261001-120000-b01",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-2b4",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-2b4: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-b01: verified.",
       "hints": []
     }
   },
@@ -16040,8 +16991,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "b2a3b33",
-    "date": "2026-10-25",
+    "commit": "a44ab19",
+    "date": "2026-10-26",
     "platform": "Windows x64",
     "pages": [
       {

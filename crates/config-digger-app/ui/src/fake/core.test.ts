@@ -128,10 +128,10 @@ describe("the fake backend", () => {
         code: "write_failed",
         message: `cannot write ${config}: Access is denied. (os error 5)`,
         candidates: [],
-        backup: String.raw`E:\cd-throwaway\localappdata\config-digger\backups\20261001-120000-2b4`,
+        backup: String.raw`E:\cd-throwaway\localappdata\config-digger\backups\20261001-120000-b01`,
         diffs: [],
         failed: {
-          operation: "20261001-120000-2b4",
+          operation: "20261001-120000-b01",
           failure: null,
           rollback: [config, String.raw`E:\cd-throwaway\many\project-01\.mcp.json`, String.raw`E:\cd-throwaway\many\project-02\.mcp.json`].map((path) => ({
             path,
