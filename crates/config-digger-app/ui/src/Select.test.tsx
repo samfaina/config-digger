@@ -208,7 +208,7 @@ describe("a Select with a text box in its panel", () => {
     expect(document.activeElement).toBe(field);
   });
 
-  test("narrows as the user types and does not jump to an option starting with the text", async () => {
+  test("keeps the active option when a letter typed in the text box starts an option above it", async () => {
     const { user, field } = renderField({ initial: "gamma", searchLabel: "Find a Project" });
     await user.click(field);
     await user.keyboard("a");

@@ -151,9 +151,9 @@ export default [
       await s.keys(KEY.Backspace.repeat(5));
       await wait(200);
       t.eq((await panel(s)).options.length, all, "al borrar vuelven todas las opciones");
-      const narrowed = await typeInPanel(t, "E");
-      p = await panel(s);
-      t.check(narrowed && p.options.find((o) => o.active)?.text === `${t.root}\\project-extra`, `con E, «${t.root}\\project-extra» sigue iluminado y no salta a otra opción que empiece por E`, p.options.find((o) => o.active)?.text);
+      const reached = await typeInPanel(t, "E");
+      const active = (await panel(s)).options.find((o) => o.active)?.text;
+      t.check(reached && active === `${t.root}\\project-extra`, `con E, «${t.root}\\project-extra» sigue iluminado y no salta a otra opción que empiece por E`, active);
       await s.keys(KEY.Backspace);
       await wait(200);
       await s.keys("throwaway");
