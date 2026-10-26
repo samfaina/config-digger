@@ -62,10 +62,20 @@ test("a step's setup runs the data script with the switches the plan adds to -Re
   assert.equal(setupSwitches(String.raw`.\uat\data\cd-throwaway-setup.ps1 -Root D:\x\cd-throwaway -Reset -Symlink`), " -Symlink");
 });
 
-test("a step that leaves something to a person says what", () => {
-  for (const step of steps.filter((s) => "manual" in s)) {
-    assert.ok(typeof step.manual === "string" && step.manual.length > 20, step.id);
-  }
+const planStep = (id) => plan.sections.flatMap((section) => section.steps).find((step) => step.id === id);
+
+test("every step the walk walks lists the walk in its automation, naming the step", () => {
+  const missing = steps
+    .filter((step) => !planStep(step.id).automation?.some((a) => a.tool === "webdriver" && a.test.endsWith(` > ${step.id}`)))
+    .map((step) => step.id);
+  assert.deepEqual(missing, []);
+});
+
+test("what a person still checks lives in the plan, never in a step module", () => {
+  assert.deepEqual(
+    steps.filter((step) => "manual" in step).map((step) => step.id),
+    [],
+  );
 });
 
 test("the profile must be a folder named cd-throwaway-profile", () => {
@@ -220,7 +230,7 @@ const manifestOf = (local, id) => readFileSync(join(local, "config-digger", "bac
 
 // Runs step 11.11's command as the tester pastes it, on that LOCALAPPDATA.
 function markNewest(local) {
-  const step = plan.sections.flatMap((section) => section.steps).find((s) => s.id === "11.11");
+  const step = planStep("11.11");
   return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", step.commands[0].text], {
     env: { ...process.env, LOCALAPPDATA: local },
     encoding: "utf8",
@@ -282,11 +292,12 @@ const screenshots = (calls) => calls.filter((c) => c.endsWith("/screenshot"));
 
 // Walks the step module `runner` in CI mode, with `ctx` added to the
 // walk's, and a folder for screenshots that the walk must leave empty.
-async function walkOnCi(runner, ctx = {}) {
+// `step` is the plan's step, by default one with no setup and no manual.
+async function walkOnCi(runner, ctx = {}, step = { id: runner.id }) {
   const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
   const s = new QuietPage();
   try {
-    const result = await walkStep({ s, version: "0.1.0", ...ctx }, { id: runner.id }, runner, { shots, ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+    const result = await walkStep({ s, version: "0.1.0", ...ctx }, step, runner, { shots, ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
     return { result, calls: s.calls, files: readdirSync(shots) };
   } finally {
     rmSync(shots, { recursive: true, force: true });
@@ -376,18 +387,30 @@ test("a step's CI result carries by ci and the run's URL", async () => {
 });
 
 test("a document of uat-results.json has the runner's fields, by and evidence, and nothing else", async () => {
-  const { result } = await walkOnCi({
-    id: "5.1",
-    manual: "Que el aviso entre y se vaya sin saltos.",
-    async run(t) {
-      t.check(true, "sale el aviso");
-      await t.shot("notice", "su color");
+  const { result } = await walkOnCi(
+    {
+      id: "5.1",
+      async run(t) {
+        t.check(true, "sale el aviso");
+        await t.shot("notice", "su color");
+      },
     },
-  });
+    {},
+    { id: "5.1", manual: planStep("5.1").manual },
+  );
   const doc = resultDocument(result);
   assert.deepEqual(Object.keys(doc).sort(), ["by", "evidence", "id", "notes", "status", "time", "version"]);
   assert.equal(doc.version, "0.1.0");
   assert.match(doc.notes, /Queda para una persona: Que el aviso entre/);
+});
+
+test("the notes of 5.1 and 11.10 end with what the plan leaves to a person, and the plan leaves 9.2's SmartScreen to one", async () => {
+  for (const id of ["5.1", "11.10"]) {
+    const { result } = await walkOnCi({ id, async run(t) { t.check(true, "sale"); } }, {}, { id, manual: planStep(id).manual });
+    assert.ok(result.notes.endsWith(`Queda para una persona: ${planStep(id).manual}`), id);
+    assert.equal(result.manual, planStep(id).manual, id);
+  }
+  assert.match(planStep("9.2").manual, /SmartScreen/);
 });
 
 test("the job summary has a line per step, with the first line of the reason of a KO or a Blocked", () => {
@@ -421,8 +444,9 @@ test("an Operation id is read from the lines that name one", () => {
 });
 
 test("a step the walk never reached, its session unopened, is Blocked with why", () => {
-  const result = unwalkedStep({ version: "0.1.0" }, { id: "1.1" }, "POST /session: 500 session not created", { ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+  const result = unwalkedStep({ version: "0.1.0" }, { id: "1.1", manual: "Que se vea." }, "POST /session: 500 session not created", { ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
   assert.equal(result.status, "blocked");
+  assert.equal(result.manual, "Que se vea.");
   assert.equal(result.notes, "Bloqueado: la sesión de WebDriver no se abrió: POST /session: 500 session not created");
   assert.deepEqual(resultDocument(result), { id: "1.1", status: "blocked", notes: result.notes, time: result.time, version: "0.1.0", by: "ci", evidence: "https://github.com/o/r/actions/runs/1" });
 });

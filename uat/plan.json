@@ -37,7 +37,10 @@
           "expect": [
             "La última vez, las cuatro líneas de la primera orden salen con «False»."
           ],
-          "covers": ["#154"]
+          "covers": ["#154"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 8.1" }
+          ]
         }
       ]
     },
@@ -60,7 +63,10 @@
             "El instalador queda en Descargas.",
             "Su nombre lleva la versión del título de esta página."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/run.ps1 > 9.1" }
+          ]
         },
         {
           "id": "9.5",
@@ -104,7 +110,10 @@
             "Entre las líneas del PATH está «C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\Programs\\config-digger».",
             "Instalar sin preguntas y leer el PATH acaba con la línea «config-digger <versión>»."
           ],
-          "covers": ["#270"]
+          "covers": ["#270"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 9.5" }
+          ]
         },
         {
           "id": "9.2",
@@ -138,7 +147,11 @@
             "Con la ruta propuesta otra vez, el botón para seguir se activa.",
             "La orden imprime «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe»."
           ],
-          "covers": ["#78", "#152"]
+          "covers": ["#78", "#152"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 9.2" }
+          ],
+          "manual": "El aviso «Windows protegió su PC» de SmartScreen: en el walk del Sandbox no sale, porque un archivo de una carpeta mapeada no lleva la marca de la web."
         },
         {
           "id": "9.3",
@@ -171,7 +184,10 @@
             "La primera orden da un error en rojo: config-digger no se reconoce.",
             "La segunda imprime «KeepPathAlone» con el valor «1», que quiere decir sin PATH."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 9.3" }
+          ]
         },
         {
           "id": "9.4",
@@ -198,7 +214,10 @@
             "La casilla de PATH empieza desmarcada: recuerda la elección del paso 9.3.",
             "La orden imprime otra vez «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe»: el PATH queda puesto para la sección Desinstalar."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 9.4" }
+          ]
         }
       ]
     },
@@ -226,7 +245,11 @@
             "El script termina con «Created the throwaway homes and Projects in E:\\cd-throwaway».",
             "Entre otros, lista «claude-code-home\\.claude.json», «codex-home\\config.toml» y «claude-desktop-home\\claude_desktop_config.json»."
           ],
-          "covers": ["#190"]
+          "covers": ["#190"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" }
+          ]
         },
         {
           "id": "1.2",
@@ -259,7 +282,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#75", "#175"]
+          "covers": ["#75", "#175"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/data.mjs > 1.2" }
+          ]
         },
         {
           "id": "1.3",
@@ -292,7 +319,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#123"]
+          "covers": ["#123"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/data.mjs > 1.3" }
+          ]
         },
         {
           "id": "1.4",
@@ -324,7 +355,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#113"]
+          "covers": ["#113"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/data.mjs > 1.4" }
+          ]
         }
       ]
     },
@@ -348,7 +383,11 @@
             "Bajo el aviso laten filas grises.",
             "Luego salen los paneles de «Agents», «Items» y «Details» con tus datos."
           ],
-          "covers": ["#180"]
+          "covers": ["#180"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/loading.mjs > 15.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/loading.mjs > 15.1" }
+          ]
         },
         {
           "id": "15.2",
@@ -370,7 +409,11 @@
             "Al volver a la ventana sale la misma barra.",
             "Al volver a la ventana no sale el estado de carga de la primera lectura."
           ],
-          "covers": ["#180"]
+          "covers": ["#180"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/loading.mjs > 15.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/loading.mjs > 15.2" }
+          ]
         },
         {
           "id": "15.3",
@@ -393,7 +436,11 @@
             "Luego salen sus datos.",
             "En ningún momento sale una línea de texto suelta en lugar del aviso."
           ],
-          "covers": ["#180"]
+          "covers": ["#180"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/loading.mjs > 15.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/loading.mjs > 15.3" }
+          ]
         }
       ]
     },
@@ -415,7 +462,11 @@
             "Arriba salen las pestañas «Projects · N» y «Agent homes · N».",
             "El botón de arriba es «Add Project» o «Add Agent home», según la pestaña abierta."
           ],
-          "covers": ["#75"]
+          "covers": ["#75"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.1" }
+          ]
         },
         {
           "id": "10.2",
@@ -439,7 +490,11 @@
             "La fila tiene las etiquetas «Codex» y «added by you».",
             "No sale ninguna fila de codex-home bajo «Claude Code»."
           ],
-          "covers": ["#75", "#175"]
+          "covers": ["#75", "#175"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.2" }
+          ]
         },
         {
           "id": "10.3",
@@ -463,7 +518,11 @@
             "La fila tiene las etiquetas «Claude Desktop» y «added by you».",
             "No sale ninguna fila de claude-desktop-home bajo «Claude Code»."
           ],
-          "covers": ["#75", "#175"]
+          "covers": ["#75", "#175"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.3" }
+          ]
         },
         {
           "id": "10.4",
@@ -486,7 +545,11 @@
             "Una fila dice «claude-desktop» con «E:\\cd-throwaway\\claude-desktop-home».",
             "Ninguna de esas carpetas sale con otro Agent."
           ],
-          "covers": ["#175"]
+          "covers": ["#175"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.4" }
+          ]
         },
         {
           "id": "10.16",
@@ -504,7 +567,11 @@
             "Cada etiqueta tiene un borde gris claro alrededor.",
             "El texto de cada etiqueta es casi blanco."
           ],
-          "covers": ["#232"]
+          "covers": ["#232"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.16" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.16" }
+          ]
         },
         {
           "id": "10.19",
@@ -525,7 +592,11 @@
             "La lista de Items muestra «cd-throwaway-user» y «cd-throwaway-user-skill», y ningún otro Item.",
             "«cd-throwaway-local» y «cd-throwaway-leftover», que son de Projects, no salen en la lista."
           ],
-          "covers": ["#153"]
+          "covers": ["#153"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.19" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.19" }
+          ]
         },
         {
           "id": "10.5",
@@ -547,7 +618,11 @@
             "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».",
             "Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado."
           ],
-          "covers": ["#75", "#319"]
+          "covers": ["#75", "#319"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.5" }
+          ]
         },
         {
           "id": "10.17",
@@ -583,7 +658,11 @@
             "En el campo Project, el grupo «MISSING PROJECTS» muestra «E:/cd-throwaway/project-gone».",
             "«E:/cd-throwaway/project-deleted» no sale en el campo Project."
           ],
-          "covers": ["#319"]
+          "covers": ["#319"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.17" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.17" }
+          ]
         },
         {
           "id": "10.6",
@@ -601,7 +680,11 @@
             "El filtro de State es «Unread».",
             "La lista de Items muestra «cd-throwaway-leftover»."
           ],
-          "covers": ["#75", "#176"]
+          "covers": ["#75", "#176"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.6" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.6" }
+          ]
         },
         {
           "id": "10.14",
@@ -620,7 +703,11 @@
             "Bajo la cabecera no salen los paneles de Agents, Items y Details, ni vacíos ni con sus cuentas a 0.",
             "Al acabar la lectura, el panel deja sitio a los paneles, con «cd-throwaway-leftover» en la lista de Items."
           ],
-          "covers": ["#180"]
+          "covers": ["#180"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.14" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.14" }
+          ]
         },
         {
           "id": "10.7",
@@ -662,7 +749,11 @@
             "En su lugar sale el grupo «▸ Missing, no leftovers · 2», cerrado.",
             "Abierto, en ese grupo la fila de project-gone dice «No leftovers» y ofrece «Hide»."
           ],
-          "covers": ["#75", "#179", "#230", "#319"]
+          "covers": ["#75", "#179", "#230", "#319"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.7" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.7" }
+          ]
         },
         {
           "id": "10.8",
@@ -683,7 +774,11 @@
             "Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.».",
             "El Project vuelve a la lista principal."
           ],
-          "covers": ["#75"]
+          "covers": ["#75"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.8" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.8" }
+          ]
         },
         {
           "id": "10.11",
@@ -707,7 +802,11 @@
             "El aviso de la rueda sigue ahí hasta que el Project vuelve a la lista principal.",
             "Entonces lo sustituye el aviso «E:\\cd-throwaway\\project-hide is listed again.»."
           ],
-          "covers": ["#179"]
+          "covers": ["#179"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.11" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.11" }
+          ]
         },
         {
           "id": "10.9",
@@ -730,7 +829,11 @@
             "La fila de project-extra dice «Folder · Added by you».",
             "La fila tiene los botones «Open in Inventory» y «Remove from list»."
           ],
-          "covers": ["#75"]
+          "covers": ["#75"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.9" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.9" }
+          ]
         },
         {
           "id": "10.12",
@@ -756,7 +859,11 @@
             "Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.».",
             "Al final, project-extra vuelve a estar en la lista."
           ],
-          "covers": ["#179"]
+          "covers": ["#179"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.12" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.12" }
+          ]
         },
         {
           "id": "10.13",
@@ -784,7 +891,11 @@
             "Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.».",
             "Al final, la fila de codex-home vuelve a estar bajo Codex."
           ],
-          "covers": ["#179"]
+          "covers": ["#179"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.13" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.13" }
+          ]
         },
         {
           "id": "10.10",
@@ -807,7 +918,11 @@
             "En Projects, la descripción dice «Projects come from the Agents' own registries plus the folders you add. config-digger never scans the disk.».",
             "En Agent homes, la descripción dice «Each Agent reads its user configuration from one or more homes. Entries in different homes never compete.»."
           ],
-          "covers": ["#221"]
+          "covers": ["#221"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.10" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.10" }
+          ]
         },
         {
           "id": "10.15",
@@ -840,7 +955,11 @@
             "Unhide devuelve project-hide a la lista principal.",
             "La pestaña Agent homes no tiene caja de búsqueda."
           ],
-          "covers": ["#224", "#319"]
+          "covers": ["#224", "#319"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.15" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.15" }
+          ]
         },
         {
           "id": "10.18",
@@ -880,7 +999,11 @@
             "Tras el Undo, el grupo «Stranded · 1» vuelve con «cd-throwaway-stranded».",
             "Tras Remove all, el grupo «Stranded» ya no sale."
           ],
-          "covers": ["#126"]
+          "covers": ["#126"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.18" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.18" }
+          ]
         }
       ]
     },
@@ -911,7 +1034,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#181"]
+          "covers": ["#181"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.1" }
+          ]
         },
         {
           "id": "2.2",
@@ -940,7 +1067,11 @@
             "Flecha arriba vuelve a «E:\\cd-throwaway\\project» sin abrir el panel.",
             "Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra «cd-throwaway-project»."
           ],
-          "covers": ["#181", "#219", "#224"]
+          "covers": ["#181", "#219", "#224"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.2" }
+          ]
         },
         {
           "id": "2.5",
@@ -976,7 +1107,11 @@
             "Con zz, el panel dice «No match».",
             "Escape cierra el panel sin cambiar el Project."
           ],
-          "covers": ["#224", "#260"]
+          "covers": ["#224", "#260"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.5" }
+          ]
         },
         {
           "id": "2.3",
@@ -1001,7 +1136,11 @@
             "Ese panel sale entero, sin pasar del borde de la ventana.",
             "El panel de Agent se abre entero debajo de su campo."
           ],
-          "covers": ["#181", "#221"]
+          "covers": ["#181", "#221"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.3" }
+          ]
         },
         {
           "id": "2.4",
@@ -1026,7 +1165,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#181"]
+          "covers": ["#181"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dropdowns.mjs > 2.4" }
+          ]
         }
       ]
     },
@@ -1054,7 +1197,11 @@
             "La fila muestra su ruta entera.",
             "No sale en ningún momento la etiqueta amarilla o blanca del sistema."
           ],
-          "covers": ["#182"]
+          "covers": ["#182"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.1" }
+          ]
         },
         {
           "id": "3.2",
@@ -1072,7 +1219,11 @@
             "Escape lo oculta y el foco sigue en el botón.",
             "Con Tab sale el tooltip «History · Undo» del botón siguiente."
           ],
-          "covers": ["#182"]
+          "covers": ["#182"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.2" }
+          ]
         },
         {
           "id": "3.3",
@@ -1092,7 +1243,11 @@
             "El de About, en la esquina de abajo a la izquierda, sale encima del botón, sin pasar del borde izquierdo.",
             "El de la fila muestra la ruta entera de la skill, partida en varias líneas."
           ],
-          "covers": ["#182", "#221"]
+          "covers": ["#182", "#221"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.3" }
+          ]
         },
         {
           "id": "3.4",
@@ -1142,7 +1297,11 @@
             "Tras Enable, cd-throwaway-desktop vuelve a salir como «Effective».",
             "Bajo los botones de la skill dice «Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.», sin pasar el ratón por ningún sitio."
           ],
-          "covers": ["#209"]
+          "covers": ["#209"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.4" }
+          ]
         }
       ]
     },
@@ -1174,7 +1333,11 @@
             "El tirador se arrastra con normalidad.",
             "Al final de la lista sale «cd-throwaway-many-30»."
           ],
-          "covers": ["#183"]
+          "covers": ["#183"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.1" }
+          ]
         },
         {
           "id": "4.2",
@@ -1195,7 +1358,11 @@
             "El tirador se arrastra con normalidad.",
             "La barra es igual a la de la lista de Items del Inventario."
           ],
-          "covers": ["#183"]
+          "covers": ["#183"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.2" }
+          ]
         },
         {
           "id": "4.3",
@@ -1222,7 +1389,11 @@
             "El tirador se arrastra con normalidad.",
             "La barra es igual a la de la lista de Items del Inventario."
           ],
-          "covers": ["#183", "#218"]
+          "covers": ["#183", "#218"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.3" }
+          ]
         },
         {
           "id": "4.4",
@@ -1246,7 +1417,11 @@
             "El tirador se arrastra con normalidad.",
             "Las dos barras son iguales a la de la lista de Items del Inventario."
           ],
-          "covers": ["#183"]
+          "covers": ["#183"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.4" }
+          ]
         },
         {
           "id": "4.5",
@@ -1268,7 +1443,11 @@
             "El tirador se arrastra con normalidad.",
             "La barra es igual a la de la lista de Items del Inventario."
           ],
-          "covers": ["#183"]
+          "covers": ["#183"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.5" }
+          ]
         },
         {
           "id": "4.6",
@@ -1302,7 +1481,11 @@
             "La ubicación acaba en «…» y su tooltip muestra la ruta entera.",
             "El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero."
           ],
-          "covers": ["#221"]
+          "covers": ["#221"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" }
+          ]
         }
       ]
     },
@@ -1380,7 +1563,12 @@
             "Con el ratón encima no se va.",
             "Unos 4 segundos después de apartar el ratón, se va igual."
           ],
-          "covers": ["#184", "#208"]
+          "covers": ["#184", "#208"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/notices.mjs > 5.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/notices.mjs > 5.1" }
+          ],
+          "manual": "Que el aviso entre y se vaya sin saltos: las pruebas miran su duración y sus fotogramas, no cómo se ve moverse."
         },
         {
           "id": "5.2",
@@ -1407,7 +1595,11 @@
             "Su texto, en blanco, dice «config-digger has kept nothing there yet.».",
             "Entra, se queda unos 4 segundos y se va como el del paso 5.1."
           ],
-          "covers": ["#184", "#208"]
+          "covers": ["#184", "#208"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/notices.mjs > 5.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/notices.mjs > 5.2" }
+          ]
         },
         {
           "id": "5.3",
@@ -1440,7 +1632,11 @@
             "Entra, se queda unos 4 segundos y se va como el del paso 5.1.",
             "El interruptor vuelve a como estaba."
           ],
-          "covers": ["#184", "#208"]
+          "covers": ["#184", "#208"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/notices.mjs > 5.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/notices.mjs > 5.3" }
+          ]
         },
         {
           "id": "5.4",
@@ -1465,7 +1661,11 @@
             "El aviso «Copied the path.» aparece y se va con un fundido.",
             "El aviso se queda en el mismo sitio, sin subir ni bajar."
           ],
-          "covers": ["#208"]
+          "covers": ["#208"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/notices.mjs > 5.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/notices.mjs > 5.4" }
+          ]
         }
       ]
     },
@@ -1495,7 +1695,11 @@
             "Con clear, la fila vuelve a no tener fondo.",
             "Con clear, la lista muestra otra vez todos los Items."
           ],
-          "covers": ["#185"]
+          "covers": ["#185"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/filters.mjs > 6.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/filters.mjs > 6.1" }
+          ]
         }
       ]
     },
@@ -1822,7 +2026,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#186", "#226"]
+          "covers": ["#186", "#226"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.1" }
+          ]
         },
         {
           "id": "7.2",
@@ -1853,7 +2061,10 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#188"]
+          "covers": ["#188"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.2" }
+          ]
         },
         {
           "id": "7.6",
@@ -1906,7 +2117,10 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#211"]
+          "covers": ["#211"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.6" }
+          ]
         },
         {
           "id": "7.3",
@@ -1938,7 +2152,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#189"]
+          "covers": ["#189"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.3" }
+          ]
         },
         {
           "id": "7.4",
@@ -1975,7 +2193,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#227"]
+          "covers": ["#227"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.4" }
+          ]
         },
         {
           "id": "7.5",
@@ -2020,7 +2242,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#229"]
+          "covers": ["#229"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.5" }
+          ]
         },
         {
           "id": "7.7",
@@ -2065,7 +2291,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#261"]
+          "covers": ["#261"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.7" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/dialog.mjs > 7.7" }
+          ]
         }
       ]
     },
@@ -2106,7 +2336,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#74", "#218"]
+          "covers": ["#74", "#218"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.1" }
+          ]
         },
         {
           "id": "11.2",
@@ -2128,7 +2362,11 @@
             "El detalle tiene «Backup», con la ruta de la copia.",
             "El Explorador abre esa carpeta, con «manifest.json» y una copia de «config.toml» cuyo nombre empieza por «1-»."
           ],
-          "covers": ["#74"]
+          "covers": ["#74"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.2" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.2" }
+          ]
         },
         {
           "id": "11.3",
@@ -2150,7 +2388,11 @@
             "La fila original muestra «Can't undo».",
             "El tooltip de «Can't undo» dice «It was undone by <id nuevo>; undo that Operation to apply it again.»."
           ],
-          "covers": ["#74"]
+          "covers": ["#74"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.3" }
+          ]
         },
         {
           "id": "11.4",
@@ -2192,7 +2434,11 @@
             "Debajo salen los botones «Open backup folder» y «Copy path».",
             "No hay ningún botón para restaurar a la fuerza."
           ],
-          "covers": ["#74", "#218", "#220"]
+          "covers": ["#74", "#218", "#220"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.4" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.4" }
+          ]
         },
         {
           "id": "11.5",
@@ -2233,7 +2479,11 @@
             "La Operation tiene una sección «Rollback» con el archivo como «never written».",
             "La Operation muestra «Can't undo»."
           ],
-          "covers": ["#74"]
+          "covers": ["#74"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.5" }
+          ]
         },
         {
           "id": "11.6",
@@ -2268,7 +2518,11 @@
             "La etiqueta pasa a «Rollback incomplete, dismissed».",
             "La barra roja ya no está en el Inventario."
           ],
-          "covers": ["#74", "#223"]
+          "covers": ["#74", "#223"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.6" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.6" }
+          ]
         },
         {
           "id": "11.7",
@@ -2291,7 +2545,11 @@
             "Files dice «Can't show a diff: the backup of Operation <id> was deleted, with the values of its edits.».",
             "El botón «Delete backup» ya no está."
           ],
-          "covers": ["#74", "#189"]
+          "covers": ["#74", "#189"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.7" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.7" }
+          ]
         },
         {
           "id": "11.8",
@@ -2329,7 +2587,11 @@
             "Mientras, los botones «Delete backup» y «Undo» del detalle se ven apagados.",
             "Luego la Operation dice «Undone by <id nuevo>» y muestra «Can't undo»."
           ],
-          "covers": ["#223"]
+          "covers": ["#223"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.8" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.8" }
+          ]
         },
         {
           "id": "11.9",
@@ -2358,7 +2620,11 @@
             "Mientras, sus botones «Enable» y «Remove» se ven apagados.",
             "Luego la tarjeta dice «Effective» y ofrece «Disable»."
           ],
-          "covers": ["#223"]
+          "covers": ["#223"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.9" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.9" }
+          ]
         },
         {
           "id": "11.10",
@@ -2396,7 +2662,12 @@
             "Unos 10 segundos después de apartar el ratón, se va bajando un poco mientras se desvanece.",
             "Al pulsar ✕, el aviso de Enable se va igual, sin desaparecer de golpe."
           ],
-          "covers": ["#208"]
+          "covers": ["#208"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.10" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.10" }
+          ],
+          "manual": "Que el aviso de Undo entre y se vaya sin saltos: las pruebas miran su duración y sus fotogramas, no cómo se ve moverse."
         },
         {
           "id": "11.11",
@@ -2460,7 +2731,11 @@
             "Tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed».",
             "Tras Dismiss, la barra roja ya no está en el Inventario."
           ],
-          "covers": ["#228", "#262"]
+          "covers": ["#228", "#262"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.11" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.11" }
+          ]
         },
         {
           "id": "11.12",
@@ -2507,7 +2782,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Symlink"
           },
-          "covers": ["#116"]
+          "covers": ["#116"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.12" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.12" }
+          ]
         }
       ]
     },
@@ -2555,7 +2834,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#159"]
+          "covers": ["#159"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 14.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/rest.mjs > 14.1" }
+          ]
         },
         {
           "id": "14.2",
@@ -2591,7 +2874,10 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#178"]
+          "covers": ["#178"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 14.2" }
+          ]
         },
         {
           "id": "14.3",
@@ -2630,7 +2916,11 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
-          "covers": ["#247"]
+          "covers": ["#247"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 14.3" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/rest.mjs > 14.3" }
+          ]
         }
       ]
     },
@@ -2661,7 +2951,11 @@
             "Esas palabras salen una sola vez.",
             "Con la versión final, Check now dice «config-digger <versión> is the latest version.»."
           ],
-          "covers": ["#79"]
+          "covers": ["#79"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 12.1" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/rest.mjs > 12.1" }
+          ]
         },
         {
           "id": "12.2",
@@ -2695,7 +2989,10 @@
             "La orden imprime «config-digger <esa versión>» y «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe».",
             "History conserva las Operations de este recorrido."
           ],
-          "covers": ["#79"]
+          "covers": ["#79"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/update.ps1 > 12.2" }
+          ]
         }
       ]
     },
@@ -2723,7 +3020,10 @@
             "El resultado dice «Disabled 1 Entry. Operation <id>: verified.».",
             "Tras Done, cd-throwaway-desktop sale como «Disabled», porque está aparcada."
           ],
-          "covers": ["#78", "#188"]
+          "covers": ["#78", "#188"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 13.1" }
+          ]
         },
         {
           "id": "13.2",
@@ -2763,7 +3063,10 @@
             "Tras reinstalar, History tiene todas las Operations del recorrido.",
             "Tras reinstalar, cd-throwaway-desktop sigue «Disabled»."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 13.2" }
+          ]
         },
         {
           "id": "13.3",
@@ -2795,7 +3098,10 @@
             "La desinstalación termina igual.",
             "La orden imprime otra vez lo mismo que en el paso 13.2: «False», «True» y un número mayor que 0."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 13.3" }
+          ]
         },
         {
           "id": "13.4",
@@ -2820,7 +3126,10 @@
           "expect": [
             "Las cuatro líneas salen con «False»: la app, las dos carpetas de datos y la elección de PATH ya no están."
           ],
-          "covers": ["#78"]
+          "covers": ["#78"],
+          "automation": [
+            { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 13.4" }
+          ]
         },
         {
           "id": "13.5",
@@ -2845,7 +3154,11 @@
           "expect": [
             "La segunda orden imprime «False»."
           ],
-          "covers": ["#190"]
+          "covers": ["#190"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/rest.mjs > 13.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/rest.mjs > 13.5" }
+          ]
         }
       ]
     }

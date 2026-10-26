@@ -1,6 +1,7 @@
 // Walks one step of the plan through its module in steps/ and gives its
 // result in the shape of the runner's `results` documents, with `by`,
-// `evidence` and the local-only `checks`, `looks` and `manual`.
+// `evidence` and the local-only `checks`, `looks` and `manual`, which the
+// plan's step holds.
 //
 // On CI (`ci: { evidence }`) the walk takes no screenshot, not even of a
 // failed step: a step's looks are left to the tester, its verdict comes from
@@ -120,7 +121,7 @@ export async function walkStep(ctx, step, runner, { shots, ci }) {
         ? `Sin juzgar en CI: ${looks.map((l) => l.what).join("; ")}. Lo juzga el tester en su walk.`
         : `A juzgar en capturas: ${looks.map((l) => `${l.what} [${l.file}]`).join("; ")}`),
     runner.note,
-    runner.manual && `Queda para una persona: ${runner.manual}`,
+    step.manual && `Queda para una persona: ${step.manual}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -134,25 +135,26 @@ export async function walkStep(ctx, step, runner, { shots, ci }) {
     evidence: ci ? ci.evidence : `uat/auto/webdriver/steps · ${id}${files.length ? ` · ${files.length} capturas locales` : ""}`,
     checks,
     looks,
-    // What a person must still see: the step stays in the tester's walk.
-    manual: runner.manual,
+    // What a person must still see, from the plan: the step stays in the
+    // tester's walk.
+    manual: step.manual,
   };
 }
 
-// The result of a step the walk never reached, because the app's session did
-// not open: Blocked, with why, in the shape walkStep gives.
-export function unwalkedStep(ctx, runner, why, { ci }) {
+// The result of the plan's `step`, which the walk never reached because the
+// app's session did not open: Blocked, with why, in the shape walkStep gives.
+export function unwalkedStep(ctx, step, why, { ci }) {
   return {
-    id: runner.id,
+    id: step.id,
     status: "blocked",
     notes: `Bloqueado: la sesión de WebDriver no se abrió: ${why}`,
     time: new Date().toISOString(),
     version: ctx.version,
     by: ci ? "ci" : "local",
-    evidence: ci ? ci.evidence : `uat/auto/webdriver/steps · ${runner.id}`,
+    evidence: ci ? ci.evidence : `uat/auto/webdriver/steps · ${step.id}`,
     checks: [],
     looks: [],
-    manual: runner.manual,
+    manual: step.manual,
   };
 }
 

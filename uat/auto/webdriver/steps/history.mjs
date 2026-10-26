@@ -398,7 +398,6 @@ export default [
   },
   {
     id: "11.10",
-    manual: "Que el aviso de Undo entre y se vaya sin saltos: las pruebas miran su duración y sus fotogramas, no cómo se ve moverse.",
     async run(t) {
       const { s } = t;
       await codex(t);
