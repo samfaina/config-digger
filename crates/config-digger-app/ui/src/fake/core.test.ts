@@ -123,6 +123,7 @@ describe("the fake backend", () => {
 
     const config = String.raw`E:\cd-throwaway\codex-home\config.toml`;
     // The recorded Operation, whose id each recording draws anew.
+    if (fixtures.executed.kind !== "applied") throw new Error("The fixtures' executed action is no applied Operation.");
     const { operation, backup } = fixtures.executed.outcome;
     expect(executed).toEqual({
       status: "error",
