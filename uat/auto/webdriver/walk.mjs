@@ -191,6 +191,11 @@ if (!opt.attach) {
 }
 if (unopened) {
   console.error(`The app's session did not open, so every step is Blocked: ${unopened.stack}`);
+  // The app's own log says how far it got.
+  const logs = join(env.LOCALAPPDATA, "config-digger", "logs");
+  for (const name of existsSync(logs) ? readdirSync(logs) : []) {
+    console.error(`${name}, its last lines:\n${readFileSync(join(logs, name), "utf8").trimEnd().split("\n").slice(-30).join("\n")}`);
+  }
   process.exitCode = 4;
 }
 if (driverStopped) {
