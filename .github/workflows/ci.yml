@@ -125,9 +125,6 @@ jobs:
           .\uat\auto\webdriver\run.ps1 -App target\release\config-digger-app.exe -Work "$env:RUNNER_TEMP\uat" -Ci
           -Evidence "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           -Summary $env:GITHUB_STEP_SUMMARY
-      - name: DIAG
-        if: failure()
-        run: .\uat\auto\webdriver\diag.ps1 -App target\release\config-digger-app.exe -Work "$env:RUNNER_TEMP\uat"
       # The results only: the walk takes no screenshot on CI.
       - name: Upload the WebDriver results
         if: ${{ !cancelled() }}
