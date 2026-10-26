@@ -253,10 +253,19 @@ describe("the action dialog", () => {
     expect(body.get("min-height")).toBe("0");
   });
 
-  test("keeps each block that scrolls a fifth of the window high, or its whole height when it is shorter, so a long one never squeezes the other out", () => {
+  test("keeps each block that scrolls a fifth of the window high, or its whole height when it is shorter, so a long one never squeezes the other out, but no more than half of what the dialog's height leaves its other parts, so it never scrolls as a whole", () => {
     // Shrinking takes height from each block in proportion to its own, which
-    // left Files a bare title under a long What changes.
-    expect(styled(".dialog-section.scrolls").get("min-height")).toBe("calc-size(max-content, min(size, 20vh))");
+    // left Files a bare title under a long What changes. A fifth each of the
+    // smallest window, 640px high, with the other parts, came to more than
+    // the dialog's 88vh (#378).
+    expect(styled(".dialog").get("max-height")).toBe("88vh");
+    expect(styled(".dialog-section.scrolls").get("min-height")).toBe("calc-size(max-content, min(size, 20vh, (88vh - 30rem) / 2))");
+  });
+
+  test("lets a WebView2 with no calc-size() shrink each block that scrolls, from a declaration before the one it skips", () => {
+    const block = css.slice(css.indexOf(".dialog-section.scrolls {"));
+    expect(block.indexOf("min-height: 0;")).toBeGreaterThan(-1);
+    expect(block.indexOf("min-height: 0;")).toBeLessThan(block.indexOf("min-height: calc-size("));
   });
 });
 

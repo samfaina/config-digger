@@ -1628,12 +1628,16 @@ p {
 }
 
 /* Shrinking takes height in proportion to each block's own, so each keeps a
-   fifth of the window, or all of its height when shorter. `min-height: 0` is
-   for a WebView2 before Chromium 129, which has no calc-size(). */
+   fifth of the window, or all of its height when shorter. In a short window,
+   where two fifths and the other parts come to more than the dialog's 88vh,
+   each keeps instead half of what the other parts leave it: 30rem holds them
+   with a short Before you apply, so the dialog itself never scrolls and its
+   buttons stay in view. `min-height: 0` is for a WebView2 before Chromium
+   129, which has no calc-size(). */
 .dialog-section.scrolls {
   flex: 0 1 auto;
   min-height: 0;
-  min-height: calc-size(max-content, min(size, 20vh));
+  min-height: calc-size(max-content, min(size, 20vh, (88vh - 30rem) / 2));
   display: flex;
   flex-direction: column;
 }
