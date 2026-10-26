@@ -65,6 +65,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: crates/config-digger-app/ui/package-lock.json
+      # The dev server runs cargo metadata for About's licenses while it
+      # serves the page: on a cold runner its download of the crates held
+      # the page for more than a test's 30 s.
+      - name: Fetch the crates
+        run: cargo fetch --locked --target x86_64-pc-windows-msvc
       - name: UAT steps on the fake backend
         working-directory: crates/config-digger-app/ui
         run: |
