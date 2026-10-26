@@ -4,6 +4,8 @@
 :root {
   --primary: #7d67cb;
   --primary-hover: #957fe0;
+  /* Where the gradient of a selected tile ends, from --primary. */
+  --primary-deep: #5d4c9e;
   --background: #16171b;
   --white: #ffffff;
   --grey: #8b8c8f;
@@ -16,6 +18,9 @@
   --tile-hover: #2c2d35;
   --line: #33343c;
   --button: #25262d;
+  /* A secondary button, such as a row's Hide or Unhide, and hovered. */
+  --cta-secondary: #34353f;
+  --cta-secondary-hover: #40414c;
 
   --state-effective: #3fb950;
   --state-shadowed: #8b8c8f;
@@ -300,12 +305,12 @@ p {
 }
 
 .cta.secondary {
-  background: #34353f;
+  background: var(--cta-secondary);
   box-shadow: none;
 }
 
 .cta.secondary:hover {
-  background: #40414c;
+  background: var(--cta-secondary-hover);
 }
 
 .cta:disabled {
@@ -407,7 +412,7 @@ p {
 
 .tile.selected,
 .bar.selected {
-  background: linear-gradient(100deg, var(--primary), #5d4c9e);
+  background: linear-gradient(100deg, var(--primary), var(--primary-deep));
   box-shadow: 0 4px 16px #7d67cb33;
 }
 
@@ -610,6 +615,16 @@ p {
   border-color: var(--tag-read-only-edge);
   background: var(--tag-read-only);
   color: var(--tag-read-only-text);
+}
+
+/* On the purple of a selected home tile, a tag is outlined in its text's
+   colour, as its usual outline fades into the gradient. */
+.tile.selected .tag {
+  border-color: var(--tag-text);
+}
+
+.tile.selected .tag.read-only {
+  border-color: var(--tag-read-only-text);
 }
 
 /* State pills: one colour per State */
@@ -2509,12 +2524,21 @@ p {
   gap: 12px;
   margin-bottom: 6px;
   padding: 10px 12px;
+  /* Transparent, so a hidden row's dashed one keeps the row's size. */
+  border: 1px solid transparent;
   border-radius: 12px;
   background: var(--tile);
 }
 
+/* A hidden row: an outline on the panel instead of a tile, its name quieter.
+   No opacity, which would bring every text and tag on it below AA. */
 .place-row.dimmed {
-  opacity: 0.6;
+  border: 1px dashed var(--faint);
+  background: transparent;
+}
+
+.place-row.dimmed .place-name {
+  color: var(--hint);
 }
 
 .place-row.informational {
