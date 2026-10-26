@@ -18,6 +18,9 @@
   --tile-hover: #2c2d35;
   --line: #33343c;
   --button: #25262d;
+  /* A secondary button, such as a row's Hide or Unhide, and hovered. */
+  --cta-secondary: #34353f;
+  --cta-secondary-hover: #40414c;
 
   --state-effective: #3fb950;
   --state-shadowed: #8b8c8f;
@@ -302,12 +305,12 @@ p {
 }
 
 .cta.secondary {
-  background: #34353f;
+  background: var(--cta-secondary);
   box-shadow: none;
 }
 
 .cta.secondary:hover {
-  background: #40414c;
+  background: var(--cta-secondary-hover);
 }
 
 .cta:disabled {
@@ -2521,6 +2524,8 @@ p {
   gap: 12px;
   margin-bottom: 6px;
   padding: 10px 12px;
+  /* Transparent, so a hidden row's dashed one keeps the row's size. */
+  border: 1px solid transparent;
   border-radius: 12px;
   background: var(--tile);
 }
