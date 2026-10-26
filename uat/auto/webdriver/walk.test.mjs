@@ -202,7 +202,7 @@ test("confirming an action dialog returns its result, though the result lands wh
 
 // A LOCALAPPDATA whose config-digger backups hold one Operation folder per
 // `{ id, title, status }`, each with its manifest as the core writes it.
-function backups(operations) {
+function localAppDataWith(operations) {
   const local = mkdtempSync(join(tmpdir(), "uat-backups-"));
   for (const { id, title, status } of operations) {
     const folder = join(local, "config-digger", "backups", id);
@@ -225,7 +225,7 @@ function markNewest(local) {
 }
 
 test("step 11.11's command marks the newest Operation by its id, the Enable of step 11.10, as needing attention", () => {
-  const local = backups([
+  const local = localAppDataWith([
     { id: "20261026-102000-c3d", title: "Enable 1 Entry", status: "applied" },
     { id: "20261026-101500-a1b", title: "Disable 1 Entry", status: "applied" },
     { id: "20261026-091500-fff", title: "Enable 1 Entry", status: "applied" },
@@ -247,7 +247,7 @@ test("step 11.11's command changes nothing when the newest Operation is not an a
     { id: "20261026-102000-c3d", title: "Disable 1 Entry", status: "applied" },
     { id: "20261026-102000-c3d", title: "Enable 1 Entry", status: "needs_attention" },
   ]) {
-    const local = backups([newest, { id: "20261026-101500-a1b", title: "Enable 1 Entry", status: "applied" }]);
+    const local = localAppDataWith([newest, { id: "20261026-101500-a1b", title: "Enable 1 Entry", status: "applied" }]);
     try {
       const before = manifestOf(local, newest.id);
       assert.throws(() => markNewest(local), /is not the applied Enable 1 Entry of step 11\.10/);

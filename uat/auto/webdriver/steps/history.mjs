@@ -503,7 +503,6 @@ export default [
         t.blocked = `la orden no marcó la Operation: ${String(error.stderr ?? error.message).trim().split("\n")[0]}`;
         return;
       }
-      t.shared.needsAttention1111 = id;
       await t.restart();
       await s.waitFor(".rail button[aria-label='Inventory']");
       await go(s, "History · Undo");
@@ -533,8 +532,8 @@ export default [
       const marked = list.find((r) => r.meta.includes(id));
       t.check(marked?.title === "Enable 1 Entry" && marked.chip === "Needs attention", "con Needs attention, sale la Operation del id que apuntaste, «Enable 1 Entry», con la etiqueta «Needs attention»", JSON.stringify(marked));
       t.check(list.length > 0 && list.every((r) => r.chip === "Needs attention"), "con Needs attention, todas las filas tienen la etiqueta «Needs attention»", list.map((r) => r.chip).join(", "));
-      const dismissed = t.shared.removeLeftoversOperation;
-      t.check(dismissed && !list.some((r) => r.meta.includes(dismissed)), "con Needs attention, no sale la Operation del paso 11.6, que ya dice «Rollback incomplete, dismissed»", list.map((r) => r.meta).join(" | "));
+      const dismissed116 = t.shared.removeLeftoversOperation;
+      t.check(dismissed116 && !list.some((r) => r.meta.includes(dismissed116)), "con Needs attention, no sale la Operation del paso 11.6, que ya dice «Rollback incomplete, dismissed»", list.map((r) => r.meta).join(" | "));
       await choose(s, "Status", "Any status");
       await typeInto(s, "input[aria-label='Search Entry names']", "CODEX");
       await wait(300);
@@ -563,6 +562,9 @@ export default [
       await waitNotice(s, `Dismissed Operation ${id}.`);
       await wait(400);
       t.eq((await detail(s)).chip, "Rollback incomplete, dismissed", "tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed»");
+      await go(s, "Inventory");
+      await wait(500);
+      t.check(!(await s.exec("return !!document.querySelector('.recovery-banner')")), "tras Dismiss, la barra roja ya no está en el Inventario");
     },
   },
   {

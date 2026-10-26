@@ -2430,7 +2430,8 @@
             "Pulsa Clear filter.",
             "Elige la fila «Enable 1 Entry» del id que apuntaste.",
             "Pulsa Dismiss.",
-            "Mira su etiqueta."
+            "Mira su etiqueta.",
+            "Vuelve al Inventario."
           ],
           "commands": [
             {
@@ -2456,7 +2457,8 @@
             "Con cd-throwaway-nada, el título dice «0 of N Operations».",
             "Tras Clear filter, la caja está vacía y los desplegables dicen «Any verb» y «Any status».",
             "Tras Clear filter, el título vuelve a «N Operations».",
-            "Tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed»."
+            "Tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed».",
+            "Tras Dismiss, la barra roja ya no está en el Inventario."
           ],
           "covers": ["#228", "#262"]
         },
