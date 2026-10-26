@@ -6,29 +6,14 @@
 // slashes, as the WebDriver walk also finds: a path matches either way.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { inventoryShown, rail } from "./app";
+import { anySeparator, away, inventoryShown, rail, row } from "./app";
+import { grey, purple } from "./look";
 import { uatStep } from "./step";
-
-const rgb = (colour: string) => (colour.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-const grey = (colour: string) => {
-  const [r, g, b, alpha = 1] = rgb(colour);
-  return alpha === 0 || (Math.abs(r - g) < 20 && Math.abs(g - b) < 25);
-};
-const violet = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return b > g + 40 && r > g;
-};
-
-/** A pattern of `text` whose path separators may be slashes or backslashes. */
-function anySlash(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\\|\//g, "[\\\\/]");
-}
 
 /** Presses Remove leftovers on the Projects tab's row of `project` and waits for the preview's What changes. */
 async function removeLeftovers(page: Page, project: string) {
   await rail(page, "Projects & homes");
-  const row = page.locator(".place-row", { has: page.locator(".place-name", { hasText: new RegExp(`^${anySlash(project)}$`) }) });
-  await row.getByRole("button", { name: "Remove leftovers" }).click();
+  await row(page, project).getByRole("button", { name: "Remove leftovers" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("region", { name: "What changes" }).or(dialog.locator(".dialog-section", { hasText: "What changes" })).first().waitFor();
   return dialog;
@@ -48,7 +33,7 @@ uatStep("7.1", async ({ page, open, check }) => {
   const key = dialog.locator(".change-key");
 
   await check("Arriba sale «PROJECT E:/cd-throwaway/project-gone» en su línea.", async () => {
-    await expect(dialog.locator(".change-project-name")).toHaveText(new RegExp(`^PROJECT\\s+${anySlash("E:/cd-throwaway/project-gone")}$`, "i"));
+    await expect(dialog.locator(".change-project-name")).toHaveText(new RegExp(`^PROJECT\\s+${anySeparator("E:/cd-throwaway/project-gone")}$`, "i"));
     await expect(dialog.locator(".change-project-name .change-label")).toHaveCSS("text-transform", "uppercase");
   });
   await check("Debajo sale «FILE .claude.json».", async () => {
@@ -85,7 +70,7 @@ uatStep("7.1", async ({ page, open, check }) => {
   });
   await check("Luego sale «KEY projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover», con la clave en gris y monoespaciada.", async () => {
     await expect(row.locator(".change-label").nth(2)).toHaveText(/^key$/i);
-    await expect(key).toHaveText(new RegExp(`^${anySlash("projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover")}$`));
+    await expect(key).toHaveText(new RegExp(`^${anySeparator("projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover")}$`));
     const look = await key.evaluate((k) => ({ colour: getComputedStyle(k).color, font: getComputedStyle(k).fontFamily }));
     expect(grey(look.colour), look.colour).toBe(true);
     expect(look.font).toMatch(/mono|consol/i);
@@ -103,7 +88,7 @@ uatStep("7.1", async ({ page, open, check }) => {
     expect(gaps.filter((gap) => gap < 3), `gaps ${gaps}`).toEqual([]);
   });
   await check("Sobre la clave sale un tooltip con el locator entero, que empieza por «E:\\cd-throwaway\\claude-code-home\\.claude.json#».", async () => {
-    await page.mouse.move(600, 4);
+    await away(page);
     await key.hover();
     await expect(page.getByRole("tooltip")).toHaveText(/^E:\\cd-throwaway\\claude-code-home\\\.claude\.json#.+cd-throwaway-leftover/);
   });
@@ -204,7 +189,7 @@ uatStep("7.4", async ({ page, open, check }) => {
     for (let presses = 0; presses < 20 && !(await changes.evaluate((c) => c === document.activeElement)); presses++) await page.keyboard.press("Tab");
     await expect(changes).toBeFocused();
     const ring = await changes.evaluate((c) => ({ style: getComputedStyle(c).outlineStyle, colour: getComputedStyle(c).outlineColor, shadow: getComputedStyle(c).boxShadow }));
-    expect((ring.style !== "none" && violet(ring.colour)) || violet(ring.shadow), JSON.stringify(ring)).toBe(true);
+    expect((ring.style !== "none" && purple(ring.colour)) || purple(ring.shadow), JSON.stringify(ring)).toBe(true);
   });
   await check("Con el foco, «What changes» se desplaza con la flecha abajo.", async () => {
     await page.keyboard.press("ArrowDown");

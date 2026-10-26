@@ -2,7 +2,8 @@
 // from computed styles: the row's background and gradient, its halo and its
 // track.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { inventoryShown } from "./app";
+import { away, inventoryShown } from "./app";
+import { grey, lightness, rgb } from "./look";
 import { uatStep } from "./step";
 
 /** What a row or a tile shows of its look. */
@@ -20,14 +21,7 @@ function look(element: Locator) {
   });
 }
 
-/** The channels of each `rgb(…)` or `rgba(…)` colour in `text`, with alpha 1 when it has none. */
-function colours(text: string | null): number[][] {
-  return [...(text ?? "").matchAll(/rgba?\(([^)]+)\)/g)].map(([, inner]) => {
-    const [red, green, blue, alpha = 1] = inner.split(",").map(Number);
-    return [red, green, blue, alpha];
-  });
-}
-
+/** The names of the Items list, in order. */
 const itemNames = (page: Page) => page.locator(".item-row .item-name").allTextContents();
 
 uatStep("6.1", async ({ page, open, check, leave }) => {
@@ -46,11 +40,10 @@ uatStep("6.1", async ({ page, open, check, leave }) => {
     await expect.poll(async () => (await look(row)).background).not.toBe(rest.background);
     const hovered = await look(row);
     expect(hovered.image).toBe("none");
-    const [[red, green, blue, alpha]] = colours(hovered.background);
-    expect(Math.max(red, green, blue) - Math.min(red, green, blue)).toBeLessThanOrEqual(16);
-    expect(alpha).toBe(1);
-    const panel = colours(await page.locator(".panel.states").evaluate((own) => getComputedStyle(own).backgroundColor))[0];
-    expect(red + green + blue).toBeGreaterThan(panel[0] + panel[1] + panel[2]);
+    expect(grey(hovered.background), hovered.background).toBe(true);
+    expect(rgb(hovered.background)[3]).toBe(1);
+    const panel = await page.locator(".panel.states").evaluate((own) => getComputedStyle(own).backgroundColor);
+    expect(lightness(hovered.background)).toBeGreaterThan(lightness(panel));
     expect(hovered.shadow).toBe(rest.shadow);
   });
 
@@ -65,13 +58,13 @@ uatStep("6.1", async ({ page, open, check, leave }) => {
     expect(chosen.shadow).toBe(tile.shadow);
   });
 
-  await page.mouse.move(600, 4);
+  await away(page);
   await check("La fila conserva el degradado al apartar el ratón.", async () => {
     expect((await look(row)).image).toBe(tile.image);
   });
   await check("Su carril se oscurece.", async () => {
-    const [track] = colours((await look(row)).track);
-    const [before] = colours(rest.track);
+    const track = rgb((await look(row)).track);
+    const before = rgb(rest.track);
     // A black veil on the gradient, where the row at rest had a white one on the panel.
     expect(track.slice(0, 3)).toEqual([0, 0, 0]);
     expect(track[3]).toBeGreaterThan(0);
@@ -92,7 +85,7 @@ uatStep("6.1", async ({ page, open, check, leave }) => {
     const cleared = await look(row);
     expect(cleared.pressed).toBe("false");
     expect(cleared.image).toBe("none");
-    expect(colours(cleared.background)[0][3]).toBe(0);
+    expect(rgb(cleared.background)[3]).toBe(0);
   });
   await check("Con clear, la lista muestra otra vez todos los Items.", async () => {
     expect(await itemNames(page)).toEqual(all);

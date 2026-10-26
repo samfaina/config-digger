@@ -5,11 +5,10 @@
 // walk's tester.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { inventoryShown, rail } from "./app";
+import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole } from "./app";
 import { uatStep } from "./step";
 
-const ROOT = String.raw`E:\cd-throwaway`;
-const NO_WRITE = "the fake backend's writes change nothing, so the list stays as the fixtures have it";
+/** Why the checks of project-gone's Inventory stay with a person. */
 const NO_LEFTOVERS =
   "the fixtures hold no inventory of project-gone, so the fake backend answers that of no Project, which has no Unread Item and no leftover";
 
@@ -33,32 +32,6 @@ function projectGroups(page: Page) {
   });
 }
 
-/** The group whose title, after its ▾ or ▸, starts with `title` and a count. */
-function group(page: Page, title: string): Locator {
-  return page.locator("h3.place-group", { hasText: new RegExp(`^[▾▸]?\\s*${title} · \\d+$`) });
-}
-
-/** Opens the group titled `title` if it is closed. */
-async function openGroup(page: Page, title: string) {
-  const toggle = group(page, title).locator(".place-group-toggle");
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-}
-
-/**
- * `path`, whichever separator it is written with: the plan writes a Project
- * that Claude Code keys with slashes as Claude Code does, the fixtures as
- * Windows does, and the WebDriver walk takes either.
- */
-function pathText(path: string): RegExp {
-  const escape = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^${path.split(/[\\/]/).map(escape).join("[\\\\/]")}$`);
-}
-
-/** The row named `name`: a Project's path, or «No Project». */
-function row(page: Page, name: string): Locator {
-  return page.locator(".place-row", { has: page.locator(".place-name", { hasText: pathText(name) }) });
-}
-
 /** How many lines of text `element` takes up. */
 function lines(element: Locator): Promise<number> {
   return element.evaluate((el) => {
@@ -68,6 +41,7 @@ function lines(element: Locator): Promise<number> {
   });
 }
 
+/** Opens the Projects tab of Projects & homes and waits for its rows. */
 async function projectsTab(page: Page) {
   await rail(page, "Projects & homes");
   await page.getByRole("tab", { name: /^Projects · / }).click();
@@ -122,11 +96,11 @@ uatStep("10.5", async ({ page, open, check, leave }) => {
   );
   await check("En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover».", async () => {
     expect(missing.open).toBe(true);
-    const gone = missing.rows.find((each) => pathText("E:/cd-throwaway/project-gone").test(each.name));
+    const gone = missing.rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
     expect(gone).toMatchObject({ sub: "The folder no longer exists · known to Claude Code", count: "1 leftover" });
   });
   await check("«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».", async () => {
-    expect(missing.rows.filter((each) => pathText("E:/cd-throwaway/project-deleted").test(each.name))).toEqual([]);
+    expect(missing.rows.filter((each) => whole("E:/cd-throwaway/project-deleted").test(each.name))).toEqual([]);
   });
   await check("Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado.", async () => {
     expect(groups[groups.indexOf(missing) + 1]).toMatchObject({ title: "▸ Missing, no leftovers · 1", open: false });
@@ -143,7 +117,7 @@ uatStep("10.6", async ({ page, open, check, leave }) => {
     await expect(page.locator(".inventory .loading")).toHaveCount(0);
   });
   await check("El campo Project dice «E:/cd-throwaway/project-gone».", async () => {
-    await expect(page.getByRole("combobox", { name: "Project" })).toHaveText(pathText("E:/cd-throwaway/project-gone"));
+    await expect(page.getByRole("combobox", { name: "Project" })).toHaveText(whole("E:/cd-throwaway/project-gone"));
   });
   await check("Está elegido «All Agents».", async () => {
     await expect(page.locator(".inventory .banner-title")).toHaveText("All Agents");

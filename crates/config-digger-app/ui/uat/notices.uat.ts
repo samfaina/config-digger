@@ -3,11 +3,13 @@
 // screen is shown, and their motion from the keyframes of their animations.
 // Whether that motion looks smooth on screen is left to a person.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { inventoryShown, rail, selectItem } from "./app";
+import { away, inventoryShown, pauseClock, rail, selectItem } from "./app";
+import { leans, lightness, lilac, white } from "./look";
 import { uatStep } from "./step";
 
 const COPIED = "Copied the path.";
 
+/** A keyframe of a notice's animation, by what moves it or fades it. */
 type Frame = { opacity?: string; translate?: string; transform?: string };
 
 /** The look of `notice`, beside an Entry card and a panel, and the keyframes of its animations. */
@@ -40,23 +42,6 @@ function animationsOf(notice: Locator) {
   );
 }
 
-const rgb = (colour: string) => (colour.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-const luminance = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-/** A colour whose `channel` (0 red, 1 green, 2 blue) is the strongest. */
-const leans = (colour: string, channel: number) => {
-  const channels = rgb(colour).slice(0, 3);
-  return channels.every((value, at) => at === channel || channels[channel] > value);
-};
-/** A light lilac: light, with blue over green and red not far under green. */
-const lilac = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return r > 150 && b > g && r > g - 20;
-};
-const white = (colour: string) => rgb(colour).slice(0, 3).every((value) => value > 230);
-
 /** Whether a frame moves the notice off its place: a translate or transform other than none or zero. */
 const offset = (frame: Frame) =>
   [frame.translate, frame.transform].some((value) => value !== undefined && value !== "none" && !/^(0(px)?\s*)+$/.test(value));
@@ -70,12 +55,9 @@ async function copyPathShown(page: Page, open: () => Promise<void>) {
   await open();
   await inventoryShown(page);
   await selectItem(page, "cd-throwaway-user");
-  await page.clock.pauseAt(Date.now() + 1000);
+  await pauseClock(page);
   return page.locator(".panel.detail .entry-location").first().getByRole("button", { name: "Copy path" });
 }
-
-/** Moves the mouse off to a quiet spot at the top of the window. */
-const away = (page: Page) => page.mouse.move(600, 4);
 
 uatStep("5.1", async ({ page, open, check, leave }) => {
   const copyPath = await copyPathShown(page, open);
@@ -91,8 +73,8 @@ uatStep("5.1", async ({ page, open, check, leave }) => {
   });
   await check("Su fondo es verde y destaca, más claro que el panel y las tarjetas.", async () => {
     expect(leans(look.background, 1), look.background).toBe(true);
-    expect(luminance(look.background), `${look.background} against the panel's ${look.panelBackground}`).toBeGreaterThan(luminance(look.panelBackground));
-    expect(luminance(look.background), `${look.background} against the card's ${look.cardBackground}`).toBeGreaterThan(luminance(look.cardBackground));
+    expect(lightness(look.background), `${look.background} against the panel's ${look.panelBackground}`).toBeGreaterThan(lightness(look.panelBackground));
+    expect(lightness(look.background), `${look.background} against the card's ${look.cardBackground}`).toBeGreaterThan(lightness(look.cardBackground));
   });
   await check("Tiene un borde verde a la izquierda y un icono verde de visto.", async () => {
     expect(look.edgeWidth, "the left border's width").toBeGreaterThan(0);
@@ -148,7 +130,7 @@ uatStep("5.2", async ({ page, open, check }) => {
   await rail(page, "Settings");
   const logs = page.locator(".settings-data .place-row", { has: page.locator(".place-name", { hasText: /^Logs$/ }) });
   await logs.waitFor();
-  await page.clock.pauseAt(Date.now() + 1000);
+  await pauseClock(page);
   await logs.getByRole("button", { name: "Open folder" }).click();
   await away(page);
   const notice = page.locator(".notice").last();

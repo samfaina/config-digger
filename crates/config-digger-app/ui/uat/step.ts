@@ -10,7 +10,7 @@ import { launch } from "../scripts/fakeUi.ts";
 import { LEFT_TO_A_PERSON, planStep } from "./plan";
 
 /** The page's query: the commands whose answer it holds, in milliseconds, and those that answer an error. */
-export type Query = { delay?: Record<string, number>; fail?: string[] };
+type Query = { delay?: Record<string, number>; fail?: string[] };
 
 type StepArgs = {
   page: Page;
@@ -36,7 +36,7 @@ const test = base.extend<object, object>({
 });
 
 /** The page's address for `query`. */
-export function address(query: Query = {}): string {
+function address(query: Query = {}): string {
   const base = process.env.FAKE_UI_URL;
   if (base === undefined) throw new Error("No fake UI is served: run the tests with `npm run uat:fake`.");
   const params = new URLSearchParams();

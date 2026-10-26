@@ -5,26 +5,11 @@
 // after a change and the list it leaves are those of that Hide: the checks of
 // what another change leaves stay with a person.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { rail } from "./app";
+import { busy, HELD, NO_WRITE, openGroup, rail, ROOT, row, spinning } from "./app";
 import { uatStep } from "./step";
 
-const HELD = 2000;
-const CHANGE_WRITES = "the fake backend answers every list change with its recorded Hide of project-hide, so what a real change leaves is seen in the real app";
-
-/** A pattern matching `text` whole. */
-const whole = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
-
-/** The row of the open tab whose path is `path`. */
-const row = (page: Page, path: string) => page.locator(".place-row", { has: page.locator(".place-name", { hasText: whole(path) }) });
-
-/** The busy notice at the bottom of the screen. */
-const busy = (page: Page) => page.locator(".notice.busy");
-
-/** Asserts the busy notice: its spinner turns and it says `text`. */
-async function spinning(page: Page, text: string) {
-  await expect(busy(page)).toHaveText(text);
-  await expect(busy(page).locator(".spinner")).not.toHaveCSS("animation-name", "none");
-}
+/** Why what a list change leaves stays with a person. */
+const CHANGE_WRITES = `${NO_WRITE}: it answers every list change with its recorded Hide of project-hide`;
 
 /** Asserts every button of `row` is disabled. */
 async function allDisabled(row: Locator) {
@@ -42,14 +27,8 @@ async function overTheDialog(page: Page) {
   expect(top).toBe(true);
 }
 
-/** Opens the group titled `title` on the Projects tab, if it is closed. */
-async function openGroup(page: Page, title: string) {
-  const toggle = page.locator(".place-group-toggle", { hasText: new RegExp(`^[▾▸]\\s*${title} · `) });
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-}
-
 uatStep("10.11", async ({ page, open, check, leave }) => {
-  const path = String.raw`E:\cd-throwaway\project-hide`;
+  const path = String.raw`${ROOT}\project-hide`;
   await open({ delay: { change_list: HELD } });
   await rail(page, "Projects & homes");
   await openGroup(page, "Hidden");
@@ -75,7 +54,7 @@ uatStep("10.11", async ({ page, open, check, leave }) => {
 });
 
 uatStep("10.12", async ({ page, open, check, leave }) => {
-  const path = String.raw`E:\cd-throwaway\project-extra`;
+  const path = String.raw`${ROOT}\project-extra`;
   await open({ delay: { change_list: HELD } });
   await rail(page, "Projects & homes");
   const extra = row(page, path);
@@ -105,14 +84,12 @@ uatStep("10.12", async ({ page, open, check, leave }) => {
     await expect(add).toBeDisabled();
   });
   leave("Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.».", CHANGE_WRITES);
-  await check("Al final, project-extra vuelve a estar en la lista.", async () => {
-    await expect(dialog).toHaveCount(0);
-    await expect(extra).toBeVisible();
-  });
+  // The fake Remove from list left the row where it was, so it can't come back.
+  leave("Al final, project-extra vuelve a estar en la lista.", CHANGE_WRITES);
 });
 
 uatStep("10.13", async ({ page, open, check, leave }) => {
-  const home = String.raw`E:\cd-throwaway\codex-home`;
+  const home = String.raw`${ROOT}\codex-home`;
   await open({ delay: { change_list: HELD } });
   await rail(page, "Projects & homes");
   await page.getByRole("tab", { name: /^Agent homes/ }).click();
@@ -138,20 +115,6 @@ uatStep("10.13", async ({ page, open, check, leave }) => {
     await expect(add).toBeDisabled();
   });
   leave("Cuando el diálogo se cierra, sale «Added E:\\cd-throwaway\\codex-home as an Agent home of Codex.».", CHANGE_WRITES);
-  await check("Al final, la fila de codex-home vuelve a estar bajo Codex.", async () => {
-    await expect(dialog).toHaveCount(0);
-    // The rows of a group follow its heading, up to the next one.
-    const under = await page.locator(".places .scroll > *").evaluateAll(
-      (elements, path) => {
-        let agent = "";
-        for (const element of elements) {
-          if (element.matches("h3.agent-group")) agent = element.firstChild?.textContent?.trim() ?? "";
-          else if (element.querySelector(".place-sub.mono")?.textContent?.trim() === path) return agent;
-        }
-        return null;
-      },
-      home,
-    );
-    expect(under).toBe("Codex");
-  });
+  // Remove from list was never pressed, so the row never left Codex.
+  leave("Al final, la fila de codex-home vuelve a estar bajo Codex.", why);
 });

@@ -5,10 +5,12 @@
 // thumb with the mouse.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { inventoryShown, rail } from "./app";
+import { away, inventoryShown, rail, ROOT } from "./app";
+import { grey, lightness } from "./look";
 import { uatStep } from "./step";
 
-const MANY_HOME = String.raw`E:\cd-throwaway\claude-code-many-home`;
+/** The home step 4.1 adds, which the fixtures hold. */
+const MANY_HOME = String.raw`${ROOT}\claude-code-many-home`;
 
 /** How a scrolling element scrolls: whether it overflows, its bar's width, its scroll and its box. */
 function scrolling(scroller: Locator) {
@@ -48,13 +50,6 @@ function scrollbarRules(page: Page) {
   });
 }
 
-/** The channels of an `rgb(…)` or `rgba(…)` colour. */
-function channels(colour: string | null): number[] {
-  return (colour?.match(/[\d.]+/g) ?? []).map(Number);
-}
-
-const lightness = (colour: string | null) => channels(colour).slice(0, 3).reduce((sum, channel) => sum + channel, 0);
-
 /** Drags the thumb of `scroller`'s bar from its top to below the bar's bottom. */
 async function dragThumb(page: Page, scroller: Locator) {
   await scroller.evaluate((element) => (element.scrollTop = 0));
@@ -85,8 +80,7 @@ async function bar(
   });
   await check(texts.thumb, async () => {
     const { thumb, panel } = await scrollbarRules(page);
-    const [red, green, blue] = channels(thumb);
-    expect(Math.max(red, green, blue) - Math.min(red, green, blue)).toBeLessThanOrEqual(16);
+    expect(grey(thumb), thumb ?? "no thumb rule").toBe(true);
     expect(lightness(thumb)).toBeGreaterThan(lightness(panel));
     expect(lightness(thumb)).toBeLessThan(3 * 128);
   });
@@ -201,8 +195,7 @@ uatStep("4.4", async ({ page, open, check }) => {
   );
   await check("El tirador es gris tenue.", async () => {
     const { thumb, panel } = await scrollbarRules(page);
-    const [red, green, blue] = channels(thumb);
-    expect(Math.max(red, green, blue) - Math.min(red, green, blue)).toBeLessThanOrEqual(16);
+    expect(grey(thumb), thumb ?? "no thumb rule").toBe(true);
     expect(lightness(thumb)).toBeGreaterThan(lightness(panel));
   });
   await check("Bajo el ratón, el tirador se aclara.", async () => {
@@ -246,8 +239,9 @@ uatStep("4.5", async ({ page, open, check }) => {
   await page.keyboard.press("Escape");
 });
 
-/** Whether two boxes share more than a pixel each way. */
+/** A box on the page, by its edges. */
 type Box = { left: number; top: number; right: number; bottom: number };
+/** Whether two boxes share more than a pixel each way. */
 const overlap = (a: Box, b: Box) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
 
 /**
@@ -341,13 +335,13 @@ uatStep("4.6", async ({ page, open, check }) => {
 
   const project = page.getByRole("combobox", { name: "Project" });
   await project.click();
-  await page.getByRole("option", { name: String.raw`E:\cd-throwaway\many\project-01`, exact: true }).click();
-  await expect(project).toHaveText(String.raw`E:\cd-throwaway\many\project-01`);
-  await page.mouse.move(600, 4);
+  await page.getByRole("option", { name: String.raw`${ROOT}\many\project-01`, exact: true }).click();
+  await expect(project).toHaveText(String.raw`${ROOT}\many\project-01`);
+  await away(page);
   await project.hover();
   await check("El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero.", async () => {
     const tooltip = page.getByRole("tooltip");
-    await expect(tooltip).toHaveText(String.raw`E:\cd-throwaway\many\project-01`);
+    await expect(tooltip).toHaveText(String.raw`${ROOT}\many\project-01`);
     expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 
@@ -383,7 +377,7 @@ uatStep("4.6", async ({ page, open, check }) => {
     const location = row.locator(".item-location");
     await expect(location).toHaveCSS("text-overflow", "ellipsis");
     expect(await location.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
-    await page.mouse.move(600, 4);
+    await away(page);
     await location.hover();
     await expect(page.getByRole("tooltip")).toHaveText(new RegExp(`^${MANY_HOME.replaceAll("\\", "\\\\")}\\\\`));
   });

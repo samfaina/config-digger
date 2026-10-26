@@ -10,36 +10,18 @@
 // the same Project, whose card offers Disable: the dialog, the busy states and
 // the snackbar «Disabled 1 Entry…» are those of any Disable.
 import { expect, type Page } from "@playwright/test";
-import { inventoryShown, rail, selectItem } from "./app";
+import { away, busy, HELD, inventoryShown, NO_WRITE, rail, ROOT, selectItem, spinning } from "./app";
+import { lightness, lilac, purple, white } from "./look";
 import { uatStep } from "./step";
 
-const HELD = 2000;
-const NO_WRITE = "the fake backend's writes change nothing, so what a real Operation leaves is seen in the real app";
-const PROJECT = String.raw`E:\cd-throwaway\project`;
-
-/** The busy notice at the bottom of the screen. */
-const busy = (page: Page) => page.locator(".notice.busy");
+/** The Project whose cd-throwaway-project server the steps disable. */
+const PROJECT = String.raw`${ROOT}\project`;
 
 /** The Entry card of the Item open in Details. */
 const card = (page: Page) => page.locator(".panel.detail .entry-card").first();
 
 /** A button of the card's actions, by its text. */
 const cardButton = (page: Page, text: string) => card(page).locator(".entry-actions").getByRole("button", { name: text, exact: true });
-
-/** The red, green, blue and alpha of a CSS colour. */
-const rgb = (colour: string) => (colour.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-const lightness = (colour: string) => rgb(colour).slice(0, 3).reduce((a, b) => a + b, 0);
-/** A light lilac: bluer than green, with plenty of red. */
-const lilac = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return b > g && r > 150;
-};
-
-/** Asserts the busy notice: its spinner turns and it says `text`. */
-async function spinning(page: Page, text: string) {
-  await expect(busy(page)).toHaveText(text);
-  await expect(busy(page).locator(".spinner")).not.toHaveCSS("animation-name", "none");
-}
 
 /** Asserts the card reads again: a small spinner with «Reading…» in its head, by its State. */
 async function cardReading(page: Page) {
@@ -130,7 +112,7 @@ uatStep("11.8", async ({ page, open, check, leave }) => {
   leave("Luego la Operation dice «Undone by <id nuevo>» y muestra «Can't undo».", NO_WRITE);
 });
 
-uatStep("11.9", async ({ page, open, check, leave }) => {
+uatStep("11.9", async ({ page, open, check }) => {
   await open({ delay: { read_inventory: HELD } });
   await disableable(page);
   await disable(page);
@@ -147,7 +129,11 @@ uatStep("11.9", async ({ page, open, check, leave }) => {
   await check("La tarjeta tiene junto a su State una rueda pequeña con «Reading…».", async () => {
     await cardReading(page);
   });
-  leave("Mientras, sus botones «Enable» y «Remove» se ven apagados.", `${NO_WRITE}: the card was never Disabled, so it offers Disable, not Enable`);
+  await check("Mientras, sus botones «Enable» y «Remove» se ven apagados.", async () => {
+    // The fake Disable changes nothing, so the card offers Disable where the real one, Disabled, offers Enable.
+    await expect(cardButton(page, "Disable")).toBeDisabled();
+    await expect(cardButton(page, "Remove")).toBeDisabled();
+  });
   await check("Luego la tarjeta dice «Effective» y ofrece «Disable».", async () => {
     await expect(busy(page)).toHaveCount(0);
     await expect(card(page).locator(".entry-reading")).toHaveCount(0);
@@ -187,8 +173,7 @@ uatStep("11.10", async ({ page, open, check, leave }) => {
     expect(style.radius).toBeLessThan(style.height / 2 - 2);
   });
   await check("Su fondo morado destaca, más claro que el panel y las tarjetas.", async () => {
-    const [r, g, b] = rgb(style.background);
-    expect(b > g + 30 && r > g, style.background).toBe(true);
+    expect(purple(style.background), style.background).toBe(true);
     expect(lightness(style.background)).toBeGreaterThan(lightness(style.panel));
     expect(lightness(style.background)).toBeGreaterThan(lightness(style.cardBackground));
   });
@@ -198,7 +183,7 @@ uatStep("11.10", async ({ page, open, check, leave }) => {
     expect(lilac(style.edge.colour), style.edge.colour).toBe(true);
   });
   await check("Su texto es blanco.", async () => {
-    expect(rgb(style.colour).slice(0, 3).every((value) => value > 230), style.colour).toBe(true);
+    expect(white(style.colour), style.colour).toBe(true);
   });
   await check("«Undo» es un botón con borde y letras lila claro.", async () => {
     const look = await undo.evaluate((element) => {
@@ -256,7 +241,7 @@ uatStep("11.10", async ({ page, open, check, leave }) => {
       });
       seen.observe(element, { attributes: true, attributeFilter: ["class"] });
     });
-    await page.mouse.move(600, 4);
+    await away(page);
     await page.clock.runFor(9_500);
     await expect(snackbar).toBeVisible();
     await expect(snackbar).not.toHaveClass(/leaving/);

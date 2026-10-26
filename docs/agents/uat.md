@@ -81,13 +81,13 @@ Each step's checks are the plan's `expect`, one by one. What a style can't show,
 
 When a step leaves the window blank, the walk notes what the page logged and its last commands, opens the app again and runs the step once more.
 
-When a step of the plan changes, change its module in `steps/` with it.
+When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, and the parts of the walk that need no app.
 
 ### The fake UI's tests
 
 `npm run uat:fake` serves the UI on the fake backend (`docs/agents/screenshots.md`) and runs one Playwright test per step in `crates/config-digger-app/ui/uat/`, in a headless Edge, or Chrome, at the app's window size. A test is named after its step's id, `uatStep("15.1", …)`, and an id that is no step of `uat/plan.json` fails the run. Each `check` names one check of the step's `expect` by its text and asserts it: the quoted text, the focus after a key press, the boxes at the smallest window where the step asks for it, the 4 s notice and the 10 s Undo snackbar on `page.clock`. A test fails unless it checks every check of its step or `leave`s it to a person with the reason, such as a motion, or the state after a write, which the fake backend never changes. A busy state is held with the page's `?delay=` on the command the step waits on. When a step of the plan changes, change its test with it: a check whose text changed fails the test.
 
-The run writes `crates/config-digger-app/ui/uat-results.json`, one document per step, `{ id, status, notes, time, version, by: "ci", evidence }`: `ok`, with the checks left to a person in the notes; `ko`, with the failed check and the assertion's message; or `blocked` when the test failed before its first check, such as on loading the page. `version` is the workspace version, and `evidence` is the CI run's URL, or the test's name outside CI. The CI job uploads the file as the `uat-results` artifact, and nothing else: no test takes a screenshot. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, and the parts of the walk that need no app.
+The run writes `crates/config-digger-app/ui/uat-results.json`, one document per step, `{ id, status, notes, time, version, by: "ci", evidence }`: `ok`, with the checks left to a person in the notes; `ko`, with the failed check and the assertion's message; or `blocked` when the test failed before its first check, such as on loading the page. `version` is the workspace version, and `evidence` is the CI run's URL, or the test's name outside CI. The CI job uploads the file as the `uat-results` artifact, and nothing else: no test takes a screenshot.
 
 ## Publishing a run
 

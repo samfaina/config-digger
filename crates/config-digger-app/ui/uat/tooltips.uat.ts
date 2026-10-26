@@ -2,29 +2,19 @@
 // tooltip is a `.tooltip` in the page's body, `hidden` until it shows.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { inventoryShown, selectItem } from "./app";
+import { away, css, inventoryShown, pauseClock, railButton, ROOT, selectItem, whole } from "./app";
+import { dark } from "./look";
 import { uatStep } from "./step";
-
-const ROOT = String.raw`E:\cd-throwaway`;
 
 /** The tooltip on screen. */
 const tooltip = (page: Page) => page.locator(".tooltip[role=tooltip]:not([hidden])");
-const railButton = (page: Page, screen: string) => page.locator(`.rail button[aria-label='${screen}']`);
 /** The grey line under the name of the Items list's row `name`: its location. */
-const location = (page: Page, name: string) =>
-  page.locator(".item-row", { has: page.locator(".item-name", { hasText: new RegExp(`^${name}$`) }) }).locator(".item-location");
+const location = (page: Page, name: string) => page.locator(".item-row", { has: page.locator(".item-name", { hasText: whole(name) }) }).locator(".item-location");
 
-const css = (locator: Locator, property: string) => locator.evaluate((el, property) => getComputedStyle(el).getPropertyValue(property), property);
-
-/** Moves the mouse to a quiet spot of the header and then onto `target`, as the tester does. */
+/** Moves the mouse away and then onto `target`, as the tester does: a tooltip opens on the mouse entering. */
 async function hoverFresh(page: Page, target: Locator) {
-  await page.mouse.move(600, 4);
+  await away(page);
   await target.hover();
-}
-
-/** Pauses the page's clock a second ahead of its own time. */
-async function pause(page: Page) {
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
 }
 
 /** Whether `box` lies inside the window `size`. */
@@ -43,7 +33,7 @@ uatStep("3.1", async ({ page, open, check }) => {
   await inventoryShown(page);
   await page.locator(".agent-tile", { hasText: "Claude Code" }).click();
   await expect(page.locator(".home-tile.selected")).toContainText("default");
-  await pause(page);
+  await pauseClock(page);
 
   await check("Tras medio segundo sale un recuadro oscuro con el texto «Inventory».", async () => {
     await hoverFresh(page, railButton(page, "Inventory"));
@@ -54,8 +44,8 @@ uatStep("3.1", async ({ page, open, check }) => {
     await page.clock.runFor(100);
     await expect(tooltip(page)).toHaveText("Inventory");
     await expect(tooltip(page)).toBeVisible();
-    const [r, g, b] = (await css(tooltip(page), "background-color")).match(/\d+/g)!.map(Number);
-    expect(r + g + b).toBeLessThan(210);
+    const background = await css(tooltip(page), "background-color");
+    expect(dark(background), background).toBe(true);
   });
   await check("El recuadro tiene esquinas redondeadas, borde fino y sombra, como los paneles de la app.", async () => {
     expect(parseFloat(await css(tooltip(page), "border-top-left-radius"))).toBeGreaterThan(0);
@@ -70,7 +60,7 @@ uatStep("3.1", async ({ page, open, check }) => {
   });
   await page.clock.resume();
   await selectItem(page, "cd-throwaway-user");
-  await pause(page);
+  await pauseClock(page);
   await check("El botón de copiar muestra «Copy the configuration, with every Secret masked».", async () => {
     await hoverFresh(page, page.locator(".panel.detail button[aria-label='Copy the configuration']"));
     await page.waitForTimeout(100);

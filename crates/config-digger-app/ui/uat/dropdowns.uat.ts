@@ -1,31 +1,19 @@
 // Section 2: the app's dropdowns, by mouse and by keyboard. Their panel is
 // `.select-panel`, whose options say by a class which one is lit (`active`)
 // and which is the field's value (`chosen`).
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { inventoryShown, rail } from "./app";
+import { css, inventoryShown, rail, ROOT } from "./app";
+import { dark, grey, purple } from "./look";
 import { uatStep } from "./step";
-
-const ROOT = String.raw`E:\cd-throwaway`;
-
-/** The channels of a CSS colour. */
-const rgb = (colour: string) => (colour.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-const dark = (colour: string) => rgb(colour).slice(0, 3).reduce((sum, channel) => sum + channel, 0) < 3 * 70;
-const purple = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return b > g + 30 && r > g;
-};
-const grey = (colour: string) => {
-  const [r, g, b] = rgb(colour);
-  return Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && r < 200;
-};
-
-const css = (locator: Locator, property: string) => locator.evaluate((el, property) => getComputedStyle(el).getPropertyValue(property), property);
 
 /** The field labelled `label`, the last one when a dialog sits over the screen. */
 const field = (page: Page, label: string) => page.getByRole("combobox", { name: label, exact: true }).last();
+/** The open dropdown's panel. */
 const panel = (page: Page) => page.locator(".select-panel");
+/** The options of the open panel. */
 const options = (page: Page) => panel(page).getByRole("option");
+/** The option the open panel lights. */
 const lit = (page: Page) => panel(page).locator(".select-option.active");
 
 /** The Inventory on the Claude Code home that step 1.2 adds, the one the fixtures record as its default. */
