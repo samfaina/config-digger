@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
+import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { DropdownOption } from "./dropdown";
 import { Select } from "./Select";
 
@@ -156,15 +156,46 @@ describe("a Select in a DOM", () => {
 describe("a Select with a text box in its panel", () => {
   const shown = () => screen.getAllByRole("option").map((option) => option.textContent);
 
-  test("puts the focus in the text box when it opens, and narrows the options as the user types", async () => {
+  describe("where, as in a real browser, a hidden element can't take the focus", () => {
+    // happy-dom ignores visibility, so a focus() under `visibility: hidden` would land where WebView2 drops it.
+    const focus = HTMLElement.prototype.focus;
+    beforeEach(() => {
+      HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+        for (let at: HTMLElement | null = this; at; at = at.parentElement) {
+          if (at.style.visibility === "hidden") return;
+        }
+        focus.call(this, options);
+      };
+    });
+    afterEach(() => {
+      HTMLElement.prototype.focus = focus;
+    });
+
+    test.each([
+      ["a click", (user: UserEvent, field: HTMLElement) => user.click(field)],
+      ["Alt+Down", async (user: UserEvent) => (await user.tab(), user.keyboard("{Alt>}{ArrowDown}{/Alt}"))],
+      ["Space", async (user: UserEvent) => (await user.tab(), user.keyboard(" "))],
+      ["Enter", async (user: UserEvent) => (await user.tab(), user.keyboard("{Enter}"))],
+    ])("puts the focus in the text box once the panel opened by %s shows, and narrows the options as the user types", async (_, open) => {
+      const { user, field } = renderField({ searchLabel: "Find a Project" });
+      await open(user, field);
+      const box = screen.getByRole("textbox", { name: "Find a Project" });
+      expect(document.activeElement).toBe(box);
+      expect(shown()).toEqual(["Alpha", "Beta", "Gamma"]);
+      await user.keyboard("MM");
+      expect(box).toHaveProperty("value", "MM");
+      expect(shown()).toEqual(["Gamma"]);
+      expect(box.getAttribute("aria-activedescendant")).toBe(optionId("Gamma"));
+    });
+  });
+
+  test("gives the focus to its text box once per opening, so a render while the panel stays open leaves it where it is", async () => {
     const { user, field } = renderField({ searchLabel: "Find a Project" });
     await user.click(field);
-    const box = screen.getByRole("textbox", { name: "Find a Project" });
-    expect(document.activeElement).toBe(box);
-    expect(shown()).toEqual(["Alpha", "Beta", "Gamma"]);
-    await user.keyboard("MM");
-    expect(shown()).toEqual(["Gamma"]);
-    expect(box.getAttribute("aria-activedescendant")).toBe(optionId("Gamma"));
+    act(() => field.focus());
+    await user.keyboard("{ArrowDown}");
+    expect(field.getAttribute("aria-activedescendant")).toBe(optionId("Beta"));
+    expect(document.activeElement).toBe(field);
   });
 
   test("chooses the active option with Enter and gives the focus back to the field", async () => {

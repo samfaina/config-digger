@@ -51,7 +51,9 @@ const SHOTS: Shot[] = [
     name: "inventory-project-dropdown-search",
     steps: async (page) => {
       await page.getByRole("combobox", { name: "Project" }).click();
-      await page.getByRole("textbox", { name: "Search Projects" }).fill("project");
+      await page.getByRole("listbox").waitFor();
+      // Typed where the focus is, as a user does: fill() would put it in the box, and hide a box the panel left without it.
+      await page.keyboard.type("project");
     },
   },
   {

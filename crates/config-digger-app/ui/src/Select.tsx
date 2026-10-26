@@ -108,8 +108,13 @@ export function Select({ value, options, onChange, label, tooltip, searchLabel, 
     const content = { width: Math.ceil(size.width), height: Math.ceil(size.height) };
     const placed = placePanel(box, content, { width: window.innerWidth, height: window.innerHeight });
     setPlacement({ ...placed, height: Math.min(content.height, placed.maxHeight) });
-    searchBox.current?.focus();
   }, [state.open]);
+
+  // Once the placement shows the panel, so once per opening: a hidden text box can't take the focus.
+  const shows = placement !== null;
+  useLayoutEffect(() => {
+    if (shows) searchBox.current?.focus();
+  }, [shows]);
 
   // A resize or a scroll under the panel would leave it away from its field, so it closes, as a native select does.
   useEffect(() => {
