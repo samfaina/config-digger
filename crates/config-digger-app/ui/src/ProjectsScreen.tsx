@@ -16,6 +16,7 @@ import { call, NOTICE_MS, type CommandResult, type Notify } from "./desktop";
 import { Icon } from "./icons";
 import { Loading, ReadProgress } from "./Loading";
 import { Status, type Notice } from "./Notice";
+import { PathPieces } from "./Pieces";
 import {
   homeGroups,
   projectSections,
@@ -370,7 +371,9 @@ function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) 
         </>
       }
     >
-      <div className="place-name mono">{row.path}</div>
+      <div className="place-name mono">
+        <PathPieces path={row.path} />
+      </div>
       <div className="place-sub">
         {row.kind} · {row.source}
       </div>
@@ -415,7 +418,9 @@ function MissingLine({ row, busy, onShow, onHide, onRemoveLeftovers }: MissingLi
         )
       }
     >
-      <div className="place-name mono">{row.path}</div>
+      <div className="place-name mono">
+        <PathPieces path={row.path} />
+      </div>
       <div className="place-sub">{row.source}</div>
       {row.leftovers.length > 0 && (
         <ul className="place-leftovers mono">
@@ -524,7 +529,9 @@ function HiddenLine({
         </>
       }
     >
-      <div className="place-name mono">{row.path}</div>
+      <div className="place-name mono">
+        <PathPieces path={row.path} />
+      </div>
       <div className="place-sub">{row.source}</div>
     </PlaceRow>
   );
@@ -610,8 +617,12 @@ function HomeLine({
   };
   return (
     <PlaceRow icon="folder" dim={row.hidden} busy={busy} count={row.entries} actions={row.actions.map((action) => buttons[action])}>
-      <div className="place-name">{row.label}</div>
-      <div className="place-sub mono">{row.path}</div>
+      <div className="place-name">
+        <PathPieces path={row.label} />
+      </div>
+      <div className="place-sub mono">
+        <PathPieces path={row.path} />
+      </div>
       <div className="tags">
         {row.agent && <span className="tag">{row.agent}</span>}
         {row.tags.map((tag) => (

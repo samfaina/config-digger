@@ -1055,9 +1055,28 @@ p {
 }
 
 .home-name {
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* A name too long for its tile is cut in the rest of its folder first, as
+   `E:\cd-thr…\claude-code-many-home`: flex shrinks each part by its shrink
+   times its width, so the head gives up its width long before the tail. */
+.home-name-head,
+.home-name-tail {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.home-name-head {
+  flex: 0 1000000 auto;
+}
+
+.home-name-tail {
+  flex: 0 1 auto;
 }
 
 /* Items list tools */
@@ -2579,6 +2598,15 @@ p {
   color: var(--grey);
   font-size: 1rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* A piece of a Project's path or a home's folder, up to and with its
+   separator: the line wraps only at the <wbr> after it, unless the piece
+   alone is wider than the column. */
+.path-piece {
+  display: inline-block;
+  max-width: 100%;
   overflow-wrap: anywhere;
 }
 

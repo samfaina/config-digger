@@ -95,7 +95,8 @@ export function HistoryScreen() {
       <header className="panel banner">
         <div>
           <div className="caption">History · Undo</div>
-          <div className="banner-title">{operationCount(listed?.length ?? 0, history?.length ?? 0)}</div>
+          {/* No count until History is read: a read again keeps the one it has. */}
+          <div className="banner-title">{history && listed ? operationCount(listed.length, history.length) : "Operations"}</div>
         </div>
         <p className="history-about dim">
           Any Operation can be undone on its own, across restarts. Undo is refused when something it touched changed

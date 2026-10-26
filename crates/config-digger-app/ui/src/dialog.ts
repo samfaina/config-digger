@@ -18,6 +18,7 @@ import type {
   Warning,
   WarningClass,
 } from "./bindings";
+import { keyPieces } from "./wrap";
 
 /** Each verb, as a button or a filter names it. */
 export const ACTION_LABELS: Record<Action, string> = {
@@ -109,7 +110,7 @@ export function changeGroups(changes: Change[]): ContextGroup[] {
       const kind = change.locator === change.path ? "Folder" : "File";
       group.files.push((file = { label: kind, path: change.path, name: fileName(change.path), changes: [] }));
     }
-    file.changes.push({ change, keyPieces: wrapPoints(locatorKey(change)) });
+    file.changes.push({ change, keyPieces: keyPieces(locatorKey(change)) });
   };
   for (const ofEntry of byEntry) {
     const [first] = ofEntry;
@@ -132,11 +133,6 @@ function ownContext({ project }: Change): ContextHeading {
 function locatorKey({ path, locator }: Change): string {
   if (locator === path) return "";
   return locator.startsWith(`${path}#`) ? locator.slice(path.length + 1) : locator;
-}
-
-/** `text` in pieces that each end at a path or key separator, so that a line wraps there and never mid-word. */
-function wrapPoints(text: string): string[] {
-  return text.match(/[^\\/.#]*[\\/.#]|[^\\/.#]+/g) ?? [];
 }
 
 /** The last part of a path, such as `.claude.json`. */

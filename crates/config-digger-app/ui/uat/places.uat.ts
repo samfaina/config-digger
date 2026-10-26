@@ -5,7 +5,7 @@
 // walk's tester.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole } from "./app";
+import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole, wrapsAtSeparators } from "./app";
 import { uatStep } from "./step";
 
 /** Why the checks of project-gone's Inventory stay with a person. */
@@ -222,6 +222,30 @@ uatStep("10.10", async ({ page, open, check }) => {
       await page.getByRole("tab", { name: /^Agent homes · / }).click();
       await expect(about).toHaveText(tabs[1].about);
     },
+  );
+  await check("En Projects, cada ruta que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta.", async () => {
+    await page.getByRole("tab", { name: /^Projects · / }).click();
+    await row(page, String.raw`${ROOT}\project-extra`).scrollIntoViewIfNeeded();
+    await wrapsAtSeparators(page.locator(".places-list .place-name.mono"));
+  });
+  await check(
+    "En Agent homes, cada carpeta o nombre de home que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta.",
+    async () => {
+      await page.getByRole("tab", { name: /^Agent homes · / }).click();
+      await wrapsAtSeparators(page.locator(".places-list .place-name, .places-list .place-sub.mono"));
+    },
+  );
+  await check("Ninguna ruta se sale de su fila ni hace que la página se desplace de lado.", () =>
+    each(async () => {
+      const overflow = await page.locator(".places-list .place-row").evaluateAll((rows) =>
+        rows.flatMap((row) => {
+          const edge = row.getBoundingClientRect().right;
+          return [...row.querySelectorAll(".mono")].filter((path) => path.getBoundingClientRect().right > edge + 1).map((path) => path.textContent);
+        }),
+      );
+      expect(overflow).toEqual([]);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+    }),
   );
 });
 

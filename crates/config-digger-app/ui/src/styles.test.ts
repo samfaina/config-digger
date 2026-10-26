@@ -389,6 +389,20 @@ describe("the Inventory at the smallest window the app allows", () => {
       expect(declarations.get("flex"), body).toBe("1");
     }
   });
+
+  test("cuts an Agent home's name too long for its tile before its folder's last part, and only then that part", () => {
+    expect(styled(".home-name").get("display")).toBe("flex");
+    for (const part of [".home-name-head", ".home-name-tail"]) {
+      const declarations = styled(part);
+      expect(declarations.get("min-width"), part).toBe("0");
+      expect(declarations.get("overflow"), part).toBe("hidden");
+      expect(declarations.get("text-overflow"), part).toBe("ellipsis");
+    }
+    // The flex shrink of each part, weighted by its width: the rest gives up all of its width before the last part gives any.
+    const shrink = (part: string) => Number(styled(part).get("flex")?.split(/\s+/)[1]);
+    expect(shrink(".home-name-tail")).toBe(1);
+    expect(shrink(".home-name-head")).toBeGreaterThanOrEqual(1e6);
+  });
 });
 
 describe("text in the Inventory at the smallest window", () => {
@@ -448,6 +462,15 @@ describe("the Projects & homes banner at the smallest window", () => {
     expect(count.get("width")).toBe("auto");
     expect(count.get("margin-left")).toBe(`${indent}px`);
     expect(styled(".place-actions", narrow).get("margin-left")).toBe("auto");
+  });
+
+  test("keeps each folder's name of a path whole on its line, and breaks one only when it is wider than the column", () => {
+    const piece = styled(".path-piece");
+    // A box of its own, so that the line wraps around it, never at the hyphen of `cd-throwaway`.
+    expect(piece.get("display")).toBe("inline-block");
+    expect(piece.get("max-width")).toBe("100%");
+    // A name wider than the column breaks inside it rather than pushing the page sideways.
+    expect(piece.get("overflow-wrap")).toBe("anywhere");
   });
 });
 

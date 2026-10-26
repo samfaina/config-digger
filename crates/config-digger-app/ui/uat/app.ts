@@ -50,6 +50,37 @@ export function whole(text: string): RegExp {
   return new RegExp(`^${anySeparator(text)}$`);
 }
 
+/** The text of each element `locator` finds, line by line as the browser lays it out. */
+export function textLines(locator: Locator): Promise<string[][]> {
+  return locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const lines: { top: number; text: string }[] = [];
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        for (let at = 0; at < node.textContent!.length; at++) {
+          range.setStart(node, at);
+          range.setEnd(node, at + 1);
+          const top = Math.round(range.getBoundingClientRect().top);
+          const line = lines.at(-1);
+          if (line && Math.abs(line.top - top) <= 2) line.text += node.textContent![at];
+          else lines.push({ top, text: node.textContent![at] });
+        }
+      }
+      return lines.map((line) => line.text);
+    }),
+  );
+}
+
+/** Expects each line but the last of each path `locator` finds to end right after a `\` or a `/`. */
+export async function wrapsAtSeparators(locator: Locator) {
+  const paths = await textLines(locator);
+  expect(paths.length).toBeGreaterThan(0);
+  for (const lines of paths) {
+    for (const line of lines.slice(0, -1)) expect(line, lines.join(" ⏎ ")).toMatch(/[\\/]$/);
+  }
+}
+
 /** A computed style of the element `locator` finds. */
 export function css(locator: Locator, property: string): Promise<string> {
   return locator.evaluate((element, property) => getComputedStyle(element).getPropertyValue(property), property);

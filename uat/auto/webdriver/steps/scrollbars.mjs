@@ -191,6 +191,24 @@ export default [
       t.check(moved.out.every((x) => x === null || x.reached) && moved.same, "al desplazarte dentro de un bloque llegas a su última fila, y los otros no se mueven", JSON.stringify(moved));
       await inventoryOf(t, "Claude Code", "claude-code-many-home");
       t.check(true, "«Claude Code» y «claude-code-many-home» se eligen con un clic");
+      const tiles = await s.exec(`
+        return [...document.querySelectorAll(".panel.homes .home-name")].map((name) => {
+          const part = (css) => { const e = name.querySelector(css); return e && { text: e.textContent, cut: e.scrollWidth > e.clientWidth }; };
+          return { head: part(".home-name-head"), tail: part(".home-name-tail") };
+        });`);
+      const tails = tiles.map((x) => x.tail?.text);
+      t.check(
+        tiles.length >= 2 && tiles.every((x) => x.tail && !x.tail.cut) && tails.includes("\\claude-code-many-home") && new Set(tails).size === tiles.length,
+        "cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra",
+        JSON.stringify(tiles),
+      );
+      const many = tiles.find((x) => x.tail?.text === "\\claude-code-many-home");
+      t.check(many?.head?.cut === true, "un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final", JSON.stringify(many));
+      t.check(
+        tiles.filter((x) => !x.head?.cut).every((x) => !x.tail.cut),
+        "un nombre que cabe en su ficha se ve entero, sin «…»",
+        JSON.stringify(tiles.filter((x) => !x.head?.cut)),
+      );
       await project(t, `${t.root}\\many\\project-01`);
       const projectField = await s.find("[role=combobox][aria-label=Project]");
       await s.hover(projectField);

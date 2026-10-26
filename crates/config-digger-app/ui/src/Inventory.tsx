@@ -596,7 +596,7 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               aria-pressed={selected}
               onClick={() => onHome(agent, home.home)}
             >
-              <span className="home-name">{home.home}</span>
+              <HomeName home={home.home} />
               <span className="grow" />
               {opened(home) && <span className="tag">{LAST_OPENED}</span>}
               {mirrored(home)}
@@ -632,6 +632,21 @@ const LAST_OPENED = "last opened here";
  */
 function homeTileTooltip(home: Home): string {
   return [home.no_configuration ?? home.folder, home.mirror?.sentence, home.not_read?.sentence].filter(Boolean).join("\n");
+}
+
+/**
+ * A home's name on its tile, in two parts: its folder's last part, with the
+ * separator before it, and the rest, which is cut first when the name is too
+ * long for the tile, so that two homes of one Agent under one folder read apart.
+ */
+function HomeName({ home }: { home: string }) {
+  const [, head = "", tail = home] = /^(.*?)([\\/][^\\/]+[\\/]?)$/.exec(home) ?? [];
+  return (
+    <span className="home-name">
+      {head && <span className="home-name-head">{head}</span>}
+      <span className="home-name-tail">{tail}</span>
+    </span>
+  );
 }
 
 /** A home as the select of All Agents lists it, with its marks and how many locations couldn't be read in it. */
