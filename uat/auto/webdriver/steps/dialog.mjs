@@ -326,4 +326,47 @@ export default [
       t.check(show && grey(show.bg) && others.every((b) => grey(b.bg)), "«Show leftovers» y los demás botones de la fila de claude-code-home son grises", JSON.stringify([show, ...others].map((b) => b && `${b.text}: ${b.bg}`)));
     },
   },
+  {
+    id: "7.7",
+    async run(t) {
+      const { s } = t;
+      const file = `${t.root}\\codex-home\\config.toml`;
+      t.ps(t.step.commands[0].text);
+      try {
+        await s.setWindow(1100, 640);
+        await inventoryOf(t, "Codex", "codex-home");
+        await project(t, `${t.root}\\project`);
+        await openItem(t, "cd-throwaway-codex");
+        await act(t, "Disable");
+        const layout = await s.exec(`
+          const d = document.querySelector(".dialog"), r = d.getBoundingClientRect();
+          const inView = (e) => { if (!e) return false; const b = e.getBoundingClientRect(); return b.top >= 0 && b.bottom <= Math.min(innerHeight, r.bottom) + 1; };
+          const callout = d.querySelector(".dialog-callout.danger");
+          const region = [...d.querySelectorAll("[role=region]")].find((e) => document.getElementById(e.getAttribute("aria-labelledby"))?.textContent.trim() === "Untouched");
+          const title = region && document.getElementById(region.getAttribute("aria-labelledby"));
+          return {
+            fits: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && d.scrollHeight <= d.clientHeight + 1, scroll: [d.scrollHeight, d.clientHeight],
+            callout: callout?.querySelector(".callout-title")?.textContent.trim(), calloutBg: callout && getComputedStyle(callout).backgroundColor, calloutBottom: callout?.getBoundingClientRect().bottom,
+            untouched: region ? [...region.querySelectorAll(".mono")].map((e) => e.textContent.trim()) : null, untouchedTop: title?.getBoundingClientRect().top, untouchedInView: inView(title),
+            title: d.querySelector(".dialog-title").textContent.trim(), titleInView: inView(d.querySelector(".dialog-title")),
+            foot: [...d.querySelectorAll(".dialog-foot button")].map((b) => ({ text: b.textContent.trim(), inView: inView(b) })) };`);
+        // The tint of a danger callout is a red so faint that only its hue says red.
+        const [cr, cg, cb] = rgb(layout.calloutBg);
+        t.check(layout.callout === "Nothing of this Operation was kept" && cr > cg && cr > cb, "el diálogo muestra un recuadro rojo «Nothing of this Operation was kept»", `${layout.callout} · ${layout.calloutBg}`);
+        t.check(layout.untouched?.[0] === file && layout.untouchedInView && layout.untouchedTop >= layout.calloutBottom - 1, `debajo sale el bloque «Untouched», que empieza por «${file}»`, JSON.stringify(layout.untouched));
+        t.check(layout.fits, "el diálogo cabe en la ventana", `contenido ${layout.scroll[0]} px en ${layout.scroll[1]} px`);
+        const foot = layout.foot.map((b) => b.text).join(", ");
+        t.check(layout.title === "Disable 1 Entry" && layout.titleInView && foot === "Close, Retry" && layout.foot.every((b) => b.inView), "el título «Disable 1 Entry» y los botones «Close» y «Retry» están a la vista", `${layout.title} · ${foot}`);
+        await s.exec("document.activeElement?.blur();");
+        const f = await tabTo(s, (e) => e.role === "region" && e.text.includes(file));
+        await wait(250);
+        const ring = await s.exec("const c = getComputedStyle(document.activeElement); return { outline: c.outlineStyle + ' ' + c.outlineColor + ' ' + c.outlineWidth, shadow: c.boxShadow }");
+        t.check(f && (violet(ring.outline.split(" ").slice(1).join(" ")) || violet(ring.shadow)), "con el foco del teclado, el bloque «Untouched» tiene un anillo violeta", JSON.stringify(ring));
+        await t.shot("resultado", "el resultado cabe en la ventana; Untouched con anillo violeta");
+        await press(s, "Close", ".dialog");
+      } finally {
+        t.ps(t.step.commands[1].text);
+      }
+    },
+  },
 ];

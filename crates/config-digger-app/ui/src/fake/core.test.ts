@@ -116,6 +116,33 @@ describe("the fake backend", () => {
     expect(ok(await commands.readHistory())).toEqual(fixtures.history);
   });
 
+  test("fails an executed action on its first file, leaving as many untouched as the page's `untouched` parameter asks for", async () => {
+    vi.stubGlobal("location", { search: "?untouched=3" });
+
+    const executed = await commands.executePlan("plan-1", []);
+
+    const config = String.raw`E:\cd-throwaway\codex-home\config.toml`;
+    expect(executed).toEqual({
+      status: "error",
+      error: {
+        code: "write_failed",
+        message: `cannot write ${config}: Access is denied. (os error 5)`,
+        candidates: [],
+        backup: String.raw`E:\cd-throwaway\localappdata\config-digger\backups\20261001-120000-2b4`,
+        diffs: [],
+        failed: {
+          operation: "20261001-120000-2b4",
+          failure: null,
+          rollback: [config, String.raw`E:\cd-throwaway\many\project-01\.mcp.json`, String.raw`E:\cd-throwaway\many\project-02\.mcp.json`].map((path) => ({
+            path,
+            outcome: "not_written",
+            reason: null,
+          })),
+        },
+      },
+    });
+  });
+
   describe("with the page's `delay` parameter", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

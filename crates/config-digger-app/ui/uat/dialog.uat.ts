@@ -6,8 +6,8 @@
 // slashes, as the WebDriver walk also finds: a path matches either way.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { anySeparator, away, inventoryShown, rail, row } from "./app";
-import { grey, purple } from "./look";
+import { anySeparator, away, css, inventoryShown, rail, ROOT, row, selectItem } from "./app";
+import { grey, leans, purple } from "./look";
 import { uatStep } from "./step";
 
 /** Presses Remove leftovers on the Projects tab's row of `project` and waits for the preview's What changes. */
@@ -195,5 +195,70 @@ uatStep("7.4", async ({ page, open, check }) => {
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowDown");
     await expect.poll(() => changes.evaluate((c) => c.scrollTop)).toBeGreaterThan(0);
+  });
+});
+
+// The fixtures record the step's cd-throwaway-codex Disabled, with no
+// Disable, so the step disables cd-throwaway-project, an Effective Claude
+// Code server of the same Project. The page's untouched parameter fails the
+// write on Codex's config.toml, as the step's read-only file does, and
+// leaves 40 files untouched: a list taller than the window, which no action
+// on the throwaway data touches enough files for.
+uatStep("7.7", async ({ page, open, check }) => {
+  await page.setViewportSize(SMALLEST);
+  await open({ untouched: 40 });
+  await inventoryShown(page);
+  await page.getByRole("combobox", { name: "Project" }).click();
+  await page.getByRole("option", { name: String.raw`${ROOT}\project`, exact: true }).click();
+  await selectItem(page, "cd-throwaway-project");
+  await page.locator(".panel.detail .entry-card").first().locator(".entry-actions").getByRole("button", { name: "Disable", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".loading")).toHaveCount(0);
+  for (const box of await dialog.locator("input[type=checkbox]").all()) await box.check();
+  await dialog.locator(".dialog-foot").getByRole("button", { name: /^Disable/ }).click();
+  const untouched = dialog.getByRole("region", { name: "Untouched" });
+  await untouched.waitFor();
+  const callout = dialog.getByRole("alert");
+  const fixed = [dialog.locator(".dialog-title"), ...["Close", "Retry"].map((name) => dialog.locator(".dialog-foot").getByRole("button", { name, exact: true }))];
+  const tops = () => Promise.all(fixed.map(async (each) => (await each.boundingBox())?.y));
+
+  await check("El diálogo muestra un recuadro rojo «Nothing of this Operation was kept».", async () => {
+    await expect(callout.locator(".callout-title")).toHaveText("Nothing of this Operation was kept");
+    const background = await css(callout, "background-color");
+    expect(leans(background, 0), background).toBe(true);
+  });
+  await check("Debajo sale el bloque «Untouched», que empieza por «E:\\cd-throwaway\\codex-home\\config.toml».", async () => {
+    await expect(untouched.locator(".mono").first()).toHaveText(String.raw`${ROOT}\codex-home\config.toml`);
+    await expect(untouched.locator(".mono")).toHaveCount(40);
+    const [alert, title] = await Promise.all([callout.boundingBox(), dialog.getByRole("heading", { name: "Untouched" }).boundingBox()]);
+    expect(title!.y, "Untouched's title below the callout").toBeGreaterThanOrEqual(alert!.y + alert!.height - 1);
+    await expect(dialog.getByRole("heading", { name: "Untouched" })).toBeInViewport({ ratio: 1 });
+    // Its list is taller than the window, so it scrolls in its block, under its title.
+    const [scroll, client] = await untouched.evaluate((list) => [list.scrollHeight, list.clientHeight]);
+    expect(scroll, "the list's height").toBeGreaterThan(SMALLEST.height);
+    expect(client, "the block's height").toBeGreaterThan(30);
+  });
+  await check("El diálogo cabe en la ventana.", async () => {
+    const box = await dialog.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(SMALLEST.height);
+    const [scroll, client] = await dialog.evaluate((d) => [d.scrollHeight, d.clientHeight]);
+    expect(scroll, "the dialog scrolls as a whole").toBeLessThanOrEqual(client + 1);
+  });
+  await check("El título «Disable 1 Entry» y los botones «Close» y «Retry» están a la vista.", async () => {
+    await expect(fixed[0]).toHaveText("Disable 1 Entry");
+    const still = await tops();
+    await untouched.hover();
+    await page.mouse.wheel(0, 20_000);
+    await expect.poll(() => untouched.evaluate((list) => list.scrollHeight - list.scrollTop - list.clientHeight)).toBeLessThanOrEqual(1);
+    expect(await tops(), "after scrolling Untouched to its end").toEqual(still);
+    for (const each of fixed) await expect(each).toBeInViewport({ ratio: 1 });
+  });
+  await check("Con el foco del teclado, el bloque «Untouched» tiene un anillo violeta.", async () => {
+    await dialog.locator(".dialog-title").click();
+    for (let presses = 0; presses < 20 && !(await untouched.evaluate((list) => list === document.activeElement)); presses++) await page.keyboard.press("Tab");
+    await expect(untouched).toBeFocused();
+    const ring = await untouched.evaluate((list) => ({ style: getComputedStyle(list).outlineStyle, colour: getComputedStyle(list).outlineColor }));
+    expect(ring.style !== "none" && purple(ring.colour), JSON.stringify(ring)).toBe(true);
   });
 });

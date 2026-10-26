@@ -12,6 +12,9 @@
  * `?delay=read_inventory:2000,read_places:500` holds the answer of each
  * command it names for that many milliseconds, then answers as usual, an
  * error too, to show a busy state long enough to look at or test.
+ * `?untouched=40` makes `execute_plan` fail on the first of 40 files and
+ * leave them all untouched, to show a result whose list is taller than the
+ * window, which no action on the throwaway data touches enough files for.
  */
 import type {
   About,
@@ -63,6 +66,10 @@ export async function invoke<T>(command: string, args: Args = {}): Promise<T> {
   if (held !== undefined) await new Promise((resolve) => setTimeout(resolve, held));
   if (failing().includes(command)) {
     throw backendError(`The fake backend fails ${command}, as the page's fail parameter asks.`);
+  }
+  if (command === "execute_plan") {
+    const count = untouched();
+    if (count !== null) throw writeFailed(count);
   }
   const answer = ANSWERS[command];
   if (answer === undefined) throw backendError(`The fake backend has no answer for ${command}.`);
@@ -149,6 +156,32 @@ function delays(): Map<string, number> {
       return [command, Number(ms)];
     }),
   );
+}
+
+/** The number of files the page's `untouched` parameter asks an executed action to leave untouched, if any. */
+function untouched(): number | null {
+  const search = globalThis.location?.search ?? "";
+  const count = new URLSearchParams(search).get("untouched");
+  if (count === null) return null;
+  // An Error, not a CommandError, as for a malformed delay.
+  if (!/^[1-9]\d*$/.test(count)) throw new Error(`The fake backend's untouched parameter «${count}» is no whole number of files above 0.`);
+  return Number(count);
+}
+
+/** The failure of the recorded Operation, had its write failed on the first of `count` files, Codex's config.toml, and left them all untouched. */
+function writeFailed(count: number): CommandError {
+  if (fixtures.executed.kind !== "applied") throw new Error("The fixtures' executed action is no applied Operation.");
+  const { operation, backup } = fixtures.executed.outcome;
+  const config = String.raw`E:\cd-throwaway\codex-home\config.toml`;
+  const others = Array.from({ length: count - 1 }, (_, index) => String.raw`E:\cd-throwaway\many\project-${String(index + 1).padStart(2, "0")}\.mcp.json`);
+  return {
+    code: "write_failed",
+    message: `cannot write ${config}: Access is denied. (os error 5)`,
+    candidates: [],
+    backup,
+    diffs: [],
+    failed: { operation, failure: null, rollback: [config, ...others].map((path) => ({ path, outcome: "not_written", reason: null })) },
+  };
 }
 
 function backendError(message: string): CommandError {

@@ -9,8 +9,12 @@ import { test as base, type Page } from "@playwright/test";
 import { launch } from "../scripts/fakeUi.ts";
 import { LEFT_TO_A_PERSON, planStep } from "./plan";
 
-/** The page's query: the commands whose answer it holds, in milliseconds, and those that answer an error. */
-type Query = { delay?: Record<string, number>; fail?: string[] };
+/**
+ * The page's query: the commands whose answer it holds, in milliseconds,
+ * those that answer an error, and how many files an executed action fails
+ * to touch.
+ */
+type Query = { delay?: Record<string, number>; fail?: string[]; untouched?: number };
 
 type StepArgs = {
   page: Page;
@@ -42,6 +46,7 @@ function address(query: Query = {}): string {
   const params = new URLSearchParams();
   if (query.delay) params.set("delay", Object.entries(query.delay).map(([command, ms]) => `${command}:${ms}`).join(","));
   if (query.fail) params.set("fail", query.fail.join(","));
+  if (query.untouched !== undefined) params.set("untouched", String(query.untouched));
   const search = params.toString();
   return search ? `${base}?${search}` : base;
 }

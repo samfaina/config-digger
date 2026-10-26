@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { ActionDialog, Changes } from "./ActionDialog";
-import { commands, type ActionPreview, type Change } from "./bindings";
+import { commands, type ActionPreview, type Change, type Error as ApiError } from "./bindings";
 import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
 
@@ -343,5 +345,230 @@ describe("the result of an action", () => {
     const hint = await screen.findByText("Restart Claude Code so that it reads what the Operation wrote.");
     expect(hint.className).toBe("callout-hint");
     expect(screen.getByText("Operation 20261023-101500-a1b · backup kept").className).toBe("callout-hint");
+  });
+});
+
+describe("the action dialog in each phase", () => {
+  const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
+  const mcpJson = String.raw`E:\cd-throwaway\project\.mcp.json`;
+  const backup = String.raw`E:\cd-throwaway\backups\1`;
+  const backupNote = `Each touched file is copied to ${backup} before anything is written.`;
+  const planned: ActionPreview = {
+    plan_id: "plan-1",
+    preview: {
+      action: "remove",
+      title: "Remove 1 Entry",
+      undo_of: null,
+      backup_of: null,
+      project: null,
+      changes: [],
+      effective: [],
+      info: [{ code: "version_outside_tested_range", path: String.raw`E:\cd-throwaway\bin\claude.exe`, sentence: "Claude Code 2.1.310 is newer than the versions this definition was tested with." }],
+      files: [],
+      folders: [],
+      deleted: [],
+      backup_folder: backup,
+      backup_note: backupNote,
+    },
+    warnings: [],
+    blocks: [],
+  };
+  const diffs = [{ path: claudeJson, diff: "@@ -1 +1 @@\n-{}\n+{ }", diff_unavailable: null, diff_note: null, changed_lines: 1 }];
+  const failure = (code: ApiError["code"], failed: ApiError["failed"], withDiffs = false): ApiError => ({
+    code,
+    message: `cannot write ${claudeJson}: Access is denied. (os error 5)`,
+    candidates: [],
+    backup,
+    diffs: withDiffs ? diffs : [],
+    failed,
+  });
+  type Executed = Awaited<ReturnType<typeof commands.executePlan>>;
+  const verifiedWithDifferences: Executed = {
+    status: "ok",
+    data: {
+      kind: "applied",
+      outcome: {
+        operation: "20261023-101500-a1b",
+        verify: "verified_with_differences",
+        differences: [{ agent: "claude-code", home: "default", locator: `${claudeJson}#mcpServers.cd-throwaway-notes`, predicted: "removed", actual: "effective" }],
+        backup,
+        sentence: "Removed 1 Entry. Operation 20261023-101500-a1b: verified with differences.",
+        hints: [],
+      },
+    },
+  };
+  const rolledBack: Executed = {
+    status: "error",
+    error: failure("verify_failed", {
+      operation: "20261023-101500-a1b",
+      failure: null,
+      rollback: [
+        { path: claudeJson, outcome: "restored", reason: null },
+        { path: mcpJson, outcome: "not_written", reason: null },
+      ],
+    }),
+  };
+  const notApplied: Executed = { status: "error", error: failure("unexpected", null) };
+  const rollbackIncomplete: Executed = {
+    status: "error",
+    error: failure(
+      "rollback_incomplete",
+      { operation: "20261023-101500-a1b", failure: "verify_failed", rollback: [{ path: claudeJson, outcome: "not_restored", reason: "Something else is there since config-digger touched it." }] },
+      true,
+    ),
+  };
+
+  const open = () =>
+    render(<ActionDialog request={{ kind: "entry", verb: "remove", locator: "x", project: null }} onClose={() => {}} onUndo={() => {}} onOpenHistory={() => {}} notify={() => {}} />);
+
+  const preview = async () => {
+    vi.mocked(commands.planAction).mockResolvedValue({ status: "ok", data: planned });
+    open();
+    await screen.findByRole("button", { name: "Remove" });
+  };
+
+  const planFailed = async () => {
+    vi.mocked(commands.planAction).mockResolvedValue({ status: "error", error: failure("undo_refused", null, true) });
+    open();
+    await screen.findByText("This action can't be previewed");
+  };
+
+  /** Opens the dialog, applies its preview and waits for `executed`'s result, which shows the button `settled`. */
+  const applyTo = async (executed: Executed, settled: string) => {
+    vi.mocked(commands.executePlan).mockResolvedValue(executed);
+    await preview();
+    screen.getByRole("button", { name: "Remove" }).click();
+    await screen.findByRole("button", { name: settled });
+  };
+
+  describe("keeps its title, its backup note and its buttons out of what scrolls", () => {
+    const stylesheet = document.createElement("style");
+    beforeAll(() => {
+      stylesheet.textContent = readFileSync(join(import.meta.dirname, "styles.css"), "utf8");
+      document.head.append(stylesheet);
+    });
+    afterAll(() => stylesheet.remove());
+
+    /** The elements around `element` that scroll what they hold, by the app's stylesheet, up to its dialog and the dialog too. */
+    const scrollingAround = (element: Element) => {
+      const found: Element[] = [];
+      for (let around = element.parentElement; around !== null; around = around.parentElement) {
+        const style = getComputedStyle(around);
+        if ([style.overflow, style.overflowY].some((value) => /auto|scroll/.test(value))) found.push(around);
+        if (around.getAttribute("role") === "dialog") break;
+      }
+      return found;
+    };
+
+    type Parts = { title: string; buttons: string[]; noted: boolean; between: () => Element[] };
+    const phases: [string, () => Promise<void>, Parts][] = [
+      [
+        "planning",
+        async () => {
+          vi.mocked(commands.planAction).mockReturnValue(new Promise(() => {}));
+          open();
+        },
+        { title: "Preparing the preview…", buttons: [], noted: false, between: () => [screen.getByText("Reading the files this action touches…")] },
+      ],
+      [
+        "plan_failed",
+        planFailed,
+        {
+          title: "Preparing the preview…",
+          buttons: ["Open backup folder", "Copy path", "Check again", "Close"],
+          noted: false,
+          between: () => [screen.getByRole("alert"), screen.getByRole("region", { name: "Backup → now" })],
+        },
+      ],
+      [
+        "preview",
+        preview,
+        {
+          title: "Remove 1 Entry",
+          buttons: ["Cancel", "Remove"],
+          noted: true,
+          between: () => [
+            screen.getByRole("region", { name: "What changes" }),
+            screen.getByRole("heading", { name: "Before you apply" }),
+            screen.getByText(/is newer than the versions/),
+            screen.getByRole("region", { name: "Files · 0" }),
+          ],
+        },
+      ],
+      [
+        "applying",
+        async () => {
+          vi.mocked(commands.executePlan).mockReturnValue(new Promise(() => {}));
+          await preview();
+          screen.getByRole("button", { name: "Remove" }).click();
+          await screen.findByText("Back up");
+        },
+        { title: "Remove 1 Entry", buttons: [], noted: true, between: () => [screen.getByRole("list")] },
+      ],
+      [
+        "done, verified with differences",
+        () => applyTo(verifiedWithDifferences, "Done"),
+        {
+          title: "Remove 1 Entry",
+          buttons: ["Undo", "Open History", "Done"],
+          noted: false,
+          between: () => [screen.getByRole("list"), screen.getByRole("status"), screen.getByRole("region", { name: "Verified with differences" })],
+        },
+      ],
+      [
+        "done, failed and rolled back",
+        () => applyTo(rolledBack, "Retry"),
+        {
+          title: "Remove 1 Entry",
+          buttons: ["Close", "Retry"],
+          noted: false,
+          between: () => [screen.getByRole("list"), screen.getByRole("alert"), screen.getByRole("region", { name: "Restored" }), screen.getByRole("region", { name: "Untouched" })],
+        },
+      ],
+      [
+        "done, not applied",
+        () => applyTo(notApplied, "Retry"),
+        { title: "Remove 1 Entry", buttons: ["Close", "Retry"], noted: false, between: () => [screen.getByRole("alert")] },
+      ],
+      [
+        "done, with its Rollback incomplete",
+        () => applyTo(rollbackIncomplete, "Open History"),
+        {
+          title: "Remove 1 Entry",
+          buttons: ["Open backup folder", "Open History", "Close"],
+          noted: false,
+          between: () => [
+            screen.getByRole("list"),
+            screen.getByRole("alert"),
+            screen.getByRole("region", { name: "Locations" }),
+            screen.getByRole("region", { name: "Backup → now" }),
+          ],
+        },
+      ],
+    ];
+
+    test.each(phases)("%s, and scrolls all that lies between them as one", async (_, reach, { title, buttons, noted, between }) => {
+      await reach();
+
+      const fixed = [screen.getByRole("heading", { level: 1, name: title }), ...buttons.map((name) => screen.getByRole("button", { name }))];
+      if (noted) fixed.push(screen.getByText(backupNote));
+      for (const element of fixed) expect(scrollingAround(element), element.textContent ?? "").toEqual([]);
+
+      // The outermost element that scrolls each part between the head and the foot: one body, inside the dialog.
+      const bodies = between().map((element) => scrollingAround(element).at(-1));
+      expect(bodies[0]?.getAttribute("role")).toBeNull();
+      for (const body of bodies) expect(body).toBe(bodies[0]);
+    });
+  });
+
+  test.each([
+    ["a preview that failed, with its backup → now diffs", planFailed, ["Backup → now"]],
+    ["an Operation verified with differences", () => applyTo(verifiedWithDifferences, "Done"), ["Verified with differences"]],
+    ["a failed Operation, rolled back", () => applyTo(rolledBack, "Retry"), ["Restored", "Untouched"]],
+    ["an incomplete Rollback", () => applyTo(rollbackIncomplete, "Open History"), ["Locations", "Backup → now"]],
+  ])("scrolls each list of %s in a region of its own, named by its title, that the keyboard can reach", async (_, reach: () => Promise<void>, titles: string[]) => {
+    await reach();
+    expect(screen.getAllByRole("region")).toEqual(titles.map((title) => screen.getByRole("region", { name: title })));
+    for (const region of screen.getAllByRole("region")) expect(region.tabIndex).toBe(0);
   });
 });

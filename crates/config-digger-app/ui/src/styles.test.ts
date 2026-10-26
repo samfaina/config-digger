@@ -243,6 +243,23 @@ describe("the action dialog", () => {
     expect(styled(".dialog").get("max-height")).toMatch(/vh$/);
   });
 
+  test("never scrolls as a whole, while the other dialogs still do, so its head and its foot stay in view", () => {
+    expect(styled(".dialog.action").get("overflow")).toBe("visible");
+    expect(styled(".dialog").get("overflow")).toBe("auto");
+    expect(styled(".dialog.action > .dialog-head").get("flex")).toBe("none");
+    expect(styled(".dialog.action > .dialog-foot").get("flex")).toBe("none");
+  });
+
+  test("gives up the height its head and its foot need from its body, which scrolls as one once the blocks in it are at their minimums", () => {
+    const body = styled(".dialog-body");
+    expect(shrinks(".dialog-body")).toBe(true);
+    expect(body.get("min-height")).toBe("0");
+    expect(body.get("overflow-y")).toBe("auto");
+    // A column, so that the blocks that scroll in it shrink first.
+    expect(body.get("display")).toBe("flex");
+    expect(body.get("flex-direction")).toBe("column");
+  });
+
   test("scrolls the body of What changes and of Files inside the block, under its title", () => {
     const block = styled(".dialog-section.scrolls");
     expect(block.get("display")).toBe("flex");

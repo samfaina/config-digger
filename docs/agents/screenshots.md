@@ -12,6 +12,8 @@ Write commands, such as `plan_action`, `execute_plan` or `save_settings`, answer
 
 `?delay=read_inventory:2000,read_places:500` holds the answer of each command it names for that many milliseconds, then answers as usual, the error of `?fail=` too, to see a busy state that would last less than a frame. An entry that is not `<command>:<whole milliseconds>` throws an error naming it, so a typo never runs with no delay. Both go in the same address: `?fail=read_about&delay=read_about:500`.
 
+`?untouched=40` makes `execute_plan` fail on Codex's `config.toml`, the first of 40 files, and leave them all untouched, to see a result whose list is taller than the window: no action on the throwaway data touches that many files. Anything but a whole number above 0 throws an error naming it.
+
 ## Run it
 
 From `crates/config-digger-app/ui`:
@@ -22,7 +24,7 @@ From `crates/config-digger-app/ui`:
 | `npm run screenshots` | Writes a PNG of each screen and state to `crates/config-digger-app/ui/screenshots/`, which git ignores. |
 | `npm run uat:fake` | Runs the tests of the UAT steps the fake backend can show, with no screenshot (see "The fake UI's tests" in `docs/agents/uat.md`). |
 
-`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's, as `tauri.conf.json` sets it. It shoots the Inventory with and without an Item selected, the open Project dropdown with and without a search, a tooltip, the action dialog with What changes, and with many changes in the smallest window the app allows, Projects & homes on both tabs, with a search, scrolled down to its missing Projects and at its Stranded Entries, the action dialog of their Remove all, History with an Operation open, filtered in the smallest window with its status dropdown open, and filtered to nothing, Settings, About, and a notice of each kind, then the Inventory with an Item selected, both tabs of Projects & homes, History with an Operation open, Settings and About again in the smallest window (the `smallest-*` shots, listed in `SMALLEST_SHOTS`). To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
+`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's, as `tauri.conf.json` sets it. It shoots the Inventory with and without an Item selected, the open Project dropdown with and without a search, a tooltip, the action dialog with What changes, and with many changes in the smallest window the app allows, Projects & homes on both tabs, with a search, scrolled down to its missing Projects and at its Stranded Entries, the action dialog of their Remove all, the result of an action that left 40 files untouched in the smallest window, History with an Operation open, filtered in the smallest window with its status dropdown open, and filtered to nothing, Settings, About, and a notice of each kind, then the Inventory with an Item selected, both tabs of Projects & homes, History with an Operation open, Settings and About again in the smallest window (the `smallest-*` shots, listed in `SMALLEST_SHOTS`). To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
 
 ## Screenshots stay local
 
