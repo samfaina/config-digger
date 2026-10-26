@@ -7,6 +7,7 @@ fn main() {
         "backups_of",
         "open_location",
         "reveal_location",
+        "open_backup_folder",
         "plan_action",
         "execute_plan",
         "cancel_plan",

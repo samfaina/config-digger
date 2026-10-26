@@ -9,6 +9,7 @@
     "allow-backups-of",
     "allow-open-location",
     "allow-reveal-location",
+    "allow-open-backup-folder",
     "allow-plan-action",
     "allow-execute-plan",
     "allow-cancel-plan",

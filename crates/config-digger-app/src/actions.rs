@@ -93,7 +93,7 @@ pub struct Actions {
     /// The number of the last plan, from which each plan's id is made.
     planned: u64,
     /// The backup folders reported by an Operation or a refused Undo, which
-    /// can be revealed.
+    /// can be opened.
     reported: HashSet<String>,
 }
 
@@ -211,7 +211,7 @@ impl Actions {
     }
 
     /// The Operation `id` in History, whose backup folder can then be
-    /// revealed, unless its backup was deleted.
+    /// opened, unless its backup was deleted.
     pub fn detail(&mut self, id: &str) -> Result<OperationDetail, Error> {
         let detail = self.core.history_show(id)?;
         if !detail.summary.backup_deleted {
@@ -228,8 +228,8 @@ impl Actions {
 
     /// Whether `path` is a backup folder an Operation, a refused Undo or a
     /// detail in History reported here, in any letter case: the webview
-    /// reveals no other.
-    pub fn can_reveal(&self, path: &Path) -> bool {
+    /// opens no other backup folder.
+    pub fn can_open_backup_folder(&self, path: &Path) -> bool {
         self.reported.contains(&session::key(path))
     }
 
@@ -370,23 +370,23 @@ mod tests {
     }
 
     #[test]
-    fn only_the_backup_folder_an_operation_reported_can_be_revealed() {
+    fn only_the_backup_folder_an_operation_reported_can_be_opened() {
         let fs = fixture();
         let mut actions = actions(&fs);
         let planned = actions.plan(&remove_notes()).unwrap();
-        assert!(!actions.can_reveal(&planned.preview.backup_folder));
+        assert!(!actions.can_open_backup_folder(&planned.preview.backup_folder));
 
         let Executed::Applied { outcome } = actions.execute(&planned.plan_id, &[]).unwrap() else {
             panic!("applied");
         };
 
-        assert!(actions.can_reveal(&outcome.backup));
-        assert!(!actions.can_reveal(&planned.preview.backup_folder));
-        assert!(!actions.can_reveal(Path::new(r"C:\Windows")));
+        assert!(actions.can_open_backup_folder(&outcome.backup));
+        assert!(!actions.can_open_backup_folder(&planned.preview.backup_folder));
+        assert!(!actions.can_open_backup_folder(Path::new(r"C:\Windows")));
     }
 
     #[test]
-    fn a_refused_undo_reports_a_backup_folder_that_can_be_revealed() {
+    fn a_refused_undo_reports_a_backup_folder_that_can_be_opened() {
         let fs = fixture();
         let mut actions = actions(&fs);
         let planned = actions.plan(&remove_notes()).unwrap();
@@ -416,7 +416,7 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(refused.code, ErrorCode::UndoRefused);
-        assert!(actions.can_reveal(refused.backup.as_deref().unwrap()));
+        assert!(actions.can_open_backup_folder(refused.backup.as_deref().unwrap()));
     }
 
     fn removed_notes(actions: &mut Actions) -> String {
@@ -428,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn history_lists_each_operation_with_a_detail_whose_backup_folder_can_be_revealed() {
+    fn history_lists_each_operation_with_a_detail_whose_backup_folder_can_be_opened() {
         let fs = fixture();
         let operation = removed_notes(&mut actions(&fs));
         // History is read after the app restarted.
@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(history[0].id, operation);
 
         let detail = actions.detail(&operation).unwrap();
-        assert!(actions.can_reveal(&detail.backup));
+        assert!(actions.can_open_backup_folder(&detail.backup));
         let diff = detail.locations[0].diff.as_ref().unwrap();
         let text = diff.diff.as_deref().unwrap();
         assert!(text.contains("-{ \"mcpServers\": { \"notes\""), "{text}");
@@ -467,10 +467,10 @@ mod tests {
         let history = actions.history().unwrap();
         assert!(history[0].backup_deleted);
         assert!(!history[0].undoable);
-        // Its folder holds only its record now, so the detail offers nothing to reveal.
+        // Its folder holds only its record now, so the detail offers nothing to open.
         let mut restarted = self::actions(&fs);
         let detail = restarted.detail(&operation).unwrap();
-        assert!(!restarted.can_reveal(&detail.backup));
+        assert!(!restarted.can_open_backup_folder(&detail.backup));
     }
 
     #[test]

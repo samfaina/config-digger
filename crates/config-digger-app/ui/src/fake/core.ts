@@ -82,6 +82,7 @@ const ANSWERS: Record<string, (args: Args) => unknown> = {
   backups_of: ({ path }) => fixtures.backups.find((known) => samePath(known.path, path as string))?.backups ?? [],
   open_location: () => null,
   reveal_location: () => null,
+  open_backup_folder: () => null,
   plan_action: ({ request }) => previewOf(request as ActionRequest),
   execute_plan: () => fixtures.executed,
   cancel_plan: () => null,

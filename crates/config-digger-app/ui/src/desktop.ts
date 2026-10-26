@@ -43,3 +43,9 @@ export async function revealLocation(path: string, notify: Notify): Promise<void
   const result = await commands.revealLocation(path);
   if (result.status === "error") notify({ kind: "error", text: `Explorer couldn't show it: ${result.error.message}` });
 }
+
+/** Opens Explorer inside an Operation's backup folder. */
+export async function openBackupFolder(path: string, notify: Notify): Promise<void> {
+  const result = await commands.openBackupFolder(path);
+  if (result.status === "error") notify({ kind: "error", text: `Explorer couldn't open it: ${result.error.message}` });
+}

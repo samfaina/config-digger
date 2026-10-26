@@ -100,17 +100,29 @@ pub async fn open_location(app: AppHandle, path: PathBuf) -> Result<(), api::Err
     .await
 }
 
-/// Shows `path`, a location the inventory shows, a backup copy of one, or
-/// the backup folder of an Operation the dialog executed, selected in
-/// Explorer.
+/// Shows `path`, a location the inventory shows or a backup copy of one,
+/// selected in Explorer, in the folder that holds it.
 #[tauri::command]
 #[specta::specta]
 pub async fn reveal_location(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
     blocking(move || {
+        ensure_shown(&app, &path)?;
+        select_in_explorer(&path)
+    })
+    .await
+}
+
+/// Opens Explorer inside `path`, the backup folder of an Operation the
+/// dialog executed or History reported, to recover from it by hand. A
+/// location the inventory shows is opened as Windows opens it.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_backup_folder(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
+    blocking(move || {
         if !app.state::<ActionsState>().reported(&path) {
             ensure_shown(&app, &path)?;
         }
-        select_in_explorer(&path)
+        open_in_windows(&path)
     })
     .await
 }
@@ -139,11 +151,12 @@ impl ActionsState {
         task(actions.as_mut().expect("set above"))
     }
 
-    /// Whether `path` is the backup folder of an Operation executed here.
+    /// Whether `path` is the backup folder of an Operation executed here, a
+    /// refused Undo or a detail in History.
     fn reported(&self, path: &Path) -> bool {
         self.lock()
             .as_ref()
-            .is_some_and(|actions| actions.can_reveal(path))
+            .is_some_and(|actions| actions.can_open_backup_folder(path))
     }
 }
 
@@ -211,7 +224,7 @@ pub async fn read_history(app: AppHandle) -> Result<Vec<OperationSummary>, api::
 }
 
 /// The Operation `id` in History, with what it changed in each file, whose
-/// backup folder can then be revealed.
+/// backup folder can then be opened.
 #[tauri::command]
 #[specta::specta]
 pub async fn history_detail(app: AppHandle, id: String) -> Result<OperationDetail, api::Error> {
@@ -527,7 +540,7 @@ fn ensure_shown(app: &AppHandle, path: &Path) -> Result<(), api::Error> {
 }
 
 /// Opens `target`, a path or a URL, in the app Windows associates with it:
-/// Explorer for a folder, the default browser for a URL.
+/// Explorer inside a folder, the default browser for a URL.
 // Explorer is a GUI program, so it opens no console window.
 #[allow(clippy::disallowed_methods)]
 fn open_in_windows(target: impl AsRef<OsStr>) -> Result<(), api::Error> {
