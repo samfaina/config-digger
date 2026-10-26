@@ -258,6 +258,8 @@ describe("the action dialog", () => {
     // A column, so that the blocks that scroll in it shrink first.
     expect(body.get("display")).toBe("flex");
     expect(body.get("flex-direction")).toBe("column");
+    // A margin taken back above would slide it over the head's last line.
+    expect(body.get("margin")?.split(/\s+/)[0]).toBe("0");
   });
 
   test("scrolls the body of What changes and of Files inside the block, under its title", () => {

@@ -1637,14 +1637,16 @@ p {
 }
 
 /* The padding, taken back by the margin, leaves room for the focus rings of
-   the blocks that scroll in it, which reach 8px past the dialog's column. */
+   the blocks that scroll in it, which reach 8px past the dialog's column and
+   below the last of them. Above, the margin of its first part leaves room,
+   and a margin taken back there would slide the body over the head. */
 .dialog-body {
   flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin: -8px;
-  padding: 8px;
+  margin: 0 -8px -8px;
+  padding: 0 8px 8px;
   overflow-y: auto;
 }
 

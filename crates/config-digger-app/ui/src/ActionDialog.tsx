@@ -674,13 +674,28 @@ type ResultBodyProps = {
 
 /** The chain as far as it got, then what Apply did and what can be done next. */
 function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }: ResultBodyProps) {
-  const undo = result.kind === "applied" ? result.undo : null;
+  const { body, foot } = resultParts(result, { onUndo, onOpenHistory, onRetry, onClose, notify });
   return (
     <>
       <div className="dialog-body">
         <Steps steps={result.steps} />
+        {body}
+      </div>
+      <footer className="dialog-foot">
+        <span className="grow" />
+        {foot}
+      </footer>
+    </>
+  );
+}
 
-        {result.kind === "applied" && (
+/** What a result shows under the chain, and the buttons of its foot. */
+function resultParts(result: Result, { onUndo, onOpenHistory, onRetry, onClose, notify }: Omit<ResultBodyProps, "result">): { body: React.ReactNode; foot: React.ReactNode } {
+  switch (result.kind) {
+    case "applied": {
+      const undo = result.undo;
+      return {
+        body: (
           <>
             <div className="dialog-callout success" role="status">
               <Icon name="play" small />
@@ -724,9 +739,29 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
               </DialogSection>
             )}
           </>
-        )}
-
-        {(result.kind === "failed" || result.kind === "not_applied") && (
+        ),
+        foot: (
+          <>
+            {undo !== null && (
+              <button type="button" className="cta secondary" onClick={() => onUndo(undo)}>
+                <Icon name="history" small />
+                Undo
+              </button>
+            )}
+            <button type="button" className="cta secondary" onClick={onOpenHistory}>
+              Open History
+            </button>
+            <button type="button" className="cta" onClick={onClose}>
+              Done
+            </button>
+          </>
+        ),
+      };
+    }
+    case "failed":
+    case "not_applied":
+      return {
+        body: (
           <>
             <div className="dialog-callout danger" role="alert">
               <Icon name="flag" small />
@@ -756,9 +791,22 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
               </DialogSection>
             )}
           </>
-        )}
-
-        {result.kind === "rollback_incomplete" && (
+        ),
+        foot: (
+          <>
+            <button type="button" className="cta secondary" onClick={onClose}>
+              Close
+            </button>
+            <button type="button" className="cta" onClick={onRetry}>
+              <Icon name="refresh" small />
+              Retry
+            </button>
+          </>
+        ),
+      };
+    case "rollback_incomplete":
+      return {
+        body: (
           <>
             <div className="dialog-callout danger strong" role="alert">
               <Icon name="flag" small />
@@ -778,54 +826,20 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
             </DialogSection>
             <BackupDiffs diffs={result.diffs} scrolls />
           </>
-        )}
-      </div>
-
-      {result.kind === "applied" && (
-        <footer className="dialog-foot">
-          <span className="grow" />
-          {undo !== null && (
-            <button type="button" className="cta secondary" onClick={() => onUndo(undo)}>
-              <Icon name="history" small />
-              Undo
+        ),
+        foot: (
+          <>
+            <BackupFolderButton backup={result.backup} notify={notify} />
+            <button type="button" className="cta secondary" onClick={onOpenHistory}>
+              Open History
             </button>
-          )}
-          <button type="button" className="cta secondary" onClick={onOpenHistory}>
-            Open History
-          </button>
-          <button type="button" className="cta" onClick={onClose}>
-            Done
-          </button>
-        </footer>
-      )}
-
-      {(result.kind === "failed" || result.kind === "not_applied") && (
-        <footer className="dialog-foot">
-          <span className="grow" />
-          <button type="button" className="cta secondary" onClick={onClose}>
-            Close
-          </button>
-          <button type="button" className="cta" onClick={onRetry}>
-            <Icon name="refresh" small />
-            Retry
-          </button>
-        </footer>
-      )}
-
-      {result.kind === "rollback_incomplete" && (
-        <footer className="dialog-foot">
-          <span className="grow" />
-          <BackupFolderButton backup={result.backup} notify={notify} />
-          <button type="button" className="cta secondary" onClick={onOpenHistory}>
-            Open History
-          </button>
-          <button type="button" className="cta" onClick={onClose}>
-            Close
-          </button>
-        </footer>
-      )}
-    </>
-  );
+            <button type="button" className="cta" onClick={onClose}>
+              Close
+            </button>
+          </>
+        ),
+      };
+  }
 }
 
 /** Where a Rollback left each location, as a label. */

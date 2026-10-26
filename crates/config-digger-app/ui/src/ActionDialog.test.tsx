@@ -141,7 +141,7 @@ describe("the preview of an action with many changes", () => {
     return screen.findByRole("region", { name: "What changes" });
   };
 
-  test("scrolls only What changes and Files, each under its title, keeping the title, Before you apply and the buttons in view", async () => {
+  test("scrolls only What changes and Files in regions of their own, each under its title, with the title, Before you apply and the buttons outside them", async () => {
     const whatChanges = await openPreview();
     const files = screen.getByRole("region", { name: "Files · 1" });
     expect(screen.getAllByRole("region")).toEqual([whatChanges, files]);
