@@ -146,11 +146,17 @@ pub(crate) fn turned_off(agent_name: &str, name: &str, field: &str, switch: &str
     }
 }
 
-/// What Enable says of an Entry Disabled by `field = false` at `switch`
-/// in the server its Agent builds.
-pub(crate) fn turned_off_enable(field: &str, switch: &str) -> String {
+/// Why Enable is not offered for an Entry Disabled by `field = false` at
+/// `switch` in the server its Agent builds: that file is git-versioned when
+/// `versioned`, or else in a layer config-digger only reads.
+pub(crate) fn turned_off_enable(field: &str, switch: &str, versioned: bool) -> String {
+    let file = if versioned {
+        "a git-versioned file, where a change reaches every clone"
+    } else {
+        "a file config-digger only reads"
+    };
     format!(
-        "Enable is not offered: config-digger does not write `{field}` of a merged server; change it at {switch} by hand."
+        "Enable is not offered: `{field} = false` at {switch} is in {file}; change it there by hand."
     )
 }
 

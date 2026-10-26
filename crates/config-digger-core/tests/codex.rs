@@ -776,8 +776,10 @@ fn the_server_codex_builds_keeps_the_secrets_of_its_entries_masked() {
     );
 }
 
+// Enable lifts the user's `enabled = false` from the user's Entry, as
+// Disable writes it, never from one config-digger only reads.
 #[test]
-fn enable_of_an_entry_a_merged_field_turns_off_is_refused_with_why() {
+fn enable_of_a_managed_entry_a_merged_field_turns_off_is_refused_with_why() {
     use config_digger_core::api::{Action, Targets};
     let fs = FakeFileSystem::new()
         .with_file(
@@ -797,10 +799,10 @@ fn enable_of_an_entry_a_merged_field_turns_off_is_refused_with_why() {
             all: false,
         },
     ) else {
-        panic!("an Enable Codex's own field holds back is planned");
+        panic!("an Enable of a managed Entry is planned");
     };
 
-    assert!(error.message.contains("`enabled`"), "{}", error.message);
+    assert!(error.message.contains("only reads"), "{}", error.message);
 }
 
 #[test]

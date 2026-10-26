@@ -682,6 +682,17 @@ pub(crate) fn resolve(
                         None => (api::State::Effective, None),
                     };
                     let off = merged.as_ref().and_then(Merged::off);
+                    // The `false` values of that field Enable deletes, or
+                    // why it is not offered.
+                    let (deleted, turned_off) = if off.is_some() && state == api::State::Disabled {
+                        let project = project_key.map(String::as_str);
+                        match disable::deleted_by_enable(definition, snapshot, entry, project) {
+                            Ok(deleted) => (deleted, None),
+                            Err(sentence) => (Vec::new(), Some(sentence)),
+                        }
+                    } else {
+                        (Vec::new(), None)
+                    };
                     // The State it would have once what sets its State is
                     // lifted. Enable lifts every switch that Disables it, and
                     // with them those of the Entries they Disable too.
@@ -703,7 +714,7 @@ pub(crate) fn resolve(
                             let render = |next: api::State, shadowed_by: Option<(&str, &str)>| {
                                 if state == api::State::Disabled
                                     && by_rule.is_empty()
-                                    && off.is_none()
+                                    && (off.is_none() || !deleted.is_empty())
                                 {
                                     explain::what_if(next, shadowed_by)
                                 } else {
@@ -798,10 +809,6 @@ pub(crate) fn resolve(
                                 mirror.source_folder.as_deref(),
                             )
                         });
-                    let turned_off = off
-                        .as_ref()
-                        .filter(|_| state == api::State::Disabled)
-                        .map(|off| explain::turned_off_enable(&off.field, &off.switch));
                     // What managed policy turns off, Enable never lifts.
                     let by_policy = !by_policy.is_empty();
                     let enable = match mirrored
@@ -813,6 +820,14 @@ pub(crate) fn resolve(
                         None => {
                             let unparks = parked[index]
                                 .map(|parked| explain::enable_unparks(&entry.name, &parked.origin));
+                            let deletes = deleted.iter().map(|field| {
+                                explain::enable_switch(
+                                    &[field.edit()],
+                                    &entry.name,
+                                    &field.path,
+                                    false,
+                                )
+                            });
                             let lifts = (!disabling.is_empty())
                                 .then(|| disable::enable(location, disabling))
                                 .transpose();
@@ -820,7 +835,7 @@ pub(crate) fn resolve(
                                 Err(sentence) => Some(api::EnableOption::NotOffered { sentence }),
                                 Ok(lifts) => {
                                     let sentences: Vec<String> =
-                                        unparks.into_iter().chain(lifts).collect();
+                                        unparks.into_iter().chain(deletes).chain(lifts).collect();
                                     (!sentences.is_empty()).then(|| api::EnableOption::Offered {
                                         sentence: sentences.join(" "),
                                     })

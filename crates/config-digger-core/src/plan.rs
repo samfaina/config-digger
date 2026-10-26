@@ -817,7 +817,17 @@ impl Targeted<'_> {
                     }
                     let parked = self.snapshot.parked_of(scanned);
                     let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
-                    if disabling.is_empty() && parked.is_none() {
+                    // A field that turns the built server off, for an Entry
+                    // it Disables rather than one a gate Blocks first.
+                    let deleted = if entry.state == State::Disabled {
+                        disable::deleted_by_enable(definition, self.snapshot, scanned, project)
+                            .map_err(|sentence| {
+                                Error::blocked(explain::enable_refused(&entry.locator, &sentence))
+                            })?
+                    } else {
+                        Vec::new()
+                    };
+                    if disabling.is_empty() && parked.is_none() && deleted.is_empty() {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
                     // Every layer's switch, or a later one would Disable it again.
@@ -840,6 +850,16 @@ impl Targeted<'_> {
                             scanned,
                             git_asks,
                         )?;
+                    }
+                    for field in deleted {
+                        // Entries of one server share its field.
+                        let edit = field.edit();
+                        let shared = by_file
+                            .iter()
+                            .any(|file| file.path == field.path && file.edits.contains(&edit));
+                        if !shared {
+                            add_switch_edit(&mut by_file, field.path, field.syntax, false, edit);
+                        }
                     }
                     for hit in lifts {
                         // Entries Disabled by one name share its switch.
