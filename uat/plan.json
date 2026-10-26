@@ -2401,8 +2401,13 @@
         {
           "id": "11.11",
           "title": "Filtrar History",
-          "goal": "History filtra sus Operations por verbo, por estado y por texto en los nombres de sus Entries, y dice cuántas deja de cuántas.",
+          "goal": "History filtra sus Operations por verbo, por estado y por texto en los nombres de sus Entries, y dice cuántas deja de cuántas: Needs attention deja solo las que necesitan recuperación a mano.",
           "instructions": [
+            "Cierra config-digger con la X de la ventana.",
+            "Ejecuta la orden: marca la Operation más nueva, el Enable del paso 11.10, como si necesitara recuperación a mano, y escribe su id.",
+            "Si la orden dice «is not the applied Enable 1 Entry of step 11.10», marca el paso como Blocked.",
+            "Apunta el id que escribe.",
+            "Abre config-digger.",
             "Ve a History.",
             "Apunta el número N del título «N Operations».",
             "En el desplegable Any verb, encima de la lista, elige Enable.",
@@ -2422,24 +2427,40 @@
             "Mira States changed en el detalle de cada una.",
             "Borra la caja.",
             "Escribe cd-throwaway-nada en la caja.",
-            "Pulsa Clear filter."
+            "Pulsa Clear filter.",
+            "Elige la fila «Enable 1 Entry» del id que apuntaste.",
+            "Pulsa Dismiss.",
+            "Mira su etiqueta.",
+            "Vuelve al Inventario."
           ],
-          "commands": [],
+          "commands": [
+            {
+              "label": "Marcar la Operation más nueva como que necesita atención",
+              "shell": "powershell",
+              "text": "$op = Get-ChildItem \"$env:LOCALAPPDATA\\config-digger\\backups\" -Directory | Sort-Object Name | Select-Object -Last 1; $file = Join-Path $op.FullName manifest.json; $text = [IO.File]::ReadAllText($file); if (-not ($text.Contains('\"title\": \"Enable 1 Entry\",') -and $text.Contains('\"status\": \"applied\",'))) { throw \"The newest Operation, $($op.Name), is not the applied Enable 1 Entry of step 11.10.\" }; [IO.File]::WriteAllText($file, $text.Replace('\"status\": \"applied\",', '\"status\": \"needs_attention\",')); $op.Name"
+            }
+          ],
           "expect": [
             "Con Enable, el título dice «M of N Operations», con M menor que N.",
-            "Con Enable, solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10.",
+            "Con Enable, solo salen filas cuyo título es «Enable 1 Entry», sea cual sea su etiqueta, entre ellas la del id que apuntaste.",
             "Con Undo, solo salen filas cuyo título empieza por «Undo», con la etiqueta «Undo of <id>».",
             "Con Undone, solo salen filas cuya etiqueta incluye «undone by <id>», con mayúscula o sin ella.",
+            "Con Undone, no sale la Operation del id que apuntaste.",
             "Con Failed, solo salen filas con la etiqueta «Failed, rolled back» o «Rollback incomplete, dismissed», entre ellas la del paso 11.5.",
-            "Con Needs attention, la lista dice «No Operation matches the filter.», porque la del paso 11.6 se descartó.",
+            "Con Failed, no sale la Operation del id que apuntaste, que necesita atención pero no ha fallado.",
+            "Con Needs attention, sale la Operation del id que apuntaste, «Enable 1 Entry», con la etiqueta «Needs attention».",
+            "Con Needs attention, todas las filas tienen la etiqueta «Needs attention».",
+            "Con Needs attention, no sale la Operation del paso 11.6, que ya dice «Rollback incomplete, dismissed».",
             "Con CODEX, cada fila elegida tiene «ENTRY cd-throwaway-codex» en «States changed».",
             "Con CODEX, no sale el Disable de cd-throwaway-user del paso 7.3.",
             "Con cd-throwaway-nada, la lista dice «No Operation matches the filter.», con el botón «Clear filter».",
             "Con cd-throwaway-nada, el título dice «0 of N Operations».",
             "Tras Clear filter, la caja está vacía y los desplegables dicen «Any verb» y «Any status».",
-            "Tras Clear filter, el título vuelve a «N Operations»."
+            "Tras Clear filter, el título vuelve a «N Operations».",
+            "Tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed».",
+            "Tras Dismiss, la barra roja ya no está en el Inventario."
           ],
-          "covers": ["#228"]
+          "covers": ["#228", "#262"]
         },
         {
           "id": "11.12",
