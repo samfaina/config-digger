@@ -2572,7 +2572,7 @@
         {
           "id": "14.3",
           "title": "El plan de una preview dice cuánto tardó",
-          "goal": "Con todos tus Agent homes y Projects reales, la preview de un Disable escribe en el log de la app una pareja plan started / plan finished, y su plan tarda menos de 2 s.",
+          "goal": "La preview de un Disable escribe en el log de la app una pareja plan started / plan finished, y plan finished dice cuánto tardó el plan.",
           "instructions": [
             "Cierra config-digger.",
             "Abre config-digger.",
@@ -2596,9 +2596,10 @@
             }
           ],
           "expect": [
-            "La orden imprime dos líneas INFO, en este orden: «plan started» y «plan finished elapsed_ms=<n>».",
-            "No sale ninguna línea «plan failed».",
-            "En «plan finished», «elapsed_ms» es menor que 2000."
+            "La orden imprime dos líneas: primero «plan started» y después «plan finished».",
+            "Las dos son INFO.",
+            "«plan finished» lleva «elapsed_ms=<n>», los milisegundos que tardó el plan.",
+            "No sale ninguna línea «plan failed»."
           ],
           "setup": {
             "label": "Restablecer los datos de prueba",

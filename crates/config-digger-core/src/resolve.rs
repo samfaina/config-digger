@@ -39,11 +39,11 @@ pub(crate) fn resolve(
                     .any(|installation| installation.out_of_range),
                 installations,
                 last_ran: home.last_ran.version().map(str::to_owned),
-                entries: count_entries(snapshot, |entry| {
+                entries: count_entries(snapshot.entries.iter().filter(|entry| {
                     entry.agent_index == home.agent_index
                         && entry.home == home.home
                         && entry.project.is_none()
-                }),
+                })),
                 notes,
                 agent: definition.agent.id.clone(),
                 agent_name: definition.agent.name.clone(),
@@ -84,15 +84,11 @@ pub(crate) fn resolve(
         })
         .collect();
 
-    // The distinct Entries of each Project, by its key, as `count_entries`
-    // counts them.
-    let mut by_project: BTreeMap<&str, BTreeSet<(&PathBuf, &Vec<String>)>> = BTreeMap::new();
+    // The Entries of each Project, by its key.
+    let mut by_project: BTreeMap<&str, Vec<&ScannedEntry>> = BTreeMap::new();
     for entry in &snapshot.entries {
         if let Some(key) = &entry.project {
-            by_project
-                .entry(key)
-                .or_default()
-                .insert((&entry.path, &entry.key_path));
+            by_project.entry(key).or_default().push(entry);
         }
     }
     let projects = snapshot
@@ -110,9 +106,9 @@ pub(crate) fn resolve(
                 .collect(),
             added: project.added,
             hidden: project.hidden,
-            entries: by_project.get(project.key.as_str()).map_or(0, |entries| {
-                u32::try_from(entries.len()).unwrap_or(u32::MAX)
-            }),
+            entries: by_project
+                .get(project.key.as_str())
+                .map_or(0, |entries| count_entries(entries.iter().copied())),
             last_opened: project
                 .last_opened
                 .iter()
@@ -1123,13 +1119,10 @@ pub(crate) fn stranded(definitions: &[AgentDefinition], snapshot: &Snapshot) -> 
     stranded
 }
 
-/// How many distinct Entries `counted` keeps: one an Agent home of each of
+/// How many distinct Entries `entries` holds: one an Agent home of each of
 /// several Agents reads counts once.
-fn count_entries(snapshot: &Snapshot, counted: impl Fn(&ScannedEntry) -> bool) -> u32 {
-    let entries = snapshot
-        .entries
-        .iter()
-        .filter(|entry| counted(entry))
+fn count_entries<'s>(entries: impl Iterator<Item = &'s ScannedEntry>) -> u32 {
+    let entries = entries
         .map(|entry| (&entry.path, &entry.key_path))
         .collect::<BTreeSet<_>>();
     u32::try_from(entries.len()).unwrap_or(u32::MAX)

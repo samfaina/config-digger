@@ -1471,13 +1471,11 @@ fn plan_lines(run: &Run) -> Vec<&str> {
         .collect()
 }
 
-#[test]
-fn a_disable_preview_logs_its_plan_started_then_finished_with_its_time() {
-    let run =
-        with_three_gemini_projects().run(&["disable", "notes", "--no-project", "--dry-run", "-v"]);
-
+/// Checks that a run succeeded and logged one plan, started at INFO and
+/// finished at INFO with its time.
+fn assert_one_finished_plan(run: &Run) {
     assert_eq!(run.code, 0, "{}", run.stderr);
-    let lines = plan_lines(&run);
+    let lines = plan_lines(run);
     assert_eq!(lines.len(), 2, "{}", run.stderr);
     assert!(lines[0].contains(" INFO "), "{}", lines[0]);
     assert!(lines[0].contains("plan started"), "{}", run.stderr);
@@ -1486,8 +1484,8 @@ fn a_disable_preview_logs_its_plan_started_then_finished_with_its_time() {
     assert!(lines[1].contains("elapsed_ms="), "{}", lines[1]);
 }
 
-#[test]
-fn a_refused_disable_preview_logs_its_plan_as_failed_with_its_time_and_the_error() {
+/// [`with_three_gemini_projects`], with the user's `notes` Disabled.
+fn with_notes_disabled() -> Harness {
     let harness = with_three_gemini_projects();
     let disabled = harness.run(&[
         "disable",
@@ -1498,6 +1496,20 @@ fn a_refused_disable_preview_logs_its_plan_as_failed_with_its_time_and_the_error
         "wide-reach",
     ]);
     assert_eq!(disabled.code, 0, "{}", disabled.stderr);
+    harness
+}
+
+#[test]
+fn a_disable_preview_logs_its_plan_started_then_finished_with_its_time() {
+    let run =
+        with_three_gemini_projects().run(&["disable", "notes", "--no-project", "--dry-run", "-v"]);
+
+    assert_one_finished_plan(&run);
+}
+
+#[test]
+fn a_refused_disable_preview_logs_its_plan_as_failed_with_its_time_and_the_error() {
+    let harness = with_notes_disabled();
 
     let run = harness.run(&[
         "disable",
@@ -1524,13 +1536,14 @@ fn a_refused_disable_preview_logs_its_plan_as_failed_with_its_time_and_the_error
 }
 
 #[test]
-fn the_previews_of_a_remove_an_undo_and_a_delete_backup_each_log_one_finished_plan() {
+fn the_previews_of_an_enable_a_remove_an_undo_and_a_delete_backup_each_log_one_finished_plan() {
     let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
     let removed = harness.removed("linear");
     let missing = with_missing_projects();
     let gone = missing.cwd().join("gone").display().to_string();
 
     let runs = [
+        with_notes_disabled().run(&["enable", "notes", "--no-project", "--dry-run", "-v"]),
         harness.run(&["remove", "notes", "--no-project", "--dry-run", "-v"]),
         harness.run(&["undo", &removed, "--dry-run", "-v"]),
         harness.run(&["history", "delete-backup", &removed, "--dry-run", "-v"]),
@@ -1545,13 +1558,7 @@ fn the_previews_of_a_remove_an_undo_and_a_delete_backup_each_log_one_finished_pl
     ];
 
     for run in &runs {
-        assert_eq!(run.code, 0, "{}", run.stderr);
-        let lines = plan_lines(run);
-        assert_eq!(lines.len(), 2, "{}", run.stderr);
-        assert!(lines[0].contains("plan started"), "{}", run.stderr);
-        assert!(lines[1].contains(" INFO "), "{}", lines[1]);
-        assert!(lines[1].contains("plan finished"), "{}", run.stderr);
-        assert!(lines[1].contains("elapsed_ms="), "{}", lines[1]);
+        assert_one_finished_plan(run);
     }
 }
 
