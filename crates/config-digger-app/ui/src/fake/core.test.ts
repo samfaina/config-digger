@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { commands } from "../bindings";
 import { fixtures } from "./fixtures";
 
@@ -114,5 +114,56 @@ describe("the fake backend", () => {
     expect(opened).toMatchObject({ status: "error", error: { code: "unexpected" } });
     expect(about.status).toBe("error");
     expect(ok(await commands.readHistory())).toEqual(fixtures.history);
+  });
+
+  describe("with the page's `delay` parameter", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** Whether `answer` has settled after `ms` of the fake clock. */
+    async function settledAfter(answer: Promise<unknown>, ms: number): Promise<boolean> {
+      let settled = false;
+      answer.then(
+        () => (settled = true),
+        () => (settled = true),
+      );
+      await vi.advanceTimersByTimeAsync(ms);
+      return settled;
+    }
+
+    test("holds the answer of each command it names for its milliseconds", async () => {
+      vi.stubGlobal("location", { search: "?delay=read_history:2000,read_about:500" });
+
+      const history = commands.readHistory();
+
+      expect(await settledAfter(history, 1999)).toBe(false);
+      expect(await settledAfter(history, 1)).toBe(true);
+      expect(ok(await history)).toEqual(fixtures.history);
+    });
+
+    test("answers the error the `fail` parameter asks for after the delay", async () => {
+      vi.stubGlobal("location", { search: "?fail=read_about&delay=read_about:500" });
+
+      const about = commands.readAbout();
+
+      expect(await settledAfter(about, 499)).toBe(false);
+      expect(await settledAfter(about, 1)).toBe(true);
+      expect(await about).toMatchObject({ status: "error", error: { code: "unexpected" } });
+    });
+
+    test("answers a command it does not name at once", async () => {
+      vi.stubGlobal("location", { search: "?delay=read_about:500" });
+
+      expect(await settledAfter(commands.readHistory(), 0)).toBe(true);
+    });
+
+    test.each(["read_history", "read_history:", "read_history:2s", "read_history:1.5", "read_history:-5"])(
+      "throws an error naming the malformed entry %s",
+      async (entry) => {
+        vi.stubGlobal("location", { search: `?delay=read_about:500,${entry}` });
+
+        await expect(commands.readHistory()).rejects.toThrow(`«${entry}»`);
+      },
+    );
   });
 });
