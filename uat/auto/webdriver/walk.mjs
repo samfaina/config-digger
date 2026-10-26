@@ -14,7 +14,7 @@
 //
 //   node uat/auto/webdriver/walk.mjs --app <config-digger-app.exe> --driver <msedgedriver.exe>
 //        --profile <…\cd-throwaway-profile> --out <results.json> --shots <dir> [--only 10.1,10.2] [--attach <session>]
-//        [--ci --evidence <run URL> --summary <file>]
+//        [--ci --evidence <run URL> --summary <file>] [--debug-port 9222]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -40,6 +40,9 @@ const { values: opt } = parseArgs({
     attach: { type: "string" },
     root: { type: "string", default: "E:\\cd-throwaway" },
     port: { type: "string", default: "4444" },
+    // With a port, the walk starts the app itself and msedgedriver attaches
+    // to its WebView2 on that port, as an elevated app needs (driver.mjs).
+    "debug-port": { type: "string" },
     // The version under test, as the app's executable reports it.
     version: { type: "string" },
     // CI mode: no screenshot at all, results with `by: "ci"` and the run's
@@ -97,6 +100,7 @@ function realData() {
 const before = realData();
 
 const port = Number(opt.port);
+const debugPort = opt["debug-port"] ? Number(opt["debug-port"]) : undefined;
 let driver;
 let s;
 // A session that does not open leaves every step Blocked, in the results all
@@ -106,7 +110,7 @@ if (opt.attach) s = Session.attach(opt.attach, port);
 else {
   try {
     driver = await startTauriDriver({ nativeDriver: opt.driver, env, port });
-    s = await Session.open({ app: opt.app, port });
+    s = await Session.open({ app: opt.app, port, env, debugPort });
   } catch (e) {
     unopened = e;
   }
@@ -159,8 +163,9 @@ const ctx = {
   // and the Start menu: the session ends and a new one starts.
   async restart() {
     await s.close().catch(() => {});
-    const next = await Session.open({ app: opt.app, port });
+    const next = await Session.open({ app: opt.app, port, env, debugPort });
     s.id = next.id;
+    s.app = next.app;
   },
 };
 

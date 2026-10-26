@@ -64,12 +64,52 @@ export class Session {
     this.id = id;
   }
 
-  static async open({ app, port = 4444 }) {
+  // msedgedriver hands the app's WebView2 its debugging port and its user data
+  // folder, where it then reads DevToolsActivePort, in WEBVIEW2_* variables.
+  // An elevated app, as on a CI runner, ignores them, so the session fails
+  // with "DevToolsActivePort file doesn't exist". With `debugPort` the walk
+  // starts the app itself, with the port in the variable, which a
+  // non-elevated app takes, and in the HKLM policy run.ps1 sets, which an
+  // elevated app takes; msedgedriver then attaches to that port.
+  static async open({ app, port = 4444, env, debugPort }) {
     const base = `http://127.0.0.1:${port}`;
-    const value = await call(base, "POST", "/session", {
-      capabilities: { alwaysMatch: { "tauri:options": { application: app } } },
+    if (!debugPort) {
+      const value = await call(base, "POST", "/session", {
+        capabilities: { alwaysMatch: { "tauri:options": { application: app } } },
+      });
+      return new Session(base, value.sessionId);
+    }
+    const debug = `http://127.0.0.1:${debugPort}/json/version`;
+    // The port of an app just closed may still answer for a moment.
+    await until(async () => !(await answers(debug)), 15000, `the debugging port ${debugPort} to close`);
+    const child = spawn(app, [], {
+      env: { ...process.env, ...env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}` },
+      stdio: "ignore",
     });
-    return new Session(base, value.sessionId);
+    let failed;
+    child.once("error", (e) => (failed = e));
+    try {
+      await until(
+        async () => {
+          if (failed) throw new Error(`the app did not start: ${failed.message}`);
+          if (child.exitCode !== null) throw new Error(`the app stopped with exit code ${child.exitCode}`);
+          return answers(debug);
+        },
+        60000,
+        `the app's WebView2 to open its debugging port ${debugPort}`,
+      );
+      const value = await call(base, "POST", "/session", {
+        capabilities: {
+          alwaysMatch: { browserName: "webview2", "ms:edgeChromium": true, "ms:edgeOptions": { debuggerAddress: `127.0.0.1:${debugPort}` } },
+        },
+      });
+      const session = new Session(base, value.sessionId);
+      session.app = child;
+      return session;
+    } catch (e) {
+      await stop(child);
+      throw e;
+    }
   }
 
   static attach(id, port = 4444) {
@@ -80,8 +120,14 @@ export class Session {
     return call(this.base, method, `/session/${this.id}${path}`, body);
   }
 
-  close() {
-    return this.cmd("DELETE", "");
+  // Ends the session and, with the app the walk started, closes the app, as
+  // msedgedriver does with the one it starts.
+  async close() {
+    try {
+      await this.cmd("DELETE", "");
+    } finally {
+      if (this.app) await stop(this.app);
+    }
   }
 
   // Runs `script` in the page. `args` reach it as `arguments`; pass an
@@ -300,6 +346,32 @@ export const ref = (el) => ({ [ELEMENT]: el });
 
 // The element a script returned, as `find` gives it, or null.
 export const unwrap = (value) => (value ? value[ELEMENT] : null);
+
+// Whether `url` answers with a 2xx.
+async function answers(url) {
+  try {
+    return (await fetch(url, { signal: AbortSignal.timeout(2000) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+// Waits until `probe` returns something truthy; a throw ends the wait.
+async function until(probe, timeout, what) {
+  const end = Date.now() + timeout;
+  while (!(await probe())) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await sleep(200);
+  }
+}
+
+// Stops a process the walk started and waits until it has gone.
+async function stop(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const gone = new Promise((resolve) => child.once("exit", resolve));
+  child.kill();
+  await gone;
+}
 
 async function call(base, method, path, body) {
   const res = await fetch(base + path, {

@@ -65,23 +65,26 @@ if ($Ci) { $arguments += @("--ci", "--evidence", $Evidence) } else { $arguments 
 if ($Summary) { $arguments += @("--summary", $Summary) }
 if ($Only) { $arguments += @("--only", $Only) }
 
-# msedgedriver hands WebView2 its switches, the debugging port among them, in
-# WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS. An elevated app ignores that variable,
-# and a CI runner runs elevated, so the port never opens and the session fails
-# with "DevToolsActivePort file doesn't exist". An elevated app honours the
-# HKLM policy: while the walk runs, it holds the same switches for the app's
-# executable alone, and what was there before is put back.
+# msedgedriver hands WebView2 its switches, the debugging port among them,
+# and the user data folder where it reads DevToolsActivePort, in WEBVIEW2_*
+# variables. An elevated app ignores them, and a CI runner runs elevated, so
+# the session would fail with "DevToolsActivePort file doesn't exist". An
+# elevated app honours the HKLM policy: while the walk runs, it holds the
+# switches msedgedriver 155 sets, with a fixed debugging port, for the app's
+# executable alone, and what was there before is put back. The walk starts
+# the app itself and msedgedriver attaches to that port (driver.mjs).
 $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $policy = "HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
 $exe = Split-Path $App -Leaf
 $previous = $null
 if ($elevated) {
+    $debugPort = 9222
     if (-not (Test-Path $policy)) { New-Item $policy -Force | Out-Null }
     $previous = (Get-ItemProperty $policy -Name $exe -ErrorAction SilentlyContinue).$exe
-    # The switches msedgedriver 155 sets in the variable.
-    $switches = "--allow-pre-commit-input --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-client-side-phishing-detection --disable-default-apps --disable-features=IgnoreDuplicateNavs,Prewarm --disable-hang-monitor --disable-popup-blocking --disable-prompt-on-repost --disable-sync --enable-automation --enable-logging --log-level=0 --no-first-run --no-service-autorun --password-store=basic --remote-debugging-port=0 --test-type=webdriver --use-mock-keychain"
+    $switches = "--allow-pre-commit-input --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-client-side-phishing-detection --disable-default-apps --disable-features=IgnoreDuplicateNavs,Prewarm --disable-hang-monitor --disable-popup-blocking --disable-prompt-on-repost --disable-sync --enable-automation --enable-logging --log-level=0 --no-first-run --no-service-autorun --password-store=basic --remote-debugging-port=$debugPort --test-type=webdriver --use-mock-keychain"
     New-ItemProperty $policy -Name $exe -Value $switches -PropertyType String -Force | Out-Null
-    Write-Output "Elevated: the WebView2 switches are in the HKLM policy for $exe while the walk runs"
+    $arguments += @("--debug-port", $debugPort)
+    Write-Output "Elevated: the WebView2 switches are in the HKLM policy for $exe while the walk runs, with the debugging port $debugPort"
 }
 try {
     node @arguments

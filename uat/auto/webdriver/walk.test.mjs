@@ -452,3 +452,7 @@ test("on CI, a session that does not open still writes uat-results.json and the 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("with a debugging port, a session whose app does not start fails saying so", async () => {
+  await assert.rejects(Session.open({ app: join(tmpdir(), "no-such-config-digger-app.exe"), port: 4481, env: {}, debugPort: 4480 }), /the app did not start/);
+});
