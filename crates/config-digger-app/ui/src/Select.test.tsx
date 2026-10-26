@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { DropdownOption } from "./dropdown";
 import { Select } from "./Select";
 
@@ -158,24 +158,31 @@ describe("a Select with a text box in its panel", () => {
 
   describe("where, as in a real browser, a hidden element can't take the focus", () => {
     // happy-dom ignores visibility, so a focus() under `visibility: hidden` would land where WebView2 drops it.
-    const focus = HTMLElement.prototype.focus;
+    // Select hides its unplaced panel by an inline style, the only one this reads.
     beforeEach(() => {
-      HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+      const focus = HTMLElement.prototype.focus;
+      vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
         for (let at: HTMLElement | null = this; at; at = at.parentElement) {
           if (at.style.visibility === "hidden") return;
         }
         focus.call(this, options);
-      };
+      });
     });
     afterEach(() => {
-      HTMLElement.prototype.focus = focus;
+      vi.restoreAllMocks();
     });
+
+    /** Opens the panel from the keyboard: Tab to the field, then `keys`. */
+    const byKeys = (keys: string) => async (user: UserEvent) => {
+      await user.tab();
+      await user.keyboard(keys);
+    };
 
     test.each([
       ["a click", (user: UserEvent, field: HTMLElement) => user.click(field)],
-      ["Alt+Down", async (user: UserEvent) => (await user.tab(), user.keyboard("{Alt>}{ArrowDown}{/Alt}"))],
-      ["Space", async (user: UserEvent) => (await user.tab(), user.keyboard(" "))],
-      ["Enter", async (user: UserEvent) => (await user.tab(), user.keyboard("{Enter}"))],
+      ["Alt+Down", byKeys("{Alt>}{ArrowDown}{/Alt}")],
+      ["Space", byKeys(" ")],
+      ["Enter", byKeys("{Enter}")],
     ])("puts the focus in the text box once the panel opened by %s shows, and narrows the options as the user types", async (_, open) => {
       const { user, field } = renderField({ searchLabel: "Find a Project" });
       await open(user, field);
@@ -189,12 +196,15 @@ describe("a Select with a text box in its panel", () => {
     });
   });
 
-  test("gives the focus to its text box once per opening, so a render while the panel stays open leaves it where it is", async () => {
+  test("gives the focus to its text box once per opening, so a key on the field while the panel stays open leaves it there", async () => {
     const { user, field } = renderField({ searchLabel: "Find a Project" });
     await user.click(field);
     act(() => field.focus());
     await user.keyboard("{ArrowDown}");
     expect(field.getAttribute("aria-activedescendant")).toBe(optionId("Beta"));
+    expect(document.activeElement).toBe(field);
+    await user.keyboard("g");
+    expect(field.getAttribute("aria-activedescendant")).toBe(optionId("Gamma"));
     expect(document.activeElement).toBe(field);
   });
 

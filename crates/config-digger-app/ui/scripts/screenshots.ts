@@ -52,7 +52,7 @@ const SHOTS: Shot[] = [
     steps: async (page) => {
       await page.getByRole("combobox", { name: "Project" }).click();
       await page.getByRole("listbox").waitFor();
-      // Typed where the focus is, as a user does: fill() would put it in the box, and hide a box the panel left without it.
+      // Typed where the focus is, as a user does: fill() focuses the box itself, so the shot would hide a panel that opens without it.
       await page.keyboard.type("project");
     },
   },
