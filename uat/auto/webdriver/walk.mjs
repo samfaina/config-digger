@@ -170,7 +170,7 @@ const ctx = {
 };
 
 if (unopened) {
-  for (const id of ids) save(unwalkedStep(ctx, runners.get(id), unopened.message, { ci }));
+  for (const id of ids) save(unwalkedStep(ctx, planSteps.get(id), unopened.message, { ci }));
 } else {
   for (const id of ids) {
     const started = Date.now();

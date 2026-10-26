@@ -77,7 +77,6 @@ const fades = (frames) => frames.length >= 2 && Number(frames[0].opacity ?? 1) !
 export default [
   {
     id: "5.1",
-    manual: "Que el aviso entre y se vaya sin saltos: las pruebas miran su duración y sus fotogramas, no cómo se ve moverse.",
     async run(t) {
       const { s } = t;
       const button = await copyPath(t);

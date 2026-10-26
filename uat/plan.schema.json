@@ -85,6 +85,37 @@
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "automation": {
+          "description": "The tools that walk the step without a tester. A step with automation and no manual is out of the tester's queue in the runner.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/automation" }
+        },
+        "manual": {
+          "description": "What a person still checks on the step, and why no tool can. A step with manual stays in the tester's queue, whatever its automation. The WebDriver walk adds it to its notes.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "where", "test"],
+      "properties": {
+        "tool": {
+          "description": "What walks the step: the fake UI's tests (fake-ui), the WebDriver walk (webdriver), the Windows Sandbox walk (sandbox), the local script (local), a CLI test (cli), a screenshot compared with its reference (visual), or the agent that judges the local walk's screenshots (agent-judge).",
+          "enum": ["fake-ui", "webdriver", "sandbox", "local", "cli", "visual", "agent-judge"]
+        },
+        "where": {
+          "description": "Where the tool runs: on CI (ci), or on a tester's or an agent's PC (local).",
+          "enum": ["ci", "local"]
+        },
+        "test": {
+          "description": "The check that covers the step. For webdriver and sandbox, \"<file from the repo root> > <step id>\": the step module in uat/auto/webdriver/steps/, or the Step block, or the verdict run.ps1 writes itself, in uat/auto/sandbox/, such as \"uat/auto/webdriver/steps/notices.mjs > 5.1\". For visual, a shot name of SHOTS in crates/config-digger-app/ui/scripts/screenshots.ts, such as \"inventory\".",
+          "type": "string",
+          "minLength": 1
         }
       }
     },

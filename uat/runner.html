@@ -108,6 +108,13 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, .step-link:fo
 .chip.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
 .chip.ko { color: var(--ko); background: var(--ko-bg); border-color: transparent; }
 .chip.blocked { color: var(--blocked); background: var(--blocked-bg); border-color: transparent; }
+/* What wrote a tool's verdict, and a step a tool walks: outlined, so they
+   read apart from a verdict. */
+.chip.by, .chip.auto { color: var(--accent); border-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.counts .unrun { color: var(--blocked); font-weight: 600; }
+.run-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#review[aria-pressed="true"] { border-color: var(--accent); }
 
 .step {
   background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
@@ -168,6 +175,9 @@ textarea {
 .nav { display: flex; justify-content: space-between; gap: 8px; }
 .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .export { display: grid; gap: 8px; }
+.review-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 24px; }
+.review-item { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+.judge-notes { white-space: pre-wrap; }
 .export textarea { font-family: var(--font-mono); font-size: 0.8rem; min-height: 120px; }
 @media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
 </style>
@@ -179,7 +189,10 @@ textarea {
         <h1 id="run-name">UAT de config-digger</h1>
         <p class="run-meta" id="run-meta">Cargando el plan…</p>
       </div>
-      <button type="button" id="export" class="primary" disabled>Exportar pasos con notas</button>
+      <div class="run-actions">
+        <button type="button" id="review" aria-pressed="false">Revisar KO del agente juez (0)</button>
+        <button type="button" id="export" class="primary" disabled>Exportar pasos con notas</button>
+      </div>
     </div>
     <div class="bar" role="progressbar" id="bar" aria-label="Progreso del recorrido" aria-valuemin="0" aria-valuenow="0" aria-valuemax="0">
       <span class="ok" id="bar-ok" style="width:0"></span>
@@ -212,12 +225,25 @@ const Uat = (() => {
     blocked: { label: "Bloqueado", needs: "Escribe en las notas qué lo bloquea.", save: "Guardar bloqueado" },
   };
 
-  /** The database document of a step's result. Throws when the status
-   * needs notes and there are none. */
-  function result(id, status, notes, version, now) {
+  /** What wrote a result, by its `by`: a tool's verdict names it, a
+   * tester's has no `by`. */
+  const WRITERS = { ci: "CI", local: "Local", "agent-judge": "Agente juez" };
+
+  /** The label of what wrote `result`, or null for a tester's. */
+  function byLabel(result) {
+    return WRITERS[result?.by] ?? null;
+  }
+
+  /** The database document of a tester's result, which has no `by`.
+   * Throws when the status needs notes and there are none. When `saved`,
+   * the step's stored result, is the agent judge's verdict, or a tester's
+   * that overruled it, the document keeps that verdict as `judged`. */
+  function result(id, status, notes, version, now, saved) {
     const text = notes.trim();
     if (STATUSES[status].needs && !text) throw new Error(STATUSES[status].needs);
-    return { id, status, notes: text, time: now.toISOString(), version };
+    const doc = { id, status, notes: text, time: now.toISOString(), version };
+    const judged = saved?.by === "agent-judge" ? { status: saved.status, notes: saved.notes } : saved?.judged;
+    return judged ? { ...doc, judged } : doc;
   }
 
   /** What a click on a verdict button does: `save` the status, or make it
@@ -241,24 +267,51 @@ const Uat = (() => {
     return plan.sections.flatMap((section) => section.steps);
   }
 
-  /** How many of the plan's steps have a result, in all and by status. A
-   * result whose step left the plan does not count. */
+  /** Whether a tool walks the step and leaves nothing to a person: it is
+   * out of the tester's queue, though the tester may still walk it. */
+  function automated(step) {
+    return Boolean(step.automation?.length) && !step.manual;
+  }
+
+  /** Whether the step waits in the tester's queue: not automated, and with
+   * no result yet. */
+  function queued(step, results) {
+    return !automated(step) && !results[step.id];
+  }
+
+  /** How many of the plan's steps have a result, in all and by status, and
+   * of those without one, how many are `toWalk` in the queue and how many
+   * are automated steps no tool gave a result for, `unrun`. A result whose
+   * step left the plan does not count. */
   function progress(plan, results) {
     const all = steps(plan);
     const counts = Object.fromEntries(Object.keys(STATUSES).map((status) => [status, 0]));
     for (const step of all) {
       if (results[step.id]) counts[results[step.id].status] += 1;
     }
-    return { done: all.filter((step) => results[step.id]).length, total: all.length, counts };
+    return {
+      done: all.filter((step) => results[step.id]).length,
+      total: all.length,
+      counts,
+      toWalk: all.filter((step) => queued(step, results)).length,
+      unrun: all.filter((step) => automated(step) && !results[step.id]).length,
+    };
   }
 
-  /** The step to show after `id`: the next one without a result, starting
-   * over at the top, or `id` itself once every step has one. */
+  /** The step to show after `id`: the next one in the queue, starting over
+   * at the top, or `id` itself once the queue is empty. */
   function nextStep(plan, results, id) {
     const all = steps(plan);
     const at = all.findIndex((step) => step.id === id);
     const order = [...all.slice(at + 1), ...all.slice(0, at + 1)];
-    return (order.find((step) => !results[step.id]) ?? all[at]).id;
+    return (order.find((step) => queued(step, results)) ?? all[at]).id;
+  }
+
+  /** The step to start the walk on: the first in the queue, or the plan's
+   * first once the queue is empty. */
+  function firstStep(plan, results) {
+    const all = steps(plan);
+    return (all.find((step) => queued(step, results)) ?? all[0]).id;
   }
 
   /** A table cell's text: a pipe would end the cell, a line break the row. */
@@ -267,15 +320,25 @@ const Uat = (() => {
   }
 
   /** The steps with notes as a Markdown table, in plan order, whatever
-   * their verdict: a note on an OK step may be a finding too. */
+   * their verdict: a note on an OK step may be a finding too. "Por" names
+   * what wrote a tool's verdict, and is empty for a tester's. */
   function exportMarkdown(plan, results) {
     const rows = steps(plan)
       .map((step) => [step, results[step.id]])
       .filter(([, result]) => result?.notes)
       .map(([step, result]) =>
-        `| ${step.id} | ${cell(step.title)} | ${STATUSES[result.status].label} | ${cell(result.notes)} |`);
+        `| ${step.id} | ${cell(step.title)} | ${STATUSES[result.status].label} | ${byLabel(result) ?? ""} | ${cell(result.notes)} |`);
     if (!rows.length) return "Ningún paso con notas.";
-    return ["| Paso | Título | Estado | Notas |", "| --- | --- | --- | --- |", ...rows].join("\n");
+    return ["| Paso | Título | Estado | Por | Notas |", "| --- | --- | --- | --- | --- |", ...rows].join("\n");
+  }
+
+  /** What Revisar lists: each step whose result is a KO of the agent judge,
+   * as `{ step, result }`, in plan order. A judge's OK is not listed, and a
+   * judged KO leaves once a tester saves a verdict on it. */
+  function toReview(plan, results) {
+    return steps(plan)
+      .map((step) => ({ step, result: results[step.id] }))
+      .filter(({ result }) => result?.status === "ko" && result.by === "agent-judge");
   }
 
   /** A check of a step's `expect` in parts, each `{ text, ui }`: `ui` is
@@ -288,7 +351,7 @@ const Uat = (() => {
       .filter((part) => part.ui || part.text);
   }
 
-  return { STATUSES, result, choose, look, steps, progress, nextStep, exportMarkdown, checkParts };
+  return { STATUSES, result, byLabel, choose, look, steps, automated, progress, nextStep, firstStep, exportMarkdown, toReview, checkParts };
 })();
 </script>
 <script>
@@ -303,6 +366,16 @@ const Uat = (() => {
     canWrite: false,
     saving: false,
     problem: "",
+    // The step the problem is about: the current one, or one in Revisar.
+    problemStep: null,
+    // "step" shows the current step, "review" the agent judge's KOs.
+    view: "step",
+    // The notes typed in Revisar so far, by step: a write from another tab
+    // re-renders the list.
+    reviewNotes: {},
+    // Whether the step on screen is the first one shown, so the walk may
+    // move it to the first in the queue once the results are in.
+    firstShown: false,
     // A KO or Blocked picked on the current step before its notes: chosen,
     // not stored yet.
     pending: null,
@@ -369,17 +442,37 @@ const Uat = (() => {
       : el("span", { class: "chip" }, "Pendiente");
   }
 
+  /** What wrote a tool's verdict, as a chip; nothing for a tester's. */
+  function byChip(result) {
+    const label = Uat.byLabel(result);
+    return label ? el("span", { class: "chip by", title: `Veredicto de: ${label}` }, label) : null;
+  }
+
+  /** A step's chips in the list: its verdict and what wrote it, or, for a
+   * step a tool walks that has no result yet, that it is automated. */
+  function stepChips(step) {
+    const saved = state.results[step.id];
+    if (!saved && Uat.automated(step)) return el("span", { class: "chips" }, el("span", { class: "chip auto" }, "Automático"));
+    return el("span", { class: "chips" }, byChip(saved), chip(saved?.status));
+  }
+
   function renderProgress() {
-    const { done, total, counts } = Uat.progress(state.plan, state.results);
+    const { done, total, counts, toWalk, unrun } = Uat.progress(state.plan, state.results);
     for (const status of Object.keys(Uat.STATUSES)) {
       $(`bar-${status}`).style.width = total ? `${(counts[status] / total) * 100}%` : "0";
     }
     $("bar").setAttribute("aria-valuenow", String(done));
     $("bar").setAttribute("aria-valuemax", String(total));
+    // An automated step without a result is a tool that did not run: it
+    // counts apart, so it is seen rather than dropped.
     $("counts").replaceChildren(
       el("span", {}, `${done} de ${total} pasos`),
       ...Object.entries(Uat.STATUSES).map(([status, { label }]) => el("span", {}, `${label} ${counts[status]}`)),
-      el("span", {}, `Pendientes ${total - done}`));
+      el("span", {}, `Pendientes ${toWalk}`),
+      el("span", { class: unrun ? "unrun" : "" }, `Automáticos sin resultado ${unrun}`));
+    const review = Uat.toReview(state.plan, state.results).length;
+    $("review").textContent = `Revisar KO del agente juez (${review})`;
+    $("review").setAttribute("aria-pressed", String(state.view === "review"));
   }
 
   function renderSteps() {
@@ -390,8 +483,8 @@ const Uat = (() => {
           const link = el("button", { type: "button", class: "step-link", onclick: () => show(step.id) },
             el("span", { class: "step-id" }, step.id),
             el("span", { class: "step-title" }, step.title),
-            chip(state.results[step.id]?.status));
-          if (step.id === state.current) link.setAttribute("aria-current", "step");
+            stepChips(step));
+          if (state.view === "step" && step.id === state.current) link.setAttribute("aria-current", "step");
           return el("li", {}, link);
         })))));
   }
@@ -476,14 +569,19 @@ const Uat = (() => {
     const savedLine = saved
       ? `Guardado: ${Uat.STATUSES[saved.status].label} · ${new Date(saved.time).toLocaleString("es-ES")} · versión ${saved.version}`
       : "Sin resultado todavía.";
+    const automated = Uat.automated(step);
 
     // replaceChildren would print a missing block as the text "null".
     $("step").replaceChildren(...[
       el("div", { class: "eyebrow" },
         el("span", { class: "step-id" }, `Paso ${step.id}`),
         el("span", {}, `${section.id}. ${section.title}`),
-        el("span", { class: "covers" }, ...step.covers.map((c) => el("span", { class: "chip" }, c)))),
+        el("span", { class: "covers" }, ...step.covers.map((c) => el("span", { class: "chip" }, c))),
+        automated ? el("span", { class: "chip auto" }, "Automático") : null),
       el("div", { class: "block" }, el("h2", {}, step.title), el("p", {}, step.goal)),
+      automated
+        ? el("p", { class: "notice", id: "automated-hint" }, "Este paso lo recorre una herramienta, así que no está en tu recorrido. Puedes recorrerlo igualmente: tu veredicto sustituye al suyo.")
+        : null,
       step.setup ? el("div", { class: "block setup" }, el("h3", {}, "Antes de empezar"), commandBlock(step.setup)) : null,
       el("div", { class: "block" }, el("h3", {}, "Instrucciones"),
         el("ol", { class: "instructions" }, ...step.instructions.map((line) => el("li", {}, line)))),
@@ -501,8 +599,8 @@ const Uat = (() => {
           ? el("div", { class: "pending-save" }, saveButton, missing)
           : missing,
         el("p", { class: "hint", id: "notes-hint" }, "Obligatorias en KO y Bloqueado: qué viste y qué esperabas. En OK son opcionales y también se leen: escríbelas antes de pulsar OK."),
-        state.problem ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
-        el("p", { class: "saved" }, savedLine)),
+        state.problem && state.problemStep === step.id ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
+        el("p", { class: "saved" }, savedLine, " ", byChip(saved))),
       el("div", { class: "nav" }, move("← Anterior", all[at - 1]), move("Siguiente →", all[at + 1])),
     ].filter((block) => block != null));
     if (typing) {
@@ -511,13 +609,71 @@ const Uat = (() => {
     }
   }
 
+  /** Revisar: the agent judge's KOs, each with the judge's notes, the
+   * screenshot's path to copy, and the tester's verdict, which replaces the
+   * judge's and keeps it as `judged`. */
+  function renderReview() {
+    const focused = document.activeElement?.dataset?.review;
+    const locked = !state.canWrite || state.saving;
+    const item = ({ step, result }) => {
+      const notes = el("textarea", { id: `review-notes-${step.id}`, "data-review": step.id, "aria-describedby": "review-hint" });
+      notes.value = state.reviewNotes[step.id] ?? "";
+      notes.addEventListener("input", () => { state.reviewNotes[step.id] = notes.value; });
+      const path = el("pre", {}, el("code", {}, result.evidence ?? "Sin ruta"));
+      const copyButton = el("button", { type: "button", "aria-label": `Copiar la ruta de la captura del paso ${step.id}` }, "Copiar");
+      copyButton.addEventListener("click", () => copy(result.evidence ?? "", copyButton, path));
+      copyButton.disabled = !result.evidence;
+      const verdict = (status) => {
+        const button = el("button", { type: "button", class: status }, Uat.STATUSES[status].label);
+        button.disabled = locked;
+        button.addEventListener("click", () => record(step.id, status, notes.value));
+        return button;
+      };
+      return el("li", { class: "review-item" },
+        el("div", { class: "eyebrow" },
+          el("span", { class: "step-id" }, `Paso ${step.id}`),
+          byChip(result),
+          chip(result.status)),
+        el("h2", {}, step.title),
+        el("div", { class: "block" }, el("h3", {}, "Notas del agente juez"), el("p", { class: "judge-notes" }, result.notes)),
+        el("div", { class: "block" }, el("h3", {}, "Captura, en el PC del walk local"),
+          el("div", { class: "code-row" }, path, copyButton)),
+        el("div", { class: "verdict" },
+          el("label", { for: `review-notes-${step.id}` }, "Tus notas"),
+          notes,
+          el("div", { class: "verdict-buttons" }, ...Object.keys(Uat.STATUSES).map(verdict)),
+          state.problem && state.problemStep === step.id ? el("p", { class: "problem", role: "alert" }, state.problem) : null,
+          el("div", { class: "nav" }, el("button", { type: "button", onclick: () => show(step.id) }, "Abrir el paso"))));
+    };
+    const list = Uat.toReview(state.plan, state.results);
+    $("step").replaceChildren(
+      el("div", { class: "block" },
+        el("h2", {}, "Revisar los KO del agente juez"),
+        el("p", { class: "hint", id: "review-hint" }, "El agente juez los marcó KO al mirar las capturas del walk local. Abre la captura en ese PC y guarda tu veredicto: sustituye al del juez, que queda guardado aparte. KO y Bloqueado necesitan notas.")),
+      list.length
+        ? el("ol", { class: "review-list" }, ...list.map(item))
+        : el("p", {}, "Ningún KO del agente juez por revisar."),
+      el("div", { class: "nav" }, el("button", { type: "button", onclick: () => show(state.current) }, "← Volver al paso")));
+    if (focused) $(`review-notes-${focused}`)?.focus();
+  }
+
   function render() {
     renderProgress();
     renderSteps();
-    renderStep();
+    if (state.view === "review") renderReview();
+    else renderStep();
+  }
+
+  function review() {
+    state.view = "review";
+    state.problem = "";
+    render();
+    $("step").scrollIntoView({ block: "nearest" });
   }
 
   function show(id) {
+    state.view = "step";
+    state.firstShown = false;
     state.current = id;
     state.problem = "";
     state.pending = null;
@@ -529,21 +685,27 @@ const Uat = (() => {
 
   async function record(id, status, notes) {
     let doc;
+    state.problemStep = id;
     try {
-      doc = Uat.result(id, status, notes, state.run.version, new Date());
+      doc = Uat.result(id, status, notes, state.run.version, new Date(), state.results[id]);
     } catch (error) {
       state.problem = error.message;
-      renderStep();
+      render();
       return;
     }
     state.saving = true;
     state.problem = "";
-    renderStep();
+    render();
     try {
       await state.db.collection("results").doc(id).set(doc);
       state.results = { ...state.results, [id]: doc };
       state.saving = false;
-      show(Uat.nextStep(state.plan, state.results, id));
+      if (state.view === "review") {
+        delete state.reviewNotes[id];
+        render();
+      } else {
+        show(Uat.nextStep(state.plan, state.results, id));
+      }
     } catch (error) {
       state.saving = false;
       if (error?.code === "invalid_argument") {
@@ -556,6 +718,8 @@ const Uat = (() => {
       render();
     }
   }
+
+  $("review").addEventListener("click", review);
 
   $("export").addEventListener("click", () => {
     const text = Uat.exportMarkdown(state.plan, state.results);
@@ -589,6 +753,10 @@ const Uat = (() => {
     db.collection("results").onSnapshot(
       (snap) => {
         state.results = Object.fromEntries(snap.docs.map((doc) => [doc.id, doc.data()]));
+        // A walk not started on a chosen step starts on the first step of
+        // the queue, which the results decide.
+        if (state.firstShown) state.current = Uat.firstStep(state.plan, state.results);
+        state.firstShown = false;
         // Export only once the results are in: before, it would read as a
         // run with nothing to report.
         $("export").disabled = false;
@@ -620,7 +788,8 @@ const Uat = (() => {
     $("run-meta").textContent = `${state.plan.title} · versión ${state.run.version}`;
     const ids = Uat.steps(state.plan).map((step) => step.id);
     const wanted = [location.hash.slice(1), remembered()].find((id) => ids.includes(id));
-    state.current = wanted ?? ids[0];
+    state.current = wanted ?? Uat.firstStep(state.plan, {});
+    state.firstShown = !wanted;
     render();
     connect().catch((error) => {
       notice(`No se pudo conectar con los resultados: ${error?.message ?? error}. Recarga la página.`, true);
