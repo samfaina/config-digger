@@ -12,11 +12,27 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 /// The version of every JSON document config-digger emits. It is 1 at the
 /// first release. Bump it on any breaking change to a document: a field
 /// renamed, removed or retyped. A new field is not one.
 pub const SCHEMA_VERSION: u32 = 1;
+
+/// Runs `plan`, logged with how long it took, whether it finished or
+/// failed. A failed plan is a warning: its error reaches the caller as it
+/// is.
+fn timed_plan(plan: impl FnOnce() -> Result<plan::Planned, Error>) -> Result<Plan, Error> {
+    let started = Instant::now();
+    tracing::info!("plan started");
+    let result = plan();
+    let elapsed_ms = started.elapsed().as_millis();
+    match &result {
+        Ok(_) => tracing::info!(elapsed_ms, "plan finished"),
+        Err(error) => tracing::warn!(elapsed_ms, %error, "plan failed"),
+    }
+    result.map(Plan)
+}
 
 /// The core, holding the ports and the loaded definitions.
 pub struct Core {
@@ -238,16 +254,17 @@ impl Core {
         action: Action,
         targets: &Targets,
     ) -> Result<Plan, Error> {
-        plan::plan(
-            &self.definitions,
-            &self.ports,
-            &snapshot.scanned,
-            &snapshot.options,
-            context,
-            action,
-            targets,
-        )
-        .map(Plan)
+        timed_plan(|| {
+            plan::plan(
+                &self.definitions,
+                &self.ports,
+                &snapshot.scanned,
+                &snapshot.options,
+                context,
+                action,
+                targets,
+            )
+        })
     }
 
     /// Plans the Remove of every leftover of the missing Project `project`,
@@ -260,26 +277,28 @@ impl Core {
         snapshot: &Snapshot,
         project: &Path,
     ) -> Result<Plan, Error> {
-        plan::plan_remove_leftovers(
-            &self.definitions,
-            &self.ports,
-            &snapshot.scanned,
-            &snapshot.options,
-            project,
-        )
-        .map(Plan)
+        timed_plan(|| {
+            plan::plan_remove_leftovers(
+                &self.definitions,
+                &self.ports,
+                &snapshot.scanned,
+                &snapshot.options,
+                project,
+            )
+        })
     }
 
     /// Plans the Remove of every Stranded Entry as one Operation, with no
     /// Project. It fails with `NoMatch` when none is Stranded.
     pub fn plan_remove_stranded(&self, snapshot: &Snapshot) -> Result<Plan, Error> {
-        plan::plan_remove_stranded(
-            &self.definitions,
-            &self.ports,
-            &snapshot.scanned,
-            &snapshot.options,
-        )
-        .map(Plan)
+        timed_plan(|| {
+            plan::plan_remove_stranded(
+                &self.definitions,
+                &self.ports,
+                &snapshot.scanned,
+                &snapshot.options,
+            )
+        })
     }
 
     /// Executes a plan once every warning in it is acknowledged: takes the
@@ -293,7 +312,7 @@ impl Core {
     /// edits, applied to the files as they are now, in the context it ran
     /// in. It is refused when what the Operation touched changed since.
     pub fn plan_undo(&self, id: &str) -> Result<Plan, Error> {
-        plan::plan_undo(&self.definitions, &self.ports, id).map(Plan)
+        timed_plan(|| plan::plan_undo(&self.definitions, &self.ports, id))
     }
 
     /// Plans the deletion of the backup of the Operation `id`, such as one
@@ -302,7 +321,7 @@ impl Core {
     /// needs attention, the plan warns that the backup is the only copy for
     /// manual recovery, and executing it dismisses the Operation.
     pub fn plan_delete_backup(&self, id: &str) -> Result<Plan, Error> {
-        plan::plan_delete_backup(&self.ports, id).map(Plan)
+        timed_plan(|| plan::plan_delete_backup(&self.ports, id))
     }
 
     /// Every Operation in History, newest first, across restarts.
