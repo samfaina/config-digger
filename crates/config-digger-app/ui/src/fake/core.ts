@@ -9,6 +9,9 @@
  *
  * `?fail=open_location,read_about` in the page's address makes the commands
  * it names answer an error, to show how a screen reports one.
+ * `?delay=read_inventory:2000,read_places:500` holds the answer of each
+ * command it names for that many milliseconds, then answers as usual, an
+ * error too, to show a busy state long enough to look at or test.
  */
 import type {
   About,
@@ -56,6 +59,8 @@ type Args = Record<string, unknown>;
 
 /** Tauri's `invoke`, answered from the fixtures. */
 export async function invoke<T>(command: string, args: Args = {}): Promise<T> {
+  const held = delays().get(command);
+  if (held !== undefined) await new Promise((resolve) => setTimeout(resolve, held));
   if (failing().includes(command)) {
     throw backendError(`The fake backend fails ${command}, as the page's fail parameter asks.`);
   }
@@ -128,6 +133,22 @@ function previewOf(request: ActionRequest): ActionPreview {
 function failing(): string[] {
   const search = globalThis.location?.search ?? "";
   return new URLSearchParams(search).get("fail")?.split(",") ?? [];
+}
+
+/** The milliseconds the page's `delay` parameter holds each command's answer for. */
+function delays(): Map<string, number> {
+  const search = globalThis.location?.search ?? "";
+  const entries = new URLSearchParams(search).get("delay")?.split(",") ?? [];
+  return new Map(
+    entries.map((entry) => {
+      const [, command, ms] = /^([^:]+):(\d+)$/.exec(entry) ?? [];
+      // An Error, not a CommandError, so `bindings.ts` throws it: a typo in a test fails rather than running with no delay.
+      if (command === undefined) {
+        throw new Error(`The fake backend's delay parameter has a malformed entry «${entry}»: each entry is <command>:<ms>, in whole milliseconds.`);
+      }
+      return [command, Number(ms)];
+    }),
+  );
 }
 
 function backendError(message: string): CommandError {

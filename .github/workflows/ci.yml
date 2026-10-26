@@ -52,3 +52,34 @@ jobs:
           npm ci
           npm test
           npm run build
+
+  # The UAT steps the UI on the fake backend can show, one Playwright test
+  # each, in a headless Edge. A PR that breaks one fails here, without a
+  # release build.
+  uat-fake-ui:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crates/config-digger-app/ui/package-lock.json
+      # The dev server runs cargo metadata for About's licenses while it
+      # serves the page: on a cold runner its download of the crates held
+      # the page for more than a test's 30 s.
+      - name: Fetch the crates
+        run: cargo fetch --locked --target x86_64-pc-windows-msvc
+      - name: UAT steps on the fake backend
+        working-directory: crates/config-digger-app/ui
+        run: |
+          npm ci
+          npm run uat:fake
+      # The results only: the tests take no screenshot, and the repo is public.
+      - name: Upload the UAT results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-results
+          path: crates/config-digger-app/ui/uat-results.json
+          if-no-files-found: error

@@ -7,19 +7,12 @@
  * The screenshots stay on this machine: the repo is public, so none is
  * committed or attached to a PR (see `docs/agents/screenshots.md`).
  */
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium, type Browser, type Page } from "playwright-core";
-import { createServer } from "vite";
+import type { Page } from "playwright-core";
+import { launch, serveFakeUi, SMALLEST, UI, WINDOW } from "./fakeUi.ts";
 
-const UI = fileURLToPath(new URL("..", import.meta.url));
 const OUT = join(UI, "screenshots");
-/** The app's window, as `tauri.conf.json` opens it. */
-const { width, height, minWidth, minHeight } = JSON.parse(readFileSync(join(UI, "..", "tauri.conf.json"), "utf8")).app.windows[0];
-const WINDOW: { width: number; height: number } = { width, height };
-/** The smallest window the app allows. */
-const SMALLEST: { width: number; height: number } = { width: minWidth, height: minHeight };
 
 type Shot = {
   /** The PNG's name, without its extension. */
@@ -209,23 +202,9 @@ async function settled(page: Page) {
   );
 }
 
-/** A headless Edge, or else Chrome. */
-async function launch(): Promise<Browser> {
-  for (const channel of ["msedge", "chrome"]) {
-    try {
-      return await chromium.launch({ channel, headless: true });
-    } catch {
-      // Not installed: try the next one.
-    }
-  }
-  throw new Error("Neither Edge nor Chrome is installed.");
-}
-
 async function main() {
-  const server = await createServer({ root: UI, mode: "fake", logLevel: "warn" });
-  await server.listen();
-  const url = server.resolvedUrls?.local[0];
-  if (url === undefined) throw new Error("The fake backend's dev server has no URL.");
+  const server = await serveFakeUi();
+  const { url } = server;
   const browser = await launch();
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
