@@ -8,18 +8,22 @@
 //
 // Checks that need eyes, such as a colour or a shadow, are not guessed: the
 // step takes a screenshot and lists the check under "a juzgar", for the agent
-// judge to read. Screenshots stay on this machine.
+// judge to read. Screenshots stay on this machine. With --ci the walk takes
+// none and writes only the runner's fields, `by: "ci"` and the run's URL
+// (step.mjs).
 //
 //   node uat/auto/webdriver/walk.mjs --app <config-digger-app.exe> --driver <msedgedriver.exe>
 //        --profile <…\cd-throwaway-profile> --out <results.json> --shots <dir> [--only 10.1,10.2] [--attach <session>]
+//        [--ci --evidence <run URL> --summary <file>] [--debug-port 9222]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
-import { refocus, setupSwitches, wait } from "./lib.mjs";
+import { setupSwitches } from "./lib.mjs";
+import { jobSummary, reason, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import sections from "./steps/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,16 +40,26 @@ const { values: opt } = parseArgs({
     attach: { type: "string" },
     root: { type: "string", default: "E:\\cd-throwaway" },
     port: { type: "string", default: "4444" },
+    // With a port, the walk starts the app itself and msedgedriver attaches
+    // to its WebView2 on that port, as an elevated app needs (driver.mjs).
+    "debug-port": { type: "string" },
     // The version under test, as the app's executable reports it.
     version: { type: "string" },
+    // CI mode: no screenshot at all, results with `by: "ci"` and the run's
+    // URL as `evidence`, and the job summary appended to `summary`.
+    ci: { type: "boolean", default: false },
+    evidence: { type: "string" },
+    summary: { type: "string" },
   },
 });
+if (opt.ci && !opt.evidence) throw new Error("--ci needs --evidence, the URL of the CI run");
+const ci = opt.ci ? { evidence: opt.evidence } : null;
 
 const plan = JSON.parse(readFileSync(join(repo, "uat", "plan.json"), "utf8"));
 const planSteps = new Map(plan.sections.flatMap((section) => section.steps.map((step) => [step.id, step])));
 const version = opt.version ?? JSON.parse(readFileSync(join(repo, "crates", "config-digger-app", "ui", "package.json"), "utf8")).version;
 const env = profileEnv(opt.profile);
-mkdirSync(opt.shots, { recursive: true });
+if (!ci) mkdirSync(opt.shots, { recursive: true });
 
 // The steps in the plan's order, so the state each one leaves is the state the
 // next one starts from, as in the manual walk.
@@ -86,16 +100,26 @@ function realData() {
 const before = realData();
 
 const port = Number(opt.port);
+const debugPort = opt["debug-port"] ? Number(opt["debug-port"]) : undefined;
 let driver;
 let s;
+// A session that does not open leaves every step Blocked, in the results all
+// the same, and the walk breaking.
+let unopened;
 if (opt.attach) s = Session.attach(opt.attach, port);
 else {
-  driver = await startTauriDriver({ nativeDriver: opt.driver, env, port });
-  s = await Session.open({ app: opt.app, port });
+  try {
+    driver = await startTauriDriver({ nativeDriver: opt.driver, env, port });
+    s = await Session.open({ app: opt.app, port, env, debugPort });
+  } catch (e) {
+    unopened = e;
+  }
 }
 
 const results = existsSync(opt.out) ? JSON.parse(readFileSync(opt.out, "utf8")) : [];
-const save = (result) => {
+const save = (walked) => {
+  // On CI the results are uat-results.json, which reaches a run as it is.
+  const result = ci ? resultDocument(walked) : walked;
   const at = results.findIndex((r) => r.id === result.id);
   if (at >= 0) results[at] = result;
   else results.push(result);
@@ -139,139 +163,44 @@ const ctx = {
   // and the Start menu: the session ends and a new one starts.
   async restart() {
     await s.close().catch(() => {});
-    const next = await Session.open({ app: opt.app, port });
+    const next = await Session.open({ app: opt.app, port, env, debugPort });
     s.id = next.id;
+    s.app = next.app;
   },
 };
 
-for (const id of ids) {
-  const step = planSteps.get(id);
-  const checks = [];
-  const looks = [];
-  const shots = [];
-  const findings = [];
-  const t = {
-    ...ctx,
-    step,
-    check(ok, what, actual) {
-      checks.push({ ok: Boolean(ok), what, actual });
-      return Boolean(ok);
-    },
-    eq(actual, expected, what) {
-      return t.check(actual === expected, what, actual === expected ? undefined : `«${actual}», no «${expected}»`);
-    },
-    has(text, part, what) {
-      return t.check(typeof text === "string" && text.includes(part), what ?? `sale «${part}»`, undefined);
-    },
-    // A path the plan spells with / where the app shows \, or the other way:
-    // the same path, so the check holds, and a note says how it reads.
-    path(actual, expected, what) {
-      const norm = (p) => (p ?? "").replaceAll("/", "\\");
-      const same = norm(actual) === norm(expected);
-      const note = `La ruta sale como «${actual}»; el plan la escribe «${expected}».`;
-      if (same && actual !== expected && !findings.includes(note)) findings.push(note);
-      if (what) t.check(same, what, same ? undefined : `«${actual}», no «${expected}»`);
-      return same;
-    },
-    // Something seen on the way that the plan's checks don't ask about.
-    note(text) {
-      if (!findings.includes(text)) findings.push(text);
-    },
-    async shot(name, ...judge) {
-      const file = join(opt.shots, `${id}-${shots.length + 1}-${name}.png`);
-      await s.screenshot(file);
-      shots.push(file);
-      for (const what of judge) looks.push({ what, file: basename(file) });
-      return file;
-    },
-    blocked: null,
-  };
-  const started = Date.now();
-  let error;
-  // A window left blank, React's root empty, is a finding of the step: its
-  // notes keep what the page logged and its last calls. The app opens again,
-  // as the tester would, and the step runs once more from there.
-  for (let attempt = 1; ; attempt++) {
-    error = undefined;
-    try {
-      if (step.setup) {
-        ctx.setup(step);
-        // The tester runs the setup in PowerShell and comes back to the
-        // window, whose focus reads the files again.
-        await refocus(s).catch(() => {});
-        await wait(800);
-      }
-      await runners.get(id).run(t);
-    } catch (e) {
-      error = e;
-      // What the window showed when the step failed, for whoever reads the
-      // KO; then a dialog left open is closed, so it can't block the next step.
-      await t.shot("error").catch(() => {});
-      await s
-        .exec(
-          `const foot = document.querySelector(".dialog .dialog-foot");
-           const out = foot && [...foot.querySelectorAll("button")].find((b) => ["Cancel", "Close", "Done"].includes(b.textContent.trim()) && !b.disabled);
-           out?.click();`,
-        )
-        .catch(() => {});
-    }
-    const blank = await s
-      .exec(
-        `const root = document.getElementById("root");
-         if (!root || root.children.length) return null;
-         return { errors: JSON.parse(sessionStorage.getItem("__uatErrors") || "[]"),
-                  calls: performance.getEntriesByType("resource").map((r) => r.name.replace("http://ipc.localhost/", "")).slice(-8) };`,
-      )
-      .catch(() => null);
-    if (!blank) break;
-    findings.push(`La ventana se quedó en blanco (la raíz de React vacía). Errores de la página: ${blank.errors.join(" | ") || "ninguno"}. Últimas llamadas: ${blank.calls.join(", ")}. La app se abrió de nuevo${attempt === 1 ? " y el paso se repitió" : ""}.`);
-    await ctx.restart().catch(() => {});
-    if (attempt === 2) {
-      error ??= new Error("the window went blank");
-      break;
-    }
-    checks.length = 0;
-    looks.length = 0;
+if (unopened) {
+  for (const id of ids) save(unwalkedStep(ctx, runners.get(id), unopened.message, { ci }));
+} else {
+  for (const id of ids) {
+    const started = Date.now();
+    const result = await walkStep(ctx, planSteps.get(id), runners.get(id), { shots: opt.shots, ci });
+    save(result);
+    writeFileSync(sharedFile, JSON.stringify(shared, null, 2) + "\n");
+    console.log(`${id} ${result.status} ${Math.round((Date.now() - started) / 100) / 10}s${result.status === "ok" ? "" : ` · ${reason(result)}`}`);
   }
-  const failed = checks.filter((c) => !c.ok);
-  // A step that failed before any of its own checks, such as on its setup or
-  // on the state an earlier step left, is Blocked, not KO
-  // (docs/research/uat-automation.md, section 6).
-  if (error && !checks.length && !t.blocked) t.blocked = `antes de sus comprobaciones: ${error.message}`;
-  const status = t.blocked ? "blocked" : error || failed.length ? "ko" : "ok";
-  const notes = [
-    t.blocked && `Bloqueado: ${t.blocked}`,
-    ...failed.map((c) => `KO: ${c.what}${c.actual ? `: ${c.actual}` : ""}`),
-    error && `Error: ${error.message}`,
-    ...findings.map((f) => `Nota: ${f}`),
-    `Comprobado (${checks.length - failed.length}/${checks.length}): ${checks.filter((c) => c.ok).map((c) => c.what).join("; ")}`,
-    looks.length && `A juzgar en capturas: ${looks.map((l) => `${l.what} [${l.file}]`).join("; ")}`,
-    runners.get(id).note,
-    runners.get(id).manual && `Queda para una persona: ${runners.get(id).manual}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  const result = {
-    id,
-    status,
-    notes,
-    time: new Date().toISOString(),
-    version,
-    by: "local",
-    evidence: `uat/auto/webdriver/steps · ${id}${shots.length ? ` · ${shots.length} capturas locales` : ""}`,
-    checks,
-    looks,
-    // What a person must still see: the step stays in the tester's walk.
-    manual: runners.get(id).manual,
-  };
-  save(result);
-  writeFileSync(sharedFile, JSON.stringify(shared, null, 2) + "\n");
-  console.log(`${id} ${status} ${Math.round((Date.now() - started) / 100) / 10}s${failed.length ? ` · ${failed.map((c) => c.what).join(" · ")}` : ""}${error ? ` · ${error.message}` : ""}`);
 }
+if (opt.summary) appendFileSync(opt.summary, jobSummary(results));
 
+// A driver that stopped on the way leaves every later step Blocked: that is
+// the walk breaking, not a verdict.
+const driverStopped = !unopened && driver && (driver.exitCode !== null || driver.signalCode !== null);
 if (!opt.attach) {
-  await s.close().catch(() => {});
+  await s?.close().catch(() => {});
   driver?.kill();
+}
+if (unopened) {
+  console.error(`The app's session did not open, so every step is Blocked: ${unopened.stack}`);
+  // The app's own log says how far it got.
+  const logs = join(env.LOCALAPPDATA, "config-digger", "logs");
+  for (const name of existsSync(logs) ? readdirSync(logs) : []) {
+    console.error(`${name}, its last lines:\n${readFileSync(join(logs, name), "utf8").trimEnd().split("\n").slice(-30).join("\n")}`);
+  }
+  process.exitCode = 4;
+}
+if (driverStopped) {
+  console.error(`tauri-driver stopped during the walk, with ${driver.signalCode ?? `exit code ${driver.exitCode}`}`);
+  process.exitCode = 3;
 }
 
 const after = realData();

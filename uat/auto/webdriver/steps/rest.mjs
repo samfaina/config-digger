@@ -65,6 +65,7 @@ export default [
   },
   {
     id: "14.2",
+    ciLacks: "los homes reales de un tester, que el paso mide",
     note: "Con el CLI que va junto a la app, sobre tus homes reales y sin escribir: «list -v» hace el escaneo del arranque y «disable --dry-run -v» los dos de la preview, con CODEX_HOME en el home de Codex de prueba solo para esa orden.",
     async run(t) {
       // The step's goal is a full scan of the tester's own homes, which the
