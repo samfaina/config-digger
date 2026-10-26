@@ -83,3 +83,53 @@ jobs:
           name: uat-results
           path: crates/config-digger-app/ui/uat-results.json
           if-no-files-found: error
+
+  # The WebDriver walk on the release build, built as a release builds it,
+  # with no screenshot: the repo is public. Its verdicts are a report: a
+  # step's KO or Blocked leaves the job green, and only the walk breaking
+  # turns it red: the build, the setup or the driver failing, tauri-driver
+  # stopping during the walk, the walk stopping before its last step, or a
+  # write outside the throwaway root and profile.
+  uat-webdriver:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crates/config-digger-app/ui/package-lock.json
+      # cargo app-release embeds ui/dist, which cargo builds nothing of.
+      - name: Build the UI
+        working-directory: crates/config-digger-app/ui
+        run: |
+          npm ci
+          npm run build
+      # Steps 14.2 and 14.3 run the CLI next to the app.
+      - name: Release app and CLI
+        run: |
+          cargo app-release --locked
+          cargo build --release --package config-digger-cli --locked
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+      # The plan's paths are E:\cd-throwaway.
+      - name: Map drive E
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\e-drive" | Out-Null
+          subst E: "$env:RUNNER_TEMP\e-drive"
+      - name: WebDriver walk
+        run: >-
+          .\uat\auto\webdriver\run.ps1 -App target\release\config-digger-app.exe -Work "$env:RUNNER_TEMP\uat" -Ci
+          -Evidence "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          -Summary $env:GITHUB_STEP_SUMMARY
+      # The results only: the walk takes no screenshot on CI.
+      - name: Upload the WebDriver results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-webdriver-results
+          path: ${{ runner.temp }}/uat/uat-results.json
+          if-no-files-found: error

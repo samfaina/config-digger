@@ -1,16 +1,19 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
 // it knows match the plan, the throwaway profile, opening a group on the
 // Projects tab, confirming an action dialog up to its result, reading an
-// Operation id, and step 11.11's command that marks an Operation.
+// Operation id, step 11.11's command that marks an Operation, and the walk's
+// CI mode: no screenshot, the steps a runner can't do, uat-results.json and
+// the job summary.
 // Run them with `node --test uat/auto/webdriver/walk.test.mjs`.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
+import { jobSummary, resultDocument, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
 import { openGroup } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
@@ -257,6 +260,156 @@ test("step 11.11's command changes nothing when the newest Operation is not an a
       rmSync(local, { recursive: true, force: true });
     }
   }
+});
+
+// A session whose page is an app window that is not blank: every script
+// answers null. It keeps each command the walk sends, and writes a picture
+// for a screenshot, as the driver does.
+class QuietPage extends Session {
+  constructor() {
+    super("http://fake", "fake");
+    this.calls = [];
+  }
+
+  async cmd(method, path) {
+    this.calls.push(`${method} ${path}`);
+    return path === "/screenshot" ? Buffer.from("png").toString("base64") : null;
+  }
+}
+
+const screenshots = (calls) => calls.filter((c) => c.endsWith("/screenshot"));
+
+// Walks the step module `runner` in CI mode, with `ctx` added to the
+// walk's, and a folder for screenshots that the walk must leave empty.
+async function walkOnCi(runner, ctx = {}) {
+  const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
+  const s = new QuietPage();
+  try {
+    const result = await walkStep({ s, version: "0.1.0", ...ctx }, { id: runner.id }, runner, { shots, ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+    return { result, calls: s.calls, files: readdirSync(shots) };
+  } finally {
+    rmSync(shots, { recursive: true, force: true });
+  }
+}
+
+test("on CI, a step with looks takes no screenshot and is OK on its checks, its looks left to the tester", async () => {
+  const { result, calls, files } = await walkOnCi({
+    id: "4.1",
+    async run(t) {
+      t.check(true, "sale el tooltip");
+      await t.shot("tooltip", "su sombra", "su color");
+    },
+  });
+  assert.deepEqual(screenshots(calls), []);
+  assert.deepEqual(files, []);
+  assert.equal(result.status, "ok");
+  assert.match(result.notes, /Sin juzgar en CI: su sombra; su color/);
+  assert.doesNotMatch(result.notes, /\.png/);
+});
+
+test("on CI, a step that throws before its checks takes no screenshot and is Blocked with the error", async () => {
+  const { result, calls, files } = await walkOnCi({
+    id: "3.1",
+    async run() {
+      throw new Error("timed out waiting for the Projects tab");
+    },
+  });
+  assert.deepEqual(screenshots(calls), []);
+  assert.deepEqual(files, []);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.notes.split("\n")[0], "Bloqueado: antes de sus comprobaciones: timed out waiting for the Projects tab");
+});
+
+test("on CI, a failed check makes the step KO with its message, and a throw after it takes no screenshot", async () => {
+  const { result, calls } = await walkOnCi({
+    id: "3.2",
+    async run(t) {
+      t.eq("2 Projects", "3 Projects", "sale «3 Projects»");
+      throw new Error("no button Remove");
+    },
+  });
+  assert.deepEqual(screenshots(calls), []);
+  assert.equal(result.status, "ko");
+  assert.equal(result.notes.split("\n")[0], "KO: sale «3 Projects»: «2 Projects», no «3 Projects»");
+});
+
+test("on CI, a step that needs what a runner lacks is Blocked, naming it, without running", async () => {
+  let ran = false;
+  const { result } = await walkOnCi({
+    id: "14.2",
+    ciLacks: "los homes de un tester",
+    async run() {
+      ran = true;
+    },
+  });
+  assert.equal(ran, false);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.notes.split("\n")[0], "Bloqueado: el runner de CI no tiene los homes de un tester");
+});
+
+test("on a runner without Claude Desktop, 7.2, 7.6 and 13.1 are Blocked naming it, and 14.2 naming the tester's homes", async () => {
+  const reasons = {};
+  for (const id of ["7.2", "7.6", "13.1", "14.2"]) {
+    // A runner's PowerShell finds no Claude Desktop: no Start menu app, no claude.exe.
+    const { result } = await walkOnCi(steps.find((step) => step.id === id), { root: "E:\\cd-throwaway", ps: () => "" });
+    assert.equal(result.status, "blocked", id);
+    reasons[id] = result.notes.split("\n")[0];
+  }
+  assert.deepEqual(reasons, {
+    "7.2": "Bloqueado: Claude Desktop no está instalado en este PC",
+    "7.6": "Bloqueado: Claude Desktop no está instalado en este PC",
+    "13.1": "Bloqueado: Claude Desktop no está instalado en este PC",
+    "14.2": "Bloqueado: el runner de CI no tiene los homes reales de un tester, que el paso mide",
+  });
+});
+
+test("a step's CI result carries by ci and the run's URL", async () => {
+  const { result } = await walkOnCi({
+    id: "4.1",
+    async run(t) {
+      t.check(true, "sale");
+    },
+  });
+  assert.equal(result.by, "ci");
+  assert.equal(result.evidence, "https://github.com/o/r/actions/runs/1");
+});
+
+test("a document of uat-results.json has the runner's fields, by and evidence, and nothing else", async () => {
+  const { result } = await walkOnCi({
+    id: "5.1",
+    manual: "Que el aviso entre y se vaya sin saltos.",
+    async run(t) {
+      t.check(true, "sale el aviso");
+      await t.shot("notice", "su color");
+    },
+  });
+  const doc = resultDocument(result);
+  assert.deepEqual(Object.keys(doc).sort(), ["by", "evidence", "id", "notes", "status", "time", "version"]);
+  assert.equal(doc.version, "0.1.0");
+  assert.match(doc.notes, /Queda para una persona: Que el aviso entre/);
+});
+
+test("the job summary has a line per step, with the first line of the reason of a KO or a Blocked", () => {
+  const summary = jobSummary([
+    { id: "1.1", status: "ok", notes: "Comprobado (2/2): a; b" },
+    { id: "3.2", status: "ko", notes: "KO: sale «3 Projects»: «2 Projects», no «3 Projects»\nComprobado (0/1): " },
+    { id: "7.2", status: "blocked", notes: "Bloqueado: Claude Desktop no está instalado en este PC\nComprobado (0/0): " },
+  ]);
+  assert.equal(
+    summary,
+    [
+      "| Paso | Veredicto | Motivo |",
+      "| --- | --- | --- |",
+      "| 1.1 | ok | |",
+      "| 3.2 | ko | KO: sale «3 Projects»: «2 Projects», no «3 Projects» |",
+      "| 7.2 | blocked | Bloqueado: Claude Desktop no está instalado en este PC |",
+      "",
+    ].join("\n"),
+  );
+});
+
+test("a reason with a pipe keeps the summary's table whole", () => {
+  assert.match(jobSummary([{ id: "6.1", status: "ko", notes: "KO: sale «a | b»" }]), /\| 6\.1 \| ko \| KO: sale «a \\\| b» \|/);
 });
 
 test("an Operation id is read from the lines that name one", () => {

@@ -267,7 +267,10 @@ export function operationId(text) {
 // own configuration: config-digger runs on the throwaway profile, so nothing
 // of it changes. Returns false, with the step Blocked, when it isn't installed.
 export async function withClaudeDesktop(t, body) {
-  const app = t.ps("@(Get-StartApps | Where-Object { $_.Name -eq 'Claude' } | Select-Object -First 1 -ExpandProperty AppID)");
+  // A Windows without Get-StartApps, as a CI runner may be, has no Claude Desktop to open.
+  const app = t.ps(
+    "@(if (Get-Command Get-StartApps -ErrorAction SilentlyContinue) { Get-StartApps | Where-Object { $_.Name -eq 'Claude' } | Select-Object -First 1 -ExpandProperty AppID })",
+  );
   if (!app) {
     t.blocked = "Claude Desktop no está instalado en este PC";
     return false;
