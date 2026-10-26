@@ -2018,6 +2018,51 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
           },
           "covers": ["#229"]
+        },
+        {
+          "id": "7.7",
+          "title": "El resultado de una Operation fallida en la ventana más pequeña",
+          "goal": "En el resultado de una Operation, cada lista se desplaza en un bloque propio, bajo su título, y el título y los botones del diálogo se quedan a la vista. Ninguna acción sobre los datos de prueba toca archivos bastantes para una lista más alta que la ventana, así que aquí «Untouched» tiene una sola línea; el test del fake UI la alarga a 40.",
+          "instructions": [
+            "Ejecuta la primera orden, que deja config.toml en solo lectura.",
+            "Haz la ventana de config-digger tan pequeña como deje, de unos 1100 × 640.",
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project.",
+            "En la lista Items, elige cd-throwaway-codex.",
+            "Pulsa Disable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Tab hasta que el bloque Untouched tenga el anillo de foco.",
+            "Pulsa Close.",
+            "Ejecuta la segunda orden, que quita la solo lectura: sin ella fallan los pasos siguientes."
+          ],
+          "commands": [
+            {
+              "label": "Poner config.toml en solo lectura",
+              "shell": "powershell",
+              "text": "attrib +r E:\\cd-throwaway\\codex-home\\config.toml"
+            },
+            {
+              "label": "Quitar la solo lectura",
+              "shell": "powershell",
+              "text": "attrib -r E:\\cd-throwaway\\codex-home\\config.toml"
+            }
+          ],
+          "expect": [
+            "El diálogo muestra un recuadro rojo «Nothing of this Operation was kept».",
+            "Debajo sale el bloque «Untouched», que empieza por «E:\\cd-throwaway\\codex-home\\config.toml».",
+            "El diálogo cabe en la ventana.",
+            "El título «Disable 1 Entry» y los botones «Close» y «Retry» están a la vista.",
+            "Con el foco del teclado, el bloque «Untouched» tiene un anillo violeta."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#261"]
         }
       ]
     },

@@ -110,6 +110,20 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "action-dialog-untouched",
+    query: "?untouched=40",
+    steps: async (page) => {
+      await page.setViewportSize(SMALLEST);
+      await page.getByRole("combobox", { name: "Project" }).click();
+      await page.getByRole("option", { name: String.raw`E:\cd-throwaway\project`, exact: true }).click();
+      await selectItem(page, "cd-throwaway-project");
+      await page.locator(".entry-card").first().getByRole("button", { name: "Disable", exact: true }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.locator(".dialog-foot").getByRole("button", { name: /^Disable/ }).click();
+      await dialog.getByRole("region", { name: "Untouched" }).waitFor();
+    },
+  },
+  {
     name: "projects-homes",
     steps: async (page) => {
       await rail(page, "Projects & homes");

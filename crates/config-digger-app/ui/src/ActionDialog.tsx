@@ -62,7 +62,9 @@ type Props = {
 
 /**
  * One modal dialog per action: its preview with everything that matters for
- * safety on one page, then the write as it happens and what it did.
+ * safety on one page, then the write as it happens and what it did. In every
+ * phase, its head and its foot stay in view, and its `dialog-body` between
+ * them scrolls as one when what it holds does not fit.
  */
 export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefused, notify }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: "planning" });
@@ -196,18 +198,24 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
           {planned && <p className="dialog-subtitle">{subtitle(planned.preview)}</p>}
         </header>
 
-        {phase.kind === "planning" && <Loading text="Reading the files this action touches…" rows={3} />}
+        {phase.kind === "planning" && (
+          <div className="dialog-body">
+            <Loading text="Reading the files this action touches…" rows={3} />
+          </div>
+        )}
 
         {phase.kind === "plan_failed" && (
           <>
-            <div className="dialog-callout danger" role="alert">
-              <Icon name="flag" small />
-              <div>
-                <div className="callout-title">This action can't be previewed</div>
-                {phase.error.message}
+            <div className="dialog-body">
+              <div className="dialog-callout danger" role="alert">
+                <Icon name="flag" small />
+                <div>
+                  <div className="callout-title">This action can't be previewed</div>
+                  {phase.error.message}
+                </div>
               </div>
+              <BackupDiffs diffs={phase.error.diffs} scrolls />
             </div>
-            <BackupDiffs diffs={phase.error.diffs} />
             <footer className="dialog-foot">
               <span className="grow" />
               <BackupFolderButton backup={phase.error.backup} notify={notify} />
@@ -245,7 +253,9 @@ export function ActionDialog({ request, onClose, onUndo, onOpenHistory, onRefuse
 
         {phase.kind === "applying" && (
           <>
-            <Steps steps={[]} running />
+            <div className="dialog-body">
+              <Steps steps={[]} running />
+            </div>
             <footer className="dialog-foot">
               <span className="dialog-backup">{phase.planned.preview.backup_note}</span>
             </footer>
@@ -287,70 +297,72 @@ function PreviewBody({ planned, acknowledged, fresh, leftovers, onToggle, onChec
   const before = blocks.length + warnings.length + preview.info.length;
   return (
     <>
-      {fresh !== null && (
-        <div className="dialog-callout fresh" role="status">
-          <Icon name="refresh" small />
-          <div>
-            <div className="callout-title">Nothing was written, this is a fresh preview</div>
-            {fresh}. Check it and confirm again.
-          </div>
-        </div>
-      )}
-
-      <DialogSection title="What changes" scrolls>
-        <Changes changes={preview.changes} notify={notify} />
-        {preview.effective.map((effective) => (
-          <p key={`${effective.agent}|${effective.home}|${effective.item}`} className="effective-change">
-            {effective.sentence}
-          </p>
-        ))}
-      </DialogSection>
-
-      {before > 0 && (
-        <DialogSection title="Before you apply">
-          {blocks.map((block, index) => (
-            <div key={`block-${index}`} className="check block">
-              <Icon name="flag" small />
-              <div className="check-body">
-                <AdviceLines kind="Blocked" advice={block.advice} sentence={block.sentence} />
-                <div className="check-fix">
-                  <button type="button" className="cta secondary" onClick={onCheckAgain}>
-                    <Icon name="refresh" small />
-                    Check again
-                  </button>
-                </div>
-              </div>
+      <div className="dialog-body">
+        {fresh !== null && (
+          <div className="dialog-callout fresh" role="status">
+            <Icon name="refresh" small />
+            <div>
+              <div className="callout-title">Nothing was written, this is a fresh preview</div>
+              {fresh}. Check it and confirm again.
             </div>
-          ))}
-          {warnings.map((warning) => {
-            const ticked = acknowledged.has(warning.class);
-            const git = warning.class === "git-versioned";
-            return (
-              <label key={warning.class} className={`check warning${git ? " git" : ""}`}>
-                <input type="checkbox" checked={ticked} onChange={() => onToggle(warning.class)} />
-                <Icon name="warning" small />
-                <div className="check-body">
-                  <AdviceLines kind={git ? "Git-versioned" : "Warning"} advice={warning.advice} sentence={warning.sentence} />
-                </div>
-              </label>
-            );
-          })}
-          {preview.info.map((info, index) => (
-            <Tooltip key={`info-${index}`} text={info.path}>
-              <div className="check info" tabIndex={0}>
-                <Icon name="info" small />
-                <div>{info.sentence}</div>
-              </div>
-            </Tooltip>
+          </div>
+        )}
+
+        <DialogSection title="What changes" scrolls>
+          <Changes changes={preview.changes} notify={notify} />
+          {preview.effective.map((effective) => (
+            <p key={`${effective.agent}|${effective.home}|${effective.item}`} className="effective-change">
+              {effective.sentence}
+            </p>
           ))}
         </DialogSection>
-      )}
 
-      <DialogSection title={`Files · ${preview.files.length + preview.folders.length}`} scrolls>
-        {locations(preview).map((location, index) => (
-          <LocationBlock key={`${location.path}|${index}`} location={location} />
-        ))}
-      </DialogSection>
+        {before > 0 && (
+          <DialogSection title="Before you apply">
+            {blocks.map((block, index) => (
+              <div key={`block-${index}`} className="check block">
+                <Icon name="flag" small />
+                <div className="check-body">
+                  <AdviceLines kind="Blocked" advice={block.advice} sentence={block.sentence} />
+                  <div className="check-fix">
+                    <button type="button" className="cta secondary" onClick={onCheckAgain}>
+                      <Icon name="refresh" small />
+                      Check again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {warnings.map((warning) => {
+              const ticked = acknowledged.has(warning.class);
+              const git = warning.class === "git-versioned";
+              return (
+                <label key={warning.class} className={`check warning${git ? " git" : ""}`}>
+                  <input type="checkbox" checked={ticked} onChange={() => onToggle(warning.class)} />
+                  <Icon name="warning" small />
+                  <div className="check-body">
+                    <AdviceLines kind={git ? "Git-versioned" : "Warning"} advice={warning.advice} sentence={warning.sentence} />
+                  </div>
+                </label>
+              );
+            })}
+            {preview.info.map((info, index) => (
+              <Tooltip key={`info-${index}`} text={info.path}>
+                <div className="check info" tabIndex={0}>
+                  <Icon name="info" small />
+                  <div>{info.sentence}</div>
+                </div>
+              </Tooltip>
+            ))}
+          </DialogSection>
+        )}
+
+        <DialogSection title={`Files · ${preview.files.length + preview.folders.length}`} scrolls>
+          {locations(preview).map((location, index) => (
+            <LocationBlock key={`${location.path}|${index}`} location={location} />
+          ))}
+        </DialogSection>
+      </div>
 
       <footer className="dialog-foot">
         <span className="dialog-backup">{preview.backup_note}</span>
@@ -571,11 +583,14 @@ export function Diff({ diff }: { diff: Pick<FileDiff, "diff" | "diff_note"> }) {
   );
 }
 
-/** A masked diff from each backed-up file to what it holds now, as for a refused Undo or an incomplete Rollback. */
-export function BackupDiffs({ diffs }: { diffs: FileDiff[] }) {
+/**
+ * A masked diff from each backed-up file to what it holds now, as for a
+ * refused Undo or an incomplete Rollback, in a region of its own when it `scrolls`.
+ */
+export function BackupDiffs({ diffs, scrolls = false }: { diffs: FileDiff[]; scrolls?: boolean }) {
   if (diffs.length === 0) return null;
   return (
-    <DialogSection title="Backup → now">
+    <DialogSection title="Backup → now" scrolls={scrolls}>
       {diffs.map((diff) => (
         <div key={diff.path} className="file-block">
           <div className="file-head static">
@@ -659,56 +674,74 @@ type ResultBodyProps = {
 
 /** The chain as far as it got, then what Apply did and what can be done next. */
 function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }: ResultBodyProps) {
-  const undo = result.kind === "applied" ? result.undo : null;
+  const { body, foot } = resultParts(result, { onUndo, onOpenHistory, onRetry, onClose, notify });
   return (
     <>
-      <Steps steps={result.steps} />
+      <div className="dialog-body">
+        <Steps steps={result.steps} />
+        {body}
+      </div>
+      <footer className="dialog-foot">
+        <span className="grow" />
+        {foot}
+      </footer>
+    </>
+  );
+}
 
-      {result.kind === "applied" && (
-        <>
-          <div className="dialog-callout success" role="status">
-            <Icon name="play" small />
-            <div>
-              <div className="callout-title">{result.sentence}</div>
-              {result.hints.map((hint) => (
-                <div key={hint} className="callout-hint">
-                  {hint}
-                </div>
-              ))}
-              <div className="callout-hint">{result.note}</div>
+/** What a result shows under the chain, and the buttons of its foot. */
+function resultParts(result: Result, { onUndo, onOpenHistory, onRetry, onClose, notify }: Omit<ResultBodyProps, "result">): { body: React.ReactNode; foot: React.ReactNode } {
+  switch (result.kind) {
+    case "applied": {
+      const undo = result.undo;
+      return {
+        body: (
+          <>
+            <div className="dialog-callout success" role="status">
+              <Icon name="play" small />
+              <div>
+                <div className="callout-title">{result.sentence}</div>
+                {result.hints.map((hint) => (
+                  <div key={hint} className="callout-hint">
+                    {hint}
+                  </div>
+                ))}
+                <div className="callout-hint">{result.note}</div>
+              </div>
             </div>
-          </div>
-          {result.differences.length > 0 && (
-            <DialogSection title="Verified with differences">
-              <table className="differences">
-                <thead>
-                  <tr>
-                    <th>Entry</th>
-                    <th>Predicted</th>
-                    <th>Actual</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.differences.map((difference) => (
-                    <tr key={`${difference.agent}|${difference.home}|${difference.locator}`}>
-                      <td>
-                        <div>{difference.agent}</div>
-                        <div className="mono dim">{difference.locator}</div>
-                      </td>
-                      <td>
-                        <StateAfterPill state={difference.predicted} />
-                      </td>
-                      <td>
-                        <StateAfterPill state={difference.actual} />
-                      </td>
+            {result.differences.length > 0 && (
+              <DialogSection title="Verified with differences" scrolls>
+                <table className="differences">
+                  <thead>
+                    <tr>
+                      <th>Entry</th>
+                      <th>Predicted</th>
+                      <th>Actual</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DialogSection>
-          )}
-          <footer className="dialog-foot">
-            <span className="grow" />
+                  </thead>
+                  <tbody>
+                    {result.differences.map((difference) => (
+                      <tr key={`${difference.agent}|${difference.home}|${difference.locator}`}>
+                        <td>
+                          <div>{difference.agent}</div>
+                          <div className="mono dim">{difference.locator}</div>
+                        </td>
+                        <td>
+                          <StateAfterPill state={difference.predicted} />
+                        </td>
+                        <td>
+                          <StateAfterPill state={difference.actual} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DialogSection>
+            )}
+          </>
+        ),
+        foot: (
+          <>
             {undo !== null && (
               <button type="button" className="cta secondary" onClick={() => onUndo(undo)}>
                 <Icon name="history" small />
@@ -721,41 +754,46 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
             <button type="button" className="cta" onClick={onClose}>
               Done
             </button>
-          </footer>
-        </>
-      )}
-
-      {(result.kind === "failed" || result.kind === "not_applied") && (
-        <>
-          <div className="dialog-callout danger" role="alert">
-            <Icon name="flag" small />
-            <div>
-              <div className="callout-title">
-                {result.kind === "failed" ? "Nothing of this Operation was kept" : "Nothing was written"}
+          </>
+        ),
+      };
+    }
+    case "failed":
+    case "not_applied":
+      return {
+        body: (
+          <>
+            <div className="dialog-callout danger" role="alert">
+              <Icon name="flag" small />
+              <div>
+                <div className="callout-title">
+                  {result.kind === "failed" ? "Nothing of this Operation was kept" : "Nothing was written"}
+                </div>
+                {result.cause}
               </div>
-              {result.cause}
             </div>
-          </div>
-          {result.kind === "failed" && result.restored.length > 0 && (
-            <DialogSection title="Restored">
-              {result.restored.map((path) => (
-                <div key={path} className="mono">
-                  {path}
-                </div>
-              ))}
-            </DialogSection>
-          )}
-          {result.kind === "failed" && result.untouched.length > 0 && (
-            <DialogSection title="Untouched">
-              {result.untouched.map((path) => (
-                <div key={path} className="mono">
-                  {path}
-                </div>
-              ))}
-            </DialogSection>
-          )}
-          <footer className="dialog-foot">
-            <span className="grow" />
+            {result.kind === "failed" && result.restored.length > 0 && (
+              <DialogSection title="Restored" scrolls>
+                {result.restored.map((path) => (
+                  <div key={path} className="mono">
+                    {path}
+                  </div>
+                ))}
+              </DialogSection>
+            )}
+            {result.kind === "failed" && result.untouched.length > 0 && (
+              <DialogSection title="Untouched" scrolls>
+                {result.untouched.map((path) => (
+                  <div key={path} className="mono">
+                    {path}
+                  </div>
+                ))}
+              </DialogSection>
+            )}
+          </>
+        ),
+        foot: (
+          <>
             <button type="button" className="cta secondary" onClick={onClose}>
               Close
             </button>
@@ -763,31 +801,34 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
               <Icon name="refresh" small />
               Retry
             </button>
-          </footer>
-        </>
-      )}
-
-      {result.kind === "rollback_incomplete" && (
-        <>
-          <div className="dialog-callout danger strong" role="alert">
-            <Icon name="flag" small />
-            <div>
-              <div className="callout-title">Rollback incomplete: these locations need your attention</div>
-              {result.cause}
-            </div>
-          </div>
-          <DialogSection title="Locations">
-            {result.rollback.map((location) => (
-              <div key={location.path} className={`rollback-location ${location.outcome}`}>
-                <span className="mono">{location.path}</span>
-                <span className="rollback-outcome">{ROLLBACK_LABELS[location.outcome]}</span>
-                {location.reason && <div className="dim">{location.reason}</div>}
+          </>
+        ),
+      };
+    case "rollback_incomplete":
+      return {
+        body: (
+          <>
+            <div className="dialog-callout danger strong" role="alert">
+              <Icon name="flag" small />
+              <div>
+                <div className="callout-title">Rollback incomplete: these locations need your attention</div>
+                {result.cause}
               </div>
-            ))}
-          </DialogSection>
-          <BackupDiffs diffs={result.diffs} />
-          <footer className="dialog-foot">
-            <span className="grow" />
+            </div>
+            <DialogSection title="Locations" scrolls>
+              {result.rollback.map((location) => (
+                <div key={location.path} className={`rollback-location ${location.outcome}`}>
+                  <span className="mono">{location.path}</span>
+                  <span className="rollback-outcome">{ROLLBACK_LABELS[location.outcome]}</span>
+                  {location.reason && <div className="dim">{location.reason}</div>}
+                </div>
+              ))}
+            </DialogSection>
+            <BackupDiffs diffs={result.diffs} scrolls />
+          </>
+        ),
+        foot: (
+          <>
             <BackupFolderButton backup={result.backup} notify={notify} />
             <button type="button" className="cta secondary" onClick={onOpenHistory}>
               Open History
@@ -795,11 +836,10 @@ function ResultBody({ result, onUndo, onOpenHistory, onRetry, onClose, notify }:
             <button type="button" className="cta" onClick={onClose}>
               Close
             </button>
-          </footer>
-        </>
-      )}
-    </>
-  );
+          </>
+        ),
+      };
+  }
 }
 
 /** Where a Rollback left each location, as a label. */
