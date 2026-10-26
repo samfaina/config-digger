@@ -1,10 +1,11 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
 // it knows match the plan, the throwaway profile, opening a group on the
-// Projects tab, confirming an action dialog up to its result, and reading an
-// Operation id.
+// Projects tab, confirming an action dialog up to its result, reading an
+// Operation id, and step 11.11's command that marks an Operation.
 // Run them with `node --test uat/auto/webdriver/walk.test.mjs`.
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -197,6 +198,65 @@ test("confirming an action dialog returns its result, though the result lands wh
   );
   const d = await confirm(page, "Delete backup");
   assert.equal(d.text, "Operation 20261024-161841-38c · backup deleted · can no longer be undone");
+});
+
+// A LOCALAPPDATA whose config-digger backups hold one Operation folder per
+// `{ id, title, status }`, each with its manifest as the core writes it.
+function backups(operations) {
+  const local = mkdtempSync(join(tmpdir(), "uat-backups-"));
+  for (const { id, title, status } of operations) {
+    const folder = join(local, "config-digger", "backups", id);
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, "manifest.json"), JSON.stringify({ manifest_version: 1, id, sequence: 1, title, undo_of: null, status, cause: null }, null, 2));
+  }
+  return local;
+}
+
+const manifestOf = (local, id) => readFileSync(join(local, "config-digger", "backups", id, "manifest.json"), "utf8");
+
+// Runs step 11.11's command as the tester pastes it, on that LOCALAPPDATA.
+function markNewest(local) {
+  const step = plan.sections.flatMap((section) => section.steps).find((s) => s.id === "11.11");
+  return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", step.commands[0].text], {
+    env: { ...process.env, LOCALAPPDATA: local },
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+test("step 11.11's command marks the newest Operation by its id, the Enable of step 11.10, as needing attention", () => {
+  const local = backups([
+    { id: "20261026-102000-c3d", title: "Enable 1 Entry", status: "applied" },
+    { id: "20261026-101500-a1b", title: "Disable 1 Entry", status: "applied" },
+    { id: "20261026-091500-fff", title: "Enable 1 Entry", status: "applied" },
+  ]);
+  try {
+    assert.equal(markNewest(local), "20261026-102000-c3d");
+    const marked = manifestOf(local, "20261026-102000-c3d");
+    assert.equal(JSON.parse(marked).status, "needs_attention");
+    assert.ok(marked.startsWith("{"), "no byte order mark");
+    assert.equal(JSON.parse(manifestOf(local, "20261026-101500-a1b")).status, "applied");
+    assert.equal(JSON.parse(manifestOf(local, "20261026-091500-fff")).status, "applied");
+  } finally {
+    rmSync(local, { recursive: true, force: true });
+  }
+});
+
+test("step 11.11's command changes nothing when the newest Operation is not an applied Enable", () => {
+  for (const newest of [
+    { id: "20261026-102000-c3d", title: "Disable 1 Entry", status: "applied" },
+    { id: "20261026-102000-c3d", title: "Enable 1 Entry", status: "needs_attention" },
+  ]) {
+    const local = backups([newest, { id: "20261026-101500-a1b", title: "Enable 1 Entry", status: "applied" }]);
+    try {
+      const before = manifestOf(local, newest.id);
+      assert.throws(() => markNewest(local), /is not the applied Enable 1 Entry of step 11\.10/);
+      assert.equal(manifestOf(local, newest.id), before);
+      assert.equal(JSON.parse(manifestOf(local, "20261026-101500-a1b")).status, "applied");
+    } finally {
+      rmSync(local, { recursive: true, force: true });
+    }
+  }
 });
 
 test("an Operation id is read from the lines that name one", () => {

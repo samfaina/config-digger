@@ -491,8 +491,21 @@ export default [
   },
   {
     id: "11.11",
+    note: "La app se cierra y se abre con una sesión nueva de WebDriver; la orden del paso marca el manifest.json desde la prueba.",
     async run(t) {
       const { s } = t;
+      await s.close();
+      let id;
+      try {
+        id = t.ps(t.step.commands[0].text);
+      } catch (error) {
+        await t.restart();
+        t.blocked = `la orden no marcó la Operation: ${String(error.stderr ?? error.message).trim().split("\n")[0]}`;
+        return;
+      }
+      t.shared.needsAttention1111 = id;
+      await t.restart();
+      await s.waitFor(".rail button[aria-label='Inventory']");
       await go(s, "History · Undo");
       await s.until(() => s.exec("return document.querySelectorAll('.operation-row').length > 0"), { what: "the rows" });
       const title = () => s.exec("return document.querySelector('.history .banner-title').textContent.trim()");
@@ -502,7 +515,7 @@ export default [
       let list = await rows(s);
       const m = (await title()).match(/^(\d+) of (\d+) Operations$/);
       t.check(m && Number(m[1]) < n && Number(m[2]) === n, "con Enable, el título dice «M of N Operations», con M menor que N", await title());
-      t.check(list.length > 0 && list.every((r) => r.title === "Enable 1 Entry"), "con Enable, solo salen filas «Enable 1 Entry», entre ellas la del paso 11.10", list.map((r) => r.title).join(", "));
+      t.check(list.length > 0 && list.every((r) => r.title === "Enable 1 Entry") && list.some((r) => r.meta.includes(id)), "con Enable, solo salen filas cuyo título es «Enable 1 Entry», sea cual sea su etiqueta, entre ellas la del id que apuntaste", list.map((r) => `${r.title} [${r.chip}]`).join(", "));
       await choose(s, "Verb", "Undo");
       list = await rows(s);
       t.check(list.length > 0 && list.every((r) => r.title.startsWith("Undo") && /^Undo of \S+/.test(r.chip)), "con Undo, solo salen filas que empiezan por «Undo», con la etiqueta «Undo of <id>»", list.map((r) => `${r.title} [${r.chip}]`).join(", "));
@@ -510,11 +523,18 @@ export default [
       await choose(s, "Status", "Undone");
       list = await rows(s);
       t.check(list.length > 0 && list.every((r) => /undone by \S+/i.test(r.chip)), "con Undone, solo salen filas cuya etiqueta incluye «undone by <id>»", list.map((r) => r.chip).join(", "));
+      t.check(!list.some((r) => r.meta.includes(id)), "con Undone, no sale la Operation del id que apuntaste", list.map((r) => r.meta).join(" | "));
       await choose(s, "Status", "Failed");
       list = await rows(s);
       t.check(list.length > 0 && list.every((r) => ["Failed, rolled back", "Rollback incomplete, dismissed"].includes(r.chip)) && list.some((r) => r.meta.includes(t.shared.failed115)), "con Failed, solo salen filas «Failed, rolled back» o «Rollback incomplete, dismissed», entre ellas la del paso 11.5", list.map((r) => r.chip).join(", "));
+      t.check(!list.some((r) => r.meta.includes(id)), "con Failed, no sale la Operation del id que apuntaste, que necesita atención pero no ha fallado", list.map((r) => r.meta).join(" | "));
       await choose(s, "Status", "Needs attention");
-      t.eq(await s.exec("return document.querySelector('.history-list .empty')?.firstChild?.textContent.trim() ?? document.querySelector('.history-list .empty')?.textContent.trim()"), "No Operation matches the filter.", "con Needs attention, la lista dice «No Operation matches the filter.»");
+      list = await rows(s);
+      const marked = list.find((r) => r.meta.includes(id));
+      t.check(marked?.title === "Enable 1 Entry" && marked.chip === "Needs attention", "con Needs attention, sale la Operation del id que apuntaste, «Enable 1 Entry», con la etiqueta «Needs attention»", JSON.stringify(marked));
+      t.check(list.length > 0 && list.every((r) => r.chip === "Needs attention"), "con Needs attention, todas las filas tienen la etiqueta «Needs attention»", list.map((r) => r.chip).join(", "));
+      const dismissed = t.shared.removeLeftoversOperation;
+      t.check(dismissed && !list.some((r) => r.meta.includes(dismissed)), "con Needs attention, no sale la Operation del paso 11.6, que ya dice «Rollback incomplete, dismissed»", list.map((r) => r.meta).join(" | "));
       await choose(s, "Status", "Any status");
       await typeInto(s, "input[aria-label='Search Entry names']", "CODEX");
       await wait(300);
@@ -538,6 +558,11 @@ export default [
       const state = await s.exec("return { box: document.querySelector('input[aria-label=\"Search Entry names\"]').value, verb: document.querySelector('[role=combobox][aria-label=Verb]').textContent.trim(), status: document.querySelector('[role=combobox][aria-label=Status]').textContent.trim() }");
       t.check(state.box === "" && state.verb === "Any verb" && state.status === "Any status", "tras Clear filter, la caja está vacía y los desplegables dicen «Any verb» y «Any status»", JSON.stringify(state));
       t.eq(await title(), `${n} Operations`, `tras Clear filter, el título vuelve a «${n} Operations»`);
+      await pickOperation(s, id);
+      await press(s, "Dismiss", ".history-detail");
+      await waitNotice(s, `Dismissed Operation ${id}.`);
+      await wait(400);
+      t.eq((await detail(s)).chip, "Rollback incomplete, dismissed", "tras Dismiss, la etiqueta de esa Operation pasa a «Rollback incomplete, dismissed»");
     },
   },
   {
