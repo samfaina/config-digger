@@ -807,6 +807,80 @@ describe("a tag", () => {
   });
 });
 
+describe("a hidden row of Projects & homes", () => {
+  test("is never faded, as no text or outline on it could undo an opacity or a filter on the row", () => {
+    const dimming = allRules.filter((found) => found.selector.split(",").some((listed) => listed.includes(".place-row.dimmed")));
+    expect(dimming.length).toBeGreaterThan(0);
+    for (const found of dimming) {
+      expect(found.declarations.get("opacity"), found.selector).toBeUndefined();
+      expect(found.declarations.get("filter"), found.selector).toBeUndefined();
+    }
+  });
+
+  /** What a hidden row is drawn on: its own background, or the panel's where it has none. */
+  const hiddenRow = () => {
+    const background = new Map([...styled(".place-row"), ...styled(".place-row.dimmed")]).get("background");
+    return colour(background === "transparent" ? styled(".panel").get("background") : background);
+  };
+
+  test("still reads as hidden next to a shown row, drawn apart from a tile", () => {
+    expect(styled(".place-row.dimmed").get("background")).not.toBe(styled(".place-row").get("background"));
+  });
+
+  test("has a name, lines, a count and tags that meet WCAG AA, and tag outlines at 3:1 against it", () => {
+    const row = hiddenRow();
+    const name = styled(".place-row.dimmed .place-name").get("color") ?? styled(".place-name").get("color") ?? rootValues.get("color");
+    for (const [what, text] of [
+      ["the name", name],
+      [".place-sub", styled(".place-sub").get("color")],
+      [".place-count", styled(".place-count").get("color")],
+    ]) {
+      expect(contrast(colour(text), row), what).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const selector of TAGS) {
+      const declarations = tone(selector);
+      expect(contrast(colour(declarations.get("color")), colour(declarations.get("background"))), selector).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colour(outline(selector)), row), `${selector} outline`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  test("has small buttons whose labels meet WCAG AA on their fill", () => {
+    // A secondary button's fill is not a token; a disabled one, while an action runs, is exempt from AA.
+    const fill = (value: string | undefined) => (/^#[0-9a-f]{6}$/i.test(value ?? "") ? (value as string) : colour(value));
+    const label = colour(styled(".cta").get("color"));
+    for (const selector of [".cta.secondary", ".cta.danger"]) {
+      expect(contrast(label, fill(styled(selector).get("background"))), selector).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe("a tag on a selected home tile", () => {
+  /** The declarations of a tag of the tone `selector` on a selected tile, over those of the same tag elsewhere. */
+  const onSelected = (selector: string) => new Map([...tone(selector), ...styled(".tile.selected .tag"), ...styled(`.tile.selected ${selector}`)]);
+
+  test("has an outline at 3:1 against both ends of the tile's gradient, and text that meets WCAG AA on its fill, in the plain and read-only tones a home shows", () => {
+    const gradient = styled(".tile.selected").get("background") ?? "";
+    const ends = tokensUsed(gradient);
+    // Every colour of the gradient is a token, so none is left unchecked.
+    expect(rawColours(gradient), gradient).toEqual([]);
+    expect(ends).toHaveLength(2);
+    for (const selector of [".tag", ".tag.read-only"]) {
+      const declarations = onSelected(selector);
+      const edge = colour(declarations.get("border-color") ?? declarations.get("border")?.split(/\s+/).pop());
+      for (const end of ends) expect(contrast(edge, colour(`var(${end})`)), `${selector} on ${end}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(colour(declarations.get("color")), colour(declarations.get("background"))), selector).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test("keeps its usual outline outside a selected tile", () => {
+    for (const selector of [".tag", ".tag.read-only"]) expect(outline(selector), selector).not.toBe(onSelected(selector).get("border-color"));
+  });
+
+  test("takes every colour from the :root tokens", () => {
+    expectTokenColours([".tile.selected .tag", ".tile.selected .tag.read-only"]);
+  });
+});
+
 describe("an element the keyboard reaches for its tooltip", () => {
   // The Mirrored and not read tags, a single home's name, a flag alert, the
   // time the inventory was read, the parked from tag, and the action dialog's

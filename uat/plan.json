@@ -554,24 +554,62 @@
         {
           "id": "10.16",
           "title": "Las etiquetas de un Agent home",
-          "goal": "Las etiquetas de una fila, como «added by you», se leen de un vistazo y tienen un color por lo que dicen.",
+          "goal": "Las etiquetas de una fila, como «added by you», se leen de un vistazo y tienen un color por lo que dicen, también en la fila de un home oculto y en la ficha seleccionada de un home.",
           "instructions": [
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
-            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home."
+            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home.",
+            "Cierra config-digger.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el USERPROFILE de prueba».",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila default, bajo Claude Code, pulsa Hide.",
+            "Mira la fila default junto a las otras filas: su nombre, su ruta, su cuenta, sus etiquetas y sus botones.",
+            "En la fila default, pulsa Unhide.",
+            "Cierra config-digger.",
+            "Ejecuta en PowerShell la orden «Crear los datos de prueba con perfiles de VS Code».",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el APPDATA de prueba».",
+            "En el panel Agents, elige VS Code.",
+            "En el desplegable Project, elige E:\\cd-throwaway\\project.",
+            "Mira la ficha seleccionada del panel Agent home y su marca.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
           ],
-          "commands": [],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el USERPROFILE de prueba",
+              "shell": "powershell",
+              "text": "$env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-profile'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            },
+            {
+              "label": "Crear los datos de prueba con perfiles de VS Code",
+              "shell": "powershell",
+              "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -VsCode"
+            },
+            {
+              "label": "Abrir config-digger con el APPDATA de prueba",
+              "shell": "powershell",
+              "text": "$env:APPDATA = 'E:\\cd-throwaway\\vscode-appdata'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            }
+          ],
           "expect": [
             "Cada una de las tres filas tiene dos etiquetas: su Agent («Claude Code», «Codex» o «Claude Desktop») y «added by you».",
             "Cada etiqueta es una píldora rellena de gris, no un texto gris sobre el fondo de la fila.",
             "Cada etiqueta tiene un borde gris claro alrededor.",
-            "El texto de cada etiqueta es casi blanco."
+            "El texto de cada etiqueta es casi blanco.",
+            "Tras Hide, la fila default lleva la etiqueta «hidden».",
+            "La fila oculta no tiene el fondo de las otras filas, sino un borde discontinuo sobre el panel.",
+            "El nombre de la fila oculta es gris claro, no blanco como el de las otras filas.",
+            "La ruta, la cuenta, las etiquetas y los botones de la fila oculta se leen tan claros como en las otras filas.",
+            "Unhide da el aviso «default of Claude Code is listed again.».",
+            "La ficha seleccionada es «profile» y lleva la marca «last opened here».",
+            "El borde de la marca «last opened here» se ve claro sobre el morado de la ficha seleccionada."
           ],
-          "covers": ["#232"],
+          "covers": ["#232", "#279"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.16" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.16" }
-          ]
+          ],
+          "manual": "La fila de un home oculto y la marca sobre la ficha seleccionada: el recorrido no abre la app con otro USERPROFILE ni otro APPDATA, y cómo se lee un borde sobre el morado se juzga mirando."
         },
         {
           "id": "10.19",
