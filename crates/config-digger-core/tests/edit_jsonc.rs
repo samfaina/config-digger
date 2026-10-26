@@ -449,6 +449,21 @@ fn an_edit_that_would_change_lines_outside_its_span_is_refused() {
 }
 
 #[test]
+fn an_edit_that_would_change_lines_outside_its_span_is_refused_without_a_final_newline() {
+    let text = b"{\n  \"mcpServers\": {\n\n    \"a\": { \"command\": \"x\" },\n    \"b\": { \"command\": \"y\" }\n  }\n}";
+    let file = EditableFile::decode(text, Syntax::Jsonc).unwrap();
+
+    let error = file
+        .apply(&Edit::Set {
+            key_path: key("mcpServers.c"),
+            value: json!({ "command": "z" }),
+        })
+        .unwrap_err();
+
+    assert_eq!(error, EditError::OutsideEntry { line: 3 });
+}
+
+#[test]
 fn remove_item_takes_its_line_and_its_inverse_puts_it_back() {
     let text = b"{\n  \"disabled\": [\n    \"a\",\n    \"b\",\n  ],\n}\n";
     let edit = Edit::RemoveItem {

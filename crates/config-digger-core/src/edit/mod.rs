@@ -410,8 +410,17 @@ fn remove_empty_objects(value: &mut Value) {
 /// Refuses the edit when a changed line falls outside every allowed range.
 /// Blank lines next to a range count as part of it.
 fn check_lines(before: &str, after: &str, allowed: &[Range<usize>]) -> Result<(), EditError> {
-    let before = lines(before);
-    let after = lines(after);
+    // In a file without a final newline, a line that becomes the last one, or
+    // stops being it, gains or loses its newline without being changed.
+    let (before, after) = if before.is_empty() || before.ends_with('\n') {
+        (before.to_owned(), after.to_owned())
+    } else if after.is_empty() {
+        (format!("{before}\n"), String::new())
+    } else {
+        (format!("{before}\n"), format!("{after}\n"))
+    };
+    let before = lines(&before);
+    let after = lines(&after);
     let is_blank = |line: &&str| line.trim().is_empty();
     let mut widened: Vec<Range<usize>> = allowed
         .iter()
