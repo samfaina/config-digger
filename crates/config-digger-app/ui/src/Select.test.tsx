@@ -208,6 +208,16 @@ describe("a Select with a text box in its panel", () => {
     expect(document.activeElement).toBe(field);
   });
 
+  test("narrows as the user types and does not jump to an option starting with the text", async () => {
+    const { user, field } = renderField({ initial: "gamma", searchLabel: "Find a Project" });
+    await user.click(field);
+    await user.keyboard("a");
+    const box = screen.getByRole("textbox", { name: "Find a Project" });
+    expect(box).toHaveProperty("value", "a");
+    expect(shown()).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(box.getAttribute("aria-activedescendant")).toBe(optionId("Gamma"));
+  });
+
   test("chooses the active option with Enter and gives the focus back to the field", async () => {
     const { user, field, chosen } = renderField({ searchLabel: "Find a Project" });
     await user.tab();

@@ -154,6 +154,12 @@ uatStep("2.5", async ({ page, open, check }) => {
     await expect(search).toHaveValue("");
     await expect(options(page)).toHaveCount(all);
   });
+  await check("Con E, «E:\\cd-throwaway\\project-extra» sigue iluminado y no salta a otra opción que empiece por E.", async () => {
+    await page.keyboard.type("E");
+    await expect(search).toHaveValue("E");
+    await expect(lit(page)).toHaveText(extra);
+  });
+  await page.keyboard.press("Backspace");
   await page.keyboard.type("throwaway");
   await check("Con throwaway quedan los Projects de «E:\\cd-throwaway», con los que faltan bajo «MISSING PROJECTS».", async () => {
     for (const text of await options(page).allInnerTexts()) expect(text.replaceAll("/", "\\")).toMatch(/^E:\\cd-throwaway\\/);
