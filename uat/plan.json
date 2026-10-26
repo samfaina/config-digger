@@ -945,11 +945,13 @@
         {
           "id": "2.5",
           "title": "Buscar un Project en el desplegable",
-          "goal": "La caja de búsqueda del panel de Project deja las opciones que contienen lo escrito, en cualquier parte de la ruta, y el teclado sigue eligiendo como en un desplegable.",
+          "goal": "La caja de búsqueda del panel de Project deja las opciones que contienen lo escrito, en cualquier parte de la ruta, sin saltar a una opción que empiece por lo escrito, y el teclado sigue eligiendo como en un desplegable.",
           "instructions": [
             "En el Inventario, haz clic en el campo Project de la cabecera.",
             "Escribe EXTRA, en mayúsculas.",
             "Borra lo escrito con Retroceso.",
+            "Escribe E, en mayúscula.",
+            "Borra la E con Retroceso.",
             "Escribe throwaway.",
             "Pulsa Flecha abajo y pulsa Enter.",
             "Abre el panel otra vez con un clic en el campo.",
@@ -962,6 +964,7 @@
             "Bajo la caja salen todas las opciones.",
             "Con EXTRA queda solo «E:\\cd-throwaway\\project-extra», iluminado.",
             "Al borrar vuelven todas las opciones.",
+            "Con E, «E:\\cd-throwaway\\project-extra» sigue iluminado y no salta a otra opción que empiece por E.",
             "Con throwaway quedan los Projects de «E:\\cd-throwaway», con los que faltan bajo «MISSING PROJECTS».",
             "Con throwaway, «No Project» no sale.",
             "Con throwaway, «E:\\cd-throwaway\\project-extra» sigue iluminado.",
@@ -973,7 +976,7 @@
             "Con zz, el panel dice «No match».",
             "Escape cierra el panel sin cambiar el Project."
           ],
-          "covers": ["#224"]
+          "covers": ["#224", "#260"]
         },
         {
           "id": "2.3",
