@@ -46,9 +46,15 @@ export function address(query: Query = {}): string {
   return search ? `${base}?${search}` : base;
 }
 
-export function uatStep(id: string, body: (args: StepArgs) => Promise<void>) {
+/**
+ * `bug` names the issue of a known bug that fails the step today: the test is
+ * expected to fail, so CI stays green while the results say KO, and it fails
+ * the run once the bug is fixed, for the mark to go.
+ */
+export function uatStep(id: string, body: (args: StepArgs) => Promise<void>, { bug }: { bug?: string } = {}) {
   const step = planStep(id);
   test(id, async ({ page }, testInfo) => {
+    test.fail(bug !== undefined, bug);
     const done = new Set<string>();
     const known = (text: string) => {
       if (!step.expect.includes(text)) throw new Error(`«${text}» is no check of step ${id} in uat/plan.json.`);

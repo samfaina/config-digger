@@ -28,11 +28,12 @@ export async function serveFakeUi(): Promise<{ url: string; close: () => Promise
   return { url, close: () => server.close() };
 }
 
-/** A headless Edge, or else Chrome. */
+/** A headless Edge, or else Chrome, with scrollbars, as the app's WebView2 has them. */
 export async function launch(): Promise<Browser> {
   for (const channel of ["msedge", "chrome"]) {
     try {
-      return await chromium.launch({ channel, headless: true });
+      // Playwright hides them in headless mode, which leaves a list's scrollbar no room and nothing to look at.
+      return await chromium.launch({ channel, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"] });
     } catch {
       // Not installed: try the next one.
     }

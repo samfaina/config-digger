@@ -29,7 +29,10 @@ type Document = {
 };
 
 export default class UatResults implements Reporter {
-  private readonly documents: Document[] = [];
+  /** Each step's last document, as `--repeat-each` runs its test again. */
+  private readonly documents = new Map<string, Document>();
+  /** The tests of each step, by their title path: two of them walk the step twice. */
+  private readonly tests = new Map<string, Set<string>>();
 
   constructor(private readonly options: Options) {}
 
@@ -42,8 +45,10 @@ export default class UatResults implements Reporter {
         ? ["ok", leftToAPerson(test)]
         : checks.length === 0
           ? ["blocked", plain(result.error?.message)]
-          : ["ko", [failed?.title, plain(failed?.error?.message ?? result.error?.message)].filter(Boolean).join("\n")];
-    this.documents.push({
+          : ["ko", [knownBug(test), failed?.title, plain(failed?.error?.message ?? result.error?.message)].filter(Boolean).join("\n")];
+    const tests = this.tests.get(test.title) ?? new Set();
+    this.tests.set(test.title, tests.add(test.titlePath().join(" › ")));
+    this.documents.set(test.title, {
       id: test.title,
       status,
       notes,
@@ -55,11 +60,10 @@ export default class UatResults implements Reporter {
   }
 
   async onEnd(): Promise<{ status?: FullResult["status"] } | undefined> {
-    writeFileSync(this.options.file, JSON.stringify(this.documents, null, 2) + "\n");
-    const ids = this.documents.map((document) => document.id);
-    const twice = ids.filter((id, at) => ids.indexOf(id) !== at);
+    writeFileSync(this.options.file, JSON.stringify([...this.documents.values()], null, 2) + "\n");
+    const twice = [...this.tests].filter(([, tests]) => tests.size > 1).map(([id]) => id);
     if (twice.length > 0) {
-      console.error(`More than one test walks step ${[...new Set(twice)].join(", ")}.`);
+      console.error(`More than one test walks step ${twice.join(", ")}.`);
       return { status: "failed" };
     }
     return undefined;
@@ -74,6 +78,12 @@ export default class UatResults implements Reporter {
 function leftToAPerson(test: TestCase): string {
   const left = test.annotations.filter((annotation) => annotation.type === LEFT_TO_A_PERSON).map((annotation) => `- ${annotation.description}`);
   return left.length > 0 ? ["Queda para una persona:", ...left].join("\n") : "";
+}
+
+/** The bug a test is marked to fail by, `test.fail()`'s description, as the notes' first line. */
+function knownBug(test: TestCase): string | undefined {
+  const bug = test.annotations.find((annotation) => annotation.type === "fail")?.description;
+  return bug === undefined ? undefined : `Fallo conocido: ${bug}`;
 }
 
 /** A message without the terminal's colour codes. */

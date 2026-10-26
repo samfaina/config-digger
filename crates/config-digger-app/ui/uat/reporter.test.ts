@@ -17,11 +17,12 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function testCase(id: string, annotations: TestCase["annotations"] = []): TestCase {
+function testCase(id: string, annotations: TestCase["annotations"] = [], file = "loading.uat.ts"): TestCase {
   return {
     title: id,
-    titlePath: () => ["", "", "loading.uat.ts", id],
+    titlePath: () => ["", "", file, id],
     annotations,
+    expectedStatus: annotations.some((annotation) => annotation.type === "fail") ? "failed" : "passed",
   } as unknown as TestCase;
 }
 
@@ -68,6 +69,17 @@ describe("the UAT results of a run", () => {
     });
   });
 
+  test("say a step whose test fails as a known bug is KO, naming the bug", async () => {
+    const known = [{ type: "fail", description: "#378" }];
+    const failed = result("failed", { steps: [step(CHECK, "Expected: visible")], error: "Expected: visible" });
+
+    const { documents } = await run([[testCase("7.4", known), failed]]);
+
+    expect(documents[0]).toMatchObject({ status: "ko", notes: `Fallo conocido: #378
+${CHECK}
+Expected: visible` });
+  });
+
   test("say a step whose test failed before its first check is Blocked, with the error", async () => {
     const { documents } = await run([[testCase("15.1"), result("timedOut", { error: "Test timeout of 30000ms exceeded." })]]);
 
@@ -101,9 +113,19 @@ describe("the UAT results of a run", () => {
   test("fail the run when two tests walk the same step", async () => {
     const { end } = await run([
       [testCase("15.1"), result("passed", { steps: [step(CHECK)] })],
-      [testCase("15.1"), result("passed", { steps: [step(CHECK)] })],
+      [testCase("15.1", [], "places.uat.ts"), result("passed", { steps: [step(CHECK)] })],
     ]);
 
     expect(end).toEqual({ status: "failed" });
+  });
+
+  test("keep the last verdict of a test run more than once", async () => {
+    const { end, documents } = await run([
+      [testCase("15.1"), result("passed", { steps: [step(CHECK)] })],
+      [testCase("15.1"), result("failed", { steps: [step(CHECK, "Expected: 1")], error: "Expected: 1" })],
+    ]);
+
+    expect(end).toBeUndefined();
+    expect(documents).toEqual([expect.objectContaining({ id: "15.1", status: "ko" })]);
   });
 });
