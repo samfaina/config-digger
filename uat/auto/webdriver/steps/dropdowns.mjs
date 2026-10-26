@@ -44,7 +44,7 @@ async function typeInPanel(t, text) {
   await wait(200);
   const after = (await panel(s))?.search?.value ?? "";
   if (after !== before + text) {
-    t.note("Al abrir el panel, el foco se queda en el campo y no pasa a la caja «Search Projects…»: lo escrito no llega. Select.tsx enfoca la caja en su useLayoutEffect, cuando el panel aún tiene visibility: hidden, y un elemento oculto no recibe el foco. Con un clic en la caja, el filtro funciona.");
+    t.note("Al abrir el panel, el foco se queda en el campo y no pasa a la caja «Search Projects…»: lo escrito no llega. Un elemento con visibility: hidden no recibe el foco, así que Select.tsx debe enfocar la caja cuando el panel ya se ve (#286). Con un clic en la caja, el filtro funciona.");
     const box = await s.find(".select-panel input");
     await s.click(box);
     await s.keys(text);
