@@ -33,6 +33,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::backups_of,
         commands::open_location,
         commands::reveal_location,
+        commands::open_backup_folder,
         commands::plan_action,
         commands::execute_plan,
         commands::cancel_plan,

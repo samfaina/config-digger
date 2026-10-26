@@ -26,6 +26,7 @@ describe("the fake backend", () => {
       backupsOf: () => commands.backupsOf(entry.path),
       openLocation: () => commands.openLocation(entry.path),
       revealLocation: () => commands.revealLocation(entry.path),
+      openBackupFolder: () => commands.openBackupFolder(fixtures.details[0].backup),
       planAction: () => commands.planAction({ kind: "entry", verb: "remove", locator: entry.locator, project: null }),
       executePlan: () => commands.executePlan("plan-1", []),
       cancelPlan: () => commands.cancelPlan("plan-1"),

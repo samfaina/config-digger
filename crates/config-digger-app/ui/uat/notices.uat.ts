@@ -125,7 +125,7 @@ uatStep("5.2", async ({ page, open, check }) => {
   // it opened nothing. Opening a location answers an error here, so a notice
   // of the UI opening one anyway would be an error.
   await page.clock.install();
-  await open({ fail: ["open_location", "reveal_location"] });
+  await open({ fail: ["open_location", "reveal_location", "open_backup_folder"] });
   await inventoryShown(page);
   await rail(page, "Settings");
   const logs = page.locator(".settings-data .place-row", { has: page.locator(".place-name", { hasText: /^Logs$/ }) });

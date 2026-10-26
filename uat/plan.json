@@ -2404,7 +2404,7 @@
             "El detalle tiene «Backup», con la ruta de la copia.",
             "El Explorador abre esa carpeta, con «manifest.json» y una copia de «config.toml» cuyo nombre empieza por «1-»."
           ],
-          "covers": ["#74"],
+          "covers": ["#74", "#288"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/history.mjs > 11.2" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/history.mjs > 11.2" }

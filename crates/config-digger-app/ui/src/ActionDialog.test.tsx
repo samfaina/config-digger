@@ -4,17 +4,33 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { ActionDialog, Changes } from "./ActionDialog";
+import { ActionDialog, BackupPath, Changes } from "./ActionDialog";
 import { commands, type ActionPreview, type Change, type Error as ApiError } from "./bindings";
 import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
 
 vi.mock("./bindings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./bindings")>();
-  return { ...actual, commands: { ...actual.commands, planAction: vi.fn(), executePlan: vi.fn(), cancelPlan: vi.fn(async () => ({ status: "ok", data: null })) } };
+  const done = async () => ({ status: "ok" as const, data: null });
+  return {
+    ...actual,
+    commands: { ...actual.commands, planAction: vi.fn(), executePlan: vi.fn(), cancelPlan: vi.fn(done), openBackupFolder: vi.fn(done), revealLocation: vi.fn(done) },
+  };
 });
 
 afterEach(cleanup);
+
+describe("Open backup folder", () => {
+  test("opens Explorer inside the backup folder, rather than showing it selected in its parent", () => {
+    const backup = String.raw`C:\Users\me\AppData\Local\config-digger\backups\20260101T000000Z-remove`;
+    render(<BackupPath backup={backup} notify={() => {}} />);
+
+    screen.getByRole("button", { name: "Open backup folder" }).click();
+
+    expect(commands.openBackupFolder).toHaveBeenCalledWith(backup);
+    expect(commands.revealLocation).not.toHaveBeenCalled();
+  });
+});
 
 describe("the action dialog while it prepares the preview", () => {
   test("shows the busy indicator naming what it reads, over placeholder rows", () => {

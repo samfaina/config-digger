@@ -27,11 +27,17 @@ export const commands = {
 	 */
 	openLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("open_location", { path })),
 	/**
-	 *  Shows `path`, a location the inventory shows, a backup copy of one, or
-	 *  the backup folder of an Operation the dialog executed, selected in
-	 *  Explorer.
+	 *  Shows `path`, a location the inventory shows or a backup copy of one,
+	 *  selected in Explorer, in the folder that holds it.
 	 */
 	revealLocation: (path: string) => typedError<null, Error>(__TAURI_INVOKE("reveal_location", { path })),
+	/**
+	 *  Opens Explorer inside `path`, the backup folder of an Operation the
+	 *  dialog executed or History reported, to recover from it by hand. It
+	 *  takes a location the inventory shows too, but shows it selected unless
+	 *  it is a folder: it never starts a file nor follows a link.
+	 */
+	openBackupFolder: (path: string) => typedError<null, Error>(__TAURI_INVOKE("open_backup_folder", { path })),
 	/**
 	 *  Plans `request` against what the disk holds now, without writing
 	 *  anything, and holds the plan under the id the preview carries.
@@ -48,7 +54,7 @@ export const commands = {
 	readHistory: () => typedError<OperationSummary[], Error>(__TAURI_INVOKE("read_history")),
 	/**
 	 *  The Operation `id` in History, with what it changed in each file, whose
-	 *  backup folder can then be revealed.
+	 *  backup folder can then be opened.
 	 */
 	historyDetail: (id: string) => typedError<OperationDetail, Error>(__TAURI_INVOKE("history_detail", { id })),
 	/**

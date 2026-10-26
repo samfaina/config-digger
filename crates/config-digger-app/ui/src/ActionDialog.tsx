@@ -10,7 +10,7 @@ import {
   type StateAfter,
   type WarningClass,
 } from "./bindings";
-import { call, copy, revealLocation, type Notify } from "./desktop";
+import { call, copy, openBackupFolder, type Notify } from "./desktop";
 import {
   appliedResult,
   applyButton,
@@ -625,11 +625,11 @@ export function BackupPath({ backup, notify }: { backup: string; notify: Notify 
   );
 }
 
-/** Shows the backup folder an error points at in Explorer. */
+/** Opens Explorer inside the backup folder an Operation or an error points at. */
 export function BackupFolderButton({ backup, notify }: { backup: string | null; notify: Notify }) {
   if (backup === null) return null;
   return (
-    <button type="button" className="cta secondary" onClick={() => void revealLocation(backup, notify)}>
+    <button type="button" className="cta secondary" onClick={() => void openBackupFolder(backup, notify)}>
       <Icon name="folder" small />
       Open backup folder
     </button>

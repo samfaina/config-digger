@@ -89,9 +89,7 @@ pub async fn backups_of(app: AppHandle, path: PathBuf) -> Result<Vec<Backup>, ap
 pub async fn open_location(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
     blocking(move || {
         ensure_shown(&app, &path)?;
-        // A link, even a broken one, is shown selected rather than followed.
-        let link = std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_symlink());
-        if link || path.is_dir() {
+        if is_link(&path) || path.is_dir() {
             select_in_explorer(&path)
         } else {
             open_in_windows(&path)
@@ -100,17 +98,34 @@ pub async fn open_location(app: AppHandle, path: PathBuf) -> Result<(), api::Err
     .await
 }
 
-/// Shows `path`, a location the inventory shows, a backup copy of one, or
-/// the backup folder of an Operation the dialog executed, selected in
-/// Explorer.
+/// Shows `path`, a location the inventory shows or a backup copy of one,
+/// selected in Explorer, in the folder that holds it.
 #[tauri::command]
 #[specta::specta]
 pub async fn reveal_location(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
     blocking(move || {
+        ensure_shown(&app, &path)?;
+        select_in_explorer(&path)
+    })
+    .await
+}
+
+/// Opens Explorer inside `path`, the backup folder of an Operation the
+/// dialog executed or History reported, to recover from it by hand. It
+/// takes a location the inventory shows too, but shows it selected unless
+/// it is a folder: it never starts a file nor follows a link.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_backup_folder(app: AppHandle, path: PathBuf) -> Result<(), api::Error> {
+    blocking(move || {
         if !app.state::<ActionsState>().reported(&path) {
             ensure_shown(&app, &path)?;
         }
-        select_in_explorer(&path)
+        if opens_inside(&path) {
+            open_in_windows(&path)
+        } else {
+            select_in_explorer(&path)
+        }
     })
     .await
 }
@@ -139,11 +154,12 @@ impl ActionsState {
         task(actions.as_mut().expect("set above"))
     }
 
-    /// Whether `path` is the backup folder of an Operation executed here.
+    /// Whether `path` is the backup folder of an Operation executed here, a
+    /// refused Undo or a detail in History.
     fn reported(&self, path: &Path) -> bool {
         self.lock()
             .as_ref()
-            .is_some_and(|actions| actions.can_reveal(path))
+            .is_some_and(|actions| actions.can_open_backup_folder(path))
     }
 }
 
@@ -211,7 +227,7 @@ pub async fn read_history(app: AppHandle) -> Result<Vec<OperationSummary>, api::
 }
 
 /// The Operation `id` in History, with what it changed in each file, whose
-/// backup folder can then be revealed.
+/// backup folder can then be opened.
 #[tauri::command]
 #[specta::specta]
 pub async fn history_detail(app: AppHandle, id: String) -> Result<OperationDetail, api::Error> {
@@ -526,8 +542,19 @@ fn ensure_shown(app: &AppHandle, path: &Path) -> Result<(), api::Error> {
     }
 }
 
+/// Whether `path` is a link, even a broken one, which Explorer shows
+/// selected rather than follows.
+fn is_link(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink())
+}
+
+/// Whether Explorer opens `path` from the inside: a folder that is no link.
+fn opens_inside(path: &Path) -> bool {
+    !is_link(path) && path.is_dir()
+}
+
 /// Opens `target`, a path or a URL, in the app Windows associates with it:
-/// Explorer for a folder, the default browser for a URL.
+/// Explorer inside a folder, the default browser for a URL.
 // Explorer is a GUI program, so it opens no console window.
 #[allow(clippy::disallowed_methods)]
 fn open_in_windows(target: impl AsRef<OsStr>) -> Result<(), api::Error> {
@@ -561,4 +588,37 @@ fn start(mut explorer: Command) -> Result<(), api::Error> {
         .spawn()
         .map(drop)
         .map_err(|error| api::Error::unexpected(format!("cannot start Explorer: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_folder_is_opened_from_the_inside() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("20260101T000000Z-remove");
+        std::fs::create_dir(&folder).unwrap();
+        let copy = folder.join("1-config.toml");
+        std::fs::write(&copy, "").unwrap();
+
+        assert!(opens_inside(&folder));
+        assert!(!opens_inside(&copy));
+        assert!(!opens_inside(&temp.path().join("gone")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_link_to_a_folder_is_not_followed() {
+        let temp = tempfile::tempdir().unwrap();
+        let folder = temp.path().join("skill");
+        std::fs::create_dir(&folder).unwrap();
+        let link = temp.path().join("link");
+        // Creating a symbolic link needs Developer Mode or an elevated shell.
+        if std::os::windows::fs::symlink_dir(&folder, &link).is_err() {
+            return;
+        }
+
+        assert!(!opens_inside(&link));
+    }
 }
