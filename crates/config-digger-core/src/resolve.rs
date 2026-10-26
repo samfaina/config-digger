@@ -1130,28 +1130,45 @@ pub(crate) fn leftovers(
     definitions: &[AgentDefinition],
     snapshot: &Snapshot,
 ) -> Vec<api::Leftovers> {
+    leftovers_from(snapshot, |project| {
+        let context = Context {
+            project: Some(project.to_path_buf()),
+        };
+        Cow::Owned(resolve(definitions, snapshot, &context))
+    })
+}
+
+/// The leftovers of [`leftovers`], each from `inventory`, which gives the
+/// Items in a missing Project's context.
+pub(crate) fn leftovers_from<'i>(
+    snapshot: &Snapshot,
+    inventory: impl Fn(&Path) -> Cow<'i, api::Inventory>,
+) -> Vec<api::Leftovers> {
+    // A plugin bound to the Project is no leftover: only the Agent
+    // uninstalls it.
+    let leftover = |entry: &api::Entry| {
+        entry.plugin.is_none()
+            && entry
+                .reason
+                .as_ref()
+                .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
+    };
     snapshot
         .projects
         .iter()
         .filter(|project| !project.exists)
         .filter_map(|project| {
-            let context = Context {
-                project: Some(project.path.clone()),
-            };
-            let mut items = resolve(definitions, snapshot, &context).items;
-            // A plugin bound to the Project is no leftover: only the Agent
-            // uninstalls it.
-            for item in &mut items {
-                item.entries.retain(|entry| {
-                    entry.plugin.is_none()
-                        && entry
-                            .reason
-                            .as_ref()
-                            .is_some_and(|reason| reason.code == api::ReasonCode::ProjectMissing)
-                });
-                item.state = api::State::Unread;
-            }
-            items.retain(|item| !item.entries.is_empty());
+            let items: Vec<api::Item> = inventory(&project.path)
+                .items
+                .iter()
+                .filter(|item| item.entries.iter().any(leftover))
+                .map(|item| {
+                    let mut item = item.clone();
+                    item.entries.retain(leftover);
+                    item.state = api::State::Unread;
+                    item
+                })
+                .collect();
             (!items.is_empty()).then(|| api::Leftovers {
                 project: project.path.clone(),
                 items,
