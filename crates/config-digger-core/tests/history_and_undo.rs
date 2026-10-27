@@ -641,7 +641,7 @@ fn an_operation_recorded_without_the_emptied_object_undoes_as_before() {
     let inverse = recorded["locations"][0]["edits"][0]["inverse"]
         .as_object_mut()
         .unwrap();
-    assert!(inverse.remove("emptied").is_some(), "{recorded}");
+    assert!(inverse.remove("emptied_object").is_some(), "{recorded}");
     fs.put_file(&manifest, recorded.to_string());
 
     undo_with(&core(&fs), &removed.operation).unwrap();

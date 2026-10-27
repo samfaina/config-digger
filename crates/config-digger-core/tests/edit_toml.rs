@@ -407,7 +407,7 @@ fn the_undo_of_a_remove_is_an_insert_that_brings_back_the_table() {
             after: None,
             inline: false,
             comments: vec!["# Docs server, read-only".into()],
-            emptied: None,
+            emptied_object: None,
         }
     );
     assert_eq!(
@@ -498,7 +498,7 @@ fn the_undo_of_a_remove_puts_an_inline_server_back_in_place() {
             after: None,
             inline: true,
             comments: vec!["# Linear (hosted)".into()],
-            emptied: None,
+            emptied_object: None,
         }
     );
 
@@ -539,7 +539,7 @@ fn edits_of_missing_or_mistyped_keys_are_refused() {
             after: None,
             inline: false,
             comments: Vec::new(),
-            emptied: None,
+            emptied_object: None,
         })
         .unwrap_err(),
         EditError::AlreadyExists {
@@ -606,7 +606,7 @@ fn insert_into_an_inline_table_goes_after_its_sibling() {
         after: after.map(String::from),
         inline: true,
         comments: Vec::new(),
-        emptied: None,
+        emptied_object: None,
     };
 
     assert_eq!(
@@ -628,7 +628,7 @@ fn a_table_inserted_after_a_plain_key_goes_before_the_first_sibling_table() {
         after: Some("timeout".into()),
         inline: false,
         comments: Vec::new(),
-        emptied: None,
+        emptied_object: None,
     };
 
     assert_eq!(

@@ -157,7 +157,7 @@ fn the_undo_of_a_remove_is_an_insert_that_brings_back_the_value_and_its_comment(
             after: Some("filesystem".into()),
             inline: false,
             comments: vec!["/* GitHub: token comes from the environment */".into()],
-            emptied: None,
+            emptied_object: None,
         }
     );
     assert_eq!(
@@ -503,7 +503,7 @@ fn insert_into_a_single_line_object_goes_after_its_sibling() {
         after: Some("a".into()),
         inline: true,
         comments: Vec::new(),
-        emptied: None,
+        emptied_object: None,
     };
 
     assert_eq!(
@@ -540,14 +540,19 @@ fn remove_of_the_first_key_of_a_single_line_object_keeps_its_spacing() {
     );
 }
 
-/// `bytes` after a Remove of `key_path`, then the Undo of that Remove.
-fn removed_then_undone(bytes: &[u8], key_path: &str) -> Vec<u8> {
-    let applied = apply(
+/// A Remove of `key_path` from `bytes`.
+fn removed(bytes: &[u8], key_path: &str) -> Applied {
+    apply(
         bytes,
         &Edit::Remove {
             key_path: key(key_path),
         },
-    );
+    )
+}
+
+/// `bytes` after a Remove of `key_path`, then the Undo of that Remove.
+fn removed_then_undone(bytes: &[u8], key_path: &str) -> Vec<u8> {
+    let applied = removed(bytes, key_path);
     apply(&applied.bytes, &applied.inverse).bytes
 }
 
@@ -568,12 +573,7 @@ const ONLY_SERVER: &[u8] =
 
 #[test]
 fn the_undo_of_a_remove_that_emptied_an_object_gives_back_its_comment_and_lines() {
-    let applied = apply(
-        ONLY_SERVER,
-        &Edit::Remove {
-            key_path: key("mcpServers.a"),
-        },
-    );
+    let applied = removed(ONLY_SERVER, "mcpServers.a");
     assert_eq!(
         String::from_utf8(applied.bytes).unwrap(),
         "{\n  \"mcpServers\": {}\n}\n"
@@ -594,12 +594,7 @@ fn the_undo_of_a_remove_that_emptied_an_object_in_a_crlf_file_with_a_bom_keeps_b
 
 #[test]
 fn the_undo_of_a_remove_that_emptied_an_object_keeps_a_key_added_since() {
-    let applied = apply(
-        ONLY_SERVER,
-        &Edit::Remove {
-            key_path: key("mcpServers.a"),
-        },
-    );
+    let applied = removed(ONLY_SERVER, "mcpServers.a");
     let added = apply(
         &applied.bytes,
         &Edit::Set {
@@ -630,6 +625,23 @@ fn an_insert_recorded_without_the_emptied_object_writes_the_key_on_the_objects_l
 
     assert_eq!(
         String::from_utf8(apply(b"{\n  \"mcpServers\": {}\n}\n", &recorded).bytes).unwrap(),
+        "{\n  \"mcpServers\": { \"a\": { \"command\": \"npx\" } }\n}\n"
+    );
+}
+
+#[test]
+fn an_undo_that_writes_no_comment_puts_back_an_emptied_object_only_when_it_holds_none() {
+    let text = b"{\n  \"mcpServers\": {\n    \"a\": {\n      \"command\": \"npx\"\n    }\n  }\n}\n";
+    let applied = removed(text, "mcpServers.a");
+    let commented = removed(ONLY_SERVER, "mcpServers.a");
+
+    assert_eq!(
+        apply(&applied.bytes, &applied.inverse.without_comments()).bytes,
+        text
+    );
+    assert_eq!(
+        String::from_utf8(apply(&commented.bytes, &commented.inverse.without_comments()).bytes)
+            .unwrap(),
         "{\n  \"mcpServers\": { \"a\": { \"command\": \"npx\" } }\n}\n"
     );
 }

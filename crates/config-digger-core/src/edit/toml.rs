@@ -128,7 +128,7 @@ impl File<'_> {
                 .filter(|line| line.starts_with('#'))
                 .map(str::to_owned)
                 .collect(),
-            emptied: None,
+            emptied_object: None,
         };
 
         // The section's comments go on the next key of the same table, or

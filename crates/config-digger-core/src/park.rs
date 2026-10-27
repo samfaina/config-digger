@@ -145,7 +145,7 @@ impl ParkedEntry {
             after: self.after.clone(),
             inline: self.inline,
             comments: self.comments.clone(),
-            emptied: None,
+            emptied_object: None,
         }
     }
 
