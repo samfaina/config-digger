@@ -34,17 +34,26 @@ const result = (id, more = {}) => ({
   looks: [],
   ...more,
 });
+// A plan step's automation entry that names the agent judge.
+const judged = (id) => ({ tool: "agent-judge", where: "local", test: `uat/auto/webdriver/steps/history.mjs > ${id}` });
 
-// A shots folder holding the files named, each a stand-in for a PNG.
-function shotsWith(...names) {
+// A shots folder holding the files named, each a stand-in for a PNG, gone
+// when test `t` ends.
+function shotsWith(t, ...names) {
   const dir = mkdtempSync(join(tmpdir(), "uat-judge-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   for (const name of names) writeFileSync(join(dir, name), "png");
   return dir;
 }
 
+// The walk's results, a shots folder holding `names`, and their listing.
+function walked(t, results, names, steps = results.map((r) => step(r.id))) {
+  const shots = shotsWith(t, ...names);
+  return { shots, results, listing: toJudge(plan(...steps), results, shots) };
+}
+
 test("the listing takes each result with looks, with its plan fields, the walk's verdict and each shot's absolute path", (t) => {
-  const shots = shotsWith("7.5-1-botones.png");
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const shots = shotsWith(t, "7.5-1-botones.png");
   const results = [
     result("7.4"),
     result("7.5", { looks: [{ what: "los cuatro botones comparten un rojo", file: "7.5-1-botones.png" }] }),
@@ -62,9 +71,8 @@ test("the listing takes each result with looks, with its plan fields, the walk's
   ]);
 });
 
-test("the listing marks a shot missing on disk, and the step Blocked before the judge looks", (t) => {
-  const shots = shotsWith("4.1-1-lista.png");
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+test("the listing marks a shot missing on disk, and the step as one the judge can't judge", (t) => {
+  const shots = shotsWith(t, "4.1-1-lista.png");
   const results = [
     result("4.1", {
       looks: [
@@ -78,45 +86,33 @@ test("the listing marks a shot missing on disk, and the step Blocked before the 
     { what: "la barra de scroll fina", file: join(shots, "4.1-1-lista.png") },
     { what: "la barra de scroll al pasar el ratón", file: join(shots, "4.1-2-hover.png"), missing: true },
   ]);
-  assert.equal(listed.blocked, `falta la captura ${join(shots, "4.1-2-hover.png")}`);
+  assert.equal(listed.unjudged, `falta la captura ${join(shots, "4.1-2-hover.png")}`);
 });
 
-test("the listing marks a step the walk Blocked as Blocked before the judge looks", (t) => {
-  const shots = shotsWith("2.1-1-error.png");
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+test("the listing marks a step the walk Blocked as one the judge can't judge", (t) => {
+  const shots = shotsWith(t, "2.1-1-error.png");
   const results = [result("2.1", { status: "blocked", looks: [{ what: "la ventana al fallar", file: "2.1-1-error.png" }] })];
-  assert.equal(toJudge(plan(step("2.1")), results, shots)[0].blocked, "el walk dejó el paso bloqueado");
+  assert.equal(toJudge(plan(step("2.1")), results, shots)[0].unjudged, "el walk dejó el paso bloqueado");
 });
 
-const judged = (id) => ({ tool: "agent-judge", where: "local", test: `uat/auto/webdriver/steps/history.mjs > ${id}` });
-
-test("the listing takes a step whose automation lists agent-judge, Blocked when the walk took no shot of it", (t) => {
-  const shots = shotsWith();
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+test("the listing takes a step whose automation lists agent-judge, unjudged when the walk took no shot of it", (t) => {
+  const shots = shotsWith(t);
   const listed = toJudge(plan(step("7.4"), step("7.6", { automation: [judged("7.6")] })), [result("7.4"), result("7.6")], shots);
   assert.deepEqual(
-    listed.map(({ id, looks, blocked }) => ({ id, looks, blocked })),
-    [{ id: "7.6", looks: [], blocked: "el walk no tomó ninguna captura que juzgar" }],
+    listed.map(({ id, looks, unjudged }) => ({ id, looks, unjudged })),
+    [{ id: "7.6", looks: [], unjudged: "el walk no tomó ninguna captura que juzgar" }],
   );
 });
 
 test("the listing leaves out a result the judge already judged", (t) => {
-  const shots = shotsWith("7.5-1-botones.png");
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const shots = shotsWith(t, "7.5-1-botones.png");
   const results = [result("7.5", { by: "agent-judge", looks: [{ what: "un rojo", file: "7.5-1-botones.png" }] })];
   assert.deepEqual(toJudge(plan(step("7.5", { automation: [judged("7.5")] })), results, shots), []);
 });
 
-// The walk's results and the listing of a shots folder holding `names`.
-function walked(results, names, steps = results.map((r) => step(r.id))) {
-  const shots = shotsWith(...names);
-  return { shots, results, listing: toJudge(plan(...steps), results, shots) };
-}
-
 test("a verdict merges with by agent-judge, its status and evidence, the walk's notes and the judge's under Juez", (t) => {
   const looks = [{ what: "los cuatro botones comparten un rojo", file: "7.5-1-botones.png" }];
-  const { shots, results, listing } = walked([result("7.4"), result("7.5", { looks })], ["7.5-1-botones.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [result("7.4"), result("7.5", { looks })], ["7.5-1-botones.png"]);
   const shot = join(shots, "7.5-1-botones.png");
   const notes = "Delete backup en History es violeta, no rojo: expect dice que los cuatro botones comparten un rojo. Captura 7.5-1-botones.png.";
   const merged = merge(results, listing, [{ id: "7.5", status: "ko", notes, evidence: shot }]);
@@ -135,8 +131,7 @@ test("a verdict merges with by agent-judge, its status and evidence, the walk's 
 
 test("a verdict for a step the listing didn't list is refused, and nothing merges", (t) => {
   const looks = [{ what: "un rojo", file: "7.5-1-botones.png" }];
-  const { shots, results, listing } = walked([result("7.4"), result("7.5", { looks })], ["7.5-1-botones.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [result("7.4"), result("7.5", { looks })], ["7.5-1-botones.png"]);
   const ok = { id: "7.5", status: "ok", notes: "Los botones son rojos.", evidence: join(shots, "7.5-1-botones.png") };
   assert.throws(
     () => merge(results, listing, [ok, { id: "7.4", status: "ok", notes: "Bien.", evidence: "" }]),
@@ -144,10 +139,11 @@ test("a verdict for a step the listing didn't list is refused, and nothing merge
   );
 });
 
-test("a listed step with no verdict is refused, so no step keeps an unjudged OK", (t) => {
-  const { shots, results, listing } = walked([result("7.5", { looks: [{ what: "un rojo", file: "7.5-1-botones.png" }] })], ["7.5-1-botones.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+test("a listed step with no verdict, or with two, is refused, so no step keeps an unjudged OK", (t) => {
+  const { shots, results, listing } = walked(t, [result("7.5", { looks: [{ what: "un rojo", file: "7.5-1-botones.png" }] })], ["7.5-1-botones.png"]);
   assert.throws(() => merge(results, listing, []), /no verdict for 7\.5/);
+  const ok = { id: "7.5", status: "ok", notes: "", evidence: join(shots, "7.5-1-botones.png") };
+  assert.throws(() => merge(results, listing, [ok, { ...ok, status: "ko", notes: "No es rojo." }]), /7\.5 has two verdicts/);
 });
 
 test("a step whose shot is missing merges Blocked, whatever the judge said, with the missing shot as evidence", (t) => {
@@ -155,8 +151,7 @@ test("a step whose shot is missing merges Blocked, whatever the judge said, with
     { what: "la barra fina", file: "4.1-1-lista.png" },
     { what: "la barra al pasar el ratón", file: "4.1-2-hover.png" },
   ];
-  const { shots, results, listing } = walked([result("4.1", { looks })], ["4.1-1-lista.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [result("4.1", { looks })], ["4.1-1-lista.png"]);
   const missing = join(shots, "4.1-2-hover.png");
   const [merged] = merge(results, listing, [{ id: "4.1", status: "ok", notes: "La barra es fina.", evidence: join(shots, "4.1-1-lista.png") }]);
   assert.equal(merged.status, "blocked");
@@ -166,11 +161,9 @@ test("a step whose shot is missing merges Blocked, whatever the judge said, with
 });
 
 test("a step the walk Blocked, or took no shot of, stays Blocked with the walk's evidence", (t) => {
-  const judged = { tool: "agent-judge", where: "local", test: "uat/auto/webdriver/steps/history.mjs > 7.6" };
-  const steps = [step("2.1"), step("7.6", { automation: [judged] })];
+  const steps = [step("2.1"), step("7.6", { automation: [judged("7.6")] })];
   const blocked = result("2.1", { status: "blocked", notes: "Bloqueado: antes de sus comprobaciones", looks: [{ what: "la ventana", file: "2.1-1-error.png" }] });
-  const { shots, results, listing } = walked([blocked, result("7.6")], ["2.1-1-error.png"], steps);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [blocked, result("7.6")], ["2.1-1-error.png"], steps);
   const merged = merge(results, listing, [
     { id: "2.1", status: "ok", notes: "", evidence: join(shots, "2.1-1-error.png") },
     { id: "7.6", status: "ok", notes: "", evidence: "" },
@@ -187,8 +180,7 @@ test("a step the walk Blocked, or took no shot of, stays Blocked with the walk's
 test("a walk KO stays KO when the judge finds the look OK, with the judge's findings added", (t) => {
   const looks = [{ what: "un rojo", file: "7.5-1-botones.png" }];
   const ko = result("7.5", { status: "ko", notes: "KO: sale «Delete backup»", looks });
-  const { shots, results, listing } = walked([ko], ["7.5-1-botones.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [ko], ["7.5-1-botones.png"]);
   const shot = join(shots, "7.5-1-botones.png");
   const [merged] = merge(results, listing, [{ id: "7.5", status: "ok", notes: "Los cuatro botones son rojos.", evidence: shot }]);
   assert.deepEqual(
@@ -197,10 +189,26 @@ test("a walk KO stays KO when the judge finds the look OK, with the judge's find
   );
 });
 
+test("a walk KO the judge can't judge, with no shot or a missing one, stays KO and says so", (t) => {
+  const steps = [step("7.5"), step("7.6", { automation: [judged("7.6")] })];
+  const missing = result("7.5", { status: "ko", notes: "KO: sale «Delete backup»", looks: [{ what: "un rojo", file: "7.5-1-botones.png" }] });
+  const { shots, results, listing } = walked(t, [missing, result("7.6", { status: "ko", notes: "KO: sale «7.6»" })], [], steps);
+  const merged = merge(results, listing, [
+    { id: "7.5", status: "ok", notes: "", evidence: "" },
+    { id: "7.6", status: "ok", notes: "", evidence: "" },
+  ]);
+  assert.deepEqual(
+    merged.map(({ status, notes, evidence }) => ({ status, notes, evidence })),
+    [
+      { status: "ko", notes: `KO: sale «Delete backup»\nJuez:\nSin juzgar: falta la captura ${join(shots, "7.5-1-botones.png")}`, evidence: join(shots, "7.5-1-botones.png") },
+      { status: "ko", notes: "KO: sale «7.6»\nJuez:\nSin juzgar: el walk no tomó ninguna captura que juzgar", evidence: "uat/auto/webdriver/steps · 7.6" },
+    ],
+  );
+});
+
 test("a verdict is refused when its status is unknown, a KO has no notes, or its evidence names no shot of the step", (t) => {
   const looks = [{ what: "un rojo", file: "7.5-1-botones.png" }];
-  const { shots, results, listing } = walked([result("7.5", { looks })], ["7.5-1-botones.png"]);
-  t.after(() => rmSync(shots, { recursive: true, force: true }));
+  const { shots, results, listing } = walked(t, [result("7.5", { looks })], ["7.5-1-botones.png"]);
   const shot = join(shots, "7.5-1-botones.png");
   const refused = (verdict) => assert.throws(() => merge(results, listing, [{ id: "7.5", ...verdict }]), /7\.5/);
   refused({ status: "bien", notes: "", evidence: shot });
@@ -211,10 +219,17 @@ test("a verdict is refused when its status is unknown, a KO has no notes, or its
   assert.equal(merge(results, listing, [{ id: "7.5", status: "ok", notes: "", evidence: shot }])[0].status, "ok");
 });
 
+test("evidence that spells a shot's path with / or another case names that shot, as the listing spells it", (t) => {
+  const looks = [{ what: "un rojo", file: "7.5-1-botones.png" }];
+  const { shots, results, listing } = walked(t, [result("7.5", { looks })], ["7.5-1-botones.png"]);
+  const shot = join(shots, "7.5-1-botones.png");
+  const [merged] = merge(results, listing, [{ id: "7.5", status: "ok", notes: "", evidence: shot.replaceAll("\\", "/").toUpperCase() }]);
+  assert.equal(merged.evidence, shot);
+});
+
 test("the command lists the work folder's steps to judge, then merges a verdicts file into its webdriver.json", (t) => {
   const real = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8")).sections[0].steps[0];
-  const work = mkdtempSync(join(tmpdir(), "uat-judge-work-"));
-  t.after(() => rmSync(work, { recursive: true, force: true }));
+  const work = shotsWith(t);
   mkdirSync(join(work, "shots"));
   writeFileSync(join(work, "shots", `${real.id}-1-vista.png`), "png");
   const looks = [{ what: "la vista", file: `${real.id}-1-vista.png` }];
@@ -230,7 +245,7 @@ test("the command lists the work folder's steps to judge, then merges a verdicts
   assert.equal(JSON.parse(readFileSync(join(work, "webdriver.json"), "utf8"))[0].by, "local", "a refused merge writes nothing");
 
   writeFileSync(verdicts, JSON.stringify([{ id: real.id, status: "ok", notes: "Se ve bien.", evidence: listed.looks[0].file }]));
-  judge("merge", "--verdicts", verdicts);
+  assert.match(judge("merge", "--verdicts", verdicts), /: 1 OK, 0 KO, 0 Blocked/);
   const [merged] = JSON.parse(readFileSync(join(work, "webdriver.json"), "utf8"));
   assert.deepEqual({ by: merged.by, status: merged.status, evidence: merged.evidence }, { by: "agent-judge", status: "ok", evidence: listed.looks[0].file });
   assert.deepEqual(JSON.parse(judge("list")), [], "a judged step is listed no more");

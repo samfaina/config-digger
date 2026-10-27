@@ -27,6 +27,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
   - `webdriver`: `<file> > <step id>`, the step module in `uat/auto/webdriver/steps/`, as in `uat/auto/webdriver/steps/notices.mjs > 5.1`.
   - `sandbox`: `<file> > <step id>`, the `Step` block in a script of `uat/auto/sandbox/`, as in `uat/auto/sandbox/in-sandbox.ps1 > 9.2`, or `uat/auto/sandbox/run.ps1 > 9.1` for the verdict `run.ps1` writes itself.
   - `visual`: a bare shot name of `SHOTS` in `crates/config-digger-app/ui/scripts/screenshots.ts`, as in `inventory`.
+  - `agent-judge`: the same as `webdriver`, the step module whose screenshots the judge reads. A step that lists `agent-judge` lists `webdriver` too.
   - The other tools: the same `<file> > <step id>`. Nothing checks them yet: each one's ticket adds its check when it lands.
 - `manual` (optional): what a person still checks on the step, and why no tool can, such as how a notice moves. The plan is the only place it lives: the WebDriver walk reads it from here.
 
@@ -43,7 +44,7 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 5. Use only throwaway data: `cd-throwaway-*` Entries and the fake Secret `not-a-real-secret`. When a step needs data the setup script does not create yet, add it to the script, and use `setup` when the step needs it fresh.
 6. List the issue in `covers`.
 7. Fill `automation` with each tool that walks the step, and its `test`: when a step module, a `Step` block or a test of the fake UI covers it, list it. Fill `manual` with what a person must still see, when a tool walks the step but can't see all of it. A step no tool walks needs neither.
-8. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), that a step opens the Agent homes tab before it presses Add Agent home, that each check is one sentence whose « and » pair up, that each `webdriver`, `sandbox` or `visual` test names a step module, a `Step` block or a shot that exists, and that a step that lists `agent-judge` lists `webdriver` too.
+8. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), that a step opens the Agent homes tab before it presses Add Agent home, that each check is one sentence whose « and » pair up, that each `webdriver`, `agent-judge`, `sandbox` or `visual` test names a step module, a `Step` block or a shot that exists, and that a step that lists `agent-judge` lists `webdriver` too.
 
 When a change to the app makes a step wrong, change the step's text and keep its id.
 
@@ -102,7 +103,7 @@ It takes every result of the walk whose `looks` is not empty, and every step who
 
 `uat/auto/webdriver/judge.mjs` does the mechanical half, and the model only does the looking. `--work` is the `-Work` of `run.ps1`, `$env:TEMP\config-digger-uat` by default, whose `webdriver.json` holds the walk's results and `shots` its screenshots.
 
-- `node uat/auto/webdriver/judge.mjs list [--work <dir>]` prints the steps to judge, as JSON. Each has its step's `title`, `goal`, `instructions` and `expect` from `uat/plan.json` in the checkout, which is the commit under test; `walk`, the walk's own `status`, `checks` and `notes`; and `looks`, each `{ what, file }` with the PNG's absolute path, and `missing: true` when it is not on disk. A step the judge can't judge has `blocked`, saying why: the walk left it Blocked, took no screenshot of it, or one of its screenshots is missing.
+- `node uat/auto/webdriver/judge.mjs list [--work <dir>]` prints the steps to judge, as JSON. Each has its step's `title`, `goal`, `instructions` and `expect` from `uat/plan.json` in the checkout, which is the commit under test; `walk`, the walk's own `status`, `checks` and `notes`; and `looks`, each `{ what, file }` with the PNG's absolute path, and `missing: true` when it is not on disk. A step the judge can't judge has `unjudged`, saying why: the walk left it Blocked, took no screenshot of it, or one of its screenshots is missing.
 - `node uat/auto/webdriver/judge.mjs merge --verdicts <file> [--work <dir>]` writes the judge's verdicts into `webdriver.json` and prints how many are OK, KO and Blocked. The file holds one entry per listed step, `{ id, status, notes, evidence }`. `node --test uat/auto/webdriver/judge.test.mjs` tests both modes.
 
 The verdict on a step:
@@ -110,10 +111,10 @@ The verdict on a step:
 - `ok` when the walk's status was `ok`, and every `looks` entry and every part of `expect` a picture can show holds in the screenshots.
 - `ko` when a screenshot breaks one. The notes name the part of `expect`, what the picture shows instead, and the screenshot's file name, as in "Delete backup en History es violeta, no rojo: expect dice que los cuatro botones comparten un rojo. Captura 7.5-2-botones.png."
 - `blocked` when a screenshot a `looks` entry names is missing on disk, the walk took none of a step that lists `agent-judge`, or the walk's status was `blocked`.
-- A walk `ko` stays `ko`, never `ok`, with the judge's findings on the look added to its notes.
+- A walk `ko` stays `ko`, never `ok` or `blocked`, with the judge's findings on the look added to its notes.
 - What a picture can't show, such as timing, motion, or text a check already asserted, the judge leaves alone. One line of its notes says so; it never guesses.
 
-The merge replaces each listed step's result with the judge's `status`, `by: "agent-judge"` and `evidence`: the absolute path of the screenshot that decided the verdict, or of those the judge looked at for an `ok`, joined by `; `. The walk's notes stay, and the judge's lines follow under a line of their own, "Juez:". The other fields stay as the walk wrote them, so step 4 of Publishing a run imports them unchanged. The merge enforces the rules it can: a walk `ko` stays `ko`, a step listed with `blocked` merges as `blocked` whatever the judge said, with the missing screenshot as its `evidence`, or the walk's own when none is missing. It refuses the whole file, and writes nothing, on a verdict for a step it didn't list, a listed step with no verdict, a status other than `ok`, `ko` or `blocked`, a `ko` or `blocked` without notes, or an `evidence` that names anything but the step's own screenshots.
+The merge replaces each listed step's result with the judge's `status`, `by: "agent-judge"` and `evidence`: the absolute path of the screenshot that decided the verdict, or of those the judge looked at for an `ok`, joined by `; `. The walk's notes stay, and the judge's lines follow under a line of their own, "Juez:". The other fields stay as the walk wrote them, so step 4 of Publishing a run imports them unchanged. The merge enforces the rules it can: a walk `ko` stays `ko`, and a step listed with `unjudged` merges as `blocked` whatever the judge said, or `ko` after a walk `ko`, with a line "Bloqueado: …" or "Sin juzgar: …" saying why, and the missing screenshot as its `evidence`, or the walk's own when none is missing. It refuses the whole file, and writes nothing, on a verdict for a step it didn't list, a listed step with no verdict or with two, a status other than `ok`, `ko` or `blocked`, a `ko` or `blocked` without notes on a step the judge could judge, or an `evidence` that names anything but the step's own screenshots. It takes a screenshot's path with either slash and in any case, and writes it as the listing does.
 
 To judge a walk, the agent that ran it follows this prompt, or gives it to a subagent:
 
@@ -121,7 +122,8 @@ To judge a walk, the agent that ran it follows this prompt, or gives it to a sub
 Judge the look of the UAT steps of the local WebDriver walk in <work folder>.
 1. Run `node uat/auto/webdriver/judge.mjs list --work <work folder>` from the repo root.
 2. For each step it lists:
-   - With `blocked`: write the verdict `blocked`, with "" as its notes and evidence. The merge writes why.
+   - With `unjudged`: open nothing, and write the verdict `blocked`, with "" as its notes and evidence. The merge
+     writes why, and keeps a walk `ko` as `ko`.
    - Otherwise, open each PNG of its `looks` with the Read tool. Check each `looks` entry's `what`, and each part of
      `expect` a picture can show, against the screenshots. Read `walk` for what the walk's checks already asserted.
    - Write `ok` when everything a picture can show holds, else `ko`, naming in the notes, in Spanish, the part of
