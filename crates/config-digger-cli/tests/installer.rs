@@ -78,7 +78,6 @@ impl Harness {
             .env("ProgramFiles", self.root.path().join("ProgramFiles"))
             .env_remove("CODEX_HOME")
             .env_remove("CLAUDE_CONFIG_DIR")
-            .env_remove("CLAUDE_USER_DATA_DIR")
             .env_remove("RUST_LOG")
             .output()
             .unwrap();

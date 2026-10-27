@@ -846,7 +846,7 @@
           ]
         },
         {
-          "description": "The folder an environment variable holds, such as Claude Desktop's\n`CLAUDE_USER_DATA_DIR`, while it is set to an absolute path. The Agent\nuses it whenever it is set, creating it if needed.",
+          "description": "The folder an environment variable holds, such as Codex's `CODEX_HOME`,\nwhile it is set to an absolute path. The Agent uses it whenever it is\nset, creating it if needed.",
           "type": "object",
           "properties": {
             "variable": {

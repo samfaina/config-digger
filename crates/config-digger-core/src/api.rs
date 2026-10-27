@@ -1957,7 +1957,7 @@ pub enum HomeSource {
     Default,
     /// The environment variable that holds its folder.
     Environment {
-        /// The variable's name, such as `CLAUDE_USER_DATA_DIR`.
+        /// The variable's name, such as `CODEX_HOME`.
         variable: String,
     },
     /// Another location the Agent definition knows of, such as an MSIX

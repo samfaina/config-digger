@@ -138,7 +138,6 @@ impl Harness {
             .env("ProgramFiles", self.root.path().join("ProgramFiles"))
             .env_remove("CODEX_HOME")
             .env_remove("CLAUDE_CONFIG_DIR")
-            .env_remove("CLAUDE_USER_DATA_DIR")
             .env_remove("RUST_LOG");
         // Variables that make Claude Code ignore its cached Feature gates.
         for variable in [
@@ -2833,25 +2832,27 @@ fn homes_and_agents_say_whether_a_variable_or_a_known_location_found_a_home() {
     let msix = harness
         .local_app_data()
         .join(r"Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude");
-    let custom = harness.folder("claude-data");
-    for folder in [&classic, &msix, &custom] {
+    for folder in [&classic, &msix] {
         std::fs::create_dir_all(folder).unwrap();
         std::fs::write(folder.join(config), "{}").unwrap();
     }
-    let env = [("CLAUDE_USER_DATA_DIR", custom.to_str().unwrap())];
+    let codex_home = harness.folder("codex-home");
+    std::fs::write(codex_home.join("config.toml"), "").unwrap();
+    let env = [("CODEX_HOME", codex_home.to_str().unwrap())];
 
     let list = harness.run_with_env(&["homes", "list", "--json"], &env);
     let text = harness.run_with_env(&["homes", "list", "--wide"], &env);
     let agents = harness.run_with_env(&["agents", "--wide"], &env);
 
     assert_eq!(list.code, 0, "{}", list.stderr);
-    let sources: Vec<(String, Value)> = list.document()["homes"]
+    let sources: Vec<(String, String, Value)> = list.document()["homes"]
         .as_array()
         .unwrap()
         .iter()
-        .filter(|home| home["agent"] == "claude-desktop")
+        .filter(|home| home["agent"] == "claude-desktop" || home["agent"] == "codex")
         .map(|home| {
             (
+                home["agent"].as_str().unwrap().to_owned(),
                 home["home"].as_str().unwrap().to_owned(),
                 home["source"].clone(),
             )
@@ -2861,17 +2862,26 @@ fn homes_and_agents_say_whether_a_variable_or_a_known_location_found_a_home() {
         sources,
         vec![
             (
-                "user-data-dir".to_owned(),
-                json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
+                "claude-desktop".to_owned(),
+                "classic".to_owned(),
+                json!({"kind": "default"})
             ),
-            ("classic".to_owned(), json!({"kind": "default"})),
-            ("msix".to_owned(), json!({"kind": "known_location"})),
+            (
+                "claude-desktop".to_owned(),
+                "msix".to_owned(),
+                json!({"kind": "known_location"})
+            ),
+            (
+                "codex".to_owned(),
+                "codex-home".to_owned(),
+                json!({"kind": "environment", "variable": "CODEX_HOME"})
+            ),
         ]
     );
     for run in [&text, &agents] {
         assert_eq!(run.code, 0, "{}", run.stderr);
         for source in [
-            "environment variable %CLAUDE_USER_DATA_DIR%",
+            "environment variable %CODEX_HOME%",
             "definition default",
             "known location",
         ] {

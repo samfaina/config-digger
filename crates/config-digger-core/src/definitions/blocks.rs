@@ -239,9 +239,9 @@ impl Locate for JsonListLocator {
     }
 }
 
-/// The folder an environment variable holds, such as Claude Desktop's
-/// `CLAUDE_USER_DATA_DIR`, while it is set to an absolute path. The Agent
-/// uses it whenever it is set, creating it if needed.
+/// The folder an environment variable holds, such as Codex's `CODEX_HOME`,
+/// while it is set to an absolute path. The Agent uses it whenever it is
+/// set, creating it if needed.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EnvLocator {

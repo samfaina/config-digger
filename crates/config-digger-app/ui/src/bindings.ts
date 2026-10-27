@@ -925,7 +925,7 @@ export type HomeSource =
 { kind: "default" } | 
 /**  The environment variable that holds its folder. */
 { kind: "environment"; 
-/**  The variable's name, such as `CLAUDE_USER_DATA_DIR`. */
+/**  The variable's name, such as `CODEX_HOME`. */
 variable: string } | 
 /**
  *  Another location the Agent definition knows of, such as an MSIX

@@ -199,6 +199,30 @@ fn a_folder_codex_home_names_that_is_already_a_home_is_listed_once() {
     assert_eq!(codex_items(&inventory).count(), 1);
 }
 
+#[test]
+fn a_home_the_user_adds_where_codex_home_finds_it_keeps_the_variable_as_its_source() {
+    let other = Path::new(r"D:\codex-home");
+    let fs = FakeFileSystem::new().with_file(
+        other.join("config.toml"),
+        "[mcp_servers.fetch]\ncommand = \"uvx\"\n",
+    );
+    let core = core_with(&fs, env().with_var("CODEX_HOME", other.to_str().unwrap()));
+
+    core.add_home(other, "codex").unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let homes: Vec<_> = codex_homes(&inventory)
+        .filter(|home| home.folder == other)
+        .collect();
+    assert_eq!(homes.len(), 1);
+    assert_eq!(homes[0].home, "codex-home");
+    assert_eq!(
+        json_of(&homes[0].source),
+        json!({ "kind": "environment", "variable": "CODEX_HOME" })
+    );
+}
+
 /// Orca's Codex home, a copy of the user's `config.toml` next to links to
 /// `~\.codex\plugins` and `~\.codex\skills`.
 fn with_orca(fs: FakeFileSystem) -> FakeFileSystem {

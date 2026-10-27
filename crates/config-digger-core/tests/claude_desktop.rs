@@ -189,38 +189,28 @@ fn with_classic_at(fs: FakeFileSystem, folder: &Path) -> FakeFileSystem {
 }
 
 #[test]
-fn claude_user_data_dir_names_the_home_claude_desktop_reads_and_skips_the_others() {
+fn claude_user_data_dir_names_no_home_since_signed_builds_ignore_it() {
     let custom = PathBuf::from(r"E:\claude-data");
-    let fs = with_classic_at(store(), &custom);
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    let fs = with_classic_at(fs, &custom);
     let env = env().with_var("CLAUDE_USER_DATA_DIR", r"E:\claude-data");
-    let inventory = inventory_with(&fs, env);
 
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(filesystem.home, "user-data-dir");
+    let with_variable = inventory_with(&fs, env);
+
+    let filesystem = item(&with_variable, "filesystem");
+    assert_eq!(filesystem.home, "classic");
     assert_eq!(json(filesystem.state), "effective");
-    assert_eq!(home(&inventory, "user-data-dir").folder, custom);
-    assert_eq!(home(&inventory, "user-data-dir").not_read, None);
-
-    let skipped = home(&inventory, "msix");
-    let not_read = skipped
-        .not_read
-        .as_ref()
-        .expect("the MSIX home is not read");
-    assert_eq!(not_read.read_instead.as_deref(), Some("user-data-dir"));
-    assert!(
-        not_read.sentence.contains(r"E:\claude-data"),
-        "{}",
-        not_read.sentence
-    );
-    let notes = item(&inventory, "notes");
-    assert_eq!(json(notes.state), "unread");
-    let reason = notes.entries[0].reason.as_ref().unwrap();
-    assert_eq!(json(reason.code), "lookup_order_skips_home");
-    assert_eq!(
-        json(&notes.entries[0].disable)["code"],
-        "unread",
-        "an Unread Entry can only be Removed"
-    );
+    for home in &with_variable.homes {
+        assert_ne!(home.folder, custom, "{home:#?}");
+        if let Some(not_read) = &home.not_read {
+            assert!(
+                !not_read.sentence.contains(r"E:\claude-data"),
+                "{}",
+                not_read.sentence
+            );
+        }
+    }
+    assert_eq!(with_variable, inventory(&fs));
 }
 
 #[test]
@@ -267,17 +257,11 @@ fn third_party_inference_keeps_a_home_of_its_own_that_is_always_read() {
 }
 
 #[test]
-fn each_home_says_whether_the_definition_default_a_variable_or_a_known_location_found_it() {
+fn each_home_says_whether_the_definition_default_or_a_known_location_found_it() {
     let fs = with_classic_at(store(), Path::new(CLASSIC));
     let fs = with_classic_at(fs, &PathBuf::from(LOCAL_APP_DATA).join("Claude-3p"));
-    let fs = with_classic_at(fs, Path::new(r"E:\claude-data"));
-    let env = env().with_var("CLAUDE_USER_DATA_DIR", r"E:\claude-data");
-    let inventory = inventory_with(&fs, env);
+    let inventory = inventory(&fs);
 
-    assert_eq!(
-        json(&home(&inventory, "user-data-dir").source),
-        serde_json::json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
-    );
     assert_eq!(
         json(&home(&inventory, "classic").source),
         serde_json::json!({"kind": "default"})
@@ -289,30 +273,6 @@ fn each_home_says_whether_the_definition_default_a_variable_or_a_known_location_
     assert_eq!(
         json(&home(&inventory, "third-party").source),
         serde_json::json!({"kind": "known_location"})
-    );
-}
-
-#[test]
-fn a_home_the_user_adds_where_a_variable_finds_it_keeps_the_variable_as_its_source() {
-    let custom = PathBuf::from(r"E:\claude-data");
-    let fs = with_classic_at(FakeFileSystem::new(), &custom);
-    let env = env().with_var("CLAUDE_USER_DATA_DIR", r"E:\claude-data");
-    let core = core_with(&fs, env);
-
-    core.add_home(&custom, "claude-desktop").unwrap();
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    let inventory = core.resolve(&snapshot, &Context::default());
-
-    let homes: Vec<&Home> = inventory
-        .homes
-        .iter()
-        .filter(|home| home.agent == "claude-desktop")
-        .collect();
-    assert_eq!(homes.len(), 1);
-    assert_eq!(homes[0].home, "user-data-dir");
-    assert_eq!(
-        json(&homes[0].source),
-        serde_json::json!({"kind": "environment", "variable": "CLAUDE_USER_DATA_DIR"})
     );
 }
 
