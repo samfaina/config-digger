@@ -1250,6 +1250,52 @@ fn of_two_nested_skills_at_one_path_the_first_folder_s_wins_and_in_one_folder_cu
 }
 
 #[test]
+fn of_two_nested_skills_at_one_path_the_first_folder_s_wins_whatever_their_markers() {
+    let fs = git_app_with_skills(&[r"y\.cursor\skills\kinds", r"x\.agents\skills\kinds"]);
+
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        skills_named(&inventory, "kinds")[0].1,
+        [
+            (
+                "effective".to_owned(),
+                project(r"app\x\.agents\skills\kinds").display().to_string()
+            ),
+            (
+                "shadowed".to_owned(),
+                project(r"app\y\.cursor\skills\kinds").display().to_string()
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_nested_claude_skill_in_the_first_folder_wins_while_third_party_configs_are_on() {
+    let fs = git_app_with_skills(&[r"y\.cursor\skills\k", r"x\.claude\skills\k"]);
+    let (x, y) = (
+        project(r"app\x\.claude\skills\k").display().to_string(),
+        project(r"app\y\.cursor\skills\k").display().to_string(),
+    );
+
+    let on = inventory_at(&with_third_party(fs.clone(), true), &project("app"));
+    let off = inventory_at(&with_third_party(fs, false), &project("app"));
+
+    assert_eq!(
+        skills_named(&on, "k")[0].1,
+        [
+            ("effective".to_owned(), x.clone()),
+            ("shadowed".to_owned(), y.clone())
+        ]
+    );
+    let off = &skills_named(&off, "k")[0].1;
+    assert!(
+        off.contains(&("effective".to_owned(), y)) && off.contains(&("disabled".to_owned(), x)),
+        "{off:?}"
+    );
+}
+
+#[test]
 fn ignore_files_leave_out_the_folders_down_to_the_marker_not_the_skills_folder() {
     let fs = git_app_with_skills(&[
         r"gi-folder\.cursor\skills\ignored-folder",

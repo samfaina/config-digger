@@ -686,10 +686,12 @@ on_read_failure = "ignores_file"
 # `~\.agents\skills\review` and a Project's `.cursor\skills\review`; the
 # first in this order wins, a user's skill over a Project's [test]. A nested
 # skill wins over both [test]. Of two nested ones, the one whose folder
-# holding the marker comes first by path wins, and of one folder's, the
-# first marker in the order above [test]; config-digger ranks the markers
-# first instead, so of `x\.agents\skills\k` and `y\.cursor\skills\k` it
-# shows the second Effective, where Cursor uses the first (#359).
+# holding the marker comes first by path wins, whatever their markers,
+# `x\.agents\skills\k` over `y\.cursor\skills\k`, and by path, not by depth,
+# `a\b\c\.cursor\skills\k` over `b\.cursor\skills\k`; of one folder's, the
+# first marker in the order above [test]. So the five nested locations are
+# one group of `precedence`. Its folders compare name by name, case aside,
+# as the walk down enters them, which puts `a\b\` before `a-b\`.
 #
 # Cursor lists a `SKILL.md` without a frontmatter, one whose YAML does not
 # parse or never closes, under its folder's name in the `/` menu, where the
@@ -703,9 +705,10 @@ on_read_failure = "ignores_file"
 # before a Project's until one is picked, after which the order follows
 # that record, which can match either path [test].
 [items.skill]
-precedence = ["nested-cursor-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "nested-agents-skills", "user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
+precedence = [["nested-cursor-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "nested-agents-skills"], "user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }
 checks = ["frontmatter", "rules", "disable", "precedence"]
+unverified = "Of two nested skills at one path whose folders differ where one has a separator and the other a character such as `-`, `a\\b\\.cursor\\skills\\k` and `a-b\\.cursor\\skills\\k`, the first is taken to win, as config-digger walks folders name by name: how Cursor orders the two is not known."
 
 # Cursor has no switch for one skill [docs, code]: config-digger parks the
 # folder of one it Disables in its own store, and puts it back on Enable.

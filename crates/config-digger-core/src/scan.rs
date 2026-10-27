@@ -909,6 +909,9 @@ pub(crate) struct ScannedEntry {
     /// How many folders up from the Project folder its location was read,
     /// 0 outside a Project.
     pub depth: usize,
+    /// For a location a walk down reads, the folder the walk found holding
+    /// its path, such as `app\x` for `app\x\.agents\skills`.
+    pub found_in: Option<PathBuf>,
     /// For a skill, why the Agent may not read its `SKILL.md` as written.
     pub defect: Option<SkillDefect>,
     /// For a skill read under its location's name rule, its name and defect
@@ -1408,6 +1411,11 @@ fn read_as_if(
                     scanner.walk_below = down.cloned();
                     scanner.read_location(home, definition, location, path, key, depth);
                     scanner.walk_below = None;
+                    if down.is_some() {
+                        for entry in &mut scanner.entries[start..] {
+                            entry.found_in = Some(folder.clone());
+                        }
+                    }
                     let name = folder.file_name().unwrap_or_default().to_string_lossy();
                     let parts = NameParts {
                         plugin: None,
@@ -3768,6 +3776,7 @@ impl Scanner<'_> {
                 config: masked.value,
                 masked: masked.key_paths,
                 depth: 0,
+                found_in: None,
                 defect: None,
                 unruled: None,
                 link: None,
@@ -3834,6 +3843,7 @@ impl Scanner<'_> {
                     config: value.clone(),
                     masked: Vec::new(),
                     depth,
+                    found_in: None,
                     defect: None,
                     unruled: None,
                     link: None,
@@ -4281,6 +4291,7 @@ impl Scanner<'_> {
                     config: found.value.clone(),
                     masked: Vec::new(),
                     depth,
+                    found_in: None,
                     defect: None,
                     unruled: None,
                     link: None,
@@ -4373,6 +4384,7 @@ impl Scanner<'_> {
                         config: serde_json::Value::Object(serde_json::Map::new()),
                         masked: Vec::new(),
                         depth,
+                        found_in: None,
                         defect: None,
                         unruled: None,
                         link: Some(link),
@@ -4435,6 +4447,7 @@ impl Scanner<'_> {
             config: read.config,
             masked: Vec::new(),
             depth,
+            found_in: None,
             defect: read.defect,
             unruled: read.unruled,
             link,

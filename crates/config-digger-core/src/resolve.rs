@@ -211,10 +211,18 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            // A later file of a settings source overrides an earlier one.
+            // Within a group of `precedence`, the folder an Entry was found in
+            // comes first. A later file of a settings source overrides an
+            // earlier one.
             let rank = |entry: &ScannedEntry| {
+                let (item, in_group) = definition.group_rank(definition.location(&entry.location));
+                let folder = in_group
+                    .and(entry.found_in.as_deref())
+                    .map(paths::folder_order);
                 (
-                    definition.rank(definition.location(&entry.location)),
+                    item,
+                    folder,
+                    in_group,
                     overridden(definition, snapshot, entry),
                 )
             };
