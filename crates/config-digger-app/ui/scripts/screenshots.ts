@@ -102,6 +102,14 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "projects-hidden",
+    steps: async (page) => {
+      await rail(page, "Projects & homes");
+      await page.getByRole("button", { name: /Hidden · / }).click();
+      await page.locator(".place-row.dimmed").first().scrollIntoViewIfNeeded();
+    },
+  },
+  {
     name: "action-dialog-stranded",
     steps: async (page) => {
       await rail(page, "Projects & homes");

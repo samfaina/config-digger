@@ -832,6 +832,20 @@ describe("a tag", () => {
   });
 });
 
+/** The declarations of a row of Projects & homes of the class `selector`, over those of every row. */
+const placeRow = (selector: string) => new Map([...styled(".place-row"), ...styled(selector)]);
+
+/** The width, style and colour of the border of a row of the class `selector`, from its `border` or its longhands. */
+const placeBorder = (selector: string) => {
+  const declarations = placeRow(selector);
+  const [width, style, edge] = declarations.get("border")?.split(/\s+/) ?? [];
+  return {
+    width: px(declarations.get("border-width") ?? width),
+    style: declarations.get("border-style") ?? style,
+    edge: declarations.get("border-color") ?? edge,
+  };
+};
+
 describe("a hidden row of Projects & homes", () => {
   test("is never faded, as no text or outline on it could undo an opacity or a filter on the row", () => {
     const dimming = allRules.filter((found) => found.selector.split(",").some((listed) => listed.includes(".place-row.dimmed")));
@@ -844,15 +858,14 @@ describe("a hidden row of Projects & homes", () => {
 
   /** What a hidden row is drawn on: its own background, or the panel's where it has none. */
   const hiddenRow = () => {
-    const background = new Map([...styled(".place-row"), ...styled(".place-row.dimmed")]).get("background");
+    const background = placeRow(".place-row.dimmed").get("background");
     return colour(background === "transparent" ? styled(".panel").get("background") : background);
   };
 
   test("still reads as hidden next to a shown row, drawn apart from a tile", () => {
     expect(styled(".place-row.dimmed").get("background")).not.toBe(styled(".place-row").get("background"));
     // Its outline is as wide as a shown row's transparent one, so Hide and Unhide never move the rows.
-    const width = (selector: string) => px(styled(selector).get("border")?.split(/\s+/)[0]);
-    expect(width(".place-row.dimmed")).toBe(width(".place-row"));
+    expect(placeBorder(".place-row.dimmed").width).toBe(placeBorder(".place-row").width);
   });
 
   test("has a name, lines, a count and tags that meet WCAG AA, and tag outlines at 3:1 against it", () => {
@@ -876,6 +889,31 @@ describe("a hidden row of Projects & homes", () => {
     const label = colour(styled(".cta").get("color"));
     for (const selector of [".cta.secondary", ".cta.secondary:hover", ".cta.danger", ".cta.danger:hover"]) {
       expect(contrast(label, colour(styled(selector).get("background"))), selector).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe("the No Project row of the Projects tab", () => {
+  test("reads apart from a hidden row in more than colour, as it has neither its dashed outline nor a background of its own", () => {
+    const sameStyle = placeBorder(".place-row.informational").style === placeBorder(".place-row.dimmed").style;
+    const sameBackground = placeRow(".place-row.informational").get("background") === placeRow(".place-row.dimmed").get("background");
+    expect(sameStyle && sameBackground).toBe(false);
+    expect(placeBorder(".place-row.informational").edge).toBe("transparent");
+    expect(placeRow(".place-row.informational").get("background")).toBe("transparent");
+  });
+
+  test("keeps a shown row's transparent border, so it is as big as every other row", () => {
+    expect(placeBorder(".place-row.informational").width).toBe(placeBorder(".place-row").width);
+  });
+
+  test("has a name and a line that meet WCAG AA against the panel it is drawn on", () => {
+    const panel = colour(styled(".panel").get("background"));
+    const name = styled(".place-row.informational .place-name").get("color") ?? styled(".place-name").get("color") ?? styled(":root").get("color");
+    for (const [what, text] of [
+      ["the name", name],
+      [".place-sub", styled(".place-row.informational .place-sub").get("color") ?? styled(".place-sub").get("color")],
+    ]) {
+      expect(contrast(colour(text), panel), what).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

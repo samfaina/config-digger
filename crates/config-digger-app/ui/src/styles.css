@@ -2562,8 +2562,9 @@ p {
   color: var(--hint);
 }
 
+/* No Project: a note on the panel, with no tile and no visible border, so a
+   dashed one means only a hidden row. */
 .place-row.informational {
-  border: 1px dashed var(--line);
   background: transparent;
 }
 
