@@ -107,6 +107,13 @@ async function busyPress(t, path, button, command, busyText) {
 
 const allDisabled = (buttons) => Array.isArray(buttons) && buttons.length > 0 && buttons.every((b) => b.disabled);
 
+// Scrolls the first element matching `css` whose text holds `text` to the
+// middle of what scrolls it, so that the shot taken next shows it.
+async function scrollTo(s, css, text = "") {
+  await s.exec(`[...document.querySelectorAll(arguments[0])].find((e) => e.textContent.includes(arguments[1]))?.scrollIntoView({ block: "center" });`, css, text);
+  await wait(200);
+}
+
 export default [
   {
     id: "10.1",
@@ -407,10 +414,12 @@ export default [
         return r > g + 40 && r > b + 40;
       };
       t.check(red.length > 0 && red.every((l) => reddish(l.color) || reddish(l.bg)), "el diff marca en rojo las líneas de «cd-throwaway-leftover»", JSON.stringify(red.slice(0, 2)));
+      await scrollTo(s, ".dialog .diff-removed", "cd-throwaway-leftover");
       await t.shot("diff", "las líneas de cd-throwaway-leftover salen en rojo");
       const outside = parts.paths.filter((p) => !p.replaceAll("/", "\\").toLowerCase().startsWith(t.root.toLowerCase()));
       t.check(outside.length === 0, `ninguna casilla ni aviso nombra una ruta fuera de ${t.root}`, outside.join(", "));
       checkBeforeYouApply(t, parts.before);
+      if (parts.before.length) await scrollTo(s, ".dialog .check");
       if (parts.before.length) await t.shot("before-you-apply", "si hay aviso: bloque ámbar con borde ámbar a la izquierda, icono junto a su casilla, primera línea en negrita, rutas en monospace en su línea; si hay nota: bloque azul con borde azul claro e icono de información");
       t.check(parts.foot && /^Each touched file is copied to .+ before anything is written\.$/.test(parts.foot.text), "la nota del pie dice «Each touched file is copied to … before anything is written.»", parts.foot?.text);
       if (parts.foot) {
@@ -418,6 +427,7 @@ export default [
         t.check(r >= 160 && g >= 160 && b >= 160, "la nota del pie va en gris claro, no en gris oscuro", parts.foot.color);
         if (parts.textSize) t.check(Math.abs(parseFloat(parts.foot.size) - parseFloat(parts.textSize)) <= 1.5, "la nota del pie tiene casi el tamaño del texto de las casillas", `${parts.foot.size} frente a ${parts.textSize}`);
       }
+      await scrollTo(s, ".dialog .dialog-backup");
       await t.shot("pie", "la nota del pie va en gris claro, casi blanco, del tamaño del texto de las casillas");
       const result = await confirm(s, "Remove");
       t.check(/Removed 1 Entry\. Operation \S+: verified\./.test(result.text), "el resultado dice «Removed 1 Entry. Operation <id>: verified.»", result.text.split("\n").find((l) => l.includes("Operation")));
@@ -472,6 +482,10 @@ export default [
       groups = await projectGroups(s);
       const row = inGroup(groups, "▾ Hidden", path) ?? groups.find((g) => g.title.includes("Hidden"))?.rows.find((r) => r.name === path);
       t.check(row, "abierto, el grupo muestra el Project");
+      // The list ends at the Hidden group: the shot waits for the notices
+      // over it to go, the Undo of 10.7 lasting 10 s.
+      await s.until(async () => (await notices(s)).length === 0, { what: "the notices gone", timeout: 12000 }).catch(() => {});
+      await scrollTo(s, ".place-row", path);
       await t.shot("hidden", "el Project oculto sale en gris");
       await s.click(await s.until(() => rowButton(s, path, "Unhide"), { what: "Unhide" }));
       const listed = await waitNotice(s, `${path} is listed again`);
@@ -713,6 +727,10 @@ export default [
       const remove = await rowButton(s, name, "Remove");
       const removeClass = remove ? await s.attr(remove, "class") : "";
       t.check(removeClass.includes("danger") && (await buttonEl(s, "Remove all", ".places")), "su fila tiene un botón «Remove» rojo, y el grupo un botón «Remove all»", removeClass);
+      // The shot needs the group's title in view, and the notice of Remove
+      // from list gone from over the row.
+      await s.until(async () => (await notices(s)).length === 0, { what: "the notices gone", timeout: 8000 }).catch(() => {});
+      await scrollTo(s, ".place-group-toggle", "Stranded");
       await t.shot("stranded", "el grupo Stranded con su fila, el Remove rojo y el Remove all");
 
       const cli = join(dirname(t.app), "config-digger.exe");

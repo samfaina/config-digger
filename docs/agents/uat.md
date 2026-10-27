@@ -27,6 +27,7 @@ A manual UAT walk of config-digger runs from a kit in `uat/`. The plan lives in 
   - `webdriver`: `<file> > <step id>`, the step module in `uat/auto/webdriver/steps/`, as in `uat/auto/webdriver/steps/notices.mjs > 5.1`.
   - `sandbox`: `<file> > <step id>`, the `Step` block in a script of `uat/auto/sandbox/`, as in `uat/auto/sandbox/in-sandbox.ps1 > 9.2`, or `uat/auto/sandbox/run.ps1 > 9.1` for the verdict `run.ps1` writes itself.
   - `visual`: a bare shot name of `SHOTS` in `crates/config-digger-app/ui/scripts/screenshots.ts`, as in `inventory`.
+  - `agent-judge`: the same as `webdriver`, the step module whose screenshots the judge reads. A step that lists `agent-judge` lists `webdriver` too.
   - The other tools: the same `<file> > <step id>`. Nothing checks them yet: each one's ticket adds its check when it lands.
 - `manual` (optional): what a person still checks on the step, and why no tool can, such as how a notice moves. The plan is the only place it lives: the WebDriver walk reads it from here.
 
@@ -43,7 +44,7 @@ Keys are in English. The text is in the tester's language, Spanish today. The ru
 5. Use only throwaway data: `cd-throwaway-*` Entries and the fake Secret `not-a-real-secret`. When a step needs data the setup script does not create yet, add it to the script, and use `setup` when the step needs it fresh.
 6. List the issue in `covers`.
 7. Fill `automation` with each tool that walks the step, and its `test`: when a step module, a `Step` block or a test of the fake UI covers it, list it. Fill `manual` with what a person must still see, when a tool walks the step but can't see all of it. A step no tool walks needs neither.
-8. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), that a step opens the Agent homes tab before it presses Add Agent home, that each check is one sentence whose « and » pair up, and that each `webdriver`, `sandbox` or `visual` test names a step module, a `Step` block or a shot that exists.
+8. Run `cargo test -p xtask --test uat_plan`. It checks the plan against the schema, that no step id is used twice, that no step asks for a window smaller than the app's smallest (`minWidth` and `minHeight` in `crates/config-digger-app/tauri.conf.json`), that a step opens the Agent homes tab before it presses Add Agent home, that each check is one sentence whose « and » pair up, that each `webdriver`, `agent-judge`, `sandbox` or `visual` test names a step module, a `Step` block or a shot that exists, and that a step that lists `agent-judge` lists `webdriver` too.
 
 When a change to the app makes a step wrong, change the step's text and keep its id.
 
@@ -88,11 +89,55 @@ Most steps run without a tester, from `uat/auto/`, before the run is published. 
 
 The WebDriver walk drives the release build through `tauri-driver` and the `msedgedriver` of the installed WebView2, which `run.ps1` downloads. It runs the app on a throwaway Windows profile, a folder named `cd-throwaway-profile` that stands for `USERPROFILE`, `APPDATA` and `LOCALAPPDATA`, so the app never sees the tester's Agent homes or data, and on the throwaway data of `uat/data/cd-throwaway-setup.ps1`. It walks the steps in the plan's order, one module per section in `uat/auto/webdriver/steps/`, and answers the Windows folder picker with UI Automation (`picker.ps1`). Steps 7.2 and 13.1 open Claude Desktop, and close it again if it was closed. Step 7.6 opens a second Claude Desktop with `--user-data-dir` on the throwaway Claude Desktop home, and closes only that one. Without Claude Desktop installed, these steps are Blocked. Step 14.2 measures the scans of the tester's own homes with the CLI next to the app, `list -v` and `disable --dry-run -v`, which write nothing. Step 14.3 adds to its notes the `plan finished` line of the same `disable --dry-run -v` on the tester's own homes. Step 5.4 emulates Windows' animation effects turned off with `prefers-reduced-motion`, the setting WebView2 takes from them, and never changes the tester's setting. At the end the walk checks that config-digger's real data folders and the real Codex and Claude Desktop configuration are byte for byte as before, and exits with 2 when one changed. To see a busy state that lasts less than a frame, a step holds a command's answer: Tauri's `invoke` can't be wrapped, so `driver.mjs` holds the `fetch` it sends to `http://ipc.localhost/<command>`.
 
-Each step's checks are the plan's `expect`, one by one. What a style can't show, such as a colour seen as a whole or a shadow, is listed in `looks`, and in the result's notes under "A juzgar en capturas", with the screenshot to look at. The walk's `ok` then covers its checks only: before the step reaches a run, the agent that ran the walk reads those screenshots and sets the step's verdict, `ko` with what it saw when a picture breaks the `expect`, and `by: "agent-judge"`. A step whose `manual` in the plan says what a person must still see, such as how a notice moves, stays in the tester's walk, and the walk ends its notes with that line, "Queda para una persona: …". A step module never holds `manual`. A step that fails before any of its own checks, on its setup or on what an earlier step left, is `blocked`.
+Each step's checks are the plan's `expect`, one by one. What a style can't show, such as a colour seen as a whole or a shadow, is listed in `looks`, and in the result's notes under "A juzgar en capturas", with the screenshot to look at. The walk's `ok` then covers its checks only: before the step reaches a run, [the agent judge](#the-agent-judge) reads those screenshots and gives the step its verdict. A step whose `manual` in the plan says what a person must still see, such as how a notice moves, stays in the tester's walk, and the walk ends its notes with that line, "Queda para una persona: …". A step module never holds `manual`. A step that fails before any of its own checks, on its setup or on what an earlier step left, is `blocked`.
 
 When a step leaves the window blank, the walk notes what the page logged and its last commands, opens the app again and runs the step once more.
 
 When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, that each step it walks lists `webdriver` in its `automation` with a `test` ending in its id, that no step module holds `manual`, and the parts of the walk that need no app.
+
+### The agent judge
+
+The agent judge reads the screenshots of the local WebDriver walk and writes each step's verdict on its look into the walk's results. It runs after the walk, on the PC that ran it, and before [Publishing a run](#publishing-a-run). It never runs on CI, which takes no screenshot.
+
+It takes every result of the walk whose `looks` is not empty, and every step whose plan `automation` lists `agent-judge`, but a result it already judged. A step that lists `agent-judge` lists `webdriver` too, since its screenshots come from that walk: `uat_plan` checks it.
+
+`uat/auto/webdriver/judge.mjs` does the mechanical half, and the model only does the looking. `--work` is the `-Work` of `run.ps1`, `$env:TEMP\config-digger-uat` by default, whose `webdriver.json` holds the walk's results and `shots` its screenshots.
+
+- `node uat/auto/webdriver/judge.mjs list [--work <dir>]` prints the steps to judge, as JSON. Each has its step's `title`, `goal`, `instructions` and `expect` from `uat/plan.json` in the checkout, which is the commit under test; `walk`, the walk's own `status`, `checks` and `notes`; and `looks`, each `{ what, file }` with the PNG's absolute path, and `missing: true` when it is not on disk. A step the judge can't judge has `unjudged`, saying why: the walk left it Blocked, took no screenshot of it, or one of its screenshots is missing.
+- `node uat/auto/webdriver/judge.mjs merge --verdicts <file> [--work <dir>]` writes the judge's verdicts into `webdriver.json` and prints how many are OK, KO and Blocked. The file holds one entry per listed step, `{ id, status, notes, evidence }`. `node --test uat/auto/webdriver/judge.test.mjs` tests both modes.
+
+The verdict on a step:
+
+- `ok` when the walk's status was `ok`, and every `looks` entry and every part of `expect` a picture can show holds in the screenshots.
+- `ko` when a screenshot breaks one. The notes name the part of `expect`, what the picture shows instead, and the screenshot's file name, as in "Delete backup en History es violeta, no rojo: expect dice que los cuatro botones comparten un rojo. Captura 7.5-2-botones.png."
+- `blocked` when a screenshot a `looks` entry names is missing on disk, the walk took none of a step that lists `agent-judge`, or the walk's status was `blocked`. The judge also writes `blocked` when a screenshot is there but doesn't show what its `looks` entry names, such as when a notice covers it or the list is scrolled away from it. Its notes say what the shot shows instead, so that the step module takes the shot again.
+- A walk `ko` stays `ko`, never `ok` or `blocked`, with the judge's findings on the look added to its notes.
+- What a picture can't show, such as timing, motion, or text a check already asserted, the judge leaves alone. One line of its notes says so; it never guesses.
+
+The merge replaces each listed step's result with the judge's `status`, `by: "agent-judge"` and `evidence`: the absolute path of the screenshot that decided the verdict, or of those the judge looked at for an `ok`, joined by `; `. The walk's notes stay, and the judge's lines follow under a line of their own, "Juez:". The other fields stay as the walk wrote them, so step 4 of Publishing a run imports them unchanged. The merge enforces the rules it can: a walk `ko` stays `ko`, and a step listed with `unjudged` merges as `blocked` whatever the judge said, or `ko` after a walk `ko`, with a line "Bloqueado: …" or "Sin juzgar: …" saying why, and the missing screenshot as its `evidence`, or the walk's own when none is missing. It refuses the whole file, and writes nothing, on a verdict for a step it didn't list, a listed step with no verdict or with two, a status other than `ok`, `ko` or `blocked`, a `ko` or `blocked` without notes on a step the judge could judge, or an `evidence` that names anything but the step's own screenshots. It takes a screenshot's path with either slash and in any case, and writes it as the listing does.
+
+To judge a walk, the agent that ran it follows this prompt, or gives it to a subagent:
+
+```text
+Judge the look of the UAT steps of the local WebDriver walk in <work folder>.
+1. Run `node uat/auto/webdriver/judge.mjs list --work <work folder>` from the repo root.
+2. For each step it lists:
+   - With `unjudged`: open nothing, and write the verdict `blocked`, with "" as its notes and evidence. The merge
+     writes why, and keeps a walk `ko` as `ko`.
+   - Otherwise, open each PNG of its `looks` with the Read tool. Check each `looks` entry's `what`, and each part of
+     `expect` a picture can show, against the screenshots. Read `walk` for what the walk's checks already asserted.
+   - When a screenshot doesn't show what its `looks` entry names, write `blocked`, saying what it shows instead.
+   - Write `ok` when everything a picture can show holds, else `ko`, naming in the notes, in Spanish, the part of
+     `expect`, what the picture shows instead and the screenshot's file name. Add one line naming what no picture can
+     show, such as timing or motion, and do not guess it.
+   - `evidence` is the absolute path of the screenshot that decided a `ko`, or of those you looked at for an `ok`,
+     joined by "; ". Never an image.
+3. Write the verdicts, one `{ id, status, notes, evidence }` per listed step, as a JSON array to a file in your
+   scratchpad, and run `node uat/auto/webdriver/judge.mjs merge --work <work folder> --verdicts <that file>`.
+4. Report the line merge prints. Never commit, attach, upload or post a screenshot.
+```
+
+The screenshots are read only by the session's model, through the Read tool. They are never committed, attached to an issue or a PR, uploaded to an Artifact, or sent to any other service, as `docs/agents/screenshots.md` asks of every screenshot. `evidence` is a path on the PC of the walk, never an image, and the run's "Revisar" shows that path. A PR that reports a judged walk gives the counts, never a screenshot.
 
 ### The WebDriver walk on CI
 
@@ -130,7 +175,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`.
 
-4. Import the automated results: one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. This import is the only way an automated verdict reaches the database: no tool writes to a run. The `local` verdicts are the files of the local walks, the WebDriver walk's after the agent judged its screenshots, and the `ci` verdicts are the `uat-results.json` the CI jobs of the release candidate's commit upload (see above). Write a result only for a step id in the plan at that commit.
+4. Import the automated results: one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. This import is the only way an automated verdict reaches the database: no tool writes to a run. The `local` verdicts are the files of the local walks, the WebDriver walk's after [the agent judge](#the-agent-judge) merged its verdicts, and the `ci` verdicts are the `uat-results.json` the CI jobs of the release candidate's commit upload (see above). Write a result only for a step id in the plan at that commit.
    - Leave out the steps that still need a person, those with `manual` in the plan, unless their automated verdict is already KO, which a ticket fixes first.
    - Leave out any step that already has a tester's result, one with no `by`: a tester's verdict is never overwritten.
    - When two tools have a verdict for the same step, write one. The order is a tester's verdict, then `agent-judge`, then `local`, then `ci`: the local walk ran on the release build, and the agent judge's verdict replaces that step's `local` one. When the written verdict is `local` or `agent-judge` and the `ci` one has another status, add a line to the notes naming it and its notes, `CI: <status>: <its notes>`, with each line break of those notes a ` / `.

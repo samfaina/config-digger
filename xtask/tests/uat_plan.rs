@@ -187,18 +187,28 @@ fn problems(plan: &Value) -> Vec<String> {
                 }
             }
             // A tool's test names a check the tool has, for the tools that
-            // exist.
+            // exist. The agent judge judges the screenshots of a step module
+            // of the WebDriver walk.
+            let (mut webdriver, mut agent_judge) = (false, false);
             for automation in step["automation"].as_array().into_iter().flatten() {
                 let test = automation["test"].as_str().unwrap_or("");
                 let tool = automation["tool"].as_str().unwrap_or("");
+                webdriver |= tool == "webdriver";
+                agent_judge |= tool == "agent-judge";
                 let missing = match tool {
-                    "webdriver" if !names_a_step_module(test) => "step module",
+                    "webdriver" | "agent-judge" if !names_a_step_module(test) => "step module",
                     "sandbox" if !names_a_step_block(test) => "Step block",
                     "visual" if !shots.iter().any(|shot| shot == test) => "shot",
                     _ => continue,
                 };
+                let article = if tool.starts_with('a') { "an" } else { "a" };
                 problems.push(format!(
-                    "step {id} has a {tool} test that names no {missing}: {test:?}"
+                    "step {id} has {article} {tool} test that names no {missing}: {test:?}"
+                ));
+            }
+            if agent_judge && !webdriver {
+                problems.push(format!(
+                    "step {id} lists agent-judge without webdriver, whose screenshots the judge reads"
                 ));
             }
         }
@@ -333,11 +343,28 @@ fn a_step_takes_what_walks_it_and_what_a_person_still_checks() {
             { "tool": "fake-ui", "where": "ci", "test": "anything until #265 checks it" },
             { "tool": "local", "where": "local", "test": "anything" },
             { "tool": "cli", "where": "ci", "test": "anything" },
-            { "tool": "agent-judge", "where": "local", "test": "anything" }
+            { "tool": "agent-judge", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" }
         ]),
         Some("Que la ventana se vea nítida: ninguna herramienta lo mira."),
     );
     assert_eq!(problems(&plan), Vec::<String>::new());
+}
+
+#[test]
+fn agent_judge_without_the_webdriver_walk_fails() {
+    let mut plan = plan();
+    automate(
+        &mut plan,
+        serde_json::json!([
+            { "tool": "visual", "where": "local", "test": "inventory" },
+            { "tool": "agent-judge", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" }
+        ]),
+        None,
+    );
+    assert_eq!(
+        problems(&plan),
+        ["step 1.1 lists agent-judge without webdriver, whose screenshots the judge reads"]
+    );
 }
 
 #[test]
@@ -375,7 +402,9 @@ fn a_test_that_names_no_walked_step_fails() {
             { "tool": "webdriver", "where": "ci", "test": "data.mjs 1.1" },
             { "tool": "sandbox", "where": "local", "test": "uat/auto/sandbox/in-sandbox.ps1 > 1.1" },
             { "tool": "sandbox", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" },
-            { "tool": "visual", "where": "local", "test": "no-such-shot" }
+            { "tool": "visual", "where": "local", "test": "no-such-shot" },
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.1" },
+            { "tool": "agent-judge", "where": "local", "test": "anything" }
         ]),
         None,
     );
@@ -388,6 +417,7 @@ fn a_test_that_names_no_walked_step_fails() {
             r#"step 1.1 has a sandbox test that names no Step block: "uat/auto/sandbox/in-sandbox.ps1 > 1.1""#,
             r#"step 1.1 has a sandbox test that names no Step block: "uat/auto/webdriver/steps/data.mjs > 1.1""#,
             r#"step 1.1 has a visual test that names no shot: "no-such-shot""#,
+            r#"step 1.1 has an agent-judge test that names no step module: "anything""#,
         ]
     );
 }

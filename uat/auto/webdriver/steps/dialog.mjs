@@ -115,6 +115,9 @@ export default [
           return { lines: new Set(pieces.map((p) => Math.round(p.getBoundingClientRect().top))).size, split: pieces.filter((p) => p.getClientRects().length > 1).map((p) => p.textContent) };`);
         t.check(narrow.lines > 1 && narrow.split.length === 0, "con la ventana estrecha, la clave pasa a la línea siguiente tras un punto o una barra, nunca en medio de una palabra", JSON.stringify(narrow));
         t.note("La ventana no se estrecha por debajo de 1100 px y ahí la clave cabe en una línea: el corte se comprueba estrechando el diálogo a 420 px.");
+        // What changes scrolls inside the dialog: the shot needs the key in view.
+        await s.exec("document.querySelector('.dialog .change-key').scrollIntoView({ block: 'center' });");
+        await wait(200);
         await t.shot("clave", "la clave partida tras un punto o una barra");
         await s.exec("document.querySelector('.dialog').style.maxWidth = ''");
       }
