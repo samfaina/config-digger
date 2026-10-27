@@ -185,15 +185,15 @@ FunctionEnd
 
 ; Runs `config-digger installer <verb> "$INSTDIR"` and tells running
 ; programs that the environment changed. When the edit fails, or the CLI
-; doesn't start, the install details say so, and a GUI run warns with
-; `failed`, which says what to do by hand, and the folder. A silent run
-; skips the warning, and its exit code stays as it was.
-!macro EditUserPath verb failed
+; doesn't start, the install details say so, and a GUI run shows
+; `warning`, which says what to do by hand, with the folder. A silent run
+; skips it, and its exit code stays as it was.
+!macro EditUserPath verb warning
   nsExec::ExecToLog '"$INSTDIR\${CLI_EXE}" installer ${verb} "$INSTDIR"'
   Pop $0
   ${If} $0 != 0
     DetailPrint "config-digger installer ${verb} failed: $0"
-    MessageBox MB_OK|MB_ICONEXCLAMATION "${failed}$\r$\n$\r$\n$INSTDIR" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${warning}$\r$\n$\r$\n$INSTDIR" /SD IDOK
   ${EndIf}
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 !macroend

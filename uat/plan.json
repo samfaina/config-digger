@@ -127,10 +127,13 @@
             "Abre el instalador de C:\\Descargas con doble clic.",
             "Deja marcada la casilla Add the config-digger command to my PATH.",
             "Sigue con los botones por defecto.",
-            "Lee el aviso que sale antes del final y pulsa Aceptar.",
+            "Lee el aviso que sale antes del final.",
+            "Pulsa Aceptar.",
             "Termina la instalación con los botones por defecto.",
-            "Abre config-digger desde el menú Inicio, y ciérralo con la X de la ventana.",
+            "Abre config-digger desde el menú Inicio.",
+            "Ciérralo con la X de la ventana.",
             "Ejecuta la orden Ver la app y el PATH.",
+            "Ejecuta la orden Desinstalar sin preguntas: así la instalación sin preguntas tiene que instalar la app, no encontrarla.",
             "Ejecuta la orden Instalar sin preguntas y leer el código de salida.",
             "Ejecuta la orden Desbloquear el PATH del usuario.",
             "Cierra el Sandbox: lo que se instaló dentro se borra."
@@ -152,6 +155,11 @@
               "text": "Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger-app.exe\"; @((Get-ItemProperty HKCU:\\Environment).Path -split ';' | Where-Object { $_.TrimEnd('\\') -eq \"$env:LOCALAPPDATA\\Programs\\config-digger\" }).Count"
             },
             {
+              "label": "Desinstalar sin preguntas",
+              "shell": "powershell",
+              "text": "Start-Process \"$env:LOCALAPPDATA\\Programs\\config-digger\\uninstall.exe\" /S -Wait; Start-Sleep -Seconds 10; Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger-app.exe\""
+            },
+            {
               "label": "Instalar sin preguntas y leer el código de salida",
               "shell": "powershell",
               "text": "(Start-Process (Get-ChildItem C:\\Descargas\\config-digger_*_x64-setup.exe | Sort-Object LastWriteTime | Select-Object -Last 1).FullName /S -Wait -PassThru).ExitCode; Test-Path \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger-app.exe\""
@@ -169,6 +177,7 @@
             "Tras pulsar Aceptar, la instalación acaba como siempre.",
             "config-digger se abre desde el menú Inicio.",
             "Ver la app y el PATH imprime «True» y luego «0»: la app está, y su carpeta no está en el PATH.",
+            "Desinstalar sin preguntas imprime «False»: la app ya no está.",
             "La instalación sin preguntas no saca ninguna ventana.",
             "Instalar sin preguntas y leer el código de salida imprime «0» y luego «True»."
           ],
@@ -3320,7 +3329,8 @@
             "Ejecuta la orden Desinstalar.",
             "En el desinstalador, marca Delete config-digger data.",
             "Pulsa Uninstall.",
-            "Lee el aviso del PATH y pulsa Aceptar.",
+            "Lee el aviso del PATH.",
+            "Pulsa Aceptar.",
             "En el aviso de Delete config-digger data, pulsa Aceptar.",
             "Cuando termine la desinstalación, ejecuta la orden Ver qué queda de config-digger.",
             "Ejecuta otra vez la orden Instalar sin preguntas.",
@@ -3374,7 +3384,7 @@
           "expect": [
             "Tras pulsar Uninstall sale un aviso que dice «The config-digger folder could not be taken off your user PATH.».",
             "El aviso nombra la carpeta «C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\Programs\\config-digger».",
-            "Tras pulsar Aceptar, sale el aviso de Delete config-digger data.",
+            "Tras pulsar Aceptar, sale el aviso «Deleting config-digger data deletes every backup, and with them the Undo history.».",
             "Ver qué queda de config-digger saca las cuatro líneas con «False»: la desinstalación siguió y borró los datos.",
             "La desinstalación sin preguntas no saca ninguna ventana.",
             "Ver si queda la app imprime «False»."
