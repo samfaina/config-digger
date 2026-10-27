@@ -2,9 +2,13 @@
 // Item, wait for the Inventory. Each helper finds its element by what the
 // tester reads where the app gives a role or a label to find it by.
 import { expect, type Locator, type Page } from "@playwright/test";
+import { wrapFault } from "./wraps";
 
 /** The throwaway data's root, as the fixtures write every path under it. */
 export const ROOT = String.raw`E:\cd-throwaway`;
+
+/** The folder of the throwaway data whose paths are long enough to wrap in step 10.10. */
+export const WRAPS = String.raw`${ROOT}\paths-that-wrap\in-the-smallest-window\of-config-digger`;
 
 /** How long a busy-state step holds the answer it waits on, in milliseconds. */
 export const HELD = 2000;
@@ -72,13 +76,13 @@ export function textLines(locator: Locator): Promise<string[][]> {
   );
 }
 
-/** Expects each line but the last of each path `locator` finds to end right after a `\` or a `/`. */
+/**
+ * Expects a path `locator` finds to take more than one line, and each line but
+ * the last of each path to end right after a `\` or a `/`.
+ */
 export async function wrapsAtSeparators(locator: Locator) {
-  const paths = await textLines(locator);
-  expect(paths.length).toBeGreaterThan(0);
-  for (const lines of paths) {
-    for (const line of lines.slice(0, -1)) expect(line, lines.join(" ⏎ ")).toMatch(/[\\/]$/);
-  }
+  const fault = wrapFault(await textLines(locator));
+  if (fault !== undefined) throw new Error(fault);
 }
 
 /** A computed style of the element `locator` finds. */

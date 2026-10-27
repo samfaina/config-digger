@@ -150,7 +150,7 @@ try {
     # parked Entry and a backup.
     Step "13.1" {
         & powershell -NoProfile -ExecutionPolicy Bypass -File C:\uat\scripts\cd-throwaway-setup.ps1 -Root C:\cd-throwaway | Out-Null
-        Note "13.1" "homes add: $(Digger homes add --agent claude-desktop C:\cd-throwaway\claude-desktop-home)"
+        Note "13.1" "homes add: $(Digger homes add --agent claude-desktop C:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home)"
         $out = Digger --no-project disable cd-throwaway-desktop --yes
         Note "13.1" "disable: $($out -join ' / ')"
         Check "13.1" "the Disable is verified" (($out -join " ") -match "Disabled 1 Entry\. Operation \S+: verified\.") $true

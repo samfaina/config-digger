@@ -91,7 +91,7 @@ fn reset_creates_the_test_data_again() {
     assert!(claude.contains("cd-throwaway-user"));
     assert!(root.join("codex-home/config.toml").is_file());
     assert!(
-        root.join("claude-desktop-home/claude_desktop_config.json")
+        root.join("paths-that-wrap/in-the-smallest-window/of-config-digger/claude-desktop-home/claude_desktop_config.json")
             .is_file()
     );
 }

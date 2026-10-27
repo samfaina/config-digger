@@ -56,7 +56,7 @@ Step "12.2" {
     Check "12.2" "A installed" ((Digger --version) -join "") "config-digger $versionA"
     # History before the update: one Disable on throwaway data.
     & powershell -NoProfile -ExecutionPolicy Bypass -File C:\uat\scripts\cd-throwaway-setup.ps1 -Root C:\cd-throwaway | Out-Null
-    Digger homes add --agent claude-desktop C:\cd-throwaway\claude-desktop-home | Out-Null
+    Digger homes add --agent claude-desktop C:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home | Out-Null
     Note "12.2" "disable: $((Digger --no-project disable cd-throwaway-desktop --yes) -join ' / ')"
     $operations = OperationCount
     Note "12.2" "Operations before the update: $operations"

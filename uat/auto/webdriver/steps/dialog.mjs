@@ -1,7 +1,7 @@
 // Section 7: the action dialog and the buttons that delete.
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { buttonEl, fieldValue, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, confirm, dialog, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
+import { act, addHome, confirm, DESKTOP_HOME, dialog, done, inventoryOf, openItem, operationId, project, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
 
 // Claude Code Disables a user Entry per Project, so Disable is offered only
 // with a Project chosen. The steps that Disable cd-throwaway-user name none:
@@ -149,7 +149,7 @@ export default [
     note: "Claude Desktop de verdad, abierto con --user-data-dir en el home de prueba, y cerrado solo ese. Otro Claude Desktop abierto en este PC no lee ese home.",
     async run(t) {
       const { s } = t;
-      const home = `${t.root}\\claude-desktop-home`;
+      const home = `${t.root}\\${DESKTOP_HOME}`;
       await withClaudeDesktopIn(t, home, async (close) => {
         await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
         await openItem(t, "cd-throwaway-desktop");
