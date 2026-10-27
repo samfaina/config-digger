@@ -28,9 +28,11 @@ fn with_skill(fs: FakeFileSystem, folder: impl AsRef<Path>, text: &str) -> FakeF
     fs.with_file(folder.as_ref().join("SKILL.md"), text.to_owned())
 }
 
-/// A Claude Code home with no MCP servers.
+/// A Claude Code home with no MCP servers, signed in to the claude.ai
+/// account whose synced skills are in `synced\org_acct`.
 fn claude_home() -> FakeFileSystem {
-    FakeFileSystem::new().with_file(in_home(".claude.json"), "{}")
+    let state = json!({ "oauthAccount": { "organizationUuid": "org", "accountUuid": "acct" } });
+    FakeFileSystem::new().with_file(in_home(".claude.json"), state.to_string())
 }
 
 fn core(fs: &FakeFileSystem) -> Core {
@@ -171,8 +173,8 @@ fn enterprise_skills_are_read_from_program_files_as_managed_and_read_only() {
 
 #[test]
 fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
-    let synced = in_home(r".claude\skills\synced\org1_acct1");
-    let fs = with_skill(FakeFileSystem::new(), synced.join("pdf"), &skill_md("pdf"))
+    let synced = in_home(r".claude\skills\synced\org_acct");
+    let fs = with_skill(claude_home(), synced.join("pdf"), &skill_md("pdf"))
         .with_file(synced.join("manifest.json"), "{}")
         .with_file(
             in_home(r".claude\skills\synced\.staging\xlsx\SKILL.md"),
@@ -189,7 +191,7 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
     let entry = entry_json(&skill(&inventory, "anthropic-skills:pdf").entries[0]);
     assert_eq!(
         entry["path"],
-        r"C:\Users\fixture\.claude\skills\synced\org1_acct1\pdf"
+        r"C:\Users\fixture\.claude\skills\synced\org_acct\pdf"
     );
     assert_eq!(entry["scope"], "user");
     assert_eq!(entry["provenance"], "cloud_mirror");
@@ -200,13 +202,13 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
 fn synced_skills_are_read_only_two_folders_below_synced() {
     let synced = in_home(r".claude\skills\synced");
     let fs = with_skill(
-        FakeFileSystem::new(),
-        synced.join(r"org1_acct1\pdf"),
+        claude_home(),
+        synced.join(r"org_acct\pdf"),
         &skill_md("pdf"),
     );
     let fs = with_skill(fs, synced.join("loose"), &skill_md("loose"));
-    let fs = with_skill(fs, synced.join(r"org1_acct1\group\deep"), &skill_md("deep"));
-    let fs = with_skill(fs, synced.join(r"org1_acct1\pdf\inner"), &skill_md("inner"))
+    let fs = with_skill(fs, synced.join(r"org_acct\group\deep"), &skill_md("deep"));
+    let fs = with_skill(fs, synced.join(r"org_acct\pdf\inner"), &skill_md("inner"))
         .with_file(synced.join("notes.txt"), "");
 
     let inventory = no_project(&fs);

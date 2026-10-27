@@ -32,10 +32,18 @@ fn with_skill(fs: FakeFileSystem, folder: impl AsRef<Path>, text: &str) -> FakeF
     fs.with_file(folder.as_ref().join("SKILL.md"), text.to_owned())
 }
 
-/// A Claude Code home whose `~/.claude.json` is `state`, with a skill
-/// `pdf` synced from claude.ai and a personal skill `deploy`.
+/// `state` signed in to the claude.ai account whose synced skills and
+/// plugins are in `synced\org1_acct1`.
+fn signed_in(state: &Value) -> String {
+    let mut state = state.clone();
+    state["oauthAccount"] = json!({ "organizationUuid": "org1", "accountUuid": "acct1" });
+    state.to_string()
+}
+
+/// A Claude Code home whose `~/.claude.json` is `state`, signed in, with a
+/// skill `pdf` synced from claude.ai and a personal skill `deploy`.
 fn claude_home(state: &Value) -> FakeFileSystem {
-    let fs = FakeFileSystem::new().with_file(in_home(".claude.json"), state.to_string());
+    let fs = FakeFileSystem::new().with_file(in_home(".claude.json"), signed_in(state));
     let fs = with_skill(
         fs,
         in_home(r".claude\skills\synced\org1_acct1\pdf"),
@@ -115,11 +123,24 @@ fn a_synced_skill_stays_effective_while_the_sync_gate_is_cached_off() {
     );
 }
 
-/// The sentence of the one caveat of the synced skill `pdf`, checking its code.
+/// The sentence of the one caveat of the Effective synced skill `pdf`,
+/// checking its code.
 fn pdf_caveat(inventory: &Inventory, code: &str) -> String {
     let entry = entry_json(&skill(inventory, PDF).entries[0]);
     assert_eq!(entry["state"], "effective", "{entry}");
-    let caveats = entry["caveats"].as_array().unwrap();
+    gate_caveat(&entry, code)
+}
+
+/// The sentence of the one caveat of `entry` but that of the account it is
+/// read for, which a variable that takes Claude Code off the account adds,
+/// checking its code.
+fn gate_caveat(entry: &Value, code: &str) -> String {
+    let caveats: Vec<&Value> = entry["caveats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|caveat| caveat["code"] != "may_run_off_account")
+        .collect();
     assert_eq!(caveats.len(), 1, "{entry}");
     assert_eq!(caveats[0]["code"], code, "{entry}");
     caveats[0]["sentence"].as_str().unwrap().to_owned()
@@ -154,7 +175,10 @@ fn a_gate_whose_cache_file_is_missing_or_unreadable_is_assumed_off() {
     for fs in [missing, broken, denied] {
         let inventory = inventory(&fs);
 
-        assert_eq!(pdf_caveat(&inventory, "gate_assumed"), ASSUMED_UNREADABLE);
+        // Without `~/.claude.json`, Claude Code is signed in to no account.
+        let entry = entry_json(&skill(&inventory, PDF).entries[0]);
+        assert_eq!(entry["reason"]["code"], "not_signed_in", "{entry}");
+        assert_eq!(gate_caveat(&entry, "gate_assumed"), ASSUMED_UNREADABLE);
     }
 }
 
@@ -673,13 +697,13 @@ fn a_variable_in_the_remote_settings_env_bypasses_the_cache() {
 
 const PLUGIN_SYNC_GATE: &str = "tengu_claudeai_plugins_sync_enabled";
 
-/// A Claude Code home whose `~/.claude.json` is `state`, with the plugin
-/// `demo` synced from claude.ai, carrying the skill `notes` and the server
-/// `docs`.
+/// A Claude Code home whose `~/.claude.json` is `state`, signed in, with
+/// the plugin `demo` synced from claude.ai, carrying the skill `notes` and
+/// the server `docs`.
 fn synced_plugin_home(state: &Value) -> FakeFileSystem {
     let plugin = in_home(r".claude\plugins\synced\org1_acct1\demo~g3");
     let fs = FakeFileSystem::new()
-        .with_file(in_home(".claude.json"), state.to_string())
+        .with_file(in_home(".claude.json"), signed_in(state))
         .with_file(
             plugin.join(r".claude-plugin\plugin.json"),
             json!({ "name": "demo" }).to_string(),

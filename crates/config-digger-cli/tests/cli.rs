@@ -491,6 +491,7 @@ fn list_prints_a_skill_with_its_folder() {
 #[test]
 fn a_feature_gate_caveat_shows_in_the_entry_detail_and_not_in_the_list() {
     let state = json!({
+        "oauthAccount": { "organizationUuid": "org1", "accountUuid": "acct1" },
         "cachedGrowthBookFeatures": { "tengu_claudeai_skills_sync_enabled": true },
         "cachedGrowthBookFeaturesAt": 1_790_926_800_000_u64,
     });

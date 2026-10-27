@@ -117,8 +117,12 @@ Said of an Entry that the Agent will not use because of a gate outside the Entry
 _Avoid_: Pending, denied, untrusted
 
 **Unread**:
-Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, or one in a location the Agent reads only while a Feature gate, or one of the Agent's settings, has another value, such as another app's configuration VS Code discovers only once told to. It competes with nothing and can only be Removed.
+Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, one kept for another account than the Signed-in account, or one in a location the Agent reads only while a Feature gate, or one of the Agent's settings, has another value, such as another app's configuration VS Code discovers only once told to. It competes with nothing and can only be Removed, unless config-digger only reads it, as a copy of an account's configuration.
 _Avoid_: Orphaned, stale, ignored
+
+**Signed-in account**:
+The account an Agent home is signed in to, as a file of the home names it, such as the claude.ai account of `oauthAccount` in Claude Code's `~/.claude.json`. An Agent reads the configuration it keeps for an account, such as Claude Code's synced skills and plugins, only in the Signed-in account's folder, and none while the home is signed in to no account or a setting takes the Agent off it, such as an API key or a third-party provider.
+_Avoid_: Logged-in user, current account, active account
 
 **Leftover**:
 An Unread Entry keyed to a missing Project in a user file, such as an MCP server under a Claude Code `projects["<path>"]` key. The leftovers of every missing Project are listed together and can be Removed in one Operation, or all of one Project's at once. Removing them never touches the Project's key itself, nor any trust it records.

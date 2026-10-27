@@ -7601,47 +7601,132 @@ impl Validate for EnvBypass {
             }
         }
         for map in &self.env_maps {
-            let context = |e: String| format!("env map: {e}");
-            map.anchor.validate().map_err(context)?;
-            if map.anchor.settings().is_none() {
-                map.anchor.one_file().map_err(context)?;
-            }
-            if map.every_source && map.anchor.settings().is_none() {
-                return Err(context("every_source needs a settings anchor".into()));
-            }
-            if map.anchor.walk() != &ProjectWalk::None
-                || map.anchor.project_storage().is_some()
-                || map.anchor.project_file()
-            {
-                return Err(context(
-                    "an env map lies in one file of the Project folder".into(),
-                ));
-            }
-            validate_key_path(&map.key_path).map_err(context)?;
+            validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
+                .map_err(|e| format!("env map: {e}"))?;
         }
         Ok(())
     }
 }
 
+/// A key in one file, or in the files of settings, as an env map or a
+/// [`SettingKey`] names it.
+fn validate_key_in_file(
+    what: &str,
+    anchor: &Anchor,
+    key_path: &[String],
+    every_source: bool,
+) -> Result<(), String> {
+    anchor.validate()?;
+    if anchor.settings().is_none() {
+        anchor.one_file()?;
+    }
+    if every_source && anchor.settings().is_none() {
+        return Err("every_source needs a settings anchor".into());
+    }
+    if anchor.walk() != &ProjectWalk::None
+        || anchor.project_storage().is_some()
+        || anchor.project_file()
+    {
+        return Err(format!("{what} lies in one file of the Project folder"));
+    }
+    validate_key_path(key_path)
+}
+
 impl Bypasses for EnvBypass {
     fn bypassed_by(&self, var: &dyn Fn(&str) -> Option<String>) -> Option<String> {
-        let non_empty = |name: &str| var(name).is_some_and(|value| !value.is_empty());
-        self.variables
-            .iter()
-            .find(|variable| {
-                let set = match variable.values {
-                    VariableValues::NonEmpty => non_empty(&variable.name),
-                    VariableValues::Truthy => var(&variable.name).is_some_and(|value| {
-                        ["1", "true", "yes", "on"].contains(&value.trim().to_lowercase().as_str())
-                    }),
-                };
-                set && !variable.unless.iter().any(|name| non_empty(name))
-            })
-            .map(|variable| variable.name.clone())
+        first_set(&self.variables, var)
     }
 
     fn env_maps(&self) -> &[EnvMap] {
         &self.env_maps
+    }
+}
+
+/// The name of the first of `variables` that counts as set, `var` giving a
+/// variable's value as the Agent sees it.
+pub(crate) fn first_set(
+    variables: &[BypassVariable],
+    var: &dyn Fn(&str) -> Option<String>,
+) -> Option<String> {
+    let non_empty = |name: &str| var(name).is_some_and(|value| !value.is_empty());
+    variables
+        .iter()
+        .find(|variable| {
+            let set = match variable.values {
+                VariableValues::NonEmpty => non_empty(&variable.name),
+                VariableValues::Truthy => var(&variable.name).is_some_and(|value| {
+                    ["1", "true", "yes", "on"].contains(&value.trim().to_lowercase().as_str())
+                }),
+            };
+            set && !variable.unless.iter().any(|name| non_empty(name))
+        })
+        .map(|variable| variable.name.clone())
+}
+
+// --- Signed-in account ------------------------------------------------------
+
+/// A key in one file, or in each file of settings, such as `apiKeyHelper`
+/// in each of Claude Code's settings files.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingKey {
+    pub anchor: Anchor,
+    /// The key path of the value, one key per segment.
+    pub key_path: Vec<String>,
+    /// With a settings anchor, the key is read from every source the Agent
+    /// reads such keys from, as an env map's `every_source` says.
+    #[serde(default)]
+    pub every_source: bool,
+}
+
+/// What takes an Agent off its Signed-in account in a context, so that it
+/// reads none of the account's folders there, such as Claude Code running
+/// on an API key or a third-party provider.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OffAccount {
+    /// Keys that take it off when a file of the context sets one to a
+    /// value other than `null` or an empty string, highest first.
+    #[serde(default)]
+    pub settings: Vec<SettingKey>,
+    /// Variables that take it off when a map of `env_maps` sets one. Set in
+    /// the environment config-digger runs in, they only may: the Agent can
+    /// start in another, and its Entries keep their State, with a caveat.
+    #[serde(default)]
+    pub variables: Vec<BypassVariable>,
+    /// Maps of variables the Agent applies over the environment it starts
+    /// in, highest first, as a Feature gate bypass's are.
+    #[serde(default)]
+    pub env_maps: Vec<EnvMap>,
+    /// Variables that may take it off wherever they are set, such as one the
+    /// Agent uses only in some of its modes: its Entries keep their State,
+    /// with a caveat.
+    #[serde(default)]
+    pub may_be_off: Vec<BypassVariable>,
+}
+
+impl Validate for OffAccount {
+    fn validate(&self) -> Result<(), String> {
+        if self.settings.is_empty() && self.variables.is_empty() && self.may_be_off.is_empty() {
+            return Err("off needs settings or variables".into());
+        }
+        if !self.variables.is_empty() && self.env_maps.is_empty() {
+            return Err("off variables need env maps to be read from".into());
+        }
+        for variable in self.variables.iter().chain(&self.may_be_off) {
+            for name in std::iter::once(&variable.name).chain(&variable.unless) {
+                validate_variable(name)?;
+            }
+        }
+        for key in &self.settings {
+            validate_key_in_file("a setting", &key.anchor, &key.key_path, key.every_source)
+                .map_err(|e| format!("setting: {e}"))?;
+        }
+        for map in &self.env_maps {
+            validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
+                .map_err(|e| format!("env map: {e}"))?;
+        }
+        Ok(())
     }
 }
 
@@ -7668,6 +7753,7 @@ pub(crate) trait Holds {
 pub(crate) enum Condition {
     FeatureGate(GateCondition),
     Setting(SettingIs),
+    SignedInAccount(AccountCondition),
 }
 
 impl Validate for Condition {
@@ -7675,6 +7761,7 @@ impl Validate for Condition {
         match self {
             Condition::FeatureGate(block) => block.validate(),
             Condition::Setting(block) => block.validate(),
+            Condition::SignedInAccount(_) => Ok(()),
         }
     }
 }
@@ -7688,6 +7775,9 @@ impl Holds for Condition {
         match self {
             Condition::FeatureGate(block) => block.holds(gate_on, setting),
             Condition::Setting(block) => block.holds(gate_on, setting),
+            // Which folder an Entry is in decides it, apart from gates and
+            // settings.
+            Condition::SignedInAccount(_) => true,
         }
     }
 
@@ -7695,6 +7785,7 @@ impl Holds for Condition {
         match self {
             Condition::FeatureGate(block) => block.gate(),
             Condition::Setting(block) => block.gate(),
+            Condition::SignedInAccount(_) => None,
         }
     }
 }
@@ -7703,11 +7794,21 @@ impl Condition {
     /// The setting it depends on, if any.
     pub fn setting(&self) -> Option<&SettingIs> {
         match self {
-            Condition::FeatureGate(_) => None,
+            Condition::FeatureGate(_) | Condition::SignedInAccount(_) => None,
             Condition::Setting(block) => Some(block),
         }
     }
 }
+
+/// Holds for an Entry in the folder of its Agent home's Signed-in account,
+/// the definition's `account`, while the Agent runs on that account in the
+/// context. The account's folder is the first below the location's folder
+/// or, for a location in plugins, below the folder of the plugins'
+/// registry; an Entry in another folder there is Unread, as is every one
+/// while the home is signed in to no account or the Agent runs off it.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AccountCondition {}
 
 /// Holds while a Feature gate of the same definition is on, or with
 /// `is = false`, while it is off.

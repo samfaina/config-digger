@@ -12,7 +12,7 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
-use crate::scan::{Expected, ScannedShape, ValueType};
+use crate::scan::{Expected, OffBy, ScannedShape, ValueType};
 use crate::{locator, park};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -1659,6 +1659,80 @@ pub(crate) fn needs_setting(agent_name: &str, setting: &SettingIs) -> Reason {
             "{agent_name} reads it only while its setting `{key}` is {}.",
             setting.equals
         ),
+    }
+}
+
+/// An Unread Entry's reason: `agent_name` reads only the folder `folder` of
+/// the `account` account it is signed in to, and the Entry is in another.
+pub(crate) fn other_account(agent_name: &str, account: &str, folder: &str) -> Reason {
+    Reason {
+        code: ReasonCode::OtherAccount,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} reads only the folder of the {account} account it is signed in to, {folder}, not this one."
+        ),
+    }
+}
+
+/// An Unread Entry's reason: `agent_name` reads it only for the `account`
+/// account it is signed in to, and it is signed in to none.
+pub(crate) fn not_signed_in(agent_name: &str, account: &str) -> Reason {
+    Reason {
+        code: ReasonCode::NotSignedIn,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} is signed in to no {account} account, and reads this only for the account it is signed in to."
+        ),
+    }
+}
+
+/// An Unread Entry's reason: `agent_name` reads it only while it runs on its
+/// `account` account, and what `off` names takes it off that account.
+pub(crate) fn off_account(agent_name: &str, account: &str, off: &OffBy) -> Reason {
+    Reason {
+        code: ReasonCode::OffAccount,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{} takes {agent_name} off its {account} account, and it reads this only while it runs on that account.",
+            set_where(off)
+        ),
+    }
+}
+
+/// The caveat of an Entry `agent_name` reads only while it runs on its
+/// `account` account, which what `off` names may take it off.
+pub(crate) fn may_run_off_account(agent_name: &str, account: &str, off: &OffBy) -> String {
+    match off {
+        OffBy::Environment(name) => format!(
+            "`{name}` is set in config-digger's environment: when {agent_name} starts with it, it may run off its {account} account, and then does not read this."
+        ),
+        OffBy::Setting { .. } | OffBy::Mapped { .. } => format!(
+            "{} may take {agent_name} off its {account} account, and then it does not read this.",
+            set_where(off)
+        ),
+    }
+}
+
+/// Where a setting or a variable is set, such as "`apiKeyHelper` in
+/// C:\Users\me\.claude\settings.json".
+fn set_where(off: &OffBy) -> String {
+    match off {
+        OffBy::Setting { key_path, path } => {
+            format!("`{}` in {}", key_path.join("` › `"), path.display())
+        }
+        OffBy::Mapped {
+            name,
+            key_path,
+            path,
+        } => format!(
+            "`{name}` in `{}` of {}",
+            key_path.join("` › `"),
+            path.display()
+        ),
+        OffBy::Environment(name) => format!("`{name}` in config-digger's environment"),
     }
 }
 

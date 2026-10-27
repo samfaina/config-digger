@@ -25,10 +25,16 @@ fn skill_md(name: &str) -> String {
     format!("---\nname: {name}\ndescription: The {name} skill.\n---\n\nDo {name}.\n")
 }
 
-/// A Claude Code home with the synced plugin folder `demo~g3`, whose
-/// manifest names it `demo`, with the skill `notes` and the server `docs`.
+/// A Claude Code home signed in to the claude.ai account of [`ACCOUNT`],
+/// with the synced plugin folder `demo~g3`, whose manifest names it `demo`,
+/// with the skill `notes` and the server `docs`.
 fn synced_home() -> FakeFileSystem {
+    let account = json!({ "organizationUuid": "org1", "accountUuid": "acct1" });
     FakeFileSystem::new()
+        .with_file(
+            in_home(".claude.json"),
+            json!({ "oauthAccount": account }).to_string(),
+        )
         .with_file(
             in_account(r"demo~g3\.claude-plugin\plugin.json"),
             json!({ "name": "demo", "version": "1.2.0" }).to_string(),
