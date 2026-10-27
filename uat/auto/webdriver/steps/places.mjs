@@ -77,13 +77,13 @@ export function wrapFault(paths) {
 // How many lines the text of an element takes, from the boxes of its
 // contents, each `{ text, top }`, `text` true for a box of a text node. The
 // boxes of other elements, such as an Add button's icon, a flex item centred
-// on its own, don't count, and tops within 2 px are one line, as `linesOf`
-// reads the paths. Step 10.10 runs its source in the page, so it uses nothing
-// from this module.
+// on its own, don't count, and a top within 2 px of a line's first is on that
+// line, the tolerance `linesOf` reads the paths with. Step 10.10 runs its
+// source in the page, so it uses nothing from this module.
 export function textLines(boxes) {
   const tops = boxes.filter((box) => box.text).map((box) => box.top).sort((a, b) => a - b);
-  let lines = 0, line;
-  for (const top of tops) if (line === undefined || top - line > 2) [lines, line] = [lines + 1, top];
+  let lines = 0, lineTop;
+  for (const top of tops) if (lineTop === undefined || top - lineTop > 2) [lines, lineTop] = [lines + 1, top];
   return lines;
 }
 
@@ -588,11 +588,12 @@ export default [
           const header = document.querySelector(".places header, .places .banner");
           const aboutEl = document.querySelector(".places-about");
           const addEl = [...document.querySelectorAll(".places button")].find((b) => b.textContent.trim().startsWith("Add"));
+          const addBoxes = addEl ? boxes(addEl) : null;
           return {
             title: lines(document.querySelector(".places .banner-title")),
             tabs: [...document.querySelectorAll("[role=tab]")].map((e) => [e.textContent.trim(), lines(e)]),
-            add: lines(addEl),
-            addBoxes: addEl ? boxes(addEl) : null,
+            add: addBoxes && textLines(addBoxes),
+            addBoxes,
             aboutInHeader: header ? header.contains(aboutEl) : null,
             aboutAboveList: aboutEl ? aboutEl.getBoundingClientRect().bottom <= (document.querySelector(".places .scroll")?.getBoundingClientRect().top ?? 0) + 1 : false,
             about: aboutEl?.textContent.trim(),

@@ -1,6 +1,7 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
 // it knows match the plan, the throwaway profile, opening a group on the
-// Projects tab, confirming an action dialog up to its result, reading an
+// Projects tab, step 10.10's counts of the lines of a label and of where a
+// path wraps, confirming an action dialog up to its result, reading an
 // Operation id, step 11.11's command that marks an Operation, and the walk's
 // CI mode: no screenshot, the steps a runner can't do, uat-results.json and
 // the job summary, written too when the app's session does not open.
@@ -175,13 +176,21 @@ test("step 10.10's paths pass when one wraps, each line but its last ending in a
   assert.equal(wrapFault([["E:\\cd-throwaway\\project"], ["E:\\cd-throwaway\\", "a-folder/", "project-long"]]), undefined);
 });
 
-test("step 10.10 counts one line for an Add button whose icon sits off its label's top, by half a pixel either side of the rounding", () => {
+test("step 10.10 counts one line for an Add button whose icon's box sits off its label's top, even by half a pixel", () => {
   assert.equal(textLines([{ text: false, top: 48 }, { text: true, top: 47.5 }]), 1);
   assert.equal(textLines([{ text: false, top: 48 }, { text: true, top: 47.4 }]), 1);
 });
 
 test("step 10.10 counts two lines for an Add button whose label wraps beside its icon", () => {
   assert.equal(textLines([{ text: false, top: 57 }, { text: true, top: 47.5 }, { text: true, top: 66.5 }]), 2);
+});
+
+test("step 10.10 counts one line for runs of text a pixel apart on the same line", () => {
+  assert.equal(textLines([{ text: true, top: 47.5 }, { text: true, top: 48.4 }]), 1);
+});
+
+test("step 10.10's line count runs in the page from its source alone", () => {
+  assert.equal(new Function(`${textLines}\nreturn textLines(arguments[0]);`)([{ text: true, top: 47.5 }, { text: true, top: 66.5 }]), 2);
 });
 
 // A session whose page is only an action dialog, each of its states
