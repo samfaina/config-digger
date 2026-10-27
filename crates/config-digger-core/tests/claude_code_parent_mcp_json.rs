@@ -3,7 +3,9 @@
 //! `E:\outer\repo\sub\deep`, `repo` holding `.git`, and the Project at
 //! `deep`, as the release gate's probe builds them.
 
-use config_digger_core::api::{Action, Context, Core, Entry, Inventory, ScanOptions, Targets};
+use config_digger_core::api::{
+    Action, Context, Core, Entry, Inventory, Plan, ScanOptions, Targets,
+};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -41,17 +43,19 @@ fn unapproved() -> FakeFileSystem {
         .with_file(mcp_json(SUB), servers("sub"))
 }
 
-/// `fs` with every `.mcp.json` server approved in the Project's settings.
-fn approved(fs: FakeFileSystem) -> FakeFileSystem {
+/// `fs` with every `.mcp.json` server approved in the settings of the
+/// Project `project`.
+fn approved(fs: FakeFileSystem, project: &str) -> FakeFileSystem {
     fs.with_file(
-        Path::new(DEEP).join(r".claude\settings.json"),
+        Path::new(project).join(r".claude\settings.json"),
         r#"{ "enableAllProjectMcpServers": true }"#,
     )
 }
 
-/// [`unapproved`] with `repo` a git repo, every server [`approved`].
+/// [`unapproved`] with `repo` a git repo, every server [`approved`] in
+/// `deep`.
 fn fixture() -> FakeFileSystem {
-    approved(unapproved().with_folder(Path::new(REPO).join(".git")))
+    approved(unapproved().with_folder(Path::new(REPO).join(".git")), DEEP)
 }
 
 fn core(fs: &FakeFileSystem) -> Core {
@@ -149,7 +153,7 @@ fn every_parent_s_mcp_json_is_read_past_the_repo_root_and_the_nearest_wins() {
 
 #[test]
 fn the_walk_does_not_need_a_git_repo() {
-    let fs = approved(unapproved());
+    let fs = approved(unapproved(), DEEP);
 
     assert_read_as_the_probe_found(&inventory(&fs));
 }
@@ -219,26 +223,36 @@ fn disabled_mcpjson_servers_in_the_project_s_settings_disables_a_parent_s_server
 
 #[test]
 fn disable_of_a_parent_s_server_writes_the_project_s_local_settings() {
-    let fs = fixture();
+    let fs = fixture().with_file(mcp_json(DEEP), servers("deep"));
     let core = core(&fs);
-    let context = Context {
-        project: Some(PathBuf::from(DEEP)),
+    let disable = |folder: &str, name: &str| {
+        let snapshot = core
+            .scan(&ScanOptions {
+                projects: vec![PathBuf::from(DEEP)],
+            })
+            .unwrap();
+        let targets = Targets {
+            selectors: vec![format!("{}#mcpServers.{name}", mcp_json(folder).display())],
+            all: false,
+        };
+        let context = Context {
+            project: Some(PathBuf::from(DEEP)),
+        };
+        core.plan(&snapshot, &context, Action::Disable, &targets)
+            .unwrap()
     };
-    let snapshot = core
-        .scan(&ScanOptions {
-            projects: vec![PathBuf::from(DEEP)],
-        })
-        .unwrap();
-    let targets = Targets {
-        selectors: vec![format!("{}#mcpServers.cd-outer", mcp_json(OUTER).display())],
-        all: false,
+    let files = |plan: &Plan| -> Vec<PathBuf> {
+        plan.preview()
+            .files
+            .iter()
+            .map(|file| file.path.clone())
+            .collect()
     };
 
-    let plan = core
-        .plan(&snapshot, &context, Action::Disable, &targets)
-        .unwrap();
-    assert_eq!(plan.preview().files.len(), 1);
-    assert_eq!(plan.preview().files[0].path, settings_local());
+    // The file Disable writes for a server of the Project's own `.mcp.json`.
+    assert_eq!(files(&disable(DEEP, "cd-deep")), [settings_local()]);
+    let plan = disable(OUTER, "cd-outer");
+    assert_eq!(files(&plan), [settings_local()]);
     core.execute(plan, &[]).unwrap();
 
     let written: Value = serde_json::from_slice(&fs.contents(settings_local()).unwrap()).unwrap();
@@ -279,10 +293,7 @@ fn a_parent_s_mcp_json_that_does_not_parse_is_skipped_alone() {
 
 #[test]
 fn a_project_inside_another_reads_the_parent_s_servers_as_its_own_too() {
-    let fs = fixture().with_file(
-        Path::new(REPO).join(r".claude\settings.json"),
-        r#"{ "enableAllProjectMcpServers": true }"#,
-    );
+    let fs = approved(fixture(), REPO);
 
     for project in [REPO, DEEP] {
         let inventory = inventory_in(&fs, &[REPO, DEEP], project);

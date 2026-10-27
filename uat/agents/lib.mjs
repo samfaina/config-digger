@@ -71,6 +71,20 @@ export function run(command, args, { cwd, env = {}, input, timeout = 120_000 } =
   });
 }
 
+// Maps a free drive letter to `folder` with `subst`, so a probe can reach
+// the root of a drive without writing a real one, and resolves with the
+// letter. `unsubst` takes it off again.
+export async function subst(folder) {
+  const letter = [..."ZYXWVUTSRQPONMLKJIHG"].find((l) => !fs.existsSync(`${l}:\\`));
+  if (!letter) throw new Error("subst: no drive letter from G to Z is free");
+  fs.mkdirSync(folder, { recursive: true });
+  const mapped = await run("subst.exe", [`${letter}:`, folder]);
+  if (mapped.code !== 0) throw new Error(`subst ${letter}: failed: ${mapped.stdout}${mapped.stderr}`);
+  return letter;
+}
+
+export const unsubst = (letter) => run("subst.exe", [`${letter}:`, "/d"]);
+
 // Stops a probe that writes machine-wide paths, `%ProgramFiles%`,
 // `%ProgramData%` or `HKLM`, unless it runs in Windows Sandbox, whose only
 // user is WDAGUtilityAccount. `uat/agents/sandbox.ps1` runs it there.

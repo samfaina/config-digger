@@ -13,7 +13,7 @@
 // runs.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, gitInit, json, modelServer, probe, run, same, skill, write } from "./lib.mjs";
+import { fresh, gitInit, json, modelServer, probe, run, same, skill, subst, unsubst, write } from "./lib.mjs";
 
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
 const version = (await run(bin, ["--version"])).stdout.trim().split(" ")[0];
@@ -25,9 +25,9 @@ const reply = { id: "msg_x", type: "message", role: "assistant", model: "claude-
 
 // One `claude -p` run: what its init event lists, and the skill lines of
 // the request its model gets.
-async function session(home, cwd, { prompt = "hi", args = [], vars = {} } = {}) {
+async function session(home, cwd, { prompt = "hi", args = [], extraEnv = {} } = {}) {
   const model = await modelServer(reply);
-  const env = { CLAUDE_CONFIG_DIR: home, ANTHROPIC_API_KEY: "not-a-real-secret", ANTHROPIC_BASE_URL: model.url, ...vars };
+  const env = { CLAUDE_CONFIG_DIR: home, ANTHROPIC_API_KEY: "not-a-real-secret", ANTHROPIC_BASE_URL: model.url, ...extraEnv };
   const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", ...args], { cwd, env });
   model.close();
   const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
@@ -80,6 +80,14 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     const { stdout } = await claude(home, deep, "mcp", "get", "cd-throwaway-same");
     return same(stdout.match(/Args: (.*)/)?.[1].trim(), "/c sub");
   });
+  // A parent folder's settings are not the Project's: `sub`'s list leaves
+  // its own server read, and only the Project's list skips one.
+  write(path.join(repo, "sub", ".claude", "settings.local.json"), { disabledMcpjsonServers: ["cd-throwaway-sub"] });
+  write(path.join(deep, ".claude", "settings.local.json"), { disabledMcpjsonServers: ["cd-throwaway-outer"] });
+  await p.check("items.mcp.disable[1]", "a parent folder's server is skipped by the Project's own `disabledMcpjsonServers`, not by the parent folder's", async () => {
+    const s = await session(home, deep);
+    return same(throwaway(s.servers).sort(), ["cd-throwaway-repo", "cd-throwaway-same", "cd-throwaway-sub"]);
+  });
 
   // The user's home folder, moved to a throwaway one, with a Project below it.
   const userHome = path.join(dir, "user-home");
@@ -87,25 +95,23 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
   const belowHome = path.join(userHome, "proj");
   fs.mkdirSync(belowHome, { recursive: true });
   await p.check("locations[project-mcp]", "the home folder's `.mcp.json` is read as a Project file when the Project is below it", async () => {
-    const s = await session(home, belowHome, { vars: { USERPROFILE: userHome, HOME: userHome } });
+    const s = await session(home, belowHome, { extraEnv: { USERPROFILE: userHome, HOME: userHome } });
     return same(throwaway(s.servers), ["cd-throwaway-home"]);
   });
 
   // The root of a drive `subst` maps to a throwaway folder, never a real one.
-  const letter = [..."ZYXWVUTSRQPONMLKJIHG"].find((l) => !fs.existsSync(`${l}:\\`));
   const drive = path.join(dir, "drive");
   write(path.join(drive, ".mcp.json"), { mcpServers: { "cd-throwaway-root": stdio("root") } });
   write(path.join(drive, "top", ".mcp.json"), { mcpServers: { "cd-throwaway-top": stdio("top") } });
   fs.mkdirSync(path.join(drive, "top", "proj"), { recursive: true });
-  const mapped = await run("subst.exe", [`${letter}:`, drive]);
-  if (mapped.code !== 0) throw new Error(`subst ${letter}: failed: ${mapped.stdout}${mapped.stderr}`);
+  const letter = await subst(drive);
   try {
     await p.check("locations[project-mcp]", "the `.mcp.json` at the root of the drive is not read", async () => {
       const s = await session(home, `${letter}:\\top\\proj`);
       return same(throwaway(s.servers), ["cd-throwaway-top"]);
     });
   } finally {
-    await run("subst.exe", [`${letter}:`, "/d"]);
+    await unsubst(letter);
   }
 
   const plain = path.join(dir, "plain");
