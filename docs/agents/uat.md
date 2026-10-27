@@ -86,6 +86,7 @@ Most steps run without a tester, from `uat/auto/`, before the run is published. 
 | `uat/auto/webdriver/` | The app's screens: sections 1, 15, 10, 2, 3, 4, 5, 6, 7, 11 and 14, 12.1, 13.1 and 13.5 | `.\uat\auto\webdriver\run.ps1 -App <config-digger-app.exe>`; CI runs it on each PR, with no screenshot (see [The WebDriver walk on CI](#the-webdriver-walk-on-ci)) |
 | `crates/config-digger-app/ui/uat/` | The steps the UI on the fake backend can show, the "Fake UI" steps of section 8 of `docs/research/uat-automation.md`, on every PR. They catch regressions; they remove no step from the WebDriver walk, whose verdict counts when both have one, as it ran on the release build | `npm run uat:fake` in `crates/config-digger-app/ui`; CI runs it on each PR |
 | `uat/auto/sandbox/` | A clean PC, install, update and uninstall in Windows Sandbox: 8.1, 9.1 to 9.5, 12.2, 13.2 to 13.4. SmartScreen in 9.2 stays with a person: a file from a mapped folder has no mark of the web. Needs Windows Sandbox, so Windows Pro, Enterprise or Education | `.\uat\auto\sandbox\build-update.ps1 -Commit v<version>`, then `.\uat\auto\sandbox\run.ps1 -Version <version>` |
+| `uat/auto/run.ps1` | The local script: the two rows above in one command, for the steps that need the tester's PC (see [The local script](#the-local-script)) | `.\uat\auto\run.ps1 -Version <version> -App <config-digger-app.exe>`, before each release candidate |
 
 The WebDriver walk drives the release build through `tauri-driver` and the `msedgedriver` of the installed WebView2, which `run.ps1` downloads. It runs the app on a throwaway Windows profile, a folder named `cd-throwaway-profile` that stands for `USERPROFILE`, `APPDATA` and `LOCALAPPDATA`, so the app never sees the tester's Agent homes or data, and on the throwaway data of `uat/data/cd-throwaway-setup.ps1`. It walks the steps in the plan's order, one module per section in `uat/auto/webdriver/steps/`, and answers the Windows folder picker with UI Automation (`picker.ps1`). Steps 7.2 and 13.1 open Claude Desktop, and close it again if it was closed. Step 7.6 opens a second Claude Desktop with `--user-data-dir` on the throwaway Claude Desktop home, and closes only that one. Without Claude Desktop installed, these steps are Blocked. Step 14.2 measures the scans of the tester's own homes with the CLI next to the app, `list -v` and `disable --dry-run -v`, which write nothing. Step 14.3 adds to its notes the `plan finished` line of the same `disable --dry-run -v` on the tester's own homes. Step 5.4 emulates Windows' animation effects turned off with `prefers-reduced-motion`, the setting WebView2 takes from them, and never changes the tester's setting. At the end the walk checks that config-digger's real data folders and the real Codex and Claude Desktop configuration are byte for byte as before, and exits with 2 when one changed. To see a busy state that lasts less than a frame, a step holds a command's answer: Tauri's `invoke` can't be wrapped, so `driver.mjs` holds the `fetch` it sends to `http://ipc.localhost/<command>`.
 
@@ -95,16 +96,37 @@ When a step leaves the window blank, the walk notes what the page logged and its
 
 When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, that each step it walks lists `webdriver` in its `automation` with a `test` ending in its id, that no step module holds `manual`, and the parts of the walk that need no app.
 
+### The local script
+
+Run `uat/auto/run.ps1` on the tester's PC before each release candidate, then [the agent judge](#the-agent-judge), then [Publishing a run](#publishing-a-run). It walks every step that needs that PC: the Sandbox's install, update and uninstall, 7.2 and 13.1 with Claude Desktop open, and 14.2 on the tester's own homes.
+
+```powershell
+git fetch --tags
+.\uat\auto\run.ps1 -Version 0.1.0-rc.4 -App target\release\config-digger-app.exe
+```
+
+`-App` is the release build of `-Version`: the script refuses an executable that reports another version, before it runs anything. `-Work` is its output folder, `$env:TEMP\config-digger-uat` by default, and `-Root` the throwaway root, `E:\cd-throwaway` by default. It needs what each tool needs: `tauri-driver`, Node, `gh`, Windows Sandbox, and the release candidate's tag in the checkout, since `build-update.ps1` builds installers A and B from it.
+
+It runs these in order, and stops at the first that fails, with a message naming it and the tools that did not run:
+
+1. `sandbox\build-update.ps1 -Commit v<version> -Work <Work>\update`: installers A and B for 12.2.
+2. `sandbox\run.ps1 -Version <version> -Work <Work>\sandbox -Update <Work>\update\installers`: the Sandbox walk, with 9.1's `gh release download`. Its results are `<Work>\sandbox\uat-results.json`.
+3. `webdriver\run.ps1 -App <App> -Work <Work> -Root <Root>`: the WebDriver walk. Its results are `<Work>\webdriver.json` and its screenshots `<Work>\shots`. Without Claude Desktop installed, 7.2 and the open case of 13.1 are Blocked, with "Claude Desktop no está instalado en este PC" as the reason.
+
+A tool fails when it throws or exits with a code. A step's KO or Blocked is a verdict, not a failure. Once all three ran, `node uat/auto/results.mjs --work <Work>` writes `<Work>\uat-results.json`: one document per step of both walks, `{ id, status, notes, time, version, by, evidence }`, in the plan's order, with `by: "local"` and none of the walk's `checks`, `looks` or `manual`. It refuses a step with two results, or one that is no step of the plan. The script deletes an earlier run's `uat-results.json` when it starts and a failed run writes none, so the file in `<Work>` always holds a whole run.
+
+It writes nothing outside `-Root`, the throwaway profile and `<Work>`, the profile being in `<Work>`. 14.2 still reads the real homes and writes nothing. Before the first tool, `uat/auto/untouched.mjs` takes a snapshot of the tester's own data: config-digger's real data folders, the real Codex and Claude Desktop configuration, and the checkout's `git status`. At the end, after a failed tool too, it compares them and prints "Nothing outside <Root>, the throwaway profile and <Work> changed", or lists what changed and fails the script. The builds of `build-update.ps1` also fill cargo's and npm's caches, and register their git worktree, `<Work>\update\tree`, in the checkout's `.git`, as any build and any worktree do. `node --test uat/auto/local.test.mjs` tests the script on stub tools, with `results.mjs` and `untouched.mjs`.
+
 ### The agent judge
 
 The agent judge reads the screenshots of the local WebDriver walk and writes each step's verdict on its look into the walk's results. It runs after the walk, on the PC that ran it, and before [Publishing a run](#publishing-a-run). It never runs on CI, which takes no screenshot.
 
 It takes every result of the walk whose `looks` is not empty, and every step whose plan `automation` lists `agent-judge`, but a result it already judged. A step that lists `agent-judge` lists `webdriver` too, since its screenshots come from that walk: `uat_plan` checks it.
 
-`uat/auto/webdriver/judge.mjs` does the mechanical half, and the model only does the looking. `--work` is the `-Work` of `run.ps1`, `$env:TEMP\config-digger-uat` by default, whose `webdriver.json` holds the walk's results and `shots` its screenshots.
+`uat/auto/webdriver/judge.mjs` does the mechanical half, and the model only does the looking. `--work` is the `-Work` of `run.ps1`, `$env:TEMP\config-digger-uat` by default, whose `webdriver.json` holds the walk's results and `shots` its screenshots. After the local script, it is that script's `-Work`, the same folder by default.
 
 - `node uat/auto/webdriver/judge.mjs list [--work <dir>]` prints the steps to judge, as JSON. Each has its step's `title`, `goal`, `instructions` and `expect` from `uat/plan.json` in the checkout, which is the commit under test; `walk`, the walk's own `status`, `checks` and `notes`; and `looks`, each `{ what, file }` with the PNG's absolute path, and `missing: true` when it is not on disk. A step the judge can't judge has `unjudged`, saying why: the walk left it Blocked, took no screenshot of it, or one of its screenshots is missing.
-- `node uat/auto/webdriver/judge.mjs merge --verdicts <file> [--work <dir>]` writes the judge's verdicts into `webdriver.json` and prints how many are OK, KO and Blocked. The file holds one entry per listed step, `{ id, status, notes, evidence }`. `node --test uat/auto/webdriver/judge.test.mjs` tests both modes.
+- `node uat/auto/webdriver/judge.mjs merge --verdicts <file> [--work <dir>]` writes the judge's verdicts into `webdriver.json` and prints how many are OK, KO and Blocked. When `--work` holds the local script's `uat-results.json`, the merge writes that file again from the merged `webdriver.json` and the Sandbox's results, so it holds the judge's verdicts too. The file holds one entry per listed step, `{ id, status, notes, evidence }`. `node --test uat/auto/webdriver/judge.test.mjs` tests both modes.
 
 The verdict on a step:
 
@@ -175,7 +197,7 @@ A run is one private Artifact, with its own database of results. Publish a new o
 
 3. Check the empty database once with `ArtifactData`, `action: "list"`, `collection: "results"`.
 
-4. Import the automated results: one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. This import is the only way an automated verdict reaches the database: no tool writes to a run. The `local` verdicts are the files of the local walks, the WebDriver walk's after [the agent judge](#the-agent-judge) merged its verdicts, and the `ci` verdicts are the `uat-results.json` the CI jobs of the release candidate's commit upload (see above). Write a result only for a step id in the plan at that commit.
+4. Import the automated results: one `ArtifactData` `batch` of `set results/<step id>`, each `{ id, status, notes, time, version, by, evidence }` and nothing else. This import is the only way an automated verdict reaches the database: no tool writes to a run. The `local` and `agent-judge` verdicts are the `uat-results.json` of [the local script](#the-local-script), once [the agent judge](#the-agent-judge) merged its verdicts, and the `ci` verdicts are the `uat-results.json` the CI jobs of the release candidate's commit upload (see above). Write a result only for a step id in the plan at that commit.
    - Leave out the steps that still need a person, those with `manual` in the plan, unless their automated verdict is already KO, which a ticket fixes first.
    - Leave out any step that already has a tester's result, one with no `by`: a tester's verdict is never overwritten.
    - When two tools have a verdict for the same step, write one. The order is a tester's verdict, then `agent-judge`, then `local`, then `ci`: the local walk ran on the release build, and the agent judge's verdict replaces that step's `local` one. When the written verdict is `local` or `agent-judge` and the `ci` one has another status, add a line to the notes naming it and its notes, `CI: <status>: <its notes>`, with each line break of those notes a ` / `.

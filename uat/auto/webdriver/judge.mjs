@@ -9,12 +9,15 @@
 // `--work` is run.ps1's -Work, $env:TEMP\config-digger-uat by default: the
 // walk's results are its webdriver.json and its screenshots its shots folder.
 // `list` prints the steps to judge as JSON. `merge` writes the verdicts into
-// webdriver.json, or nothing when it refuses one.
+// webdriver.json, or nothing when it refuses one. In the work folder of the
+// local script, uat/auto/run.ps1, it writes them into its uat-results.json
+// too, which is what a run imports.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { writeResults } from "../results.mjs";
 
 // Why the judge can't judge a step, or undefined when it can: the walk left
 // it Blocked, took no shot of it, or a shot is missing on disk.
@@ -143,5 +146,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const judged = merged.filter((result) => listing.some((step) => step.id === result.id));
     const count = (status) => judged.filter((result) => result.status === status).length;
     console.log(`Merged ${judged.length} verdicts into ${resultsFile}: ${count("ok")} OK, ${count("ko")} KO, ${count("blocked")} Blocked`);
+    if (existsSync(join(opt.work, "uat-results.json"))) console.log(`Wrote them into ${writeResults(opt.work, plan)}`);
   } else throw new Error("usage: judge.mjs list [--work <dir>] | judge.mjs merge --verdicts <file> [--work <dir>]");
 }
