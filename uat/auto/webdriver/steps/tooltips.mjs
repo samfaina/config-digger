@@ -1,7 +1,7 @@
 // Section 3: the app's tooltips, by mouse and by keyboard.
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { focused, go, hoverFresh, press, tabTo, tooltip, wait } from "../lib.mjs";
-import { act, dialog, done, inventoryOf, openItem, project, waitPreview } from "./common.mjs";
+import { act, DESKTOP_HOME, dialog, done, inventoryOf, openItem, project, waitPreview } from "./common.mjs";
 
 const inside = (tip) => tip && tip.rect.left >= 0 && tip.rect.top >= 0 && tip.rect.right <= tip.vw && tip.rect.bottom <= tip.vh;
 
@@ -137,7 +137,7 @@ export default [
       await press(s, "Cancel", ".dialog");
       await s.until(() => s.exec("return !document.querySelector('.dialog')"), { what: "the dialog closed" });
 
-      const config = `${t.root}\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json`;
+      const config = `${t.root}\\${DESKTOP_HOME}\\claude_desktop_config.json`;
       await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
       await s.click(await s.until(() => desktopRow("Effective"), { what: "cd-throwaway-desktop Effective" }));
       await wait(400);

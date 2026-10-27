@@ -3,12 +3,8 @@
 import { dirname, join } from "node:path";
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { buttonEl, choose, fieldValue, go, notices, panel, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
+import { act, addHome, checkBeforeYouApply, confirm, DESKTOP_HOME, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
-
-// The Claude Desktop home's folder under the throwaway root, which the data
-// script makes long enough to wrap in step 10.10.
-const DESKTOP_HOME = "paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home";
 
 // The Projects tab, as groups: each heading's text, whether it is open, and
 // its rows with their texts and buttons.
@@ -69,7 +65,9 @@ export async function openGroup(s, title, opts) {
 // What is wrong with how the paths of a tab wrap, each path as its lines laid
 // out: none takes more than one line, so none shows where it wraps, or a line
 // but the last ends inside a folder's name rather than right after a `\` or a
-// `/`. Undefined when a path wraps and each wraps only at a separator.
+// `/`. Undefined when a path wraps and each wraps only at a separator. The
+// fake UI's tests have the same check, `wrapFault` in
+// crates/config-digger-app/ui/uat/wraps.ts.
 export function wrapFault(paths) {
   if (!paths.some((lines) => lines.length > 1)) return `ninguna de las ${paths.length} rutas ocupa más de una línea, así que ninguna muestra dónde se parte`;
   const midWord = paths.find((lines) => lines.slice(0, -1).some((line) => !/[\\/]$/.test(line)));

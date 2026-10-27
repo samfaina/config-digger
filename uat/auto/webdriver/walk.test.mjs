@@ -160,6 +160,10 @@ test("step 10.10's paths fail when none takes more than one line", () => {
   assert.equal(wrapFault([["E:\\cd-throwaway\\project"], ["E:\\cd-throwaway\\project-extra"]]), "ninguna de las 2 rutas ocupa más de una línea, así que ninguna muestra dónde se parte");
 });
 
+test("step 10.10's paths fail when there is none", () => {
+  assert.equal(wrapFault([]), "ninguna de las 0 rutas ocupa más de una línea, así que ninguna muestra dónde se parte");
+});
+
 test("step 10.10's paths fail when one breaks inside a folder's name, though another wraps right after a separator", () => {
   assert.equal(
     wrapFault([["E:\\cd-throwaway\\", "project"], ["E:\\cd-throwaway\\proj", "ect-extra"]]),

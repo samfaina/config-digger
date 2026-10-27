@@ -5,7 +5,7 @@
 // walk's tester.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole, wrapsAtSeparators } from "./app";
+import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole, WRAPS, wrapsAtSeparators } from "./app";
 import { uatStep } from "./step";
 
 /** Why the checks of project-gone's Inventory stay with a person. */
@@ -88,7 +88,7 @@ uatStep("10.5", async ({ page, open, check, leave }) => {
   );
   await check("«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» no salen como Projects.", async () => {
     expect(rows.map((each) => each.name)).not.toContain(`${ROOT}\\codex-home`);
-    expect(rows.map((each) => each.name)).not.toContain(`${ROOT}\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home`);
+    expect(rows.map((each) => each.name)).not.toContain(`${WRAPS}\\claude-desktop-home`);
   });
   leave(
     "El grupo «▾ Missing · 1» está abierto.",
@@ -225,7 +225,7 @@ uatStep("10.10", async ({ page, open, check }) => {
   );
   await check("En Projects, cada ruta que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta.", async () => {
     await page.getByRole("tab", { name: /^Projects · / }).click();
-    await row(page, String.raw`${ROOT}\paths-that-wrap\in-the-smallest-window\of-config-digger\project-long`).scrollIntoViewIfNeeded();
+    await row(page, `${WRAPS}\\project-long`).scrollIntoViewIfNeeded();
     await wrapsAtSeparators(page.locator(".places-list .place-name.mono"));
   });
   await check(

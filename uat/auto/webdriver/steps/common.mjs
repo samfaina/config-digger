@@ -3,6 +3,10 @@
 import { ref, unwrap } from "../driver.mjs";
 import { choose, go, press, tab, wait, waitNotice } from "../lib.mjs";
 
+// The Claude Desktop home's folder under the throwaway root, which the data
+// script makes long enough to wrap in step 10.10.
+export const DESKTOP_HOME = "paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home";
+
 // Add Agent home with `agent` and `folder` typed in, as 1.2, 10.2 and 10.3 do,
 // and the checks they share: the notice, the row under its Agent's group, its
 // tags, and no row under another group.

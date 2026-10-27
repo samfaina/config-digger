@@ -7,6 +7,9 @@ import { wrapFault } from "./wraps";
 /** The throwaway data's root, as the fixtures write every path under it. */
 export const ROOT = String.raw`E:\cd-throwaway`;
 
+/** The folder of the throwaway data whose paths are long enough to wrap in step 10.10. */
+export const WRAPS = String.raw`${ROOT}\paths-that-wrap\in-the-smallest-window\of-config-digger`;
+
 /** How long a busy-state step holds the answer it waits on, in milliseconds. */
 export const HELD = 2000;
 
