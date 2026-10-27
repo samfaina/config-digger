@@ -250,3 +250,35 @@ test("the command lists the work folder's steps to judge, then merges a verdicts
   assert.deepEqual({ by: merged.by, status: merged.status, evidence: merged.evidence }, { by: "agent-judge", status: "ok", evidence: listed.looks[0].file });
   assert.deepEqual(JSON.parse(judge("list")), [], "a judged step is listed no more");
 });
+
+test("in the local script's work folder, the merge writes the judged results into its uat-results.json too", (t) => {
+  const real = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8")).sections[0].steps[0];
+  const work = shotsWith(t);
+  mkdirSync(join(work, "shots"));
+  mkdirSync(join(work, "sandbox"));
+  writeFileSync(join(work, "shots", `${real.id}-1-vista.png`), "png");
+  writeFileSync(join(work, "webdriver.json"), JSON.stringify([result(real.id, { looks: [{ what: "la vista", file: `${real.id}-1-vista.png` }] })]));
+  writeFileSync(join(work, "sandbox", "uat-results.json"), "[]");
+  writeFileSync(join(work, "uat-results.json"), JSON.stringify([result(real.id)]));
+  const verdicts = join(work, "verdicts.json");
+  const shot = join(work, "shots", `${real.id}-1-vista.png`);
+  writeFileSync(verdicts, JSON.stringify([{ id: real.id, status: "ok", notes: "Se ve bien.", evidence: shot }]));
+  execFileSync(process.execPath, [fileURLToPath(new URL("./judge.mjs", import.meta.url)), "merge", "--verdicts", verdicts, "--work", work], { stdio: "pipe" });
+  const [published] = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8"));
+  assert.deepEqual({ by: published.by, evidence: published.evidence, looks: published.looks }, { by: "agent-judge", evidence: shot, looks: undefined });
+});
+
+test("a merge whose uat-results.json can't be written again writes nothing, not even webdriver.json", (t) => {
+  const real = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8")).sections[0].steps[0];
+  const work = shotsWith(t);
+  mkdirSync(join(work, "shots"));
+  writeFileSync(join(work, "shots", `${real.id}-1-vista.png`), "png");
+  writeFileSync(join(work, "webdriver.json"), JSON.stringify([result(real.id, { looks: [{ what: "la vista", file: `${real.id}-1-vista.png` }] })]));
+  // The local script's file, with no Sandbox results beside it.
+  writeFileSync(join(work, "uat-results.json"), JSON.stringify([result(real.id)]));
+  const verdicts = join(work, "verdicts.json");
+  writeFileSync(verdicts, JSON.stringify([{ id: real.id, status: "ok", notes: "Se ve bien.", evidence: join(work, "shots", `${real.id}-1-vista.png`) }]));
+  assert.throws(() => execFileSync(process.execPath, [fileURLToPath(new URL("./judge.mjs", import.meta.url)), "merge", "--verdicts", verdicts, "--work", work], { stdio: "pipe" }));
+  assert.equal(JSON.parse(readFileSync(join(work, "webdriver.json"), "utf8"))[0].by, "local");
+  assert.equal(JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8"))[0].by, "local");
+});

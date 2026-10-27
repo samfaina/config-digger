@@ -16,11 +16,11 @@
 //        --profile <…\cd-throwaway-profile> --out <results.json> --shots <dir> [--only 10.1,10.2] [--attach <session>]
 //        [--ci --evidence <run URL> --summary <file>] [--debug-port 9222]
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { changedFiles, realData } from "../untouched.mjs";
 import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
 import { jobSummary, reason, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
@@ -72,32 +72,9 @@ if (opt.from) {
   ids = ids.slice(ids.indexOf(opt.from));
 }
 
-// The tester's own data the walk must never touch: config-digger's real data
-// folders and the configuration files of the Agents the steps open. A hash of
-// each file before the walk is compared with one after. Claude Code's files
-// are left out: an agent running the walk writes them itself.
-function realData() {
-  const files = [];
-  const walkDir = (dir) => {
-    if (!existsSync(dir)) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) walkDir(path);
-      else files.push(path);
-    }
-  };
-  walkDir(join(process.env.APPDATA, "config-digger"));
-  walkDir(join(process.env.LOCALAPPDATA, "config-digger"));
-  files.push(join(process.env.USERPROFILE, ".codex", "config.toml"), join(process.env.APPDATA, "Claude", "claude_desktop_config.json"));
-  const packages = join(process.env.LOCALAPPDATA, "Packages");
-  if (existsSync(packages)) {
-    for (const name of readdirSync(packages).filter((n) => n.startsWith("Claude_"))) {
-      files.push(join(packages, name, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
-    }
-  }
-  return new Map(files.filter((f) => existsSync(f)).map((f) => [f, createHash("sha256").update(readFileSync(f)).digest("hex")]));
-}
-const before = realData();
+// The tester's own data the walk must never touch (untouched.mjs), hashed
+// before the walk and compared after it.
+const before = realData(process.env);
 
 const port = Number(opt.port);
 const debugPort = opt["debug-port"] ? Number(opt["debug-port"]) : undefined;
@@ -203,8 +180,7 @@ if (driverStopped) {
   process.exitCode = 3;
 }
 
-const after = realData();
-const changed = [...new Set([...before.keys(), ...after.keys()])].filter((f) => before.get(f) !== after.get(f));
+const changed = changedFiles(before, realData(process.env));
 if (changed.length) {
   console.error(`The walk changed the tester's own data:\n${changed.join("\n")}`);
   process.exitCode = 2;
