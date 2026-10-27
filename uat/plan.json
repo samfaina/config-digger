@@ -621,7 +621,7 @@
         {
           "id": "10.20",
           "title": "Un Project oculto junto a No Project",
-          "goal": "La fila de un Project oculto y la fila No Project se distinguen por algo más que el color: la oculta tiene un borde discontinuo y la etiqueta «hidden», No Project ni borde ni etiqueta, y los textos de las dos se leen claros.",
+          "goal": "La fila de un Project oculto y la fila No Project se distinguen por algo más que el color: la oculta tiene un borde discontinuo y la etiqueta «hidden», No Project ni borde visible ni etiqueta, y los textos de las dos se leen claros.",
           "instructions": [
             "Ve a Projects & homes.",
             "Abre la pestaña Projects.",
@@ -634,10 +634,14 @@
           "expect": [
             "La fila de «E:\\cd-throwaway\\project-hide» en Hidden tiene un borde discontinuo sobre el panel.",
             "La fila de «E:\\cd-throwaway\\project-hide» en Hidden lleva la etiqueta «hidden».",
-            "La fila «No Project» no tiene borde ni el fondo de las otras filas.",
+            "La fila «No Project» no tiene ningún borde visible.",
+            "La fila «No Project» no tiene el fondo de las otras filas.",
             "La fila «No Project» no lleva ninguna etiqueta.",
-            "El nombre, la línea y la etiqueta de la fila oculta se leen claros.",
-            "El nombre y el texto de la fila «No Project» se leen claros.",
+            "El nombre de la fila oculta se lee claro.",
+            "La línea «Known to Claude Code» de la fila oculta se lee clara.",
+            "La etiqueta «hidden» se lee clara.",
+            "El nombre «No Project» se lee claro.",
+            "El texto bajo «No Project» se lee claro.",
             "Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.»."
           ],
           "covers": ["#397"],

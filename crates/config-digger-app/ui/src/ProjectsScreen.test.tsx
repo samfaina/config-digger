@@ -114,6 +114,9 @@ const unpieced = (markup: string) => markup.replace(/<span class="path-piece">([
 const rowMarkup = (markup: string, name: string) =>
   (markup.split('<div class="place-row').find((each) => unpieced(each).includes(`>${name}</div>`)) ?? "").split("<h3")[0];
 
+/** The name of the row of `path`, whose text is split in the pieces it wraps between. */
+const named = (path: string) => (_: string, element: Element | null) => element?.classList.contains("place-name") === true && element.textContent === path;
+
 /** The opening tag of each button of the row named `name`. */
 const buttonsOf = (markup: string, name: string) => rowMarkup(markup, name).match(/<button[^>]*>/g) ?? [];
 
@@ -191,8 +194,7 @@ describe("a hidden Project's row", () => {
     );
 
     await userEvent.click(rendered.getByRole("button", { name: "▸ Hidden · 1" }));
-    const rowOfName = (name: string) =>
-      rendered.getByText((_, element) => element?.classList.contains("place-name") === true && element.textContent === name).closest(".place-row") as HTMLElement;
+    const rowOfName = (name: string) => rendered.getByText(named(name)).closest(".place-row") as HTMLElement;
     const tags = (row: HTMLElement) => [...row.querySelectorAll(".tags .tag")].map((tag) => tag.textContent);
     expect(tags(rowOfName(HIDE))).toEqual(["hidden"]);
     expect(rowOfName("No Project").querySelector(".tag")).toBeNull();
@@ -231,8 +233,6 @@ describe("the group of missing Projects without leftovers", () => {
     <ProjectsTab places={places} search={search} busy={[]} onShow={() => {}} onChange={() => {}} onRemoveLeftovers={() => {}} onRemoveStranded={() => {}} />
   );
   const titles = () => rendered.getAllByRole("heading").map((heading) => heading.textContent);
-  /** The name of the row of `path`, whose text is split in the pieces it wraps between. */
-  const named = (path: string) => (_: string, element: Element | null) => element?.classList.contains("place-name") === true && element.textContent === path;
   const listed = (path: string) => rendered.queryByText(named(path)) !== null;
 
   test("follows Missing, closed, with its count, and leaves its rows out of Missing", () => {
