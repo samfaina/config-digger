@@ -633,12 +633,12 @@
           "commands": [],
           "expect": [
             "La fila de «E:\\cd-throwaway\\project-hide» en Hidden tiene un borde discontinuo sobre el panel.",
-            "La fila de «E:\\cd-throwaway\\project-hide» en Hidden lleva la etiqueta «hidden».",
+            "La fila de «E:\\cd-throwaway\\project-hide» en Hidden lleva las etiquetas «known to Claude Code» y «hidden».",
             "La fila «No Project» no tiene ningún borde visible.",
             "La fila «No Project» no tiene el fondo de las otras filas.",
             "La fila «No Project» no lleva ninguna etiqueta.",
             "El nombre de la fila oculta se lee claro.",
-            "La línea «Known to Claude Code» de la fila oculta se lee clara.",
+            "La etiqueta «known to Claude Code» de la fila oculta se lee clara.",
             "La etiqueta «hidden» se lee clara.",
             "El nombre «No Project» se lee claro.",
             "El texto bajo «No Project» se lee claro.",
@@ -688,10 +688,11 @@
           "commands": [],
           "expect": [
             "Salen «E:\\cd-throwaway\\project» y «E:\\cd-throwaway\\project-hide».",
-            "Cada uno tiene la línea «Folder · Known to Claude Code».",
+            "Cada uno tiene la línea «Folder».",
+            "Cada uno lleva la etiqueta «known to Claude Code».",
             "«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» no salen como Projects.",
             "El grupo «▾ Missing · 1» está abierto.",
-            "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover».",
+            "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists», la etiqueta «known to Claude Code» y «1 leftover».",
             "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».",
             "Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado."
           ],
@@ -724,12 +725,12 @@
           "expect": [
             "Con deleted, el grupo «Missing, no leftovers · 1» se abre solo.",
             "Con deleted, ese grupo muestra «E:/cd-throwaway/project-deleted».",
-            "La fila de project-deleted dice «The folder no longer exists · known to Claude Code» y «No leftovers».",
+            "La fila de project-deleted dice «The folder no longer exists» y «No leftovers», y lleva la etiqueta «known to Claude Code».",
             "El único botón de la fila es «Hide».",
             "Al borrar lo escrito, el grupo vuelve a «▸ Missing, no leftovers · 1», cerrado.",
             "Hide da el aviso «Hid E:/cd-throwaway/project-deleted. Picking it in the Inventory still evaluates it.».",
             "Tras Hide, el grupo «Missing, no leftovers» ya no sale.",
-            "El grupo «Hidden · 1» muestra project-deleted con la línea «Missing · Known to Claude Code».",
+            "El grupo «Hidden · 1» muestra project-deleted con las etiquetas «known to Claude Code», «missing» y «hidden».",
             "Unhide da el aviso «E:/cd-throwaway/project-deleted is listed again.».",
             "Tras Unhide, project-deleted vuelve al grupo «Missing, no leftovers · 1».",
             "En el campo Project, el grupo «MISSING PROJECTS» muestra «E:/cd-throwaway/project-gone».",
@@ -903,13 +904,38 @@
           "expect": [
             "Con no-existe, el diálogo muestra el error «E:\\cd-throwaway\\no-existe is not an existing folder or .code-workspace file».",
             "Con project-extra sale el aviso «Added E:\\cd-throwaway\\project-extra: every Agent is evaluated on it.».",
-            "La fila de project-extra dice «Folder · Added by you».",
+            "La fila de project-extra dice «Folder» y lleva solo la etiqueta «added by you».",
             "La fila tiene los botones «Open in Inventory» y «Remove from list»."
           ],
           "covers": ["#75"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.9" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.9" }
+          ]
+        },
+        {
+          "id": "10.21",
+          "title": "Las etiquetas de un Project",
+          "goal": "Quién añadió un Project y qué Agents lo conocen se lee de un vistazo en etiquetas como las de un Agent home, no en una línea gris bajo la ruta.",
+          "instructions": [
+            "En la pestaña Projects, mira las filas de E:\\cd-throwaway\\project y E:\\cd-throwaway\\project-extra.",
+            "Mira la fila de E:/cd-throwaway/project-gone en el grupo Missing.",
+            "Mira las etiquetas de esas filas: su fondo, su borde y su texto."
+          ],
+          "commands": [],
+          "expect": [
+            "La fila de «E:\\cd-throwaway\\project» lleva la etiqueta «known to Claude Code».",
+            "La fila de «E:\\cd-throwaway\\project-extra» lleva solo la etiqueta «added by you».",
+            "La fila de «E:/cd-throwaway/project-gone» lleva la etiqueta «known to Claude Code».",
+            "Ninguna de las tres filas dice «Known to Claude Code» ni «Added by you» en una línea gris bajo la ruta.",
+            "Cada etiqueta es una píldora rellena de gris, no un texto gris sobre el fondo de la fila.",
+            "Cada etiqueta tiene un borde gris claro alrededor.",
+            "El texto de cada etiqueta es casi blanco."
+          ],
+          "covers": ["#278"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.21" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.21" }
           ]
         },
         {

@@ -6,16 +6,17 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
 import { group, inventoryShown, NO_WRITE, openGroup, rail, ROOT, row, whole, WRAPS, wrapsAtSeparators } from "./app";
+import { grey, rgb } from "./look";
 import { uatStep } from "./step";
 
 /** Why the checks of project-gone's Inventory stay with a person. */
 const NO_LEFTOVERS =
   "the fixtures hold no inventory of project-gone, so the fake backend answers that of no Project, which has no Unread Item and no leftover";
 
-/** The Projects tab, as groups: each heading's text, whether it is open, and its rows. */
+/** The Projects tab, as groups: each heading's text, whether it is open, and its rows with their lines and tags. */
 function projectGroups(page: Page) {
   return page.locator(".places-list .scroll").evaluate((list) => {
-    const groups: { title: string; open: boolean; rows: { name: string; sub: string; count: string | null }[] }[] = [];
+    const groups: { title: string; open: boolean; rows: { name: string; subs: string[]; tags: string[]; count: string | null }[] }[] = [];
     for (const el of list.children) {
       if (el.matches("h3.place-group")) {
         const toggle = el.querySelector(".place-group-toggle");
@@ -23,7 +24,8 @@ function projectGroups(page: Page) {
       } else if (el.matches(".place-row") && groups.length > 0) {
         groups.at(-1)!.rows.push({
           name: el.querySelector(".place-name")!.textContent!.trim(),
-          sub: el.querySelector(".place-sub")!.textContent!.trim(),
+          subs: [...el.querySelectorAll(".place-sub")].map((sub) => sub.textContent!.trim()),
+          tags: [...el.querySelectorAll(".tags .tag")].map((tag) => tag.textContent!.trim()),
           count: el.querySelector(".place-count")?.textContent!.trim() ?? null,
         });
       }
@@ -82,10 +84,12 @@ uatStep("10.5", async ({ page, open, check, leave }) => {
   await check("Salen «E:\\cd-throwaway\\project» y «E:\\cd-throwaway\\project-hide».", async () => {
     expect(rows.map((each) => each.name)).toEqual(expect.arrayContaining([`${ROOT}\\project`, `${ROOT}\\project-hide`]));
   });
-  leave(
-    "Cada uno tiene la línea «Folder · Known to Claude Code».",
-    "the fixtures have project-hide hidden, and a hidden row says only «Known to Claude Code»",
-  );
+  leave("Cada uno tiene la línea «Folder».", "the fixtures have project-hide hidden, and a hidden row has no «Folder» line");
+  await check("Cada uno lleva la etiqueta «known to Claude Code».", async () => {
+    for (const name of [`${ROOT}\\project`, `${ROOT}\\project-hide`]) {
+      expect(rows.find((each) => each.name === name)?.tags, name).toContain("known to Claude Code");
+    }
+  });
   await check("«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» no salen como Projects.", async () => {
     expect(rows.map((each) => each.name)).not.toContain(`${ROOT}\\codex-home`);
     expect(rows.map((each) => each.name)).not.toContain(`${WRAPS}\\claude-desktop-home`);
@@ -94,16 +98,64 @@ uatStep("10.5", async ({ page, open, check, leave }) => {
     "El grupo «▾ Missing · 1» está abierto.",
     "the fixtures add claude-code-many-home, whose missing Project makes the group «Missing · 2»; the walk checks it on fresh data",
   );
-  await check("En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover».", async () => {
-    expect(missing.open).toBe(true);
-    const gone = missing.rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
-    expect(gone).toMatchObject({ sub: "The folder no longer exists · known to Claude Code", count: "1 leftover" });
-  });
+  await check(
+    "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists», la etiqueta «known to Claude Code» y «1 leftover».",
+    async () => {
+      expect(missing.open).toBe(true);
+      const gone = missing.rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
+      expect(gone).toMatchObject({ subs: ["The folder no longer exists"], tags: ["known to Claude Code"], count: "1 leftover" });
+    },
+  );
   await check("«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».", async () => {
     expect(missing.rows.filter((each) => whole("E:/cd-throwaway/project-deleted").test(each.name))).toEqual([]);
   });
   await check("Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado.", async () => {
     expect(groups[groups.indexOf(missing) + 1]).toMatchObject({ title: "▸ Missing, no leftovers · 1", open: false });
+  });
+});
+
+uatStep("10.21", async ({ page, open, check }) => {
+  await open();
+  await projectsTab(page);
+  const rows = (await projectGroups(page)).flatMap((each) => each.rows);
+  const project = rows.find((each) => each.name === `${ROOT}\\project`);
+  const extra = rows.find((each) => each.name === `${ROOT}\\project-extra`);
+  const gone = rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
+  const tag = await row(page, `${ROOT}\\project`)
+    .locator(".tags .tag")
+    .first()
+    .evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, border: style.borderTopStyle, width: style.borderTopWidth, edge: style.borderTopColor, colour: style.color };
+    });
+
+  await check("La fila de «E:\\cd-throwaway\\project» lleva la etiqueta «known to Claude Code».", async () => {
+    expect(project?.tags).toEqual(["known to Claude Code"]);
+  });
+  await check("La fila de «E:\\cd-throwaway\\project-extra» lleva solo la etiqueta «added by you».", async () => {
+    expect(extra?.tags).toEqual(["added by you"]);
+  });
+  await check("La fila de «E:/cd-throwaway/project-gone» lleva la etiqueta «known to Claude Code».", async () => {
+    expect(gone?.tags).toEqual(["known to Claude Code"]);
+  });
+  await check("Ninguna de las tres filas dice «Known to Claude Code» ni «Added by you» en una línea gris bajo la ruta.", async () => {
+    const lines = [project, extra, gone].flatMap((each) => each?.subs ?? []);
+    expect(lines.filter((line) => /known to|added by you/i.test(line))).toEqual([]);
+  });
+  await check("Cada etiqueta es una píldora rellena de gris, no un texto gris sobre el fondo de la fila.", async () => {
+    expect(rgb(tag.background)[3] > 0 && grey(tag.background), tag.background).toBe(true);
+  });
+  await check("Cada etiqueta tiene un borde gris claro alrededor.", async () => {
+    expect([tag.border, tag.width]).toEqual(["solid", "1px"]);
+    expect(grey(tag.edge), tag.edge).toBe(true);
+  });
+  await check("El texto de cada etiqueta es casi blanco.", async () => {
+    expect(
+      rgb(tag.colour)
+        .slice(0, 3)
+        .every((channel) => channel > 200),
+      tag.colour,
+    ).toBe(true);
   });
 });
 

@@ -7,7 +7,7 @@ import { act, addHome, checkBeforeYouApply, confirm, DESKTOP_HOME, dialog, dialo
 import { loadingState } from "./loading.mjs";
 
 // The Projects tab, as groups: each heading's text, whether it is open, and
-// its rows with their texts and buttons.
+// its rows with their texts, tags and buttons.
 export function projectGroups(s) {
   return s.exec(`
     const groups = [];
@@ -19,6 +19,8 @@ export function projectGroups(s) {
         groups.at(-1).rows.push({
           name: el.querySelector(".place-name")?.textContent.trim(),
           sub: el.querySelector(".place-sub")?.textContent.trim(),
+          subs: [...el.querySelectorAll(".place-sub")].map((e) => e.textContent.trim()),
+          tags: [...el.querySelectorAll(".tags .tag")].map((e) => e.textContent.trim()),
           count: el.querySelector(".place-count")?.textContent.trim(),
           buttons: [...el.querySelectorAll("button")].map((b) => ({ text: b.textContent.trim(), disabled: b.disabled })),
           opacity: getComputedStyle(el).opacity,
@@ -233,13 +235,13 @@ export default [
       const none = await look(noneRow);
       const clear = (colour) => /rgba\(.*,\s*0\)$/.test(colour) || colour === "transparent";
       t.check(hidden.border === "dashed" && clear(hidden.bg), `la fila de «${path}» en Hidden tiene un borde discontinuo sobre el panel`, `${hidden.border} ${hidden.bg}`);
-      t.eq(hidden.tags.join("|"), "hidden", `la fila de «${path}» en Hidden lleva la etiqueta «hidden»`);
+      t.eq(hidden.tags.join("|"), "known to Claude Code|hidden", `la fila de «${path}» en Hidden lleva las etiquetas «known to Claude Code» y «hidden»`);
       t.check(clear(none.edge), "la fila «No Project» no tiene ningún borde visible", `${none.border} ${none.edge}`);
       t.check(clear(none.bg), "la fila «No Project» no tiene el fondo de las otras filas", none.bg);
       t.check(none.tags.length === 0, "la fila «No Project» no lleva ninguna etiqueta", none.tags.join(", "));
       await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(hiddenRow));
       await wait(200);
-      await t.shot("oculta", "el nombre de la fila oculta se lee claro", "la línea «Known to Claude Code» de la fila oculta se lee clara", "la etiqueta «hidden» se lee clara");
+      await t.shot("oculta", "el nombre de la fila oculta se lee claro", "la etiqueta «known to Claude Code» de la fila oculta se lee clara", "la etiqueta «hidden» se lee clara");
       await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(noneRow));
       await wait(200);
       await t.shot("no-project", "el nombre «No Project» se lee claro", "el texto bajo «No Project» se lee claro");
@@ -281,7 +283,8 @@ export default [
       for (const name of ["project", "project-hide"]) {
         const row = inGroup(groups, "Projects", `${t.root}\\${name}`);
         t.check(row, `sale «${t.root}\\${name}»`);
-        t.eq(row?.sub, "Folder · Known to Claude Code", `${name} tiene la línea «Folder · Known to Claude Code»`);
+        t.eq(row?.subs.join(" | "), "Folder", `${name} tiene la línea «Folder»`);
+        t.eq(row?.tags.join("|"), "known to Claude Code", `${name} lleva la etiqueta «known to Claude Code»`);
       }
       const all = groups.flatMap((g) => g.rows.map((r) => r.name));
       for (const name of ["codex-home", DESKTOP_HOME]) t.check(!all.includes(`${t.root}\\${name}`), `«${t.root}\\${name}» no sale como Project`);
@@ -290,7 +293,8 @@ export default [
       t.check(missing?.open, "el grupo Missing está abierto");
       const gone = missing?.rows[0];
       t.path(gone?.name, "E:/cd-throwaway/project-gone", "en Missing sale «E:/cd-throwaway/project-gone»");
-      t.eq(gone?.sub, "The folder no longer exists · known to Claude Code", "con la línea «The folder no longer exists · known to Claude Code»");
+      t.eq(gone?.subs.join(" | "), "The folder no longer exists", "con la línea «The folder no longer exists»");
+      t.eq(gone?.tags.join("|"), "known to Claude Code", "con la etiqueta «known to Claude Code»");
       t.eq(gone?.count, "1 leftover", "y «1 leftover»");
       t.check(!missing?.rows.some((r) => /project-deleted$/.test(r.name)), "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1»", missing?.rows.map((r) => r.name).join(", "));
       const next = groups[groups.indexOf(missing) + 1];
@@ -310,9 +314,9 @@ export default [
       t.check(noLeftovers?.title === "Missing, no leftovers · 1" && noLeftovers.open, "con deleted, el grupo «Missing, no leftovers · 1» se abre solo", noLeftovers && `${noLeftovers.title} ${noLeftovers.open ? "abierto" : "cerrado"}`);
       t.check(row && t.path(row.name, "E:/cd-throwaway/project-deleted"), "con deleted, ese grupo muestra «E:/cd-throwaway/project-deleted»", noLeftovers?.rows.map((r) => r.name).join(", "));
       t.check(
-        row?.sub === "The folder no longer exists · known to Claude Code" && row.count === "No leftovers",
-        "la fila de project-deleted dice «The folder no longer exists · known to Claude Code» y «No leftovers»",
-        row && `${row.sub}; ${row.count}`,
+        row?.subs.join(" | ") === "The folder no longer exists" && row.count === "No leftovers" && row.tags.join("|") === "known to Claude Code",
+        "la fila de project-deleted dice «The folder no longer exists» y «No leftovers», y lleva la etiqueta «known to Claude Code»",
+        row && `${row.subs.join(" | ")}; ${row.count}; ${row.tags.join(", ")}`,
       );
       t.eq(row?.buttons.map((b) => b.text).join(", "), "Hide", "el único botón de la fila es «Hide»");
       await typeInto(s, search, "");
@@ -328,7 +332,7 @@ export default [
       await openGroup(s, "Hidden");
       groups = await projectGroups(s);
       const hidden = groups.find((g) => g.title.includes("Hidden · 1"))?.rows.find((r) => r.name === path);
-      t.eq(hidden?.sub, "Missing · Known to Claude Code", "el grupo «Hidden · 1» muestra project-deleted con la línea «Missing · Known to Claude Code»");
+      t.eq(hidden?.tags.join("|"), "known to Claude Code|missing|hidden", "el grupo «Hidden · 1» muestra project-deleted con las etiquetas «known to Claude Code», «missing» y «hidden»");
       await s.click(await s.until(() => rowButton(s, path, "Unhide"), { what: "Unhide" }));
       const listed = await waitNotice(s, `${path} is listed again`);
       t.eq(listed.text, `${path} is listed again.`, "Unhide da el aviso «E:/cd-throwaway/project-deleted is listed again.»");
@@ -538,8 +542,46 @@ export default [
       const added = await waitNotice(s, `Added ${extra}`);
       t.eq(added.text, `Added ${extra}: every Agent is evaluated on it.`, `sale el aviso «Added ${extra}: every Agent is evaluated on it.»`);
       const row = (await projectGroups(s)).flatMap((g) => g.rows).find((r) => r.name === extra);
-      t.eq(row?.sub, "Folder · Added by you", "la fila dice «Folder · Added by you»");
+      t.check(
+        row?.subs.join(" | ") === "Folder" && row.tags.join("|") === "added by you",
+        "la fila dice «Folder» y lleva solo la etiqueta «added by you»",
+        row && `${row.subs.join(" | ")}; ${row.tags.join(", ")}`,
+      );
       t.eq(row?.buttons.map((b) => b.text).join(", "), "Open in Inventory, Remove from list", "la fila tiene «Open in Inventory» y «Remove from list»");
+    },
+  },
+  {
+    id: "10.21",
+    async run(t) {
+      const { s } = t;
+      await go(s, "Projects & homes");
+      await tab(s, "Projects");
+      const groups = await projectGroups(s);
+      const project = inGroup(groups, "Projects", `${t.root}\\project`);
+      const extra = inGroup(groups, "Projects", `${t.root}\\project-extra`);
+      const gone = missingGroup(groups)?.rows.find((r) => /project-gone$/.test(r.name));
+      t.eq(project?.tags.join("|"), "known to Claude Code", `la fila de «${t.root}\\project» lleva la etiqueta «known to Claude Code»`);
+      t.eq(extra?.tags.join("|"), "added by you", `la fila de «${t.root}\\project-extra» lleva solo la etiqueta «added by you»`);
+      t.eq(gone?.tags.join("|"), "known to Claude Code", "la fila de «E:/cd-throwaway/project-gone» lleva la etiqueta «known to Claude Code»");
+      const lines = [project, extra, gone].flatMap((row) => row?.subs ?? []);
+      t.check(
+        !lines.some((line) => /known to|added by you/i.test(line)),
+        "ninguna de las tres filas dice «Known to Claude Code» ni «Added by you» en una línea gris bajo la ruta",
+        lines.join(" | "),
+      );
+      const style = await s.exec(`
+        const tag = document.querySelector(".places .place-row .tags .tag");
+        const c = getComputedStyle(tag);
+        return { bg: c.backgroundColor, border: c.borderTopWidth + " " + c.borderTopStyle + " " + c.borderTopColor, color: c.color };`);
+      const rgb = (x) => (x.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+      const [r, g, b, a = 1] = rgb(style.bg);
+      t.check(a > 0 && Math.abs(r - g) < 20 && Math.abs(g - b) < 20, "cada etiqueta es una píldora rellena de gris", style.bg);
+      t.check(style.border.includes("solid") && !style.border.startsWith("0px"), "cada etiqueta tiene un borde alrededor", style.border);
+      const [cr, cg, cb] = rgb(style.color);
+      t.check(cr > 200 && cg > 200 && cb > 200, "el texto de cada etiqueta es casi blanco", style.color);
+      await s.until(async () => (await notices(s)).length === 0, { what: "the notices gone", timeout: 6000 }).catch(() => {});
+      await scrollTo(s, ".place-row", `${t.root}\\project-extra`);
+      await t.shot("etiquetas", "las etiquetas de los Projects son píldoras grises con borde gris claro y texto casi blanco, como las de la pestaña Agent homes");
     },
   },
   {

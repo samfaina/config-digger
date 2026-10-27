@@ -179,6 +179,35 @@ describe("a row of the Projects tab", () => {
   });
 });
 
+describe("where a Project comes from", () => {
+  test("shows as tags on a present, a missing and a hidden row, not as a line under the path", async () => {
+    render(
+      <ProjectsTab
+        places={{
+          ...places,
+          projects: [project({ path: KEEP, added: true }), project({ path: GONE, missing: true }), project({ path: DELETED, missing: true, hidden: true })],
+        }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+        onRemoveStranded={() => {}}
+      />,
+    );
+
+    await userEvent.click(rendered.getByRole("button", { name: "▸ Hidden · 1" }));
+    const rowOfName = (name: string) => rendered.getByText(named(name)).closest(".place-row") as HTMLElement;
+    const shown = (name: string) => ({
+      tags: [...rowOfName(name).querySelectorAll(".tags .tag")].map((tag) => tag.textContent),
+      lines: [...rowOfName(name).querySelectorAll(".place-sub")].map((line) => line.textContent),
+    });
+    expect(shown(KEEP)).toEqual({ tags: ["added by you", "known to Claude Code"], lines: ["Folder"] });
+    expect(shown(GONE)).toEqual({ tags: ["known to Claude Code"], lines: ["The folder no longer exists"] });
+    expect(shown(DELETED)).toEqual({ tags: ["known to Claude Code", "missing", "hidden"], lines: [] });
+  });
+});
+
 describe("a hidden Project's row", () => {
   test("is tagged hidden once the Hidden group is open, as a hidden Agent home is, and No Project is not", async () => {
     render(
@@ -196,7 +225,7 @@ describe("a hidden Project's row", () => {
     await userEvent.click(rendered.getByRole("button", { name: "▸ Hidden · 1" }));
     const rowOfName = (name: string) => rendered.getByText(named(name)).closest(".place-row") as HTMLElement;
     const tags = (row: HTMLElement) => [...row.querySelectorAll(".tags .tag")].map((tag) => tag.textContent);
-    expect(tags(rowOfName(HIDE))).toEqual(["hidden"]);
+    expect(tags(rowOfName(HIDE))).toEqual(["known to Claude Code", "hidden"]);
     expect(rowOfName("No Project").querySelector(".tag")).toBeNull();
   });
 });
