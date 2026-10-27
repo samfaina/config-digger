@@ -36,7 +36,7 @@ Settled decisions this catalog must respect:
 
 ### Primitive families
 
-1. **Path expansion and home locators**: `%ENV%`/`~` expansion; `env-override` (CODEX_HOME, GEMINI_CLI_HOME, CLAUDE_USER_DATA_DIR); `glob` (MSIX `Packages\Claude_*`); `lookup-order` (first existing wins, others Unread with lookup_order_skips_home); `homes-from-json-list` (VS Code profiles from a JSON file listing them); user-added homes (core).
+1. **Path expansion and home locators**: `%ENV%`/`~` expansion; `env-override` (CODEX_HOME, GEMINI_CLI_HOME); `glob` (MSIX `Packages\Claude_*`); `lookup-order` (first existing wins, others Unread with lookup_order_skips_home); `homes-from-json-list` (VS Code profiles from a JSON file listing them); user-added homes (core).
 2. **Location anchors and enumeration**: `home:<root>`, `project`, `system` (%ProgramData%); `each-dir` (glob directories, e.g. extensions/plugins installed folders); `json-registry` (enumerate installed plugins from a JSON registry file, then a relative path inside each).
 3. **Formats**: `json`, `jsonc`, `toml`, `skill-folder` (folder with SKILL.md + frontmatter), `manifest` (JSON or TOML manifest of an extension/plugin that contributes Entries); `sqlite-value` (read-only Entries from a JSON value stored in an SQLite row, e.g. a runtime cache). `root` is a key path that may contain `{project}` (project-keyed roots like `projects.{project}.mcpServers`) with a path spelling.
 4. **Project registries and path spelling**: `json-keys`, `toml-table-keys`, `json-list`, `sqlite-row` (generic: table, match column, optional value column, optional JSON path; also lists rows, e.g. a `paths` column split by newline); spellings `native`, `forward-slash`, `file-uri`, `slash-drive` (`/E:/`). Project walk: `folder-only`, `repo-root-to-folder`, `workspace-members` (.code-workspace), `folder-and-subfolders`.
@@ -218,7 +218,7 @@ docs.windsurf.com redirects to docs.devin.ai/desktop. Source: https://docs.devin
 - Legacy `.claude/commands/*.md`: is it in scope for v0.1? It would need a single-file skill format.
 ### Claude Desktop
 **Fits**
-- Homes: `env-override` `CLAUDE_USER_DATA_DIR` (named root `data`). Store and enterprise MSIX homes via `glob` `%LOCALAPPDATA%\Packages\{Claude_*,AnthropicPBC.Claude_*}\LocalCache\Roaming\Claude`. Classic home `%APPDATA%\Claude`. 3P home `%LOCALAPPDATA%\Claude-3p`.
+- Homes: none from an `env-override`, since signed builds ignore `CLAUDE_USER_DATA_DIR` (#368); a folder given with `--user-data-dir` is a home the user adds. Store and enterprise MSIX homes via `glob` `%LOCALAPPDATA%\Packages\{Claude_*,AnthropicPBC.Claude_*}\LocalCache\Roaming\Claude`. Classic home `%APPDATA%\Claude`. 3P home `%LOCALAPPDATA%\Claude-3p`.
 - Scopes: `managed`, `user`. `[projects]` is empty and every State is per (home, none).
 - User-file location: `home:data` + `claude_desktop_config.json`, `json` (core strips the BOM), root `mcpServers`, Scope user, Provenance `file`, store_class `rewritten-while-running`. Field map is command/args/env; `extensionId` goes to "other".
 - Extension location: `each-dir` `Claude Extensions\*\manifest.json`, `manifest` format, root `server.mcp_config`, Provenance `extension`.

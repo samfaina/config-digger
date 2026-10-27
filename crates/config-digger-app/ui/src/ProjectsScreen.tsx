@@ -685,7 +685,7 @@ function ProjectsSide({ places }: { places: Places | null }) {
 /** Where Agent homes come from, as their source tags name it. */
 const HOME_SOURCES: [string, string][] = [
   ["Default location", "Where each Agent definition says the Agent keeps its user configuration."],
-  ["Environment variable", "CODEX_HOME, GEMINI_CLI_HOME and CLAUDE_USER_DATA_DIR, as config-digger sees them."],
+  ["Environment variable", "CODEX_HOME and GEMINI_CLI_HOME, as config-digger sees them."],
   ["Known location", "MSIX packages, VS Code profiles, and homes other tools keep, such as Orca's Mirrored Codex home."],
   ["Added by you", "Any existing folder, read with the Agent definition you pick."],
 ];

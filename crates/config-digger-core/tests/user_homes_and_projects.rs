@@ -616,7 +616,7 @@ fn each_agent_names_the_environment_variables_its_homes_are_found_through() {
         variables,
         [
             ("claude-code", vec![]),
-            ("claude-desktop", vec!["CLAUDE_USER_DATA_DIR"]),
+            ("claude-desktop", vec![]),
             ("vscode", vec![]),
             ("cursor", vec![]),
             ("codex", vec!["CODEX_HOME"]),

@@ -9,7 +9,8 @@ format_version = 1
 verified = { min = "2.16120", max = "2.16120" }
 
 # The data folder Claude Desktop reads, `<userData>`, is the first of these
-# that exists [bundle]. `CLAUDE_USER_DATA_DIR` sets it outright [bundle].
+# that exists [bundle]. The signed app ignores `CLAUDE_USER_DATA_DIR`
+# [test, bundle], so no home comes from it (#368).
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
 # share [bundle]. Each package's app ends with its own `LocalCache`, which
 # no other app sees [docs]. A package's app sees `%APPDATA%\Claude` with its
@@ -18,8 +19,8 @@ verified = { min = "2.16120", max = "2.16120" }
 # holds wins [test]. A lookup order picks a whole folder, the classic one
 # here (#306).
 lookup_orders = [
-  ["user-data-dir", "claude-data", "classic", "msix"],
-  ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc"],
+  ["claude-data", "classic", "msix"],
+  ["claude-data", "classic", "msix-anthropicpbc"],
 ]
 
 [agent]
@@ -37,14 +38,14 @@ id = "msix"
 folder = "%ProgramFiles%/WindowsApps/Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["user-data-dir", "claude-data", "classic", "msix", "third-party"]
+homes = ["claude-data", "classic", "msix", "third-party"]
 
 [[installations]]
 id = "msix-anthropicpbc"
 folder = "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["user-data-dir", "claude-data", "classic", "msix-anthropicpbc", "third-party"]
+homes = ["claude-data", "classic", "msix-anthropicpbc", "third-party"]
 
 # The classic installer, which claude.ai serves beside the MSIX package, is
 # Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude`,
@@ -56,7 +57,7 @@ id = "classic"
 folder = "%LOCALAPPDATA%/AnthropicClaude"
 executable = "claude.exe"
 versions = [{ block = "exe-version" }]
-homes = ["user-data-dir", "claude-data", "classic", "third-party"]
+homes = ["claude-data", "classic", "third-party"]
 
 # The app runs as `claude.exe` from its package [disk] or from its classic
 # `app-<version>` folder [test], as the Claude Code CLI does from
@@ -73,22 +74,9 @@ paths = [
 # as `--user-data-dir=<folder>`, quoted on some and not on others [disk].
 # Started with `--user-data-dir=<folder>`, it reads that folder, which every
 # process names, the main one too; the signed app ignores
-# `CLAUDE_USER_DATA_DIR` [test]. So a running Claude Desktop reads a home the
-# user added only while one of its processes names its folder (#211).
+# `CLAUDE_USER_DATA_DIR` [test, bundle]. So a running Claude Desktop reads a
+# home the user added only while one of its processes names its folder (#211).
 data_folder_switch = "--user-data-dir"
-
-[[homes]]
-id = "user-data-dir"
-folder = { block = "env", variable = "CLAUDE_USER_DATA_DIR" }
-
-[homes.roots]
-# Holds the user's servers in `mcpServers`, next to UI preferences.
-config = "claude_desktop_config.json"
-extensions = "Claude Extensions"
-extension_settings = "Claude Extensions Settings"
-installations = "extensions-installations.json"
-# The mirror of the account's skills.
-skills = "local-agent-mode-sessions/skills-plugin"
 
 [[homes]]
 id = "claude-data"
@@ -96,6 +84,7 @@ folder = { block = "path", path = "%LOCALAPPDATA%/Claude-Data" }
 when = [{ block = "unc-variable", variable = "APPDATA" }]
 
 [homes.roots]
+# Holds the user's servers in `mcpServers`, next to UI preferences.
 config = "claude_desktop_config.json"
 extensions = "Claude Extensions"
 extension_settings = "Claude Extensions Settings"
