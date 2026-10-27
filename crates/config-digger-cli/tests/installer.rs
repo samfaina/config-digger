@@ -75,6 +75,7 @@ impl Harness {
             .env("LOCALAPPDATA", self.local_app_data())
             .env("APPDATA", self.roaming_app_data())
             .env("ProgramData", self.root.path().join("ProgramData"))
+            .env("ProgramFiles", self.root.path().join("ProgramFiles"))
             .env_remove("CODEX_HOME")
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("CLAUDE_USER_DATA_DIR")

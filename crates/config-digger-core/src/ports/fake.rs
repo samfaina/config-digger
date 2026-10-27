@@ -778,10 +778,19 @@ impl FileSystem for FakeFileSystem {
 }
 
 /// Processes held in memory. Clones share them, so a test can start a
-/// process after the core was built.
+/// process after the core was built, and one count of
+/// [`listings`](Self::listings).
 #[derive(Debug, Clone, Default)]
 pub struct FakeProcesses {
-    running: Arc<Mutex<Vec<RunningProcess>>>,
+    state: Arc<Mutex<ProcessList>>,
+}
+
+#[derive(Debug, Default)]
+struct ProcessList {
+    running: Vec<RunningProcess>,
+    /// What the listings after the next one find in place of `running`.
+    settled: Option<Vec<RunningProcess>>,
+    listings: usize,
 }
 
 impl FakeProcesses {
@@ -790,13 +799,26 @@ impl FakeProcesses {
         self
     }
 
-    /// The process runs from now on.
-    pub fn start(&self, process: RunningProcess) {
-        self.processes().push(process);
+    /// The next listing still finds the processes running now; those after
+    /// it find `running` in their place, as when the first listing caught
+    /// some of them starting or exiting.
+    pub fn then(self, running: Vec<RunningProcess>) -> Self {
+        self.processes().settled = Some(running);
+        self
     }
 
-    fn processes(&self) -> MutexGuard<'_, Vec<RunningProcess>> {
-        self.running
+    /// The process runs from now on.
+    pub fn start(&self, process: RunningProcess) {
+        self.processes().running.push(process);
+    }
+
+    /// How many times the processes were listed so far.
+    pub fn listings(&self) -> usize {
+        self.processes().listings
+    }
+
+    fn processes(&self) -> MutexGuard<'_, ProcessList> {
+        self.state
             .lock()
             .expect("no test panics while holding the fake processes")
     }
@@ -804,7 +826,13 @@ impl FakeProcesses {
 
 impl Processes for FakeProcesses {
     fn running(&self) -> Vec<RunningProcess> {
-        self.processes().clone()
+        let mut processes = self.processes();
+        processes.listings += 1;
+        let listed = processes.running.clone();
+        if let Some(settled) = processes.settled.take() {
+            processes.running = settled;
+        }
+        listed
     }
 }
 
@@ -1045,5 +1073,10 @@ impl Default for FakeClock {
 impl Clock for FakeClock {
     fn now(&self) -> SystemTime {
         *self.instant()
+    }
+
+    /// Advances the clock without waiting.
+    fn pause(&self, duration: Duration) {
+        self.advance(duration);
     }
 }

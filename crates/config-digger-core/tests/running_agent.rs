@@ -983,3 +983,107 @@ fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_folder_
     let skill_md = PathBuf::from(LINKED_SKILLS).join(r"review\SKILL.md");
     assert!(fs.contents(skill_md).is_some());
 }
+
+/// [`plain_agent`] whose process is `store.exe` in `~/.store` only.
+fn store_agent_at_its_path() -> String {
+    plain_agent("[process]\nimages = [\"store.exe\"]\npaths = [\"~/.store/store.exe\"]\n")
+}
+
+/// A `store.exe` whose path the OS hides, as while it starts or exits.
+fn store_agent_with_a_hidden_path() -> RunningProcess {
+    process(32, "store.exe", None, "store.exe")
+}
+
+#[test]
+fn a_process_with_a_hidden_path_gone_when_listed_again_is_not_the_agent_running() {
+    let fs = store_fs();
+    let processes = FakeProcesses::default()
+        .with_process(store_agent_with_a_hidden_path())
+        .then(vec![]);
+    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+
+    let plan = remove(&core, "search");
+
+    assert_eq!(running_agent_sentence(&plan), None);
+}
+
+#[test]
+fn a_process_with_a_hidden_path_read_when_listed_again_is_the_agent_running_only_at_its_path() {
+    let fs = store_fs();
+    let elsewhere = process(32, "store.exe", Some(r"D:\tools\store.exe"), "store.exe");
+    let processes = FakeProcesses::default()
+        .with_process(store_agent_with_a_hidden_path())
+        .then(vec![elsewhere]);
+    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+    assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
+
+    let at_its_path = process(
+        32,
+        "store.exe",
+        Some(r"C:\Users\fixture\.store\store.exe"),
+        "store.exe",
+    );
+    let processes = FakeProcesses::default()
+        .with_process(store_agent_with_a_hidden_path())
+        .then(vec![at_its_path]);
+    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+
+    let sentence = running_agent_sentence(&remove(&core, "search")).expect("a warning");
+    assert!(sentence.contains("Store Agent"), "{sentence}");
+}
+
+#[test]
+fn a_process_whose_path_stays_hidden_when_listed_again_is_the_agent_running() {
+    let fs = store_fs();
+    let processes = FakeProcesses::default()
+        .with_process(store_agent_with_a_hidden_path())
+        .then(vec![store_agent_with_a_hidden_path()]);
+    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+
+    let sentence = running_agent_sentence(&remove(&core, "search")).expect("a warning");
+    assert!(sentence.contains("Store Agent"), "{sentence}");
+    assert_eq!(processes.listings(), 2);
+}
+
+#[test]
+fn without_a_process_whose_path_is_hidden_the_processes_are_listed_once() {
+    let fs = store_fs();
+    let elsewhere = process(33, "store.exe", Some(r"D:\tools\store.exe"), "store.exe");
+    let processes = FakeProcesses::default()
+        .with_process(elsewhere)
+        .with_process(process(34, "other.exe", None, ""));
+    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+
+    assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
+    assert_eq!(processes.listings(), 1);
+}
+
+#[test]
+fn one_second_listing_covers_every_process_with_a_hidden_path() {
+    let definition = store_agent_at_its_path().replace(
+        "[[scopes]]",
+        "[[homes]]\nid = \"other\"\nfolder = { block = \"path\", path = \"~\" }\nroots.state = \".other/state.vscdb\"\n\n[[scopes]]",
+    );
+    let other = PathBuf::from(HOME).join(r".other\state.vscdb");
+    let fs = store_fs().with_file(&other, STORE);
+    let processes = FakeProcesses::default()
+        .with_process(store_agent_with_a_hidden_path())
+        .with_process(process(35, "store.exe", None, "store.exe"))
+        .then(vec![]);
+    let core = core_with(&fs, &definition, &processes);
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let targets = Targets {
+        selectors: vec![
+            format!("{}#servers.search", store().display()),
+            format!("{}#servers.search", other.display()),
+        ],
+        all: false,
+    };
+
+    let plan = core
+        .plan(&snapshot, &Context::default(), Action::Remove, &targets)
+        .unwrap();
+
+    assert_eq!(running_agent_sentence(&plan), None);
+    assert_eq!(processes.listings(), 2);
+}

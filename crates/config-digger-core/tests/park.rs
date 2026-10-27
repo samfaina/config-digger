@@ -706,6 +706,37 @@ fn a_remove_in_an_added_home_warns_while_a_claude_desktop_child_names_its_folder
 }
 
 #[test]
+fn a_claude_desktop_child_naming_the_added_folder_with_a_hidden_path_counts_only_if_still_listed() {
+    let fs = desktop_and_added();
+    let child = RunningProcess {
+        pid: 7000,
+        image: "claude.exe".to_owned(),
+        path: None,
+        cmdline: desktop_child(&format!("--user-data-dir={ADDED}")),
+    };
+    let core_listing_again = |again: Vec<RunningProcess>| {
+        let mut ports = fake::ports(
+            fs.clone(),
+            env().with_var("ProgramFiles", r"C:\Program Files"),
+        );
+        ports.processes = Box::new(
+            FakeProcesses::default()
+                .with_process(child.clone())
+                .then(again),
+        );
+        let core = Core::new(ports).unwrap();
+        core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
+        core
+    };
+
+    let gone = core_listing_again(vec![]);
+    assert_desktop_reads_none_of(&plan_with(&gone, Action::Disable, "filesystem").unwrap());
+
+    let still_hidden = core_listing_again(vec![child.clone()]);
+    assert_parking_blocked(&plan_with(&still_hidden, Action::Disable, "filesystem").unwrap());
+}
+
+#[test]
 fn a_claude_desktop_child_naming_another_folder_does_not_block_parking_in_an_added_home() {
     let fs = desktop_and_added();
     let child = desktop_child(r"--user-data-dir=E:\cd-throwaway\claude-desktop-home-2");

@@ -16,6 +16,11 @@ use crate::ports::{Ports, RunningProcess};
 use crate::scan::{LocationReader, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+/// How long the check waits before it lists the processes again, for those
+/// it found without a path: about how long a process takes to start or exit.
+const PAUSE_BEFORE_LISTING_AGAIN: Duration = Duration::from_millis(250);
 
 /// The Agent homes of a snapshot, by Agent index and id, that tell which
 /// homes a running Agent may read.
@@ -116,7 +121,7 @@ pub(crate) fn check<'a>(
     files: &'a [PlannedFile],
     folders: &'a [PlannedFolder],
 ) -> RunningCheck {
-    let mut processes: Option<Vec<RunningProcess>> = None;
+    let mut listings = Listings::new(ports);
     // Whether the Agent of each home runs, since a home may override its process.
     let mut detected: BTreeMap<(usize, &str), bool> = BTreeMap::new();
     let mut readers: BTreeMap<usize, RunningReader> = BTreeMap::new();
@@ -170,14 +175,10 @@ pub(crate) fn check<'a>(
                     homes.added_outside_lookup_order.get(&key),
                     process.data_folder_switch.as_deref(),
                 ) {
-                    (None, _) => is_running(process, listed(&mut processes, ports), ports),
-                    (Some(folder), Some(switch)) => names_folder(
-                        process,
-                        switch,
-                        listed(&mut processes, ports),
-                        folder,
-                        ports,
-                    ),
+                    (None, _) => is_running(process, &mut listings),
+                    (Some(folder), Some(switch)) => {
+                        names_folder(process, switch, &mut listings, folder)
+                    }
                     (Some(_), None) => false,
                 }
             })
@@ -262,14 +263,13 @@ pub(crate) fn check<'a>(
 
 /// Whether a process matches `process`, or a session file names a PID that
 /// is alive.
-fn is_running(process: &ProcessDefinition, running: &[RunningProcess], ports: &Ports) -> bool {
-    if running
-        .iter()
-        .any(|candidate| matches(process, candidate, ports))
-    {
+fn is_running(process: &ProcessDefinition, listings: &mut Listings) -> bool {
+    if listings.any_matching(process, |_| true) {
         return true;
     }
+    let ports = listings.ports;
     process.session_files.as_ref().is_some_and(|session_files| {
+        let running = listings.first();
         session_files
             .pids(ports.fs.as_ref(), ports.env.as_ref())
             .iter()
@@ -277,12 +277,63 @@ fn is_running(process: &ProcessDefinition, running: &[RunningProcess], ports: &P
     })
 }
 
-/// The processes running now, listed the first time a check needs them.
-fn listed<'p>(
-    processes: &'p mut Option<Vec<RunningProcess>>,
-    ports: &Ports,
-) -> &'p [RunningProcess] {
-    processes.get_or_insert_with(|| ports.processes.running())
+/// The processes running now, listed the first time a check needs them, and
+/// listed once more, after a pause, the first time a candidate matches only
+/// because its path is hidden.
+struct Listings<'p> {
+    ports: &'p Ports,
+    first: Option<Vec<RunningProcess>>,
+    again: Option<Vec<RunningProcess>>,
+}
+
+impl<'p> Listings<'p> {
+    fn new(ports: &'p Ports) -> Self {
+        Listings {
+            ports,
+            first: None,
+            again: None,
+        }
+    }
+
+    fn first(&mut self) -> &[RunningProcess] {
+        self.first
+            .get_or_insert_with(|| self.ports.processes.running())
+    }
+
+    fn again(&mut self) -> &[RunningProcess] {
+        self.again.get_or_insert_with(|| {
+            self.ports.clock.pause(PAUSE_BEFORE_LISTING_AGAIN);
+            self.ports.processes.running()
+        })
+    }
+
+    /// Whether a process that matches `process` passes `test`. One that
+    /// matches only because its path is hidden is judged by the second
+    /// listing: gone, it doesn't count; with its path read, the globs decide;
+    /// still without a path, it counts, since the OS may hide it for good.
+    fn any_matching(
+        &mut self,
+        process: &ProcessDefinition,
+        test: impl Fn(&RunningProcess) -> bool,
+    ) -> bool {
+        let ports = self.ports;
+        let mut hidden = BTreeSet::new();
+        for candidate in self.first() {
+            match matches(process, candidate, ports) {
+                Match::Yes if test(candidate) => return true,
+                Match::PathHidden if test(candidate) => {
+                    hidden.insert(candidate.pid);
+                }
+                _ => {}
+            }
+        }
+        !hidden.is_empty()
+            && self.again().iter().any(|candidate| {
+                hidden.contains(&candidate.pid)
+                    && matches(process, candidate, ports) != Match::No
+                    && test(candidate)
+            })
+    }
 }
 
 /// Whether a process that matches `process` names `folder` through
@@ -290,17 +341,16 @@ fn listed<'p>(
 fn names_folder(
     process: &ProcessDefinition,
     switch: &str,
-    running: &[RunningProcess],
+    listings: &mut Listings,
     folder: &Path,
-    ports: &Ports,
 ) -> bool {
-    let fs = ports.fs.as_ref();
+    let fs = listings.ports.fs.as_ref();
     let key = paths::canonical_key(fs, folder);
-    running
-        .iter()
-        .filter(|candidate| matches(process, candidate, ports))
-        .flat_map(|candidate| switch_values(&candidate.cmdline, switch))
-        .any(|named| paths::canonical_key(fs, Path::new(named)) == key)
+    listings.any_matching(process, |candidate| {
+        switch_values(&candidate.cmdline, switch)
+            .into_iter()
+            .any(|named| paths::canonical_key(fs, Path::new(named)) == key)
+    })
 }
 
 /// The values a command line gives `switch` in the arguments it starts, as
@@ -329,24 +379,47 @@ fn switch_values<'c>(cmdline: &'c str, switch: &str) -> Vec<&'c str> {
     values
 }
 
-/// Whether one process has one of the images, a path that matches one of
-/// the globs, unless the OS hides it, and every text in its command line.
-fn matches(process: &ProcessDefinition, candidate: &RunningProcess, ports: &Ports) -> bool {
+/// How one process matches a process definition.
+#[derive(PartialEq, Eq)]
+enum Match {
+    No,
+    /// It has one of the images, a path that matches one of the globs, if
+    /// any, and every text in its command line.
+    Yes,
+    /// It has one of the images and every text in its command line, but the
+    /// OS hides its path from the globs: as while it starts or exits, or for
+    /// good for some elevated or protected processes.
+    PathHidden,
+}
+
+/// How one process matches `process`: by its image, its path and every text
+/// in its command line.
+fn matches(process: &ProcessDefinition, candidate: &RunningProcess, ports: &Ports) -> Match {
     let image = process
         .images
         .iter()
         .any(|image| image.eq_ignore_ascii_case(&candidate.image));
-    let path = process.paths.is_empty()
-        || candidate.path.as_deref().is_none_or(|path| {
-            process
-                .paths
-                .iter()
-                .any(|glob| paths::glob_matches(glob, path, ports.env.as_ref()))
-        });
     let cmdline = candidate.cmdline.to_lowercase();
     let cmdline = process
         .cmdline_contains
         .iter()
         .all(|text| cmdline.contains(&text.to_lowercase()));
-    image && path && cmdline
+    if !(image && cmdline) {
+        return Match::No;
+    }
+    if process.paths.is_empty() {
+        return Match::Yes;
+    }
+    match candidate.path.as_deref() {
+        None => Match::PathHidden,
+        Some(path)
+            if process
+                .paths
+                .iter()
+                .any(|glob| paths::glob_matches(glob, path, ports.env.as_ref())) =>
+        {
+            Match::Yes
+        }
+        Some(_) => Match::No,
+    }
 }
