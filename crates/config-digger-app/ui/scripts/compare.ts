@@ -29,16 +29,18 @@ export type Comparison =
   | { kind: "differs"; pixels: number; diff: Buffer }
   | { kind: "size mismatch"; shot: Size; reference: Size };
 
-type Size = { width: number; height: number };
+export type Size = { width: number; height: number };
 
 /** Compares the PNGs `shot` and `reference`, which match when at most `threshold` pixels differ. */
 export function compare(shot: Buffer, reference: Buffer, threshold: number): Comparison {
-  const [a, b] = [PNG.sync.read(shot), PNG.sync.read(reference)];
-  if (a.width !== b.width || a.height !== b.height) {
-    return { kind: "size mismatch", shot: { width: a.width, height: a.height }, reference: { width: b.width, height: b.height } };
+  const [shotImage, referenceImage] = [PNG.sync.read(shot), PNG.sync.read(reference)];
+  const { width, height } = shotImage;
+  if (width !== referenceImage.width || height !== referenceImage.height) {
+    return { kind: "size mismatch", shot: { width, height }, reference: { width: referenceImage.width, height: referenceImage.height } };
   }
-  const diff = new PNG({ width: a.width, height: a.height });
-  const pixels = pixelmatch(b.data, a.data, diff.data, a.width, a.height);
+  const diff = new PNG({ width, height });
+  // The diff draws the first image faded: the reference.
+  const pixels = pixelmatch(referenceImage.data, shotImage.data, diff.data, width, height);
   if (pixels <= threshold) return { kind: "match", pixels };
   return { kind: "differs", pixels, diff: PNG.sync.write(diff) };
 }

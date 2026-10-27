@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import type { Page } from "playwright-core";
 import { planStep } from "../uat/plan.ts";
-import { compare, REFERENCE, SCREENSHOTS, THRESHOLD } from "./compare.ts";
+import { compare, REFERENCE, SCREENSHOTS, THRESHOLD, type Size } from "./compare.ts";
 import { launch, serveFakeUi, SMALLEST, WINDOW } from "./fakeUi.ts";
 
 type Shot = {
@@ -63,11 +63,23 @@ const manyHome = async (page: Page) => {
 };
 
 /** Opens `screen` in the smallest window while its first read, `command`, is held. */
-const firstReadOf = async (page: Page, screen: string, command: string) => {
+const smallestFirstRead = async (page: Page, screen: string, command: string) => {
   await page.setViewportSize(SMALLEST);
   await hold(page, command);
   await rail(page, screen);
   await page.locator("main .loading").waitFor();
+};
+
+/** Disables cd-throwaway-project, whose card offers Disable, up to Done, which shows the Undo snackbar «Disabled 1 Entry…». */
+const undoSnackbar = async (page: Page) => {
+  await page.getByRole("combobox", { name: "Project" }).click();
+  await page.getByRole("option", { name: String.raw`E:\cd-throwaway\project`, exact: true }).click();
+  await selectItem(page, "cd-throwaway-project");
+  await page.locator(".entry-card").first().getByRole("button", { name: "Disable", exact: true }).click();
+  const foot = page.getByRole("dialog").locator(".dialog-foot");
+  await foot.getByRole("button", { name: /^Disable/ }).click();
+  await foot.getByRole("button", { name: "Done" }).click();
+  await page.locator(".snackbar").waitFor();
 };
 
 /** Opens the action dialog of Remove leftovers on the Projects tab's row of `project`. */
@@ -102,6 +114,14 @@ const SHOTS: Shot[] = [
     uat: ["3.1"],
     steps: async (page) => {
       await page.getByRole("button", { name: "History · Undo", exact: true }).hover();
+      await page.getByRole("tooltip").waitFor();
+    },
+  },
+  {
+    name: "tooltip-projects-homes",
+    uat: ["10.1"],
+    steps: async (page) => {
+      await page.getByRole("button", { name: "Projects & homes", exact: true }).hover();
       await page.getByRole("tooltip").waitFor();
     },
   },
@@ -279,16 +299,17 @@ const SHOTS: Shot[] = [
     name: "notice-undo",
     uat: ["11.10"],
     steps: async (page) => {
-      // cd-throwaway-project's card offers Disable; the fixtures record cd-throwaway-codex Disabled.
-      await page.getByRole("combobox", { name: "Project" }).click();
-      await page.getByRole("option", { name: String.raw`E:\cd-throwaway\project`, exact: true }).click();
-      await selectItem(page, "cd-throwaway-project");
-      await page.locator(".entry-card").first().getByRole("button", { name: "Disable", exact: true }).click();
-      const foot = page.getByRole("dialog").locator(".dialog-foot");
-      await foot.getByRole("button", { name: /^Disable/ }).click();
-      await foot.getByRole("button", { name: "Done" }).click();
-      // The mouse on the snackbar holds it while it is shot.
+      await undoSnackbar(page);
+      // The mouse on the snackbar's text holds it while it is shot.
       await page.locator(".snackbar").hover({ position: { x: 20, y: 10 } });
+    },
+  },
+  {
+    name: "notice-undo-hover",
+    uat: ["11.10"],
+    steps: async (page) => {
+      await undoSnackbar(page);
+      await page.locator(".snackbar").getByRole("button", { name: "Undo" }).hover();
     },
   },
   {
@@ -319,15 +340,24 @@ const SHOTS: Shot[] = [
       await page.locator(".inventory .loading").waitFor();
     },
   },
-  { name: "smallest-loading-projects", uat: ["15.3"], steps: (page) => firstReadOf(page, "Projects & homes", "read_places") },
-  { name: "smallest-loading-history", uat: ["15.3"], steps: (page) => firstReadOf(page, "History · Undo", "read_history") },
-  { name: "smallest-loading-settings", uat: ["15.3"], steps: (page) => firstReadOf(page, "Settings", "read_settings") },
+  { name: "smallest-loading-projects", uat: ["15.3"], steps: (page) => smallestFirstRead(page, "Projects & homes", "read_places") },
+  { name: "smallest-loading-history", uat: ["15.3"], steps: (page) => smallestFirstRead(page, "History · Undo", "read_history") },
+  { name: "smallest-loading-settings", uat: ["15.3"], steps: (page) => smallestFirstRead(page, "Settings", "read_settings") },
   {
     name: "action-dialog-leftovers",
     uat: ["7.1", "7.5", "10.7"],
     steps: async (page) => {
       await removeLeftovers(page, "E:/cd-throwaway/project-gone");
       await page.getByRole("dialog").locator(".dialog-section-title", { hasText: /^Files/ }).scrollIntoViewIfNeeded();
+    },
+  },
+  {
+    name: "action-dialog-locator-tooltip",
+    uat: ["7.1"],
+    steps: async (page) => {
+      await removeLeftovers(page, "E:/cd-throwaway/project-gone");
+      await page.getByRole("dialog").locator(".change-key").hover();
+      await page.getByRole("tooltip").waitFor();
     },
   },
   {
@@ -449,6 +479,7 @@ const SHOTS: Shot[] = [
     uat: ["4.5"],
     steps: async (page) => {
       await page.setViewportSize(SMALLEST);
+      await manyHome(page);
       await page.getByRole("combobox", { name: "Project" }).click();
       await page.locator(".select-panel .select-list").waitFor();
     },
@@ -566,14 +597,16 @@ function compareAll(names: string[]): boolean {
       console.error(`differs        ${name}: ${result.pixels} pixels, diff in screenshots/${name}.diff.png`);
       passed = false;
     } else {
-      const size = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`;
+      const size = ({ width, height }: Size) => `${width} × ${height}`;
       console.error(`size mismatch  ${name}: the shot is ${size(result.shot)}, its reference ${size(result.reference)}`);
       passed = false;
     }
   }
   const shots = new Set(ALL.map((each) => `${each.name}.png`));
-  const stale = existsSync(REFERENCE) ? readdirSync(REFERENCE).filter((file) => file.endsWith(".png") && !shots.has(file)) : [];
-  if (stale.length > 0) console.log(`No shot has these references, which can be deleted: ${stale.map((file) => `screenshots/reference/${file}`).join(", ")}.`);
+  const unmatched = existsSync(REFERENCE) ? readdirSync(REFERENCE).filter((file) => file.endsWith(".png") && !shots.has(file)) : [];
+  if (unmatched.length > 0) {
+    console.log(`No shot has these references, which can be deleted: ${unmatched.map((file) => `screenshots/reference/${file}`).join(", ")}.`);
+  }
   return passed;
 }
 

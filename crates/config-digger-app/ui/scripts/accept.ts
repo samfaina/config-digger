@@ -11,8 +11,16 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { REFERENCE, SCREENSHOTS } from "./compare.ts";
 
+/** The names of the last run's shots: each PNG of `screenshots/` but the diffs. */
+function lastRun(): string[] {
+  if (!existsSync(SCREENSHOTS)) return [];
+  return readdirSync(SCREENSHOTS)
+    .filter((file) => file.endsWith(".png") && !file.endsWith(".diff.png"))
+    .map((file) => file.slice(0, -".png".length));
+}
+
 const named = process.argv.slice(2);
-const shots = named.length > 0 ? named : existsSync(SCREENSHOTS) ? readdirSync(SCREENSHOTS).filter((file) => file.endsWith(".png") && !file.endsWith(".diff.png")).map((file) => file.slice(0, -".png".length)) : [];
+const shots = named.length > 0 ? named : lastRun();
 
 const missing = shots.filter((name) => !existsSync(join(SCREENSHOTS, `${name}.png`)));
 if (missing.length > 0) {
