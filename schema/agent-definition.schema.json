@@ -3228,10 +3228,10 @@
       "type": "object",
       "properties": {
         "precedence": {
-          "description": "Location ids of this kind, highest precedence first.",
+          "description": "Location ids of this kind, highest precedence first, each one once,\nalone or in a group.",
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/Ranked"
           }
         },
         "competition": {
@@ -3285,6 +3285,23 @@
         "precedence",
         "competition",
         "checks"
+      ]
+    },
+    "Ranked": {
+      "description": "An item of `precedence`.",
+      "anyOf": [
+        {
+          "description": "A location id.",
+          "type": "string"
+        },
+        {
+          "description": "Two or more location ids ranked as one item. Of two same-Item\nEntries of the group, the one whose folder comes first by path wins,\nand of two in one folder, the one whose location comes first here.\nFor a location a walk down reads, an Entry's folder is the one the\nwalk found holding the location's path. Every other Entry is in its\nanchor's own folder, taken as one folder for them all, ahead of the\nfolders found by a walk. Wherever a location ranks without two\nfolders to compare, the group's ids rank in their order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2
+        }
       ]
     },
     "Competition": {

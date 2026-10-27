@@ -1144,8 +1144,9 @@ pub(crate) enum ItemKind {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ItemRules {
-    /// Location ids of this kind, highest precedence first.
-    pub precedence: Vec<String>,
+    /// Location ids of this kind, highest precedence first, each one once,
+    /// alone or in a group.
+    pub precedence: Vec<Ranked>,
     pub competition: Competition,
     /// How the Agent combines same-named Entries into the one it uses, field
     /// by field. Omitted, the highest wins whole and Shadows the others.
@@ -1169,6 +1170,54 @@ pub(crate) struct ItemRules {
     /// such as deny lists: config-digger never writes them.
     #[serde(default)]
     pub rules: Vec<Rule>,
+}
+
+/// An item of `precedence`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum Ranked {
+    /// A location id.
+    One(String),
+    /// Two or more location ids ranked as one item. Of two same-Item
+    /// Entries of the group, the one whose folder comes first by path wins,
+    /// and of two in one folder, the one whose location comes first here.
+    /// For a location a walk down reads, an Entry's folder is the one the
+    /// walk found holding the location's path. Every other Entry is in its
+    /// anchor's own folder, taken as one folder for them all, ahead of the
+    /// folders found by a walk. Wherever a location ranks without two
+    /// folders to compare, the group's ids rank in their order.
+    // It holds items, not ids, so that validation can name a group inside
+    // a group, which the schema leaves out.
+    Group(#[schemars(with = "Vec<String>", length(min = 2))] Vec<Ranked>),
+}
+
+impl Ranked {
+    /// The location ids of the item, in order.
+    fn ids(&self) -> Vec<&str> {
+        match self {
+            Ranked::One(id) => vec![id],
+            Ranked::Group(group) => group.iter().flat_map(Ranked::ids).collect(),
+        }
+    }
+
+    /// The item as written, such as `["a", "b"]`.
+    fn render(&self) -> String {
+        match self {
+            Ranked::One(id) => format!("{id:?}"),
+            Ranked::Group(group) => {
+                let items: Vec<String> = group.iter().map(Ranked::render).collect();
+                format!("[{}]", items.join(", "))
+            }
+        }
+    }
+}
+
+impl ItemRules {
+    /// The location ids of `precedence`, in order, as if its groups were
+    /// written out.
+    pub fn ranked_ids(&self) -> impl Iterator<Item = &str> {
+        self.precedence.iter().flat_map(Ranked::ids)
+    }
 }
 
 /// One of an Agent's checks that decides an Entry's State.
@@ -1227,13 +1276,34 @@ impl AgentDefinition {
         &self.items[&kind]
     }
 
-    /// The precedence rank of a location among its kind, 0 being highest.
+    /// The precedence rank of a location among its kind, 0 being highest,
+    /// with the ids of each group in their order.
     pub fn rank(&self, location: &LocationDefinition) -> usize {
-        let precedence = &self.rules(location.kind).precedence;
-        precedence
-            .iter()
-            .position(|id| *id == location.id)
-            .expect("validation puts every location in its kind's precedence")
+        self.places(location).0
+    }
+
+    /// Where a location ranks among its kind for same-Item Entries: the
+    /// place of its item in `precedence`, 0 being highest, and its place in
+    /// that item's group, if it is in one, which ranks below the folder
+    /// each Entry was found in.
+    pub fn group_rank(&self, location: &LocationDefinition) -> (usize, Option<usize>) {
+        let (_, item, in_group) = self.places(location);
+        (item, in_group)
+    }
+
+    /// The location's rank, the place of its item in `precedence`, and its
+    /// place in that item's group, if it is in one.
+    fn places(&self, location: &LocationDefinition) -> (usize, usize, Option<usize>) {
+        let mut rank = 0;
+        for (place, item) in self.rules(location.kind).precedence.iter().enumerate() {
+            let ids = item.ids();
+            if let Some(at) = ids.iter().position(|id| *id == location.id) {
+                let in_group = matches!(item, Ranked::Group(_)).then_some(at);
+                return (rank + at, place, in_group);
+            }
+            rank += ids.len();
+        }
+        panic!("validation puts every location in its kind's precedence")
     }
 
     /// How to tell that the Agent of the home `home` is running: the home's
@@ -1793,18 +1863,30 @@ impl AgentDefinition {
             {
                 self.validate_setting(&source.anchor).map_err(context)?;
             }
-            unique(
-                "precedence entry",
-                rules.precedence.iter().map(String::as_str),
-            )
-            .map_err(context)?;
+            for item in &rules.precedence {
+                let Ranked::Group(group) = item else {
+                    continue;
+                };
+                let rendered = item.render();
+                if group.iter().any(|inner| matches!(inner, Ranked::Group(_))) {
+                    return Err(context(format!(
+                        "precedence group `{rendered}` holds a group"
+                    )));
+                }
+                if group.len() < 2 {
+                    return Err(context(format!(
+                        "precedence group `{rendered}` holds one location"
+                    )));
+                }
+            }
+            unique("precedence entry", rules.ranked_ids()).map_err(context)?;
             let declared: BTreeSet<&str> = self
                 .locations
                 .iter()
                 .filter(|location| location.kind == *kind)
                 .map(|location| location.id.as_str())
                 .collect();
-            let ranked: BTreeSet<&str> = rules.precedence.iter().map(String::as_str).collect();
+            let ranked: BTreeSet<&str> = rules.ranked_ids().collect();
             if let Some(id) = ranked.difference(&declared).next() {
                 return Err(context(format!(
                     "precedence names `{id}`, which is not a location of this kind"
@@ -1949,7 +2031,7 @@ impl AgentDefinition {
                     return Err(context(format!("`{id}` is not a location of this kind")));
                 }
                 // The server built from the merging locations wins over the others.
-                let merging = rules.precedence.iter().map(|id| merge.covers(id));
+                let merging = rules.ranked_ids().map(|id| merge.covers(id));
                 if merging.skip_while(|covers| *covers).any(|covers| covers) {
                     return Err(context(
                         "merging locations must rank above every other location".into(),
@@ -2707,6 +2789,65 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     fn precedence_must_not_name_unknown_locations() {
         let text = VALID.replace(r#"["user-mcp"]"#, r#"["user-mcp", "ghost"]"#);
         assert!(error(&text).contains("`ghost`"), "{}", error(&text));
+    }
+
+    /// `VALID` with the locations `other-mcp` and `third-mcp` beside
+    /// `user-mcp`, ranked by `precedence`.
+    fn with_three_locations(precedence: &str) -> String {
+        let mut text = VALID.replace(
+            r#"precedence = ["user-mcp"]"#,
+            &format!("precedence = {precedence}"),
+        );
+        for id in ["other-mcp", "third-mcp"] {
+            text.push_str(&format!(
+                "\n[[locations]]\nid = \"{id}\"\nanchor = {{ block = \"home\", root = \"state\" }}\nformat = {{ block = \"json\", dialect = \"strict\" }}\nroot = [\"{id}\"]\nkind = \"mcp\"\nscope = \"user\"\nprovenance = \"file\"\nstore_class = \"plain\"\non_read_failure = \"ignores_file\"\n"
+            ));
+        }
+        text
+    }
+
+    #[test]
+    fn a_group_of_precedence_ranks_its_locations_together() {
+        let text = with_three_locations(r#"[["other-mcp", "user-mcp"], "third-mcp"]"#);
+        let definition = parse("test.toml", &text).unwrap();
+        let ranks: Vec<usize> = ["other-mcp", "user-mcp", "third-mcp"]
+            .into_iter()
+            .map(|id| definition.rank(definition.location(id)))
+            .collect();
+        assert_eq!(ranks, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_group_of_precedence_is_rejected_unless_it_holds_two_known_locations_named_once() {
+        for (precedence, message) in [
+            (
+                r#"[["user-mcp", "other-mcp"], "user-mcp", "third-mcp"]"#,
+                "`user-mcp` is declared twice",
+            ),
+            (
+                r#"[["user-mcp", "other-mcp"], ["third-mcp", "other-mcp"]]"#,
+                "`other-mcp` is declared twice",
+            ),
+            (
+                r#"[["user-mcp"], "other-mcp", "third-mcp"]"#,
+                r#"group `["user-mcp"]` holds one location"#,
+            ),
+            (
+                r#"[["user-mcp", ["other-mcp", "third-mcp"]]]"#,
+                r#"group `["user-mcp", ["other-mcp", "third-mcp"]]` holds a group"#,
+            ),
+            (
+                r#"[["user-mcp", "ghost"], "other-mcp", "third-mcp"]"#,
+                "precedence names `ghost`",
+            ),
+        ] {
+            let text = with_three_locations(precedence);
+            assert!(
+                error(&text).contains(message),
+                "{precedence}: {}",
+                error(&text)
+            );
+        }
     }
 
     /// `VALID` with `mechanism` as the one Disable mechanism of its servers.

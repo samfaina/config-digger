@@ -99,6 +99,15 @@ pub(crate) fn key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
 }
 
+/// The key folders are ordered by: their names from the root down, case
+/// aside, so that `a\b` comes before `a-b` and a folder before those below
+/// it.
+pub(crate) fn folder_order(path: &Path) -> Vec<String> {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy().to_lowercase())
+        .collect()
+}
+
 /// The key of a spelling's lexical normalisation, for comparing without the disk.
 pub(crate) fn lexical_key(spelling: &Path) -> String {
     key(&lexical(spelling))
