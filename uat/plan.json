@@ -619,6 +619,34 @@
           "manual": "La fila de un home oculto y la marca sobre la ficha seleccionada: el recorrido no abre la app con otro USERPROFILE ni otro APPDATA, y cómo se lee un borde sobre el morado se juzga mirando."
         },
         {
+          "id": "10.20",
+          "title": "Un Project oculto junto a No Project",
+          "goal": "La fila de un Project oculto y la fila No Project se distinguen por algo más que el color: la oculta tiene un borde discontinuo y la etiqueta «hidden», No Project ni borde ni etiqueta, y los textos de las dos se leen claros.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Projects.",
+            "En la fila de E:\\cd-throwaway\\project-hide, pulsa Hide.",
+            "Abre el grupo ▸ Hidden · 1.",
+            "Mira la fila de project-hide en Hidden y la fila No Project: su borde, su fondo, sus etiquetas y sus textos.",
+            "En la fila de project-hide, pulsa Unhide."
+          ],
+          "commands": [],
+          "expect": [
+            "La fila de «E:\\cd-throwaway\\project-hide» en Hidden tiene un borde discontinuo sobre el panel.",
+            "La fila de «E:\\cd-throwaway\\project-hide» en Hidden lleva la etiqueta «hidden».",
+            "La fila «No Project» no tiene borde ni el fondo de las otras filas.",
+            "La fila «No Project» no lleva ninguna etiqueta.",
+            "El nombre, la línea y la etiqueta de la fila oculta se leen claros.",
+            "El nombre y el texto de la fila «No Project» se leen claros.",
+            "Unhide da el aviso «E:\\cd-throwaway\\project-hide is listed again.»."
+          ],
+          "covers": ["#397"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/places.mjs > 10.20" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/places.mjs > 10.20" }
+          ]
+        },
+        {
           "id": "10.19",
           "title": "La cuenta de Entries de un Agent home",
           "goal": "La cuenta de Entries de la fila de un home es la de las Entries que lista Show in Inventory, sin las de sus Projects.",

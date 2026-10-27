@@ -505,7 +505,7 @@ function StrandedGroup({ places, busy, onRemove }: { places: Places; busy: strin
   );
 }
 
-/** A hidden Project, dimmed: Unhide, and Remove from list for the user's own. */
+/** A hidden Project, dimmed and tagged hidden as a hidden home is: Unhide, and Remove from list for the user's own. */
 function HiddenLine({
   row,
   busy,
@@ -533,6 +533,9 @@ function HiddenLine({
         <PathPieces path={row.path} />
       </div>
       <div className="place-sub">{row.source}</div>
+      <div className="tags">
+        <span className="tag">hidden</span>
+      </div>
     </PlaceRow>
   );
 }

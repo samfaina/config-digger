@@ -169,6 +169,48 @@ export default [
     },
   },
   {
+    id: "10.20",
+    async run(t) {
+      const { s } = t;
+      const path = `${t.root}\\project-hide`;
+      await go(s, "Projects & homes");
+      await tab(s, "Projects");
+      await s.click(await s.until(() => rowButton(s, path, "Hide"), { what: "Hide" }));
+      await waitNotice(s, `Hid ${path}`);
+      await openGroup(s, "Hidden");
+      // The border, background and tags of the row named `name`, as drawn.
+      const look = (name) =>
+        s.exec(
+          `const row = [...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0]);
+           if (!row) return null;
+           const c = getComputedStyle(row);
+           return { border: c.borderTopStyle, edge: c.borderTopColor, bg: c.backgroundColor, tags: [...row.querySelectorAll(".tag")].map((e) => e.textContent.trim()) };`,
+          name,
+        );
+      const hidden = await s.until(() => look(path), { what: `the hidden row of ${path}` }).catch(() => null);
+      const none = await look("No Project");
+      const clear = (colour) => /rgba\(.*,\s*0\)$/.test(colour) || colour === "transparent";
+      t.check(hidden?.border === "dashed" && clear(hidden.bg), `la fila de «${path}» en Hidden tiene un borde discontinuo sobre el panel`, hidden && `${hidden.border} ${hidden.bg}`);
+      t.eq(hidden?.tags.join("|"), "hidden", `la fila de «${path}» en Hidden lleva la etiqueta «hidden»`);
+      t.check(none && clear(none.edge) && clear(none.bg), "la fila «No Project» no tiene borde ni el fondo de las otras filas", none && `${none.border} ${none.edge} ${none.bg}`);
+      t.check(none && none.tags.length === 0, "la fila «No Project» no lleva ninguna etiqueta", none?.tags.join(", "));
+      await s.exec(
+        `[...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === arguments[0])?.scrollIntoView({ block: "nearest" });`,
+        path,
+      );
+      await wait(200);
+      await t.shot("oculta", "el nombre, la línea y la etiqueta de la fila oculta se leen claros");
+      await s.exec(
+        `[...document.querySelectorAll(".place-row")].find((r) => r.querySelector(".place-name")?.textContent.trim() === "No Project")?.scrollIntoView({ block: "nearest" });`,
+      );
+      await wait(200);
+      await t.shot("no-project", "el nombre y el texto de la fila «No Project» se leen claros");
+      await s.click(await s.until(() => rowButton(s, path, "Unhide"), { what: "Unhide" }));
+      const listed = await waitNotice(s, `${path} is listed again`);
+      t.eq(listed.text, `${path} is listed again.`, `Unhide da el aviso «${path} is listed again.»`);
+    },
+  },
+  {
     id: "10.19",
     async run(t) {
       const { s } = t;

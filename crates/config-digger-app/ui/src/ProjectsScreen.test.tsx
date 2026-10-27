@@ -176,6 +176,29 @@ describe("a row of the Projects tab", () => {
   });
 });
 
+describe("a hidden Project's row", () => {
+  test("is tagged hidden once the Hidden group is open, as a hidden Agent home is, and No Project is not", async () => {
+    render(
+      <ProjectsTab
+        places={{ ...places, projects: [project({ path: KEEP }), project({ hidden: true })] }}
+        search=""
+        busy={[]}
+        onShow={() => {}}
+        onChange={() => {}}
+        onRemoveLeftovers={() => {}}
+        onRemoveStranded={() => {}}
+      />,
+    );
+
+    await userEvent.click(rendered.getByRole("button", { name: "▸ Hidden · 1" }));
+    const rowOfName = (name: string) =>
+      rendered.getByText((_, element) => element?.classList.contains("place-name") === true && element.textContent === name).closest(".place-row") as HTMLElement;
+    const tags = (row: HTMLElement) => [...row.querySelectorAll(".tags .tag")].map((tag) => tag.textContent);
+    expect(tags(rowOfName(HIDE))).toEqual(["hidden"]);
+    expect(rowOfName("No Project").querySelector(".tag")).toBeNull();
+  });
+});
+
 describe("the search of the Projects tab", () => {
   const tab = (search: string) =>
     renderToStaticMarkup(

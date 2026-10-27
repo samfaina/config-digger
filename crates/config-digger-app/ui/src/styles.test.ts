@@ -880,6 +880,39 @@ describe("a hidden row of Projects & homes", () => {
   });
 });
 
+describe("the No Project row of the Projects tab", () => {
+  /** The declarations of a row of the class `selector`, over those of every row. */
+  const row = (selector: string) => new Map([...styled(".place-row"), ...styled(selector)]);
+  /** The style, width and colour of the border of a row of the class `selector`. */
+  const border = (selector: string) => {
+    const [width, style, edge] = row(selector).get("border")?.split(/\s+/) ?? [];
+    return { width: px(width), style, edge };
+  };
+
+  test("reads apart from a hidden row in more than colour, as it has neither its dashed outline nor a background of its own", () => {
+    const sameStyle = border(".place-row.informational").style === border(".place-row.dimmed").style;
+    const sameBackground = row(".place-row.informational").get("background") === row(".place-row.dimmed").get("background");
+    expect(sameStyle && sameBackground).toBe(false);
+    expect(border(".place-row.informational").edge).toBe("transparent");
+    expect(row(".place-row.informational").get("background")).toBe("transparent");
+  });
+
+  test("keeps a shown row's transparent border, so it is as big as every other row", () => {
+    expect(border(".place-row.informational").width).toBe(border(".place-row").width);
+  });
+
+  test("has a name and a line that meet WCAG AA against the panel it is drawn on", () => {
+    const panel = colour(styled(".panel").get("background"));
+    const name = styled(".place-row.informational .place-name").get("color") ?? styled(".place-name").get("color") ?? styled(":root").get("color");
+    for (const [what, text] of [
+      ["the name", name],
+      [".place-sub", styled(".place-row.informational .place-sub").get("color") ?? styled(".place-sub").get("color")],
+    ]) {
+      expect(contrast(colour(text), panel), what).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
 describe("a tag on a selected home tile", () => {
   /** The declarations of a tag of the tone `selector` on a selected tile, over those of the same tag elsewhere. */
   const onSelected = (selector: string) => new Map([...tone(selector), ...styled(".tile.selected .tag"), ...styled(`.tile.selected ${selector}`)]);
