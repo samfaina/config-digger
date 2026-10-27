@@ -629,6 +629,11 @@
           "const": "up-to-repo-root"
         },
         {
+          "description": "In the Project folder and each parent up to the root of its drive\nor share, the root left out, in a git repo or not.",
+          "type": "string",
+          "const": "up-to-below-root"
+        },
+        {
           "description": "In every folder below the Project folder, at any depth, that holds\nthe path, such as `sub\\.cursor\\skills` for `.cursor/skills`, each\nits own location, and not in the Project folder itself, by the\nwalk's rules.",
           "type": "object",
           "properties": {

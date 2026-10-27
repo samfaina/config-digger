@@ -40,7 +40,7 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { fresh, gitInit, json, probe, root, run, same, skill, write } from "./lib.mjs";
+import { fresh, gitInit, json, probe, root, run, same, skill, subst, unsubst, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -803,14 +803,11 @@ if (runs("gates")) {
 // The letter of a drive mapped to a folder of the launch in `dir`, and the
 // home folder on it.
 async function usersDrive(dir) {
-  const letter = [..."ZYXWVUTSRQPONMLKJIHG"].find((l) => !fs.existsSync(`${l}:\\`));
   const drive = path.join(dir, "drive");
   fs.mkdirSync(path.join(drive, "Users", "cd-throwaway"), { recursive: true });
-  const mapped = await run("subst.exe", [`${letter}:`, drive]);
-  if (mapped.code !== 0) throw new Error(`subst ${letter}: failed: ${mapped.stdout}${mapped.stderr}`);
+  const letter = await subst(drive);
   return { letter, home: `${letter}:\\Users\\cd-throwaway` };
 }
-const unmap = (letter) => run("subst.exe", [`${letter}:`, "/d"]);
 
 if (runs("skills")) {
   const dir = fresh("skills", base);
@@ -860,7 +857,7 @@ if (runs("skills")) {
       },
     });
   } finally {
-    await unmap(letter);
+    await unsubst(letter);
   }
   const picked = stored(globalState(d), "cursor.skills.recentlyUsed");
   // Customize's line below each skill of `names`, by folder.
@@ -992,7 +989,7 @@ if (runs("nested-skills")) {
     store(globalState(d), "cursor/thirdPartyExtensibilityEnabled", false);
     await launch(dir, { home, during: async (win) => (seen.off = await read(win)) });
   } finally {
-    await unmap(letter);
+    await unsubst(letter);
   }
   const noGit = fresh("nested-skills-no-git", base);
   const n = folders(noGit);

@@ -3023,6 +3023,7 @@ checks = {checks}
         for anchor in [
             r#"{ block = "home", root = "state", path = "skills" }"#,
             r#"{ block = "project", path = ".test/skills", walk = "up-to-repo-root" }"#,
+            r#"{ block = "project", path = ".test/skills", walk = "up-to-below-root" }"#,
             r#"{ block = "machine", path = "%ProgramFiles%/Test/skills" }"#,
             r#"{ block = "machine", path = "C:/Test/skills" }"#,
         ] {
@@ -3032,6 +3033,9 @@ checks = {checks}
     }
 
     const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = true, follow_links = false } }"#;
+
+    /// Every walk a location can take, as a TOML value.
+    const WALKS: [&str; 3] = [r#""up-to-repo-root""#, r#""up-to-below-root""#, DOWN];
 
     #[test]
     fn a_folder_of_skill_folders_can_walk_down_from_the_project_folder() {
@@ -3199,12 +3203,58 @@ checks = {checks}
 
     #[test]
     fn a_disable_switch_cannot_walk() {
-        for walk in [r#""up-to-repo-root""#, DOWN] {
+        for walk in WALKS {
             let text = with_disable(&name_list(false, "").replace(
                 r#"{ block = "home", root = "state" }"#,
                 &format!(r#"{{ block = "project", path = ".test.json", walk = {walk} }}"#),
             ));
             assert!(error(&text).contains("cannot walk"), "{}", error(&text));
+        }
+    }
+
+    #[test]
+    fn nothing_but_a_location_walks() {
+        for walk in WALKS {
+            let walking = format!(r#"{{ block = "project", path = ".test.json", walk = {walk} }}"#);
+            let keys = with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "project-plugin-keys", anchor = {walking}, root = ["plugins"], scope = "project", cache = {{ block = "machine", path = "~/.agent/cache" }}, marker = ".complete" }}"#
+                ),
+            );
+            let setting =
+                with_location(IN_PROJECT, r#"{ block = "toml" }"#, r#"["servers"]"#).replace(
+                    r#"checks = ["disable", "precedence"]"#,
+                    r#"checks = ["trust", "disable", "precedence"]"#,
+                ) + &format!(
+                    "
+[[items.mcp.gates]]
+block = \"project-trust\"
+locations = [\"user-mcp\"]
+sources = [{{ anchor = {walking}, key_path = [\"projects\"], toml = true }}]
+field = \"trust_level\"
+trusted = \"trusted\"
+"
+                );
+            let env_map = with_gate(
+                JSON_LOOKUP,
+                &format!(
+                    r#"bypass = {{ block = "env", variables = [{{ name = "NO_FLAGS", values = "truthy" }}], env_maps = [{{ anchor = {walking}, key_path = ["env"] }}] }}"#
+                ),
+            );
+            let keyed = with_location(
+                &walking,
+                r#"{ block = "json", dialect = "strict" }"#,
+                r#"["projects", "{project}", "servers"]"#,
+            );
+            for (text, message) in [
+                (keys, "plugin keys cannot walk"),
+                (setting, "a setting cannot walk"),
+                (env_map, "an env map lies in one file of the Project folder"),
+                (keyed, "cannot be keyed by"),
+            ] {
+                assert!(error(&text).contains(message), "{walk}: {}", error(&text));
+            }
         }
     }
 

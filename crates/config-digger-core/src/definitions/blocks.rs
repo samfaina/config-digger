@@ -613,6 +613,9 @@ pub(crate) enum ProjectWalk {
     /// repo, the folder holding `.git`. Outside a repo, in the Project
     /// folder only.
     UpToRepoRoot,
+    /// In the Project folder and each parent up to the root of its drive
+    /// or share, the root left out, in a git repo or not.
+    UpToBelowRoot,
     /// In every folder below the Project folder, at any depth, that holds
     /// the path, such as `sub\.cursor\skills` for `.cursor/skills`, each
     /// its own location, and not in the Project folder itself, by the
@@ -624,7 +627,7 @@ impl Validate for ProjectWalk {
     fn validate(&self) -> Result<(), String> {
         match self {
             ProjectWalk::Down(walk) => walk.validate(),
-            ProjectWalk::None | ProjectWalk::UpToRepoRoot => Ok(()),
+            ProjectWalk::None | ProjectWalk::UpToRepoRoot | ProjectWalk::UpToBelowRoot => Ok(()),
         }
     }
 }

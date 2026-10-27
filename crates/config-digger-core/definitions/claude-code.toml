@@ -231,13 +231,19 @@ risks = ["agent_may_reset_file"]
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 # Claude Code reads `.mcp.json` in the Project folder and in every folder
-# above it, past the root of its git repo, and of same-named servers the
-# nearest folder's wins [test]. config-digger reads the Project folder's
-# alone (#292). Claude Code skips a `.mcp.json` it cannot parse, and
-# `claude mcp list` reports it [test].
+# above it, past the root of its git repo and outside one, the user's home
+# folder included, but not at the root of the drive, and of same-named
+# servers the nearest folder's wins [test]. It walks up while the folder is
+# not its path's root [binary], so it skips the root of a share too. Each
+# file's servers are the Project's: `disabledMcpjsonServers` in the
+# Project's local settings skips a parent folder's server, and the list in
+# a parent folder's own settings does not [test]. The approvals name a
+# server, not its file [docs], and are read from the Project's own settings
+# and state too. Claude Code skips a `.mcp.json` it cannot parse, the
+# others still read, and `claude mcp list` reports it [test].
 [[locations]]
 id = "project-mcp"
-anchor = { block = "project", path = ".mcp.json" }
+anchor = { block = "project", path = ".mcp.json", walk = "up-to-below-root" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
 kind = "mcp"
