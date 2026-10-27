@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "screenshots": "node scripts/screenshots.ts",
+    "screenshots:compare": "node scripts/screenshots.ts --compare",
+    "screenshots:accept": "node scripts/accept.ts",
     "uat:fake": "playwright test",
     "tauri": "cd .. && tauri"
   },
@@ -26,11 +28,14 @@
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
     "@types/node": "22.20.3",
+    "@types/pngjs": "6.0.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "happy-dom": "21.0.4",
+    "pixelmatch": "8.0.0",
     "playwright-core": "1.64.0",
+    "pngjs": "7.0.0",
     "typescript": "7.0.2",
     "vite": "8.3.2",
     "vitest": "5.0.3"
