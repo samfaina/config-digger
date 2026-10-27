@@ -552,8 +552,10 @@ pub(crate) struct ProcessDefinition {
     /// `~/.local/bin/claude.exe`: Claude Code and Claude Desktop are both
     /// `claude.exe`. A glob starts with `~/`, `%NAME%` or a drive; `*` and
     /// `?` stay within one folder name and `{a,b}` is either. Compared
-    /// case-insensitively. A process whose path the OS hides matches on its
-    /// image alone.
+    /// case-insensitively. A process whose path the OS hides is listed again
+    /// after a pause: gone by then, it does not match; with its path read,
+    /// the globs decide; still hidden, as for some elevated or protected
+    /// processes, it matches on its image alone.
     #[serde(default)]
     pub paths: Vec<String>,
     /// Text the command line must contain, every one of them, compared

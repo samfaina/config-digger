@@ -10,7 +10,7 @@ use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 pub struct RealFileSystem;
 
@@ -733,6 +733,10 @@ pub struct RealClock;
 impl Clock for RealClock {
     fn now(&self) -> SystemTime {
         SystemTime::now()
+    }
+
+    fn pause(&self, duration: Duration) {
+        std::thread::sleep(duration);
     }
 }
 

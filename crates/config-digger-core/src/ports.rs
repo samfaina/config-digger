@@ -5,7 +5,7 @@ use crate::api::LinkKind;
 use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 pub mod fake;
 pub mod real;
@@ -135,7 +135,9 @@ pub struct RunningProcess {
     pub pid: u32,
     /// The image name, such as `claude.exe`.
     pub image: String,
-    /// The executable's full path, when the OS lets us read it.
+    /// The executable's full path, when the OS lets us read it: not while
+    /// the process starts or exits, nor ever for some elevated or protected
+    /// ones.
     pub path: Option<PathBuf>,
     /// The command line, its arguments joined by spaces; empty when the OS
     /// hides it.
@@ -195,9 +197,12 @@ pub trait Environment: Send + Sync {
     fn registry_values(&self, hive: Hive, key: &str) -> Option<Vec<(String, RegistryData)>>;
 }
 
-/// The current time.
+/// The current time, and waiting.
 pub trait Clock: Send + Sync {
     fn now(&self) -> SystemTime;
+
+    /// Waits `duration` before going on.
+    fn pause(&self, duration: Duration);
 }
 
 /// Every port the core uses.

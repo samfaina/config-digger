@@ -132,8 +132,10 @@ impl Harness {
             // homes and Projects the user added or hid) stay in the temporary folder.
             .env("LOCALAPPDATA", self.local_app_data())
             .env("APPDATA", self.roaming_app_data())
-            // The machine's Codex layer stays in the temporary folder too.
+            // The machine's Codex layer stays in the temporary folder too,
+            // and so do its Installations and the paths of its running Agents.
             .env("ProgramData", self.root.path().join("ProgramData"))
+            .env("ProgramFiles", self.root.path().join("ProgramFiles"))
             .env_remove("CODEX_HOME")
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("CLAUDE_USER_DATA_DIR")
