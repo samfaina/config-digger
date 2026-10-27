@@ -74,6 +74,19 @@ export function wrapFault(paths) {
   return midWord && `una ruta se parte dentro del nombre de una carpeta: ${midWord.join(" ⏎ ")}`;
 }
 
+// How many lines the text of an element takes, from the boxes of its
+// contents, each `{ text, top }`, `text` true for a box of a text node. The
+// boxes of other elements, such as an Add button's icon, a flex item centred
+// on its own, don't count, and tops within 2 px are one line, as `linesOf`
+// reads the paths. Step 10.10 runs its source in the page, so it uses nothing
+// from this module.
+export function textLines(boxes) {
+  const tops = boxes.filter((box) => box.text).map((box) => box.top).sort((a, b) => a - b);
+  let lines = 0, line;
+  for (const top of tops) if (line === undefined || top - line > 2) [lines, line] = [lines + 1, top];
+  return lines;
+}
+
 // Presses `button` in the row of `path`, holds `command` so its busy state
 // shows, and returns what the busy notice and the row's buttons showed.
 async function busyPress(t, path, button, command, busyText) {
@@ -561,17 +574,25 @@ export default [
       ]) {
         await tab(s, name);
         const layout = await s.exec(`
-          const lines = (el) => {
-            if (!el) return null;
-            const r = document.createRange(); r.selectNodeContents(el);
-            return new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size;
+          ${textLines}
+          const boxes = (el) => {
+            const out = [], range = document.createRange(), walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              const text = node.nodeType === Node.TEXT_NODE;
+              if (text) range.selectNodeContents(node);
+              for (const box of (text ? range : node).getClientRects()) if (box.width > 0) out.push({ text, top: box.top });
+            }
+            return out;
           };
+          const lines = (el) => el ? textLines(boxes(el)) : null;
           const header = document.querySelector(".places header, .places .banner");
           const aboutEl = document.querySelector(".places-about");
+          const addEl = [...document.querySelectorAll(".places button")].find((b) => b.textContent.trim().startsWith("Add"));
           return {
             title: lines(document.querySelector(".places .banner-title")),
             tabs: [...document.querySelectorAll("[role=tab]")].map((e) => [e.textContent.trim(), lines(e)]),
-            add: lines([...document.querySelectorAll(".places button")].find((b) => b.textContent.trim().startsWith("Add"))),
+            add: lines(addEl),
+            addBoxes: addEl ? boxes(addEl) : null,
             aboutInHeader: header ? header.contains(aboutEl) : null,
             aboutAboveList: aboutEl ? aboutEl.getBoundingClientRect().bottom <= (document.querySelector(".places .scroll")?.getBoundingClientRect().top ?? 0) + 1 : false,
             about: aboutEl?.textContent.trim(),
@@ -579,7 +600,7 @@ export default [
           };`);
         t.eq(layout.title, 1, `en ${name}, el título «Projects & homes» ocupa una línea`);
         t.check(layout.tabs.every(([, n]) => n === 1), `en ${name}, cada pestaña ocupa una línea`, JSON.stringify(layout.tabs));
-        t.eq(layout.add, 1, `en ${name}, el botón «${add}» ocupa una línea`);
+        t.check(layout.add === 1, `en ${name}, el botón «${add}» ocupa una línea`, `«${layout.add}», no «1»: ${JSON.stringify(layout.addBoxes)}`);
         t.check(layout.aboutInHeader === false && layout.aboutAboveList, `en ${name}, la descripción sale encima de la lista, no en la cabecera`);
         t.eq(layout.about, about, `en ${name}, la descripción dice «${about}»`);
         const paths = await s.exec(`

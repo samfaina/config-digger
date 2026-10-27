@@ -16,7 +16,7 @@ import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
 import { jobSummary, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
-import { openGroup, wrapFault } from "./steps/places.mjs";
+import { openGroup, textLines, wrapFault } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
 const plan = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8"));
@@ -173,6 +173,15 @@ test("step 10.10's paths fail when one breaks inside a folder's name, though ano
 
 test("step 10.10's paths pass when one wraps, each line but its last ending in a separator, beside one that fits on a line", () => {
   assert.equal(wrapFault([["E:\\cd-throwaway\\project"], ["E:\\cd-throwaway\\", "a-folder/", "project-long"]]), undefined);
+});
+
+test("step 10.10 counts one line for an Add button whose icon sits off its label's top, by half a pixel either side of the rounding", () => {
+  assert.equal(textLines([{ text: false, top: 48 }, { text: true, top: 47.5 }]), 1);
+  assert.equal(textLines([{ text: false, top: 48 }, { text: true, top: 47.4 }]), 1);
+});
+
+test("step 10.10 counts two lines for an Add button whose label wraps beside its icon", () => {
+  assert.equal(textLines([{ text: false, top: 57 }, { text: true, top: 47.5 }, { text: true, top: 66.5 }]), 2);
 });
 
 // A session whose page is only an action dialog, each of its states
