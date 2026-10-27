@@ -706,7 +706,7 @@ fn a_remove_in_an_added_home_warns_while_a_claude_desktop_child_names_its_folder
 }
 
 #[test]
-fn a_claude_desktop_child_naming_the_added_folder_with_a_hidden_path_counts_only_if_still_listed() {
+fn a_claude_desktop_child_naming_the_added_folder_with_a_hidden_path_is_judged_when_listed_again() {
     let fs = desktop_and_added();
     let child = RunningProcess {
         pid: 7000,
@@ -722,7 +722,7 @@ fn a_claude_desktop_child_naming_the_added_folder_with_a_hidden_path_counts_only
         ports.processes = Box::new(
             FakeProcesses::default()
                 .with_process(child.clone())
-                .then(again),
+                .then_running(again),
         );
         let core = Core::new(ports).unwrap();
         core.add_home(Path::new(ADDED), "claude-desktop").unwrap();
@@ -731,6 +731,24 @@ fn a_claude_desktop_child_naming_the_added_folder_with_a_hidden_path_counts_only
 
     let gone = core_listing_again(vec![]);
     assert_desktop_reads_none_of(&plan_with(&gone, Action::Disable, "filesystem").unwrap());
+
+    let elsewhere = RunningProcess {
+        path: Some(PathBuf::from(r"D:\tools\claude.exe")),
+        ..child.clone()
+    };
+    let read_elsewhere = core_listing_again(vec![elsewhere]);
+    assert_desktop_reads_none_of(
+        &plan_with(&read_elsewhere, Action::Disable, "filesystem").unwrap(),
+    );
+
+    let in_its_package = RunningProcess {
+        path: Some(PathBuf::from(PACKAGE).join(r"app\claude.exe")),
+        ..child.clone()
+    };
+    let read_in_its_package = core_listing_again(vec![in_its_package]);
+    assert_parking_blocked(
+        &plan_with(&read_in_its_package, Action::Disable, "filesystem").unwrap(),
+    );
 
     let still_hidden = core_listing_again(vec![child.clone()]);
     assert_parking_blocked(&plan_with(&still_hidden, Action::Disable, "filesystem").unwrap());

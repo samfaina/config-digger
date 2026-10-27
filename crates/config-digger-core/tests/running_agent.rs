@@ -985,7 +985,7 @@ fn an_agent_that_starts_after_the_preview_of_a_remove_in_a_linked_skills_folder_
 }
 
 /// [`plain_agent`] whose process is `store.exe` in `~/.store` only.
-fn store_agent_at_its_path() -> String {
+fn store_definition_at_its_path() -> String {
     plain_agent("[process]\nimages = [\"store.exe\"]\npaths = [\"~/.store/store.exe\"]\n")
 }
 
@@ -994,13 +994,20 @@ fn store_agent_with_a_hidden_path() -> RunningProcess {
     process(32, "store.exe", None, "store.exe")
 }
 
-#[test]
-fn a_process_with_a_hidden_path_gone_when_listed_again_is_not_the_agent_running() {
-    let fs = store_fs();
+/// The processes of a check that first lists [`store_agent_with_a_hidden_path`]
+/// and then `again`, and a core over [`store_fs`] with
+/// [`store_definition_at_its_path`] that sees them.
+fn core_listing_hidden_then(again: Vec<RunningProcess>) -> (FakeProcesses, Core) {
     let processes = FakeProcesses::default()
         .with_process(store_agent_with_a_hidden_path())
-        .then(vec![]);
-    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+        .then_running(again);
+    let core = core_with(&store_fs(), &store_definition_at_its_path(), &processes);
+    (processes, core)
+}
+
+#[test]
+fn a_process_with_a_hidden_path_gone_when_listed_again_is_not_the_agent_running() {
+    let (_, core) = core_listing_hidden_then(vec![]);
 
     let plan = remove(&core, "search");
 
@@ -1009,12 +1016,8 @@ fn a_process_with_a_hidden_path_gone_when_listed_again_is_not_the_agent_running(
 
 #[test]
 fn a_process_with_a_hidden_path_read_when_listed_again_is_the_agent_running_only_at_its_path() {
-    let fs = store_fs();
     let elsewhere = process(32, "store.exe", Some(r"D:\tools\store.exe"), "store.exe");
-    let processes = FakeProcesses::default()
-        .with_process(store_agent_with_a_hidden_path())
-        .then(vec![elsewhere]);
-    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+    let (_, core) = core_listing_hidden_then(vec![elsewhere]);
     assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
 
     let at_its_path = process(
@@ -1023,10 +1026,7 @@ fn a_process_with_a_hidden_path_read_when_listed_again_is_the_agent_running_only
         Some(r"C:\Users\fixture\.store\store.exe"),
         "store.exe",
     );
-    let processes = FakeProcesses::default()
-        .with_process(store_agent_with_a_hidden_path())
-        .then(vec![at_its_path]);
-    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+    let (_, core) = core_listing_hidden_then(vec![at_its_path]);
 
     let sentence = running_agent_sentence(&remove(&core, "search")).expect("a warning");
     assert!(sentence.contains("Store Agent"), "{sentence}");
@@ -1034,13 +1034,10 @@ fn a_process_with_a_hidden_path_read_when_listed_again_is_the_agent_running_only
 
 #[test]
 fn a_process_whose_path_stays_hidden_when_listed_again_is_the_agent_running() {
-    let fs = store_fs();
-    let processes = FakeProcesses::default()
-        .with_process(store_agent_with_a_hidden_path())
-        .then(vec![store_agent_with_a_hidden_path()]);
-    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+    let (processes, core) = core_listing_hidden_then(vec![store_agent_with_a_hidden_path()]);
 
     let sentence = running_agent_sentence(&remove(&core, "search")).expect("a warning");
+
     assert!(sentence.contains("Store Agent"), "{sentence}");
     assert_eq!(processes.listings(), 2);
 }
@@ -1052,15 +1049,15 @@ fn without_a_process_whose_path_is_hidden_the_processes_are_listed_once() {
     let processes = FakeProcesses::default()
         .with_process(elsewhere)
         .with_process(process(34, "other.exe", None, ""));
-    let core = core_with(&fs, &store_agent_at_its_path(), &processes);
+    let core = core_with(&fs, &store_definition_at_its_path(), &processes);
 
     assert_eq!(running_agent_sentence(&remove(&core, "search")), None);
     assert_eq!(processes.listings(), 1);
 }
 
 #[test]
-fn one_second_listing_covers_every_process_with_a_hidden_path() {
-    let definition = store_agent_at_its_path().replace(
+fn a_single_second_listing_covers_every_process_with_a_hidden_path() {
+    let definition = store_definition_at_its_path().replace(
         "[[scopes]]",
         "[[homes]]\nid = \"other\"\nfolder = { block = \"path\", path = \"~\" }\nroots.state = \".other/state.vscdb\"\n\n[[scopes]]",
     );
@@ -1069,7 +1066,7 @@ fn one_second_listing_covers_every_process_with_a_hidden_path() {
     let processes = FakeProcesses::default()
         .with_process(store_agent_with_a_hidden_path())
         .with_process(process(35, "store.exe", None, "store.exe"))
-        .then(vec![]);
+        .then_running(vec![]);
     let core = core_with(&fs, &definition, &processes);
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
     let targets = Targets {

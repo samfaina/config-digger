@@ -777,9 +777,9 @@ impl FileSystem for FakeFileSystem {
     }
 }
 
-/// Processes held in memory. Clones share them, so a test can start a
-/// process after the core was built, and one count of
-/// [`listings`](Self::listings).
+/// Processes held in memory. Clones share them and the count of
+/// [`listings`](Self::listings), so a test can start a process after the
+/// core was built.
 #[derive(Debug, Clone, Default)]
 pub struct FakeProcesses {
     state: Arc<Mutex<ProcessList>>,
@@ -787,9 +787,11 @@ pub struct FakeProcesses {
 
 #[derive(Debug, Default)]
 struct ProcessList {
+    /// What the next listing finds.
     running: Vec<RunningProcess>,
     /// What the listings after the next one find in place of `running`.
     settled: Option<Vec<RunningProcess>>,
+    /// How many times the processes were listed.
     listings: usize,
 }
 
@@ -802,7 +804,7 @@ impl FakeProcesses {
     /// The next listing still finds the processes running now; those after
     /// it find `running` in their place, as when the first listing caught
     /// some of them starting or exiting.
-    pub fn then(self, running: Vec<RunningProcess>) -> Self {
+    pub fn then_running(self, running: Vec<RunningProcess>) -> Self {
         self.processes().settled = Some(running);
         self
     }

@@ -751,7 +751,7 @@
           "default": []
         },
         "paths": {
-          "description": "Globs the executable's path must match one of, when set, such as\n`~/.local/bin/claude.exe`: Claude Code and Claude Desktop are both\n`claude.exe`. A glob starts with `~/`, `%NAME%` or a drive; `*` and\n`?` stay within one folder name and `{a,b}` is either. Compared\ncase-insensitively. A process whose path the OS hides matches on its\nimage alone.",
+          "description": "Globs the executable's path must match one of, when set, such as\n`~/.local/bin/claude.exe`: Claude Code and Claude Desktop are both\n`claude.exe`. A glob starts with `~/`, `%NAME%` or a drive; `*` and\n`?` stay within one folder name and `{a,b}` is either. Compared\ncase-insensitively. A process whose path the OS hides is listed again\nafter a pause: gone by then, it does not match; with its path read,\nthe globs decide; still hidden, as for some elevated or protected\nprocesses, it matches on its image alone.",
           "type": "array",
           "items": {
             "type": "string"
