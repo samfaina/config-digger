@@ -2880,6 +2880,12 @@ fn folders_read(
                 None => vec![(folder.to_path_buf(), 0)],
             }
         }
+        ProjectWalk::UpToBelowRoot => folder
+            .ancestors()
+            .take_while(|parent| parent.parent().is_some())
+            .enumerate()
+            .map(|(depth, parent)| (parent.to_path_buf(), depth))
+            .collect(),
     }
 }
 
