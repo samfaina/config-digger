@@ -435,6 +435,10 @@ export default [
       t.check(!look.undo.border.startsWith("0px") && ub > ug && ur > 150, "«Undo» es un botón con borde y letras lila claro", JSON.stringify(look.undo));
       t.check(rgb(look.x.bg)[3] === 0 || look.x.bg === "rgba(0, 0, 0, 0)", "«✕» es lila claro, sin fondo", JSON.stringify(look.x));
       t.check(look.frames.some((k) => k.frames.length >= 2 && k.frames[0].translate && k.frames[0].translate !== "none"), "entra subiendo un poco mientras aparece", JSON.stringify(look.frames));
+      // The shot shows the snackbar at rest, once it has floated in.
+      await s
+        .until(() => s.exec("return document.querySelector('.snackbar')?.getAnimations().every((a) => a.playState === 'finished') ?? true;"), { what: "the snackbar at rest", timeout: 3000 })
+        .catch(() => {});
       await t.shot("snackbar", "fondo morado que destaca, borde lila claro a la izquierda, texto blanco, Undo con borde y letras lila claro, ✕ lila claro sin fondo");
       const undo = await s.find(".snackbar .snackbar-action");
       await s.hover(undo);

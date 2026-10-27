@@ -110,7 +110,7 @@ The verdict on a step:
 
 - `ok` when the walk's status was `ok`, and every `looks` entry and every part of `expect` a picture can show holds in the screenshots.
 - `ko` when a screenshot breaks one. The notes name the part of `expect`, what the picture shows instead, and the screenshot's file name, as in "Delete backup en History es violeta, no rojo: expect dice que los cuatro botones comparten un rojo. Captura 7.5-2-botones.png."
-- `blocked` when a screenshot a `looks` entry names is missing on disk, the walk took none of a step that lists `agent-judge`, or the walk's status was `blocked`.
+- `blocked` when a screenshot a `looks` entry names is missing on disk, the walk took none of a step that lists `agent-judge`, or the walk's status was `blocked`. The judge also writes `blocked` when a screenshot is there but doesn't show what its `looks` entry names, such as when a notice covers it or the list is scrolled away from it. Its notes say what the shot shows instead, so that the step module takes the shot again.
 - A walk `ko` stays `ko`, never `ok` or `blocked`, with the judge's findings on the look added to its notes.
 - What a picture can't show, such as timing, motion, or text a check already asserted, the judge leaves alone. One line of its notes says so; it never guesses.
 
@@ -126,6 +126,7 @@ Judge the look of the UAT steps of the local WebDriver walk in <work folder>.
      writes why, and keeps a walk `ko` as `ko`.
    - Otherwise, open each PNG of its `looks` with the Read tool. Check each `looks` entry's `what`, and each part of
      `expect` a picture can show, against the screenshots. Read `walk` for what the walk's checks already asserted.
+   - When a screenshot doesn't show what its `looks` entry names, write `blocked`, saying what it shows instead.
    - Write `ok` when everything a picture can show holds, else `ko`, naming in the notes, in Spanish, the part of
      `expect`, what the picture shows instead and the screenshot's file name. Add one line naming what no picture can
      show, such as timing or motion, and do not guess it.
