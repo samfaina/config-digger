@@ -9,8 +9,8 @@ use crate::definitions::blocks::{
     JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp,
     ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
     PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
-    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
-    is_entry_key,
+    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
+    StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -53,6 +53,9 @@ pub(crate) struct Snapshot {
     pub unreadable_switches: BTreeSet<PathBuf>,
     /// Every Feature gate of every found Agent home, as far as it can be read.
     pub gates: Vec<ScannedGate>,
+    /// The Signed-in account of every found Agent home whose definition
+    /// has one, and whether the Agent runs on it.
+    pub accounts: Vec<ScannedAccount>,
     /// The files of managed-exclusive gates that exist, so that they take
     /// control.
     pub exclusive: BTreeSet<PathBuf>,
@@ -361,6 +364,83 @@ pub(crate) struct ScannedGate {
     /// The file the Agent caches it in.
     pub path: PathBuf,
     pub reading: GateReading,
+}
+
+impl Snapshot {
+    /// The Signed-in account of the Agent home of `entry`, as it reads in
+    /// the context of the Project with the key `project`: as it reads
+    /// there, or else everywhere.
+    pub fn account_of(
+        &self,
+        entry: &ScannedEntry,
+        project: Option<&str>,
+    ) -> Option<&ScannedAccount> {
+        let of_entry = |account: &&ScannedAccount| {
+            account.agent_index == entry.agent_index && account.home == entry.home
+        };
+        let mut accounts = self.accounts.iter().filter(of_entry);
+        accounts
+            .clone()
+            .find(|account| project.is_some() && account.project.as_deref() == project)
+            .or_else(|| accounts.find(|account| account.project.is_none()))
+    }
+}
+
+/// The Signed-in account of one Agent home, and whether the Agent runs on
+/// it, as config-digger reads them.
+#[derive(Clone)]
+pub(crate) struct ScannedAccount {
+    pub agent_index: usize,
+    pub home: String,
+    /// The key of the Project where a file of the Project changes whether
+    /// the Agent runs on the account, or `None` for everywhere else.
+    pub project: Option<String>,
+    pub signed_in: SignedIn,
+    /// Whether the Agent runs on the account there.
+    pub on_account: OnAccount,
+}
+
+/// The account an Agent home is signed in to, as config-digger reads it.
+#[derive(Clone)]
+pub(crate) enum SignedIn {
+    /// The account whose folder has this name.
+    To(String),
+    /// No account: the file that names it is missing, or lacks one of its
+    /// ids.
+    ToNone,
+    /// The file that names it, at this path, cannot be read or parsed.
+    Unreadable(PathBuf),
+}
+
+/// Whether an Agent runs on its Signed-in account in a context.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum OnAccount {
+    /// Nothing takes it off the account.
+    Yes,
+    /// Something may, such as a variable set where config-digger cannot
+    /// tell whether the Agent applies it.
+    Maybe(OffBy),
+    /// Something takes it off the account.
+    No(OffBy),
+}
+
+/// A setting or a variable that takes an Agent off its Signed-in account,
+/// and where it is set.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum OffBy {
+    /// A key, at its key path in a file.
+    Setting {
+        key_path: Vec<String>,
+        path: PathBuf,
+    },
+    /// A variable in a map of variables, at the map's key path in a file.
+    Mapped {
+        name: String,
+        key_path: Vec<String>,
+        path: PathBuf,
+    },
+    /// A variable in the environment config-digger runs in.
+    Environment(String),
 }
 
 /// What config-digger reads of a Feature gate.
@@ -1470,6 +1550,14 @@ fn read_as_if(
         &mut scanner.reader,
         ports,
     );
+    let accounts = read_accounts(
+        definitions,
+        &found,
+        &projects,
+        &settings,
+        &mut scanner.reader,
+        ports,
+    );
     let exclusive = exclusive_files(definitions, &found, &as_if);
     scanner.entries = one_per_entry(definitions, scanner.entries);
     for entry in &mut scanner.entries {
@@ -1568,6 +1656,7 @@ fn read_as_if(
         switches,
         unreadable_switches,
         gates,
+        accounts,
         exclusive,
         settings,
         setting_values,
@@ -1891,36 +1980,209 @@ fn env_maps(
     settings: &[ScannedSettings],
     reader: &mut Reader,
 ) -> Vec<serde_json::Map<String, serde_json::Value>> {
-    let mut objects = Vec::new();
-    for map in maps {
-        let files: Vec<PathBuf> = match map.anchor.settings() {
+    maps.iter()
+        .flat_map(|map| KeyAt::map(map).values(home, project, settings, reader))
+        .filter_map(|(_, value)| value.as_object().cloned())
+        .collect()
+}
+
+/// A key in one file, or in each file of settings.
+struct KeyAt<'d> {
+    anchor: &'d Anchor,
+    key_path: &'d [String],
+    every_source: bool,
+}
+
+impl<'d> KeyAt<'d> {
+    /// The key of the object of `map`.
+    fn map(map: &'d EnvMap) -> Self {
+        KeyAt {
+            anchor: &map.anchor,
+            key_path: &map.key_path,
+            every_source: map.every_source,
+        }
+    }
+
+    /// The key `key` names.
+    fn setting(key: &'d SettingKey) -> Self {
+        KeyAt {
+            anchor: &key.anchor,
+            key_path: &key.key_path,
+            every_source: key.every_source,
+        }
+    }
+
+    /// The value at the key in each of its files for `home`, with the
+    /// file: one in a Project read in the Project folder `project` and
+    /// skipped without one, and of settings, the file that overrides the
+    /// others first. A file that is missing, cannot be read or parsed as
+    /// strict JSON, or lacks the key gives nothing.
+    fn values(
+        &self,
+        home: &FoundHome,
+        project: Option<&Path>,
+        settings: &[ScannedSettings],
+        reader: &mut Reader,
+    ) -> Vec<(PathBuf, serde_json::Value)> {
+        let files: Vec<PathBuf> = match self.anchor.settings() {
             Some(id) => settings_named(settings, home.agent_index, id)
                 .map(|known| {
-                    if map.every_source {
+                    if self.every_source {
                         known.every_source_files()
                     } else {
                         known.read().into_iter().rev().collect()
                     }
                 })
                 .unwrap_or_default(),
-            None if map.anchor.in_project() => project
-                .and_then(|project| map.anchor.path(&home.roots, Some(project)))
+            None if self.anchor.in_project() => project
+                .and_then(|project| self.anchor.path(&home.roots, Some(project)))
                 .into_iter()
                 .collect(),
-            None => map.anchor.path(&home.roots, None).into_iter().collect(),
+            None => self.anchor.path(&home.roots, None).into_iter().collect(),
         };
-        for path in files {
-            let Some(text) = reader.peek(&path).ok().flatten() else {
-                continue;
-            };
-            let object = JsonFormat::STRICT
-                .parse(text)
-                .ok()
-                .and_then(|document| lookup(&document, &map.key_path)?.as_object().cloned());
-            objects.extend(object);
+        files
+            .into_iter()
+            .filter_map(|path| {
+                let text = reader.peek(&path).ok().flatten()?;
+                let document = JsonFormat::STRICT.parse(text).ok()?;
+                let value = lookup(&document, self.key_path)?.clone();
+                Some((path, value))
+            })
+            .collect()
+    }
+}
+
+/// The Signed-in account of each found Agent home whose definition has
+/// one: the folder its ids name, read from the strict JSON file of its
+/// anchor, and what takes the Agent off it, read again for each existing
+/// Project folder whose files change that, as for Feature gates.
+fn read_accounts(
+    definitions: &[AgentDefinition],
+    found: &[FoundHome],
+    projects: &[ScannedProject],
+    settings: &[ScannedSettings],
+    reader: &mut Reader,
+    ports: &Ports,
+) -> Vec<ScannedAccount> {
+    let mut accounts = Vec::new();
+    for home in found {
+        let Some(account) = &definitions[home.agent_index].account else {
+            continue;
+        };
+        let path = account
+            .anchor
+            .path(&home.roots, None)
+            .expect("validation puts the account in a file of the Agent home");
+        let document = match reader.peek(&path) {
+            Ok(None) => Ok(None),
+            Ok(Some(text)) => JsonFormat::STRICT.parse(text).map(Some).map_err(|_| ()),
+            Err(_) => Err(()),
+        };
+        let signed_in = match document {
+            Ok(document) => document
+                .and_then(|document| {
+                    account.folder_of(|key_path| {
+                        Some(lookup(&document, key_path)?.as_str()?.to_owned())
+                    })
+                })
+                .map_or(SignedIn::ToNone, SignedIn::To),
+            Err(()) => SignedIn::Unreadable(path),
+        };
+        let on_account = |project: Option<&Path>, reader: &mut Reader| match &account.off {
+            Some(off) => on_account(off, home, project, settings, reader, ports),
+            None => OnAccount::Yes,
+        };
+        let everywhere = on_account(None, reader);
+        let in_projects = account
+            .off
+            .as_ref()
+            .is_some_and(|off| off.anchors().any(Anchor::in_project));
+        let mut readings = Vec::new();
+        if in_projects {
+            for project in projects.iter().filter(|project| project.is_folder()) {
+                let here = on_account(Some(&project.path), reader);
+                if here != everywhere {
+                    readings.push((Some(project.key.clone()), here));
+                }
+            }
+        }
+        readings.push((None, everywhere));
+        for (project, on_account) in readings {
+            accounts.push(ScannedAccount {
+                agent_index: home.agent_index,
+                home: home.home.clone(),
+                project,
+                signed_in: signed_in.clone(),
+                on_account,
+            });
         }
     }
-    objects
+    accounts
+}
+
+/// Whether the Agent of `home` runs on its Signed-in account in the
+/// Project folder `project`, or else everywhere. A setting a file sets,
+/// then a variable a map sets, take it off; one of those variables set in
+/// config-digger's environment, where no map replaces it, or a variable
+/// that only may take it off, set anywhere, only may.
+fn on_account(
+    off: &blocks::OffAccount,
+    home: &FoundHome,
+    project: Option<&Path>,
+    settings: &[ScannedSettings],
+    reader: &mut Reader,
+    ports: &Ports,
+) -> OnAccount {
+    for key in &off.settings {
+        let set = KeyAt::setting(key)
+            .values(home, project, settings, reader)
+            .into_iter()
+            .find(|(_, value)| !value.is_null() && value.as_str() != Some(""));
+        if let Some((path, _)) = set {
+            let key_path = key.key_path.clone();
+            return OnAccount::No(OffBy::Setting { key_path, path });
+        }
+    }
+    // Each map's object with its file, the one that overrides the others first.
+    let maps: Vec<(
+        PathBuf,
+        &[String],
+        serde_json::Map<String, serde_json::Value>,
+    )> = off
+        .env_maps
+        .iter()
+        .flat_map(|map| {
+            let objects = KeyAt::map(map).values(home, project, settings, reader);
+            objects.into_iter().filter_map(|(path, value)| {
+                Some((path, map.key_path.as_slice(), value.as_object()?.clone()))
+            })
+        })
+        .collect();
+    let in_map = |name: &str| maps.iter().find(|(_, _, map)| map.contains_key(name));
+    let mapped = |name: &str| {
+        let (_, _, map) = in_map(name)?;
+        map.get(name)?.as_str().map(str::to_owned)
+    };
+    let off_by = |name: String| match in_map(&name) {
+        Some((path, key_path, _)) => OffBy::Mapped {
+            name,
+            key_path: key_path.to_vec(),
+            path: path.clone(),
+        },
+        None => OffBy::Environment(name),
+    };
+    if let Some(name) = blocks::first_set(&off.variables, &mapped) {
+        return OnAccount::No(off_by(name));
+    }
+    // A variable in a map replaces the one in the environment.
+    let unmapped = |name: &str| match in_map(name) {
+        Some(_) => None,
+        None => ports.env.var(name),
+    };
+    let either = |name: &str| mapped(name).or_else(|| unmapped(name));
+    blocks::first_set(&off.variables, &unmapped)
+        .or_else(|| blocks::first_set(&off.may_be_off, &either))
+        .map_or(OnAccount::Yes, |name| OnAccount::Maybe(off_by(name)))
 }
 
 /// Every place each Disable mechanism's switch is, for each found Agent
@@ -2749,7 +3011,8 @@ fn pick(
 }
 
 /// The machine-wide paths a definition's locations, plugin and project
-/// registries and Feature gate env maps name, each by the text that names it, as far as the environment
+/// registries, Feature gate env maps and what takes the Agent off its
+/// account name, each by the text that names it, as far as the environment
 /// says where they are.
 fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String, PathBuf> {
     let env_maps = definition
@@ -2758,6 +3021,12 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .filter_map(|gate| gate.bypass.as_ref())
         .flat_map(|bypass| bypass.env_maps())
         .map(|map| &map.anchor);
+    // What takes the Agent off its account can be on the machine too.
+    let off_anchors = definition
+        .account
+        .iter()
+        .filter_map(|account| account.off.as_ref())
+        .flat_map(|off| off.anchors());
     let plugins = definition
         .plugins
         .iter()
@@ -2808,6 +3077,7 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .iter()
         .map(|location| &location.anchor)
         .chain(env_maps)
+        .chain(off_anchors)
         .chain(plugins)
         .chain(registries)
         .chain(settings)

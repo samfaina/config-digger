@@ -4,8 +4,8 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Disables, FolderTrust, Gate,
-    Holds, JsonFormat, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs, SkillDefect,
-    SkillFallback,
+    Holds, JsonFormat, ListPlugins, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs,
+    SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::Strength;
 use crate::definitions::{
@@ -13,8 +13,8 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, ScannedEntry, ScannedGate, ScannedHome, ScannedParked,
-    ScannedReadFailure, SettingOwner, Snapshot,
+    GateReading, HomeSource, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
+    ScannedParked, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
 use std::borrow::Cow;
@@ -426,6 +426,12 @@ pub(crate) fn resolve(
                     let location = definition.location(&entry.location);
                     let mut gate_caveats =
                         gate_caveats(definition, snapshot, entry, project_key.map(String::as_str));
+                    gate_caveats.extend(account_caveat(
+                        definition,
+                        snapshot,
+                        entry,
+                        project_key.map(String::as_str),
+                    ));
                     if location.cached_at.is_some()
                         && let Some(&at) = snapshot.cached.get(&entry.path)
                     {
@@ -489,9 +495,24 @@ pub(crate) fn resolve(
                     if let Some(closed) =
                         closed(definition, snapshot, entry, project_key.map(String::as_str))
                     {
+                        let account = || {
+                            definition
+                                .account
+                                .as_ref()
+                                .map_or("", |account| account.name.as_str())
+                        };
                         let reason = match closed {
                             Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
                             Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
+                            Closed::NotSignedIn(unreadable) => {
+                                explain::not_signed_in(agent_name, account(), unreadable.as_deref())
+                            }
+                            Closed::OffAccount(off) => {
+                                explain::off_account(agent_name, account(), &off)
+                            }
+                            Closed::OtherAccount { signed_in } => {
+                                explain::other_account(agent_name, account(), &signed_in)
+                            }
                         };
                         return unread_entry(
                             definition,
@@ -2147,6 +2168,14 @@ enum Closed<'d> {
     Gate(&'d str, bool),
     /// The setting that does not have the value it needs.
     Setting(&'d SettingIs),
+    /// The Agent home is signed in to no account, or, when config-digger
+    /// cannot read the file at this path that names it, taken to be.
+    NotSignedIn(Option<PathBuf>),
+    /// What takes the Agent off the account it is signed in to.
+    OffAccount(OffBy),
+    /// The Entry is in another folder than that of the account the Agent
+    /// home is signed in to.
+    OtherAccount { signed_in: String },
 }
 
 /// The first `when` condition of the location of `entry` that does not
@@ -2164,24 +2193,116 @@ fn closed<'d>(
         .position(|location| location.id == entry.location)
         .expect("snapshot location ids come from this definition");
     let kind = definition.locations[location].kind;
-    let (_, condition) = definition.locations[location]
+    definition.locations[location]
         .when
         .iter()
         .enumerate()
-        .find(|(condition, block)| {
+        .find_map(|(condition, block)| {
             let setting = |source: usize| {
                 let owner = SettingOwner::Condition {
                     location,
-                    condition: *condition,
+                    condition,
                     source,
                 };
                 setting_value(snapshot, entry, kind, owner, project)
             };
-            !block.holds(&gate_on, &setting)
-        })?;
-    Some(match condition {
-        Condition::FeatureGate(block) => Closed::Gate(block.gate.as_str(), gate_on(&block.gate)),
-        Condition::Setting(block) => Closed::Setting(block),
+            let holds = block.holds(&gate_on, &setting);
+            match block {
+                Condition::FeatureGate(block) => {
+                    (!holds).then(|| Closed::Gate(block.gate.as_str(), gate_on(&block.gate)))
+                }
+                Condition::Setting(block) => (!holds).then_some(Closed::Setting(block)),
+                Condition::SignedInAccount(_) => {
+                    account_closed(definition, snapshot, entry, project)
+                }
+            }
+        })
+}
+
+/// Why the Agent home of `entry` does not read it for the account it is
+/// signed in to, in the context of the Project with the key `project`, if
+/// it does not: it is signed in to none, it runs off the account, or the
+/// Entry is another account's.
+fn account_closed<'d>(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<Closed<'d>> {
+    let Some(account) = snapshot.account_of(entry, project) else {
+        return Some(Closed::NotSignedIn(None));
+    };
+    let ours = match &account.signed_in {
+        SignedIn::To(folder) => folder,
+        SignedIn::ToNone => return Some(Closed::NotSignedIn(None)),
+        SignedIn::Unreadable(path) => return Some(Closed::NotSignedIn(Some(path.clone()))),
+    };
+    if let OnAccount::No(off) = &account.on_account {
+        return Some(Closed::OffAccount(off.clone()));
+    }
+    (account_folder(definition, snapshot, entry)? != *ours).then(|| Closed::OtherAccount {
+        signed_in: ours.clone(),
+    })
+}
+
+/// The folder of `entry`'s account: the first below its location's folder
+/// or, for an Entry of a plugin, below the folder of the plugin's registry.
+fn account_folder(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Option<String> {
+    let home = snapshot.home_of(entry);
+    let location = definition.location(&entry.location);
+    let (bases, path) = match &entry.plugin {
+        Some(plugin) if location.anchor.plugin().is_some() => {
+            let plugins = definition
+                .plugins
+                .iter()
+                .find(|plugins| plugins.id == plugin.plugins)?;
+            (plugins.registry.anchors(), &plugin.folder)
+        }
+        _ => (vec![&location.anchor], &entry.path),
+    };
+    bases
+        .into_iter()
+        .filter_map(|anchor| anchor.path(&home.roots, None))
+        .find_map(|base| {
+            let below = path.strip_prefix(base).ok()?;
+            Some(below.components().next()?.as_os_str().to_str()?.to_owned())
+        })
+}
+
+/// The caveat of `entry` when its location is read only for the account
+/// its Agent home is signed in to, it reads it in the context of the
+/// Project with the key `project`, and something may take the Agent off
+/// that account.
+fn account_caveat(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<api::Caveat> {
+    let account = definition.account.as_ref()?;
+    let location = definition.location(&entry.location);
+    let read_for_account = location
+        .when
+        .iter()
+        .any(|condition| matches!(condition, Condition::SignedInAccount(_)));
+    if !read_for_account || closed(definition, snapshot, entry, project).is_some() {
+        return None;
+    }
+    let OnAccount::Maybe(off) = &snapshot.account_of(entry, project)?.on_account else {
+        return None;
+    };
+    let path = match off {
+        OffBy::Setting { path, .. } | OffBy::Mapped { path, .. } => path.clone(),
+        OffBy::Environment(_) => entry.path.clone(),
+    };
+    Some(api::Caveat {
+        code: api::CaveatCode::MayRunOffAccount,
+        path,
+        sentence: explain::may_run_off_account(&definition.agent.name, &account.name, off),
     })
 }
 

@@ -412,7 +412,13 @@ export type CaveatCode =
  *  The Entry is read from a copy of configuration held elsewhere, such as
  *  in the user's account, as of when the Agent cached it.
  */
-"cached_copy";
+"cached_copy" | 
+/**
+ *  The Agent reads the Entry only while it runs on the account it is
+ *  signed in to, and a variable set where config-digger cannot tell
+ *  whether the Agent applies it may take it off that account.
+ */
+"may_run_off_account";
 
 /**  An Entry's State in one Agent and context, before and after an Operation. */
 export type Change = {
@@ -1725,7 +1731,23 @@ export type ReasonCode =
  *  has another value than it has in the context, such as VS Code's
  *  discovery of another app's servers.
  */
-"setting_value";
+"setting_value" | 
+/**
+ *  The Entry is in the folder of another account than the one the
+ *  Agent home is signed in to, which alone the Agent reads.
+ */
+"other_account" | 
+/**
+ *  The Agent reads the Entry's location only for the account it is
+ *  signed in to, and the Agent home is signed in to none.
+ */
+"not_signed_in" | 
+/**
+ *  The Agent reads the Entry's location only while it runs on the
+ *  account it is signed in to, and a setting takes it off that account
+ *  in the context, such as an API key.
+ */
+"off_account";
 
 /**  Why Remove is not offered for an Entry. */
 export type RemoveNotOffered = 

@@ -65,6 +65,56 @@ images = ["claude.exe"]
 paths = ["~/.local/bin/claude.exe"]
 session_files = { block = "pid-named", folder = { block = "path", path = "~/.claude/sessions" }, extension = "json" }
 
+# The claude.ai account Claude Code is signed in to, its Signed-in account:
+# `oauthAccount` in `~/.claude.json` names it [disk]. Signing in writes it,
+# and `claude auth logout` and `/logout` take it away, the 2.1.309 to
+# 2.1.311 binaries say [binary]. Claude Code reads the skills it syncs from
+# claude.ai only from the account's folder, `<organizationUuid>_<accountUuid>`
+# [test], and its synced plugins presumably too.
+[account]
+unverified = "Claude Code is taken to read no synced skill or plugin while signed in to no claude.ai account, `oauthAccount` gone or missing an id, as the binary says (#400)."
+name = "claude.ai"
+anchor = { block = "home", root = "state_file" }
+ids = { organization = ["oauthAccount", "organizationUuid"], account = ["oauthAccount", "accountUuid"] }
+folder = "{organization}_{account}"
+
+# What takes Claude Code off the account, so that it reads none of the
+# account's synced skills and plugins in the context, as the 2.1.309 to
+# 2.1.311 binaries say [binary]: `apiKeyHelper` in a settings file, or in
+# the `env` of one a non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party
+# provider. Settings
+# files rank managed (every source), local, Project, user, and a higher
+# file's variable wins [docs]. Set in the environment config-digger runs
+# in, those variables only may: Claude Code can start in another.
+# `ANTHROPIC_API_KEY` only may wherever it is set, as Claude Code uses it
+# interactively once the user approves it, and always with `-p` [binary].
+# `primaryApiKey` in `~/.claude.json` and `CLAUDE_CODE_OAUTH_TOKEN` leave it
+# on the account [binary].
+[account.off]
+unverified = "Claude Code is taken to read no synced skill or plugin while `apiKeyHelper` is set in a settings file, or while a settings file's `env` sets a non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party provider; `ANTHROPIC_API_KEY` is taken to take it off the account only in some of its modes, and `primaryApiKey` and `CLAUDE_CODE_OAUTH_TOKEN` never, as the binary says (#400)."
+settings = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["apiKeyHelper"], every_source = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["apiKeyHelper"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["apiKeyHelper"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["apiKeyHelper"] },
+]
+variables = [
+  { name = "ANTHROPIC_AUTH_TOKEN", values = "non-empty" },
+  { name = "CLAUDE_CODE_USE_BEDROCK", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_VERTEX", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_FOUNDRY", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_MANTLE", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_ANTHROPIC_AWS", values = "truthy" },
+  { name = "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", values = "truthy" },
+]
+env_maps = [
+  { anchor = { block = "settings", settings = "managed" }, key_path = ["env"], every_source = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["env"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["env"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["env"] },
+]
+may_be_off = [{ name = "ANTHROPIC_API_KEY", values = "non-empty" }]
+
 [[homes]]
 id = "default"
 default = true
@@ -152,8 +202,10 @@ uninstall = "claude plugin uninstall {id} --scope {scope}"
 # plugin is named by its manifest's `name`, not by its folder [disk], and
 # its switches know it as `<name>@synced` [docs]. Its Entries are
 # read-only, being a copy of the account's configuration. Like
-# `synced-skills`, every account's folder is read, though Claude Code
-# reads only the signed-in account's (#308).
+# `synced-skills`, its servers and skills are read only in the Signed-in
+# account's folder, and while Claude Code runs on that account: the
+# locations anchored in synced plugins take the `signed-in-account`
+# condition, and its mark.
 #
 # Of same-named plugins Claude Code loads one: an installed marketplace
 # plugin, then a skills-dir plugin, then a synced one [docs]. config-digger
@@ -167,6 +219,7 @@ unverified = [
   "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
   "While an installed plugin of the same name loads, Claude Code loads nothing of the synced one, the docs say; config-digger Shadows only the synced servers and skills the installed plugin carries too, leaving the others Effective, and takes a Disabled installed plugin to leave the synced one loaded.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
+  "Claude Code is taken to read a synced plugin only in the folder of the claude.ai account it is signed in to, and none while it is signed in to none or runs off that account, as it does synced skills (#400).",
 ]
 registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2 }
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
@@ -340,6 +393,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 [[locations]]
 id = "synced-plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
+when = [{ block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
 references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }
 format = { block = "json", dialect = "strict" }
@@ -356,6 +410,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 [[locations]]
 id = "synced-plugin-mcp"
 anchor = { block = "plugin", plugins = "synced", path = ".mcp.json" }
+when = [{ block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -700,6 +755,7 @@ on_read_failure = "ignores_file"
 id = "synced-plugin-skills"
 unverified = "The name rule is taken to apply to a synced plugin's skills as it does to an installed plugin's."
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
+when = [{ block = "signed-in-account" }]
 format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
 name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
@@ -719,14 +775,14 @@ on_read_failure = "ignores_file"
 # `synced/` or deeper than a skill folder, and a sync round that downloads
 # deletes what sits directly under `synced/` [test]. A synced skill is named
 # `anthropic-skills:<folder>`, its frontmatter `name` an alias with the same
-# prefix [test]. It reads the folder only while signed in to claude.ai, and
-# only the signed-in account's folder, leaving another `<org>_<account>`
-# unread [test]; config-digger reads every account's folder, and does not
-# know how Claude Code is signed in (#308). Tested with a Max account.
+# prefix [test]. It reads only the Signed-in account's folder, leaving
+# another `<org>_<account>` unread [test], and none while signed in to no
+# account or off it, as `[account]` says. Tested with a Max account.
 [[locations]]
 id = "synced-skills"
 unverified = "The name rule is taken to apply to a synced skill's folder name as it does to a local skill's."
 anchor = { block = "home", root = "skills", path = "synced" }
+when = [{ block = "signed-in-account" }]
 format = { block = "skill-folder", depth = 2, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
 name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "anthropic-skills:{name}"

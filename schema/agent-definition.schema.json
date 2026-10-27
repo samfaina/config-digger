@@ -42,6 +42,17 @@
         }
       ]
     },
+    "account": {
+      "description": "The account each Agent home is signed in to, which some locations\nare read for alone.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccountDefinition"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "process": {
       "description": "How to tell that the Agent is running. Without it, config-digger\nnever finds it running.",
       "anyOf": [
@@ -736,6 +747,200 @@
           "type": "string",
           "const": "jsonc"
         }
+      ]
+    },
+    "AccountDefinition": {
+      "description": "The Signed-in account of each Agent home, as a file of the home names\nit, such as the claude.ai account of Claude Code's `oauthAccount`. The\nAgent reads the locations whose `when` holds `signed-in-account` only in\nthe account's folder, and only while it runs on the account.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "What the account is, as a sentence names it, such as `claude.ai`.",
+          "type": "string"
+        },
+        "anchor": {
+          "description": "A strict JSON file of the Agent home.",
+          "$ref": "#/$defs/Anchor"
+        },
+        "ids": {
+          "description": "The account's ids, by name, each the key path of a string in the\nfile. With any of them missing or empty, the home is signed in to\nno account.",
+          "type": "object",
+          "properties": {
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "folder": {
+          "description": "The name of the account's folder, made of its ids, each `{<name>}`,\nsuch as `{organization}_{account}`.",
+          "type": "string"
+        },
+        "off": {
+          "description": "What takes the Agent off the account. Without it, nothing does.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OffAccount"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "anchor",
+        "ids",
+        "folder"
+      ]
+    },
+    "OffAccount": {
+      "description": "What takes an Agent off its Signed-in account in a context, so that it\nreads none of the account's folders there, such as Claude Code running\non an API key or a third-party provider.",
+      "type": "object",
+      "properties": {
+        "settings": {
+          "description": "Keys that take it off when a file of the context sets one to a\nvalue other than `null` or an empty string, highest first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingKey"
+          }
+        },
+        "variables": {
+          "description": "Variables that take it off when a map of `env_maps` sets one. Set in\nthe environment config-digger runs in, they only may: the Agent can\nstart in another, and its Entries keep their State, with a caveat.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BypassVariable"
+          }
+        },
+        "env_maps": {
+          "description": "Maps of variables the Agent applies over the environment it starts\nin, highest first, as a Feature gate bypass's are.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvMap"
+          }
+        },
+        "may_be_off": {
+          "description": "Variables that may take it off wherever they are set, such as one the\nAgent uses only in some of its modes: its Entries keep their State,\nwith a caveat.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BypassVariable"
+          }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SettingKey": {
+      "description": "A key in one file, or in each file of settings, such as `apiKeyHelper`\nin each of Claude Code's settings files.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the value, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "every_source": {
+          "description": "With a settings anchor, the key is read from every source the Agent\nreads such keys from, as an env map's `every_source` says.",
+          "type": "boolean",
+          "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
+      ]
+    },
+    "BypassVariable": {
+      "description": "One variable that makes the Agent ignore its cache.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "values": {
+          "description": "Which of its values count.",
+          "$ref": "#/$defs/VariableValues"
+        },
+        "unless": {
+          "description": "Variables that, when any is set to a non-empty value, keep this one\nfrom counting.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "values"
+      ]
+    },
+    "VariableValues": {
+      "description": "Which values of a variable count as setting it.",
+      "oneOf": [
+        {
+          "description": "Any non-empty value, `0` and `false` included.",
+          "type": "string",
+          "const": "non-empty"
+        },
+        {
+          "description": "`1`, `true`, `yes` or `on`, in any case.",
+          "type": "string",
+          "const": "truthy"
+        }
+      ]
+    },
+    "EnvMap": {
+      "description": "A JSON object of variable names and string values in a file of the\nAgent home, the machine or the Project, or in settings, such as the\n`env` of a settings file. In settings, a later file read overrides an\nearlier one, variable by variable.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the object, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "every_source": {
+          "description": "With a settings anchor, the Agent reads the object from every source\nit reads such keys from, and not only from those it reads settings\nfrom, as Claude Code reads `env`: each source the user cannot write,\nor the one it reads when the user can write that one. A higher\nsource's variable wins.",
+          "type": "boolean",
+          "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
       ]
     },
     "ProcessDefinition": {
@@ -2951,6 +3156,23 @@
             "equals",
             "default"
           ]
+        },
+        {
+          "description": "Holds for an Entry in the folder of its Agent home's Signed-in account,\nthe definition's `account`, while the Agent runs on that account in the\ncontext. The account's folder is the first below the location's folder\nor, for a location in plugins, below the folder of the plugins'\nregistry; an Entry in another folder there is Unread, as is every one\nwhile the home is signed in to no account or the Agent runs off it.",
+          "type": "object",
+          "properties": {
+            "block": {
+              "type": "string",
+              "const": "signed-in-account"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ]
         }
       ]
     },
@@ -4923,79 +5145,6 @@
             "variables"
           ]
         }
-      ]
-    },
-    "BypassVariable": {
-      "description": "One variable that makes the Agent ignore its cache.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "values": {
-          "description": "Which of its values count.",
-          "$ref": "#/$defs/VariableValues"
-        },
-        "unless": {
-          "description": "Variables that, when any is set to a non-empty value, keep this one\nfrom counting.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": []
-        },
-        "unverified": {
-          "$ref": "#/$defs/Unverified"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "name",
-        "values"
-      ]
-    },
-    "VariableValues": {
-      "description": "Which values of a variable count as setting it.",
-      "oneOf": [
-        {
-          "description": "Any non-empty value, `0` and `false` included.",
-          "type": "string",
-          "const": "non-empty"
-        },
-        {
-          "description": "`1`, `true`, `yes` or `on`, in any case.",
-          "type": "string",
-          "const": "truthy"
-        }
-      ]
-    },
-    "EnvMap": {
-      "description": "A JSON object of variable names and string values in a file of the\nAgent home, the machine or the Project, or in settings, such as the\n`env` of a settings file. In settings, a later file read overrides an\nearlier one, variable by variable.",
-      "type": "object",
-      "properties": {
-        "anchor": {
-          "$ref": "#/$defs/Anchor"
-        },
-        "key_path": {
-          "description": "The key path of the object, one key per segment.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "every_source": {
-          "description": "With a settings anchor, the Agent reads the object from every source\nit reads such keys from, and not only from those it reads settings\nfrom, as Claude Code reads `env`: each source the user cannot write,\nor the one it reads when the user can write that one. A higher\nsource's variable wins.",
-          "type": "boolean",
-          "default": false
-        },
-        "unverified": {
-          "$ref": "#/$defs/Unverified"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "anchor",
-        "key_path"
       ]
     },
     "SettingOneOf": {

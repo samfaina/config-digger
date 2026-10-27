@@ -181,11 +181,12 @@ Write-TestFile "$Root\claude-code-profile\.claude.json" @"
 }
 "@
 
-# A Claude Code home with a plugin synced from claude.ai, which Claude Code
-# keeps in a folder per account and names by its manifest, and the plugin
-# sync gate cached on, on 2 Oct 2026 at 07:40 UTC.
+# A Claude Code home signed in to a claude.ai account, with a plugin synced
+# from it, which Claude Code keeps in the account's folder and names by its
+# manifest, and the plugin sync gate cached on, on 2 Oct 2026 at 07:40 UTC.
 Write-TestFile "$Root\claude-code-synced-home\.claude.json" @"
 {
+  "oauthAccount": { "organizationUuid": "cd-org", "accountUuid": "cd-acct" },
   "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
   "cachedGrowthBookFeaturesAt": 1790926800000
 }

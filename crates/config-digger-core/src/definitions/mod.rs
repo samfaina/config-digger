@@ -233,6 +233,9 @@ pub(crate) struct AgentDefinition {
     /// Where the Agent records the version that last ran against an Agent
     /// home, shown next to the Installations.
     pub last_ran: Option<LastRan>,
+    /// The account each Agent home is signed in to, which some locations
+    /// are read for alone.
+    pub account: Option<AccountDefinition>,
     /// How to tell that the Agent is running. Without it, config-digger
     /// never finds it running.
     pub process: Option<ProcessDefinition>,
@@ -485,6 +488,80 @@ impl LastRan {
     /// How the file is parsed.
     pub fn format(&self) -> JsonFormat {
         JsonFormat::of(self.dialect)
+    }
+}
+
+/// The Signed-in account of each Agent home, as a file of the home names
+/// it, such as the claude.ai account of Claude Code's `oauthAccount`. The
+/// Agent reads the locations whose `when` holds `signed-in-account` only in
+/// the account's folder, and only while it runs on the account.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AccountDefinition {
+    /// What the account is, as a sentence names it, such as `claude.ai`.
+    pub name: String,
+    /// A strict JSON file of the Agent home.
+    pub anchor: Anchor,
+    /// The account's ids, by name, each the key path of a string in the
+    /// file. With any of them missing or empty, the home is signed in to
+    /// no account.
+    pub ids: BTreeMap<String, Vec<String>>,
+    /// The name of the account's folder, made of its ids, each `{<name>}`,
+    /// such as `{organization}_{account}`.
+    pub folder: String,
+    /// What takes the Agent off the account. Without it, nothing does.
+    pub off: Option<blocks::OffAccount>,
+}
+
+impl AccountDefinition {
+    /// The name of the account's folder, given each id's value, or `None`
+    /// when one is missing or empty.
+    pub fn folder_of(&self, id: impl Fn(&[String]) -> Option<String>) -> Option<String> {
+        let mut folder = self.folder.clone();
+        for (name, key_path) in &self.ids {
+            let value = id(key_path).filter(|value| !value.is_empty())?;
+            folder = folder.replace(&format!("{{{name}}}"), &value);
+        }
+        Some(folder)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        non_empty("account name", &self.name)?;
+        self.anchor.validate()?;
+        self.anchor.one_file()?;
+        if self.anchor.in_project() || self.anchor.home_root().is_none() {
+            return Err("must lie in the Agent home".into());
+        }
+        if self.ids.is_empty() {
+            return Err("needs ids".into());
+        }
+        for key_path in self.ids.values() {
+            blocks::validate_key_path(key_path)?;
+        }
+        // Every `{...}` of the folder names an id, and every id is used.
+        let mut rest = self.folder.as_str();
+        let mut named = BTreeSet::new();
+        while let Some(start) = rest.find('{') {
+            let end = rest[start..]
+                .find('}')
+                .ok_or_else(|| format!("folder `{}` has an unclosed `{{`", self.folder))?;
+            let name = &rest[start + 1..start + end];
+            if !self.ids.contains_key(name) {
+                return Err(format!("folder names an undeclared id `{name}`"));
+            }
+            named.insert(name);
+            rest = &rest[start + end + 1..];
+        }
+        if let Some(unused) = self.ids.keys().find(|id| !named.contains(id.as_str())) {
+            return Err(format!("folder does not name the id `{unused}`"));
+        }
+        if self.folder.contains(['/', '\\']) || self.folder.trim().is_empty() {
+            return Err("folder is the name of one folder".into());
+        }
+        if let Some(off) = &self.off {
+            off.validate().map_err(|e| format!("off: {e}"))?;
+        }
+        Ok(())
     }
 }
 
@@ -1498,6 +1575,14 @@ impl AgentDefinition {
             self.validate_home_root(&last_ran.anchor).map_err(context)?;
             blocks::validate_key_path(&last_ran.key_path).map_err(context)?;
         }
+        if let Some(account) = &self.account {
+            let context = |e: String| format!("account: {e}");
+            account.validate().map_err(context)?;
+            self.validate_home_root(&account.anchor).map_err(context)?;
+            for anchor in account.off.iter().flat_map(|off| off.anchors()) {
+                self.validate_setting(anchor).map_err(context)?;
+            }
+        }
 
         for (index, registry) in self.projects.registries.iter().enumerate() {
             let context = |e: String| format!("projects.registries[{index}]: {e}");
@@ -1823,6 +1908,9 @@ impl AgentDefinition {
             }
             for condition in &location.when {
                 condition.validate().map_err(context)?;
+                if let Condition::SignedInAccount(_) = condition {
+                    self.validate_account_condition(location).map_err(context)?;
+                }
                 for source in condition
                     .setting()
                     .iter()
@@ -2278,6 +2366,21 @@ impl AgentDefinition {
             .iter()
             .find(|plugins| plugins.id == id)
             .ok_or_else(|| format!("undeclared plugins `{id}`"))
+    }
+
+    /// A `signed-in-account` condition needs the definition's `account`, and
+    /// a location whose Entries lie in folders below its own, or in plugins.
+    fn validate_account_condition(&self, location: &LocationDefinition) -> Result<(), String> {
+        if self.account.is_none() {
+            return Err("a signed-in-account condition needs `account`".into());
+        }
+        if location.anchor.plugin().is_none() && location.format.file().is_some() {
+            return Err(
+                "a signed-in-account condition needs a folder of skill folders or a location in plugins"
+                    .into(),
+            );
+        }
+        Ok(())
     }
 
     /// A setting's anchor needs the root or the `[[settings]]` it names.
@@ -3160,6 +3263,168 @@ checks = {checks}
     }
 
     const CHECKS: &str = r#"["frontmatter", "disable", "precedence"]"#;
+
+    const ACCOUNT: &str = r#"
+[account]
+name = "example.com"
+anchor = { block = "home", root = "state" }
+ids = { org = ["account", "org"], user = ["account", "user"] }
+folder = "{org}_{user}"
+
+[account.off]
+settings = [
+  { anchor = { block = "project", path = ".test/settings.json" }, key_path = ["keyHelper"] },
+  { anchor = { block = "home", root = "state" }, key_path = ["keyHelper"] },
+]
+variables = [{ name = "AUTH_TOKEN", values = "non-empty" }, { name = "USE_OTHER", values = "truthy" }]
+env_maps = [{ anchor = { block = "home", root = "state" }, key_path = ["env"] }]
+may_be_off = [{ name = "API_KEY", values = "non-empty" }]
+"#;
+
+    /// `VALID` with a folder of skill folders read only for the Signed-in
+    /// account, and `account` as the account.
+    fn with_account(account: &str) -> String {
+        with_skills(
+            r#"{ block = "home", root = "state", path = "synced" }"#,
+            &SKILL_FORMAT.replace(
+                "block = \"skill-folder\"",
+                "block = \"skill-folder\", depth = 2",
+            ),
+            CHECKS,
+        )
+        .replace(
+            "id = \"user-skills\"\n",
+            "id = \"user-skills\"\nwhen = [{ block = \"signed-in-account\" }]\n",
+        ) + account
+    }
+
+    #[test]
+    fn a_location_read_for_the_signed_in_account_loads() {
+        let text = with_account(ACCOUNT);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let without_off = ACCOUNT.split("\n[account.off]").next().unwrap();
+        let text = with_account(without_off);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_signed_in_account_condition_needs_an_account_and_a_folder_of_folders() {
+        let text = with_account("");
+        assert!(error(&text).contains("needs `account`"), "{}", error(&text));
+        let text = VALID.replace(
+            "on_read_failure = \"ignores_file\"\n",
+            "on_read_failure = \"ignores_file\"\nwhen = [{ block = \"signed-in-account\" }]\n",
+        ) + ACCOUNT;
+        assert!(
+            error(&text).contains("needs a folder of skill folders or a location in plugins"),
+            "{}",
+            error(&text)
+        );
+        let text = with_account(ACCOUNT).replace(
+            "{ block = \"signed-in-account\" }",
+            "{ block = \"signed-in-account\", account = \"other\" }",
+        );
+        assert!(error(&text).contains("unknown field"), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_account_folder_names_each_id_once_and_only_ids() {
+        for (folder, message) in [
+            ("{org}_{team}", "undeclared id `team`"),
+            ("{org}", "does not name the id `user`"),
+            ("{org}_{user", "unclosed"),
+            ("{org}/{user}", "the name of one folder"),
+        ] {
+            let text = with_account(&ACCOUNT.replace("{org}_{user}", folder));
+            assert!(error(&text).contains(message), "{folder}: {}", error(&text));
+        }
+        let text = with_account(&ACCOUNT.replace(
+            "ids = { org = [\"account\", \"org\"], user = [\"account\", \"user\"] }",
+            "ids = {}",
+        ));
+        assert!(error(&text).contains("needs ids"), "{}", error(&text));
+    }
+
+    #[test]
+    fn an_account_lies_in_one_file_of_the_agent_home() {
+        for (anchor, message) in [
+            (
+                r#"{ block = "project", path = ".test.json" }"#,
+                "must lie in the Agent home",
+            ),
+            (
+                r#"{ block = "home", root = "config" }"#,
+                "declares no root `config`",
+            ),
+        ] {
+            let text = with_account(&ACCOUNT.replacen(
+                r#"anchor = { block = "home", root = "state" }"#,
+                &format!("anchor = {anchor}"),
+                1,
+            ));
+            assert!(error(&text).contains(message), "{anchor}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn what_takes_the_agent_off_the_account_is_checked() {
+        let off = |text: &str| {
+            with_account(
+                &ACCOUNT.replace("\n[account.off]\n", &format!("\n[account.off]\n{text}\n")),
+            )
+        };
+        for (text, message) in [
+            (
+                ACCOUNT.replace(
+                    r#"variables = [{ name = "AUTH_TOKEN", values = "non-empty" }, { name = "USE_OTHER", values = "truthy" }]"#,
+                    r#"variables = [{ name = "AUTH=TOKEN", values = "non-empty" }]"#,
+                ),
+                "`AUTH=TOKEN` is not a variable name",
+            ),
+            (
+                ACCOUNT.replace(
+                    r#"env_maps = [{ anchor = { block = "home", root = "state" }, key_path = ["env"] }]"#,
+                    "",
+                ),
+                "off variables need env maps",
+            ),
+            (
+                ACCOUNT.replace(
+                    r#"{ anchor = { block = "home", root = "state" }, key_path = ["keyHelper"] },"#,
+                    r#"{ anchor = { block = "home", root = "state" }, key_path = ["keyHelper"], every_source = true },"#,
+                ),
+                "every_source needs a settings anchor",
+            ),
+            (
+                ACCOUNT.replace(
+                    r#"{ anchor = { block = "project", path = ".test/settings.json" }, key_path = ["keyHelper"] },"#,
+                    r#"{ anchor = { block = "project", path = ".test/settings.json", walk = "up-to-repo-root" }, key_path = ["keyHelper"] },"#,
+                ),
+                "a setting lies in one file of the Project folder",
+            ),
+            (
+                ACCOUNT.replace(
+                    r#"{ anchor = { block = "home", root = "state" }, key_path = ["keyHelper"] },"#,
+                    r#"{ anchor = { block = "settings", settings = "managed" }, key_path = ["keyHelper"] },"#,
+                ),
+                "managed",
+            ),
+        ] {
+            let text = with_account(&text);
+            assert!(error(&text).contains(message), "{message}: {}", error(&text));
+        }
+        let text = with_account(&format!(
+            "{}\n[account.off]\n",
+            ACCOUNT.split("\n[account.off]").next().unwrap()
+        ));
+        assert!(
+            error(&text).contains("off needs settings or variables"),
+            "{}",
+            error(&text)
+        );
+        let text = off("ignored = true");
+        assert!(error(&text).contains("unknown field"), "{}", error(&text));
+    }
 
     #[test]
     fn a_folder_of_skill_folders_loads_in_the_home_a_project_or_the_machine() {
