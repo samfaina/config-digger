@@ -690,8 +690,8 @@ on_read_failure = "ignores_file"
 # `x\.agents\skills\k` over `y\.cursor\skills\k`, and by path, not by depth,
 # `a\b\c\.cursor\skills\k` over `b\.cursor\skills\k`; of one folder's, the
 # first marker in the order above [test]. So the five nested locations are
-# one group of `precedence`. Its folders compare name by name, case aside,
-# as the walk down enters them, which puts `a\b\` before `a-b\`.
+# one group of `precedence`. Its folders compare name by name from the
+# root down, case aside, which puts `a\b\` before `a-b\`.
 #
 # Cursor lists a `SKILL.md` without a frontmatter, one whose YAML does not
 # parse or never closes, under its folder's name in the `/` menu, where the

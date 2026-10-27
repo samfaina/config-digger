@@ -216,8 +216,10 @@ pub(crate) fn resolve(
             // earlier one.
             let rank = |entry: &ScannedEntry| {
                 let (item, in_group) = definition.group_rank(definition.location(&entry.location));
-                let folder = in_group
-                    .and(entry.found_in.as_deref())
+                let folder = entry
+                    .found_in
+                    .as_deref()
+                    .filter(|_| in_group.is_some())
                     .map(paths::folder_order);
                 (
                     item,

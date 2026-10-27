@@ -1180,11 +1180,14 @@ pub(crate) enum Ranked {
     One(String),
     /// Two or more location ids ranked as one item. Of two same-Item
     /// Entries of the group, the one whose folder comes first by path wins,
-    /// and of two found in one folder, the one whose location comes first
-    /// here. An Entry's folder is the one the walk down that found its
-    /// location found holding it, or for a location without one, its
-    /// anchor's own, the same for every Entry. Wherever a location ranks
-    /// without two folders to compare, the group's ids rank in their order.
+    /// and of two in one folder, the one whose location comes first here.
+    /// For a location a walk down reads, an Entry's folder is the one the
+    /// walk found holding the location's path. Every other Entry is in its
+    /// anchor's own folder, taken as one folder for them all, ahead of the
+    /// folders found by a walk. Wherever a location ranks without two
+    /// folders to compare, the group's ids rank in their order.
+    // It holds items, not ids, so that validation can name a group inside
+    // a group, which the schema leaves out.
     Group(#[schemars(with = "Vec<String>", length(min = 2))] Vec<Ranked>),
 }
 
@@ -1276,10 +1279,7 @@ impl AgentDefinition {
     /// The precedence rank of a location among its kind, 0 being highest,
     /// with the ids of each group in their order.
     pub fn rank(&self, location: &LocationDefinition) -> usize {
-        self.rules(location.kind)
-            .ranked_ids()
-            .position(|id| id == location.id)
-            .expect("validation puts every location in its kind's precedence")
+        self.places(location).0
     }
 
     /// Where a location ranks among its kind for same-Item Entries: the
@@ -1287,19 +1287,23 @@ impl AgentDefinition {
     /// that item's group, if it is in one, which ranks below the folder
     /// each Entry was found in.
     pub fn group_rank(&self, location: &LocationDefinition) -> (usize, Option<usize>) {
-        self.rules(location.kind)
-            .precedence
-            .iter()
-            .enumerate()
-            .find_map(|(place, item)| match item {
-                Ranked::One(id) => (*id == location.id).then_some((place, None)),
-                Ranked::Group(_) => item
-                    .ids()
-                    .iter()
-                    .position(|id| *id == location.id)
-                    .map(|in_group| (place, Some(in_group))),
-            })
-            .expect("validation puts every location in its kind's precedence")
+        let (_, item, in_group) = self.places(location);
+        (item, in_group)
+    }
+
+    /// The location's rank, the place of its item in `precedence`, and its
+    /// place in that item's group, if it is in one.
+    fn places(&self, location: &LocationDefinition) -> (usize, usize, Option<usize>) {
+        let mut rank = 0;
+        for (place, item) in self.rules(location.kind).precedence.iter().enumerate() {
+            let ids = item.ids();
+            if let Some(at) = ids.iter().position(|id| *id == location.id) {
+                let in_group = matches!(item, Ranked::Group(_)).then_some(at);
+                return (rank + at, place, in_group);
+            }
+            rank += ids.len();
+        }
+        panic!("validation puts every location in its kind's precedence")
     }
 
     /// How to tell that the Agent of the home `home` is running: the home's

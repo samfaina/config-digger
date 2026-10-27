@@ -3295,7 +3295,7 @@
           "type": "string"
         },
         {
-          "description": "Two or more location ids ranked as one item. Of two same-Item\nEntries of the group, the one whose folder comes first by path wins,\nand of two found in one folder, the one whose location comes first\nhere. An Entry's folder is the one the walk down that found its\nlocation found holding it, or for a location without one, its\nanchor's own, the same for every Entry. Wherever a location ranks\nwithout two folders to compare, the group's ids rank in their order.",
+          "description": "Two or more location ids ranked as one item. Of two same-Item\nEntries of the group, the one whose folder comes first by path wins,\nand of two in one folder, the one whose location comes first here.\nFor a location a walk down reads, an Entry's folder is the one the\nwalk found holding the location's path. Every other Entry is in its\nanchor's own folder, taken as one folder for them all, ahead of the\nfolders found by a walk. Wherever a location ranks without two\nfolders to compare, the group's ids rank in their order.",
           "type": "array",
           "items": {
             "type": "string"
