@@ -7705,6 +7705,14 @@ pub(crate) struct OffAccount {
     pub may_be_off: Vec<BypassVariable>,
 }
 
+impl OffAccount {
+    /// The anchors of its settings and env maps.
+    pub fn anchors(&self) -> impl Iterator<Item = &Anchor> {
+        let keys = self.settings.iter().map(|key| &key.anchor);
+        keys.chain(self.env_maps.iter().map(|map| &map.anchor))
+    }
+}
+
 impl Validate for OffAccount {
     fn validate(&self) -> Result<(), String> {
         if self.settings.is_empty() && self.variables.is_empty() && self.may_be_off.is_empty() {

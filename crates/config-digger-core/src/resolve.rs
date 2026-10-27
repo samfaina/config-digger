@@ -13,8 +13,8 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, OffBy, ScannedEntry, ScannedGate, ScannedHome, ScannedParked,
-    ScannedReadFailure, SettingOwner, Snapshot,
+    GateReading, HomeSource, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
+    ScannedParked, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
 use std::borrow::Cow;
@@ -504,12 +504,14 @@ pub(crate) fn resolve(
                         let reason = match closed {
                             Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
                             Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
-                            Closed::NotSignedIn => explain::not_signed_in(agent_name, account()),
+                            Closed::NotSignedIn(unreadable) => {
+                                explain::not_signed_in(agent_name, account(), unreadable.as_deref())
+                            }
                             Closed::OffAccount(off) => {
                                 explain::off_account(agent_name, account(), &off)
                             }
-                            Closed::OtherAccount(folder) => {
-                                explain::other_account(agent_name, account(), &folder)
+                            Closed::OtherAccount { signed_in } => {
+                                explain::other_account(agent_name, account(), &signed_in)
                             }
                         };
                         return unread_entry(
@@ -2166,13 +2168,14 @@ enum Closed<'d> {
     Gate(&'d str, bool),
     /// The setting that does not have the value it needs.
     Setting(&'d SettingIs),
-    /// The Agent home is signed in to no account.
-    NotSignedIn,
+    /// The Agent home is signed in to no account, or, when config-digger
+    /// cannot read the file at this path that names it, taken to be.
+    NotSignedIn(Option<PathBuf>),
     /// What takes the Agent off the account it is signed in to.
     OffAccount(OffBy),
     /// The Entry is in another folder than that of the account the Agent
-    /// home is signed in to, this one.
-    OtherAccount(String),
+    /// home is signed in to.
+    OtherAccount { signed_in: String },
 }
 
 /// The first `when` condition of the location of `entry` that does not
@@ -2209,29 +2212,37 @@ fn closed<'d>(
                     (!holds).then(|| Closed::Gate(block.gate.as_str(), gate_on(&block.gate)))
                 }
                 Condition::Setting(block) => (!holds).then_some(Closed::Setting(block)),
-                Condition::SignedInAccount(_) => off_account(definition, snapshot, entry, project),
+                Condition::SignedInAccount(_) => {
+                    account_closed(definition, snapshot, entry, project)
+                }
             }
         })
 }
 
 /// Why the Agent home of `entry` does not read it for the account it is
 /// signed in to, in the context of the Project with the key `project`, if
-/// it does not.
-fn off_account<'d>(
+/// it does not: it is signed in to none, it runs off the account, or the
+/// Entry is another account's.
+fn account_closed<'d>(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
 ) -> Option<Closed<'d>> {
-    let account = snapshot.account_of(entry, project);
-    let Some(ours) = account.and_then(|account| account.folder.as_deref()) else {
-        return Some(Closed::NotSignedIn);
+    let Some(account) = snapshot.account_of(entry, project) else {
+        return Some(Closed::NotSignedIn(None));
     };
-    if let Some(off) = account.and_then(|account| account.off.clone()) {
-        return Some(Closed::OffAccount(off));
+    let ours = match &account.signed_in {
+        SignedIn::To(folder) => folder,
+        SignedIn::ToNone => return Some(Closed::NotSignedIn(None)),
+        SignedIn::Unreadable(path) => return Some(Closed::NotSignedIn(Some(path.clone()))),
+    };
+    if let OnAccount::No(off) = &account.on_account {
+        return Some(Closed::OffAccount(off.clone()));
     }
-    (account_folder(definition, snapshot, entry)? != ours)
-        .then(|| Closed::OtherAccount(ours.to_owned()))
+    (account_folder(definition, snapshot, entry)? != *ours).then(|| Closed::OtherAccount {
+        signed_in: ours.clone(),
+    })
 }
 
 /// The folder of `entry`'s account: the first below its location's folder
@@ -2281,7 +2292,9 @@ fn account_caveat(
     if !read_for_account || closed(definition, snapshot, entry, project).is_some() {
         return None;
     }
-    let off = snapshot.account_of(entry, project)?.may_be_off.as_ref()?;
+    let OnAccount::Maybe(off) = &snapshot.account_of(entry, project)?.on_account else {
+        return None;
+    };
     let path = match off {
         OffBy::Setting { path, .. } | OffBy::Mapped { path, .. } => path.clone(),
         OffBy::Environment(_) => entry.path.clone(),

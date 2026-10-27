@@ -67,10 +67,10 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 
 # The claude.ai account Claude Code is signed in to, its Signed-in account:
 # `oauthAccount` in `~/.claude.json` names it [disk]. Signing in writes it,
-# and `claude auth logout` and `/logout` take it away [binary, 2.1.309 to
-# 2.1.311]. Claude Code reads the skills and plugins it syncs from
+# and `claude auth logout` and `/logout` take it away, the 2.1.309 to
+# 2.1.311 binaries say [binary]. Claude Code reads the skills it syncs from
 # claude.ai only from the account's folder, `<organizationUuid>_<accountUuid>`
-# [test for skills].
+# [test], and its synced plugins presumably too.
 [account]
 unverified = "Claude Code is taken to read no synced skill or plugin while signed in to no claude.ai account, `oauthAccount` gone or missing an id, as the binary says (#400)."
 name = "claude.ai"
@@ -79,9 +79,10 @@ ids = { organization = ["oauthAccount", "organizationUuid"], account = ["oauthAc
 folder = "{organization}_{account}"
 
 # What takes Claude Code off the account, so that it reads none of the
-# account's synced skills and plugins in the context [binary, 2.1.309 to
-# 2.1.311]: `apiKeyHelper` in a settings file, or in the `env` of one a
-# non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party provider. Settings
+# account's synced skills and plugins in the context, as the 2.1.309 to
+# 2.1.311 binaries say [binary]: `apiKeyHelper` in a settings file, or in
+# the `env` of one a non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party
+# provider. Settings
 # files rank managed (every source), local, Project, user, and a higher
 # file's variable wins [docs]. Set in the environment config-digger runs
 # in, those variables only may: Claude Code can start in another.

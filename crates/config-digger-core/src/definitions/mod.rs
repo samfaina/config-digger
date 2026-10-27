@@ -1579,12 +1579,7 @@ impl AgentDefinition {
             let context = |e: String| format!("account: {e}");
             account.validate().map_err(context)?;
             self.validate_home_root(&account.anchor).map_err(context)?;
-            let off = account.off.iter();
-            for anchor in off
-                .clone()
-                .flat_map(|off| off.settings.iter().map(|key| &key.anchor))
-                .chain(off.flat_map(|off| off.env_maps.iter().map(|map| &map.anchor)))
-            {
+            for anchor in account.off.iter().flat_map(|off| off.anchors()) {
                 self.validate_setting(anchor).map_err(context)?;
             }
         }
@@ -2373,7 +2368,6 @@ impl AgentDefinition {
             .ok_or_else(|| format!("undeclared plugins `{id}`"))
     }
 
-    /// A setting's anchor needs the root or the `[[settings]]` it names.
     /// A `signed-in-account` condition needs the definition's `account`, and
     /// a location whose Entries lie in folders below its own, or in plugins.
     fn validate_account_condition(&self, location: &LocationDefinition) -> Result<(), String> {
@@ -2389,6 +2383,7 @@ impl AgentDefinition {
         Ok(())
     }
 
+    /// A setting's anchor needs the root or the `[[settings]]` it names.
     fn validate_setting(&self, anchor: &Anchor) -> Result<(), String> {
         self.validate_home_root(anchor)?;
         match anchor.settings() {

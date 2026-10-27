@@ -9,8 +9,8 @@ use crate::definitions::blocks::{
     JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp,
     ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
     PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
-    RelativePaths, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass,
-    is_entry_key,
+    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
+    StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -395,13 +395,33 @@ pub(crate) struct ScannedAccount {
     /// The key of the Project where a file of the Project changes whether
     /// the Agent runs on the account, or `None` for everywhere else.
     pub project: Option<String>,
-    /// The name of the account's folder, `None` when the home is signed in
-    /// to no account.
-    pub folder: Option<String>,
-    /// What takes the Agent off the account.
-    pub off: Option<OffBy>,
-    /// What may take the Agent off the account, while nothing does.
-    pub may_be_off: Option<OffBy>,
+    pub signed_in: SignedIn,
+    /// Whether the Agent runs on the account there.
+    pub on_account: OnAccount,
+}
+
+/// The account an Agent home is signed in to, as config-digger reads it.
+#[derive(Clone)]
+pub(crate) enum SignedIn {
+    /// The account whose folder has this name.
+    To(String),
+    /// No account: the file that names it is missing, or lacks one of its
+    /// ids.
+    ToNone,
+    /// The file that names it, at this path, cannot be read or parsed.
+    Unreadable(PathBuf),
+}
+
+/// Whether an Agent runs on its Signed-in account in a context.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum OnAccount {
+    /// Nothing takes it off the account.
+    Yes,
+    /// Something may, such as a variable set where config-digger cannot
+    /// tell whether the Agent applies it.
+    Maybe(OffBy),
+    /// Something takes it off the account.
+    No(OffBy),
 }
 
 /// A setting or a variable that takes an Agent off its Signed-in account,
@@ -1983,6 +2003,15 @@ impl<'d> KeyAt<'d> {
         }
     }
 
+    /// The key `key` names.
+    fn setting(key: &'d SettingKey) -> Self {
+        KeyAt {
+            anchor: &key.anchor,
+            key_path: &key.key_path,
+            every_source: key.every_source,
+        }
+    }
+
     /// The value at the key in each of its files for `home`, with the
     /// file: one in a Project read in the Project folder `project` and
     /// skipped without one, and of settings, the file that overrides the
@@ -2040,76 +2069,78 @@ fn read_accounts(
         let Some(account) = &definitions[home.agent_index].account else {
             continue;
         };
-        let document = account
+        let path = account
             .anchor
             .path(&home.roots, None)
-            .and_then(|path| reader.peek(&path).ok().flatten())
-            .and_then(|text| JsonFormat::STRICT.parse(text).ok());
-        let folder = document.and_then(|document| {
-            account.folder_of(|key_path| Some(lookup(&document, key_path)?.as_str()?.to_owned()))
-        });
-        let off = |project: Option<&Path>, reader: &mut Reader| match &account.off {
-            Some(off) => off_account(off, home, project, settings, reader, ports),
-            None => (None, None),
+            .expect("validation puts the account in a file of the Agent home");
+        let document = match reader.peek(&path) {
+            Ok(None) => Ok(None),
+            Ok(Some(text)) => JsonFormat::STRICT.parse(text).map(Some).map_err(|_| ()),
+            Err(_) => Err(()),
         };
-        let everywhere = off(None, reader);
-        let in_projects = account.off.as_ref().is_some_and(|off| {
-            off.settings
-                .iter()
-                .map(|key| &key.anchor)
-                .chain(off.env_maps.iter().map(|map| &map.anchor))
-                .any(Anchor::in_project)
-        });
+        let signed_in = match document {
+            Ok(document) => document
+                .and_then(|document| {
+                    account.folder_of(|key_path| {
+                        Some(lookup(&document, key_path)?.as_str()?.to_owned())
+                    })
+                })
+                .map_or(SignedIn::ToNone, SignedIn::To),
+            Err(()) => SignedIn::Unreadable(path),
+        };
+        let on_account = |project: Option<&Path>, reader: &mut Reader| match &account.off {
+            Some(off) => on_account(off, home, project, settings, reader, ports),
+            None => OnAccount::Yes,
+        };
+        let everywhere = on_account(None, reader);
+        let in_projects = account
+            .off
+            .as_ref()
+            .is_some_and(|off| off.anchors().any(Anchor::in_project));
         let mut readings = Vec::new();
         if in_projects {
             for project in projects.iter().filter(|project| project.is_folder()) {
-                let here = off(Some(&project.path), reader);
+                let here = on_account(Some(&project.path), reader);
                 if here != everywhere {
                     readings.push((Some(project.key.clone()), here));
                 }
             }
         }
         readings.push((None, everywhere));
-        for (project, (off, may_be_off)) in readings {
+        for (project, on_account) in readings {
             accounts.push(ScannedAccount {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
                 project,
-                folder: folder.clone(),
-                off,
-                may_be_off,
+                signed_in: signed_in.clone(),
+                on_account,
             });
         }
     }
     accounts
 }
 
-/// What takes the Agent of `home` off its Signed-in account in the Project
-/// folder `project`, or else everywhere, and what only may. A setting a
-/// file sets, then a variable a map sets, take it off; one of those
-/// variables set in config-digger's environment, where no map replaces it,
-/// or a variable that only may take it off, set anywhere, only may.
-fn off_account(
+/// Whether the Agent of `home` runs on its Signed-in account in the
+/// Project folder `project`, or else everywhere. A setting a file sets,
+/// then a variable a map sets, take it off; one of those variables set in
+/// config-digger's environment, where no map replaces it, or a variable
+/// that only may take it off, set anywhere, only may.
+fn on_account(
     off: &blocks::OffAccount,
     home: &FoundHome,
     project: Option<&Path>,
     settings: &[ScannedSettings],
     reader: &mut Reader,
     ports: &Ports,
-) -> (Option<OffBy>, Option<OffBy>) {
+) -> OnAccount {
     for key in &off.settings {
-        let at = KeyAt {
-            anchor: &key.anchor,
-            key_path: &key.key_path,
-            every_source: key.every_source,
-        };
-        let set = at
+        let set = KeyAt::setting(key)
             .values(home, project, settings, reader)
             .into_iter()
             .find(|(_, value)| !value.is_null() && value.as_str() != Some(""));
         if let Some((path, _)) = set {
             let key_path = key.key_path.clone();
-            return (Some(OffBy::Setting { key_path, path }), None);
+            return OnAccount::No(OffBy::Setting { key_path, path });
         }
     }
     // Each map's object with its file, the one that overrides the others first.
@@ -2141,7 +2172,7 @@ fn off_account(
         None => OffBy::Environment(name),
     };
     if let Some(name) = blocks::first_set(&off.variables, &mapped) {
-        return (Some(off_by(name)), None);
+        return OnAccount::No(off_by(name));
     }
     // A variable in a map replaces the one in the environment.
     let unmapped = |name: &str| match in_map(name) {
@@ -2149,10 +2180,9 @@ fn off_account(
         None => ports.env.var(name),
     };
     let either = |name: &str| mapped(name).or_else(|| unmapped(name));
-    let may_be_off = blocks::first_set(&off.variables, &unmapped)
+    blocks::first_set(&off.variables, &unmapped)
         .or_else(|| blocks::first_set(&off.may_be_off, &either))
-        .map(off_by);
-    (None, may_be_off)
+        .map_or(OnAccount::Yes, |name| OnAccount::Maybe(off_by(name)))
 }
 
 /// Every place each Disable mechanism's switch is, for each found Agent
@@ -2992,14 +3022,11 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .flat_map(|bypass| bypass.env_maps())
         .map(|map| &map.anchor);
     // What takes the Agent off its account can be on the machine too.
-    let off_account = definition
+    let off_anchors = definition
         .account
         .iter()
         .filter_map(|account| account.off.as_ref())
-        .flat_map(|off| {
-            let keys = off.settings.iter().map(|key| &key.anchor);
-            keys.chain(off.env_maps.iter().map(|map| &map.anchor))
-        });
+        .flat_map(|off| off.anchors());
     let plugins = definition
         .plugins
         .iter()
@@ -3050,7 +3077,7 @@ fn machine_paths(definition: &AgentDefinition, ports: &Ports) -> BTreeMap<String
         .iter()
         .map(|location| &location.anchor)
         .chain(env_maps)
-        .chain(off_account)
+        .chain(off_anchors)
         .chain(plugins)
         .chain(registries)
         .chain(settings)

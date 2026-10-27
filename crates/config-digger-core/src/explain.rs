@@ -1676,15 +1676,23 @@ pub(crate) fn other_account(agent_name: &str, account: &str, folder: &str) -> Re
 }
 
 /// An Unread Entry's reason: `agent_name` reads it only for the `account`
-/// account it is signed in to, and it is signed in to none.
-pub(crate) fn not_signed_in(agent_name: &str, account: &str) -> Reason {
+/// account it is signed in to, and it is signed in to none, or is taken to
+/// be since config-digger cannot read the file `unreadable` that names it.
+pub(crate) fn not_signed_in(agent_name: &str, account: &str, unreadable: Option<&Path>) -> Reason {
+    let sentence = match unreadable {
+        Some(path) => format!(
+            "config-digger cannot read {}, which names the {account} account {agent_name} is signed in to, so it takes {agent_name} to be signed in to none, and then it does not read this.",
+            path.display()
+        ),
+        None => format!(
+            "{agent_name} is signed in to no {account} account, and reads this only for the account it is signed in to."
+        ),
+    };
     Reason {
         code: ReasonCode::NotSignedIn,
         effective: None,
         switch: None,
-        sentence: format!(
-            "{agent_name} is signed in to no {account} account, and reads this only for the account it is signed in to."
-        ),
+        sentence,
     }
 }
 

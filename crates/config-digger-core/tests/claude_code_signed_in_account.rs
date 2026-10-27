@@ -444,3 +444,85 @@ fn a_primary_api_key_or_an_oauth_token_leaves_claude_code_on_the_account() {
         assert_eq!(account_caveats(&fs, env.clone()), []);
     }
 }
+
+#[test]
+fn an_unread_synced_entry_stays_read_only_whatever_keeps_it_unread() {
+    let other = with_synced_skill(signed_in(FakeFileSystem::new()), "org-b_acct-b", "pdf");
+    let signed_out = with_synced_skill(FakeFileSystem::new(), ACCOUNT, "pdf");
+    let off = synced_home().with_file(
+        in_home(r".claude\settings.json"),
+        json!({ "apiKeyHelper": "get-key.cmd" }).to_string(),
+    );
+
+    for (fs, code) in [
+        (other, "other_account"),
+        (signed_out, "not_signed_in"),
+        (off, "off_account"),
+    ] {
+        let entry = entry(&inventory(&fs), "anthropic-skills:pdf");
+        assert_eq!(entry["reason"]["code"], code, "{entry}");
+        assert_eq!(entry["remove"]["code"], "read_only", "{entry}");
+        assert_eq!(entry["disable"]["code"], "unread", "{entry}");
+    }
+}
+
+#[test]
+fn an_api_key_helper_in_the_managed_or_the_local_settings_takes_claude_code_off_the_account() {
+    let managed = synced_home().with_file(
+        in_home(r".claude\remote-settings.json"),
+        json!({ "apiKeyHelper": "get-key.cmd" }).to_string(),
+    );
+    let local = synced_home().with_file(
+        PathBuf::from(PROJECT).join(r".claude\settings.local.json"),
+        json!({ "apiKeyHelper": "get-key.cmd" }).to_string(),
+    );
+
+    assert_eq!(
+        synced_states(&managed, home_env(), &Context::default()),
+        all("unread", "off_account")
+    );
+    assert_eq!(
+        synced_states(&local, home_env(), &in_project()),
+        all("unread", "off_account")
+    );
+}
+
+#[test]
+fn a_higher_settings_files_variable_replaces_a_lower_ones() {
+    let fs = synced_home()
+        .with_file(
+            PathBuf::from(PROJECT).join(r".claude\settings.local.json"),
+            json!({ "env": { "CLAUDE_CODE_USE_BEDROCK": "0" } }).to_string(),
+        )
+        .with_file(
+            in_home(r".claude\settings.json"),
+            json!({ "env": { "CLAUDE_CODE_USE_BEDROCK": "1" } }).to_string(),
+        );
+
+    assert_eq!(
+        synced_states(&fs, home_env(), &in_project()),
+        all("effective", "")
+    );
+    assert_eq!(
+        synced_states(&fs, home_env(), &Context::default()),
+        all("unread", "off_account")
+    );
+}
+
+#[test]
+fn a_state_file_config_digger_cannot_read_says_so() {
+    let broken = with_synced_skill(FakeFileSystem::new(), ACCOUNT, "pdf")
+        .with_file(in_home(".claude.json"), "{ not json");
+    let denied = with_synced_skill(signed_in(FakeFileSystem::new()), ACCOUNT, "pdf")
+        .denying_reads_of(in_home(".claude.json"));
+
+    for fs in [broken, denied] {
+        let entry = entry(&inventory(&fs), "anthropic-skills:pdf");
+        assert_eq!(entry["state"], "unread", "{entry}");
+        assert_eq!(entry["reason"]["code"], "not_signed_in", "{entry}");
+        assert_eq!(
+            entry["reason"]["sentence"],
+            r"config-digger cannot read C:\Users\fixture\.claude.json, which names the claude.ai account Claude Code is signed in to, so it takes Claude Code to be signed in to none, and then it does not read this."
+        );
+    }
+}
