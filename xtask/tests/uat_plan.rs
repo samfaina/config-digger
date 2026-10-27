@@ -186,6 +186,18 @@ fn problems(plan: &Value) -> Vec<String> {
                     ));
                 }
             }
+            // The agent judge reads the screenshots of the WebDriver walk.
+            let tools: Vec<&str> = step["automation"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|automation| automation["tool"].as_str())
+                .collect();
+            if tools.contains(&"agent-judge") && !tools.contains(&"webdriver") {
+                problems.push(format!(
+                    "step {id} lists agent-judge without webdriver, whose screenshots the judge reads"
+                ));
+            }
             // A tool's test names a check the tool has, for the tools that
             // exist.
             for automation in step["automation"].as_array().into_iter().flatten() {
@@ -338,6 +350,23 @@ fn a_step_takes_what_walks_it_and_what_a_person_still_checks() {
         Some("Que la ventana se vea nítida: ninguna herramienta lo mira."),
     );
     assert_eq!(problems(&plan), Vec::<String>::new());
+}
+
+#[test]
+fn agent_judge_without_the_webdriver_walk_fails() {
+    let mut plan = plan();
+    automate(
+        &mut plan,
+        serde_json::json!([
+            { "tool": "visual", "where": "local", "test": "inventory" },
+            { "tool": "agent-judge", "where": "local", "test": "anything" }
+        ]),
+        None,
+    );
+    assert_eq!(
+        problems(&plan),
+        ["step 1.1 lists agent-judge without webdriver, whose screenshots the judge reads"]
+    );
 }
 
 #[test]

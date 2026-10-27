@@ -98,4 +98,4 @@ try {
 }
 if ($code) { throw "the walk stopped with exit code ${code}: see its output above" }
 Write-Output "Results: $results"
-if (-not $Ci) { Write-Output "Screenshots, for the agent judge only: $shots" }
+if (-not $Ci) { Write-Output "Screenshots, for the agent judge only: $shots. Judge them before publishing a run: docs/agents/uat.md, The agent judge." }
