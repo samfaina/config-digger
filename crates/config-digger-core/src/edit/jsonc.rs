@@ -43,7 +43,15 @@ pub(super) fn apply(text: &str, edit: &Edit) -> Result<Change, EditError> {
             after,
             inline,
             comments,
-        } => file.insert(key_path, value, after.as_deref(), *inline, comments),
+            emptied,
+        } => file.insert(
+            key_path,
+            value,
+            after.as_deref(),
+            *inline,
+            comments,
+            emptied.as_deref(),
+        ),
         Edit::Set { key_path, value } => file.set(key_path, value),
         Edit::Append { key_path, value } => file.append(key_path, value),
         Edit::RemoveItem { key_path, value } => file.remove_item(key_path, value),
@@ -115,6 +123,8 @@ impl File<'_> {
             inline: !self.text[ast_prop.value.range().start..ast_prop.value.range().end]
                 .contains('\n'),
             comments,
+            emptied: (span.properties.len() == 1)
+                .then(|| self.text[span.range.start..span.range.end].to_owned()),
         };
         prop.remove();
         let members = Members::of_object(span);
@@ -280,6 +290,7 @@ impl File<'_> {
         after: Option<&str>,
         inline: bool,
         comments: &[String],
+        emptied: Option<&str>,
     ) -> Result<Change, EditError> {
         let (parent, name) = split_key_path(key_path)?;
         let object = self.cst_object(parent)?;
@@ -299,6 +310,19 @@ impl File<'_> {
         };
         let allowed = vec![self.gap(&Members::of_object(span), index)];
 
+        if let Some(emptied) = emptied
+            && &self.text[span.range.start..span.range.end] == "{}"
+        {
+            let mut text = self.text.to_owned();
+            text.replace_range(span.range.start..span.range.end, emptied);
+            return Ok(Change {
+                text,
+                inverse: Edit::Remove {
+                    key_path: key_path.to_vec(),
+                },
+                allowed,
+            });
+        }
         if self.is_single_line(span.range) {
             return Ok(Change {
                 text: splice_into_single_line(self.text, span, index, name, value),

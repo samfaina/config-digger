@@ -41,6 +41,7 @@ pub(super) fn apply(text: &str, edit: &Edit) -> Result<Change, EditError> {
             after,
             inline,
             comments,
+            ..
         } => file.insert(key_path, value, after.as_deref(), *inline, comments),
         Edit::Append { key_path, value } => file.append(key_path, value),
         Edit::RemoveItem { key_path, value } => file.remove_item(key_path, value),
@@ -127,6 +128,7 @@ impl File<'_> {
                 .filter(|line| line.starts_with('#'))
                 .map(str::to_owned)
                 .collect(),
+            emptied: None,
         };
 
         // The section's comments go on the next key of the same table, or

@@ -599,3 +599,55 @@ fn a_second_undo_planned_before_the_first_ran_writes_nothing() {
     assert_eq!(text(&fs, claude_json()), TWO_USER_SERVERS);
     assert_eq!(core.history().unwrap().len(), 2);
 }
+
+const ONE_USER_SERVER: &str = r#"{
+  "numStartups": 3,
+  "mcpServers": {
+    "linear": {
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}
+"#;
+
+#[test]
+fn undo_of_a_remove_that_emptied_an_object_gives_back_the_objects_lines() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), ONE_USER_SERVER);
+    let removed = remove(&fs, "linear");
+    assert!(
+        text(&fs, claude_json()).contains("\"mcpServers\": {}"),
+        "{}",
+        text(&fs, claude_json())
+    );
+
+    undo_with(&core(&fs), &removed.operation).unwrap();
+
+    assert_eq!(text(&fs, claude_json()), ONE_USER_SERVER);
+}
+
+#[test]
+fn an_operation_recorded_without_the_emptied_object_undoes_as_before() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), ONE_USER_SERVER);
+    let removed = remove(&fs, "linear");
+    // The manifest as config-digger wrote it before inverses held the text
+    // of the object a Remove emptied.
+    let manifest = fs
+        .files_below(backups())
+        .into_iter()
+        .find(|path| path.ends_with("manifest.json"))
+        .unwrap();
+    let mut recorded: serde_json::Value =
+        serde_json::from_slice(&fs.contents(&manifest).unwrap()).unwrap();
+    let inverse = recorded["locations"][0]["edits"][0]["inverse"]
+        .as_object_mut()
+        .unwrap();
+    assert!(inverse.remove("emptied").is_some(), "{recorded}");
+    fs.put_file(&manifest, recorded.to_string());
+
+    undo_with(&core(&fs), &removed.operation).unwrap();
+
+    assert_eq!(
+        text(&fs, claude_json()),
+        "{\n  \"numStartups\": 3,\n  \"mcpServers\": { \"linear\": { \"url\": \"https://mcp.linear.app/mcp\" } }\n}\n"
+    );
+}
