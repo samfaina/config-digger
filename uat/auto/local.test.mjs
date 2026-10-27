@@ -109,22 +109,34 @@ test("the check names the checkout when its working tree changed", (t) => {
   assert.deepEqual(changed(before, snapshot({ env, checkout })), [`the working tree of ${checkout}: ?? uat-results.json`]);
 });
 
+test("the check names a file of the checkout that was changed before the run and changed again", (t) => {
+  const { env, checkout } = testerPc(t);
+  writeFileSync(join(checkout, "notes.md"), "uno");
+  const before = snapshot({ env, checkout });
+  writeFileSync(join(checkout, "notes.md"), "dos");
+  assert.deepEqual(changed(before, snapshot({ env, checkout })), [`the working tree of ${checkout}: ?? notes.md`]);
+});
+
 // The local script in a copy of the checkout whose three tools are stubs:
-// each notes its call in calls.txt and writes the results the real one
+// each keeps the real one's param block, notes the parameters it was given
+// in calls.txt, by name, runs `runsFirst`, and writes the results the real one
 // writes, or runs `fail` instead. It runs in Windows PowerShell on the
 // tester's PC of `testerPc`, with `app` as its -App.
-function localScript(t, { fail = {}, also = {} } = {}) {
+function localScript(t, { fail = {}, runsFirst = {} } = {}) {
   const { pc, env, checkout } = testerPc(t);
   cpSync(here, join(checkout, "uat", "auto"), { recursive: true });
   writeFileSync(join(checkout, "uat", "plan.json"), JSON.stringify(plan));
   const stub = (tool, writes) => {
     const file = join(checkout, "uat", "auto", ...tool.split("/"));
-    const call = `New-Item -ItemType Directory -Force $args[3] | Out-Null; Add-Content -LiteralPath (Join-Path '${pc}' calls.txt) -Value ('${tool} ' + ($args -join ' '))`;
-    writeFileSync(file, [call, also[tool] ?? "", fail[tool] ?? writes].join("\n"));
+    const real = readFileSync(file, "utf8").replace(/\r\n/g, "\n");
+    const params = real.slice(real.indexOf("\nparam(") + 1, real.indexOf("\n)\n") + 2);
+    const given = "($PSBoundParameters.Keys | Sort-Object | ForEach-Object { \"-$_ $($PSBoundParameters[$_])\" }) -join ' '";
+    const call = `New-Item -ItemType Directory -Force $Work | Out-Null; Add-Content -LiteralPath (Join-Path '${pc}' calls.txt) -Value ('${tool} ' + (${given}))`;
+    writeFileSync(file, [params, call, runsFirst[tool] ?? "", fail[tool] ?? writes].join("\n"));
   };
   stub("sandbox/build-update.ps1", "");
-  stub("sandbox/run.ps1", `Set-Content -LiteralPath (Join-Path $args[3] uat-results.json) -Value '${JSON.stringify([result("9.1"), result("9.2")])}' -Encoding utf8`);
-  stub("webdriver/run.ps1", `Set-Content -LiteralPath (Join-Path $args[3] webdriver.json) -Value '${JSON.stringify([result("7.1", { looks: [] }), result("7.2")])}'`);
+  stub("sandbox/run.ps1", `Set-Content -LiteralPath (Join-Path $Work uat-results.json) -Value '${JSON.stringify([result("9.1"), result("9.2")])}' -Encoding utf8`);
+  stub("webdriver/run.ps1", `Set-Content -LiteralPath (Join-Path $Work webdriver.json) -Value '${JSON.stringify([result("7.1", { looks: [] }), result("7.2")])}'`);
   execFileSync("git", ["-C", checkout, "add", "."], { stdio: "pipe" });
   execFileSync("git", ["-C", checkout, "-c", "user.name=uat", "-c", "user.email=uat@example.com", "commit", "-qm", "checkout"], { stdio: "pipe" });
   const work = join(pc, "work");
@@ -147,13 +159,13 @@ test("the command runs build-update.ps1, the Sandbox walk and the WebDriver walk
   assert.equal(ran.status, 0, ran.stderr + ran.stdout);
   assert.deepEqual(calls(), [
     `sandbox/build-update.ps1 -Commit v${appVersion} -Work ${join(work, "update")}`,
-    `sandbox/run.ps1 -Version ${appVersion} -Work ${join(work, "sandbox")} -Update ${join(work, "update", "installers")}`,
-    `webdriver/run.ps1 -App ${app} -Work ${work} -Root ${root}`,
+    `sandbox/run.ps1 -Update ${join(work, "update", "installers")} -Version ${appVersion} -Work ${join(work, "sandbox")}`,
+    `webdriver/run.ps1 -App ${app} -Root ${root} -Work ${work}`,
   ]);
   const results = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8"));
   assert.deepEqual(results, [result("9.1"), result("9.2"), result("7.1"), result("7.2")]);
   assert.match(ran.stdout, /uat-results\.json: 4 results, 4 OK, 0 KO, 0 Blocked/);
-  assert.ok(ran.stdout.includes(`Nothing outside ${root}, the throwaway profile and ${work} changed`), ran.stdout);
+  assert.ok(ran.stdout.includes("The tester's own data is as before the run: the 2 files of config-digger's real data"), ran.stdout);
 });
 
 test("the command stops at the tool that fails, saying which and what did not run, and writes no uat-results.json", (t) => {
@@ -184,9 +196,17 @@ test("the command refuses an -App that reports another version than -Version, be
 });
 
 test("the command fails when a tool changed the tester's own data, naming the file", (t) => {
-  const { env, work, run } = localScript(t, { also: { "webdriver/run.ps1": "Set-Content -LiteralPath (Join-Path $env:APPDATA config-digger/settings.json) -Value '{}x'" } });
+  const { env, work, run } = localScript(t, { runsFirst: { "webdriver/run.ps1": "Set-Content -LiteralPath (Join-Path $env:APPDATA config-digger/settings.json) -Value '{}x'" } });
   const ran = run(["-Version", appVersion, "-App", app, "-Work", work]);
   assert.notEqual(ran.status, 0);
   assert.ok(ran.stderr.includes(`The run changed the tester's own data:\n${join(env.APPDATA, "config-digger", "settings.json")}`), ran.stderr);
   assert.match(ran.stderr, /the run changed the tester's own data: see the list above/);
+});
+
+test("a check that breaks fails the command as broken, not as a change to the tester's data", (t) => {
+  const { work, run } = localScript(t, { runsFirst: { "webdriver/run.ps1": "Remove-Item -LiteralPath (Join-Path $Work untouched.json)" } });
+  const ran = run(["-Version", appVersion, "-App", app, "-Work", work]);
+  assert.notEqual(ran.status, 0);
+  assert.match(ran.stderr, /the check of the tester's own data failed: see its output above/);
+  assert.doesNotMatch(ran.stderr, /the run changed the tester's own data/);
 });

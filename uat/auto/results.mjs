@@ -25,12 +25,12 @@ export function combine(plan, ...walks) {
 }
 
 // Writes <work>\uat-results.json from the walks' results in the local
-// script's work folder: the WebDriver walk's webdriver.json, with the agent
-// judge's verdicts once it merged them, and the Sandbox's
-// sandbox\uat-results.json. Returns the file's path.
-export function writeResults(work, plan) {
+// script's work folder: the WebDriver walk's webdriver.json, or `webdriver`,
+// the agent judge's merge of it, and the Sandbox's sandbox\uat-results.json.
+// Returns the file's path. It writes nothing when it refuses a result.
+export function writeResults(work, plan, webdriver = read(join(work, "webdriver.json"))) {
   const file = join(work, "uat-results.json");
-  const results = combine(plan, read(join(work, "webdriver.json")), read(join(work, "sandbox", "uat-results.json")));
+  const results = combine(plan, webdriver, read(join(work, "sandbox", "uat-results.json")));
   writeFileSync(file, JSON.stringify(results, null, 2) + "\n");
   return file;
 }

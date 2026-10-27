@@ -16,10 +16,10 @@
 #
 #   .\uat\auto\run.ps1 -Version 0.1.0-rc.4 -App target\release\config-digger-app.exe
 #
-# It writes nothing outside -Root, the throwaway profile and -Work, and a
-# check at the end compares config-digger's real data, the real Codex and
-# Claude Desktop configuration and the checkout's working tree with how they
-# were before it ran.
+# The tools write in -Root, the throwaway profile and -Work, and the builds
+# in cargo's and npm's caches. A check at the end compares config-digger's
+# real data, the real Codex and Claude Desktop configuration and the
+# checkout's working tree with how they were before it ran.
 param(
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][string]$App,
@@ -30,36 +30,39 @@ $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $repo = (Resolve-Path "$here\..\..").Path
 
-$App = (Resolve-Path $App).Path
-$appVersion = (Get-Item $App).VersionInfo.ProductVersion
+$App = (Resolve-Path -LiteralPath $App).Path
+$appVersion = (Get-Item -LiteralPath $App).VersionInfo.ProductVersion
 if ($appVersion -ne $Version) { throw "$App reports version $appVersion, not ${Version}: pass the release build of $Version as -App" }
 
 New-Item -ItemType Directory -Force $Work | Out-Null
-$Work = (Resolve-Path $Work).Path
+$Work = (Resolve-Path -LiteralPath $Work).Path
 $results = Join-Path $Work "uat-results.json"
-if (Test-Path $results) { Remove-Item $results }
+if (Test-Path -LiteralPath $results) { Remove-Item -LiteralPath $results }
 $before = Join-Path $Work "untouched.json"
 node "$here\untouched.mjs" snapshot --checkout $repo --out $before
 if ($LASTEXITCODE) { throw "the snapshot of the tester's own data failed" }
 
-# Each tool, by the name the message gives it. A tool fails when it throws
-# or exits with a code.
-function Tool([string]$name, [string]$script, [string[]]$arguments, [string]$skipped) {
+# Runs a tool with its named parameters, as the message names it. A tool
+# fails when it throws or exits with a code; `skipped` names what then does
+# not run.
+function RunTool([string]$name, [string]$script, [hashtable]$parameters, [string]$skipped = "") {
     Write-Output "== $name"
     $global:LASTEXITCODE = 0
-    try { & $script @arguments } catch { throw "$name failed: $($_.Exception.Message). $skipped" }
-    if ($LASTEXITCODE) { throw "$name failed with exit code ${LASTEXITCODE}: see its output above. $skipped" }
+    try { & $script @parameters } catch { throw ("$name failed: $($_.Exception.Message). $skipped").TrimEnd() }
+    if ($LASTEXITCODE) { throw ("$name failed with exit code ${LASTEXITCODE}: see its output above. $skipped").TrimEnd() }
 }
 try {
     $update = Join-Path $Work "update"
-    Tool "build-update.ps1" "$here\sandbox\build-update.ps1" @("-Commit", "v$Version", "-Work", $update) "The Sandbox walk and the WebDriver walk did not run."
-    Tool "The Sandbox walk" "$here\sandbox\run.ps1" @("-Version", $Version, "-Work", (Join-Path $Work "sandbox"), "-Update", (Join-Path $update "installers")) "The WebDriver walk did not run."
-    Tool "The WebDriver walk" "$here\webdriver\run.ps1" @("-App", $App, "-Work", $Work, "-Root", $Root) ""
+    RunTool "build-update.ps1" "$here\sandbox\build-update.ps1" @{ Commit = "v$Version"; Work = $update } "The Sandbox walk and the WebDriver walk did not run."
+    RunTool "The Sandbox walk" "$here\sandbox\run.ps1" @{ Version = $Version; Work = (Join-Path $Work "sandbox"); Update = (Join-Path $update "installers") } "The WebDriver walk did not run."
+    RunTool "The WebDriver walk" "$here\webdriver\run.ps1" @{ App = $App; Work = $Work; Root = $Root }
     node "$here\results.mjs" --work $Work
     if ($LASTEXITCODE) { throw "writing $results failed: see its output above" }
 } finally {
-    node "$here\untouched.mjs" check --before $before --where "$Root, the throwaway profile and $Work"
-    $changed = $LASTEXITCODE
+    node "$here\untouched.mjs" check --before $before
+    $check = $LASTEXITCODE
 }
-if ($changed) { throw "the run changed the tester's own data: see the list above" }
-Write-Output "Judge the walk's screenshots, then publish $results`: docs/agents/uat.md, The agent judge and Publishing a run."
+# untouched.mjs exits with 2 when something changed, and with 1 when it broke.
+if ($check -eq 2) { throw "the run changed the tester's own data: see the list above" }
+if ($check) { throw "the check of the tester's own data failed: see its output above" }
+Write-Output "Judge the walk's screenshots, then publish ${results}: docs/agents/uat.md, The agent judge and Publishing a run."

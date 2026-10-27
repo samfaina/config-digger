@@ -142,10 +142,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (mode === "list") console.log(JSON.stringify(listing, null, 2));
   else if (mode === "merge" && opt.verdicts) {
     const merged = merge(results, listing, JSON.parse(readFileSync(opt.verdicts, "utf8")));
+    // The local script's file first: when it refuses the merge, webdriver.json stays as it was.
+    const published = existsSync(join(opt.work, "uat-results.json")) && writeResults(opt.work, plan, merged);
     writeFileSync(resultsFile, JSON.stringify(merged, null, 2) + "\n");
     const judged = merged.filter((result) => listing.some((step) => step.id === result.id));
     const count = (status) => judged.filter((result) => result.status === status).length;
     console.log(`Merged ${judged.length} verdicts into ${resultsFile}: ${count("ok")} OK, ${count("ko")} KO, ${count("blocked")} Blocked`);
-    if (existsSync(join(opt.work, "uat-results.json"))) console.log(`Wrote them into ${writeResults(opt.work, plan)}`);
+    if (published) console.log(`Wrote them into ${published}`);
   } else throw new Error("usage: judge.mjs list [--work <dir>] | judge.mjs merge --verdicts <file> [--work <dir>]");
 }
