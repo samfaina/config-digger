@@ -34,7 +34,7 @@ test("every step the walk knows is a step of the plan, once", () => {
 });
 
 test("every step of a section the walk covers is walked, but those the Sandbox walks", () => {
-  const sandbox = new Set(["12.2", "13.2", "13.3", "13.4"]);
+  const sandbox = new Set(["12.2", "13.2", "13.3", "13.4", "13.6"]);
   const walked = new Set(steps.map((step) => step.id));
   const covered = plan.sections.filter((section) => section.steps.some((step) => walked.has(step.id)));
   assert.deepEqual(

@@ -1,5 +1,6 @@
 //! The installer's install folder, checked against config-digger's data
-//! folders in `hooks.nsh` and against Tauri's default in `tauri.conf.json`.
+//! folders in `hooks.nsh` and against Tauri's default in `tauri.conf.json`,
+//! and the strings `hooks.nsh` shows, checked against `English.nsh`.
 
 use config_digger_core::api::DataFolders;
 use config_digger_core::ports::{Environment, Hive, RegistryData};
@@ -70,6 +71,29 @@ pub fn problems(hooks: &str, tauri_conf: &str) -> Vec<String> {
         None => problems.push("tauri.conf.json has no productName".to_owned()),
     }
     problems
+}
+
+/// The strings `hooks` shows, `$(name)`, that no `LangString name` of the
+/// language file `english` defines: NSIS would show them empty.
+pub fn missing_strings(hooks: &str, english: &str) -> Vec<String> {
+    let defined: Vec<&str> = english
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("LangString ")?.split(' ').next())
+        .collect();
+    let shown = hooks
+        .split("$(")
+        .skip(1)
+        .filter_map(|rest| rest.split_once(')'));
+    let mut missing = Vec::new();
+    for (name, _) in shown {
+        if !defined.contains(&name) && !missing.contains(&name) {
+            missing.push(name);
+        }
+    }
+    missing
+        .into_iter()
+        .map(|name| format!("hooks.nsh shows $({name}), which English.nsh does not define"))
+        .collect()
 }
 
 /// The folder `!define name "…"` names, with `$LOCALAPPDATA` and `$APPDATA`
@@ -239,6 +263,27 @@ mod tests {
                 r"Tauri's default install folder C:\Users\fixture\AppData\Local\Config Digger (productName) is no data folder, so the installer would keep it instead of INSTALL_FOLDER"
                     .to_owned()
             ]
+        );
+    }
+
+    #[test]
+    fn the_committed_hooks_show_only_strings_of_the_language_file() {
+        let hooks = include_str!("../../crates/config-digger-app/installer/hooks.nsh");
+        let english = include_str!("../../crates/config-digger-app/installer/English.nsh");
+
+        assert_eq!(missing_strings(hooks, english), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_string_the_language_file_lacks_is_a_problem() {
+        let english = "LangString addToPath ${LANG_ENGLISH} \"Add it\"\n\
+                       LangString pathNotAddedd ${LANG_ENGLISH} \"Not added\"\n";
+        let hooks = "${NSD_CreateCheckbox} 120u 177u 195u 12u \"$(addToPath)\"\n\
+                     MessageBox MB_OK \"$(pathNotAdded)$\\r$\\n$INSTDIR\" /SD IDOK\n";
+
+        assert_eq!(
+            missing_strings(hooks, english),
+            vec!["hooks.nsh shows $(pathNotAdded), which English.nsh does not define".to_owned()]
         );
     }
 

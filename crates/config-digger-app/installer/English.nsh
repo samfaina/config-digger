@@ -30,6 +30,8 @@ LangString webview2InstallSuccess ${LANG_ENGLISH} "WebView2 installed successful
 LangString deleteAppData ${LANG_ENGLISH} "Delete config-digger data"
 
 LangString addToPath ${LANG_ENGLISH} "Add the config-digger command to my PATH"
+LangString pathNotAdded ${LANG_ENGLISH} "config-digger was installed, but its command was not added to your PATH. To run config-digger from a terminal, add this folder to your user PATH by hand:"
+LangString pathNotRemoved ${LANG_ENGLISH} "The config-digger folder could not be taken off your user PATH. Remove it from your user PATH by hand:"
 LangString installFolderText ${LANG_ENGLISH} "Setup will install config-digger in the following folder. It can't be config-digger's data folder, %LOCALAPPDATA%\config-digger or %APPDATA%\config-digger, nor a folder inside or above one. $_CLICK"
 LangString deleteDataWarning ${LANG_ENGLISH} "Deleting config-digger data deletes every backup, and with them the Undo history."
 LangString deleteDataParked ${LANG_ENGLISH} "It also deletes these parked Entries, which the uninstaller never restores. To keep one, cancel and Enable it in config-digger first:"

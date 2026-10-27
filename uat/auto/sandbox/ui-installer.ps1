@@ -68,6 +68,11 @@ function SetText($edit, [string]$text) { [W32]::SendMessage((Handle $edit), 0x00
 function Text($edit) { $sb = New-Object System.Text.StringBuilder 1024; [W32]::SendMessage((Handle $edit), 0x000D, [IntPtr]1024, $sb) | Out-Null; $sb.ToString() }
 function Enabled($e) { [W32]::IsWindowEnabled((Handle $e)) }
 function Next($window) { Press (ById $window "1") }
+# Presses a window's button with the WM_COMMAND its click sends the window,
+# and unticks a box with BM_SETCHECK: a posted BM_CLICK misses a window that
+# is not active, as Setup is not once a message box has closed.
+function Click($window, $button) { [W32]::PostMessage((Handle $window), 0x0111, [IntPtr][int]$button.Current.AutomationId, (Handle $button)) | Out-Null; Start-Sleep -Milliseconds 700 }
+function Untick($box) { [W32]::SendMessage((Handle $box), 0x00F1, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
 function WaitEnabled($e, [bool]$enabled, [int]$seconds = 5) {
     $end = (Get-Date).AddSeconds($seconds)
     while ((Enabled $e) -ne $enabled -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 200 }
@@ -83,12 +88,12 @@ function Finish($window, $process) {
     while ((Get-Date) -lt $end) {
         $button = ById $window "1"
         if ($button.Current.Name -match "Finish") { break }
-        if (Enabled $button) { Press $button; Start-Sleep -Seconds 1 } else { Start-Sleep -Milliseconds 500 }
+        if (Enabled $button) { Click $window $button; Start-Sleep -Seconds 1 } else { Start-Sleep -Milliseconds 500 }
     }
     foreach ($e in $window.FindAll($T::Descendants, $C::TrueCondition)) {
-        if ($e.Current.ClassName -eq "Button" -and @("1", "2", "3") -notcontains $e.Current.AutomationId -and (Ticked $e)) { Press $e }
+        if ($e.Current.ClassName -eq "Button" -and @("1", "2", "3") -notcontains $e.Current.AutomationId -and (Ticked $e)) { Untick $e }
     }
-    Press (ById $window "1")
+    Click $window (ById $window "1")
     $process.WaitForExit(30000) | Out-Null
 }
 # The Already Installed page: Add/Reinstall components, then on.
@@ -97,22 +102,69 @@ function Reinstall($window) { Press (Control $window "RadioButton" "Add/Reinstal
 # The uninstaller relaunches itself from a temporary copy, so its window is
 # found by name.
 function Uninstaller { Window "config-digger.*Uninstall" 60 }
-# The Delete config-digger data warning: a top-level #32770 holding its text.
-function Warning([int]$seconds = 60) {
+$DialogClass = New-Object System.Windows.Automation.PropertyCondition($A::ClassNameProperty, "#32770")
+# The warning showing now whose own text matches, or nothing: a #32770 that
+# is a top-level window or, as UI Automation shows a message box, a
+# descendant of the window that owns it.
+function FindWarning([string]$pattern) {
+    foreach ($top in $A::RootElement.FindAll($T::Children, $DialogClass)) {
+        foreach ($candidate in @($top) + @($top.FindAll($T::Descendants, $DialogClass))) {
+            $own = @($candidate.FindAll($T::Children, $C::TrueCondition) | Where-Object { $_.Current.ClassName -eq "Static" -and $_.Current.Name } | ForEach-Object { $_.Current.Name }) -join " | "
+            if ($own -match $pattern) { return $candidate }
+        }
+    }
+}
+# The warning whose text matches, waiting for it: by default the Delete
+# config-digger data one.
+function Warning([string]$pattern = "Deleting config-digger data", [int]$seconds = 60) {
     $end = (Get-Date).AddSeconds($seconds)
     do {
-        foreach ($top in $A::RootElement.FindAll($T::Children, $C::TrueCondition)) {
-            if ($top.Current.ClassName -ne "#32770") { continue }
-            if ((Texts $top) -match "Deleting config-digger data") { return $top }
-        }
+        $warning = FindWarning $pattern
+        if ($warning) { return $warning }
         Start-Sleep -Milliseconds 300
     } while ((Get-Date) -lt $end)
-    throw "no Delete config-digger data warning"
+    throw "no warning matching '$pattern'"
+}
+# Presses Next or Install until the warning whose text matches shows, and
+# returns it. Fails on the Finish page, which comes after any warning.
+function UntilWarning($window, [string]$pattern, [int]$seconds = 180) {
+    $end = (Get-Date).AddSeconds($seconds)
+    while ((Get-Date) -lt $end) {
+        $warning = FindWarning $pattern
+        if ($warning) { return $warning }
+        $button = ById $window "1"
+        if ($button.Current.Name -match "Finish") { throw "the Finish page came with no warning matching '$pattern'" }
+        if (Enabled $button) { Click $window $button; Start-Sleep -Seconds 1 } else { Start-Sleep -Milliseconds 500 }
+    }
+    throw "no warning matching '$pattern'"
+}
+# Presses the one button of a warning with only OK. The installer shows it
+# from its install thread, not as the active window.
+function PressOk($warning) { Click $warning (Control $warning "Button" "") }
+# Runs the installer or the uninstaller with /S until it exited and `done`
+# holds. Returns whether a window of config-digger's showed meanwhile, which
+# a silent run must not, and the exit code. A PATH warning gets its OK, so
+# that a run showing one still ends. The uninstaller exits once it
+# relaunched itself from a temporary copy: its `done` waits for the app to
+# go.
+function Silently([string]$exe, [scriptblock]$done = { $true }, [int]$seconds = 180) {
+    $p = Start-Process $exe -ArgumentList "/S" -PassThru
+    $null = $p.Handle  # without it, ExitCode stays empty
+    $shown = $false
+    $end = (Get-Date).AddSeconds($seconds)
+    while (-not ($p.HasExited -and (& $done)) -and (Get-Date) -lt $end) {
+        if ($A::RootElement.FindAll($T::Children, $DialogClass) | Where-Object { $_.Current.Name -match "config-digger" }) { $shown = $true }
+        $warning = FindWarning "user PATH"
+        if ($warning) { PressOk $warning }
+        Start-Sleep -Milliseconds 300
+    }
+    if (-not $p.WaitForExit(1000)) { throw "$exe /S still runs after $seconds seconds" }
+    [pscustomobject]@{ Shown = $shown; ExitCode = $p.ExitCode }
 }
 # Waits for the uninstaller to remove the app, then closes its last page.
 function EndUninstall($window, [string]$installDir) {
     $end = (Get-Date).AddSeconds(120)
     while ((Test-Path "$installDir\config-digger-app.exe") -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
-    try { Press (Control $window "Button" "Finish|Close" 30) } catch { }
+    try { Click $window (Control $window "Button" "Finish|Close" 30) } catch { }
     Start-Sleep -Seconds 2
 }
