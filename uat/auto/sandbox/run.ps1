@@ -6,9 +6,9 @@
 #   .\uat\auto\sandbox\run.ps1 -Version 0.1.0-rc.3 -Runs walk
 #
 # Runs:
-# - walk: 8.1, 9.5, 9.2, 9.3, 9.4, 13.2, 13.3 and 13.4 on the release's
-#   installer and CLI zip, downloaded with gh into the folder the Sandbox
-#   sees as C:\Descargas, as 9.5's commands expect.
+# - walk: 8.1, 9.5, 9.6, 9.2, 9.3, 9.4, 13.2, 13.3, 13.4 and 13.6 on the
+#   release's installer and CLI zip, downloaded with gh into the folder the
+#   Sandbox sees as C:\Descargas, as 9.5's commands expect.
 # - update: 12.2, between the two installers build-update.ps1 writes to
 #   -Update. Run build-update.ps1 first.
 #
@@ -101,12 +101,14 @@ foreach ($run in $Runs) {
 $about = @{
     "8.1"  = "En un Windows Sandbox nuevo, la primera orden del paso, tal cual. Sin comprobar: desinstalar desde Configuración de Windows, que un PC limpio no necesita."
     "9.5"  = "Las tres órdenes del paso, tal cual, en Windows Sandbox con la release en C:\Descargas."
+    "9.6"  = "Instalador de la release manejado con UI Automation en Windows Sandbox, con HKCU\Environment bloqueado por la orden del paso; la instalación sin preguntas, con Start-Process, vigilando que no salga ningún aviso. config-digger se abrió con su exe, no desde el menú Inicio."
     "9.2"  = "Instalador de la release manejado con UI Automation en Windows Sandbox; «Get-Command» con el PATH del registro, como una ventana nueva. Sin comprobar: el aviso «Windows protegió su PC» de SmartScreen, que no sale en el Sandbox porque un archivo de una carpeta mapeada no lleva la marca de la web."
     "9.3"  = "Instalador de la release manejado con UI Automation en Windows Sandbox."
     "9.4"  = "Instalador de la release manejado con UI Automation en Windows Sandbox."
     "13.2" = "Desinstalador (uninstall.exe, no Configuración de Windows) manejado con UI Automation en Windows Sandbox. cd-throwaway-desktop se aparcó con el CLI (homes add y disable) en C:\cd-throwaway, no E:\cd-throwaway. History y el State, con el CLI (history --json y list), no en la app. Reinstalado con /S."
     "13.3" = "Desinstalador manejado con UI Automation en Windows Sandbox, con una Entry aparcada una vez: el paso 7.2 no se hace en el Sandbox, así que se espera una línea."
     "13.4" = "Reinstalado con /S y desinstalado con UI Automation en Windows Sandbox; la orden del paso, tal cual."
+    "13.6" = "Instalado y reinstalado con /S y desinstalado con UI Automation en Windows Sandbox, con HKCU\Environment bloqueado por la orden del paso; la desinstalación sin preguntas, con Start-Process, vigilando que no salga ningún aviso."
     "12.2" = "El paso pide Bloqueado con una release candidate, porque el updater solo lee releases/latest. Aquí se comprobó la actualización de verdad contra un endpoint local: A y B compilados del mismo commit con build-update.ps1, con una clave de usar y tirar hecha para esta ejecución (no la de la release, que sigue en su secreto de GitHub) y http://127.0.0.1:8765/latest.json, en Windows Sandbox. About, Check now e Install and restart, pulsados con UI Automation; History, con el CLI."
 }
 $lines = foreach ($log in $logs) { if (Test-Path $log) { Get-Content $log -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } } }
@@ -123,7 +125,7 @@ if (-not $From) { $verdicts.Add([ordered]@{
     evidence = "uat/auto/sandbox/run.ps1: gh release download"
 }) }
 
-$order = @("8.1", "9.5", "9.2", "9.3", "9.4", "12.2", "13.2", "13.3", "13.4")
+$order = @("8.1", "9.5", "9.6", "9.2", "9.3", "9.4", "12.2", "13.2", "13.3", "13.4", "13.6")
 foreach ($id in $order) {
     $mine = @($lines | Where-Object { $_.id -eq $id })
     if (-not $mine) { continue }
@@ -148,7 +150,7 @@ foreach ($id in $order) {
 # A step with no line at all never ran: the run stopped before it.
 $ran = $verdicts | ForEach-Object { $_.id }
 $expected = @()
-if ($Runs -contains "walk") { $expected += "8.1", "9.5", "9.2", "9.3", "9.4", "13.2", "13.3", "13.4" }
+if ($Runs -contains "walk") { $expected += "8.1", "9.5", "9.6", "9.2", "9.3", "9.4", "13.2", "13.3", "13.4", "13.6" }
 if ($Runs -contains "update") { $expected += "12.2" }
 foreach ($id in $expected | Where-Object { $ran -notcontains $_ }) {
     $stop = @($lines | Where-Object { $_.id -eq "run" -and $_.blocked }) | Select-Object -First 1

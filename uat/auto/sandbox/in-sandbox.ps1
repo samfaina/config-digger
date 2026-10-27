@@ -7,8 +7,10 @@
 #   {"time", "id": "<plan step id>", "blocked": "<why the step stopped>"}
 #   {"time", "id": "<plan step id>", "note": "<what the step saw>"}
 #
-# -Run walk: 8.1, 9.5, 9.2, 9.3, 9.4, 13.1 (parked with the CLI), 13.2,
-#            13.3 and 13.4, on the release's installer in C:\Descargas.
+# -Run walk: 8.1, 9.5, 9.6, 9.2, 9.3, 9.4, 13.1 (parked with the CLI),
+#            13.2, 13.3, 13.4 and 13.6, on the release's installer in
+#            C:\Descargas. 9.6 and 13.6 deny the user writes to
+#            HKCU\Environment, and allow them again whatever happens.
 # -Run update: 12.2, from installer A to B in C:\uat\update, served on
 #            127.0.0.1:8765 (see build-update.ps1).
 #
@@ -61,6 +63,27 @@ function PathChoice { (Get-ItemProperty $choiceKey -Name KeepPathAlone -ErrorAct
 function Digger { & "$installDir\config-digger.exe" @args 2>&1 | ForEach-Object { "$_" } }
 function OperationCount { @((Digger --json history | Out-String | ConvertFrom-Json).operations).Count }
 function Installer { Get-ChildItem "C:\Descargas\config-digger_${Version}_x64-setup.exe" | Select-Object -First 1 -ExpandProperty FullName }
+# Whether the user can't write in HKCU\Environment, as Bloquear el PATH del
+# usuario leaves it.
+function PathBlocked { try { Set-ItemProperty HKCU:\Environment -Name cd-throwaway-probe -Value 1; Remove-ItemProperty HKCU:\Environment -Name cd-throwaway-probe; $false } catch { $true } }
+# Runs the installer or the uninstaller with /S until it exited and `done`
+# holds, pressing OK on any PATH warning, which a silent run must not show.
+# The uninstaller exits once it relaunched itself from a temporary copy, so
+# its `done` waits for the app to go.
+function Silently([string]$exe, [scriptblock]$done = { $true }, [int]$seconds = 180) {
+    $p = Start-Process $exe -ArgumentList "/S" -PassThru
+    $null = $p.Handle  # without it, ExitCode stays empty
+    $shown = $false
+    $end = (Get-Date).AddSeconds($seconds)
+    while (-not ($p.HasExited -and (& $done)) -and (Get-Date) -lt $end) {
+        $warning = FindWarning "user PATH"
+        if ($warning) { $shown = $true; Press (OkButton $warning) }
+        Start-Sleep -Milliseconds 300
+    }
+    $p.WaitForExit()
+    [pscustomobject]@{ Shown = $shown; ExitCode = $p.ExitCode }
+}
+function AppGone { -not (Test-Path "$installDir\config-digger-app.exe") }
 
 . C:\uat\scripts\ui-installer.ps1
 
@@ -92,6 +115,43 @@ try {
         while ((Test-Path "$installDir\config-digger-app.exe") -and (Get-Date) -lt $end) { Start-Sleep -Milliseconds 500 }
         PlanCommand "8.1" "Borrar los datos de config-digger que queden" | Out-Null
         Check "9.5" "clean again for 9.2" ((PlanCommand "8.1" "Ver qué queda de config-digger") -join ",") "La app: False,Backups, History y Entries aparcados: False,Listas y ajustes: False,Elección de PATH: False"
+    }
+
+    # On the clean PC 9.5 leaves, which 9.6 leaves clean again for 9.2.
+    Step "9.6" {
+        PlanCommand "9.6" "Bloquear el PATH del usuario" | Out-Null
+        try {
+            Check "9.6" "the user PATH is blocked" (PathBlocked) $true
+            $p = Start-Process (Installer) -PassThru
+            $w = Window "config-digger.*Setup" 60 $p.Id
+            Check "9.6" "PATH box starts ticked" (Ticked (Control $w "CheckBox" "PATH")) $true
+            $warning = UntilWarning $w "user PATH"
+            $texts = Texts $warning
+            Note "9.6" "warning: $texts"
+            Check "9.6" "warning says the command is not on the PATH" ($texts.Contains("config-digger was installed, but its command was not added to your PATH.")) $true
+            Check "9.6" "warning names the folder" ($texts.Contains("C:\Users\WDAGUtilityAccount\AppData\Local\Programs\config-digger")) $true
+            Press (OkButton $warning)
+            Finish $w $p
+            Check "9.6" "the installer finished" $p.HasExited $true
+            $app = Start-Process "$installDir\config-digger-app.exe" -PassThru
+            $opened = try { [bool](Window "^config-digger$" 90 $app.Id) } catch { $false }
+            Check "9.6" "the app opens" $opened $true
+            Stop-Process -Id $app.Id -Force
+            $app.WaitForExit(10000) | Out-Null
+            $out = PlanCommand "9.6" "Ver la app y el PATH"
+            Check "9.6" "the app is installed, off the PATH" ($out -join ",") "True,0"
+            Check "9.6" "PATH choice saved as ticked" (PathChoice) 0
+            $silent = Silently (Installer)
+            Check "9.6" "the silent install shows no warning" $silent.Shown $false
+            Check "9.6" "the silent install's exit code" $silent.ExitCode 0
+            Check "9.6" "the silent install installed the app" (Test-Path "$installDir\config-digger-app.exe") $true
+        } finally {
+            PlanCommand "9.6" "Desbloquear el PATH del usuario" | Out-Null
+        }
+        Check "9.6" "the user PATH is unblocked" (PathBlocked) $false
+        Silently "$installDir\uninstall.exe" { AppGone } | Out-Null
+        PlanCommand "8.1" "Borrar los datos de config-digger que queden" | Out-Null
+        Check "9.6" "clean again for 9.2" ((PlanCommand "8.1" "Ver qué queda de config-digger") -join ",") "La app: False,Backups, History y Entries aparcados: False,Listas y ajustes: False,Elección de PATH: False"
     }
 
     Step "9.2" {
@@ -214,6 +274,43 @@ try {
         Check "13.4" "four lines" $out.Count 4
         Check "13.4" "every line False" (@($out | Where-Object { $_ -notmatch ': False$' }).Count) 0
         Check "13.4" "off the PATH" (OnPath) $false
+    }
+
+    # On the clean PC 13.4 leaves.
+    Step "13.6" {
+        PlanCommand "13.6" "Instalar sin preguntas" | Out-Null
+        Check "13.6" "on the PATH before blocking it" (OnPath) $true
+        PlanCommand "13.6" "Bloquear el PATH del usuario" | Out-Null
+        try {
+            Check "13.6" "the user PATH is blocked" (PathBlocked) $true
+            PlanCommand "13.6" "Desinstalar" | Out-Null
+            $w = Uninstaller
+            Press (Control $w "CheckBox" "Delete config-digger data")
+            Next $w
+            $warning = Warning "user PATH"
+            $texts = Texts $warning
+            Note "13.6" "warning: $texts"
+            Check "13.6" "warning says the folder stays on the PATH" ($texts.Contains("The config-digger folder could not be taken off your user PATH.")) $true
+            Check "13.6" "warning names the folder" ($texts.Contains("C:\Users\WDAGUtilityAccount\AppData\Local\Programs\config-digger")) $true
+            Press (OkButton $warning)
+            $data = Warning
+            Check "13.6" "then the Delete config-digger data warning" ((Texts $data).Contains("Deleting config-digger data deletes every backup, and with them the Undo history.")) $true
+            Press (ById $data "1")
+            EndUninstall $w $installDir
+            $out = PlanCommand "13.6" "Ver qué queda de config-digger"
+            Check "13.6" "four lines" $out.Count 4
+            Check "13.6" "every line False" (@($out | Where-Object { $_ -notmatch ': False$' }).Count) 0
+            Check "13.6" "still on the PATH, as the warning says" (OnPath) $true
+            PlanCommand "13.6" "Instalar sin preguntas" | Out-Null
+            Check "13.6" "reinstalled" (Test-Path "$installDir\config-digger-app.exe") $true
+            $silent = Silently "$installDir\uninstall.exe" { AppGone }
+            Check "13.6" "the silent uninstall shows no warning" $silent.Shown $false
+            $out = PlanCommand "13.6" "Ver si queda la app"
+            Check "13.6" "the app is gone" ($out -join ",") "False"
+        } finally {
+            PlanCommand "13.6" "Desbloquear el PATH del usuario" | Out-Null
+        }
+        Check "13.6" "the user PATH is unblocked" (PathBlocked) $false
     }
 } catch {
     Write-Line ([ordered]@{ id = "run"; blocked = "$($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)" })

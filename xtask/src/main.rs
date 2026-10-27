@@ -19,7 +19,8 @@
 //!   `<file>`: empty when no mark is under it.
 //! - `installer`: checks that the installer's install folder in `hooks.nsh`
 //!   is a folder of its own: no data folder, nor a folder inside or above
-//!   one. It writes nothing.
+//!   one, and that each string the hooks show, `$(name)`, is a `LangString`
+//!   of `English.nsh`. It writes nothing.
 //! - `fixtures`: checks that git ignores no file under a
 //!   `crates/*/tests/fixtures` folder, the contributor's global excludes
 //!   included. It writes nothing.
@@ -222,7 +223,8 @@ fn unverified_marks() -> Result<Vec<config_digger_core::definitions::marks::Mark
 /// The app's Tauri config, relative to the repository root.
 const TAURI_CONF: &str = "crates/config-digger-app/tauri.conf.json";
 
-/// The installer's install folder, as CI checks it.
+/// The installer's install folder and the strings its hooks show, as CI
+/// checks them.
 fn check_installer() -> ExitCode {
     let read = |path: &str| {
         std::fs::read_to_string(repo_file(path)).map_err(|error| {
@@ -230,13 +232,23 @@ fn check_installer() -> ExitCode {
             ExitCode::FAILURE
         })
     };
-    let files = read("crates/config-digger-app/installer/hooks.nsh")
-        .and_then(|hooks| Ok((hooks, read(TAURI_CONF)?)));
+    let files = read("crates/config-digger-app/installer/hooks.nsh").and_then(|hooks| {
+        Ok((
+            hooks,
+            read(TAURI_CONF)?,
+            read("crates/config-digger-app/installer/English.nsh")?,
+        ))
+    });
     match files {
-        Ok((hooks, tauri_conf)) => report(
-            &installer::problems(&hooks, &tauri_conf),
-            "the installer installs in a folder of its own",
-        ),
+        Ok((hooks, tauri_conf, english)) => {
+            let mut problems = installer::problems(&hooks, &tauri_conf);
+            problems.extend(installer::missing_strings(&hooks, &english));
+            report(
+                &problems,
+                "the installer installs in a folder of its own, and its hooks show only \
+                 strings of English.nsh",
+            )
+        }
         Err(code) => code,
     }
 }

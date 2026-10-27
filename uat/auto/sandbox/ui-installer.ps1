@@ -97,18 +97,39 @@ function Reinstall($window) { Press (Control $window "RadioButton" "Add/Reinstal
 # The uninstaller relaunches itself from a temporary copy, so its window is
 # found by name.
 function Uninstaller { Window "config-digger.*Uninstall" 60 }
-# The Delete config-digger data warning: a top-level #32770 holding its text.
-function Warning([int]$seconds = 60) {
+# The warning showing now whose text matches, a top-level #32770 holding
+# its text, or nothing.
+function FindWarning([string]$pattern) {
+    foreach ($top in $A::RootElement.FindAll($T::Children, $C::TrueCondition)) {
+        if ($top.Current.ClassName -eq "#32770" -and (Texts $top) -match $pattern) { return $top }
+    }
+}
+# The warning whose text matches, waiting for it: by default the Delete
+# config-digger data one.
+function Warning([string]$pattern = "Deleting config-digger data", [int]$seconds = 60) {
     $end = (Get-Date).AddSeconds($seconds)
     do {
-        foreach ($top in $A::RootElement.FindAll($T::Children, $C::TrueCondition)) {
-            if ($top.Current.ClassName -ne "#32770") { continue }
-            if ((Texts $top) -match "Deleting config-digger data") { return $top }
-        }
+        $warning = FindWarning $pattern
+        if ($warning) { return $warning }
         Start-Sleep -Milliseconds 300
     } while ((Get-Date) -lt $end)
-    throw "no Delete config-digger data warning"
+    throw "no warning matching '$pattern'"
 }
+# Presses Next or Install until the warning whose text matches shows, and
+# returns it. Fails on the Finish page, which comes after any warning.
+function UntilWarning($window, [string]$pattern, [int]$seconds = 180) {
+    $end = (Get-Date).AddSeconds($seconds)
+    while ((Get-Date) -lt $end) {
+        $warning = FindWarning $pattern
+        if ($warning) { return $warning }
+        $button = ById $window "1"
+        if ($button.Current.Name -match "Finish") { throw "the Finish page came with no warning matching '$pattern'" }
+        if (Enabled $button) { Press $button } else { Start-Sleep -Milliseconds 500 }
+    }
+    throw "no warning matching '$pattern'"
+}
+# The one button of a warning with only OK.
+function OkButton($warning) { Control $warning "Button" "" }
 # Waits for the uninstaller to remove the app, then closes its last page.
 function EndUninstall($window, [string]$installDir) {
     $end = (Get-Date).AddSeconds(120)

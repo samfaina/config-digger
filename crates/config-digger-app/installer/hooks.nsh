@@ -11,7 +11,9 @@
 ;   An unticked box is remembered for the next install, silent ones included.
 ;   `$PROFILE` is never touched. The PATH is edited by the console exe,
 ;   `config-digger installer add-to-path|remove-from-path`, because NSIS
-;   strings stop at 1024 characters and would cut a long PATH.
+;   strings stop at 1024 characters and would cut a long PATH. When the
+;   edit fails, a GUI run warns and names the folder to add or remove by
+;   hand; a silent one only says so in the install details.
 ; - The uninstaller's "Delete config-digger data" box (Tauri's
 ;   `$DeleteAppDataCheckboxState`, unchecked by default) also deletes
 ;   config-digger's data folders, after a warning that names the parked
@@ -182,12 +184,16 @@ Function AddToPathLeave
 FunctionEnd
 
 ; Runs `config-digger installer <verb> "$INSTDIR"` and tells running
-; programs that the environment changed.
-!macro EditUserPath verb
+; programs that the environment changed. When the edit fails, or the CLI
+; doesn't start, the install details say so, and a GUI run warns with
+; `failed`, which says what to do by hand, and the folder. A silent run
+; skips the warning, and its exit code stays as it was.
+!macro EditUserPath verb failed
   nsExec::ExecToLog '"$INSTDIR\${CLI_EXE}" installer ${verb} "$INSTDIR"'
   Pop $0
   ${If} $0 != 0
     DetailPrint "config-digger installer ${verb} failed: $0"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${failed}$\r$\n$\r$\n$INSTDIR" /SD IDOK
   ${EndIf}
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 !macroend
@@ -204,9 +210,9 @@ FunctionEnd
     Call LoadPathChoice
     WriteRegDWORD HKCU "${PATH_CHOICE_KEY}" "${PATH_CHOICE_VALUE}" $KeepPathAlone
     ${If} $KeepPathAlone = 1
-      !insertmacro EditUserPath remove-from-path
+      !insertmacro EditUserPath remove-from-path "$(pathNotRemoved)"
     ${Else}
-      !insertmacro EditUserPath add-to-path
+      !insertmacro EditUserPath add-to-path "$(pathNotAdded)"
     ${EndIf}
   ${EndIf}
 !macroend
@@ -216,7 +222,7 @@ FunctionEnd
 !macro NSIS_HOOK_PREUNINSTALL
   !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
   ${If} $UpdateMode <> 1
-    !insertmacro EditUserPath remove-from-path
+    !insertmacro EditUserPath remove-from-path "$(pathNotRemoved)"
 
     ${If} $DeleteAppDataCheckboxState = 1
       nsExec::ExecToStack '"$INSTDIR\${CLI_EXE}" installer parked'

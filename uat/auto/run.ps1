@@ -4,7 +4,8 @@
 #
 # 1. sandbox\build-update.ps1, the two installers 12.2 updates between, built
 #    from the release candidate's tag;
-# 2. sandbox\run.ps1, the Sandbox walk: 8.1, 9.1 to 9.5, 12.2 and 13.2 to 13.4;
+# 2. sandbox\run.ps1, the Sandbox walk: 8.1, 9.1 to 9.6, 12.2, 13.2 to 13.4
+#    and 13.6;
 # 3. webdriver\run.ps1, the WebDriver walk on the release build -App, with
 #    7.2 and 13.1 with Claude Desktop open, and 14.2 on the tester's own homes.
 #
