@@ -42,9 +42,16 @@ function Write-TestFile([string]$Path, [string]$Text) {
 # Claude Code records Projects with forward slashes.
 $slash = $Root -replace '\\', '/'
 
+# A folder whose path, under even the shortest root, is too long for one line
+# of Projects & homes in the smallest window, so that step 10.10 sees where a
+# Project's path and a home's name and folder wrap.
+$long = "paths-that-wrap\in-the-smallest-window\of-config-digger"
+$longSlash = $long -replace '\\', '/'
+
 # Claude Code home: a user server, a Project with a local server, a missing
 # Project with one leftover, a missing Project with nothing but a trust, as
-# Claude Code keeps for a deleted worktree, and a Project to hide.
+# Claude Code keeps for a deleted worktree, a Project to hide, and a Project
+# whose path wraps.
 Write-TestFile "$Root\claude-code-home\.claude.json" @"
 {
   "mcpServers": {
@@ -70,7 +77,8 @@ Write-TestFile "$Root\claude-code-home\.claude.json" @"
       }
     },
     "$slash/project-deleted": { "hasTrustDialogAccepted": true },
-    "$slash/project-hide": {}
+    "$slash/project-hide": {},
+    "$slash/$longSlash/project-long": {}
   }
 }
 "@
@@ -104,8 +112,10 @@ description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
 
-# A Project to hide, and one that no registry knows, to add by hand.
+# A Project to hide, the one whose path wraps, and one that no registry knows,
+# to add by hand.
 New-Item -ItemType Directory -Force "$Root\project-hide" | Out-Null
+New-Item -ItemType Directory -Force "$Root\$long\project-long" | Out-Null
 Write-TestFile "$Root\project-extra\.mcp.json" @"
 {
   "mcpServers": {
@@ -121,8 +131,10 @@ command = "npx"
 args = ["-y", "cd-throwaway-codex", "--api-key", "not-a-real-secret"]
 "@
 
-# Claude Desktop home: Disable parks its servers, which the uninstall test uses.
-Write-TestFile "$Root\claude-desktop-home\claude_desktop_config.json" @"
+# Claude Desktop home: Disable parks its servers, which the uninstall test
+# uses. The UAT adds it before step 10.10, as the fixtures do, so its folder,
+# which is also its name in Projects & homes, wraps.
+Write-TestFile "$Root\$long\claude-desktop-home\claude_desktop_config.json" @"
 {
   "mcpServers": {
     "cd-throwaway-desktop": { "command": "npx", "args": ["-y", "cd-throwaway-desktop"] }

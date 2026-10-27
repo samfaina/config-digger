@@ -194,7 +194,7 @@ describe("the preview of an action with many changes", () => {
 describe("Before you apply", () => {
   const claudeJson = String.raw`E:\cd-throwaway\claude-code-home\.claude.json`;
   const mcpJson = String.raw`E:\cd-throwaway\project\.mcp.json`;
-  const desktopConfig = String.raw`E:\cd-throwaway\claude-desktop-home\claude_desktop_config.json`;
+  const desktopConfig = String.raw`E:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home\claude_desktop_config.json`;
   const planned: ActionPreview = {
     plan_id: "plan-1",
     preview: {

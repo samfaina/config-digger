@@ -414,6 +414,19 @@ export const fixtures: Fixtures = {
             "last_opened": []
           },
           {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": []
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -523,8 +536,8 @@ export const fixtures: Fixtures = {
           {
             "agent": "claude-desktop",
             "agent_name": "Claude Desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
-            "folder": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "source": {
               "kind": "added"
             },
@@ -2226,7 +2239,7 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "kind": "mcp",
             "name": "cd-throwaway-desktop",
             "state": "disabled",
@@ -2245,12 +2258,12 @@ export const fixtures: Fixtures = {
                 "git_versioned": false,
                 "link": null,
                 "parked": {
-                  "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
                   "key_path": [
                     "mcpServers",
                     "cd-throwaway-desktop"
                   ],
-                  "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
                   "parked_at": "2026-10-01T12:00:00Z"
                 },
                 "state": "disabled",
@@ -2258,7 +2271,7 @@ export const fixtures: Fixtures = {
                   "code": "parked",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
                 },
                 "secondary": [],
                 "what_if": {
@@ -2282,7 +2295,7 @@ export const fixtures: Fixtures = {
                 },
                 "enable": {
                   "status": "offered",
-                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
                 },
                 "remove": {
                   "status": "offered"
@@ -2782,6 +2795,19 @@ export const fixtures: Fixtures = {
             "last_opened": []
           },
           {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": []
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -2891,8 +2917,8 @@ export const fixtures: Fixtures = {
           {
             "agent": "claude-desktop",
             "agent_name": "Claude Desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
-            "folder": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "source": {
               "kind": "added"
             },
@@ -4858,7 +4884,7 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "kind": "mcp",
             "name": "cd-throwaway-desktop",
             "state": "disabled",
@@ -4877,12 +4903,12 @@ export const fixtures: Fixtures = {
                 "git_versioned": false,
                 "link": null,
                 "parked": {
-                  "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
                   "key_path": [
                     "mcpServers",
                     "cd-throwaway-desktop"
                   ],
-                  "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
                   "parked_at": "2026-10-01T12:00:00Z"
                 },
                 "state": "disabled",
@@ -4890,7 +4916,7 @@ export const fixtures: Fixtures = {
                   "code": "parked",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
                 },
                 "secondary": [],
                 "what_if": {
@@ -4914,7 +4940,7 @@ export const fixtures: Fixtures = {
                 },
                 "enable": {
                   "status": "offered",
-                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
                 },
                 "remove": {
                   "status": "offered"
@@ -5414,6 +5440,19 @@ export const fixtures: Fixtures = {
             "last_opened": []
           },
           {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": []
+          },
+          {
             "path": "E:\\cd-throwaway\\project",
             "missing": false,
             "workspace_file": false,
@@ -5523,8 +5562,8 @@ export const fixtures: Fixtures = {
           {
             "agent": "claude-desktop",
             "agent_name": "Claude Desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
-            "folder": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "source": {
               "kind": "added"
             },
@@ -7346,7 +7385,7 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "kind": "mcp",
             "name": "cd-throwaway-desktop",
             "state": "disabled",
@@ -7365,12 +7404,12 @@ export const fixtures: Fixtures = {
                 "git_versioned": false,
                 "link": null,
                 "parked": {
-                  "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
                   "key_path": [
                     "mcpServers",
                     "cd-throwaway-desktop"
                   ],
-                  "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
                   "parked_at": "2026-10-01T12:00:00Z"
                 },
                 "state": "disabled",
@@ -7378,7 +7417,7 @@ export const fixtures: Fixtures = {
                   "code": "parked",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
                 },
                 "secondary": [],
                 "what_if": {
@@ -7402,7 +7441,7 @@ export const fixtures: Fixtures = {
                 },
                 "enable": {
                   "status": "offered",
-                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
                 },
                 "remove": {
                   "status": "offered"
@@ -7897,6 +7936,19 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 12,
+        "last_opened": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 0,
         "last_opened": []
       },
       {
@@ -8874,8 +8926,8 @@ export const fixtures: Fixtures = {
           {
             "agent": "claude-desktop",
             "agent_name": "Claude Desktop",
-            "home": "E:\\cd-throwaway\\claude-desktop-home",
-            "folder": "E:\\cd-throwaway\\claude-desktop-home",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
             "source": {
               "kind": "added"
             },
@@ -9409,6 +9461,19 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 12,
+          "last_opened": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 0,
           "last_opened": []
         },
         {
@@ -10343,8 +10408,8 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
-              "folder": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "source": {
                 "kind": "added"
               },
@@ -10461,7 +10526,7 @@ export const fixtures: Fixtures = {
   "homeCheck": {
     "agent": "claude-desktop",
     "agent_name": "Claude Desktop",
-    "folder": "E:\\cd-throwaway\\claude-desktop-home",
+    "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
     "looked_for": [
       "Claude Extensions",
       "Claude Extensions Settings",
@@ -10478,7 +10543,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-a02",
+      "id": "20261001-120000-63e",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10504,7 +10569,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-137",
+      "id": "20261001-120000-f82",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10523,14 +10588,14 @@ export const fixtures: Fixtures = {
         "cd-throwaway-desktop"
       ],
       "locations": [
-        "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+        "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82"
     },
     {
-      "id": "20261001-120000-b01",
+      "id": "20261001-120000-385",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10558,7 +10623,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-a02",
+        "id": "20261001-120000-63e",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -10944,6 +11009,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-stranded",
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
           "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
           "project": "E:\\cd-throwaway\\project",
           "before": "effective",
           "after": "disabled"
@@ -10996,7 +11072,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11016,7 +11092,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -11035,7 +11111,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -11044,7 +11120,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-137",
+        "id": "20261001-120000-f82",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11063,21 +11139,21 @@ export const fixtures: Fixtures = {
           "cd-throwaway-desktop"
         ],
         "locations": [
-          "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+          "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82"
       },
       "project": null,
       "changes": [
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": null,
           "before": "effective",
           "after": "disabled"
@@ -11085,10 +11161,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-01",
           "before": "effective",
           "after": "disabled"
@@ -11096,10 +11172,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-02",
           "before": "effective",
           "after": "disabled"
@@ -11107,10 +11183,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-03",
           "before": "effective",
           "after": "disabled"
@@ -11118,10 +11194,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-04",
           "before": "effective",
           "after": "disabled"
@@ -11129,10 +11205,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-05",
           "before": "effective",
           "after": "disabled"
@@ -11140,10 +11216,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-06",
           "before": "effective",
           "after": "disabled"
@@ -11151,10 +11227,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-07",
           "before": "effective",
           "after": "disabled"
@@ -11162,10 +11238,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-08",
           "before": "effective",
           "after": "disabled"
@@ -11173,10 +11249,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-09",
           "before": "effective",
           "after": "disabled"
@@ -11184,10 +11260,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-10",
           "before": "effective",
           "after": "disabled"
@@ -11195,10 +11271,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-11",
           "before": "effective",
           "after": "disabled"
@@ -11206,10 +11282,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-12",
           "before": "effective",
           "after": "disabled"
@@ -11217,10 +11293,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-13",
           "before": "effective",
           "after": "disabled"
@@ -11228,10 +11304,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-14",
           "before": "effective",
           "after": "disabled"
@@ -11239,10 +11315,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-15",
           "before": "effective",
           "after": "disabled"
@@ -11250,10 +11326,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-16",
           "before": "effective",
           "after": "disabled"
@@ -11261,10 +11337,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-17",
           "before": "effective",
           "after": "disabled"
@@ -11272,10 +11348,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-18",
           "before": "effective",
           "after": "disabled"
@@ -11283,10 +11359,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-19",
           "before": "effective",
           "after": "disabled"
@@ -11294,10 +11370,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-20",
           "before": "effective",
           "after": "disabled"
@@ -11305,10 +11381,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-21",
           "before": "effective",
           "after": "disabled"
@@ -11316,10 +11392,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-22",
           "before": "effective",
           "after": "disabled"
@@ -11327,10 +11403,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-23",
           "before": "effective",
           "after": "disabled"
@@ -11338,10 +11414,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-24",
           "before": "effective",
           "after": "disabled"
@@ -11349,10 +11425,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-25",
           "before": "effective",
           "after": "disabled"
@@ -11360,10 +11436,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-26",
           "before": "effective",
           "after": "disabled"
@@ -11371,10 +11447,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-27",
           "before": "effective",
           "after": "disabled"
@@ -11382,10 +11458,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-28",
           "before": "effective",
           "after": "disabled"
@@ -11393,10 +11469,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-29",
           "before": "effective",
           "after": "disabled"
@@ -11404,10 +11480,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-30",
           "before": "effective",
           "after": "disabled"
@@ -11415,10 +11491,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\many\\project-gone",
           "before": "effective",
           "after": "disabled"
@@ -11426,10 +11502,21 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project",
           "before": "effective",
           "after": "disabled"
@@ -11437,10 +11524,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project-deleted",
           "before": "effective",
           "after": "disabled"
@@ -11448,10 +11535,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project-extra",
           "before": "effective",
           "after": "disabled"
@@ -11459,10 +11546,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project-gone",
           "before": "effective",
           "after": "disabled"
@@ -11470,10 +11557,10 @@ export const fixtures: Fixtures = {
         {
           "agent": "claude-desktop",
           "agent_name": "Claude Desktop",
-          "home": "E:\\cd-throwaway\\claude-desktop-home",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
           "item": "cd-throwaway-desktop",
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": "E:\\cd-throwaway\\project-hide",
           "before": "effective",
           "after": "disabled"
@@ -11481,8 +11568,8 @@ export const fixtures: Fixtures = {
       ],
       "locations": [
         {
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137\\1-claude_desktop_config.json",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11493,8 +11580,8 @@ export const fixtures: Fixtures = {
             }
           ],
           "diff": {
-            "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-            "diff": "--- a/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n+++ b/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n@@ -1,5 +1,3 @@\n {\n-  \"mcpServers\": {\n-    \"cd-throwaway-desktop\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-desktop\"] }\n-  }\n+  \"mcpServers\": {}\n }\n\\ No newline at end of file\n",
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+            "diff": "--- a/E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json\n+++ b/E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json\n@@ -1,5 +1,3 @@\n {\n-  \"mcpServers\": {\n-    \"cd-throwaway-desktop\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-desktop\"] }\n-  }\n+  \"mcpServers\": {}\n }\n\\ No newline at end of file\n",
             "diff_unavailable": null,
             "diff_note": null,
             "changed_lines": 3
@@ -11513,27 +11600,27 @@ export const fixtures: Fixtures = {
           ],
           "diff": {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -0,0 +1,21 @@\n+{\n+  \"entries\": {\n+    \"cd-throwaway-desktop\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-desktop\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n+      }\n+    }\n+  }\n+}\n",
+            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -0,0 +1,21 @@\n+{\n+  \"entries\": {\n+    \"cd-throwaway-desktop\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-desktop\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n+      }\n+    }\n+  }\n+}\n",
             "diff_unavailable": null,
             "diff_note": null,
             "changed_lines": 21
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -0,0 +1,41 @@\n+{\n+  \"entries\": {\n+    \"cd-throwaway-desktop\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-desktop\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n+      }\n+    },\n+    \"cd-throwaway-stranded\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-stranded\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n+        \"env\": {\n+          \"API_TOKEN\": \"••••\"\n+        }\n+      }\n+    }\n+  }\n+}\n",
+            "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -0,0 +1,41 @@\n+{\n+  \"entries\": {\n+    \"cd-throwaway-desktop\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-desktop\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n+      }\n+    },\n+    \"cd-throwaway-stranded\": {\n+      \"agent\": \"claude-desktop\",\n+      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n+      \"location\": \"user-mcp\",\n+      \"name\": \"cd-throwaway-stranded\",\n+      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\\\\claude_desktop_config.json\",\n+      \"key_path\": [\"mcpServers\", \"cd-throwaway-stranded\"],\n+      \"project\": null,\n+      \"parked_at\": \"2026-10-01T12:00:00Z\",\n+      \"after\": null,\n+      \"inline\": true,\n+      \"comments\": [],\n+      \"entry\": {\n+        \"command\": \"npx\",\n+        \"args\": [\"-y\", \"cd-throwaway-stranded\"],\n+        \"env\": {\n+          \"API_TOKEN\": \"••••\"\n+        }\n+      }\n+    }\n+  }\n+}\n",
             "diff_unavailable": null,
             "diff_note": null,
             "changed_lines": 41
@@ -11544,7 +11631,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-b01",
+        "id": "20261001-120000-385",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11929,6 +12016,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-codex",
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
           "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
           "project": "E:\\cd-throwaway\\project",
           "before": "effective",
           "after": "disabled"
@@ -11981,7 +12079,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -12001,7 +12099,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -12014,10 +12112,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-b01",
+          "operation": "20261001-120000-385",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385\\1-config.toml"
         }
       ]
     },
@@ -12025,10 +12123,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-a02",
+          "operation": "20261001-120000-63e",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e\\2-manifest.json"
         }
       ]
     }
@@ -14124,10 +14222,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": null,
               "before": "disabled",
               "after": "effective"
@@ -14135,10 +14233,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-01",
               "before": "disabled",
               "after": "effective"
@@ -14146,10 +14244,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-02",
               "before": "disabled",
               "after": "effective"
@@ -14157,10 +14255,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-03",
               "before": "disabled",
               "after": "effective"
@@ -14168,10 +14266,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-04",
               "before": "disabled",
               "after": "effective"
@@ -14179,10 +14277,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-05",
               "before": "disabled",
               "after": "effective"
@@ -14190,10 +14288,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-06",
               "before": "disabled",
               "after": "effective"
@@ -14201,10 +14299,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-07",
               "before": "disabled",
               "after": "effective"
@@ -14212,10 +14310,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-08",
               "before": "disabled",
               "after": "effective"
@@ -14223,10 +14321,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-09",
               "before": "disabled",
               "after": "effective"
@@ -14234,10 +14332,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-10",
               "before": "disabled",
               "after": "effective"
@@ -14245,10 +14343,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-11",
               "before": "disabled",
               "after": "effective"
@@ -14256,10 +14354,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-12",
               "before": "disabled",
               "after": "effective"
@@ -14267,10 +14365,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-13",
               "before": "disabled",
               "after": "effective"
@@ -14278,10 +14376,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-14",
               "before": "disabled",
               "after": "effective"
@@ -14289,10 +14387,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-15",
               "before": "disabled",
               "after": "effective"
@@ -14300,10 +14398,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-16",
               "before": "disabled",
               "after": "effective"
@@ -14311,10 +14409,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-17",
               "before": "disabled",
               "after": "effective"
@@ -14322,10 +14420,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-18",
               "before": "disabled",
               "after": "effective"
@@ -14333,10 +14431,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-19",
               "before": "disabled",
               "after": "effective"
@@ -14344,10 +14442,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-20",
               "before": "disabled",
               "after": "effective"
@@ -14355,10 +14453,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-21",
               "before": "disabled",
               "after": "effective"
@@ -14366,10 +14464,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-22",
               "before": "disabled",
               "after": "effective"
@@ -14377,10 +14475,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-23",
               "before": "disabled",
               "after": "effective"
@@ -14388,10 +14486,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-24",
               "before": "disabled",
               "after": "effective"
@@ -14399,10 +14497,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-25",
               "before": "disabled",
               "after": "effective"
@@ -14410,10 +14508,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-26",
               "before": "disabled",
               "after": "effective"
@@ -14421,10 +14519,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-27",
               "before": "disabled",
               "after": "effective"
@@ -14432,10 +14530,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-28",
               "before": "disabled",
               "after": "effective"
@@ -14443,10 +14541,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-29",
               "before": "disabled",
               "after": "effective"
@@ -14454,10 +14552,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-30",
               "before": "disabled",
               "after": "effective"
@@ -14465,10 +14563,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-gone",
               "before": "disabled",
               "after": "effective"
@@ -14476,10 +14574,21 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project",
               "before": "disabled",
               "after": "effective"
@@ -14487,10 +14596,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project-deleted",
               "before": "disabled",
               "after": "effective"
@@ -14498,10 +14607,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project-extra",
               "before": "disabled",
               "after": "effective"
@@ -14509,10 +14618,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project-gone",
               "before": "disabled",
               "after": "effective"
@@ -14520,10 +14629,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\project-hide",
               "before": "disabled",
               "after": "effective"
@@ -14532,11 +14641,11 @@ export const fixtures: Fixtures = {
           "effective": [
             {
               "agent": "claude-desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
               "before": null,
-              "after": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
-              "sentence": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop becomes Effective for cd-throwaway-desktop in Claude Desktop.",
+              "after": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "sentence": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop becomes Effective for cd-throwaway-desktop in Claude Desktop.",
               "built_before": null,
               "built_after": null
             }
@@ -14544,13 +14653,13 @@ export const fixtures: Fixtures = {
           "info": [
             {
               "code": "no_installation_found",
-              "path": "E:\\cd-throwaway\\claude-desktop-home",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [
             {
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
               "git_versioned": false,
               "store_class": "rewritten-while-running",
               "edits": [
@@ -14562,7 +14671,7 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n+++ b/E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json\n@@ -1,3 +1,3 @@\n {\n-  \"mcpServers\": {}\n+  \"mcpServers\": { \"cd-throwaway-desktop\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-desktop\"] } }\n }\n\\ No newline at end of file\n",
+              "diff": "--- a/E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json\n+++ b/E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json\n@@ -1,3 +1,3 @@\n {\n-  \"mcpServers\": {}\n+  \"mcpServers\": { \"cd-throwaway-desktop\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-desktop\"] } }\n }\n\\ No newline at end of file\n",
               "diff_unavailable": null,
               "diff_note": null,
               "changed_lines": 1
@@ -14580,7 +14689,7 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
               "diff_unavailable": null,
               "diff_note": null,
               "changed_lines": 17
@@ -14594,13 +14703,13 @@ export const fixtures: Fixtures = {
         "warnings": [
           {
             "class": "wide-reach",
-            "sentence": "This Enable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop in all projects and with no Project.",
+            "sentence": "This Enable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop in all projects and with no Project.",
             "advice": [
               {
                 "todo": "Check that everything it reaches should change.",
                 "why": "This Enable reaches more than what it targets: what it writes also changes the State of this Entry.",
                 "paths": [
-                  "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop in all projects and with no Project"
+                  "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop in all projects and with no Project"
                 ]
               }
             ]
@@ -14628,10 +14737,10 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-desktop",
               "agent_name": "Claude Desktop",
-              "home": "E:\\cd-throwaway\\claude-desktop-home",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "item": "cd-throwaway-desktop",
-              "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
-              "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": null,
               "before": "disabled",
               "after": "removed"
@@ -14641,7 +14750,7 @@ export const fixtures: Fixtures = {
           "info": [
             {
               "code": "no_installation_found",
-              "path": "E:\\cd-throwaway\\claude-desktop-home",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
               "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
             }
           ],
@@ -14659,7 +14768,7 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
+              "diff": "--- a/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n+++ b/E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json\n@@ -1,22 +1,5 @@\n {\n   \"entries\": {\n-    \"cd-throwaway-desktop\": {\n-      \"agent\": \"claude-desktop\",\n-      \"home\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\",\n-      \"location\": \"user-mcp\",\n-      \"name\": \"cd-throwaway-desktop\",\n-      \"path\": \"E:\\\\cd-throwaway\\\\paths-that-wrap\\\\in-the-smallest-window\\\\of-config-digger\\\\claude-desktop-home\\\\claude_desktop_config.json\",\n-      \"key_path\": [\"mcpServers\", \"cd-throwaway-desktop\"],\n-      \"project\": null,\n-      \"parked_at\": \"2026-10-01T12:00:00Z\",\n-      \"after\": null,\n-      \"inline\": true,\n-      \"comments\": [],\n-      \"entry\": {\n-        \"command\": \"npx\",\n-        \"args\": [\"-y\", \"cd-throwaway-desktop\"]\n-      }\n-    },\n     \"cd-throwaway-stranded\": {\n       \"agent\": \"claude-desktop\",\n       \"home\": \"E:\\\\cd-throwaway\\\\claude-desktop-stranded-home\",\n",
               "diff_unavailable": null,
               "diff_note": null,
               "changed_lines": 17
@@ -15039,6 +15148,17 @@ export const fixtures: Fixtures = {
               "path": "E:\\cd-throwaway\\codex-home\\config.toml",
               "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
               "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
               "before": "disabled",
               "after": "effective"
             },
@@ -16198,7 +16318,7 @@ export const fixtures: Fixtures = {
                   ]
                 }
               ],
-              "diff": "--- a/E:\\cd-throwaway\\claude-code-home\\.claude.json\n+++ b/E:\\cd-throwaway\\claude-code-home\\.claude.json\n@@ -17,9 +17,7 @@\n       }\n     },\n     \"E:/cd-throwaway/project-gone\": {\n-      \"mcpServers\": {\n-        \"cd-throwaway-leftover\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-leftover\"] }\n-      }\n+      \"mcpServers\": {}\n     },\n     \"E:/cd-throwaway/project-deleted\": { \"hasTrustDialogAccepted\": true },\n     \"E:/cd-throwaway/project-hide\": {}\n",
+              "diff": "--- a/E:\\cd-throwaway\\claude-code-home\\.claude.json\n+++ b/E:\\cd-throwaway\\claude-code-home\\.claude.json\n@@ -17,9 +17,7 @@\n       }\n     },\n     \"E:/cd-throwaway/project-gone\": {\n-      \"mcpServers\": {\n-        \"cd-throwaway-leftover\": { \"command\": \"npx\", \"args\": [\"-y\", \"cd-throwaway-leftover\"] }\n-      }\n+      \"mcpServers\": {}\n     },\n     \"E:/cd-throwaway/project-deleted\": { \"hasTrustDialogAccepted\": true },\n     \"E:/cd-throwaway/project-hide\": {},\n",
               "diff_unavailable": null,
               "diff_note": null,
               "changed_lines": 3
@@ -16319,14 +16439,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-a02"
+        "operation": "20261001-120000-63e"
       },
       "preview": {
         "plan_id": "plan-52",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-a02 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-a02",
+          "title": "Undo 20261001-120000-63e \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-63e",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -16382,15 +16502,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-a02"
+        "operation": "20261001-120000-63e"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-a02 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-63e \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-a02",
+          "backup_of": "20261001-120000-63e",
           "project": null,
           "changes": [],
           "effective": [],
@@ -16398,11 +16518,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a02",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a02 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-63e",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-63e can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -16411,15 +16531,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-137"
+        "operation": "20261001-120000-f82"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-137 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-f82 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-137",
+          "backup_of": "20261001-120000-f82",
           "project": null,
           "changes": [],
           "effective": [],
@@ -16427,10 +16547,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-137",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-137 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f82",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-f82 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -16439,14 +16559,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-b01"
+        "operation": "20261001-120000-385"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-b01 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-b01",
+          "title": "Undo 20261001-120000-385 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-385",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -16809,6 +16929,17 @@ export const fixtures: Fixtures = {
               "item": "cd-throwaway-codex",
               "path": "E:\\cd-throwaway\\codex-home\\config.toml",
               "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
               "project": "E:\\cd-throwaway\\project",
               "before": "disabled",
               "after": "effective"
@@ -16910,15 +17041,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-b01"
+        "operation": "20261001-120000-385"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-b01 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-385 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-b01",
+          "backup_of": "20261001-120000-385",
           "project": null,
           "changes": [],
           "effective": [],
@@ -16926,10 +17057,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-b01 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-385 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -16939,11 +17070,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-b01",
+      "operation": "20261001-120000-385",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b01",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-b01: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-385",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-385: verified.",
       "hints": []
     }
   },
@@ -16966,18 +17097,18 @@ export const fixtures: Fixtures = {
       {
         "agent": "claude-desktop",
         "agent_name": "Claude Desktop",
-        "home": "E:\\cd-throwaway\\claude-desktop-home",
+        "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
         "kind": "mcp",
         "name": "cd-throwaway-desktop",
         "project": null,
         "hidden": false,
         "parked": {
-          "path": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
           "key_path": [
             "mcpServers",
             "cd-throwaway-desktop"
           ],
-          "locator": "E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "parked_at": "2026-10-01T12:00:00Z"
         }
       }
@@ -16991,8 +17122,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "a44ab19",
-    "date": "2026-10-26",
+    "commit": "f75350d",
+    "date": "2026-10-27",
     "platform": "Windows x64",
     "pages": [
       {

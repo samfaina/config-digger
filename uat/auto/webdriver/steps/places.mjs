@@ -6,6 +6,10 @@ import { buttonEl, choose, fieldValue, go, notices, panel, press, rowButton, tab
 import { act, addHome, checkBeforeYouApply, confirm, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
 
+// The Claude Desktop home's folder under the throwaway root, which the data
+// script makes long enough to wrap in step 10.10.
+const DESKTOP_HOME = "paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home";
+
 // The Projects tab, as groups: each heading's text, whether it is open, and
 // its rows with their texts and buttons.
 export function projectGroups(s) {
@@ -62,6 +66,16 @@ export async function openGroup(s, title, opts) {
   }
 }
 
+// What is wrong with how the paths of a tab wrap, each path as its lines laid
+// out: none takes more than one line, so none shows where it wraps, or a line
+// but the last ends inside a folder's name rather than right after a `\` or a
+// `/`. Undefined when a path wraps and each wraps only at a separator.
+export function wrapFault(paths) {
+  if (!paths.some((lines) => lines.length > 1)) return `ninguna de las ${paths.length} rutas ocupa más de una línea, así que ninguna muestra dónde se parte`;
+  const midWord = paths.find((lines) => lines.slice(0, -1).some((line) => !/[\\/]$/.test(line)));
+  return midWord && `una ruta se parte dentro del nombre de una carpeta: ${midWord.join(" ⏎ ")}`;
+}
+
 // Presses `button` in the row of `path`, holds `command` so its busy state
 // shows, and returns what the busy notice and the row's buttons showed.
 async function busyPress(t, path, button, command, busyText) {
@@ -116,7 +130,7 @@ export default [
   {
     id: "10.3",
     async run(t) {
-      await addHome(t, "Claude Desktop", `${t.root}\\claude-desktop-home`);
+      await addHome(t, "Claude Desktop", `${t.root}\\${DESKTOP_HOME}`);
     },
   },
   {
@@ -133,7 +147,7 @@ export default [
       for (const [agent, folder] of [
         ["claude-code", "claude-code-home"],
         ["codex", "codex-home"],
-        ["claude-desktop", "claude-desktop-home"],
+        ["claude-desktop", DESKTOP_HOME],
       ]) {
         const path = `${t.root}\\${folder}`;
         paths.push(path);
@@ -154,7 +168,7 @@ export default [
       for (const [agent, folder] of [
         ["Claude Code", "claude-code-home"],
         ["Codex", "codex-home"],
-        ["Claude Desktop", "claude-desktop-home"],
+        ["Claude Desktop", DESKTOP_HOME],
       ]) {
         const row = groups.find((g) => g.agent === agent)?.rows.find((r) => r.name === `${t.root}\\${folder}`);
         t.check(row && row.tags.join("|") === `${agent}|added by you`, `la fila de ${folder} tiene dos etiquetas: «${agent}» y «added by you»`, row?.tags.join(", "));
@@ -252,7 +266,7 @@ export default [
         t.eq(row?.sub, "Folder · Known to Claude Code", `${name} tiene la línea «Folder · Known to Claude Code»`);
       }
       const all = groups.flatMap((g) => g.rows.map((r) => r.name));
-      for (const name of ["codex-home", "claude-desktop-home"]) t.check(!all.includes(`${t.root}\\${name}`), `«${t.root}\\${name}» no sale como Project`);
+      for (const name of ["codex-home", DESKTOP_HOME]) t.check(!all.includes(`${t.root}\\${name}`), `«${t.root}\\${name}» no sale como Project`);
       const missing = missingGroup(groups);
       t.eq(missing?.title, "▾ Missing · 1", "el grupo «▾ Missing · 1»");
       t.check(missing?.open, "el grupo Missing está abierto");
@@ -583,17 +597,18 @@ export default [
             return lines.map((line) => line.text);
           };
           const css = ${JSON.stringify(name === "Projects" ? ".places-list .place-name.mono" : ".places-list .place-name, .places-list .place-sub.mono")};
-          const midWord = [...document.querySelectorAll(css)].map(linesOf).filter((lines) => lines.slice(0, -1).some((line) => !/[\\\\/]$/.test(line))).map((lines) => lines.join(" ⏎ "));
+          const lines = [...document.querySelectorAll(css)].map(linesOf);
           const out = [...document.querySelectorAll(".places-list .place-row")].flatMap((row) => [...row.querySelectorAll(".mono")].filter((p) => p.getBoundingClientRect().right > row.getBoundingClientRect().right + 1).map((p) => p.textContent));
-          return { midWord, out, sideways: document.scrollingElement.scrollWidth > innerWidth };`);
+          return { lines, out, sideways: document.scrollingElement.scrollWidth > innerWidth };`);
+        const fault = wrapFault(paths.lines);
         t.check(
-          paths.midWord.length === 0,
+          fault === undefined,
           name === "Projects"
             ? "en Projects, cada ruta que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta"
             : "en Agent homes, cada carpeta o nombre de home que ocupa más de una línea se parte justo después de una «\\», nunca dentro del nombre de una carpeta",
-          paths.midWord.join(" | "),
+          fault,
         );
-        t.check(paths.out.length === 0 && !paths.sideways, `en ${name}, ninguna ruta se sale de su fila ni hace que la página se desplace de lado`, JSON.stringify(paths));
+        t.check(paths.out.length === 0 && !paths.sideways, `en ${name}, ninguna ruta se sale de su fila ni hace que la página se desplace de lado`, JSON.stringify({ out: paths.out, sideways: paths.sideways }));
         t.shared.viewport = layout.vp;
         await t.shot(name.replace(" ", "-").toLowerCase(), `en ${name}, nada se parte ni se monta a 1100 × 640`);
       }

@@ -70,6 +70,8 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 `claude-code-profile`, in the default data, stands for a user folder: its `.claude.json` holds a second leftover of `project-gone`. Step 18.1 starts the app with `USERPROFILE` set to it, so that it is Claude Code's default home, which the app discovers and the tester can hide; a home the user added can't be hidden.
 
+`paths-that-wrap\in-the-smallest-window\of-config-digger`, in the default data, holds `project-long`, a Project Claude Code knows, and the Claude Desktop home, which step 10.3 adds. Under even the shortest root their paths are too long for one line of Projects & homes in the smallest window, so step 10.10 sees where a path wraps.
+
 `-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 
 The script refuses any `-Root` not named `cd-throwaway`, so `-Reset` can never delete another folder. It refuses an existing folder without `-Reset`. `cargo test -p xtask --test uat_data` checks both, on Windows.

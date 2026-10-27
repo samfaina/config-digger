@@ -149,7 +149,7 @@ export default [
     note: "Claude Desktop de verdad, abierto con --user-data-dir en el home de prueba, y cerrado solo ese. Otro Claude Desktop abierto en este PC no lee ese home.",
     async run(t) {
       const { s } = t;
-      const home = `${t.root}\\claude-desktop-home`;
+      const home = `${t.root}\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home`;
       await withClaudeDesktopIn(t, home, async (close) => {
         await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
         await openItem(t, "cd-throwaway-desktop");

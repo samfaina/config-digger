@@ -30,6 +30,11 @@ use std::path::{Path, PathBuf};
 /// Where the fixtures have the throwaway data: the UAT script's default.
 pub const UAT_ROOT: &str = r"E:\cd-throwaway";
 
+/// The Claude Desktop home, under the UAT script's root: a folder long enough
+/// to wrap in Projects & homes, as the script makes it.
+const DESKTOP_HOME: &str =
+    r"paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home";
+
 /// The header of the generated fixtures.
 const HEADER: &str =
     "// Recorded over the UAT's throwaway data by `cargo xtask fake-backend`. Do not edit.";
@@ -41,7 +46,7 @@ pub fn record(root: &Path) -> Result<Value, Error> {
     let root = canonical(root)?;
     let core = || Core::new(ports(&root));
 
-    let home_check = core()?.check_home(&root.join("claude-desktop-home"), "claude-desktop")?;
+    let home_check = core()?.check_home(&root.join(DESKTOP_HOME), "claude-desktop")?;
     let project_check = core()?.check_project(&root.join("project-extra"))?;
     let list_changed = change_lists(&root)?;
     core()?.record_update_check()?;
@@ -118,7 +123,7 @@ fn change_lists(root: &Path) -> Result<ListChanged, Error> {
     let scans = Scans::new(move || Session::scan(Core::new(ports(&scanned))?));
     let added = [
         ListChange::AddHome {
-            folder: root.join("claude-desktop-home"),
+            folder: root.join(DESKTOP_HOME),
             agent: "claude-desktop".to_owned(),
         },
         ListChange::AddHome {

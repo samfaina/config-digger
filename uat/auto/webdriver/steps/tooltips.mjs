@@ -137,7 +137,7 @@ export default [
       await press(s, "Cancel", ".dialog");
       await s.until(() => s.exec("return !document.querySelector('.dialog')"), { what: "the dialog closed" });
 
-      const config = `${t.root}\\claude-desktop-home\\claude_desktop_config.json`;
+      const config = `${t.root}\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json`;
       await inventoryOf(t, "Claude Desktop", "claude-desktop-home");
       await s.click(await s.until(() => desktopRow("Effective"), { what: "cd-throwaway-desktop Effective" }));
       await wait(400);

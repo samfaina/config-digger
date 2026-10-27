@@ -509,15 +509,15 @@
             "Pulsa Add Agent home.",
             "En el desplegable Agent, elige Claude Desktop.",
             "Pulsa Choose….",
-            "En el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "En el selector de Windows, elige E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home.",
             "Pulsa Seleccionar carpeta.",
             "Pulsa Add.",
             "Busca la fila nueva en la lista de Agent homes."
           ],
           "commands": [],
           "expect": [
-            "Sale el aviso «Added E:\\cd-throwaway\\claude-desktop-home as an Agent home of Claude Desktop.».",
-            "La fila de «E:\\cd-throwaway\\claude-desktop-home» está bajo el grupo «Claude Desktop».",
+            "Sale el aviso «Added E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home as an Agent home of Claude Desktop.».",
+            "La fila de «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» está bajo el grupo «Claude Desktop».",
             "La fila tiene las etiquetas «Claude Desktop» y «added by you».",
             "No sale ninguna fila de claude-desktop-home bajo «Claude Code»."
           ],
@@ -545,7 +545,7 @@
           "expect": [
             "Una fila de la tabla dice «claude-code» con «E:\\cd-throwaway\\claude-code-home».",
             "Una fila dice «codex» con «E:\\cd-throwaway\\codex-home».",
-            "Una fila dice «claude-desktop» con «E:\\cd-throwaway\\claude-desktop-home».",
+            "Una fila dice «claude-desktop» con «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home».",
             "Ninguna de esas carpetas sale con otro Agent."
           ],
           "covers": ["#175"],
@@ -561,7 +561,7 @@
           "instructions": [
             "Ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
-            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\claude-desktop-home.",
+            "Mira las etiquetas bajo E:\\cd-throwaway\\claude-code-home, E:\\cd-throwaway\\codex-home y E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home.",
             "Cierra config-digger.",
             "Ejecuta en PowerShell la orden «Abrir config-digger con el USERPROFILE de prueba».",
             "Ve a Projects & homes.",
@@ -689,7 +689,7 @@
           "expect": [
             "Salen «E:\\cd-throwaway\\project» y «E:\\cd-throwaway\\project-hide».",
             "Cada uno tiene la línea «Folder · Known to Claude Code».",
-            "«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\claude-desktop-home» no salen como Projects.",
+            "«E:\\cd-throwaway\\codex-home» y «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» no salen como Projects.",
             "El grupo «▾ Missing · 1» está abierto.",
             "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists · known to Claude Code» y «1 leftover».",
             "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».",
@@ -983,10 +983,12 @@
             "Ve a Projects & homes.",
             "Abre la pestaña Projects.",
             "Mira la cabecera y el principio de la lista.",
-            "Desplázate por la lista hasta E:\\cd-throwaway\\project-extra y mira dónde se parten las rutas que ocupan más de una línea.",
+            "Desplázate por la lista hasta E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long, que ocupa más de una línea.",
+            "Mira dónde se parten las rutas que ocupan más de una línea.",
             "Abre la pestaña Agent homes.",
             "Mira la cabecera y el principio de la lista.",
-            "Mira dónde se parten el nombre y la carpeta de cada home que ocupan más de una línea."
+            "Mira dónde se parten el nombre y la carpeta de cada home que ocupan más de una línea, como los de E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home.",
+            "Si en una pestaña ninguna ruta ocupa más de una línea, marca el paso KO: no se ve dónde se parten."
           ],
           "commands": [],
           "expect": [
@@ -1374,7 +1376,7 @@
             "En el nombre del home sale un tooltip con su carpeta entera.",
             "En «.mcp.json» sale un tooltip con «E:\\cd-throwaway\\project\\.mcp.json».",
             "En la nota de la aprobación sale un tooltip con «E:\\cd-throwaway\\project\\.mcp.json».",
-            "En la etiqueta sale un tooltip que empieza por «Parked from E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop».",
+            "En la etiqueta sale un tooltip que empieza por «Parked from E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop».",
             "La segunda línea de ese tooltip empieza por «on » y sigue con la fecha en que se aparcó.",
             "Tras Enable, cd-throwaway-desktop vuelve a salir como «Effective».",
             "Bajo los botones de la skill dice «Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.», sin pasar el ratón por ningún sitio."
@@ -2128,7 +2130,7 @@
             "Abre la pestaña Agent homes.",
             "Pulsa Add Agent home.",
             "Elige Claude Desktop como Agent.",
-            "En el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "En el selector de Windows, elige E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home.",
             "Vuelve al Inventario y elige ese home.",
             "Elige el servidor cd-throwaway-desktop.",
             "Pulsa Disable.",
@@ -2161,9 +2163,9 @@
             "Espera a que se abra su ventana.",
             "En config-digger, ve a Projects & homes.",
             "Abre la pestaña Agent homes.",
-            "Si E:\\cd-throwaway\\claude-desktop-home no está en la lista, pulsa Add Agent home.",
+            "Si E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home no está en la lista, pulsa Add Agent home.",
             "En ese caso, elige Claude Desktop como Agent.",
-            "En ese caso, en el selector de Windows, elige E:\\cd-throwaway\\claude-desktop-home.",
+            "En ese caso, en el selector de Windows, elige E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home.",
             "Vuelve al Inventario.",
             "Elige ese home.",
             "Elige el servidor cd-throwaway-desktop.",
@@ -2181,18 +2183,18 @@
             {
               "label": "Abrir Claude Desktop sobre el home de prueba",
               "shell": "powershell",
-              "text": "$exe = @(Get-ChildItem \"$env:LOCALAPPDATA\\AnthropicClaude\\app-*\\claude.exe\" -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName) + @(Get-AppxPackage | Where-Object { $_.Name -in 'Claude', 'AnthropicPBC.Claude' } | ForEach-Object { Join-Path $_.InstallLocation 'app\\claude.exe' }) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1\nStart-Process $exe -ArgumentList '--user-data-dir=E:\\cd-throwaway\\claude-desktop-home'"
+              "text": "$exe = @(Get-ChildItem \"$env:LOCALAPPDATA\\AnthropicClaude\\app-*\\claude.exe\" -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName) + @(Get-AppxPackage | Where-Object { $_.Name -in 'Claude', 'AnthropicPBC.Claude' } | ForEach-Object { Join-Path $_.InstallLocation 'app\\claude.exe' }) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1\nStart-Process $exe -ArgumentList '--user-data-dir=E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home'"
             },
             {
               "label": "Cerrar ese Claude Desktop",
               "shell": "powershell",
-              "text": "Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | Where-Object { $_.CommandLine -like '*--user-data-dir=*cd-throwaway\\claude-desktop-home*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+              "text": "Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | Where-Object { $_.CommandLine -like '*--user-data-dir=*cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
             }
           ],
           "expect": [
             "Con ese Claude Desktop abierto, el diálogo tiene un bloqueo que empieza por «Claude Desktop is running and rewrites».",
             "Ese bloqueo dice «Close Claude Desktop and retry.».",
-            "Ese bloqueo nombra «E:\\cd-throwaway\\claude-desktop-home\\claude_desktop_config.json».",
+            "Ese bloqueo nombra «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json».",
             "Su botón «Disable» no se puede pulsar.",
             "Cerrado ese Claude Desktop, el diálogo no tiene ninguna frase que empiece por «Claude Desktop is running».",
             "Entonces su botón «Disable» se puede pulsar.",

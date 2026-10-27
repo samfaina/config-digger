@@ -16,7 +16,7 @@ import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
 import { jobSummary, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
-import { openGroup } from "./steps/places.mjs";
+import { openGroup, wrapFault } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
 const plan = JSON.parse(readFileSync(new URL("../../plan.json", import.meta.url), "utf8"));
@@ -154,6 +154,21 @@ test("opening a group fails when no group has that title", async () => {
   await assert.rejects(openGroup(page, "Hidden", { timeout: 0 }), /group "Hidden"/);
   await assert.rejects(openGroup(page, "Missing", { timeout: 0 }), /group "Missing"/);
   assert.equal(page.toggles[0].open, false);
+});
+
+test("step 10.10's paths fail when none takes more than one line", () => {
+  assert.equal(wrapFault([["E:\\cd-throwaway\\project"], ["E:\\cd-throwaway\\project-extra"]]), "ninguna de las 2 rutas ocupa más de una línea, así que ninguna muestra dónde se parte");
+});
+
+test("step 10.10's paths fail when one breaks inside a folder's name, though another wraps right after a separator", () => {
+  assert.equal(
+    wrapFault([["E:\\cd-throwaway\\", "project"], ["E:\\cd-throwaway\\proj", "ect-extra"]]),
+    "una ruta se parte dentro del nombre de una carpeta: E:\\cd-throwaway\\proj ⏎ ect-extra",
+  );
+});
+
+test("step 10.10's paths pass when one wraps, each line but its last ending in a separator, beside one that fits on a line", () => {
+  assert.equal(wrapFault([["E:\\cd-throwaway\\project"], ["E:\\cd-throwaway\\", "a-folder/", "project-long"]]), undefined);
 });
 
 // A session whose page is only an action dialog, each of its states
