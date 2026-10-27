@@ -116,6 +116,34 @@ async function scrollTo(s, css, text = "") {
   await wait(200);
 }
 
+// The red, green, blue and alpha of a computed colour.
+const rgb = (colour) => (colour.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+
+// A grey: its red, green and blue within 20 of each other.
+const grey = (colour) => {
+  const [r, g, b] = rgb(colour);
+  return Math.abs(r - g) < 20 && Math.abs(g - b) < 20;
+};
+
+// Checks that each tag `css` matches is a filled grey pill with a grey
+// outline and nearly white text, as steps 10.16 and 10.21 expect.
+async function checkTagLook(t, css) {
+  const looks = await t.s.exec(
+    `return [...document.querySelectorAll(arguments[0])].map((tag) => {
+       const c = getComputedStyle(tag);
+       return { text: tag.textContent.trim(), bg: c.backgroundColor, border: c.borderTopWidth + " " + c.borderTopStyle, edge: c.borderTopColor, color: c.color };
+     });`,
+    css,
+  );
+  const each = (ok, what) => {
+    const wrong = looks.filter((look) => !ok(look));
+    t.check(looks.length > 0 && wrong.length === 0, what, looks.length === 0 ? "ninguna etiqueta" : wrong.map((look) => `${look.text}: ${JSON.stringify(look)}`).join("; "));
+  };
+  each((look) => (rgb(look.bg)[3] ?? 1) > 0 && grey(look.bg), "cada etiqueta es una píldora rellena de gris");
+  each((look) => look.border.includes("solid") && !look.border.startsWith("0px") && grey(look.edge), "cada etiqueta tiene un borde gris alrededor");
+  each((look) => rgb(look.color).slice(0, 3).every((channel) => channel > 200), "el texto de cada etiqueta es casi blanco");
+}
+
 export default [
   {
     id: "10.1",
@@ -193,16 +221,8 @@ export default [
         const row = groups.find((g) => g.agent === agent)?.rows.find((r) => r.name === `${t.root}\\${folder}`);
         t.check(row && row.tags.join("|") === `${agent}|added by you`, `la fila de ${folder} tiene dos etiquetas: «${agent}» y «added by you»`, row?.tags.join(", "));
       }
-      const style = await s.exec(`
-        const tag = document.querySelector(".places .tag");
-        const c = getComputedStyle(tag);
-        return { bg: c.backgroundColor, border: c.borderTopWidth + " " + c.borderTopStyle + " " + c.borderTopColor, color: c.color, radius: c.borderTopLeftRadius };`);
-      const rgb = (x) => (x.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-      const [r, g, b, a = 1] = rgb(style.bg);
-      t.check(a > 0 && Math.abs(r - g) < 20 && Math.abs(g - b) < 20, "cada etiqueta es una píldora rellena de gris", style.bg);
-      t.check(style.border.includes("solid") && !style.border.startsWith("0px"), "cada etiqueta tiene un borde alrededor", style.border);
-      const [cr, cg, cb] = rgb(style.color);
-      t.check(cr > 200 && cg > 200 && cb > 200, "el texto de cada etiqueta es casi blanco", style.color);
+      // A Mirrored home's read-only tag has a tone of its own.
+      await checkTagLook(t, ".places .tag:not(.read-only)");
       await t.shot("etiquetas", "las etiquetas son píldoras grises con borde gris claro y texto casi blanco");
     },
   },
@@ -569,16 +589,7 @@ export default [
         "ninguna de las tres filas dice «Known to Claude Code» ni «Added by you» en una línea gris bajo la ruta",
         lines.join(" | "),
       );
-      const style = await s.exec(`
-        const tag = document.querySelector(".places .place-row .tags .tag");
-        const c = getComputedStyle(tag);
-        return { bg: c.backgroundColor, border: c.borderTopWidth + " " + c.borderTopStyle + " " + c.borderTopColor, color: c.color };`);
-      const rgb = (x) => (x.match(/\d+(\.\d+)?/g) ?? []).map(Number);
-      const [r, g, b, a = 1] = rgb(style.bg);
-      t.check(a > 0 && Math.abs(r - g) < 20 && Math.abs(g - b) < 20, "cada etiqueta es una píldora rellena de gris", style.bg);
-      t.check(style.border.includes("solid") && !style.border.startsWith("0px"), "cada etiqueta tiene un borde alrededor", style.border);
-      const [cr, cg, cb] = rgb(style.color);
-      t.check(cr > 200 && cg > 200 && cb > 200, "el texto de cada etiqueta es casi blanco", style.color);
+      await checkTagLook(t, ".places .place-row .tags .tag");
       await s.until(async () => (await notices(s)).length === 0, { what: "the notices gone", timeout: 6000 }).catch(() => {});
       await scrollTo(s, ".place-row", `${t.root}\\project-extra`);
       await t.shot("etiquetas", "las etiquetas de los Projects son píldoras grises con borde gris claro y texto casi blanco, como las de la pestaña Agent homes");

@@ -121,13 +121,12 @@ uatStep("10.21", async ({ page, open, check }) => {
   const project = rows.find((each) => each.name === `${ROOT}\\project`);
   const extra = rows.find((each) => each.name === `${ROOT}\\project-extra`);
   const gone = rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
-  const tag = await row(page, `${ROOT}\\project`)
-    .locator(".tags .tag")
-    .first()
-    .evaluate((el) => {
+  const tags = await page.locator(".places-list .place-row .tags .tag").evaluateAll((els) =>
+    els.map((el) => {
       const style = getComputedStyle(el);
       return { background: style.backgroundColor, border: style.borderTopStyle, width: style.borderTopWidth, edge: style.borderTopColor, colour: style.color };
-    });
+    }),
+  );
 
   await check("La fila de «E:\\cd-throwaway\\project» lleva la etiqueta «known to Claude Code».", async () => {
     expect(project?.tags).toEqual(["known to Claude Code"]);
@@ -143,19 +142,24 @@ uatStep("10.21", async ({ page, open, check }) => {
     expect(lines.filter((line) => /known to|added by you/i.test(line))).toEqual([]);
   });
   await check("Cada etiqueta es una píldora rellena de gris, no un texto gris sobre el fondo de la fila.", async () => {
-    expect(rgb(tag.background)[3] > 0 && grey(tag.background), tag.background).toBe(true);
+    expect(tags.length).toBeGreaterThan(0);
+    for (const tag of tags) expect(rgb(tag.background)[3] > 0 && grey(tag.background), tag.background).toBe(true);
   });
   await check("Cada etiqueta tiene un borde gris claro alrededor.", async () => {
-    expect([tag.border, tag.width]).toEqual(["solid", "1px"]);
-    expect(grey(tag.edge), tag.edge).toBe(true);
+    for (const tag of tags) {
+      expect([tag.border, tag.width]).toEqual(["solid", "1px"]);
+      expect(grey(tag.edge), tag.edge).toBe(true);
+    }
   });
   await check("El texto de cada etiqueta es casi blanco.", async () => {
-    expect(
-      rgb(tag.colour)
-        .slice(0, 3)
-        .every((channel) => channel > 200),
-      tag.colour,
-    ).toBe(true);
+    for (const tag of tags) {
+      expect(
+        rgb(tag.colour)
+          .slice(0, 3)
+          .every((channel) => channel > 200),
+        tag.colour,
+      ).toBe(true);
+    }
   });
 });
 

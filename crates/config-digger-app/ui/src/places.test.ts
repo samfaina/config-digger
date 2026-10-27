@@ -57,6 +57,9 @@ function places(overrides: Partial<Places> = {}): Places {
 }
 
 describe("the Projects tab", () => {
+  /** Tags in the plain tone, with these texts. */
+  const plain = (...texts: string[]) => texts.map((text) => ({ text, tone: "plain" }));
+
   test("lists each Project with its kind, where it came from and its Project Entries", () => {
     const { present } = projectSections(
       places({
@@ -75,7 +78,6 @@ describe("the Projects tab", () => {
       }),
     );
 
-    const plain = (...texts: string[]) => texts.map((text) => ({ text, tone: "plain" }));
     expect(present.map(({ path, kind, tags, entries }) => ({ path, kind, tags, entries }))).toEqual([
       { path: String.raw`E:\code\shop`, kind: "Folder", tags: plain("known to Claude Code", "known to VS Code"), entries: "3 Project Entries" },
       {
@@ -127,7 +129,7 @@ describe("the Projects tab", () => {
       {
         project: expect.objectContaining({ path: GONE }),
         path: GONE,
-        tags: [{ text: "known to Claude Code", tone: "plain" }],
+        tags: plain("known to Claude Code"),
         leftovers: [
           `${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.old`,
           `${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.search`,
@@ -153,7 +155,7 @@ describe("the Projects tab", () => {
       {
         project: expect.objectContaining({ path: DELETED }),
         path: DELETED,
-        tags: [{ text: "known to Claude Code", tone: "plain" }],
+        tags: plain("known to Claude Code"),
         leftovers: [],
         count: "No leftovers",
         hideOffered: true,
@@ -219,15 +221,8 @@ describe("the Projects tab", () => {
     expect(sections.missing).toEqual([]);
     expect(sections.noLeftovers).toEqual([]);
     expect(sections.hidden.map(({ path, tags, removable }) => ({ path, tags, removable }))).toEqual([
-      { path: String.raw`E:\code\old`, tags: [{ text: "known to Claude Code", tone: "plain" }], removable: false },
-      {
-        path: GONE,
-        tags: [
-          { text: "added by you", tone: "plain" },
-          { text: "missing", tone: "plain" },
-        ],
-        removable: true,
-      },
+      { path: String.raw`E:\code\old`, tags: plain("known to Claude Code", "hidden"), removable: false },
+      { path: GONE, tags: plain("added by you", "missing", "hidden"), removable: true },
     ]);
   });
 

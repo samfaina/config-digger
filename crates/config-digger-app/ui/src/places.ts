@@ -27,7 +27,7 @@ export type ProjectRow = {
   /** Folder, or `.code-workspace` with its members. */
   kind: string;
   /** Who added it and which Agents' registries record it, such as "added by you" and "known to Claude Code". */
-  tags: Tag[];
+  tags: PlaceTag[];
   /** Such as "3 Project Entries". */
   entries: string;
   offer: ListOffer;
@@ -38,7 +38,7 @@ export type MissingRow = {
   project: Project;
   path: string;
   /** As a present Project's. */
-  tags: Tag[];
+  tags: PlaceTag[];
   /** Each leftover as its file → key path, without those in hidden Agent homes. */
   leftovers: string[];
   /** Such as "2 leftovers". */
@@ -51,8 +51,8 @@ export type MissingRow = {
 export type HiddenRow = {
   project: Project;
   path: string;
-  /** As a present Project's, then "missing" when its folder no longer exists. */
-  tags: Tag[];
+  /** As a present Project's, then "missing" when its folder no longer exists, and "hidden". */
+  tags: PlaceTag[];
   removable: boolean;
 };
 
@@ -99,7 +99,7 @@ export function projectSections(places: Places, search = ""): ProjectSections {
   const hiddenRow = (project: Project): HiddenRow => ({
     project,
     path: project.path,
-    tags: project.missing ? [...tags(project), { text: "missing", tone: "plain" }] : tags(project),
+    tags: [...tags(project), ...(project.missing ? [plainTag("missing")] : []), plainTag("hidden")],
     removable: removableProject(project),
   });
   const found = places.projects.filter((project) => project.path.toLowerCase().includes(search.toLowerCase()));
@@ -159,9 +159,14 @@ export function strandedRows(places: Places): StrandedRow[] {
 }
 
 /** Where a Project came from, as its tags say: the user, then each registry that records it. */
-function projectTags(project: Project, agentName: (id: string) => string): Tag[] {
-  const sources = [...(project.added ? ["added by you"] : []), ...project.registered_by.map((id) => `known to ${agentName(id)}`)];
-  return sources.map((text) => ({ text, tone: "plain" }));
+function projectTags(project: Project, agentName: (id: string) => string): PlaceTag[] {
+  const texts = [...(project.added ? ["added by you"] : []), ...project.registered_by.map((id) => `known to ${agentName(id)}`)];
+  return texts.map(plainTag);
+}
+
+/** A tag in the plain tone. */
+function plainTag(text: string): PlaceTag {
+  return { text, tone: "plain" };
 }
 
 /** Forgetting a Project a registry records does nothing: it is found again. */
@@ -173,7 +178,7 @@ function removableProject(project: Project): boolean {
 export type HomeAction = "show" | "hide" | "unhide" | "remove_from_list";
 
 /** A tag on a row of Projects & homes; a Mirrored home's says it is read-only. */
-export type Tag = { text: string; tone: "plain" | "read_only" };
+export type PlaceTag = { text: string; tone: "plain" | "read_only" };
 
 /** One Agent home, as the Agent homes tab shows it. */
 export type HomeRow = {
@@ -183,7 +188,7 @@ export type HomeRow = {
   /** The name of the Agent that reads it, on a home the user added, whose label is its folder. */
   agent: string | null;
   path: string;
-  tags: Tag[];
+  tags: PlaceTag[];
   /** What it is, when it is Mirrored, not read or without configuration, and other notes. */
   notes: string[];
   /** Such as "3 Entries". */
@@ -236,7 +241,7 @@ function installed(installations: Installation[]): string[] {
 /** A home's row: its tags and notes, and Show in Inventory, Hide, Unhide or Remove from list. */
 function homeRow(home: Home): HomeRow {
   const removable = home.source.kind === "added";
-  const tags: Tag[] = [{ text: sourceTag(home.source), tone: "plain" }];
+  const tags: PlaceTag[] = [{ text: sourceTag(home.source), tone: "plain" }];
   if (home.mirror) tags.push({ text: `${home.mirror.label}, read-only · from ${home.mirror.source}`, tone: "read_only" });
   if (home.not_read) tags.push({ text: "not read", tone: "plain" });
   const notes = [

@@ -28,7 +28,7 @@ import {
   type MissingRow,
   type ProjectRow,
   type ShowInInventory,
-  type Tag,
+  type PlaceTag,
 } from "./places";
 import { useActionDialog } from "./useActionDialog";
 import { readCue, reads } from "./reads";
@@ -376,11 +376,7 @@ function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) 
         <PathPieces path={row.path} />
       </div>
       <div className="place-sub">{row.kind}</div>
-      <div className="tags">
-        {row.tags.map((tag) => (
-          <TagPill key={tag.text} tag={tag} />
-        ))}
-      </div>
+      <Tags tags={row.tags} />
     </PlaceRow>
   );
 }
@@ -426,11 +422,7 @@ function MissingLine({ row, busy, onShow, onHide, onRemoveLeftovers }: MissingLi
         <PathPieces path={row.path} />
       </div>
       <div className="place-sub">The folder no longer exists</div>
-      <div className="tags">
-        {row.tags.map((tag) => (
-          <TagPill key={tag.text} tag={tag} />
-        ))}
-      </div>
+      <Tags tags={row.tags} />
       {row.leftovers.length > 0 && (
         <ul className="place-leftovers mono">
           {row.leftovers.map((leftover) => (
@@ -541,18 +533,24 @@ function HiddenLine({
       <div className="place-name mono">
         <PathPieces path={row.path} />
       </div>
-      <div className="tags">
-        {row.tags.map((tag) => (
-          <TagPill key={tag.text} tag={tag} />
-        ))}
-        <span className="tag">hidden</span>
-      </div>
+      <Tags tags={row.tags} />
     </PlaceRow>
   );
 }
 
+/** A Project's tags, in a row of their own. */
+function Tags({ tags }: { tags: PlaceTag[] }) {
+  return (
+    <div className="tags">
+      {tags.map((tag) => (
+        <TagPill key={tag.text} tag={tag} />
+      ))}
+    </div>
+  );
+}
+
 /** A tag on a row, in the tone of what it tells. */
-function TagPill({ tag }: { tag: Tag }) {
+function TagPill({ tag }: { tag: PlaceTag }) {
   return <span className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>{tag.text}</span>;
 }
 
