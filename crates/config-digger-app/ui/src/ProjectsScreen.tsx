@@ -28,6 +28,7 @@ import {
   type MissingRow,
   type ProjectRow,
   type ShowInInventory,
+  type PlaceTag,
 } from "./places";
 import { useActionDialog } from "./useActionDialog";
 import { readCue, reads } from "./reads";
@@ -374,9 +375,8 @@ function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) 
       <div className="place-name mono">
         <PathPieces path={row.path} />
       </div>
-      <div className="place-sub">
-        {row.kind} · {row.source}
-      </div>
+      <div className="place-sub">{row.kind}</div>
+      <Tags tags={row.tags} />
     </PlaceRow>
   );
 }
@@ -421,7 +421,8 @@ function MissingLine({ row, busy, onShow, onHide, onRemoveLeftovers }: MissingLi
       <div className="place-name mono">
         <PathPieces path={row.path} />
       </div>
-      <div className="place-sub">{row.source}</div>
+      <div className="place-sub">The folder no longer exists</div>
+      <Tags tags={row.tags} />
       {row.leftovers.length > 0 && (
         <ul className="place-leftovers mono">
           {row.leftovers.map((leftover) => (
@@ -532,12 +533,25 @@ function HiddenLine({
       <div className="place-name mono">
         <PathPieces path={row.path} />
       </div>
-      <div className="place-sub">{row.source}</div>
-      <div className="tags">
-        <span className="tag">hidden</span>
-      </div>
+      <Tags tags={row.tags} />
     </PlaceRow>
   );
+}
+
+/** A Project's tags, in a row of their own. */
+function Tags({ tags }: { tags: PlaceTag[] }) {
+  return (
+    <div className="tags">
+      {tags.map((tag) => (
+        <TagPill key={tag.text} tag={tag} />
+      ))}
+    </div>
+  );
+}
+
+/** A tag on a row, in the tone of what it tells. */
+function TagPill({ tag }: { tag: PlaceTag }) {
+  return <span className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>{tag.text}</span>;
 }
 
 /** Every Agent's homes, each Agent headed by its Installations' versions. */
@@ -628,9 +642,7 @@ function HomeLine({
       <div className="tags">
         {row.agent && <span className="tag">{row.agent}</span>}
         {row.tags.map((tag) => (
-          <span key={tag.text} className={`tag${tag.tone === "read_only" ? " read-only" : ""}`}>
-            {tag.text}
-          </span>
+          <TagPill key={tag.text} tag={tag} />
         ))}
         {row.hidden && <span className="tag">hidden</span>}
       </div>

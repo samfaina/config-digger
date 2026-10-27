@@ -57,6 +57,9 @@ function places(overrides: Partial<Places> = {}): Places {
 }
 
 describe("the Projects tab", () => {
+  /** Tags in the plain tone, with these texts. */
+  const plain = (...texts: string[]) => texts.map((text) => ({ text, tone: "plain" }));
+
   test("lists each Project with its kind, where it came from and its Project Entries", () => {
     const { present } = projectSections(
       places({
@@ -75,15 +78,15 @@ describe("the Projects tab", () => {
       }),
     );
 
-    expect(present.map(({ path, kind, source, entries }) => ({ path, kind, source, entries }))).toEqual([
-      { path: String.raw`E:\code\shop`, kind: "Folder", source: "Known to Claude Code, VS Code", entries: "3 Project Entries" },
+    expect(present.map(({ path, kind, tags, entries }) => ({ path, kind, tags, entries }))).toEqual([
+      { path: String.raw`E:\code\shop`, kind: "Folder", tags: plain("known to Claude Code", "known to VS Code"), entries: "3 Project Entries" },
       {
         path: String.raw`E:\code\shop.code-workspace`,
         kind: String.raw`.code-workspace · members E:\code\api, E:\code\web`,
-        source: "Added by you",
+        tags: plain("added by you"),
         entries: "1 Project Entry",
       },
-      { path: String.raw`E:\code\tools`, kind: "Folder", source: "Added by you · also known to Claude Code", entries: "No Project Entries" },
+      { path: String.raw`E:\code\tools`, kind: "Folder", tags: plain("added by you", "known to Claude Code"), entries: "No Project Entries" },
     ]);
   });
 
@@ -126,7 +129,7 @@ describe("the Projects tab", () => {
       {
         project: expect.objectContaining({ path: GONE }),
         path: GONE,
-        source: "The folder no longer exists · known to Claude Code",
+        tags: plain("known to Claude Code"),
         leftovers: [
           `${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.old`,
           `${CLAUDE_JSON} → projects.E:/code/gone.mcpServers.search`,
@@ -152,7 +155,7 @@ describe("the Projects tab", () => {
       {
         project: expect.objectContaining({ path: DELETED }),
         path: DELETED,
-        source: "The folder no longer exists · known to Claude Code",
+        tags: plain("known to Claude Code"),
         leftovers: [],
         count: "No leftovers",
         hideOffered: true,
@@ -217,9 +220,9 @@ describe("the Projects tab", () => {
     expect(sections.present).toEqual([]);
     expect(sections.missing).toEqual([]);
     expect(sections.noLeftovers).toEqual([]);
-    expect(sections.hidden.map(({ path, source, removable }) => ({ path, source, removable }))).toEqual([
-      { path: String.raw`E:\code\old`, source: "Known to Claude Code", removable: false },
-      { path: GONE, source: "Missing · Added by you", removable: true },
+    expect(sections.hidden.map(({ path, tags, removable }) => ({ path, tags, removable }))).toEqual([
+      { path: String.raw`E:\code\old`, tags: plain("known to Claude Code", "hidden"), removable: false },
+      { path: GONE, tags: plain("added by you", "missing", "hidden"), removable: true },
     ]);
   });
 

@@ -146,7 +146,7 @@ const SHOTS: Shot[] = [
   },
   {
     name: "projects",
-    uat: ["10.1"],
+    uat: ["10.1", "10.21"],
     steps: async (page) => {
       await rail(page, "Projects & homes");
       await page.getByRole("tab", { name: "Projects" }).waitFor();
