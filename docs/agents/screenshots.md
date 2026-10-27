@@ -22,9 +22,30 @@ From `crates/config-digger-app/ui`:
 | --- | --- |
 | `npm run dev:fake` | Serves the UI on the fake backend, at the address Vite prints (port 1430, or the next free one). |
 | `npm run screenshots` | Writes a PNG of each screen and state to `crates/config-digger-app/ui/screenshots/`, which git ignores. |
+| `npm run screenshots:compare` | Writes the same PNGs, then compares each with its reference (see "Compare with references"). |
+| `npm run screenshots:accept` | Copies the last run's PNGs into `screenshots/reference/`: all of them, or those it names, as in `npm run screenshots:accept -- about settings`. |
 | `npm run uat:fake` | Runs the tests of the UAT steps the fake backend can show, with no screenshot (see "The fake UI's tests" in `docs/agents/uat.md`). |
 
-`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's, as `tauri.conf.json` sets it. It shoots the Inventory with and without an Item selected, the open Project dropdown with and without a search, a tooltip, the action dialog with What changes, and with many changes in the smallest window the app allows, Projects & homes on both tabs, with a search, scrolled down to its missing Projects, at its Stranded Entries and with its Hidden group open, the action dialog of their Remove all, the result of an action that left 40 files untouched in the smallest window, History with an Operation open, filtered in the smallest window with its status dropdown open, and filtered to nothing, Settings, About, and a notice of each kind, then the Inventory with an Item selected, both tabs of Projects & homes, History with an Operation open, Settings and About again in the smallest window (the `smallest-*` shots, listed in `SMALLEST_SHOTS`). To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
+`npm run screenshots` opens the UI in a headless Edge, or Chrome when Edge is missing, in a window the size of the app's, as `tauri.conf.json` sets it. It shoots the Inventory with and without an Item selected, the open Project dropdown with and without a search, a tooltip, the action dialog with What changes, and with many changes in the smallest window the app allows, Projects & homes on both tabs, with a search, scrolled down to its missing Projects, at its Stranded Entries and with its Hidden group open, the action dialog of their Remove all, the result of an action that left 40 files untouched in the smallest window, History with an Operation open, filtered in the smallest window with its status dropdown open, and filtered to nothing, Settings, About, and a notice of each kind, then the Inventory with an Item selected, both tabs of Projects & homes, History with an Operation open, Settings and About again in the smallest window (the `smallest-*` shots, listed in `SMALLEST_SHOTS`). It also shoots the look of each UAT step that research #236 (section 8 of `docs/research/uat-automation.md`) marks "visual": the loading states, held with `?delay=`, the notices, the dialogs, dropdowns, tooltips and scrollbars of those steps. A spinner or a pulse is shot at its first frame, so a busy state shoots the same each run. To shoot another state, add a shot to `SHOTS` in `ui/scripts/screenshots.ts`. Open a PNG to check the change by eye.
+
+A shot whose state shows a UAT step's look names that step's id in its `uat` field, as in `uat: ["15.1"]`, so a step's look and its shots can be matched. The script fails on an id that is no step of `uat/plan.json`. A shot that covers no step leaves `uat` out. The visual steps the fake backend can't show have no shot: 4.1's own scrollbar of the real WebView2 window, and the other real-window shots, belong to the agent judge's ticket, #268.
+
+## Compare with references
+
+`npm run screenshots:compare` shoots every shot, then compares each PNG with the reference of the same name in `screenshots/reference/`, with `pixelmatch`. For each shot it prints one of:
+
+- `match`: no more pixels differ than the threshold.
+- `differs`: more pixels differ, with the shot's name and their count. It writes `screenshots/<name>.diff.png`: the reference, faded, with each pixel that differs in red.
+- `no reference`: the shot has none yet.
+- `size mismatch`: the shot and its reference differ in width or height.
+
+It also lists the references that match no shot, which can be deleted. It exits non-zero when any shot differs, has no reference or has a size mismatch.
+
+The threshold is `THRESHOLD` in `ui/scripts/compare.ts`: 20 pixels, at pixelmatch's default colour distance. It is small because the references are shot on the same machine and browser that compare them, where an unchanged screen matches to the pixel.
+
+The references live in `screenshots/reference/`, one set per machine: a reference shot on another machine doesn't match, since DPI and font smoothing differ. Git ignores them with the rest of `screenshots/`, and they are never committed.
+
+Compare mode never writes a reference. Only `npm run screenshots:accept` does, from the last run's PNGs. That is how a first baseline, or a changed look, becomes a reference. Look at each new or changed shot before accepting it: the agent judge will once #268 lands, and until then you look by eye. A diff says the look changed, not that the new look is right.
 
 ## Screenshots stay local
 
