@@ -286,7 +286,7 @@ fn plan_with(
             "a Delete backup targets an Operation, not Entries: plan it with plan_delete_backup",
         )),
     }?;
-    log_git_asks(git_asks);
+    git_asks.log("plan");
     for home in mirrored {
         let mirror = home.mirror.as_ref().expect("a Mirrored home has a mirror");
         // What it writes outside the home it copies, such as a Project's
@@ -310,18 +310,6 @@ fn plan_with(
         });
     }
     Ok(planned)
-}
-
-/// Logs, once for a plan, what it asked the git index outside its scans,
-/// when it asked about any path.
-fn log_git_asks(asks: GitAsks) {
-    if asks.paths > 0 {
-        tracing::info!(
-            paths = asks.paths,
-            git_calls = asks.calls,
-            "plan asked the git index"
-        );
-    }
 }
 
 /// The Entries an action on `selected` goes to, each once: each Entry
@@ -1527,7 +1515,7 @@ pub(crate) fn plan_undo(
     )?;
     let homes = RunningHomes::of(definitions, &snapshot);
     let running = running::check(definitions, ports, &homes, &files, &folders);
-    log_git_asks(git_asks);
+    git_asks.log("plan");
     Ok(Planned {
         action: Action::Undo,
         entries: preview.changes.len(),
@@ -1752,15 +1740,17 @@ impl UndoBlocked<'_> {
 /// and skill folders, as [`plan_undo`] returns it, or `None` when they allow
 /// it. Its diffs are masked for the locations of `snapshot` that read each
 /// file. Why History alone stops it is left to [`history::not_undoable`].
+/// What it asks the git index is counted in `asks`.
 pub(crate) fn undo_refusal(
     definitions: &[AgentDefinition],
     ports: &Ports,
     manifest: &history::Manifest,
     snapshot: &Snapshot,
+    asks: &mut GitAsks,
 ) -> Option<Error> {
     match undo_files(ports, manifest) {
         Err(blocked) => Some(blocked.into_error(definitions, snapshot)),
-        Ok(_) => undo_folders(ports, manifest, &mut GitAsks::default()).err(),
+        Ok(_) => undo_folders(ports, manifest, asks).err(),
     }
 }
 

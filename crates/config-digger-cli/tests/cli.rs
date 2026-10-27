@@ -1685,21 +1685,105 @@ fn a_plan_that_asks_the_git_index_about_no_folder_logs_no_line_of_it() {
     assert!(plan_git_lines(&undo).is_empty(), "{}", undo.stderr);
 }
 
-#[test]
-fn reading_history_logs_no_plan_line_of_the_git_asks_of_an_undo() {
-    let harness = Harness::new()
-        .with_file(".claude.json", "{}")
-        .with_file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\n---\n");
+/// The one `history asked the git index` line of a run's log, after
+/// checking that it is logged at INFO.
+fn history_git_line(run: &Run) -> &str {
+    let lines = history_git_lines(run);
+    assert_eq!(lines.len(), 1, "{}", run.stderr);
+    assert!(lines[0].contains(" INFO "), "{}", lines[0]);
+    lines[0]
+}
+
+/// The `history asked the git index` lines of a run's log.
+fn history_git_lines(run: &Run) -> Vec<&str> {
+    run.stderr
+        .lines()
+        .filter(|line| line.contains("history asked the git index"))
+        .collect()
+}
+
+/// A Claude Code home with the user skills `names`, in the git repo of the
+/// folder the binary runs in, which does not version them.
+fn with_claude_skills_in_git_repo(names: &[&str]) -> Harness {
+    let harness = names.iter().fold(
+        Harness::new().with_file(".claude.json", "{}"),
+        |harness, name| {
+            harness.with_file(
+                &format!(".claude/skills/{name}/SKILL.md"),
+                &format!("---\nname: {name}\n---\n"),
+            )
+        },
+    );
     in_git_repo(&harness, &[]);
+    harness
+}
+
+#[test]
+fn reading_the_history_of_a_remove_of_a_skill_folder_logs_its_git_asks() {
+    let harness = with_claude_skills_in_git_repo(&["deploy"]);
+    harness.removed("deploy");
+
+    let run = harness.run(&["history", "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    let line = history_git_line(&run);
+    // The folder its Undo would move back, asked about in one `git ls-files`.
+    assert!(line.contains("paths=1"), "{line}");
+    assert!(line.contains("git_calls=1"), "{line}");
+    assert!(plan_git_lines(&run).is_empty(), "{}", run.stderr);
+}
+
+#[test]
+fn the_git_asks_of_reading_two_operations_are_summed_in_one_line() {
+    let harness = with_claude_skills_in_git_repo(&["deploy", "lint"]);
+    harness.removed("deploy");
+    harness.removed("lint");
+
+    let run = harness.run(&["history", "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    let line = history_git_line(&run);
+    // The folder of each Operation, asked about in a `git ls-files` of its own.
+    assert!(line.contains("paths=2"), "{line}");
+    assert!(line.contains("git_calls=2"), "{line}");
+}
+
+#[test]
+fn reading_history_that_asks_the_git_index_about_no_folder_logs_no_line_of_it() {
+    let harness = Harness::new().with_file(".claude.json", TWO_USER_SERVERS);
+    in_git_repo(&harness, &[]);
+    harness.removed("linear");
+
+    let run = harness.run(&["history", "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    assert!(history_git_lines(&run).is_empty(), "{}", run.stderr);
+}
+
+#[test]
+fn showing_a_remove_of_a_skill_folder_logs_the_git_asks_of_its_summary_and_its_undo_refusal() {
+    let harness = with_claude_skills_in_git_repo(&["deploy"]);
     let removed = harness.removed("deploy");
 
-    let history = harness.run(&["history", "-v"]);
-    let show = harness.run(&["history", "show", &removed, "-v"]);
+    let run = harness.run(&["history", "show", &removed, "-v"]);
 
-    assert_eq!(history.code, 0, "{}{}", history.stdout, history.stderr);
-    assert!(plan_git_lines(&history).is_empty(), "{}", history.stderr);
-    assert_eq!(show.code, 0, "{}{}", show.stdout, show.stderr);
-    assert!(plan_git_lines(&show).is_empty(), "{}", show.stderr);
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    let line = history_git_line(&run);
+    // The folder its Undo would move back, asked about once for the summary
+    // and once for the Undo refusal.
+    assert!(line.contains("paths=2"), "{line}");
+    assert!(line.contains("git_calls=2"), "{line}");
+    let scans = scan_lines(&run);
+    assert_eq!(scans.len(), 2, "{}", run.stderr);
+    // The paths its scan asks about, which History's asks do not add to.
+    assert!(scans[1].contains("paths=3"), "{}", scans[1]);
+    let history_line = run.stderr.find("history asked the git index").unwrap();
+    assert!(
+        run.stderr.rfind("scan finished").unwrap() < history_line,
+        "{}",
+        run.stderr
+    );
+    assert!(plan_git_lines(&run).is_empty(), "{}", run.stderr);
 }
 
 #[test]
@@ -1818,6 +1902,20 @@ fn dismissing_an_operation_that_does_not_need_attention_exits_5() {
 
     assert_eq!(run.code, 5, "{}", run.stderr);
     assert_eq!(run.document()["error"]["code"], "blocked");
+}
+
+#[test]
+fn dismissing_a_remove_of_a_skill_folder_that_needs_attention_logs_no_git_asks() {
+    let harness = with_claude_skills_in_git_repo(&["deploy"]);
+    let removed = harness.removed("deploy");
+    harness.needing_attention(&removed);
+
+    let run = harness.run(&["history", "dismiss", &removed, "-v"]);
+
+    assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
+    // An Operation that needs attention is never undoable, so its summary
+    // asks about none of its folders.
+    assert!(history_git_lines(&run).is_empty(), "{}", run.stderr);
 }
 
 #[test]
