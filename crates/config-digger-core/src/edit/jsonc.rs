@@ -9,7 +9,7 @@ use jsonc_parser::cst::{
     CstArray, CstComment, CstInputValue, CstLeafNode, CstNode, CstObject, CstObjectProp,
     CstRootNode,
 };
-use jsonc_parser::{CollectOptions, ParseOptions, ast};
+use jsonc_parser::{CollectOptions, CommentCollectionStrategy, ParseOptions, ast};
 use serde_json::Value;
 use std::ops::Range;
 
@@ -43,7 +43,15 @@ pub(super) fn apply(text: &str, edit: &Edit) -> Result<Change, EditError> {
             after,
             inline,
             comments,
-        } => file.insert(key_path, value, after.as_deref(), *inline, comments),
+            emptied_object,
+        } => file.insert(
+            key_path,
+            value,
+            after.as_deref(),
+            *inline,
+            comments,
+            emptied_object.as_deref(),
+        ),
         Edit::Set { key_path, value } => file.set(key_path, value),
         Edit::Append { key_path, value } => file.append(key_path, value),
         Edit::RemoveItem { key_path, value } => file.remove_item(key_path, value),
@@ -115,6 +123,8 @@ impl File<'_> {
             inline: !self.text[ast_prop.value.range().start..ast_prop.value.range().end]
                 .contains('\n'),
             comments,
+            emptied_object: (span.properties.len() == 1)
+                .then(|| self.text[span.range.start..span.range.end].to_owned()),
         };
         prop.remove();
         let members = Members::of_object(span);
@@ -280,6 +290,7 @@ impl File<'_> {
         after: Option<&str>,
         inline: bool,
         comments: &[String],
+        emptied_object: Option<&str>,
     ) -> Result<Change, EditError> {
         let (parent, name) = split_key_path(key_path)?;
         let object = self.cst_object(parent)?;
@@ -298,13 +309,25 @@ impl File<'_> {
                 .map_or(span.properties.len(), |index| index + 1),
         };
         let allowed = vec![self.gap(&Members::of_object(span), index)];
+        let inverse = Edit::Remove {
+            key_path: key_path.to_vec(),
+        };
 
+        if let Some(emptied_object) = emptied_object
+            && &self.text[span.range.start..span.range.end] == "{}"
+        {
+            let mut text = self.text.to_owned();
+            text.replace_range(span.range.start..span.range.end, emptied_object);
+            return Ok(Change {
+                text,
+                inverse,
+                allowed,
+            });
+        }
         if self.is_single_line(span.range) {
             return Ok(Change {
                 text: splice_into_single_line(self.text, span, index, name, value),
-                inverse: Edit::Remove {
-                    key_path: key_path.to_vec(),
-                },
+                inverse,
                 allowed,
             });
         }
@@ -324,9 +347,7 @@ impl File<'_> {
         }
         Ok(Change {
             text,
-            inverse: Edit::Remove {
-                key_path: key_path.to_vec(),
-            },
+            inverse,
             allowed,
         })
     }
@@ -555,6 +576,18 @@ fn with_comments_above(
     let mut text = text.to_owned();
     text.insert_str(line_start, &block);
     Ok(text)
+}
+
+/// Whether `text` holds a comment, or does not parse.
+pub(super) fn holds_comments(text: &str) -> bool {
+    let options = CollectOptions {
+        comments: CommentCollectionStrategy::Separate,
+        tokens: false,
+    };
+    jsonc_parser::parse_to_ast(text, &options, &ParseOptions::default()).map_or(true, |ast| {
+        ast.comments
+            .is_some_and(|comments| comments.values().any(|comments| !comments.is_empty()))
+    })
 }
 
 /// Whether `jsonc-parser` writes `value` over several lines.

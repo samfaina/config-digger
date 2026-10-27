@@ -196,12 +196,9 @@ fn plan(core: &Core, action: Action, name: &str) -> Plan {
     core.plan(&snapshot, &in_petme(), action, &targets).unwrap()
 }
 
-/// The local settings, holding `disabledMcpjsonServers` as the plain string
-/// `"a"` after the permissions Claude Code keeps there. They hold another
-/// key, as Claude Code's do: the JSONC editor writes a key put back in an
-/// object a Remove left empty on the object's line.
-const PLAIN_A: &str =
-    "{\n  \"permissions\": { \"allow\": [] },\n  \"disabledMcpjsonServers\": \"a\"\n}\n";
+/// The local settings, holding only `disabledMcpjsonServers`, as the plain
+/// string `"a"`, over three lines.
+const PLAIN_A: &str = "{\n  \"disabledMcpjsonServers\": \"a\"\n}\n";
 
 /// A home whose `~/.claude.json` has not recorded petme-app, so that
 /// Disable writes the local settings, which hold `local`, and whose user
@@ -237,7 +234,7 @@ fn disable_over_a_plain_string_writes_a_list_of_both_names_and_undo_puts_the_str
 
     assert_eq!(
         local_value(&fs),
-        json!({ "permissions": { "allow": [] }, "disabledMcpjsonServers": ["a", "b"] })
+        json!({ "disabledMcpjsonServers": ["a", "b"] })
     );
     assert_eq!(project_entry(&inventory(&fs), "b")["state"], "disabled");
     core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
@@ -255,7 +252,7 @@ fn enable_of_the_name_a_plain_string_holds_deletes_the_key_and_undo_puts_it_back
 
     let outcome = core.execute(plan(&core, Action::Enable, "a"), &[]).unwrap();
 
-    assert_eq!(local_value(&fs), json!({ "permissions": { "allow": [] } }));
+    assert_eq!(local_value(&fs), json!({}));
     assert_eq!(project_entry(&inventory(&fs), "a")["state"], "effective");
     core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
         .unwrap();

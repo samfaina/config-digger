@@ -46,12 +46,21 @@ pub enum Edit {
     /// object or table written on one line, where they are left out.
     /// `inline` writes an object on one line: a JSONC object on a single
     /// line, or a TOML inline table instead of a `[table]`.
+    ///
+    /// `emptied_object` is set on the inverse of a JSONC Remove that took
+    /// the last key of its object: the object's text from its `{` to its `}`
+    /// as it was read, with the key's comments. While the object is still
+    /// `{}`, that text replaces it, so the object comes back as it was and
+    /// the rule above on comments does not apply. Once the object holds
+    /// another key, the key is added as above.
     Insert {
         key_path: Vec<String>,
         value: Value,
         after: Option<String>,
         inline: bool,
         comments: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        emptied_object: Option<String>,
     },
     /// Appends a value to the list at the key. With [`Edit::RemoveItem`], its
     /// inverse, it treats the list as a set of names, such as a list of
@@ -74,7 +83,8 @@ impl Edit {
         }
     }
 
-    /// The edit, writing no comment.
+    /// The edit, writing no comment: an Insert puts back an emptied
+    /// object's text only when that text holds no comment.
     pub fn without_comments(self) -> Edit {
         match self {
             Edit::Insert {
@@ -82,6 +92,7 @@ impl Edit {
                 value,
                 after,
                 inline,
+                emptied_object,
                 ..
             } => Edit::Insert {
                 key_path,
@@ -89,6 +100,7 @@ impl Edit {
                 after,
                 inline,
                 comments: Vec::new(),
+                emptied_object: emptied_object.filter(|text| !jsonc::holds_comments(text)),
             },
             edit => edit,
         }
