@@ -174,10 +174,35 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
   write(path.join(user, "cd-throwaway-badyaml", "SKILL.md"), "---\nname: [unclosed\ndescription: d-cd-throwaway-badyaml\n---\n");
   write(path.join(user, "cd-throwaway-badutf8", "SKILL.md"), Buffer.from("---\nname: cd-throwaway-badutf8\ndescription: d-cd-throwaway-badutf8 \xff\xfe\n---\n", "latin1"));
   at(user, "cd-throwaway-denied");
+  // Frontmatters that are not YAML, each in the folder `cd-throwaway-fm-<case>`.
+  const frontmatters = {
+    colon: "name: cd-throwaway-fm-colon\ndescription: d-fm Use when: x\n---",
+    quoted: "name: \"cd-throwaway-fm-quoted\"\ndescription: 'd-fm: x'\n---",
+    stray: "name: cd-throwaway-fm-stray\njust text\ndescription: d-fm: x\n---",
+    indented: "  name: cd-throwaway-fm-indented\ndescription: d-fm\n---",
+    twonames: "name: cd-throwaway-fm-first\nname: cd-throwaway-fm-second\ndescription: d-fm\n---",
+    continued: "name: cd-throwaway-fm-continued\ndescription: d-fm one\n  two\n---",
+    continuedcolon: "name: cd-throwaway-fm-continuedcolon\ndescription: d-fm: one\n  two\n---",
+    unclosedquote: "name: \"cd-throwaway-fm-unclosedquote\ndescription: d-fm: x\n---",
+    trailing: "name: cd-throwaway-fm-trailing\ndescription: d-fm for the following:\n---",
+    trailingcolon: "name: cd-throwaway-fm-trailingcolon\ndescription: d-fm: for the following:\n---",
+    unclosed: "name: cd-throwaway-fm-unclosed\ndescription: d-fm: x",
+    number: "name: 123\ndescription: d-fm-number: x\n---",
+    noname: "description: d-fm: x\n---",
+  };
+  for (const [name, frontmatter] of Object.entries(frontmatters)) {
+    write(path.join(user, `cd-throwaway-fm-${name}`, "SKILL.md"), `---\n${frontmatter}\nbody\n`);
+  }
   const denied = path.join(user, "cd-throwaway-denied", "SKILL.md");
   await run("icacls", [denied, "/deny", `${process.env.USERNAME}:(R)`]);
   const listed = await skills(home, proj);
   await run("icacls", [denied, "/remove:d", process.env.USERNAME]);
+  // Each `cd-throwaway-fm-<case>` skill Codex lists, as `<name>: <description>`.
+  const { stdout: prompt } = await codex(home, proj, "debug", "prompt-input");
+  const read = Object.fromEntries(
+    [...prompt.replaceAll("\\n", "\n").matchAll(/^- (.*?): (d-fm.*?) \(file: r\d+\/cd-throwaway-fm-([a-z]+)\/SKILL\.md\)$/gm)].map(([, name, description, folder]) => [folder, `${name}: ${description}`]),
+  );
+  const readOf = (...folders) => Object.fromEntries(folders.map((folder) => [folder, read[folder] ?? null]));
 
   await p.check("locations[project-agents-skills]", "`.agents\\skills` is read in a Project Codex does not trust", async () => {
     return same(listed.includes("cd-throwaway-agents"), true);
@@ -188,9 +213,31 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
   await p.check("items.skill", "a `SKILL.md` that is not UTF-8, or that cannot be opened, is skipped", async () => {
     return same(listed.filter((n) => /badutf8|denied/.test(n)), []);
   });
-  await p.check("items.skill", "a frontmatter that is not YAML is read line by line: `name: [unclosed` names the skill `[unclosed`", async () => {
+  await p.check("items.skill", "an unparsable `[` value is read again quoted: `name: [unclosed` names the skill `[unclosed`", async () => {
     const { stdout } = await codex(home, proj, "debug", "prompt-input");
     return same(stdout.includes("- [unclosed: d-cd-throwaway-badyaml"), true);
+  });
+  await p.check("items.skill", "a frontmatter that is not YAML is read again with each plain value holding `: ` quoted, and quotes are YAML's", async () => {
+    return same(readOf("colon", "quoted"), { colon: "cd-throwaway-fm-colon: d-fm Use when: x", quoted: "cd-throwaway-fm-quoted: d-fm: x" });
+  });
+  await p.check("items.skill", "a stray line, an indented `name`, two `name` lines, a quote that never closes and a `: ` value going on over indented lines skip the skill", async () => {
+    return same(readOf("stray", "indented", "twonames", "continuedcolon", "unclosedquote"), { stray: null, indented: null, twonames: null, continuedcolon: null, unclosedquote: null });
+  });
+  await p.check("items.skill", "a value ending in `:` skips the skill, unless it holds `: ` too, which Codex quotes", async () => {
+    return same(readOf("trailing", "trailingcolon"), { trailing: null, trailingcolon: "cd-throwaway-fm-trailingcolon: d-fm: for the following:" });
+  });
+  await p.check("items.skill", "a plain `description` goes on over indented lines", async () => {
+    return same(readOf("continued"), { continued: "cd-throwaway-fm-continued: d-fm one two" });
+  });
+  await p.check("items.skill", "a frontmatter that never closes skips the skill", async () => {
+    return same(readOf("unclosed"), { unclosed: null });
+  });
+  await p.check("items.skill", "`name: 123` names the skill `123`", async () => {
+    return same(readOf("number"), { number: "123: d-fm-number: x" });
+  });
+  // Found beside #299: `no_name = "skip"` says otherwise.
+  await p.check("items.skill", "a frontmatter without a `name` names the skill after its folder, with its description", async () => {
+    return same(readOf("noname"), { noname: "cd-throwaway-fm-noname: d-fm: x" });
   });
   await p.check("items.skill.disable[0]", "a rule's path matches the `SKILL.md` in any case, with either slash, with or without `\\\\?\\`", async () => {
     const file = path.join(user, "a", "cd-throwaway-depth2", "SKILL.md");

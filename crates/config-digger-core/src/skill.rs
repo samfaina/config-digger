@@ -6,21 +6,28 @@
 //! file that differs is only said to have changed.
 
 use crate::api::{Error, SkillContent, SkillFile, SkillFileChange, SkillFileChangeKind};
-use crate::definitions::blocks::SkillDefect;
+use crate::definitions::blocks::{SkillDefect, SkillFallback};
 use crate::ports::FileSystem;
+use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::Path;
+use std::sync::LazyLock;
 
 /// The file whose frontmatter names and describes a skill.
 const SKILL_MD: &str = "SKILL.md";
 
-/// What the skill folder at `folder` holds.
-pub(crate) fn content(fs: &dyn FileSystem, folder: &Path) -> Result<SkillContent, Error> {
+/// What the skill folder at `folder` holds, its frontmatter read as an
+/// Agent whose `malformed_frontmatter` is `reading` reads it.
+pub(crate) fn content(
+    fs: &dyn FileSystem,
+    folder: &Path,
+    reading: SkillFallback,
+) -> Result<SkillContent, Error> {
     let files = files(fs, folder)?;
     let frontmatter = files
         .get(SKILL_MD)
-        .and_then(|bytes| frontmatter(&String::from_utf8_lossy(bytes)).ok())
+        .and_then(|bytes| frontmatter(&String::from_utf8_lossy(bytes), reading).ok())
         .unwrap_or_default();
     Ok(SkillContent {
         name: frontmatter.get("name").cloned(),
@@ -115,37 +122,148 @@ fn cannot_read(path: &Path, error: &io::Error) -> Error {
     Error::blocked(format!("cannot read {}: {error}", path.display()))
 }
 
-/// The top-level scalar keys of the YAML frontmatter of a `SKILL.md`, as
-/// far as a skill's `name` and `description` need: plain, quoted, and `|`
-/// or `>` block scalars, and plain scalars continued on indented lines. Or
-/// why there is none: the text does not open with `---`, or the
-/// frontmatter never closes or holds a top-level line that is not a key.
-pub(crate) fn frontmatter(text: &str) -> Result<BTreeMap<String, String>, SkillDefect> {
-    let mut keys = BTreeMap::new();
+/// The top-level scalar keys of the frontmatter of a `SKILL.md`, as an
+/// Agent whose `malformed_frontmatter` is `reading` reads them, as far as a
+/// skill's `name` and `description` need. Or why there are none: the text
+/// does not open with a `---` frontmatter, the frontmatter is not YAML the
+/// Agent reads, or, read line by line, it lacks the `name` or the
+/// `description`.
+pub(crate) fn frontmatter(
+    text: &str,
+    reading: SkillFallback,
+) -> Result<BTreeMap<String, String>, SkillDefect> {
+    let lines = match lines(text) {
+        Ok(lines) => lines,
+        Err(Unclosed) if reading.reads_again() => return Err(SkillDefect::NoFrontmatter),
+        Err(Unclosed) => return Err(SkillDefect::MalformedFrontmatter),
+    }
+    .ok_or(SkillDefect::NoFrontmatter)?;
+    let read = scalars(&lines);
+    let yaml = read.as_ref().filter(|read| match reading {
+        SkillFallback::Skip | SkillFallback::FolderName => !read.any(|scalar| scalar.colon),
+        SkillFallback::QuoteValues => {
+            !read.indented_first
+                && !read.any(Scalar::refused_quoted)
+                && !["name", "description"]
+                    .iter()
+                    .any(|key| read.twice.contains(*key))
+        }
+        SkillFallback::LineByLine => {
+            !read.indented_first
+                && !read.any(Scalar::refused)
+                && read.twice.is_empty()
+                && ["name", "description"]
+                    .iter()
+                    .all(|key| read.keys.get(*key).is_some_and(|scalar| scalar.yaml_string))
+        }
+    });
+    match (yaml, reading) {
+        (Some(read), _) => Ok(read
+            .keys
+            .iter()
+            .map(|(key, scalar)| (key.clone(), scalar.value.clone()))
+            .collect()),
+        (None, SkillFallback::LineByLine) => line_by_line(&lines),
+        (None, _) => Err(SkillDefect::MalformedFrontmatter),
+    }
+}
+
+/// A frontmatter that opens with `---` and never closes.
+struct Unclosed;
+
+/// The lines of the frontmatter of a `SKILL.md`, or none when it does not
+/// open with `---`.
+fn lines(text: &str) -> Result<Option<Vec<&str>>, Unclosed> {
     let mut lines = text.trim_start_matches('\u{feff}').lines();
     if lines.next().map(str::trim_end) != Some("---") {
-        return Err(SkillDefect::NoFrontmatter);
+        return Ok(None);
     }
     let mut closed = false;
-    let lines: Vec<&str> = lines
+    let lines = lines
         .take_while(|line| {
             closed = line.trim_end() == "---";
             !closed
         })
         .collect();
-    if !closed {
-        return Err(SkillDefect::MalformedFrontmatter);
+    if closed {
+        Ok(Some(lines))
+    } else {
+        Err(Unclosed)
     }
+}
+
+/// The top-level keys of a frontmatter, each read as YAML would read it as
+/// far as it can be told.
+struct Scalars {
+    keys: BTreeMap<String, Scalar>,
+    /// The keys given more than once, which YAML refuses. The later wins in
+    /// `keys`.
+    twice: BTreeSet<String>,
+    /// Whether an indented line comes before the first key, which YAML
+    /// refuses.
+    indented_first: bool,
+}
+
+impl Scalars {
+    fn any(&self, test: impl Fn(&Scalar) -> bool) -> bool {
+        self.keys.values().any(test)
+    }
+}
+
+/// The value of a top-level key.
+struct Scalar {
+    value: String,
+    /// Whether it is a plain value holding `: `, which would start a mapping
+    /// in YAML.
+    colon: bool,
+    /// Whether it is a plain value with a line ending in `:`, which would
+    /// start a mapping in YAML too.
+    colon_at_end: bool,
+    /// Whether it is a plain value going on over indented lines.
+    continued: bool,
+    /// Whether it is a quoted value whose quote does not close on its line.
+    unclosed: bool,
+    /// Whether YAML reads it, when it reads it, as a string rather than
+    /// null, a boolean, a number, a date or a collection.
+    yaml_string: bool,
+}
+
+impl Scalar {
+    /// Whether YAML refuses the value.
+    fn refused(&self) -> bool {
+        self.colon || self.colon_at_end || self.unclosed
+    }
+
+    /// Whether YAML still refuses the value once Codex quotes it, which it
+    /// does to a plain value holding `: `: quoted, such a value is YAML
+    /// while it stays on its line.
+    fn refused_quoted(&self) -> bool {
+        let quoted = self.colon && !self.continued;
+        self.unclosed || (!quoted && (self.colon || self.colon_at_end))
+    }
+}
+
+/// The top-level keys of the frontmatter `lines`: plain, quoted, and `|` or
+/// `>` block scalars, and plain scalars continued on indented lines. None
+/// when a top-level line is not a key.
+fn scalars(lines: &[&str]) -> Option<Scalars> {
+    let mut read = Scalars {
+        keys: BTreeMap::new(),
+        twice: BTreeSet::new(),
+        indented_first: false,
+    };
     let mut index = 0;
     while index < lines.len() {
         let line = lines[index];
         index += 1;
         if line.trim().is_empty() || line.starts_with([' ', '\t', '#']) {
+            read.indented_first |= read.keys.is_empty()
+                && line.starts_with([' ', '\t'])
+                && !line.trim().is_empty()
+                && !line.trim_start().starts_with('#');
             continue;
         }
-        let Some((key, value)) = line.split_once(':') else {
-            return Err(SkillDefect::MalformedFrontmatter);
-        };
+        let (key, value) = line.split_once(':')?;
         let value = value.trim();
         let continued: Vec<&str> = lines[index..]
             .iter()
@@ -154,14 +272,24 @@ pub(crate) fn frontmatter(text: &str) -> Result<BTreeMap<String, String>, SkillD
             .collect();
         index += continued.len();
         let continued: Vec<&str> = continued.iter().map(|line| line.trim()).collect();
-        let value = match value.chars().next() {
-            Some('|') => continued.join("\n").trim_end().to_owned(),
-            Some('>') => fold(&continued),
-            Some(quote @ ('"' | '\'')) => value
-                .strip_prefix(quote)
-                .and_then(|value| value.strip_suffix(quote))
-                .unwrap_or(value)
-                .to_owned(),
+        let mut scalar = Scalar {
+            value: String::new(),
+            colon: false,
+            colon_at_end: false,
+            continued: false,
+            unclosed: false,
+            yaml_string: true,
+        };
+        match value.chars().next() {
+            Some('|') => scalar.value = continued.join("\n").trim_end().to_owned(),
+            Some('>') => scalar.value = fold(&continued),
+            Some(quote @ ('"' | '\'')) => {
+                let inner = value
+                    .strip_prefix(quote)
+                    .and_then(|value| value.strip_suffix(quote));
+                scalar.unclosed = inner.is_none();
+                scalar.value = inner.unwrap_or(value).to_owned();
+            }
             // A key with no value on its line may open a mapping or a list,
             // which is no scalar.
             _ if value.is_empty()
@@ -169,20 +297,81 @@ pub(crate) fn frontmatter(text: &str) -> Result<BTreeMap<String, String>, SkillD
                     .iter()
                     .any(|line| line.contains(": ") || line.starts_with("- ")) =>
             {
-                String::new()
+                scalar.yaml_string = false;
             }
             _ => {
                 let lines = [&[value][..], &continued].concat();
                 // `: ` would start a mapping inside a plain scalar.
-                if lines.iter().any(|line| line.contains(": ")) {
-                    return Err(SkillDefect::MalformedFrontmatter);
-                }
-                fold(&lines)
+                scalar.colon = lines.iter().any(|line| line.contains(": "));
+                scalar.colon_at_end = lines.iter().any(|line| line.ends_with(':'));
+                scalar.continued = continued.iter().any(|line| !line.is_empty());
+                scalar.value = fold(&lines);
+                scalar.yaml_string = !no_yaml_string(&scalar.value);
             }
-        };
-        keys.insert(key.trim().to_owned(), value);
+        }
+        let key = key.trim().to_owned();
+        if read.keys.insert(key.clone(), scalar).is_some() {
+            read.twice.insert(key);
+        }
     }
-    Ok(keys)
+    Some(read)
+}
+
+/// Whether YAML reads the plain value `value` as no string: null, a
+/// boolean, a number or a date, as its core schema and timestamps do, or a
+/// collection, an alias, a tag or a character no plain value starts with.
+fn no_yaml_string(value: &str) -> bool {
+    value.is_empty()
+        || value.starts_with(['[', '{', '*', '!', '@', '`', '#'])
+        || NO_STRING.is_match(value)
+}
+
+/// The plain values YAML reads as null, a boolean, a number or a date.
+static NO_STRING: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(concat!(
+        r"^(?:~|null|Null|NULL|true|True|TRUE|false|False|FALSE",
+        r"|[-+]?(?:0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+)",
+        r"|[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)(?:[eE][-+]?[0-9]+)?",
+        r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)",
+        r"|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt ].*)?)$",
+    ))
+    .expect("the pattern compiles")
+});
+
+/// The `name` and `description` of the frontmatter `lines`, read line by
+/// line as Gemini CLI reads a frontmatter that is not YAML.
+fn line_by_line(lines: &[&str]) -> Result<BTreeMap<String, String>, SkillDefect> {
+    let (mut name, mut description) = (None, None);
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
+        index += 1;
+        if let Some(value) = after_key(line, "name") {
+            name = Some(value.trim().to_owned());
+        } else if let Some(value) = after_key(line, "description") {
+            let mut parts = vec![value.trim()];
+            while let Some(next) = lines
+                .get(index)
+                .filter(|line| line.starts_with([' ', '\t']) && !line.trim().is_empty())
+            {
+                parts.push(next.trim());
+                index += 1;
+            }
+            parts.retain(|part| !part.is_empty());
+            description = Some(parts.join(" "));
+        }
+    }
+    let name = name.ok_or(SkillDefect::NoName)?;
+    let description = description.ok_or(SkillDefect::NoDescription)?;
+    Ok(BTreeMap::from([
+        ("name".to_owned(), name),
+        ("description".to_owned(), description),
+    ]))
+}
+
+/// What follows `<key>:` on `line`, after any blanks before the key.
+fn after_key<'l>(line: &'l str, key: &str) -> Option<&'l str> {
+    line.trim_start().strip_prefix(key)?.strip_prefix(':')
 }
 
 /// Lines folded into one, as YAML folds a plain or `>` scalar.

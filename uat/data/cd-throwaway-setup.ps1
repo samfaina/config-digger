@@ -12,6 +12,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   adds a git Project whose git-versioned Codex layer declares a server
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex skills whose frontmatter is not YAML
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
@@ -20,7 +21,8 @@ param(
     [switch]$Cursor,
     [switch]$NameRule,
     [switch]$PlainString,
-    [switch]$CodexLayer
+    [switch]$CodexLayer,
+    [switch]$Frontmatter
 )
 $ErrorActionPreference = "Stop"
 
@@ -398,6 +400,50 @@ env = { CD_THROWAWAY_TOKEN = "not-a-real-secret" }
     if ($LASTEXITCODE -ne 0) {
         throw "Cannot add .codex\config.toml to the git index of $folder."
     }
+}
+
+# With -Frontmatter, Codex skills whose frontmatter is not YAML: one whose
+# description holds `: `, which Codex reads quoted, and one with a stray
+# line, which it skips. And a Gemini CLI home, gemini-home, whose skills
+# Gemini CLI reads line by line: the same two, which it loads, and one with
+# no `name` line, which it skips. The default data has none, so that no
+# other step counts them.
+if ($Frontmatter) {
+    $gemini = "$Root\gemini-home\.gemini"
+    Write-TestFile "$gemini\settings.json" "{}"
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-colon\SKILL.md" @"
+---
+name: cd-throwaway-fm-gemini-colon
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-stray\SKILL.md" @"
+---
+name: cd-throwaway-fm-gemini-stray
+just text
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-noname\SKILL.md" @"
+---
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+
+    $skills = "$Root\codex-home\skills"
+    Write-TestFile "$skills\cd-throwaway-fm-colon\SKILL.md" @"
+---
+name: cd-throwaway-fm-colon
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+    Write-TestFile "$skills\cd-throwaway-fm-stray\SKILL.md" @"
+---
+name: cd-throwaway-fm-stray
+just text
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
 }
 
 Write-Host "Created the throwaway homes and Projects in $Root"

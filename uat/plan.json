@@ -2182,6 +2182,83 @@
       ]
     },
     {
+      "id": "23",
+      "title": "Frontmatter de skill que no es YAML",
+      "steps": [
+        {
+          "id": "23.1",
+          "title": "Codex lee otra vez un frontmatter que no es YAML",
+          "goal": "Una skill de Codex cuya description lleva «: » sale Effective con su name y esa description, como Codex la lee con el valor entre comillas, y una con una línea suelta en el frontmatter sigue Invalid con la razón malformed_skill.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "Busca cd-throwaway-fm en la lista Items.",
+            "Abre el Item cd-throwaway-fm-colon.",
+            "Lee la configuración de su Entry.",
+            "Abre el Item cd-throwaway-fm-stray.",
+            "Lee la razón de su Entry."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «cd-throwaway-fm-colon» sale «Effective».",
+            "La configuración de su Entry tiene la línea «\"description\": \"Throwaway skill for testing config-digger. Use when: never.\"».",
+            "El Item «cd-throwaway-fm-stray» sale «Invalid».",
+            "Su Entry da la razón «Codex skips this skill: its SKILL.md frontmatter is not valid YAML.»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con frontmatters que no son YAML",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Frontmatter"
+          },
+          "covers": ["#299"]
+        },
+        {
+          "id": "23.2",
+          "title": "Gemini CLI lee línea a línea un frontmatter que no es YAML",
+          "goal": "En un home de Gemini CLI, una skill cuya description lleva «: » y una con una línea suelta salen Effective con su name y su description, leídas línea a línea, y una sin línea name sale Invalid con la razón malformed_skill.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Gemini CLI.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\gemini-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Ve al Inventario.",
+            "En Agents, elige Gemini CLI.",
+            "En Agent home, elige gemini-home.",
+            "Busca cd-throwaway-fm-gemini en la lista Items.",
+            "Abre el Item cd-throwaway-fm-gemini-colon y lee la configuración de su Entry.",
+            "Abre el Item cd-throwaway-fm-gemini-stray.",
+            "Abre el Item cd-throwaway-fm-gemini-noname y lee la razón de su Entry.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\gemini-home, bajo Gemini CLI, pulsa Remove from list."
+          ],
+          "commands": [],
+          "expect": [
+            "Sale el aviso «Added E:\\cd-throwaway\\gemini-home as an Agent home of Gemini CLI.».",
+            "El Item «cd-throwaway-fm-gemini-colon» sale «Effective».",
+            "La configuración de su Entry tiene la línea «\"description\": \"Throwaway skill for testing config-digger. Use when: never.\"».",
+            "El Item «cd-throwaway-fm-gemini-stray» sale «Effective».",
+            "El Item «cd-throwaway-fm-gemini-noname» sale «Invalid».",
+            "Su Entry da la razón «Gemini CLI skips this skill: its SKILL.md frontmatter has no `name`.».",
+            "Al final sale el aviso «Removed E:\\cd-throwaway\\gemini-home of Gemini CLI from config-digger's list. Nothing on disk changed.»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con frontmatters que no son YAML",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Frontmatter"
+          },
+          "covers": ["#299"]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [

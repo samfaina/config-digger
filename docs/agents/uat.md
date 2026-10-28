@@ -60,6 +60,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  # adds Claude Code skills whose folder names break its name rule
 .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  # adds a Project whose Claude Code settings hold plain-string MCP lists
 .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   # adds a git Project whose git-versioned Codex layer declares a server
+.\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  # adds Codex skills whose frontmatter is not YAML
 ```
 
 `-NameRule` adds three skills to the Claude Code home: one whose folder name starts with a space, one with a zero-width space in it, and one with a space inside it, which the rule keeps, all named `cd-throwaway-name…`. They stay out of the default data, so that no other step counts them; step 19.1 walks them.
@@ -67,6 +68,8 @@ When a change to the app makes a step wrong, change the step's text and keep its
 `-PlainString` adds `project-plain`, whose `.mcp.json` declares four `cd-throwaway-plain-*` servers and whose `.claude\settings.local.json` holds `enabledMcpjsonServers` and `disabledMcpjsonServers` as one plain-string name each, as Claude Code reads them since 2.1.299. Claude Code's state does not record the Project, so that Disable writes its local settings rather than `~/.claude.json`; steps 20.1 and 20.2 add it by hand and remove it at the end.
 
 `-CodexLayer` adds `codex-project`, a git repo made with `git init` that the Codex home trusts, whose `.codex\config.toml`, added to the git index, declares `cd-throwaway-codex-layer`, a server the Codex home does not declare. Disable of it writes a Stand-in in the home's `config.toml`; step 22.1 walks it.
+
+`-Frontmatter` adds two skills to the Codex home's `skills` folder whose frontmatter is not YAML: `cd-throwaway-fm-colon`, whose `description` holds `: `, which Codex reads quoted, and `cd-throwaway-fm-stray`, with a line that is no key, which Codex skips. Step 23.1 walks them. It also adds `gemini-home`, a Gemini CLI home whose `.gemini\skills` holds the same two, which Gemini CLI reads line by line, and `cd-throwaway-fm-gemini-noname`, with no `name` line, which it skips. Step 23.2 adds the home, walks them and takes the home off the list again.
 
 `-Cursor` writes Cursor's files as they would be in an `%APPDATA%` of their own, `cursor-appdata`: Cursor has run and opened `cursor-project`, a git repo, made with `git init`, whose `packages\app\.cursor\skills` holds a skill. A step that needs them starts the app with `APPDATA` set to that folder, as step 17.1 does.
 

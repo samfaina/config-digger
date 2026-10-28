@@ -253,6 +253,137 @@ fn a_plugin_s_skill_folders_are_found_up_to_6_folders_below_its_skills_folder() 
     assert!(!has_item(&inventory, "linear:seven"));
 }
 
+/// The skills of a Codex home whose user skill folder `folder` holds a
+/// `SKILL.md` with `text`, and whose plugin `linear` holds the same skill.
+fn with_skill_md(text: &str) -> Inventory {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new()
+        .with_file(user_config(), on(&["linear@openai-curated"]))
+        .with_file(skill(&Path::new(CODEX).join("skills"), "folder"), text)
+        .with_file(skill(&linear.join("skills"), "folder"), text);
+    inventory(&fs)
+}
+
+/// The one Codex skill of the user skills folder, and the plugin's.
+fn only_skills(inventory: &Inventory) -> Vec<&Item> {
+    let skills: Vec<&Item> = codex_items(inventory)
+        .filter(|item| code(item.kind) == "skill")
+        .collect();
+    assert_eq!(skills.len(), 2, "{skills:?}");
+    skills
+}
+
+#[test]
+fn a_description_holding_a_colon_and_space_is_read_quoted() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Use when: the user asks\n---\n");
+
+    for name in ["review", "linear:review"] {
+        let review = item(&inventory, name);
+        assert_eq!(states(review), ["effective"]);
+        assert_eq!(
+            entry_json(&review.entries[0])["config"],
+            json!({ "name": "review", "description": "Use when: the user asks" })
+        );
+    }
+}
+
+#[test]
+fn an_unclosed_bracket_names_the_skill_as_written() {
+    let inventory = with_skill_md("---\nname: [unclosed\ndescription: Reviews.\n---\n");
+
+    assert_eq!(states(item(&inventory, "[unclosed")), ["effective"]);
+    assert_eq!(states(item(&inventory, "linear:[unclosed")), ["effective"]);
+}
+
+/// The reason of each of the two skills, which are Invalid.
+fn invalid_reasons(inventory: &Inventory) -> Vec<String> {
+    only_skills(inventory)
+        .into_iter()
+        .map(|skill| {
+            assert_eq!(states(skill), ["invalid"]);
+            let reason = skill.entries[0].reason.as_ref().unwrap();
+            assert_eq!(code(reason.code), "malformed_skill");
+            reason.sentence.clone()
+        })
+        .collect()
+}
+
+#[test]
+fn a_frontmatter_codex_cannot_read_even_quoted_is_invalid() {
+    for text in [
+        // A stray line.
+        "---\nname: review\njust text\ndescription: Use when: x\n---\n",
+        // An indented `name`.
+        "---\n  name: review\ndescription: Reviews.\n---\n",
+        // Two `name` lines.
+        "---\nname: review\nname: other\ndescription: Reviews.\n---\n",
+        // A value holding `: ` that goes on.
+        "---\nname: review\ndescription: Use when: x\n  and y\n---\n",
+        // A value ending in `:` without `: `.
+        "---\nname: review\ndescription: Use for the following:\n---\n",
+        // A quote that never closes.
+        "---\nname: \"review\ndescription: Use when: x\n---\n",
+    ] {
+        let inventory = with_skill_md(text);
+
+        for sentence in invalid_reasons(&inventory) {
+            assert!(
+                sentence.contains("is not valid YAML"),
+                "{text:?}: {sentence}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_value_ending_in_a_colon_is_read_quoted_when_it_holds_a_colon_and_space() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Use when: asked for:\n---\n");
+
+    let review = item(&inventory, "review");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"]["description"],
+        "Use when: asked for:"
+    );
+}
+
+#[test]
+fn a_frontmatter_without_a_name_line_is_invalid() {
+    let inventory = with_skill_md("---\ndescription: Use when: x\n---\n");
+
+    for sentence in invalid_reasons(&inventory) {
+        assert!(sentence.contains("has no `name`"), "{sentence}");
+    }
+}
+
+#[test]
+fn an_unclosed_frontmatter_is_no_frontmatter() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Reviews.\n");
+
+    for sentence in invalid_reasons(&inventory) {
+        assert!(
+            sentence.contains("does not open with a `---` frontmatter"),
+            "{sentence}"
+        );
+    }
+}
+
+#[test]
+fn skill_content_reads_the_frontmatter_as_the_inventory_does() {
+    let folder = Path::new(CODEX).join(r"skills\folder");
+    let fs = FakeFileSystem::new().with_file(
+        folder.join("SKILL.md"),
+        "---\nname: review\ndescription: Use when: x\n---\n",
+    );
+
+    let content = core_with(&fs).skill_content(&folder, "codex").unwrap();
+
+    assert_eq!(
+        (content.name.as_deref(), content.description.as_deref()),
+        (Some("review"), Some("Use when: x"))
+    );
+}
+
 /// A plugin's `.mcp.json` declaring the server `name` at `url`.
 fn mcp_json(name: &str, url: &str) -> String {
     json!({ "mcpServers": { name: { "url": url } } }).to_string()
