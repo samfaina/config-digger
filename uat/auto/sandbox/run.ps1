@@ -9,19 +9,29 @@
 # - walk: 8.1, 9.5, 9.6, 9.2, 9.3, 9.4, 13.2, 13.3, 13.4 and 13.6 on the
 #   release's installer and CLI zip, downloaded with gh into the folder the
 #   Sandbox sees as C:\Descargas, as 9.5's commands expect.
-# - update: 12.2, between the two installers build-update.ps1 writes to
-#   -Update. Run build-update.ps1 first.
+# - update: 12.2, between installers A and B, which build-update.ps1 builds
+#   first, before any Sandbox opens, from -Commit, the release candidate's
+#   tag by default, into <Work>\update. -Update takes the installers folder
+#   of a build made before instead.
 #
-# Each run opens one Sandbox, whose LogonCommand runs in-sandbox.ps1, waits
-# for its results\done.txt, and waits for the Sandbox to close, since only
-# one runs at a time. Needs Windows Sandbox (Pro, Enterprise or Education)
-# and gh. Everything it installs stays in the Sandbox. It takes no
-# screenshot, and writes nothing in the repository.
+# Each run opens one Sandbox with open-sandbox.ps1, whose LogonCommand runs
+# in-sandbox.ps1, and waits for it to close, since only one runs at a time.
+# Needs Windows Sandbox (Pro, Enterprise or Education), gh, and for the
+# build what release.yml's needs. Everything it installs stays in the
+# Sandbox. Everything it writes on this PC is under -Work, which each run
+# starts again: the checkout of the commit, the builds, the key, the .wsb
+# files, the Sandbox's results and uat-results.json, but for npm's, cargo's
+# and tauri's shared caches, which any build fills. It takes no screenshot,
+# and writes nothing in the repository.
 param(
     [Parameter(Mandatory)] [string]$Version,
     [string]$Work = "$env:TEMP\cd-uat-sandbox",
     [ValidateSet("walk", "update")] [string[]]$Runs = @("walk", "update"),
-    [string]$Update = "$env:TEMP\cd-uat-update\installers",
+    # The commit installers A and B are built from.
+    [string]$Commit = "v$Version",
+    # The installers folder build-update.ps1 wrote before, to update between
+    # its installers instead of building them.
+    [string]$Update = "",
     [string]$Out = "",
     [int]$TimeoutMinutes = 40,
     # A folder holding the installer and the CLI zip of a build that is not
@@ -30,15 +40,30 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo = (Resolve-Path "$PSScriptRoot\..\..\..").Path
+New-Item -ItemType Directory -Force $Work | Out-Null
+$Work = (Resolve-Path -LiteralPath $Work).Path
 if (-not $Out) { $Out = "$Work\uat-results.json" }
+if (Test-Path -LiteralPath $Out) { Remove-Item -LiteralPath $Out }
 $release = "$Work\release"
 $scripts = "$Work\scripts"
-New-Item -ItemType Directory -Force $Work, $release, $scripts | Out-Null
+# What an earlier run wrote, but the build's, which build-update.ps1 starts
+# again itself.
+Get-ChildItem $Work -Force | Where-Object { $_.Name -in "release", "scripts" -or $_.Name -like "results-*" -or $_.Name -like "*.wsb" } | Remove-Item -Recurse -Force
+New-Item -ItemType Directory $release, $scripts | Out-Null
+
+# A and B first: a build that fails stops the command.
+if ($Runs -contains "update") {
+    if (-not $Update) {
+        & "$PSScriptRoot\build-update.ps1" -Commit $Commit -Work "$Work\update" -Repo $repo
+        $Update = "$Work\update\installers"
+    }
+    if (-not (Test-Path "$Update\latest.json")) { throw "no $Update\latest.json: -Update takes the installers folder build-update.ps1 writes" }
+    $Update = (Resolve-Path -LiteralPath $Update).Path
+}
 
 # The release's assets, named after its version.
 $setupName = "config-digger_${Version}_x64-setup.exe"
 $zipName = "config-digger_${Version}_x64-cli.zip"
-Remove-Item "$release\*" -Force -ErrorAction SilentlyContinue
 if ($From) {
     Copy-Item "$From\$setupName", "$From\$zipName" $release
 } else {
@@ -53,10 +78,6 @@ foreach ($file in @(Get-ChildItem "$PSScriptRoot\*.ps1") + (Get-Item "$repo\uat\
 }
 Copy-Item "$repo\uat\plan.json" $scripts -Force
 
-function WaitSandboxClosed([int]$seconds = 180) {
-    $end = (Get-Date).AddSeconds($seconds)
-    while ((Get-Process -Name WindowsSandbox* -ErrorAction SilentlyContinue) -and (Get-Date) -lt $end) { Start-Sleep -Seconds 3 }
-}
 function Mapped([string]$hostFolder, [string]$sandbox, [bool]$readOnly) {
     "<MappedFolder><HostFolder>$hostFolder</HostFolder><SandboxFolder>$sandbox</SandboxFolder><ReadOnly>$($readOnly.ToString().ToLower())</ReadOnly></MappedFolder>"
 }
@@ -71,10 +92,7 @@ foreach ($run in $Runs) {
         (Mapped $scripts "C:\uat\scripts" $true),
         (Mapped $results "C:\uat\results" $false)
     )
-    if ($run -eq "update") {
-        if (-not (Test-Path "$Update\latest.json")) { throw "no $Update\latest.json: run build-update.ps1 first" }
-        $folders += Mapped (Resolve-Path $Update).Path "C:\uat\update" $true
-    }
+    if ($run -eq "update") { $folders += Mapped $Update "C:\uat\update" $true }
     $wsb = "$Work\$run.wsb"
     Set-Content $wsb @"
 <Configuration>
@@ -86,13 +104,7 @@ foreach ($run in $Runs) {
   <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\uat\scripts\in-sandbox.ps1 -Run $run -Version $Version</Command></LogonCommand>
 </Configuration>
 "@
-    WaitSandboxClosed
-    Write-Host "$run`: opening Windows Sandbox"
-    Start-Process $wsb
-    $end = (Get-Date).AddMinutes($TimeoutMinutes)
-    while (-not (Test-Path "$results\done.txt") -and (Get-Date) -lt $end) { Start-Sleep -Seconds 10 }
-    if (-not (Test-Path "$results\done.txt")) { Write-Warning "$run`: no done.txt after $TimeoutMinutes minutes" }
-    WaitSandboxClosed
+    & "$PSScriptRoot\open-sandbox.ps1" -Wsb $wsb -Results $results -TimeoutMinutes $TimeoutMinutes
     $logs += "$results\results.jsonl"
 }
 
@@ -109,7 +121,7 @@ $about = @{
     "13.3" = "Desinstalador manejado con UI Automation en Windows Sandbox, con una Entry aparcada una vez: el paso 7.2 no se hace en el Sandbox, así que se espera una línea."
     "13.4" = "Reinstalado con /S y desinstalado con UI Automation en Windows Sandbox; la orden del paso, tal cual."
     "13.6" = "Instalado y reinstalado con /S y desinstalado con UI Automation en Windows Sandbox, con HKCU\Environment bloqueado por la orden del paso; la desinstalación sin preguntas, con Start-Process, vigilando que no salga ningún aviso."
-    "12.2" = "El paso pide Bloqueado con una release candidate, porque el updater solo lee releases/latest. Aquí se comprobó la actualización de verdad contra un endpoint local: A y B compilados del mismo commit con build-update.ps1, con una clave de usar y tirar hecha para esta ejecución (no la de la release, que sigue en su secreto de GitHub) y http://127.0.0.1:8765/latest.json, en Windows Sandbox. About, Check now e Install and restart, pulsados con UI Automation; History, con el CLI."
+    "12.2" = "El paso pide Bloqueado con una release candidate, porque el updater solo lee releases/latest. Aquí se comprobó la actualización de verdad contra un endpoint local: A y B compilados del mismo commit con build-update.ps1, con una clave de usar y tirar hecha para esta ejecución (no la de la release, que sigue en su secreto de GitHub) y http://127.0.0.1:8765/latest.json, en Windows Sandbox. About, Check now e Install and restart, pulsados con UI Automation; History, con el CLI; las listas y los ajustes, comparando la carpeta de datos roaming archivo a archivo antes y después."
 }
 $lines = foreach ($log in $logs) { if (Test-Path $log) { Get-Content $log -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } } }
 $verdicts = [System.Collections.Generic.List[object]]::new()

@@ -82,6 +82,18 @@ function WhilePathBlocked([string]$id, [scriptblock]$body) {
 }
 
 . C:\uat\scripts\ui-installer.ps1
+. C:\uat\scripts\checks.ps1
+
+# Checks the Already Installed page against the line of step $id's expect
+# that names it: its text and the choice it offers.
+function AlreadyInstalled([string]$id, $window) {
+    $text, $choice = PlanQuotes $plan $id "Already Installed" $Version
+    $radio = Control $window "RadioButton" ([regex]::Escape($choice))
+    Check $id "the Already Installed page offers $choice" $radio.Current.Name $choice
+    $texts = Texts $window
+    Note $id "already installed page: $texts"
+    Check $id "the Already Installed page's text" $(if ($texts.Contains($text)) { $text } else { $texts }) $text
+}
 
 try {
     Note "run" "sandbox user $env:USERNAME, culture $((Get-Culture).Name), PowerShell $($PSVersionTable.PSVersion), run $Run, version $Version"
@@ -187,7 +199,7 @@ try {
         Press $box
         Check "9.3" "PATH box unticked" (Ticked $box) $false
         Next $w
-        Note "9.3" "already installed page: $(Texts $w)"
+        AlreadyInstalled "9.3" $w
         Reinstall $w
         Finish $w $p
         Check "9.3" "Get-Command in a new terminal" (CommandSource) "not recognized"
@@ -202,6 +214,7 @@ try {
         Check "9.4" "PATH box starts unticked" (Ticked $box) $false
         Press $box
         Next $w
+        AlreadyInstalled "9.4" $w
         Reinstall $w
         Finish $w $p
         Check "9.4" "Get-Command in a new terminal" (CommandSource) "$installDir\config-digger.exe"

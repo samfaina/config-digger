@@ -2,11 +2,10 @@
 # before each release candidate (docs/agents/uat.md, "The local script").
 # It runs, in order:
 #
-# 1. sandbox\build-update.ps1, the two installers 12.2 updates between, built
+# 1. sandbox\run.ps1, the Sandbox walk: 8.1, 9.1 to 9.6, 12.2, 13.2 to 13.4
+#    and 13.6, which first builds the two installers 12.2 updates between
 #    from the release candidate's tag;
-# 2. sandbox\run.ps1, the Sandbox walk: 8.1, 9.1 to 9.6, 12.2, 13.2 to 13.4
-#    and 13.6;
-# 3. webdriver\run.ps1, the WebDriver walk on the release build -App, with
+# 2. webdriver\run.ps1, the WebDriver walk on the release build -App, with
 #    7.2 and 13.1 with Claude Desktop open, and 14.2 on the tester's own homes.
 #
 # It stops at the first one that fails, saying which. Then it writes one
@@ -53,9 +52,7 @@ function RunTool([string]$name, [string]$script, [hashtable]$parameters, [string
     if ($LASTEXITCODE) { throw ("$name failed with exit code ${LASTEXITCODE}: see its output above. $skipped").TrimEnd() }
 }
 try {
-    $update = Join-Path $Work "update"
-    RunTool "build-update.ps1" "$here\sandbox\build-update.ps1" @{ Commit = "v$Version"; Work = $update } "The Sandbox walk and the WebDriver walk did not run."
-    RunTool "The Sandbox walk" "$here\sandbox\run.ps1" @{ Version = $Version; Work = (Join-Path $Work "sandbox"); Update = (Join-Path $update "installers") } "The WebDriver walk did not run."
+    RunTool "The Sandbox walk" "$here\sandbox\run.ps1" @{ Version = $Version; Work = (Join-Path $Work "sandbox") } "The WebDriver walk did not run."
     RunTool "The WebDriver walk" "$here\webdriver\run.ps1" @{ App = $App; Work = $Work; Root = $Root }
     node "$here\results.mjs" --work $Work
     if ($LASTEXITCODE) { throw "writing $results failed: see its output above" }
