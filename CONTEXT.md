@@ -108,6 +108,10 @@ _Avoid_: Off, inactive
 Said of a Disabled Entry that config-digger moved out of its Agent's reach into its own store, because the Agent has no native way to Disable it; Enable puts it back where it was parked from, its origin: an Agent, one of its Agent homes, a location and, when keyed to one, a Project. The store is never pruned.
 _Avoid_: Stashed, archived, moved
 
+**Stand-in**:
+A table in a user file that holds just enough of a server for its Agent to accept it, and the switch that turns it off, written to Disable a server of a git-versioned layer without writing to that layer. It turns the server off in every Project that declares it; in any other folder it is a Disabled server of its own, which only Remove takes away. Enable deletes it whole, whoever wrote it.
+_Avoid_: Placeholder, dummy, shadow table
+
 **Partial switch**:
 A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note.
 _Avoid_: Partial disable, partly off
