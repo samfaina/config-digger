@@ -3594,6 +3594,17 @@ impl Compete for Competition {
 }
 
 impl Competition {
+    /// How the Agent ranks plugins' Entries by a setting, if it does.
+    pub fn plugin_order(&self) -> Option<&PluginOrder> {
+        match self {
+            Competition::ExactName(block) => block.plugin_order.as_ref(),
+            Competition::CaseInsensitiveName(_)
+            | Competition::PathKey(_)
+            | Competition::SameUrl(_)
+            | Competition::Never(_) => None,
+        }
+    }
+
     /// The ids of the locations whose Entries compete by endpoint.
     pub fn endpoint_locations(&self) -> &[String] {
         match self {
@@ -3749,11 +3760,65 @@ pub(crate) struct ExactName {
     /// Claude Code's plugin servers.
     #[serde(default)]
     pub by_endpoint: Vec<String>,
+    /// How the Agent ranks the Entries of some `by_endpoint` locations by
+    /// the place of their plugin in a setting. Omitted, by location alone.
+    pub plugin_order: Option<PluginOrder>,
 }
 
 impl Validate for ExactName {
     fn validate(&self) -> Result<(), String> {
+        let Some(order) = &self.plugin_order else {
+            return Ok(());
+        };
+        order.validate().map_err(|e| format!("plugin_order: {e}"))?;
+        if let Some(id) = order
+            .locations
+            .iter()
+            .find(|id| !self.by_endpoint.contains(id))
+        {
+            return Err(format!("plugin_order: `{id}` does not compete by endpoint"));
+        }
         Ok(())
+    }
+}
+
+/// The order in which the Agent ranks plugins, as Claude Code ranks two
+/// plugins' servers with one endpoint by `enabledPlugins`: the keys of an
+/// object, each a plugin's id, merged from its sources in order, each key
+/// keeping the place where it first appears. The Entries of `locations`
+/// rank together where the first of them ranks: by their plugin's place,
+/// a plugin no source names last, and within one plugin by location.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginOrder {
+    /// The ids of the `by_endpoint` locations whose Entries it ranks.
+    pub locations: Vec<String>,
+    /// Where the object is, in the order the Agent merges it, the first
+    /// first. Every source reads the same key path.
+    pub sources: Vec<SettingPlace>,
+}
+
+impl Validate for PluginOrder {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("locations needs a location".into());
+        }
+        validate_sources(&self.sources)?;
+        if self
+            .sources
+            .iter()
+            .any(|source| source.key_path != self.sources[0].key_path)
+        {
+            return Err("every source reads the same key path".into());
+        }
+        Ok(())
+    }
+}
+
+impl PluginOrder {
+    /// The key path of the object, such as `["enabledPlugins"]`.
+    pub fn key_path(&self) -> &[String] {
+        &self.sources[0].key_path
     }
 }
 

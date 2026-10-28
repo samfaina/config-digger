@@ -211,9 +211,10 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            // Within a group of `precedence`, the folder an Entry was found in
-            // comes first. A later file of a settings source overrides an
-            // earlier one.
+            // Entries the competition ranks by plugin rank together, by their
+            // plugin's place. Within a group of `precedence`, the folder an
+            // Entry was found in comes first. A later file of a settings
+            // source overrides an earlier one.
             let rank = |entry: &ScannedEntry| {
                 let (item, in_group) = definition.group_rank(definition.location(&entry.location));
                 let folder = entry
@@ -222,6 +223,7 @@ pub(crate) fn resolve(
                     .filter(|_| in_group.is_some())
                     .map(paths::folder_order);
                 (
+                    plugin_rank(definition, snapshot, entry, project_key.map(String::as_str)),
                     item,
                     folder,
                     in_group,
@@ -404,17 +406,35 @@ pub(crate) fn resolve(
                 })
                 .collect();
             let shadowed_by = |index: usize, winner: usize| {
-                let same_endpoint = definition
-                    .rules(kind)
-                    .competition
-                    .by_endpoint(&entries[index].location)
+                let competition = &definition.rules(kind).competition;
+                let same_endpoint = competition.by_endpoint(&entries[index].location)
                     && blocks::endpoint(&entries[index].config)
                         == blocks::endpoint(&entries[winner].config);
                 let same_url = urls[index].is_some() && urls[index] == urls[winner];
+                let effective_scope = &definition.location(&entries[winner].location).scope;
+                let effective = locator::render(&entries[winner].path, &entries[winner].key_path);
+                let place = |entry: &ScannedEntry| {
+                    plugin_place(definition, snapshot, entry, project_key.map(String::as_str))
+                };
+                // The winner's plugin comes first in the order the Agent ranks plugins by.
+                if let (Some(order), Some(lost), Some(won)) = (
+                    competition.plugin_order(),
+                    place(entries[index]),
+                    place(entries[winner]),
+                ) && won < lost
+                {
+                    return explain::shadowed_by_plugin_order(
+                        agent_name,
+                        effective_scope,
+                        &effective,
+                        same_endpoint || same_url,
+                        &order.key_path().join("."),
+                    );
+                }
                 explain::shadowed_by_precedence(
                     agent_name,
-                    &definition.location(&entries[winner].location).scope,
-                    &locator::render(&entries[winner].path, &entries[winner].key_path),
+                    effective_scope,
+                    &effective,
                     rank(entries[index]) == rank(entries[winner]),
                     same_endpoint || same_url,
                 )
@@ -1468,7 +1488,12 @@ fn item_key(
                 && other.name == entry.name
                 && competition.by_endpoint(&other.location)
         })
-        .min_by_key(|other| definition.rank(definition.location(&other.location)))
+        .min_by_key(|other| {
+            (
+                plugin_rank(definition, snapshot, other, project),
+                definition.rank(definition.location(&other.location)),
+            )
+        })
         .copied()
         .unwrap_or(entry);
     let Some(endpoint) = blocks::endpoint(&same_name.config) else {
@@ -1489,6 +1514,72 @@ fn item_key(
         Some(other) => by_name(other),
         None => ItemKey::Endpoint(endpoint),
     }
+}
+
+/// The first part of the rank of `entry` among its kind, in the context of
+/// the Project with the key `project`, a pair: for an Entry of a location
+/// its competition ranks by plugin, the place in `precedence` of the
+/// highest of that order's locations, then its plugin's place in the order;
+/// for any other Entry, the place of its own location, then 0. The place of
+/// its own location breaks a tie.
+fn plugin_rank(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> (usize, usize) {
+    let location = definition.location(&entry.location);
+    let order = definition.rules(location.kind).competition.plugin_order();
+    match (order, plugin_place(definition, snapshot, entry, project)) {
+        (Some(order), Some(place)) => {
+            let first = order
+                .locations
+                .iter()
+                .map(|id| definition.group_rank(definition.location(id)).0)
+                .min()
+                .expect("validation gives a plugin order a location");
+            (first, place)
+        }
+        _ => (definition.group_rank(location).0, 0),
+    }
+}
+
+/// The place of the plugin of `entry` in the order its competition ranks
+/// plugins by, in the context of the Project with the key `project`, after
+/// every plugin the order names when it names none: `None` for an Entry of
+/// a location the order does not rank.
+fn plugin_place(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<usize> {
+    let location = definition.location(&entry.location);
+    let order = definition.rules(location.kind).competition.plugin_order()?;
+    if !order.locations.contains(&location.id) {
+        return None;
+    }
+    let objects = (0..order.sources.len()).flat_map(|source| {
+        let owner = SettingOwner::PluginOrder { source };
+        snapshot
+            .settings_for(entry, location.kind, owner, project)
+            .filter_map(|setting| setting.value.as_ref())
+    });
+    // Each plugin id keeps the place where it first appears.
+    let mut merged: Vec<&str> = Vec::new();
+    for id in objects
+        .filter_map(serde_json::Value::as_object)
+        .flat_map(|object| object.keys())
+    {
+        if !merged.contains(&id.as_str()) {
+            merged.push(id);
+        }
+    }
+    let id = entry.plugin.as_ref().map(|plugin| plugin.id.as_str());
+    Some(
+        id.and_then(|id| merged.iter().position(|known| *known == id))
+            .unwrap_or(merged.len()),
+    )
 }
 
 /// The Agent home of `entry`, when the Agent's lookup order skips it.

@@ -29,11 +29,7 @@ pub(crate) fn shadowed_by_precedence(
     tied: bool,
     same_endpoint: bool,
 ) -> Reason {
-    let endpoint = if same_endpoint {
-        "has the same endpoint and "
-    } else {
-        ""
-    };
+    let endpoint = same_endpoint_words(same_endpoint);
     let why = if tied {
         format!(
             "which {endpoint}has the same precedence in {agent_name}; which of the two it uses is not known"
@@ -48,6 +44,38 @@ pub(crate) fn shadowed_by_precedence(
         effective: Some(effective.to_owned()),
         switch: None,
         sentence: format!("Shadowed by the {effective_scope} Entry {effective}, {why}."),
+    }
+}
+
+/// A Shadowed Entry's reason, pointing at the Effective Entry `effective`
+/// of another plugin, which `agent_name` ranks first because that plugin
+/// comes first in the setting at `key_path`, joined with `.`.
+/// `same_endpoint` says they compete because they have the same endpoint.
+pub(crate) fn shadowed_by_plugin_order(
+    agent_name: &str,
+    effective_scope: &str,
+    effective: &str,
+    same_endpoint: bool,
+    key_path: &str,
+) -> Reason {
+    let endpoint = same_endpoint_words(same_endpoint);
+    Reason {
+        code: ReasonCode::ShadowedByPrecedence,
+        effective: Some(effective.to_owned()),
+        switch: None,
+        sentence: format!(
+            "Shadowed by the {effective_scope} Entry {effective}, which {endpoint}{agent_name} ranks first, since its plugin comes first in `{key_path}`."
+        ),
+    }
+}
+
+/// The words a Shadowed Entry's reason says, after "which", of an Entry it
+/// competes with because they have the same endpoint, if they do.
+fn same_endpoint_words(same_endpoint: bool) -> &'static str {
+    if same_endpoint {
+        "has the same endpoint and "
+    } else {
+        ""
     }
 }
 
