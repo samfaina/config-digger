@@ -7,6 +7,10 @@ import { choose, go, press, tab, wait, waitNotice } from "../lib.mjs";
 // script makes long enough to wrap in step 10.10.
 export const DESKTOP_HOME = "paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home";
 
+// The folder `name` under the walk's root, with /, as Claude Code keys its
+// Projects and the plan writes them: «<root>/project-gone».
+export const rootSlash = (t, name) => `${t.root.replaceAll("\\", "/")}/${name}`;
+
 // Add Agent home with `agent` and `folder` typed in, as 1.2, 10.2 and 10.3 do,
 // and the checks they share: the notice, the row under its Agent's group, its
 // tags, and no row under another group.

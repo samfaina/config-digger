@@ -3,7 +3,7 @@
 import { dirname, join } from "node:path";
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { buttonEl, choose, fieldValue, go, notices, panel, press, rowButton, tab, typeInto, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, checkBeforeYouApply, confirm, DESKTOP_HOME, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, waitPreview } from "./common.mjs";
+import { act, addHome, checkBeforeYouApply, confirm, DESKTOP_HOME, dialog, dialogParts, done, homeGroups, inventoryOf, openItem, operationId, pickFolder, rootSlash, waitPreview } from "./common.mjs";
 import { loadingState } from "./loading.mjs";
 
 // The Projects tab, as groups: each heading's text, whether it is open, and
@@ -312,11 +312,12 @@ export default [
       t.eq(missing?.title, "▾ Missing · 1", "el grupo «▾ Missing · 1»");
       t.check(missing?.open, "el grupo Missing está abierto");
       const gone = missing?.rows[0];
-      t.path(gone?.name, "E:/cd-throwaway/project-gone", "en Missing sale «E:/cd-throwaway/project-gone»");
+      const goneAt = rootSlash(t, "project-gone");
+      t.path(gone?.name, goneAt, `en Missing sale «${goneAt}»`);
       t.eq(gone?.subs.join(" | "), "The folder no longer exists", "con la línea «The folder no longer exists»");
       t.eq(gone?.tags.join("|"), "known to Claude Code", "con la etiqueta «known to Claude Code»");
       t.eq(gone?.count, "1 leftover", "y «1 leftover»");
-      t.check(!missing?.rows.some((r) => /project-deleted$/.test(r.name)), "«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1»", missing?.rows.map((r) => r.name).join(", "));
+      t.check(!missing?.rows.some((r) => /project-deleted$/.test(r.name)), `«${rootSlash(t, "project-deleted")}» no sale en el grupo «Missing · 1»`, missing?.rows.map((r) => r.name).join(", "));
       const next = groups[groups.indexOf(missing) + 1];
       t.check(next?.title === "▸ Missing, no leftovers · 1" && !next.open, "tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado", next && `${next.title} ${next.open ? "abierto" : "cerrado"}`);
     },
@@ -331,8 +332,9 @@ export default [
       await typeInto(s, search, "deleted");
       let noLeftovers = noLeftoversGroup(await projectGroups(s));
       const row = noLeftovers?.rows.find((r) => /project-deleted$/.test(r.name));
+      const deleted = rootSlash(t, "project-deleted");
       t.check(noLeftovers?.title === "Missing, no leftovers · 1" && noLeftovers.open, "con deleted, el grupo «Missing, no leftovers · 1» se abre solo", noLeftovers && `${noLeftovers.title} ${noLeftovers.open ? "abierto" : "cerrado"}`);
-      t.check(row && t.path(row.name, "E:/cd-throwaway/project-deleted"), "con deleted, ese grupo muestra «E:/cd-throwaway/project-deleted»", noLeftovers?.rows.map((r) => r.name).join(", "));
+      t.check(row && t.path(row.name, deleted), `con deleted, ese grupo muestra «${deleted}»`, noLeftovers?.rows.map((r) => r.name).join(", "));
       t.check(
         row?.subs.join(" | ") === "The folder no longer exists" && row.count === "No leftovers" && row.tags.join("|") === "known to Claude Code",
         "la fila de project-deleted dice «The folder no longer exists» y «No leftovers», y lleva la etiqueta «known to Claude Code»",
@@ -343,10 +345,10 @@ export default [
       noLeftovers = noLeftoversGroup(await projectGroups(s));
       t.check(noLeftovers?.title === "▸ Missing, no leftovers · 1" && !noLeftovers.open, "al borrar lo escrito, el grupo vuelve a «▸ Missing, no leftovers · 1», cerrado", noLeftovers && `${noLeftovers.title} ${noLeftovers.open ? "abierto" : "cerrado"}`);
       await openGroup(s, "Missing, no leftovers");
-      const path = row?.name ?? "E:/cd-throwaway/project-deleted";
+      const path = row?.name ?? deleted;
       await s.click(await s.until(() => rowButton(s, path, "Hide"), { what: "Hide" }));
       const hid = await waitNotice(s, `Hid ${path}`);
-      t.eq(hid.text, `Hid ${path}. Picking it in the Inventory still evaluates it.`, "Hide da el aviso «Hid E:/cd-throwaway/project-deleted. Picking it in the Inventory still evaluates it.»");
+      t.eq(hid.text, `Hid ${path}. Picking it in the Inventory still evaluates it.`, `Hide da el aviso «Hid ${path}. Picking it in the Inventory still evaluates it.»`);
       let groups = await projectGroups(s);
       t.check(!noLeftoversGroup(groups), "tras Hide, el grupo «Missing, no leftovers» ya no sale", groups.map((g) => g.title).join(", "));
       await openGroup(s, "Hidden");
@@ -355,7 +357,7 @@ export default [
       t.eq(hidden?.tags.join("|"), "known to Claude Code|missing|hidden", "el grupo «Hidden · 1» muestra project-deleted con las etiquetas «known to Claude Code», «missing» y «hidden»");
       await s.click(await s.until(() => rowButton(s, path, "Unhide"), { what: "Unhide" }));
       const listed = await waitNotice(s, `${path} is listed again`);
-      t.eq(listed.text, `${path} is listed again.`, "Unhide da el aviso «E:/cd-throwaway/project-deleted is listed again.»");
+      t.eq(listed.text, `${path} is listed again.`, `Unhide da el aviso «${path} is listed again.»`);
       await openGroup(s, "Missing, no leftovers");
       noLeftovers = noLeftoversGroup(await projectGroups(s));
       t.check(noLeftovers?.title.endsWith("Missing, no leftovers · 1") && noLeftovers.rows.some((r) => r.name === path), "tras Unhide, project-deleted vuelve al grupo «Missing, no leftovers · 1»", noLeftovers?.title);
@@ -368,8 +370,9 @@ export default [
         options: [...document.querySelectorAll(".select-panel [role=option]")].map((o) => o.textContent.trim()),
       };`);
       const missing = field.groups.find((g) => g.title === "MISSING PROJECTS");
-      t.check(missing?.options.some((o) => t.path(o.split(" · ")[0], "E:/cd-throwaway/project-gone")), "en el campo Project, el grupo «MISSING PROJECTS» muestra «E:/cd-throwaway/project-gone»", JSON.stringify(field.groups));
-      t.check(!field.options.some((o) => /project-deleted/.test(o)), "«E:/cd-throwaway/project-deleted» no sale en el campo Project", field.options.join(", "));
+      const gone = rootSlash(t, "project-gone");
+      t.check(missing?.options.some((o) => t.path(o.split(" · ")[0], gone)), `en el campo Project, el grupo «MISSING PROJECTS» muestra «${gone}»`, JSON.stringify(field.groups));
+      t.check(!field.options.some((o) => /project-deleted/.test(o)), `«${deleted}» no sale en el campo Project`, field.options.join(", "));
       await s.keys(KEY.Escape);
       await wait(200);
     },
@@ -389,7 +392,7 @@ export default [
         items: [...document.querySelectorAll(".item-row .item-name")].map((e) => e.textContent.trim()),
       };`);
       t.check(state.agent !== undefined, "se abre el Inventario");
-      t.path(state.project, "E:/cd-throwaway/project-gone", "el campo Project dice «E:/cd-throwaway/project-gone»");
+      t.path(state.project, rootSlash(t, "project-gone"), `el campo Project dice «${rootSlash(t, "project-gone")}»`);
       t.eq(state.agent, "All Agents", "está elegido «All Agents»");
       t.eq(state.pressed.join(","), "Unread", "el filtro de State es «Unread»");
       t.check(state.items.includes("cd-throwaway-leftover"), "la lista de Items muestra «cd-throwaway-leftover»", state.items.join(", "));
@@ -585,7 +588,7 @@ export default [
       const gone = [missingGroup(groups), noLeftoversGroup(groups)].flatMap((g) => g?.rows ?? []).find((r) => r.name?.replaceAll("/", "\\") === `${t.root}\\project-gone`);
       t.eq(project?.tags.join("|"), "known to Claude Code", `la fila de «${t.root}\\project» lleva la etiqueta «known to Claude Code»`);
       t.eq(extra?.tags.join("|"), "added by you", `la fila de «${t.root}\\project-extra» lleva solo la etiqueta «added by you»`);
-      t.eq(gone?.tags.join("|"), "known to Claude Code", "la fila de «E:/cd-throwaway/project-gone» lleva la etiqueta «known to Claude Code»");
+      t.eq(gone?.tags.join("|"), "known to Claude Code", `la fila de «${rootSlash(t, "project-gone")}» lleva la etiqueta «known to Claude Code»`);
       const lines = [project, extra, gone].flatMap((row) => row?.subs ?? []);
       t.check(
         !lines.some((line) => /known to|added by you/i.test(line)),
@@ -734,8 +737,8 @@ export default [
       const noLeftovers = noLeftoversGroup(v.groups);
       t.check(noLeftovers?.title === "Missing, no leftovers · 1" && noLeftovers.open, "con gone, el grupo «Missing, no leftovers · 1» se abre solo", noLeftovers && `${noLeftovers.title} ${noLeftovers.open ? "abierto" : "cerrado"}`);
       t.check(
-        noLeftovers?.rows.length === 1 && t.path(noLeftovers.rows[0].name, "E:/cd-throwaway/project-gone"),
-        "con gone, ese grupo muestra solo «E:/cd-throwaway/project-gone», sin leftovers desde el paso 10.7",
+        noLeftovers?.rows.length === 1 && t.path(noLeftovers.rows[0].name, rootSlash(t, "project-gone")),
+        `con gone, ese grupo muestra solo «${rootSlash(t, "project-gone")}», sin leftovers desde el paso 10.7`,
         noLeftovers?.rows.map((r) => r.name).join(", "),
       );
       await typeInto(s, "input[aria-label='Search Projects']", "zz");
@@ -842,7 +845,7 @@ async function goneRow(t) {
   await tab(s, "Projects");
   await openGroup(s, "Missing");
   const groups = await projectGroups(s);
-  return missingGroup(groups)?.rows.find((r) => /project-gone$/.test(r.name))?.name ?? "E:/cd-throwaway/project-gone";
+  return missingGroup(groups)?.rows.find((r) => /project-gone$/.test(r.name))?.name ?? rootSlash(t, "project-gone");
 }
 
 async function openSection(s, title) {

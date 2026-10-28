@@ -6,6 +6,10 @@ import { KEY, ref, unwrap } from "./driver.mjs";
 
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The throwaway root the plan's commands write. A step that runs one puts the
+// walk's root in its place.
+export const PLAN_ROOT = "E:\\cd-throwaway";
+
 // The switches a step's setup gives the data script besides -Root and
 // -Reset, such as -Symlink, each with the space before it.
 export function setupSwitches(text) {
