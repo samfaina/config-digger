@@ -6,7 +6,9 @@
 // On CI (`ci: { evidence }`) the walk takes no screenshot, not even of a
 // failed step: a step's looks are left to the tester, its verdict comes from
 // its checks alone, and a step whose module names what a runner lacks
-// (`ciLacks`) is Blocked without running.
+// (`ciLacks`) is Blocked without running. A step that also checks things
+// which don't need it (`ciRuns`) runs, reads `t.ciLacks` to leave out what
+// needs it, and is Blocked when the rest passes.
 import { basename, join } from "node:path";
 import { refocus, wait } from "./lib.mjs";
 
@@ -56,9 +58,11 @@ export async function walkStep(ctx, step, runner, { shots, ci }) {
       return file;
     },
     blocked: null,
+    ciLacks: (ci && runner.ciLacks) || null,
   };
   let error;
-  if (ci && runner.ciLacks) t.blocked = `el runner de CI no tiene ${runner.ciLacks}`;
+  const lacking = t.ciLacks && `el runner de CI no tiene ${t.ciLacks}`;
+  if (lacking && !runner.ciRuns) t.blocked = lacking;
   // A window left blank, React's root empty, is a finding of the step: its
   // notes keep what the page logged and its last calls. The app opens again,
   // as the tester would, and the step runs once more from there.
@@ -109,10 +113,16 @@ export async function walkStep(ctx, step, runner, { shots, ci }) {
   // on the state an earlier step left, is Blocked, not KO
   // (docs/research/uat-automation.md, section 6).
   if (error && !checks.length && !t.blocked) t.blocked = `antes de sus comprobaciones: ${error.message}`;
+  // A step that ran without what the runner lacks is Blocked for it when the
+  // rest passed; when not, its notes say what went unchecked.
+  const ranLacking = lacking && runner.ciRuns;
+  const unchecked = ranLacking && (error || failed.length || t.blocked) ? `Sin comprobar: ${lacking}` : null;
+  if (ranLacking && !unchecked) t.blocked = lacking;
   const status = t.blocked ? "blocked" : error || failed.length ? "ko" : "ok";
   const notes = [
     t.blocked && `Bloqueado: ${t.blocked}`,
     ...failed.map((c) => `KO: ${c.what}${c.actual ? `: ${c.actual}` : ""}`),
+    unchecked,
     error && `Error: ${error.message}`,
     ...findings.map((f) => `Nota: ${f}`),
     `Comprobado (${checks.length - failed.length}/${checks.length}): ${checks.filter((c) => c.ok).map((c) => c.what).join("; ")}`,

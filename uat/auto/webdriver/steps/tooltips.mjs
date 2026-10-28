@@ -97,10 +97,12 @@ export default [
     async run(t) {
       const { s } = t;
       const rings = [];
+      const reached = new Set();
       // Tabs to the first element `css` matches, whose text holds `text`, and
-      // returns its tooltip, or null when no tab stop matches.
+      // returns its tooltip, or null when no tab stop matches or none shows.
       const read = async (css, text = "") => {
         if (!(await tabToMatch(s, css, text))) return null;
+        reached.add(css);
         await wait(150);
         rings.push({ css, outline: (await focused(s))?.outline });
         return tooltip(s);
@@ -122,7 +124,7 @@ export default [
       const time = await read(".banner-value");
       t.check(time && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time.text), "en la hora de «Inventory read» sale al momento un tooltip con la fecha y la hora exactas, con segundos", time?.text);
       const folder = await read(".single-home");
-      t.check(folder && /^[A-Za-z]:\\/.test(folder.text), "en el nombre del home sale un tooltip con su carpeta entera", folder?.text ?? "ningún Agent tiene un solo home");
+      t.check(folder && /^[A-Za-z]:\\/.test(folder.text), "en el nombre del home sale un tooltip con su carpeta entera", folder?.text ?? (reached.has(".single-home") ? "el nombre tiene el foco y no sale ningún tooltip" : "ningún Agent tiene un solo home"));
 
       const mcpJson = `${t.root}\\project\\.mcp.json`;
       await inventoryOf(t, "Claude Code", "claude-code-home");

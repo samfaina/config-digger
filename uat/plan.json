@@ -992,7 +992,7 @@
           "goal": "Quién añadió un Project y qué Agents lo conocen se lee de un vistazo en etiquetas como las de un Agent home, no en una línea gris bajo la ruta.",
           "instructions": [
             "En la pestaña Projects, mira las filas de E:\\cd-throwaway\\project y E:\\cd-throwaway\\project-extra.",
-            "Mira la fila de E:/cd-throwaway/project-gone en el grupo Missing.",
+            "Abre el grupo ▸ Missing, no leftovers, donde el paso 10.7 dejó E:/cd-throwaway/project-gone, y mira su fila.",
             "Mira las etiquetas de esas filas: su fondo, su borde y su texto."
           ],
           "commands": [],
@@ -1315,7 +1315,7 @@
           ],
           "commands": [],
           "expect": [
-            "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo.",
+            "El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo si cabe entero, y encima si no.",
             "Ese panel sale entero, sin pasar del borde de la ventana.",
             "El panel de Agent se abre entero debajo de su campo."
           ],

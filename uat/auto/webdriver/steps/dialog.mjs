@@ -241,7 +241,10 @@ export default [
         const [c, f] = [sections[0], sections.at(-1)];
         const fTop = f.scrollTop;
         c.scrollTop = c.scrollHeight;
-        return { cTop: c.scrollTop, fTop: f.scrollTop, fBefore: fTop, last: [...c.querySelectorAll(".change-item")].at(-1)?.textContent.trim(), lastVisible: (() => { const l = [...c.querySelectorAll(".change-item")].at(-1).getBoundingClientRect(), b = c.getBoundingClientRect(); return l.bottom <= b.bottom + 1 && l.top >= b.top - 1; })() };`);
+        // A change is several lines, Entry, Agent, Key and State, taller than
+        // the block at the smallest window: at the bottom, the last one's end shows.
+        const row = [...c.querySelectorAll(".change-row")].at(-1);
+        return { cTop: c.scrollTop, fTop: f.scrollTop, fBefore: fTop, last: row?.querySelector(".change-item")?.textContent.trim(), lastVisible: (() => { const l = row.getBoundingClientRect(), b = c.getBoundingClientRect(); return l.bottom <= b.bottom + 1 && l.bottom > b.top; })() };`);
       t.check(scrolled.cTop > 0 && scrolled.fTop === scrolled.fBefore, "al desplazarte dentro de uno, solo se mueve su contenido, bajo su título", JSON.stringify(scrolled));
       t.check(scrolled.last === "cd-throwaway-gone-12" && scrolled.lastVisible, "«What changes» llega abajo, al cambio de «cd-throwaway-gone-12»", scrolled.last);
       await s.exec("const f = [...document.querySelectorAll('.dialog .dialog-section-body')].at(-1); f.scrollTop = f.scrollHeight;");

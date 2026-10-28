@@ -203,8 +203,12 @@ export default [
       await s.click(combo);
       let p = await s.until(() => panel(s), { what: "the panel" });
       const fieldRect = await s.rect(combo);
-      await t.shot("home", "el panel de la fila de Claude Code sale entero debajo del campo");
-      t.check(p.rect.top >= fieldRect.y + fieldRect.height - 2, "el panel de la fila de Claude Code se abre debajo del campo", `${p.rect.top} frente a ${fieldRect.y + fieldRect.height}`);
+      await t.shot("home", "el panel de la fila de Claude Code sale entero, debajo del campo si cabe y encima si no");
+      // The app opens it above when the room below can't hold it whole (placePanel in ui/src/dropdown.ts).
+      const fieldBottom = fieldRect.y + fieldRect.height;
+      const below = p.rect.top >= fieldBottom - 2;
+      const above = p.rect.bottom <= fieldRect.y + 2 && p.vh - fieldBottom < p.rect.bottom - p.rect.top;
+      t.check(below || above, "el panel de la fila de Claude Code se abre debajo del campo si cabe entero, y encima si no", `panel de ${p.rect.top} a ${p.rect.bottom}, campo de ${fieldRect.y} a ${fieldBottom}, ventana de ${p.vh}`);
       t.check(p.rect.bottom <= p.vh && p.rect.left >= 0 && p.rect.right <= p.vw, "ese panel sale entero, sin pasar del borde de la ventana", JSON.stringify(p.rect));
       await s.keys(KEY.Escape);
       await go(s, "Projects & homes");

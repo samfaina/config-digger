@@ -17,6 +17,7 @@ import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
 import { jobSummary, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
+import { causeOnCi } from "./steps/history.mjs";
 import { openGroup, textLines, wrapFault } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
@@ -327,19 +328,21 @@ class QuietPage extends Session {
 
 const screenshots = (calls) => calls.filter((c) => c.endsWith("/screenshot"));
 
-// Walks the step module `runner` in CI mode, with `ctx` added to the
-// walk's, and a folder for screenshots that the walk must leave empty.
+// Walks the step module `runner` with the walk's `ci`, with `ctx` added to
+// the walk's, and a folder for screenshots, which on CI it must leave empty.
 // `step` is the plan's step, by default one with no setup and no manual.
-async function walkOnCi(runner, ctx = {}, step = { id: runner.id }) {
+async function walkWith(ci, runner, ctx = {}, step = { id: runner.id }) {
   const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
   const s = new QuietPage();
   try {
-    const result = await walkStep({ s, version: "0.1.0", ...ctx }, step, runner, { shots, ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+    const result = await walkStep({ s, version: "0.1.0", ...ctx }, step, runner, { shots, ci });
     return { result, calls: s.calls, files: readdirSync(shots) };
   } finally {
     rmSync(shots, { recursive: true, force: true });
   }
 }
+
+const walkOnCi = (...args) => walkWith({ evidence: "https://github.com/o/r/actions/runs/1" }, ...args);
 
 test("on CI, a step with looks takes no screenshot and is OK on its checks, its looks left to the tester", async () => {
   const { result, calls, files } = await walkOnCi({
@@ -394,6 +397,63 @@ test("on CI, a step that needs what a runner lacks is Blocked, naming it, withou
   assert.equal(ran, false);
   assert.equal(result.status, "blocked");
   assert.equal(result.notes.split("\n")[0], "Bloqueado: el runner de CI no tiene los homes de un tester");
+});
+
+test("on CI, a step that runs without what a runner lacks keeps its other checks and is Blocked, naming it", async () => {
+  let lacks;
+  const { result } = await walkOnCi({
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      lacks = t.ciLacks;
+      t.check(true, "sale «Rollback ✓»");
+      if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
+    },
+  });
+  assert.equal(lacks, "Windows en español");
+  assert.equal(result.status, "blocked");
+  assert.deepEqual(result.notes.split("\n").slice(0, 2), ["Bloqueado: el runner de CI no tiene Windows en español", "Comprobado (1/1): sale «Rollback ✓»"]);
+});
+
+test("on CI, a step that runs without what a runner lacks is KO when one of its other checks fails", async () => {
+  const { result } = await walkOnCi({
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      t.check(false, "sale «Rollback ✓»", "«Rollback ✗»");
+    },
+  });
+  assert.equal(result.status, "ko");
+  assert.deepEqual(result.notes.split("\n").slice(0, 2), ["KO: sale «Rollback ✓»: «Rollback ✗»", "Sin comprobar: el runner de CI no tiene Windows en español"]);
+});
+
+test("off CI, a step that runs without what a runner lacks checks everything", async () => {
+  const { result } = await walkWith(null, {
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
+    },
+  });
+  assert.equal(result.status, "ko");
+});
+
+test("on CI, 11.5 runs its other checks without the cause, which Windows writes in the runner's English", () => {
+  const step = steps.find((s) => s.id === "11.5");
+  assert.equal(step.ciLacks, "Windows en español, que escribe «Acceso denegado. (os error 5)» en la causa: el del runner la escribe en inglés");
+  assert.equal(step.ciRuns, true);
+});
+
+test("on CI, 11.5's cause is its path and «(os error 5)», whatever Windows' words between them, and the rollback after them", () => {
+  const file = "E:\\cd-throwaway\\codex-home\\config.toml";
+  assert.equal(causeOnCi(`cannot write ${file}: Access is denied. (os error 5); Operation 20261028-082652-134 was rolled back`, file), true);
+  assert.equal(causeOnCi(`cannot write ${file}: Acceso denegado. (os error 5)`, file), true);
+  assert.equal(causeOnCi(`cannot write ${file}: The system cannot find the file specified. (os error 2)`, file), false);
+  assert.equal(causeOnCi("cannot write D:\\a\\_temp\\e-drive\\cd-throwaway\\codex-home\\config.toml: Access is denied. (os error 5)", file), false);
+  assert.equal(causeOnCi(undefined, file), false);
 });
 
 test("on a runner without Claude Desktop, 7.2, 7.6 and 13.1 are Blocked naming it, and 14.2 naming the tester's homes", async () => {

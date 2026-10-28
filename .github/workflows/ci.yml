@@ -115,11 +115,52 @@ jobs:
           cargo build --release --package config-digger-cli --locked
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
-      # The plan's paths are E:\cd-throwaway.
-      - name: Map drive E
+      # The plan's paths are E:\cd-throwaway, on a real volume: the app
+      # resolves a subst drive to its target folder (#398).
+      - name: Mount a volume at E
         run: |
-          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\e-drive" | Out-Null
-          subst E: "$env:RUNNER_TEMP\e-drive"
+          if ([System.IO.DriveInfo]::GetDrives().Name -contains "E:\") { throw "E: is taken on this runner" }
+          $vhdx = "$env:RUNNER_TEMP\e-drive.vhdx"
+          $script = "$env:RUNNER_TEMP\e-drive.diskpart"
+          Set-Content $script @(
+            "create vdisk file=`"$vhdx`" maximum=4096 type=expandable"
+            "select vdisk file=`"$vhdx`""
+            "attach vdisk"
+            "convert mbr"
+            "create partition primary"
+            "format fs=ntfs quick label=cd-uat"
+            "assign letter=E"
+          )
+          diskpart /s $script
+          if ($LASTEXITCODE) { throw "diskpart failed with exit code $LASTEXITCODE" }
+          $volume = Get-Volume -DriveLetter E
+          if ($volume.FileSystem -ne "NTFS") { throw "E: is not the NTFS volume diskpart made" }
+          "E: is the volume of $vhdx, $([math]::Round($volume.SizeRemaining / 1GB, 1)) GB free"
+      # The UI's prefers-reduced-motion rules turn the motion off when
+      # Windows' animation effects are off, which WebView2 reads from
+      # SPI_GETCLIENTAREAANIMATION when the app starts.
+      - name: Turn on animation effects
+        run: |
+          Add-Type -Namespace Win32 -Name Spi -MemberDefinition @"
+          [DllImport("user32.dll", SetLastError = true)]
+          public static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint flags);
+          [DllImport("user32.dll", SetLastError = true)]
+          public static extern bool SystemParametersInfo(uint action, uint param, IntPtr value, uint flags);
+          "@
+          function Animations {
+            $on = $false
+            if (-not [Win32.Spi]::SystemParametersInfo(0x1042, 0, [ref]$on, 0)) { throw "SPI_GETCLIENTAREAANIMATION failed" }
+            $on
+          }
+          $found = Animations
+          if (-not $found) {
+            # SPI_SETCLIENTAREAANIMATION to TRUE, SPIF_UPDATEINIFILE.
+            if (-not [Win32.Spi]::SystemParametersInfo(0x1043, 0, [IntPtr]1, 1)) { throw "SPI_SETCLIENTAREAANIMATION failed" }
+            if (-not (Animations)) { throw "Windows' animation effects are still off" }
+          }
+          $line = "Windows' animation effects were $(if ($found) { 'on' } else { 'off, and the job turned them on' }) before the walk."
+          $line
+          "$line`n" >> $env:GITHUB_STEP_SUMMARY
       - name: WebDriver walk
         run: >-
           .\uat\auto\webdriver\run.ps1 -App target\release\config-digger-app.exe -Work "$env:RUNNER_TEMP\uat" -Ci
