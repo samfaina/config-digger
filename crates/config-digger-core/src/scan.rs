@@ -5,12 +5,12 @@
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, DownWalk,
-    EnvMap, FindsBy, Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect,
-    JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp,
-    ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
-    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
-    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
-    StoreClass, is_entry_key,
+    EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere, InstallationFolders,
+    JsonDialect, JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator,
+    LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache,
+    PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register,
+    Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList,
+    Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -3730,6 +3730,19 @@ impl Scanner<'_> {
                 tracing::debug!(plugin = %record.id, "plugin folder superseded");
                 continue;
             }
+            // A plugin of a marketplace in a folder is read there, its
+            // record's folder only telling whether it is superseded.
+            let marketplaces = match &plugins.registry {
+                PluginRegistry::JsonPluginRecords(block) => block.marketplaces.as_ref(),
+                _ => None,
+            };
+            let in_marketplace = marketplaces.zip(plugins.id_separator.as_deref()).and_then(
+                |(marketplaces, separator)| {
+                    let (name, marketplace) = record.id.split_once(separator)?;
+                    self.marketplace_folder(home, marketplaces, name, marketplace)
+                },
+            );
+            let folder = in_marketplace.unwrap_or(folder);
             let project = match &record.project {
                 Some(spelling) => match self.projects.add(Path::new(spelling), None) {
                     Some(key) => Some(key),
@@ -3800,6 +3813,36 @@ impl Scanner<'_> {
                 Vec::new()
             }
         }
+    }
+
+    /// The folder of the plugin named `name` in the marketplace named
+    /// `marketplace`, when the marketplace is in a folder and its manifest
+    /// names one for the plugin; `None` when the plugin is read from its
+    /// record's folder. A file that cannot be read here names no folder,
+    /// and is no Read failure.
+    fn marketplace_folder(
+        &mut self,
+        home: &FoundHome,
+        marketplaces: &FolderMarketplaces,
+        name: &str,
+        marketplace: &str,
+    ) -> Option<PathBuf> {
+        let record = marketplaces.registries().find_map(|(anchor, root)| {
+            let path = anchor.path(&home.roots, None)?;
+            let text = self.reader.peek(&path).ok()??;
+            FolderMarketplaces::record_in(text, root, marketplace)
+        })?;
+        let folder = marketplaces.folder_of(&record)?;
+        let manifest = blocks::join_relative(&folder, &marketplaces.manifest);
+        let Some(text) = self.reader.peek(&manifest).ok().flatten() else {
+            tracing::debug!(%marketplace, path = %manifest.display(), "no marketplace manifest to read");
+            return None;
+        };
+        let found = marketplaces.plugin_folder(&folder, text, name);
+        if found.is_none() {
+            tracing::debug!(plugin = %name, %marketplace, "the marketplace names no folder for the plugin");
+        }
+        found
     }
 
     /// A record for each plugin the Project folder `folder`, whose key is

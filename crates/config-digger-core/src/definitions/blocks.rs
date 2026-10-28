@@ -2337,6 +2337,162 @@ pub(crate) struct JsonPluginRecords {
     pub project: Option<String>,
     /// The field of a record that holds its version.
     pub version: Option<String>,
+    /// The marketplaces the plugins come from, when a plugin of a
+    /// marketplace in a folder is read from that folder rather than from
+    /// the folder its record holds. Without it, every plugin is read from
+    /// its record's folder.
+    pub marketplaces: Option<FolderMarketplaces>,
+}
+
+/// The marketplaces plugins are installed from, as far as they say where a
+/// plugin's files are, such as Claude Code's `directory` marketplaces: a
+/// plugin whose id names a marketplace in a folder, after the plugins'
+/// `id_separator`, is read from the folder its entry in the marketplace's
+/// manifest names, a path relative to the marketplace's folder. A plugin
+/// of a marketplace of another kind, or one whose manifest is missing,
+/// does not parse, does not list it or names no folder below the
+/// marketplace's for it, is read from its record's folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FolderMarketplaces {
+    /// A strict JSON file of the Agent home or the machine whose object's
+    /// keys are marketplace names, each holding the marketplace's record,
+    /// such as Claude Code's `known_marketplaces.json`.
+    pub anchor: Anchor,
+    /// The settings files that record a marketplace the file does not,
+    /// each with the key path of the object whose keys are marketplace
+    /// names, in order: the first that records it decides.
+    #[serde(default)]
+    pub settings: Vec<MarketplaceSettings>,
+    /// The key path, in a marketplace's record, of its kind.
+    pub kind: Vec<String>,
+    /// What the kind holds for a marketplace in a folder, such as
+    /// `directory`.
+    pub folder_kind: String,
+    /// The key paths, in a marketplace's record, of its folder, in order:
+    /// the first that holds an absolute path names it.
+    pub folder: Vec<Vec<String>>,
+    /// The marketplace's manifest, a `/`-separated path relative to its
+    /// folder.
+    pub manifest: String,
+    /// The key path, in the manifest, of the list of its plugins' entries.
+    pub plugins: Vec<String>,
+    /// The field of an entry that holds the plugin's name.
+    pub name: String,
+    /// The field of an entry that holds where the plugin's files are: as a
+    /// relative path, a folder below the marketplace's or that folder.
+    pub source: String,
+}
+
+/// A settings file that records marketplaces, such as Claude Code's
+/// `extraKnownMarketplaces` in the user settings.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MarketplaceSettings {
+    /// The file, a strict JSON one of the Agent home or the machine.
+    pub anchor: Anchor,
+    /// The key path of the object whose keys are marketplace names.
+    pub key_path: Vec<String>,
+}
+
+impl Validate for FolderMarketplaces {
+    fn validate(&self) -> Result<(), String> {
+        for (anchor, _) in self.registries() {
+            anchor.validate()?;
+            anchor.one_file()?;
+            if anchor.home_root().is_none() && anchor.machine().is_none() {
+                return Err(
+                    "marketplaces and their settings must lie in the Agent home or the machine"
+                        .into(),
+                );
+            }
+        }
+        for key_path in self
+            .settings
+            .iter()
+            .map(|settings| &settings.key_path)
+            .chain([&self.kind, &self.plugins])
+            .chain(&self.folder)
+        {
+            validate_key_path(key_path)?;
+        }
+        if self.folder.is_empty() {
+            return Err("a marketplace needs a key path of its folder".into());
+        }
+        if [&self.folder_kind, &self.name, &self.source]
+            .iter()
+            .any(|text| text.is_empty())
+        {
+            return Err("a marketplaces field must not be empty".into());
+        }
+        validate_relative(&self.manifest)
+    }
+}
+
+impl FolderMarketplaces {
+    /// The files that record marketplaces, in the order they are read,
+    /// each with the key path of the object whose keys are marketplace
+    /// names, empty for the whole document.
+    pub fn registries(&self) -> impl Iterator<Item = (&Anchor, &[String])> {
+        std::iter::once((&self.anchor, [].as_slice())).chain(
+            self.settings
+                .iter()
+                .map(|settings| (&settings.anchor, settings.key_path.as_slice())),
+        )
+    }
+
+    /// The record of the marketplace `marketplace` in the text of a file
+    /// whose object at `root`, the whole document when it is empty, is
+    /// keyed by marketplace name; `None` when it records none or does not
+    /// parse.
+    pub fn record_in(text: &str, root: &[String], marketplace: &str) -> Option<Value> {
+        let document = JsonFormat::STRICT.parse(text).ok()?;
+        let records = root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key))?;
+        records.get(marketplace).cloned()
+    }
+
+    /// The folder of the marketplace the record `record` records, when it
+    /// is a marketplace in a folder.
+    pub fn folder_of(&self, record: &Value) -> Option<PathBuf> {
+        let at = |key_path: &[String]| {
+            key_path
+                .iter()
+                .try_fold(record, |value, key| value.get(key))?
+                .as_str()
+        };
+        if at(&self.kind)? != self.folder_kind {
+            return None;
+        }
+        self.folder.iter().find_map(|key_path| {
+            let folder = paths::lexical(Path::new(at(key_path)?));
+            paths::is_absolute(&folder).then_some(folder)
+        })
+    }
+
+    /// The folder of the plugin named `name` in the marketplace at
+    /// `folder`, by the text of the marketplace's manifest: its first
+    /// entry of that name, when its source is a relative path that stays
+    /// in the marketplace's folder.
+    pub fn plugin_folder(&self, folder: &Path, manifest: &str, name: &str) -> Option<PathBuf> {
+        let document = JsonFormat::STRICT.parse(manifest).ok()?;
+        let entries = self
+            .plugins
+            .iter()
+            .try_fold(&document, |value, key| value.get(key))?
+            .as_array()?;
+        let entry = entries
+            .iter()
+            .find(|entry| entry.get(&self.name).and_then(Value::as_str) == Some(name))?;
+        let source = entry.get(&self.source)?.as_str()?;
+        if source.is_empty() {
+            return None;
+        }
+        // An absolute source replaces the folder, and `..` can climb out of it.
+        let plugin = paths::lexical(&folder.join(source));
+        plugin.starts_with(folder).then_some(plugin)
+    }
 }
 
 impl Validate for JsonPluginRecords {
@@ -2358,13 +2514,20 @@ impl Validate for JsonPluginRecords {
                 return Err("a plugin registry field must not be empty".into());
             }
         }
+        if let Some(marketplaces) = &self.marketplaces {
+            marketplaces.validate()?;
+        }
         Ok(())
     }
 }
 
 impl ListPlugins for JsonPluginRecords {
     fn anchors(&self) -> Vec<&Anchor> {
-        vec![&self.anchor]
+        let marketplaces = self
+            .marketplaces
+            .iter()
+            .flat_map(|marketplaces| marketplaces.registries().map(|(anchor, _)| anchor));
+        std::iter::once(&self.anchor).chain(marketplaces).collect()
     }
 }
 

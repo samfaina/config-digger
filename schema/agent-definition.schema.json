@@ -1909,6 +1909,17 @@
                 "null"
               ]
             },
+            "marketplaces": {
+              "description": "The marketplaces the plugins come from, when a plugin of a\nmarketplace in a folder is read from that folder rather than from\nthe folder its record holds. Without it, every plugin is read from\nits record's folder.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FolderMarketplaces"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "json-plugin-records"
@@ -2125,6 +2136,102 @@
             "separator"
           ]
         }
+      ]
+    },
+    "FolderMarketplaces": {
+      "description": "The marketplaces plugins are installed from, as far as they say where a\nplugin's files are, such as Claude Code's `directory` marketplaces: a\nplugin whose id names a marketplace in a folder, after the plugins'\n`id_separator`, is read from the folder its entry in the marketplace's\nmanifest names, a path relative to the marketplace's folder. A plugin\nof a marketplace of another kind, or one whose manifest is missing,\ndoes not parse, does not list it or names no folder below the\nmarketplace's for it, is read from its record's folder.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "description": "A strict JSON file of the Agent home or the machine whose object's\nkeys are marketplace names, each holding the marketplace's record,\nsuch as Claude Code's `known_marketplaces.json`.",
+          "$ref": "#/$defs/Anchor"
+        },
+        "settings": {
+          "description": "The settings files that record a marketplace the file does not,\neach with the key path of the object whose keys are marketplace\nnames, in order: the first that records it decides.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MarketplaceSettings"
+          }
+        },
+        "kind": {
+          "description": "The key path, in a marketplace's record, of its kind.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folder_kind": {
+          "description": "What the kind holds for a marketplace in a folder, such as\n`directory`.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "The key paths, in a marketplace's record, of its folder, in order:\nthe first that holds an absolute path names it.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "manifest": {
+          "description": "The marketplace's manifest, a `/`-separated path relative to its\nfolder.",
+          "type": "string"
+        },
+        "plugins": {
+          "description": "The key path, in the manifest, of the list of its plugins' entries.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The field of an entry that holds the plugin's name.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The field of an entry that holds where the plugin's files are: as a\nrelative path, a folder below the marketplace's or that folder.",
+          "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "kind",
+        "folder_kind",
+        "folder",
+        "manifest",
+        "plugins",
+        "name",
+        "source"
+      ]
+    },
+    "MarketplaceSettings": {
+      "description": "A settings file that records marketplaces, such as Claude Code's\n`extraKnownMarketplaces` in the user settings.",
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "description": "The file, a strict JSON one of the Agent home or the machine.",
+          "$ref": "#/$defs/Anchor"
+        },
+        "key_path": {
+          "description": "The key path of the object whose keys are marketplace names.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "key_path"
       ]
     },
     "InstallRecords": {
