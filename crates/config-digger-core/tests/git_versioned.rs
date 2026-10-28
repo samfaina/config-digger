@@ -10,6 +10,7 @@ use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, Fak
 use std::path::PathBuf;
 
 const HOME: &str = r"C:\Users\fixture";
+const APP_DATA: &str = r"C:\Users\fixture\AppData\Roaming";
 const LOCAL_APP_DATA: &str = r"C:\Users\fixture\AppData\Local";
 const PROJECT: &str = r"E:\projects\petme-app";
 
@@ -392,4 +393,92 @@ fn a_scan_asks_the_git_index_once_per_repository() {
     assert_eq!(asked, [PathBuf::from(HOME), PathBuf::from(PROJECT)]);
     assert!(entry(&inventory, "linear").git_versioned);
     assert!(entry(&inventory, "notes").git_versioned);
+}
+
+/// The user's Cursor skill `name`.
+fn cursor_skill(name: &str) -> PathBuf {
+    PathBuf::from(HOME).join(r".cursor\skills").join(name)
+}
+
+/// A Cursor that has run once, with the user's skills `review` and `lint`
+/// parked in config-digger's store, and the locator of each one's record
+/// there.
+fn parked_cursor_skills(env: &FakeEnvironment) -> (FakeFileSystem, Vec<String>) {
+    let fs = ["review", "lint"].iter().fold(
+        fixture().with_file(
+            PathBuf::from(APP_DATA).join(r"Cursor\User\settings.json"),
+            "{}\n",
+        ),
+        |fs, name| {
+            fs.with_file(
+                cursor_skill(name).join("SKILL.md"),
+                format!("---\nname: {name}\n---\n"),
+            )
+        },
+    );
+    let core = Core::new(fake::ports(fs.clone(), env.clone())).unwrap();
+    for name in ["review", "lint"] {
+        let snapshot = core.scan(&ScanOptions { projects: vec![] }).unwrap();
+        let selector = cursor_skill(name).display().to_string();
+        let park = core
+            .plan(
+                &snapshot,
+                &Context { project: None },
+                Action::Disable,
+                &targets(&[&selector]),
+            )
+            .unwrap();
+        core.execute(park, &[WarningClass::WideReach]).unwrap();
+    }
+    let store = PathBuf::from(LOCAL_APP_DATA).join(r"config-digger\parked\manifest.json");
+    let locators = ["review", "lint"]
+        .iter()
+        .map(|name| format!("{}#entries.{name}", store.display()))
+        .collect();
+    (fs, locators)
+}
+
+#[test]
+fn an_enable_asks_the_git_index_once_per_repository_of_the_folders_it_brings_back() {
+    // Both skills in a dotfiles repo at the home folder, which versions
+    // `review` only.
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("APPDATA", APP_DATA)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let (fs, parked) = parked_cursor_skills(&env);
+    let mut ports = fake::ports(fs, env);
+    let git = FakeGitIndex::default()
+        .with_repository(HOME)
+        .with_versioned(cursor_skill("review"));
+    ports.git = Box::new(git.clone());
+    let core = Core::new(ports).unwrap();
+    let snapshot = core.scan(&ScanOptions { projects: vec![] }).unwrap();
+    let scanned = git.asked().len();
+
+    let parked: Vec<&str> = parked.iter().map(String::as_str).collect();
+    let plan = core
+        .plan(
+            &snapshot,
+            &Context { project: None },
+            Action::Enable,
+            &targets(&parked),
+        )
+        .unwrap();
+
+    // The folders it brings back in one call, then the scan of what the
+    // plan comes to, which asks as the scan before it did.
+    let asked = git.asked();
+    let (scan, planned) = asked.split_at(scanned);
+    assert_eq!(planned, [&[PathBuf::from(HOME)][..], scan].concat());
+    let versioned = |name: &str| {
+        let folder = plan
+            .preview()
+            .folders
+            .iter()
+            .find(|folder| folder.path == cursor_skill(name))
+            .unwrap_or_else(|| panic!("no folder `{name}` brought back"));
+        folder.git_versioned
+    };
+    assert!(versioned("review"));
+    assert!(!versioned("lint"));
 }
