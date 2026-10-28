@@ -612,8 +612,9 @@ mod tests {
         Core::new(ports).unwrap()
     }
 
-    /// A Cursor whose user skill `review`, in a dotfiles repo at the home
-    /// folder, a Disable moved to config-digger's store.
+    /// A Cursor that has run once, with the user's skill `review`, in a
+    /// dotfiles repo at the home folder, parked in config-digger's store by
+    /// a Disable that History holds.
     fn parked_skill() -> FakeFileSystem {
         let skill = PathBuf::from(HOME).join(r".cursor\skills\review");
         let fs = FakeFileSystem::new()
@@ -637,7 +638,7 @@ mod tests {
 
     /// What Settings reads over `fs`, and the repositories that asks the
     /// git index about, sorted.
-    fn settings_asks(fs: &FakeFileSystem) -> (SettingsRead, Vec<PathBuf>) {
+    fn read_settings_and_git_asks(fs: &FakeFileSystem) -> (SettingsRead, Vec<PathBuf>) {
         let git = FakeGitIndex::default().with_repository(HOME);
         let read = settings_read(core(fs, &git)).unwrap();
         let mut asked = git.asked();
@@ -648,14 +649,16 @@ mod tests {
     #[test]
     fn settings_asks_the_git_index_nothing_about_history() {
         let fs = parked_skill();
-        let (with_history, asked_with_history) = settings_asks(&fs);
+        let (with_history, asked_with_history) = read_settings_and_git_asks(&fs);
         fs.delete_folder(PathBuf::from(LOCAL_APP_DATA).join(r"config-digger\backups"));
 
-        let (without_history, asked_without_history) = settings_asks(&fs);
+        let (without_history, asked_without_history) = read_settings_and_git_asks(&fs);
 
         assert_eq!(with_history.operations, 1);
         assert_eq!(without_history.operations, 0);
+        // Both scans find the parked skill, so they ask the same.
         assert_eq!(with_history.parked.len(), 1);
+        assert_eq!(without_history.parked.len(), 1);
         assert_eq!(asked_with_history, asked_without_history);
     }
 

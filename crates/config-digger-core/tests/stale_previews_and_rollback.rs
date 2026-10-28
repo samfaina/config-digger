@@ -340,18 +340,14 @@ fn the_operation_count_counts_every_operation_history_lists() {
 
     let count = core(&fs).operation_count().unwrap();
 
-    let mut statuses: Vec<String> = core(&fs)
-        .history()
-        .unwrap()
-        .into_iter()
-        .map(|operation| operation.status_text)
-        .collect();
-    statuses.sort();
+    let history = core(&fs).history().unwrap();
+    assert_eq!(count, history.len());
+    let mut statuses: Vec<&str> = history.iter().map(|op| op.status_text.as_str()).collect();
+    statuses.sort_unstable();
     assert_eq!(statuses.len(), 4);
     assert_eq!(statuses[..2], ["Failed, rolled back", "Needs attention"]);
     assert_eq!(statuses[2], format!("Undo of {done}"));
     assert!(statuses[3].starts_with("Undone by "), "{}", statuses[3]);
-    assert_eq!(count, 4);
 }
 
 #[test]
