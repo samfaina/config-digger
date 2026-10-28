@@ -116,10 +116,9 @@ jobs:
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
       # The plan's paths are E:\cd-throwaway, on a real volume: the app
-      # resolves a subst drive to its target folder (#388, #398).
+      # resolves a subst drive to its target folder (#398).
       - name: Mount a volume at E
         run: |
-          $ErrorActionPreference = "Stop"
           if ([System.IO.DriveInfo]::GetDrives().Name -contains "E:\") { throw "E: is taken on this runner" }
           $vhdx = "$env:RUNNER_TEMP\e-drive.vhdx"
           $script = "$env:RUNNER_TEMP\e-drive.diskpart"
@@ -142,18 +141,23 @@ jobs:
       # SPI_GETCLIENTAREAANIMATION when the app starts.
       - name: Turn on animation effects
         run: |
-          $ErrorActionPreference = "Stop"
           Add-Type -Namespace Win32 -Name Spi -MemberDefinition @"
           [DllImport("user32.dll", SetLastError = true)]
           public static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint flags);
           [DllImport("user32.dll", SetLastError = true)]
           public static extern bool SystemParametersInfo(uint action, uint param, IntPtr value, uint flags);
           "@
-          function Animations { $on = $false; if (-not [Win32.Spi]::SystemParametersInfo(0x1042, 0, [ref]$on, 0)) { throw "SPI_GETCLIENTAREAANIMATION failed" }; $on }
+          function Animations {
+            $on = $false
+            if (-not [Win32.Spi]::SystemParametersInfo(0x1042, 0, [ref]$on, 0)) { throw "SPI_GETCLIENTAREAANIMATION failed" }
+            $on
+          }
           $found = Animations
-          # SPI_SETCLIENTAREAANIMATION, SPIF_UPDATEINIFILE.
-          if (-not $found -and -not [Win32.Spi]::SystemParametersInfo(0x1043, 0, [IntPtr]1, 1)) { throw "SPI_SETCLIENTAREAANIMATION failed" }
-          if (-not (Animations)) { throw "Windows' animation effects are still off" }
+          if (-not $found) {
+            # SPI_SETCLIENTAREAANIMATION to TRUE, SPIF_UPDATEINIFILE.
+            if (-not [Win32.Spi]::SystemParametersInfo(0x1043, 0, [IntPtr]1, 1)) { throw "SPI_SETCLIENTAREAANIMATION failed" }
+            if (-not (Animations)) { throw "Windows' animation effects are still off" }
+          }
           $line = "Windows' animation effects were $(if ($found) { 'on' } else { 'off, and the job turned them on' }) before the walk."
           $line
           "$line`n" >> $env:GITHUB_STEP_SUMMARY

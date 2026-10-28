@@ -327,19 +327,21 @@ class QuietPage extends Session {
 
 const screenshots = (calls) => calls.filter((c) => c.endsWith("/screenshot"));
 
-// Walks the step module `runner` in CI mode, with `ctx` added to the
-// walk's, and a folder for screenshots that the walk must leave empty.
+// Walks the step module `runner` with the walk's `ci`, with `ctx` added to
+// the walk's, and a folder for screenshots, which on CI it must leave empty.
 // `step` is the plan's step, by default one with no setup and no manual.
-async function walkOnCi(runner, ctx = {}, step = { id: runner.id }) {
+async function walkWith(ci, runner, ctx = {}, step = { id: runner.id }) {
   const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
   const s = new QuietPage();
   try {
-    const result = await walkStep({ s, version: "0.1.0", ...ctx }, step, runner, { shots, ci: { evidence: "https://github.com/o/r/actions/runs/1" } });
+    const result = await walkStep({ s, version: "0.1.0", ...ctx }, step, runner, { shots, ci });
     return { result, calls: s.calls, files: readdirSync(shots) };
   } finally {
     rmSync(shots, { recursive: true, force: true });
   }
 }
+
+const walkOnCi = (...args) => walkWith({ evidence: "https://github.com/o/r/actions/runs/1" }, ...args);
 
 test("on CI, a step with looks takes no screenshot and is OK on its checks, its looks left to the tester", async () => {
   const { result, calls, files } = await walkOnCi({
@@ -427,20 +429,15 @@ test("on CI, a step that runs without what a runner lacks is KO when one of its 
 });
 
 test("off CI, a step that runs without what a runner lacks checks everything", async () => {
-  const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
-  try {
-    const result = await walkStep({ s: new QuietPage(), version: "0.1.0" }, { id: "11.5" }, {
-      id: "11.5",
-      ciLacks: "Windows en español",
-      ciRuns: true,
-      async run(t) {
-        if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
-      },
-    }, { shots, ci: null });
-    assert.equal(result.status, "ko");
-  } finally {
-    rmSync(shots, { recursive: true, force: true });
-  }
+  const { result } = await walkWith(null, {
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
+    },
+  });
+  assert.equal(result.status, "ko");
 });
 
 test("on CI, 11.5 runs its other checks without the cause, which Windows writes in the runner's English", () => {

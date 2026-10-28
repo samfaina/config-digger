@@ -237,7 +237,10 @@ export default [
         t.check(steps.some((x) => /Back up/.test(x) && x.includes("✓")) && steps.some((x) => /Write failed/.test(x) && x.includes("✗")) && steps.some((x) => /Rollback/.test(x) && x.includes("✓")), "el diálogo muestra «Back up ✓», «Write failed ✗» y «Rollback ✓»", steps.join(" | "));
         t.check(result.text.includes("Nothing of this Operation was kept"), "el diálogo muestra un recuadro rojo «Nothing of this Operation was kept»");
         const cause = `cannot write ${file}: Acceso denegado. (os error 5)`;
-        if (!t.ciLacks) t.check(result.text.includes(cause), `la causa dice «${cause}»`, result.text.split("\n").find((l) => l.includes("cannot write")));
+        const said = result.text.split("\n").find((l) => l.includes("cannot write"));
+        // On CI the path and the code are checked, not Windows' words between them.
+        if (t.ciLacks) t.check(said?.includes(`cannot write ${file}: `) && said.trimEnd().endsWith("(os error 5)"), `la causa dice «cannot write ${file}: … (os error 5)»`, said);
+        else t.check(result.text.includes(cause), `la causa dice «${cause}»`, said);
         const id = operationId(result.text);
         t.shared.failed115 = id;
         await press(s, "Close", ".dialog");
