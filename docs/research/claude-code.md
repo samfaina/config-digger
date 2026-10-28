@@ -167,8 +167,8 @@ Enabled state is recorded only in the settings files' `enabledPlugins` map, whos
 Plugin structure ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs, disk]:
 
 - The manifest is `.claude-plugin\plugin.json` and is optional.
-- `mcpServers` merges with the default `.mcp.json`. It can be a path string, an inline object, a `.mcpb`/`.dxt` bundle, or an array of these. The supabase plugin sets `"mcpServers": "./agents/claude/.mcp.json"` [disk], so a parser has to resolve paths and can't simply read `<root>\.mcp.json`.
-- `skills` adds to the default `skills\` directory.
+- `mcpServers` merges with the default `.mcp.json`. It can be a path string, an inline object, a `.mcpb`/`.dxt` bundle, or an array of these. The supabase plugin sets `"mcpServers": "./agents/claude/.mcp.json"` [disk], so a parser has to resolve paths and can't simply read `<root>\.mcp.json`. A value of another shape, such as a number or a list holding one, fails the manifest's validation, and the plugin fails to load whole [test].
+- `skills` adds to the default `skills\` directory. A plugin skill's name is its folder's, or a declared skill folder's frontmatter `name`, with each UTF-16 unit other than `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-` written `-`; no name rule skips it but on the whole `<plugin>:<name>`, over 256 characters [test].
 
 **Attribution algorithm** (derived from the facts above):
 
@@ -209,7 +209,7 @@ How a synced plugin differs from an installed one:
 
 config-digger reads each `<name>~g<n>` folder as a plugin with `cloud-mirror` Provenance at user Scope, read-only: its servers and skills, as for an installed plugin, and nothing else of `synced\` (#113).
 
-"Extensions": Claude Code has no separate extension concept. The nearest thing is `.mcpb`/`.dxt` bundles referenced from a plugin, which are extracted to `.mcpb-cache\` inside the plugin root ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. In 2.1.310's code, `.mcpb-cache\<hash>.metadata.json` records each bundle it extracted: `source`, the value that names it, `extractedPath`, `.mcpb-cache\<content hash>`, which holds the bundle's `manifest.json`, and when it was cached. The bundle's one server is named by the manifest's `name`, from its `server.mcp_config` with `${__dirname}` standing for that folder [binary].
+"Extensions": Claude Code has no separate extension concept. The nearest thing is `.mcpb`/`.dxt` bundles referenced from a plugin, which are extracted to `.mcpb-cache\` inside the plugin root ([plugins reference](https://code.claude.com/docs/en/plugins-reference)) [docs]. In 2.1.310's code, `.mcpb-cache\<hash>.metadata.json` records each bundle it extracted: `source`, the value that names it, `extractedPath`, `.mcpb-cache\<content hash>`, which holds the bundle's `manifest.json`, and when it was cached. The bundle's one server is named by the manifest's `name`, from its `server.mcp_config` with `${__dirname}` standing for that folder [binary]; the release gate's probe saw all of it on 2.1.299 to 2.1.312 ([release gate](release-gate.md)).
 
 ## 6. Native Disable mechanisms (no removal)
 

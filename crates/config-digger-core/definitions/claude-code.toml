@@ -308,9 +308,12 @@ interpolation = { block = "braces", default_separator = ":-" }
 on_read_failure = "ignores_file"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
+# A `mcpServers` of `~/.claude.json` that is not an object, here or in a
+# Project's state (`local-mcp`), Claude Code skips: `claude mcp list` reports
+# it "[Failed to parse]", the file's other servers are read, and the value
+# is left as written [test].
 [[locations]]
 id = "user-mcp"
-unverified = "A value of `~/.claude.json` where servers are that is not an object, such as `mcpServers` or a Project's `mcpServers` holding a list, is taken to leave the file's other servers read: what Claude Code does with it is not known."
 anchor = { block = "home", root = "state_file" }
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -361,19 +364,21 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # declared later replaces an earlier one [docs], so this location ranks
 # above it. It extracts a bundle into the plugin's `.mcpb-cache` folder and
 # reads its server config [docs]: the `server.mcp_config` of its
-# `manifest.json`, `${__dirname}` standing for the folder [docs], named by
-# its `name` [binary]. A bundle it has not extracted yet, before it first
-# loads the plugin, has no Entry. It does not start a bundle's server whose
-# required `user_config` is not set [binary], which config-digger does not
-# check. A plugin whose `plugin.json` does not parse
-# fails to load, the servers of its `.mcp.json` and its skills with it
-# [test]; config-digger leaves out this file's Entries alone (#295).
+# `manifest.json`, `${__dirname}` standing for the folder [docs, test],
+# named by its `name` [test]. It records each bundle it extracts in
+# `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and
+# the absolute `extractedPath`, `.mcpb-cache/<content hash>`, it went to
+# [test]. A bundle it has not extracted yet, before it first loads the
+# plugin, has no Entry. It does not start a bundle's server whose required
+# `user_config` is not set [binary], which config-digger does not check. A
+# plugin whose `plugin.json` does not parse fails to load, the servers of
+# its `.mcp.json` and its skills with it [test], and so does one whose
+# `mcpServers` is of a shape the manifest's schema refuses, such as a
+# number, `true`, `null` or a list holding a number ("Manifest validation
+# failed") [test]; config-digger leaves out this file's Entries alone
+# (#295).
 [[locations]]
 id = "plugin-manifest-mcp"
-unverified = [
-  "Claude Code is taken to record each bundle it extracts in `.mcpb-cache/<hash>.metadata.json`, with the `source` that names it and the absolute `extractedPath` it went to, and to name the bundle's server by its manifest's `name`, as its code does.",
-  "A manifest `mcpServers` that is not an object, a path or a list of them is taken to leave the plugin's other servers and its skills read, though a manifest that does not parse fails the plugin whole (#295).",
-]
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
 name_template = "plugin:{plugin}:{name}"
 references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }
@@ -728,17 +733,20 @@ on_read_failure = "ignores_file"
 # own [docs]. They answer to `<plugin>:<folder>`, and to `<plugin>:<name>`
 # as an alias [test], so they never compete with other skills [docs]. A
 # declared folder that holds a `SKILL.md` is one skill, named
-# `<plugin>:<name>` by its frontmatter, or else by its folder, and Claude
-# Code loads a `SKILL.md` it reaches twice once [binary]. It writes `-` for
-# each character of a plugin skill's name other than a letter, a digit, `_`
-# and `-` [binary], which config-digger does not yet. A `SKILL.md`
-# at the plugin's root, with no `skills` folder or field, is not read.
+# `<plugin>:<name>` by its frontmatter, or else by its folder [test], and
+# Claude Code loads a `SKILL.md` it reaches twice once [binary]. A
+# `SKILL.md` at the plugin's root, with no `skills` folder or field, is not
+# read.
+# No name rule skips a plugin's skill folder or refuses a declared skill's
+# `name` [test]. Claude Code writes `-` for each UTF-16 unit of the name
+# other than `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-`, a declared skill's
+# `name` trimmed and rid of a leading `<plugin>:` first, and holds the
+# whole `<plugin>:<name>` to the folder name rule, so that only one over
+# 256 characters is skipped [test]. config-digger applies the rule of local
+# skills instead (#429). In a folder of skill folders, a frontmatter `name`
+# the rule refuses is no alias [test].
 [[locations]]
 id = "plugin-skills"
-unverified = [
-  "A folder the manifest's `skills` declares that holds a `SKILL.md` is taken to be one skill named by its frontmatter `name`, as Claude Code's code names it.",
-  "The name rule is taken to apply to a plugin's skills as it does to local ones: a folder name that breaks it skips the skill, and a frontmatter `name` that breaks it counts as no `name`.",
-]
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
 format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
 name_rule_when = { gate = "tengu_slate_wicket" }
@@ -753,7 +761,7 @@ on_read_failure = "ignores_file"
 # Scope.
 [[locations]]
 id = "synced-plugin-skills"
-unverified = "The name rule is taken to apply to a synced plugin's skills as it does to an installed plugin's."
+unverified = "A synced plugin's skills are taken to be named as an installed plugin's are (#429)."
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
 when = [{ block = "signed-in-account" }]
 format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
