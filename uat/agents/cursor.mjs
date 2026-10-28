@@ -9,8 +9,8 @@
 //   node uat/agents/cursor.mjs [--bin <Cursor.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=plugins,broken-user` runs those launches only: `plugins`,
-// `broken-<user|project>`, `project-plugins`, `sign-in`, `gates`, `skills`
-// and `nested-skills`.
+// `wrong-shape`, `broken-<user|project>`, `project-plugins`, `sign-in`,
+// `gates`, `skills` and `nested-skills`.
 //
 // Cursor takes a Statsig gate from the account's cache, or signed out from
 // its code's default, unless an override in the profile's
@@ -431,6 +431,72 @@ if (runs("plugins")) {
   );
   await p.check("locations[claude-plugin-mcp]", "Cursor reads a Claude Code plugin's `.mcp.json` it cannot parse around the error: both servers start", async () =>
     same(of("cc-bad-mcp-a", "cc-bad-mcp-b"), ["cc-bad-mcp-a", "cc-bad-mcp-b"]),
+  );
+}
+
+// ---------------------------------------------------------------- a manifest's servers of the wrong shape
+
+// Local plugins whose first manifest names a skills folder, `custom`, each
+// with a skill in `custom`, in `other` and in the default `skills` folder,
+// and a server in `.mcp.json`: one whose manifest is well formed, two
+// whose `mcpServers` is a path or a list of a path and an object, and
+// others whose `mcpServers` is neither a path, an object nor a list of
+// either, alone or before a manifest that names `other`. The probe reads
+// the `/` menu for each skill, Customize's list of skills, and the
+// servers that started.
+if (runs("wrong-shape")) {
+  const dir = fresh("wrong-shape", base);
+  const d = folders(dir);
+  const first = (name, extra = {}) => ({ ".cursor-plugin/plugin.json": { name, skills: "./custom", ...extra } });
+  const plugins = {
+    "cd-throwaway-ws-ok": first("cd-throwaway-ws-ok"),
+    "cd-throwaway-ws-number": first("cd-throwaway-ws-number", { mcpServers: 42 }),
+    "cd-throwaway-ws-list": first("cd-throwaway-ws-list", { mcpServers: [42] }),
+    "cd-throwaway-ws-null": first("cd-throwaway-ws-null", { mcpServers: null }),
+    // A path, and a list of a path and an object, which Cursor accepts.
+    "cd-throwaway-ws-path": { ...first("cd-throwaway-ws-path", { mcpServers: "./servers.json" }), "servers.json": { mcpServers: {} } },
+    "cd-throwaway-ws-mixed": { ...first("cd-throwaway-ws-mixed", { mcpServers: ["./servers.json", {}] }), "servers.json": { mcpServers: {} } },
+    "cd-throwaway-ws-next": { ...first("cd-throwaway-ws-next", { mcpServers: 42 }), ".claude-plugin/plugin.json": { name: "cd-throwaway-ws-next", skills: "./other" } },
+  };
+  const tag = (name) => name.replace("cd-throwaway-", "");
+  localPlugins(d.cursor, Object.entries(plugins).map(([name, files]) => [name, { ...files, ".mcp.json": servers(tag(name)) }]));
+  const names = [];
+  for (const name of Object.keys(plugins)) {
+    for (const folder of ["custom", "other", "skills"]) {
+      const skillName = `${name}-${folder}`;
+      skill(path.join(d.cursor, "plugins", "local", name, folder, skillName), [`name: ${skillName}`, `description: ${folder}`]);
+      names.push(skillName);
+    }
+  }
+  let seen;
+  const tags = await launch(dir, {
+    during: async (win) => {
+      const slash = {};
+      for (const name of names) slash[name] = (await win.slash(`/${name}`)).filter(([entry]) => entry === `/${name}`).map(([, description]) => description);
+      seen = { slash, customize: (await win.skills()).filter(([n]) => names.includes(n)) };
+    },
+  });
+  // The folders whose skill Cursor listed for the plugin `name`, in the `/`
+  // menu and in Customize.
+  const listedOf = (name) => ({
+    slash: ["custom", "other", "skills"].filter((folder) => seen?.slash[`${name}-${folder}`]?.includes(folder)),
+    customize: (seen?.customize ?? []).filter(([n]) => n.startsWith(`${name}-`)).map(([, folder]) => folder),
+  });
+  const read = (folder) => ({ slash: [folder], customize: [folder] });
+
+  await p.check("locations[cursor-plugin-manifest-mcp]", "Cursor rejects whole a manifest whose `mcpServers` is neither a path, an object nor a list of either, as one it cannot parse: it lists the skills of the `skills` folder, not of the folder the manifest names, or those of the next manifest, in the `/` menu and in Customize", async () =>
+    same(Object.fromEntries(Object.keys(plugins).map((name) => [name, listedOf(name)])), {
+      "cd-throwaway-ws-ok": read("custom"),
+      "cd-throwaway-ws-number": read("skills"),
+      "cd-throwaway-ws-list": read("skills"),
+      "cd-throwaway-ws-null": read("skills"),
+      "cd-throwaway-ws-path": read("custom"),
+      "cd-throwaway-ws-mixed": read("custom"),
+      "cd-throwaway-ws-next": read("other"),
+    }),
+  );
+  await p.check("locations[cursor-plugin-mcp]", "Cursor still starts the servers of the `.mcp.json` of a plugin whose manifest it rejects for its `mcpServers`", async () =>
+    same(tags.filter((t) => t.startsWith("ws-")), Object.keys(plugins).map(tag).sort()),
   );
 }
 
@@ -947,6 +1013,10 @@ if (runs("nested-skills")) {
   at("x/.agents/skills", "cd-throwaway-n-holder", "x agents");
   at("b/.cursor/skills", "cd-throwaway-n-deep", "b");
   at("a/b/c/.cursor/skills", "cd-throwaway-n-deep", "a/b/c");
+  // Two whose folders differ where one has a separator and the other `-`,
+  // which comes before `\` and `/` as a character, after the end of a name.
+  at("a/b/.cursor/skills", "cd-throwaway-n-separator", "a/b");
+  at("a-b/.cursor/skills", "cd-throwaway-n-separator", "a-b");
   // An excluded name below the skills folder.
   at("sub/.cursor/skills/build", "cd-throwaway-n-below-build", "below build");
   await gitInit(d.proj);
@@ -971,6 +1041,7 @@ if (runs("nested-skills")) {
     "cd-throwaway-n-kinds",
     "cd-throwaway-n-holder",
     "cd-throwaway-n-deep",
+    "cd-throwaway-n-separator",
     "cd-throwaway-n-below-build",
     "cd-throwaway-n-ignored-marker",
     "cd-throwaway-n-nogit",
@@ -1070,6 +1141,12 @@ if (runs("nested-skills")) {
         slash: { "cd-throwaway-n-pair": ["x"], "cd-throwaway-n-kinds": ["x agents"], "cd-throwaway-n-holder": ["x cursor"], "cd-throwaway-n-deep": ["a/b/c"] },
         customize: [["cd-throwaway-n-deep", "a/b/c"], ["cd-throwaway-n-holder", "x cursor"], ["cd-throwaway-n-kinds", "x agents"], ["cd-throwaway-n-pair", "x"]],
       },
+    ),
+  );
+  await p.check("items.skill", "Of two nested skills at one path below `a\\b\\.cursor\\skills` and `a-b\\.cursor\\skills`, Cursor lists one only: the one of `a\\b`, whose folders come first name by name", async () =>
+    same(
+      { slash: listed(seen.on, "cd-throwaway-n-separator"), customize: rows(seen.on, ["cd-throwaway-n-separator"]) },
+      { slash: ["a/b"], customize: [["cd-throwaway-n-separator", "a/b"]] },
     ),
   );
 }
