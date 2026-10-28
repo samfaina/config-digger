@@ -1606,3 +1606,269 @@ fn servers_of_another_shape_in_a_file_the_manifest_names_leave_the_plugin_loaded
         .unwrap();
     assert_eq!(code(failure.reaction), "unknown");
 }
+
+// --- A plugin of a `directory` marketplace ---------------------------------
+
+/// The folder of the `directory` marketplace `my-market`, the user's own.
+const MARKET: &str = r"E:\dev\my-market";
+
+/// localp's copy in the cache, which Claude Code does not read.
+fn localp_cache() -> PathBuf {
+    in_cache(r"my-market\localp\1.0.0")
+}
+
+/// localp's folder in the marketplace, which its entry's source names.
+fn localp_market() -> PathBuf {
+    PathBuf::from(MARKET).join(r"plugins\localp")
+}
+
+fn known_marketplaces() -> PathBuf {
+    PathBuf::from(HOME).join(r".claude\plugins\known_marketplaces.json")
+}
+
+/// The record of `my-market` as Claude Code keeps it, in
+/// `known_marketplaces.json` or under `extraKnownMarketplaces`.
+fn my_market_record() -> Value {
+    json!({ "source": { "source": "directory", "path": MARKET }, "installLocation": MARKET })
+}
+
+/// The fixture with the plugin localp installed and on, from the
+/// marketplace `my-market`, whose manifest lists it with `source` as its
+/// entry's source. Its copy in the cache and its folder in the marketplace
+/// each carry a server and a skill of their own; `my-market` is in no
+/// marketplace registry.
+fn with_localp(source: Value) -> FakeFileSystem {
+    let fs = fixture();
+    let mut installed = json_of(
+        &fs,
+        PathBuf::from(HOME).join(r".claude\plugins\installed_plugins.json"),
+    );
+    installed["plugins"]["localp@my-market"] = json!([{
+        "scope": "user",
+        "installPath": localp_cache().display().to_string(),
+        "version": "1.0.0",
+    }]);
+    let mut settings = json_of(&fs, user_settings());
+    settings["enabledPlugins"]["localp@my-market"] = json!(true);
+    let skill = |name: &str| format!("---\nname: {name}\ndescription: A skill.\n---\n");
+    fs.with_file(
+        PathBuf::from(HOME).join(r".claude\plugins\installed_plugins.json"),
+        installed.to_string(),
+    )
+    .with_file(user_settings(), settings.to_string())
+    .with_file(
+        PathBuf::from(MARKET).join(r".claude-plugin\marketplace.json"),
+        json!({ "name": "my-market", "plugins": [{ "name": "localp", "source": source }] })
+            .to_string(),
+    )
+    .with_file(
+        localp_cache().join(".mcp.json"),
+        json!({ "mcpServers": { "cached": { "command": "cached" } } }).to_string(),
+    )
+    .with_file(
+        localp_cache().join(r"skills\cached-skill\SKILL.md"),
+        skill("cached-skill"),
+    )
+    .with_file(
+        localp_market().join(".mcp.json"),
+        json!({ "mcpServers": { "live": { "command": "${CLAUDE_PLUGIN_ROOT}/live.js" } } })
+            .to_string(),
+    )
+    .with_file(
+        localp_market().join(r"skills\live-skill\SKILL.md"),
+        skill("live-skill"),
+    )
+}
+
+/// The names of the Items of localp, sorted.
+fn localp_items(inventory: &Inventory) -> Vec<&str> {
+    let mut names: Vec<&str> = inventory
+        .items
+        .iter()
+        .filter(|item| {
+            item.entries.iter().any(|entry| {
+                entry
+                    .plugin
+                    .as_ref()
+                    .is_some_and(|plugin| plugin.id == "localp@my-market")
+            })
+        })
+        .map(|item| item.name.as_str())
+        .collect();
+    names.sort_unstable();
+    names
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_is_read_from_the_folder_its_entry_names() {
+    let fs = with_localp(json!("./plugins/localp")).with_file(
+        known_marketplaces(),
+        json!({ "my-market": my_market_record() }).to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:live-skill", "plugin:localp:live"]
+    );
+    let live = item(&inventory, "plugin:localp:live");
+    assert_eq!(live.entries[0].path, localp_market().join(".mcp.json"));
+    assert_eq!(code(live.state), "effective");
+    let skill = item(&inventory, "localp:live-skill");
+    assert_eq!(
+        skill.entries[0].path,
+        localp_market().join(r"skills\live-skill")
+    );
+    let plugin = skill.entries[0].plugin.as_ref().unwrap();
+    assert_eq!(plugin.scope.as_deref(), Some("user"));
+    assert_eq!(plugin.version.as_deref(), Some("1.0.0"));
+}
+
+#[test]
+fn a_directory_marketplace_only_the_user_settings_record_is_read_from_its_folder() {
+    let fs = with_localp(json!("./plugins/localp"));
+    let mut settings = json_of(&fs, user_settings());
+    settings["extraKnownMarketplaces"] =
+        json!({ "my-market": { "source": { "source": "directory", "path": MARKET } } });
+    fs.put_file(user_settings(), settings.to_string());
+    fs.put_file(
+        known_marketplaces(),
+        json!({ "claude-plugins-official": { "source": { "source": "github", "repo": "anthropics/claude-plugins-official" } } })
+            .to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:live-skill", "plugin:localp:live"]
+    );
+}
+
+#[test]
+fn a_plugin_of_a_marketplace_of_another_kind_is_read_from_its_install_path() {
+    let fs = with_localp(json!("./plugins/localp")).with_file(
+        known_marketplaces(),
+        json!({ "my-market": { "source": { "source": "github", "repo": "me/my-market" }, "installLocation": MARKET } })
+            .to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:cached-skill", "plugin:localp:cached"]
+    );
+}
+
+#[test]
+fn a_plugin_the_directory_marketplace_names_no_folder_for_is_read_from_its_install_path() {
+    let manifest = PathBuf::from(MARKET).join(r".claude-plugin\marketplace.json");
+    let object = json!({ "source": "github", "repo": "me/localp" });
+    for (case, fs) in [
+        ("an object source", with_localp(object)),
+        ("no manifest", {
+            let fs = with_localp(json!("./plugins/localp"));
+            fs.delete_file(&manifest);
+            fs
+        }),
+        (
+            "a manifest that does not parse",
+            with_localp(json!("./plugins/localp")).with_file(&manifest, r#"{ "plugins": ["#),
+        ),
+        (
+            "no entry of its name",
+            with_localp(json!("./plugins/localp")).with_file(
+                &manifest,
+                json!({ "plugins": [{ "name": "other", "source": "./plugins/localp" }] })
+                    .to_string(),
+            ),
+        ),
+    ] {
+        fs.put_file(
+            known_marketplaces(),
+            json!({ "my-market": my_market_record() }).to_string(),
+        );
+
+        let inventory = no_project(&fs);
+
+        assert_eq!(
+            localp_items(&inventory),
+            ["localp:cached-skill", "plugin:localp:cached"],
+            "{case}"
+        );
+        assert!(
+            inventory.read_failures.is_empty(),
+            "{case}: {:?}",
+            inventory.read_failures
+        );
+    }
+}
+
+/// The fixture with localp of a `directory` marketplace that
+/// `known_marketplaces.json` records, its entry's source a nested folder.
+fn localp_in_market() -> FakeFileSystem {
+    with_localp(json!("./plugins/localp")).with_file(
+        known_marketplaces(),
+        json!({ "my-market": my_market_record() }).to_string(),
+    )
+}
+
+#[test]
+fn claude_plugin_root_expands_to_the_marketplace_folder_of_its_plugin() {
+    let inventory = no_project(&localp_in_market());
+
+    assert_eq!(
+        item(&inventory, "plugin:localp:live").entries[0].config,
+        json!({ "command": "E:/dev/my-market/plugins/localp/live.js" })
+    );
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_is_removed_only_by_uninstalling_it_and_no_write_reaches_its_cache_copy()
+ {
+    let fs = localp_in_market();
+    let core = core(&fs);
+    let untouched = |fs: &FakeFileSystem| {
+        [
+            localp_cache().join(".mcp.json"),
+            localp_cache().join(r"skills\cached-skill\SKILL.md"),
+            localp_market().join(".mcp.json"),
+            localp_market().join(r"skills\live-skill\SKILL.md"),
+        ]
+        .map(|path| fs.contents(path))
+    };
+    let before = untouched(&fs);
+
+    let Err(error) = plan(
+        &core,
+        &Context::default(),
+        Action::Remove,
+        &["localp:live-skill"],
+    ) else {
+        panic!("Remove of a plugin Entry is refused");
+    };
+    assert_eq!(code(error.code), "blocked");
+    assert!(
+        error
+            .message
+            .contains("claude plugin uninstall localp@my-market --scope user"),
+        "{}",
+        error.message
+    );
+    let plan = plan(
+        &core,
+        &Context::default(),
+        Action::Disable,
+        &["plugin:localp:live"],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, user_settings())["enabledPlugins"]["localp@my-market"],
+        json!(false)
+    );
+    assert_eq!(untouched(&fs), before);
+}

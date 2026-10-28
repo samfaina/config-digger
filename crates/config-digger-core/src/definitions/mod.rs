@@ -4495,6 +4495,42 @@ checks = {CHECKS}
     }
 
     #[test]
+    fn a_plugin_registry_s_marketplaces_lie_in_the_home_or_the_machine_and_name_their_fields() {
+        let marketplaces = |registry: &str, settings: &str, manifest: &str, name: &str| {
+            with_plugins("").replace(
+                r#"folder = "path" }"#,
+                &format!(
+                    r#"folder = "path", marketplaces = {{ anchor = {registry}, settings = [{{ anchor = {settings}, key_path = ["extra"] }}], separator = "@", kind = ["source", "kind"], directory = "directory", folder = [["location"], ["source", "path"]], manifest = "{manifest}", plugins = ["plugins"], name = "{name}", source = "source" }} }}"#
+                ),
+            )
+        };
+        let home = r#"{ block = "home", root = "plugins", path = "known.json" }"#;
+        let machine = r#"{ block = "machine", path = "~/.agent/settings.json" }"#;
+        let text = marketplaces(home, machine, ".agent/marketplace.json", "name");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (registry, settings) in [(IN_PROJECT, machine), (home, IN_PROJECT)] {
+            let text = marketplaces(registry, settings, ".agent/marketplace.json", "name");
+            assert!(
+                error(&text).contains("must lie in the Agent home or the machine"),
+                "{}",
+                error(&text)
+            );
+        }
+        let text = marketplaces(home, machine, "../marketplace.json", "name");
+        assert!(
+            error(&text).contains("must be a relative path"),
+            "{}",
+            error(&text)
+        );
+        let text = marketplaces(home, machine, ".agent/marketplace.json", "");
+        assert!(
+            error(&text).contains("must not be empty"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn a_project_s_plugins_marketplace_is_one_folder_name() {
         let keys = |marketplace: &str| {
             with_plugins("").replace(

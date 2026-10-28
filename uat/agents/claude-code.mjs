@@ -207,6 +207,8 @@ function verbatimSkill(dir, folder) {
   const home = path.join(dir, "home");
   const proj = path.join(dir, "proj");
   const market = path.join(dir, "market");
+  // Each plugin's folder, nested below the marketplace's, as its entry's `source` names it.
+  const folder = (name) => path.join(market, "plugins", name);
   fs.mkdirSync(proj, { recursive: true });
   const plugins = {
     "cd-throwaway-p1": { "cd-throwaway-ep1": { type: "http", url: "http://127.0.0.1:9/mcp" } },
@@ -214,10 +216,10 @@ function verbatimSkill(dir, folder) {
     "cd-throwaway-p3": { "cd-throwaway-p3srv": stdio("p3") },
   };
   for (const [name, servers] of Object.entries(plugins)) {
-    write(path.join(market, name, ".claude-plugin", "plugin.json"), { name, version: "1.0.0" });
-    write(path.join(market, name, ".mcp.json"), { mcpServers: servers });
+    write(path.join(folder(name), ".claude-plugin", "plugin.json"), { name, version: "1.0.0" });
+    write(path.join(folder(name), ".mcp.json"), { mcpServers: servers });
   }
-  write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: Object.keys(plugins).map((name) => ({ name, source: `./${name}` })) });
+  write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: Object.keys(plugins).map((name) => ({ name, source: `./plugins/${name}` })) });
   await claude(home, proj, "plugin", "marketplace", "add", market);
   for (const name of Object.keys(plugins)) await claude(home, proj, "plugin", "install", `${name}@cd-throwaway-market`);
   const settingsFile = path.join(home, "settings.json");
@@ -255,13 +257,13 @@ function verbatimSkill(dir, folder) {
     return same(servers, ["plugin:cd-throwaway-p3:cd-throwaway-p3srv", "plugin:cd-throwaway-p1:cd-throwaway-ep1"]);
   });
 
-  await p.check("locations[plugin-mcp]", "a plugin of a `directory` marketplace is read from the marketplace's folder, not from the cache", async () => {
+  await p.check("locations[plugin-mcp]", "a plugin of a `directory` marketplace is read from the folder its entry's `source` names in the marketplace's folder, not from the cache", async () => {
     const { stdout } = await claude(home, proj, "plugin", "list");
-    return same(stdout.includes(`Read from: ${path.join(market, "cd-throwaway-p3")}`), true);
+    return same(stdout.includes(`Read from: ${folder("cd-throwaway-p3")}`), true);
   });
 
   await p.check("locations[plugin-mcp]", "a plugin's `.mcp.json` that does not parse leaves the plugin loaded without its servers", async () => {
-    const file = path.join(market, "cd-throwaway-p3", ".mcp.json");
+    const file = path.join(folder("cd-throwaway-p3"), ".mcp.json");
     const kept = fs.readFileSync(file, "utf8");
     write(file, '{ "mcpServers": { broken');
     const s = await session(home, proj);
@@ -270,7 +272,7 @@ function verbatimSkill(dir, folder) {
   });
 
   await p.check("locations[plugin-manifest-mcp]", "a plugin whose `plugin.json` does not parse fails to load, servers of its `.mcp.json` included", async () => {
-    const file = path.join(market, "cd-throwaway-p3", ".claude-plugin", "plugin.json");
+    const file = path.join(folder("cd-throwaway-p3"), ".claude-plugin", "plugin.json");
     const kept = fs.readFileSync(file, "utf8");
     write(file, '{ "name": broken');
     const s = await session(home, proj);

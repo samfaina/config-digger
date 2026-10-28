@@ -5,12 +5,12 @@
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, DownWalk,
-    EnvMap, FindsBy, Format, Gate, GateStore, HoldsHere, InstallationFolders, JsonDialect,
-    JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp,
-    ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders,
-    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry,
-    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling,
-    StoreClass, is_entry_key,
+    EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere, InstallationFolders,
+    JsonDialect, JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator,
+    LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache,
+    PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register,
+    Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList,
+    Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -3792,14 +3792,58 @@ impl Scanner<'_> {
         let Some(text) = self.reader.text(home, &path, None) else {
             return Vec::new();
         };
-        match block.records(text) {
+        let mut records = match block.records(text) {
             Ok(records) => records,
             Err(error) => {
                 self.reader
                     .fail(home, &path, None, ReadFailureKind::Parse, error.position);
-                Vec::new()
+                return Vec::new();
+            }
+        };
+        if let Some(marketplaces) = &block.marketplaces {
+            for record in &mut records {
+                if let Some(folder) = self.marketplace_folder(home, marketplaces, &record.id) {
+                    record.folder = folder.display().to_string();
+                }
             }
         }
+        records
+    }
+
+    /// The folder of the plugin with the id `id` in its marketplace, when
+    /// the marketplace is in a folder and its manifest names one for the
+    /// plugin; `None` when the plugin is read from its record's folder. A
+    /// file that cannot be read here names no folder, and is no Read
+    /// failure.
+    fn marketplace_folder(
+        &mut self,
+        home: &FoundHome,
+        marketplaces: &FolderMarketplaces,
+        id: &str,
+    ) -> Option<PathBuf> {
+        let (name, marketplace) = marketplaces.split(id)?;
+        let registries = std::iter::once((&marketplaces.anchor, [].as_slice())).chain(
+            marketplaces
+                .settings
+                .iter()
+                .map(|settings| (&settings.anchor, settings.key_path.as_slice())),
+        );
+        let record = registries.into_iter().find_map(|(anchor, root)| {
+            let path = anchor.path(&home.roots, None)?;
+            let text = self.reader.peek(&path).ok()??;
+            FolderMarketplaces::record(text, root, marketplace)
+        })?;
+        let folder = marketplaces.folder_of(&record)?;
+        let manifest = blocks::join_relative(&folder, &marketplaces.manifest);
+        let Some(text) = self.reader.peek(&manifest).ok().flatten() else {
+            tracing::debug!(plugin = %id, path = %manifest.display(), "no marketplace manifest to read");
+            return None;
+        };
+        let found = marketplaces.plugin_folder(&folder, text, name);
+        if found.is_none() {
+            tracing::debug!(plugin = %id, "the marketplace names no folder for the plugin");
+        }
+        found
     }
 
     /// A record for each plugin the Project folder `folder`, whose key is
