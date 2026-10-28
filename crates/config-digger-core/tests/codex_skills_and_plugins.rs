@@ -183,6 +183,46 @@ fn an_untrusted_project_s_skills_still_load() {
     assert_eq!(code(item(&inventory, "test").state), "effective");
 }
 
+/// `fs` with the skill `six` 6 folders below the folder of skills `skills`,
+/// and the skill `seven` 7 below it.
+fn deep_skills(fs: FakeFileSystem, skills: &Path) -> FakeFileSystem {
+    fs.with_file(skill(&skills.join(r"a\b\c\d\e"), "six"), skill_md("six"))
+        .with_file(
+            skill(&skills.join(r"a\b\c\d\e\f"), "seven"),
+            skill_md("seven"),
+        )
+}
+
+/// Whether the inventory holds a Codex Item named `name`.
+fn has_item(inventory: &Inventory, name: &str) -> bool {
+    codex_items(inventory).any(|item| item.name == name)
+}
+
+#[test]
+fn skill_folders_are_found_up_to_6_folders_below_a_root() {
+    let web = project(r"mono\apps\web");
+    let roots = [
+        web.join(r".codex\skills"),
+        web.join(r".agents\skills"),
+        Path::new(CODEX).join("skills"),
+        Path::new(HOME).join(r".agents\skills"),
+        Path::new(CODEX).join(r"skills\.system"),
+        Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\skills"),
+    ];
+    let fs = roots
+        .iter()
+        .fold(monorepo(true), |fs, root| deep_skills(fs, root));
+
+    let inventory = inventory_at(&fs, &web);
+
+    let six: Vec<&Item> = codex_items(&inventory)
+        .filter(|item| item.name == "six")
+        .collect();
+    assert_eq!(six.len(), roots.len(), "{six:?}");
+    assert!(six.iter().all(|item| states(item) == ["effective"]));
+    assert!(!has_item(&inventory, "seven"));
+}
+
 /// The folder of the version `version` of the plugin `name` Codex installed
 /// from the marketplace `marketplace`.
 /// The user's `config.toml` tables that turn on the plugins `ids`, as Codex
@@ -199,6 +239,18 @@ fn plugin(marketplace: &str, name: &str, version: &str) -> PathBuf {
         .join(marketplace)
         .join(name)
         .join(version)
+}
+
+#[test]
+fn a_plugin_s_skill_folders_are_found_up_to_6_folders_below_its_skills_folder() {
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    let fs = FakeFileSystem::new().with_file(user_config(), on(&["linear@openai-curated"]));
+    let fs = deep_skills(fs, &linear.join("skills"));
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(states(item(&inventory, "linear:six")), ["effective"]);
+    assert!(!has_item(&inventory, "linear:seven"));
 }
 
 /// A plugin's `.mcp.json` declaring the server `name` at `url`.

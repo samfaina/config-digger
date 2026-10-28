@@ -3648,6 +3648,44 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
+    fn only_a_recursive_skill_folder_caps_its_depth_at_1_or_more() {
+        let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
+        let capped = |cap: &str| {
+            let format = SKILL_FORMAT.replace(" }", &format!(", {cap} }}"));
+            with_skills(anchor, &format, CHECKS)
+        };
+        let text = capped("recursive = true, max_depth = 6");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let zero = error(&capped("recursive = true, max_depth = 0"));
+        assert!(
+            zero.contains("a skill folder's max_depth must be at least 1"),
+            "{zero}"
+        );
+        let flat = error(&capped("max_depth = 6"));
+        assert!(
+            flat.contains("only a recursive skill folder can set a max_depth"),
+            "{flat}"
+        );
+    }
+
+    #[test]
+    fn a_skill_list_s_skills_cannot_cap_their_depth() {
+        let skills = r#"{ name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", max_depth = 6 }"#;
+        let list = format!(
+            r#"{{ block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = {skills} }}"#
+        );
+        let capped = error(&with_skills(
+            r#"{ block = "home", root = "state" }"#,
+            &list,
+            CHECKS,
+        ));
+        assert!(
+            capped.contains("it cannot be recursive or set a depth or a max_depth"),
+            "{capped}"
+        );
+    }
+
+    #[test]
     fn every_format_of_skill_folders_takes_a_name_rule_and_no_unknown_one() {
         let rule = r#", name_rule = "visible-chars" }"#;
         let folder = SKILL_FORMAT.replace(" }", rule);

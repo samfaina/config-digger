@@ -148,7 +148,7 @@ The name rule, on 2.1.299 to 2.1.309 with `tengu_slate_wicket` at its default:
 | `:302` `items.mcp.disable[2]`: a plugin missing from `config.toml` is on | It is off, with its servers and skills | Corrected: `default_value = false` |
 | `:341` `items.mcp.rules[0]`: requirements on args or URL patterns | Codex reads `identity = { command = { executable, args = [<matcher>] } }` and `identity = { url = <matcher> }`, a matcher being exact, prefix or a regex of the whole value; a regex that does not compile stops Codex. The plain `{ command }` form ignores args | Ticket: config-digger reads the matchers ([#141](https://github.com/samfaina/config-digger/issues/141)); that a regex that does not compile stops Codex, which the core cannot say yet, needs a ticket, not filed yet |
 | `:384` `locations[project-agents-skills]`: trust does not apply | `.agents\skills` is read in an untrusted Project | Confirmed |
-| `:474` `items.skill`: skills at any depth | Skill folders are found up to 6 folders below a root, not 7 | Ticket [#298](https://github.com/samfaina/config-digger/issues/298) |
+| `:474` `items.skill`: skills at any depth | Skill folders are found up to 6 folders below a root, not 7 | Ticket [#298](https://github.com/samfaina/config-digger/issues/298), done: `max_depth = 6` on every Codex skill location, the two of plugins included, a recursive read neither entering nor listing a folder below it; that Codex caps a plugin's skill folders too, which the probe did not test, is marked `unverified` |
 | `:475` `items.skill`: an unreadable `SKILL.md` is skipped | A `SKILL.md` that is not UTF-8 or cannot be opened is skipped | Confirmed |
 | `:493` `items.skill.disable[0]`: the spelling of a canonical path | A rule's path matches in any case, with either slash, with or without `\\?\` | Confirmed |
 
@@ -304,13 +304,14 @@ Marks are named by their table, as `cargo xtask unverified` prints them; line nu
 | Needs | Marks | Ticket |
 |---|---|---|
 | Server-managed settings: Claude Teams or Enterprise | Claude Code `settings[managed]`, `locations[managed-settings-mcp]` (a `remote-settings.json` that does not parse) | Under the exception |
-| A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]` | Under the exception |
+| A Codex enterprise account, with remote plugins | Codex `locations[cloud-mcp]` (2), `locations[remote-plugin-mcp]`, `items.mcp.disable[1]`, `locations[remote-plugin-skills]` | Under the exception |
 | A deployment of Claude Desktop for a third-party provider | Claude Desktop `items.mcp.rules[1]` | Under the exception |
 | A Cursor team account | Cursor `plugins[project]` (the marketplace of a key that names none, on an account in a team) | Under the exception |
 | The app signed in, after [#305](https://github.com/samfaina/config-digger/issues/305) | Claude Desktop `locations[mirrored-skills]` | [#313](https://github.com/samfaina/config-digger/issues/313) |
 | A Project trusted under its forward-slash key in another case, and `enabledMcpjsonServers` in the managed settings in an untrusted Project | Claude Code `items.mcp.gates[0]` (2), from [#293](https://github.com/samfaina/config-digger/issues/293) | None yet |
 | A synced plugin whose manifest fails, in the throwaway signed-in home of `claude-account.mjs`, and a plugin that is off or forced off whose manifest fails | Claude Code `locations[synced-plugin-manifest-mcp]`, `locations[synced-plugin-mcp]`, `locations[synced-plugin-skills]`, `items.mcp`, `items.skill`, all from [#295](https://github.com/samfaina/config-digger/issues/295) | None yet |
 | A `directory` marketplace whose manifest is missing or does not parse, does not list the plugin, or gives it a `source` that is not a path below the marketplace's folder | Claude Code `plugins[installed]`, from [#296](https://github.com/samfaina/config-digger/issues/296) | None yet |
+| An installed Codex plugin with a skill folder 6 and one 7 folders below its skills folder | Codex `locations[plugin-skills]`, from [#298](https://github.com/samfaina/config-digger/issues/298) | None yet |
 | The throwaway signed-in home of `claude-account.mjs`, signed out and taken off its account | Claude Code `account`, `account.off`, `plugins[synced]` (another account's folder), all from [#308](https://github.com/samfaina/config-digger/issues/308) | [#400](https://github.com/samfaina/config-digger/issues/400) |
 
 Each mark of the three rows under the exception is written as a table of its `sentence` and what its test `needs`. The release workflow runs `cargo xtask unverified --gate` before the build and fails, listing them, while any other mark is left; the release notes list each mark under the exception with what its test needs ([#315](https://github.com/samfaina/config-digger/issues/315)).
