@@ -1818,7 +1818,7 @@ pub(crate) fn gates(
                 Some((Check::Policy, reason))
             }
             Gate::ApprovalList(block) => {
-                let approved = (0..block.sources.len()).any(|source| {
+                let values = |source: usize| {
                     let owner = SettingOwner::Gate {
                         gate: index,
                         source,
@@ -1826,10 +1826,25 @@ pub(crate) fn gates(
                     snapshot
                         .settings_for(entry, location.kind, owner, project)
                         .filter_map(|value| value.value.as_ref())
-                        .any(|value| block.approves(source, value, &entry.name))
-                });
-                let reason =
-                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);
+                };
+                let trusted = block
+                    .trust_source()
+                    .is_some_and(|trust| values(trust).any(|value| *value == true));
+                let approved = (0..block.sources.len())
+                    .filter(|&source| trusted || !block.sources[source].trusted_only)
+                    .any(|source| {
+                        values(source).any(|value| block.approves(source, value, &entry.name))
+                    });
+                let reason = if block.trust.is_some() && !trusted {
+                    explain::not_approved_untrusted(
+                        agent_name,
+                        &entry.name,
+                        &entry.path,
+                        block.prompt,
+                    )
+                } else {
+                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt)
+                };
                 (!approved).then_some((Check::Approval, reason))
             }
             Gate::PolicyField(block) => {

@@ -248,8 +248,11 @@ fn a_project_no_registry_knows_is_evaluated_when_asked_for() {
             r"E:\scratch\.mcp.json",
             r#"{"mcpServers": {"scratchpad": {"command": "x"}}}"#,
         )
+        // Approved in the user's settings: Claude Code has not recorded
+        // the Project, so it trusts it not, and the Project's own approvals
+        // would not count.
         .with_file(
-            r"E:\scratch\.claude\settings.local.json",
+            PathBuf::from(HOME).join(r".claude\settings.json"),
             r#"{"enabledMcpjsonServers": ["scratchpad"]}"#,
         );
     let core = core(fs);

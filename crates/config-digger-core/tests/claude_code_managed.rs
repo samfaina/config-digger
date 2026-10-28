@@ -718,8 +718,10 @@ fn a_rule_file_that_cannot_be_read_is_a_caveat() {
 }
 
 /// A Claude Code home that recorded the Project as `E:/projects/petme-app`
-/// with `project_state`, whose `.mcp.json` declares `supabase` and `notes`.
-fn project_home(project_state: Value) -> FakeFileSystem {
+/// with `project_state`, the user trusting it so that its own approvals
+/// count, whose `.mcp.json` declares `supabase` and `notes`.
+fn project_home(mut project_state: Value) -> FakeFileSystem {
+    project_state["hasTrustDialogAccepted"] = json!(true);
     claude_home(&json!({
         "mcpServers": { "notes": { "command": "notes-mcp" } },
         "projects": { "E:/projects/petme-app": project_state },
@@ -809,6 +811,23 @@ fn a_project_server_is_approved_by_name_or_all_at_once_in_any_settings_file() {
             path.display()
         );
     }
+}
+
+#[test]
+fn a_project_server_is_approved_by_the_managed_settings_in_an_untrusted_project() {
+    let fs = project_home(json!({}))
+        .with_file(
+            in_home(".claude.json"),
+            json!({ "projects": { "E:/projects/petme-app": {} } }).to_string(),
+        )
+        .with_file(
+            in_program_files(r"ClaudeCode\managed-settings.json"),
+            json!({ "enabledMcpjsonServers": ["supabase"] }).to_string(),
+        );
+
+    let inventory = in_petme(&fs);
+
+    assert_eq!(project_entry(&inventory, "supabase")["state"], "effective");
 }
 
 #[test]

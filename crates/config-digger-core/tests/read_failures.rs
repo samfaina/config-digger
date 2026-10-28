@@ -54,11 +54,12 @@ fn mcp_json() -> PathBuf {
     PathBuf::from(PROJECT).join(".mcp.json")
 }
 
-/// `fs` with the Project's shared settings approving every `.mcp.json`
-/// server, which Claude Code otherwise Blocks.
+/// `fs` with the user's settings approving every `.mcp.json` server, which
+/// Claude Code otherwise Blocks. The Project's own approvals would count
+/// only in a Project its `~/.claude.json` trusts.
 fn approved(fs: FakeFileSystem) -> FakeFileSystem {
     fs.with_file(
-        PathBuf::from(PROJECT).join(r".claude\settings.json"),
+        in_home(r".claude\settings.json"),
         r#"{"enableAllProjectMcpServers": true}"#,
     )
 }

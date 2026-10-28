@@ -15,6 +15,7 @@
   },
   "projects": {
     "E:/projects/petme-app": {
+      "hasTrustDialogAccepted": true,
       "mcpServers": {
         "github": {
           "command": "gh-mcp"

@@ -2425,6 +2425,11 @@ fn read_rules(
                         .min();
                     read.retain(|place| known.source_of(&place.path) == highest);
                 }
+                // Only the Project's key spelled with forward slashes counts.
+                let project_key = setting.key_path.iter().position(|key| key == PROJECT_KEY);
+                if let Some(at) = project_key.filter(|_| setting.forward_slashes) {
+                    read.retain(|place| !place.key_path[at].contains('\\'));
+                }
                 for place in read {
                     values.push(ScannedSetting {
                         agent_index: home.agent_index,
