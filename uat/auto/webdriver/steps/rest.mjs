@@ -5,7 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { go, press, wait } from "../lib.mjs";
+import { go, PLAN_ROOT, press, wait } from "../lib.mjs";
 import { confirm, done, inventoryOf, openItem, project, waitPreview, withClaudeDesktop } from "./common.mjs";
 import { unwrap } from "../driver.mjs";
 
@@ -170,8 +170,8 @@ export default [
     id: "13.5",
     async run(t) {
       await t.s.close().catch(() => {});
-      t.ps(t.step.commands[0].text.replace("E:\\cd-throwaway", t.root));
-      t.eq(t.ps(t.step.commands[1].text.replace("E:\\cd-throwaway", t.root)), "False", "la segunda orden imprime «False»");
+      t.ps(t.step.commands[0].text.replace(PLAN_ROOT, t.root));
+      t.eq(t.ps(t.step.commands[1].text.replace(PLAN_ROOT, t.root)), "False", "la segunda orden imprime «False»");
       await t.restart();
     },
   },

@@ -1,6 +1,7 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
-// it knows match the plan, the throwaway profile, opening a group on the
-// Projects tab, step 10.10's counts of the lines of a label and of where a
+// it knows match the plan, no step module holds the plan's root, the
+// throwaway profile, opening a group on the Projects tab, step 10.5 on a root
+// outside E:, step 10.10's counts of the lines of a label and of where a
 // path wraps, confirming an action dialog up to its result, reading an
 // Operation id, step 11.11's command that marks an Operation, and the walk's
 // CI mode: no screenshot, the steps a runner can't do, uat-results.json and
@@ -80,6 +81,12 @@ test("what a person still checks lives in the plan, never in a step module", () 
   );
 });
 
+test("no step module holds the plan's root: each builds its paths from the walk's", () => {
+  const dir = new URL("./steps/", import.meta.url);
+  const holding = readdirSync(dir).filter((file) => /E:[\\/]+cd-throwaway/i.test(readFileSync(new URL(file, dir), "utf8")));
+  assert.deepEqual(holding, []);
+});
+
 test("the profile must be a folder named cd-throwaway-profile", () => {
   assert.throws(() => profileEnv(join(tmpdir(), "my-profile")), /cd-throwaway-profile/);
 });
@@ -102,9 +109,9 @@ test("the profile holds both AppData folders, the known folders and a Claude Cod
 });
 
 // Runs a script of the walk on a fake page's `document`, with its `args` as
-// `arguments`.
+// `arguments`. Every element's computed style is empty.
 function runScript(document, { script, args }) {
-  return new Function("document", "args", `return (function () {${script}}).apply(null, args);`)(document, args);
+  return new Function("document", "getComputedStyle", "args", `return (function () {${script}}).apply(null, args);`)(document, () => ({}), args);
 }
 
 // A session whose page is only the group toggles of a Projects tab, each
@@ -156,6 +163,65 @@ test("opening a group fails when no group has that title", async () => {
   await assert.rejects(openGroup(page, "Hidden", { timeout: 0 }), /group "Hidden"/);
   await assert.rejects(openGroup(page, "Missing", { timeout: 0 }), /group "Missing"/);
   assert.equal(page.toggles[0].open, false);
+});
+
+// A session whose page is the Projects tab of Projects & homes, its groups
+// `{ title, open, rows }` with each row `{ name, subs, tags, count }`, and a
+// group without `open` heading the list, which has no toggle: the
+// rail's buttons and the tabs are found and clicked, and a script runs on
+// the groups' headings and rows.
+class ProjectsPage extends Session {
+  constructor(groups) {
+    super("http://fake", "fake");
+    const node = (matches, text, parts = {}, attrs = {}) => ({
+      textContent: text,
+      matches: (css) => css === matches,
+      querySelector: (css) => parts[css]?.[0] ?? null,
+      querySelectorAll: (css) => parts[css] ?? [],
+      getAttribute: (name) => attrs[name] ?? null,
+    });
+    const text = (t) => node("", t);
+    this.tabs = ["Projects", "Agent homes"].map((name, i) => ({ id: `tab-${i}`, textContent: name }));
+    this.children = groups.flatMap(({ title, open, rows }) => [
+      open === undefined
+        ? node("h3.place-group", title)
+        : node("h3.place-group", `${open ? "▾" : "▸"} ${title}`, { ".place-group-toggle": [node("", title, {}, { "aria-expanded": String(open) })] }),
+      ...(open === false ? [] : rows).map((row) =>
+        node("", null, {
+          ".place-name": [text(row.name)],
+          ".place-sub": (row.subs ?? []).map(text),
+          ".tags .tag": (row.tags ?? []).map(text),
+          ".place-count": row.count ? [text(row.count)] : [],
+        }),
+      ),
+    ]);
+    for (const row of this.children.filter((c) => !c.matches("h3.place-group"))) row.matches = (css) => css === ".place-row";
+  }
+
+  async cmd(method, path, body) {
+    if (path === "/element" && body.value.startsWith(".rail button")) return ref("rail");
+    if (path === "/execute/sync") {
+      const document = { querySelectorAll: (css) => (css === "[role=tab]" ? this.tabs : css === ".places .scroll > *" ? this.children : []) };
+      const value = runScript(document, body);
+      return this.tabs.includes(value) ? ref(value.id) : value;
+    }
+    if (/^\/element\/[^/]+\/click$/.test(path)) return null;
+    throw new Error(`${method} ${path}`);
+  }
+}
+
+test("step 10.5 finds the missing Project under the walk's root, wherever it is, and says so", async () => {
+  const root = "D:\\uat\\cd-throwaway";
+  const known = { subs: ["Folder"], tags: ["known to Claude Code"] };
+  const page = new ProjectsPage([
+    { title: "Projects · 2", rows: [{ name: `${root}\\project`, ...known }, { name: `${root}\\project-hide`, ...known }] },
+    { title: "Missing · 1", open: true, rows: [{ name: "D:/uat/cd-throwaway/project-gone", subs: ["The folder no longer exists"], tags: ["known to Claude Code"], count: "1 leftover" }] },
+    { title: "Missing, no leftovers · 1", open: false, rows: [] },
+  ]);
+  const { result } = await walkOnCi(steps.find((step) => step.id === "10.5"), { s: page, root });
+  assert.equal(result.status, "ok", result.notes);
+  assert.match(result.notes, /en Missing sale «D:\/uat\/cd-throwaway\/project-gone»/);
+  assert.doesNotMatch(result.notes, /E:/);
 });
 
 test("step 10.10's paths fail when none takes more than one line", () => {
