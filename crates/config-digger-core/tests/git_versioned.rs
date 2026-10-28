@@ -465,8 +465,10 @@ fn an_enable_asks_the_git_index_once_per_repository_of_the_folders_it_brings_bac
         )
         .unwrap();
 
-    // The folders it brings back in one call, then the scan of what the
-    // plan comes to, which asks as the scan before it did.
+    // The folders it brings back in one call, then the plan's scan of what
+    // it comes to. The fake index cannot tell that scan's asks apart, so
+    // this counts on it asking what the scan before it did: here every
+    // file and folder it reads is under the same two repositories.
     let asked = git.asked();
     let (scan, planned) = asked.split_at(scanned);
     assert_eq!(planned, [&[PathBuf::from(HOME)][..], scan].concat());

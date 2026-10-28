@@ -867,14 +867,7 @@ impl Targeted<'_> {
                 }
             }
         }
-        let versioned = scan::versioned_paths(
-            self.ports,
-            brought_back.iter().map(|folder| folder.path.as_path()),
-            git_asks,
-        );
-        for folder in &mut brought_back {
-            folder.git_versioned = versioned.contains(&folder.path);
-        }
+        mark_git_versioned(self.ports, &mut brought_back, git_asks);
         planned_folders.extend(brought_back);
         self.park(&mut by_file, &mut planned_folders, &parks)?;
 
@@ -1945,15 +1938,22 @@ pub(crate) fn undo_folders(
             size,
         });
     }
+    mark_git_versioned(ports, &mut planned, asks);
+    Ok(planned)
+}
+
+/// Sets the `git_versioned` of each of `folders`, asking the git index about
+/// them all together, once per repo they are in. What it asks is counted in
+/// `asks`.
+fn mark_git_versioned(ports: &Ports, folders: &mut [PlannedFolder], asks: &mut GitAsks) {
     let versioned = scan::versioned_paths(
         ports,
-        planned.iter().map(|folder| folder.path.as_path()),
+        folders.iter().map(|folder| folder.path.as_path()),
         asks,
     );
-    for folder in &mut planned {
+    for folder in folders {
         folder.git_versioned = versioned.contains(&folder.path);
     }
-    Ok(planned)
 }
 
 /// A touched file whose Undo is refused.
