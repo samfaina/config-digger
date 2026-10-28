@@ -138,6 +138,58 @@ pub(crate) fn duplicate_plugin_name(agent_name: &str, plugin: &str) -> Reason {
     }
 }
 
+/// An Invalid Entry's reason: `agent_name` does not load the plugin
+/// `plugin` it is part of, since a file of the plugin fails as `cause` says.
+pub(crate) fn plugin_failed_to_load(agent_name: &str, plugin: &str, cause: &str) -> Reason {
+    Reason {
+        code: ReasonCode::PluginFailedToLoad,
+        effective: None,
+        switch: None,
+        sentence: format!("Invalid: {}", plugin_not_loaded(agent_name, plugin, cause)),
+    }
+}
+
+/// What a Read failure of a file of the plugin `plugin`, failing as `cause`
+/// says, means for `agent_name`, which does not load the plugin then.
+pub(crate) fn plugin_not_loaded(agent_name: &str, plugin: &str, cause: &str) -> String {
+    format!("{agent_name} does not load the plugin `{plugin}`, since {cause}.")
+}
+
+/// Why `agent_name` cannot read the file `path`, of `kind`, read in
+/// `dialect`: the error's `position`, or for a shape, `shape`. It never
+/// quotes the file.
+pub(crate) fn file_failure_cause(
+    agent_name: &str,
+    path: &Path,
+    kind: ReadFailureKind,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+    shape: Option<&ScannedShape>,
+) -> String {
+    if let Some(shape) = shape {
+        let (items, found, expected) = shape_words(shape);
+        return format!(
+            "the {items} at {} are {found}, not {expected}",
+            locator::render(path, &shape.key_path)
+        );
+    }
+    let path = path.display();
+    match kind {
+        ReadFailureKind::Parse => {
+            let at = match position {
+                Some((line, column)) => format!(" (line {line}, column {column})"),
+                None => String::new(),
+            };
+            format!("{path} does not parse as {dialect}{at}")
+        }
+        ReadFailureKind::Shape => format!("{path} is {dialect} but not an object"),
+        ReadFailureKind::Decode => format!("{path} is not text {agent_name} can decode"),
+        ReadFailureKind::Permission | ReadFailureKind::Io | ReadFailureKind::Sqlite => {
+            format!("{path} cannot be read")
+        }
+    }
+}
+
 /// An Invalid Entry's reason: the server `agent_name` builds from the
 /// Entries of `name` holds `fields`, which exclude each other.
 pub(crate) fn transport_conflict(agent_name: &str, name: &str, fields: &[&str]) -> Reason {
@@ -1523,6 +1575,16 @@ pub(crate) fn read_failure(
 /// are in `path`, as `shape` says, means: only that location fails. It
 /// never quotes the file.
 pub(crate) fn shape_failure(agent_name: &str, path: &Path, shape: &ScannedShape) -> String {
+    let (items, found, expected) = shape_words(shape);
+    format!(
+        "{agent_name} cannot read the {items} at {}: it holds {found}, not {expected}, so it reads no Entries from there.",
+        locator::render(path, &shape.key_path)
+    )
+}
+
+/// The Items a location of another shape holds, the shape it holds and the
+/// one expected, as a sentence words them.
+fn shape_words(shape: &ScannedShape) -> (&'static str, &'static str, &'static str) {
     let items = match shape.kind {
         ItemKind::Mcp => "MCP servers",
         ItemKind::Skill => "skills",
@@ -1540,10 +1602,7 @@ pub(crate) fn shape_failure(agent_name: &str, path: &Path, shape: &ScannedShape)
         Expected::List => "a list",
         Expected::ObjectOrPath => "an object or a path",
     };
-    format!(
-        "{agent_name} cannot read the {items} at {}: it holds {found}, not {expected}, so it reads no Entries from there.",
-        locator::render(path, &shape.key_path)
-    )
+    (items, found, expected)
 }
 
 /// The note of a Read failure in a file `agent_name` asks about at startup.

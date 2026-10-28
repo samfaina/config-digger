@@ -2488,6 +2488,10 @@ pub enum ReasonCode {
     /// The Agent refuses the plugin the Entry is part of, since another of
     /// its plugins has the same name.
     DuplicatePluginName,
+    /// The Agent does not load the plugin the Entry is part of, since it
+    /// cannot read a file of the plugin, such as a manifest that does not
+    /// parse.
+    PluginFailedToLoad,
     /// config-digger parked the Entry in its parked-Entry store, out of the
     /// Agent's reach, since the Agent has no switch for it. Enable puts it
     /// back.
@@ -2569,6 +2573,9 @@ pub enum ReadFailureReaction {
     /// What it does is not known, so every Item of the location's kinds in
     /// the contexts it reaches gets a caveat.
     Unknown,
+    /// It does not load the plugin the location is in, so every Entry of
+    /// the plugin is Invalid.
+    FailsPlugin,
     /// It refuses to start in the contexts the location reaches, which
     /// flags it as unable to start there.
     StopsAgent,
@@ -2580,6 +2587,7 @@ impl From<definitions::ReadFailureReaction> for ReadFailureReaction {
             definitions::ReadFailureReaction::IgnoresFile => ReadFailureReaction::IgnoresFile,
             definitions::ReadFailureReaction::AsksUser => ReadFailureReaction::AsksUser,
             definitions::ReadFailureReaction::Unknown => ReadFailureReaction::Unknown,
+            definitions::ReadFailureReaction::FailsPlugin => ReadFailureReaction::FailsPlugin,
             definitions::ReadFailureReaction::StopsAgent => ReadFailureReaction::StopsAgent,
         }
     }

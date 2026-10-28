@@ -353,3 +353,32 @@ fn every_claude_code_home_notes_that_cloud_connectors_are_not_on_disk() {
         "{notes:?}"
     );
 }
+
+#[test]
+fn a_synced_plugin_whose_manifest_fails_has_every_entry_invalid() {
+    let manifest = in_account(r"demo~g3\.claude-plugin\plugin.json");
+    for broken in [r#"{ "name": "#, r#"{ "name": "demo", "mcpServers": 42 }"#] {
+        let fs = synced_home().with_file(&manifest, broken);
+
+        let inventory = inventory(&fs);
+
+        for name in ["plugin:demo:docs", "demo:notes"] {
+            let entry = entry_json(&item(&inventory, name).entries[0]);
+            assert_eq!(entry["state"], "invalid", "{broken}: {name}");
+            assert_eq!(
+                entry["reason"]["code"], "plugin_failed_to_load",
+                "{broken}: {name}"
+            );
+        }
+        let failure = inventory
+            .read_failures
+            .iter()
+            .find(|failure| failure.path == manifest)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(failure.reaction).unwrap(),
+            "fails_plugin",
+            "{broken}"
+        );
+    }
+}

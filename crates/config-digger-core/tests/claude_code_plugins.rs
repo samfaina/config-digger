@@ -1369,3 +1369,177 @@ fn between_two_plugins_enabled_plugins_decides_over_the_file_a_server_comes_from
     assert_eq!(code(manifest_supa.state), "shadowed");
     assert_eq!(item(&inventory, "plugin:context7:c7").entries.len(), 3);
 }
+
+/// supabase's manifest.
+fn supabase_manifest() -> PathBuf {
+    in_cache(r"claude-plugins-official\supabase\0.1.4\.claude-plugin\plugin.json")
+}
+
+/// The fixture, where supabase's own `.mcp.json` carries the server
+/// `root-server` and its manifest holds `manifest`.
+fn with_supabase_manifest(manifest: &str) -> FakeFileSystem {
+    fixture()
+        .with_file(
+            supa(),
+            json!({ "mcpServers": { "root-server": { "command": "supa" } } }).to_string(),
+        )
+        .with_file(supabase_manifest(), manifest)
+}
+
+#[test]
+fn a_plugin_whose_manifest_does_not_parse_has_every_entry_invalid() {
+    let fs = with_supabase_manifest(r#"{ "name": "supabase", "#);
+
+    let inventory = no_project(&fs);
+
+    for name in ["plugin:supabase:root-server", "supabase:supabase-postgres"] {
+        let supabase = item(&inventory, name);
+        assert_eq!(code(supabase.state), "invalid", "{name}");
+        let reason = supabase.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "plugin_failed_to_load", "{name}");
+        assert_eq!(
+            reason.sentence,
+            format!(
+                "Invalid: Claude Code does not load the plugin `supabase`, since {} does not parse as strict JSON (line 1, column 22).",
+                supabase_manifest().display()
+            ),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn the_read_failure_of_a_manifest_that_does_not_parse_says_claude_code_does_not_load_the_plugin() {
+    let fs = with_supabase_manifest(r#"{ "name": "supabase", "#);
+
+    let inventory = no_project(&fs);
+
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.path == supabase_manifest())
+        .unwrap();
+    assert_eq!(code(failure.reaction), "fails_plugin");
+    assert_eq!(
+        failure.sentence,
+        format!(
+            "Claude Code does not load the plugin `supabase`, since {} does not parse as strict JSON (line 1, column 22).",
+            supabase_manifest().display()
+        )
+    );
+}
+
+#[test]
+fn a_plugin_whose_manifests_mcp_servers_has_a_shape_the_schema_refuses_has_every_entry_invalid() {
+    let manifest = supabase_manifest();
+    for (servers, at, found) in [
+        ("42", "mcpServers", "a number"),
+        ("true", "mcpServers", "true or false"),
+        ("null", "mcpServers", "null"),
+        ("[42]", "mcpServers.0", "a number"),
+    ] {
+        let fs = with_supabase_manifest(&format!(
+            r#"{{ "name": "supabase", "mcpServers": {servers} }}"#
+        ));
+
+        let inventory = no_project(&fs);
+
+        let cause = format!(
+            "the MCP servers at {}#{at} are {found}, not an object or a path",
+            manifest.display()
+        );
+        for name in ["plugin:supabase:root-server", "supabase:supabase-postgres"] {
+            let supabase = item(&inventory, name);
+            assert_eq!(code(supabase.state), "invalid", "{servers}: {name}");
+            let reason = supabase.entries[0].reason.as_ref().unwrap();
+            assert_eq!(
+                code(reason.code),
+                "plugin_failed_to_load",
+                "{servers}: {name}"
+            );
+            assert_eq!(
+                reason.sentence,
+                format!("Invalid: Claude Code does not load the plugin `supabase`, since {cause}."),
+                "{servers}: {name}"
+            );
+        }
+        let failure = inventory
+            .read_failures
+            .iter()
+            .find(|failure| failure.path == manifest)
+            .unwrap();
+        assert_eq!(code(failure.reaction), "fails_plugin", "{servers}");
+        assert_eq!(
+            failure.sentence,
+            format!("Claude Code does not load the plugin `supabase`, since {cause}."),
+            "{servers}"
+        );
+    }
+}
+
+#[test]
+fn a_plugins_mcp_json_that_does_not_parse_leaves_out_only_its_own_servers() {
+    let fs = fixture().with_file(supa(), r#"{ "mcpServers": "#);
+
+    let inventory = no_project(&fs);
+
+    for name in ["plugin:supabase:supabase", "supabase:supabase-postgres"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.path == supa())
+        .unwrap();
+    assert_eq!(code(failure.reaction), "ignores_file");
+}
+
+#[test]
+fn a_plugin_turned_off_with_a_manifest_that_does_not_parse_is_disabled() {
+    let superpowers = in_cache(r"claude-plugins-official\superpowers\6.4.1");
+    let fs = fixture()
+        .with_file(
+            superpowers.join(".mcp.json"),
+            json!({ "mcpServers": { "memory": { "command": "memory" } } }).to_string(),
+        )
+        .with_file(
+            superpowers.join(r".claude-plugin\plugin.json"),
+            r#"{ "name": "#,
+        );
+
+    let inventory = no_project(&fs);
+
+    for name in ["plugin:superpowers:memory", "superpowers:brainstorming"] {
+        let entry = entry_json(&item(&inventory, name).entries[0]);
+        assert_eq!(entry["state"], "disabled", "{name}");
+        assert_eq!(entry["reason"]["code"], "plugin_disabled", "{name}");
+        assert_eq!(
+            entry["secondary"][0]["code"], "plugin_failed_to_load",
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_plugin_that_fails_to_load_leaves_the_other_plugins_alone_and_shadows_none_of_their_servers() {
+    // supabase comes first in `enabledPlugins`, so its server `supa` would
+    // shadow context7's `c7` of the same endpoint.
+    let fs = one_endpoint()
+        .with_file(supabase_manifest(), r#"{ "name": "#)
+        .with_file(
+            user_settings(),
+            enabled_plugins(&[(SUPABASE, true), (CONTEXT7, true), (TOOLBOX, true)]),
+        );
+
+    let inventory = no_project(&fs);
+
+    let (_, supa, c7) = one_endpoint_states(&inventory);
+    assert_eq!((supa.as_str(), c7.as_str()), ("invalid", "effective"));
+    for name in [
+        "toolbox:core",
+        "plugin:toolbox:runner",
+        "plugin:toolbox:weather",
+    ] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+}

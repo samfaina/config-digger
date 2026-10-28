@@ -1444,6 +1444,11 @@
           "const": "unknown"
         },
         {
+          "description": "It does not load the plugin the location is in, so every Entry of\nevery location in that plugin is Invalid, at the `plugin-load`\ncheck. Only a location in plugins takes it.",
+          "type": "string",
+          "const": "fails_plugin"
+        },
+        {
           "description": "It refuses to start in the contexts the location reaches.",
           "type": "string",
           "const": "stops_agent"
@@ -3929,6 +3934,11 @@
           "description": "The Agent refuses the plugin the Entry is part of, since another of\nits list has the same name: Invalid, with `duplicate_plugin_name`.\nRequired when a location of the kind is in plugins whose list refuses\nsame names, and refused otherwise.",
           "type": "string",
           "const": "plugin-name"
+        },
+        {
+          "description": "The Agent does not load the plugin the Entry is part of, since a\nfile of the plugin whose location reacts with `fails_plugin` cannot\nbe read: Invalid, with `plugin_failed_to_load`. An Entry of a plugin\nthe Agent does not load does not compete. Required when a location of\nthe kind is in plugins a location reacting with `fails_plugin` is in\ntoo, and refused otherwise.",
+          "type": "string",
+          "const": "plugin-load"
         }
       ]
     },

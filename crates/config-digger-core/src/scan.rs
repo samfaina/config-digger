@@ -1163,6 +1163,9 @@ pub(crate) struct ScannedReadFailure {
     /// For a shape, where it is: only that location fails, and the rest of
     /// the file is read. `None` when the whole file fails.
     pub shape: Option<ScannedShape>,
+    /// The plugin a location in plugins found the file in, when it is the
+    /// file the location is anchored on there, not one its references name.
+    pub plugin: Option<ScannedPlugin>,
 }
 
 /// Where a location holds a value of a shape config-digger cannot enumerate.
@@ -4278,16 +4281,23 @@ impl Scanner<'_> {
             .or_else(|| candidates.clone().next())
             .expect("validation gives a plugin anchor a path");
         let start = self.entries.len();
+        let failures = self.reader.failures.len();
         match &location.references {
             None if let Format::ManifestSkills(block) = &location.format => {
-                self.read_manifest_skills(home, location, block, plugin, path);
+                self.read_manifest_skills(home, location, block, plugin, path.clone());
             }
             None => {
                 let project = plugin.project.clone();
-                self.read_location(home, definition, location, path, project, 0);
+                self.read_location(home, definition, location, path.clone(), project, 0);
             }
             Some(references) => {
-                self.read_references(home, definition, location, references, plugin, path);
+                let file = path.clone();
+                self.read_references(home, definition, location, references, plugin, file);
+            }
+        }
+        for failure in &mut self.reader.failures[failures..] {
+            if failure.path == path {
+                failure.plugin = Some(plugin.clone());
             }
         }
         for entry in &mut self.entries[start..] {
@@ -5380,6 +5390,7 @@ impl<'p> Reader<'p> {
             kind,
             position,
             shape: None,
+            plugin: None,
         });
     }
 
@@ -5401,6 +5412,7 @@ impl<'p> Reader<'p> {
             kind: ReadFailureKind::Shape,
             position: None,
             shape: Some(shape),
+            plugin: None,
         });
     }
 
