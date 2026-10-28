@@ -3666,16 +3666,22 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
             flat.contains("only a recursive skill folder can set a max_depth"),
             "{flat}"
         );
+    }
 
+    #[test]
+    fn a_skill_list_s_skills_cannot_cap_their_depth() {
         let skills = r#"{ name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", max_depth = 6 }"#;
         let list = format!(
             r#"{{ block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = {skills} }}"#
         );
-        let text = with_skills(r#"{ block = "home", root = "state" }"#, &list, CHECKS);
+        let capped = error(&with_skills(
+            r#"{ block = "home", root = "state" }"#,
+            &list,
+            CHECKS,
+        ));
         assert!(
-            error(&text).contains("it cannot be recursive or set a depth or a max_depth"),
-            "{}",
-            error(&text)
+            capped.contains("it cannot be recursive or set a depth or a max_depth"),
+            "{capped}"
         );
     }
 

@@ -3267,7 +3267,7 @@ impl Validate for SkillFolder {
         }
         if self.recursive && self.depth != 1 {
             return Err(
-                "a recursive skill folder reads skills at any depth; it cannot set a depth".into(),
+                "a recursive skill folder reads skills at every depth down to its max_depth; it cannot set a depth".into(),
             );
         }
         match self.max_depth {
