@@ -118,16 +118,19 @@ name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/
 # The extensions that ship with each Installation, in its commit folder's
 # `resources\app\extensions`, such as GitHub Copilot Chat in `copilot`
 # [disk], each named by its manifest's `name`. The user cannot uninstall
-# one. VS Code ranks them before the installed extensions [binary]. What
-# VS Code does with an installed extension that has a built-in one's id is
-# not checked: both are read. An Installation's folder holds one commit
-# folder [disk]: one left over from an update would be read too.
+# one. VS Code ranks them before the installed extensions, and each group
+# by its folders' names: of two extensions' skills of one name, a built-in
+# one's wins over an installed one's whose folder sorts first, and of two
+# installed ones', the one whose folder sorts first [test]. VS Code loads
+# one extension of an id: an installed extension with a built-in one's id
+# takes its place when its version is higher, and is skipped when it is
+# the same or lower [test]. Its CLI refuses to install such an extension
+# [test], which is left when VS Code starts to ship one the user had
+# installed. config-digger reads both (#432). An Installation's folder
+# holds one commit folder [disk]: one left over from an update would be
+# read too.
 [[plugins]]
 id = "built-in-extensions"
-unverified = [
-  "That VS Code ranks its built-in extensions before the installed ones comes from its code only.",
-  "What VS Code does with an installed extension that has a built-in one's id is not known: both are taken to be read.",
-]
 registry = { block = "installation-folders", folder = "*/resources/app/extensions", marker = "package.json" }
 name = { file = "package.json", key_path = ["name"] }
 
@@ -135,14 +138,14 @@ name = { file = "package.json", key_path = ["name"] }
 # disk], each named by its manifest's `name`. A folder is named by the
 # extension's lowercased id, version and target platform, as
 # `acme.helper-1.0.0-win32-x64`, which is also how `.obsolete` names the
-# folders VS Code is to delete, in a JSON object of `true`s, such as the old
-# version an update replaced [binary]: such a folder holds no extension.
-# VS Code lists the default profile's extensions in the folder's
-# `extensions.json`, and adds there any folder it finds here [binary], so
-# the folders are read instead.
+# folders VS Code is to delete, in a JSON object of `true`s [binary]. An
+# update leaves the old version's folder, named in `.obsolete`, until VS
+# Code next starts and deletes both; such a folder holds no extension, VS
+# Code loading the new version only [test]. VS Code lists the default
+# profile's extensions in the folder's `extensions.json`, and adds there any
+# folder it finds here [binary], so the folders are read instead.
 [[plugins]]
 id = "extensions"
-unverified = "The shape of `.obsolete` comes from VS Code's code only: none was seen on disk."
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/extensions" }, marker = "package.json", removals = ".obsolete" }
 name = { file = "package.json", key_path = ["name"] }
 

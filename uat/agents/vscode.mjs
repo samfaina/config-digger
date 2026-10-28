@@ -10,8 +10,8 @@
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
 // `files`, `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
-// `experiments`, `trust`, `nonce`, `enablement`, `skills`, `profiles` and
-// `policy`.
+// `experiments`, `trust`, `nonce`, `enablement`, `skills`, `extensions`,
+// `profiles` and `policy`.
 //
 // VS Code starts an MCP server only when asked. A probe extension, loaded
 // with `--extensionDevelopmentPath`, asks it to start every server it
@@ -812,6 +812,126 @@ if (runs("skills")) {
   );
   await p.check("items.skill.disable[0]", "a skill turned off there, with a description, stays in `chat.getSkills`, the list VS Code builds its model's `<skills>` from", async () =>
     same(named(seen.done.skills, "cd-throwaway-off").length, 1),
+  );
+}
+
+// ---------------------------------------------------------------- built-in, installed and updated extensions
+
+// An extension's folder in `dir`, as `publisher.name` at `version`, which
+// contributes one skill per name of `skills` in its `chatSkills`, each with
+// the description `from`.
+function extensionFolder(dir, { publisher = "cd-throwaway", name, version, skills, from }) {
+  write(path.join(dir, "package.json"), {
+    name,
+    publisher,
+    version,
+    engines: { vscode: "^1.100.0" },
+    contributes: { chatSkills: skills.map((s) => ({ path: `./skills/${s}/SKILL.md` })) },
+  });
+  for (const s of skills) skill(path.join(dir, "skills", s), [`description: ${from}`]);
+}
+
+// A VSIX of the extension `options` describes: a zip archive holding it in
+// `extension`, which VS Code's CLI installs. VS Code names the folder of an
+// extension installed from a VSIX with no target platform [binary].
+async function vsix(file, options) {
+  const src = fresh(path.basename(file, ".vsix"), path.join(path.dirname(file), "vsix-src"));
+  extensionFolder(path.join(src, "extension"), options);
+  const packed = await run(path.join(process.env.SystemRoot, "System32", "tar.exe"), ["--format", "zip", "-cf", file, "-C", src, "extension"]);
+  if (packed.code !== 0) throw new Error(`tar failed: ${packed.stderr}`);
+  return file;
+}
+
+// Runs VS Code's CLI, as `bin\code.cmd` does, on the profile of `dir`.
+async function cli(dir, args) {
+  const d = folders(dir);
+  fs.mkdirSync(d.home, { recursive: true });
+  const script = path.join(path.dirname(bin), commit, "resources", "app", "out", "cli.js");
+  return run(bin, [script, ...profileArgs(dir), ...args], { env: { ELECTRON_RUN_AS_NODE: "1", VSCODE_DEV: "", USERPROFILE: d.home, APPDATA: d.appData } });
+}
+
+// The built-in extensions are the folder `--builtin-extensions-dir` names,
+// here a copy of the Installation's `resources\app\extensions` with the
+// probe's added, so that the Installation stays as it is. Each extension
+// installed in the launch's `--extensions-dir` comes from VS Code's CLI, as
+// a VSIX. The CLI refuses to install a built-in extension's id, so the
+// extensions that have one are installed before the probe adds the
+// built-in ones, as when VS Code starts to ship an extension the user had
+// installed, as it did GitHub Copilot Chat. The oracle is the skills
+// `chat.getSkills` lists, each named after the extension that contributes
+// it.
+if (runs("extensions")) {
+  const dir = fresh("extensions", base);
+  const builtin = path.join(dir, "builtin");
+  fs.cpSync(path.join(path.dirname(bin), commit, "resources", "app", "extensions"), builtin, { recursive: true });
+  const extensions = path.join(dir, "ext");
+  const packs = fresh("vsix", dir);
+  const builtinArg = `--builtin-extensions-dir=${builtin}`;
+  const install = async (options) => {
+    const file = await vsix(path.join(packs, `${options.name}-${options.version}.vsix`), options);
+    return cli(dir, [builtinArg, "--install-extension", file, "--force"]);
+  };
+
+  // One skill name in a built-in extension and an installed one, whose
+  // folder sorts first, and another in two installed extensions, the one
+  // whose folder sorts last installed first.
+  await install({ name: "rank-b", version: "1.0.0", skills: ["cd-throwaway-rank", "cd-throwaway-rank-installed"], from: "installed b" });
+  await install({ name: "rank-a", version: "1.0.0", skills: ["cd-throwaway-rank-installed"], from: "installed a" });
+  extensionFolder(path.join(builtin, "zz-cd-throwaway-rank"), { name: "rank-builtin", version: "1.0.0", skills: ["cd-throwaway-rank"], from: "built-in" });
+  // An installed extension with a built-in one's id, at a higher version,
+  // the same one and a lower one.
+  const twins = [
+    ["newer", "1.0.0", "2.0.0"],
+    ["same", "1.0.0", "1.0.0"],
+    ["older", "2.0.0", "1.0.0"],
+  ];
+  const twinsInstalled = [];
+  for (const [name, , installedVersion] of twins) twinsInstalled.push((await install({ name, version: installedVersion, skills: [`cd-throwaway-${name}-installed`], from: "installed" })).code);
+  for (const [name, builtinVersion] of twins) {
+    extensionFolder(path.join(builtin, `cd-throwaway-${name}`), { name, version: builtinVersion, skills: [`cd-throwaway-${name}-builtin`], from: "built-in" });
+  }
+  // An extension updated, version 1.0.0 then 2.0.0, its publisher in mixed
+  // case.
+  const updated = { publisher: "CD-Throwaway", name: "updated", from: "installed" };
+  await install({ ...updated, version: "1.0.0", skills: ["cd-throwaway-updated-1"] });
+  const update = await install({ ...updated, version: "2.0.0", skills: ["cd-throwaway-updated-2"] });
+  const obsoleteFile = path.join(extensions, ".obsolete");
+  const updatedFolders = () => fs.readdirSync(extensions).filter((f) => f.startsWith("cd-throwaway.updated-")).sort();
+  const obsolete = fs.existsSync(obsoleteFile) ? fs.readFileSync(obsoleteFile, "utf8") : null;
+  const kept = updatedFolders();
+
+  const seen = await launch(dir, fresh("proj", dir), { args: [builtinArg] });
+  const from = (name) => (seen.done.skills ?? []).filter((s) => s.name === name).map((s) => s.description);
+
+  await p.check("plugins[built-in-extensions]", "of two extensions' skills of one name, VS Code keeps the built-in extension's over the installed one's, whose folder sorts first, and of two installed ones', the one whose folder sorts first", async () =>
+    same({ builtin: from("cd-throwaway-rank"), installed: from("cd-throwaway-rank-installed") }, { builtin: ["built-in"], installed: ["installed a"] }),
+  );
+  await p.check("plugins[built-in-extensions]", "VS Code loads an installed extension with a built-in one's id in its place when its version is higher, and the built-in one when its version is the same or lower", async () =>
+    same(
+      {
+        installed: twinsInstalled,
+        loaded: Object.fromEntries(twins.map(([name]) => [name, [`cd-throwaway-${name}-builtin`, `cd-throwaway-${name}-installed`].filter((s) => from(s).length)])),
+      },
+      { installed: [0, 0, 0], loaded: { newer: ["cd-throwaway-newer-installed"], same: ["cd-throwaway-same-builtin"], older: ["cd-throwaway-older-builtin"] } },
+    ),
+  );
+  await p.check("plugins[extensions]", "updating an extension leaves its old version's folder, named `<id>-<version>` in lower case, and `.obsolete`, a JSON object holding `true` under that name; VS Code then loads the new version only, and deletes the folder and the file", async () =>
+    same(
+      {
+        update: update.code,
+        obsolete: obsolete && JSON.parse(obsolete),
+        kept,
+        skills: ["cd-throwaway-updated-1", "cd-throwaway-updated-2"].filter((s) => from(s).length),
+        after: { folders: updatedFolders(), obsolete: fs.existsSync(obsoleteFile) },
+      },
+      {
+        update: 0,
+        obsolete: { "cd-throwaway.updated-1.0.0": true },
+        kept: ["cd-throwaway.updated-1.0.0", "cd-throwaway.updated-2.0.0"],
+        skills: ["cd-throwaway-updated-2"],
+        after: { folders: ["cd-throwaway.updated-2.0.0"], obsolete: false },
+      },
+    ),
   );
 }
 
