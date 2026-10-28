@@ -416,6 +416,7 @@ fn the_built_in_marks_under_the_exception_say_what_their_test_needs() {
             ("codex.toml", "locations[cloud-mcp]", codex),
             ("codex.toml", "locations[remote-plugin-mcp]", codex),
             ("codex.toml", "items.mcp.disable[1]", codex),
+            ("codex.toml", "locations[remote-plugin-skills]", codex),
         ]
     );
 }

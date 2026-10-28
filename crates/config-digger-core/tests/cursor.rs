@@ -424,6 +424,7 @@ fn skill_folders_are_read_at_any_depth_and_only_the_same_path_competes() {
         ),
         in_home(r".claude\skills\.trash\old"),
     );
+    let fs = with_skill(fs, in_home(r".claude\skills\a\b\c\d\e\f\g\deep"));
 
     let inventory = inventory(&fs);
 
@@ -431,6 +432,9 @@ fn skill_folders_are_read_at_any_depth_and_only_the_same_path_competes() {
     assert_eq!(unslop.len(), 2, "{unslop:?}");
     assert!(unslop.iter().all(|(state, _)| state == "effective"));
     assert!(skills_named(&inventory, "old").is_empty());
+    let deep = skills_named(&inventory, "deep");
+    assert_eq!(deep.len(), 1, "{deep:?}");
+    assert_eq!(deep[0].0, "effective");
 }
 
 #[test]

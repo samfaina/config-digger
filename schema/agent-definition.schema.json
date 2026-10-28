@@ -2565,7 +2565,7 @@
           "type": "object",
           "properties": {
             "recursive": {
-              "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth.\nA skill folder's own subfolders never are.",
+              "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth\ndown to `max_depth`. A skill folder's own subfolders never are.",
               "type": "boolean",
               "default": false
             },
@@ -2575,6 +2575,15 @@
               "format": "uint",
               "minimum": 0,
               "default": 1
+            },
+            "max_depth": {
+              "description": "How many folders below the location's folder a recursive location\nreads, at least 1, counted as `depth` is: a folder below it is\nneither read nor a skill. Without it a recursive location reads at\nany depth.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "minimum": 0
             },
             "name_from": {
               "description": "Where a skill's name comes from.",
@@ -2868,7 +2877,7 @@
       "type": "object",
       "properties": {
         "recursive": {
-          "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth.\nA skill folder's own subfolders never are.",
+          "description": "Whether a subfolder without `SKILL.md` is read in turn, at any depth\ndown to `max_depth`. A skill folder's own subfolders never are.",
           "type": "boolean",
           "default": false
         },
@@ -2878,6 +2887,15 @@
           "format": "uint",
           "minimum": 0,
           "default": 1
+        },
+        "max_depth": {
+          "description": "How many folders below the location's folder a recursive location\nreads, at least 1, counted as `depth` is: a folder below it is\nneither read nor a skill. Without it a recursive location reads at\nany depth.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
         },
         "name_from": {
           "description": "Where a skill's name comes from.",

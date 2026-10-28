@@ -3105,8 +3105,8 @@ impl SqliteJson {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SkillFolder {
-    /// Whether a subfolder without `SKILL.md` is read in turn, at any depth.
-    /// A skill folder's own subfolders never are.
+    /// Whether a subfolder without `SKILL.md` is read in turn, at any depth
+    /// down to `max_depth`. A skill folder's own subfolders never are.
     #[serde(default)]
     pub recursive: bool,
     /// How many folders below the location's folder each skill folder
@@ -3115,6 +3115,11 @@ pub(crate) struct SkillFolder {
     /// A recursive location keeps 1.
     #[serde(default = "one_folder_down")]
     pub depth: usize,
+    /// How many folders below the location's folder a recursive location
+    /// reads, at least 1, counted as `depth` is: a folder below it is
+    /// neither read nor a skill. Without it a recursive location reads at
+    /// any depth.
+    pub max_depth: Option<usize>,
     /// Where a skill's name comes from.
     pub name_from: NameFrom,
     /// How the Agent rewrites a name into the one it uses, if it does.
@@ -3159,9 +3164,9 @@ impl Validate for SkillList {
         if self.field.is_empty() {
             return Err("a skill-list field must not be empty".into());
         }
-        if self.skills.recursive || self.skills.depth != 1 {
+        if self.skills.recursive || self.skills.depth != 1 || self.skills.max_depth.is_some() {
             return Err(
-                "a skill list names each skill folder; it cannot be recursive or set a depth"
+                "a skill list names each skill folder; it cannot be recursive or set a depth or a max_depth"
                     .into(),
             );
         }
@@ -3264,6 +3269,13 @@ impl Validate for SkillFolder {
             return Err(
                 "a recursive skill folder reads skills at any depth; it cannot set a depth".into(),
             );
+        }
+        match self.max_depth {
+            Some(0) => return Err("a skill folder's max_depth must be at least 1".into()),
+            Some(_) if !self.recursive => {
+                return Err("only a recursive skill folder can set a max_depth".into());
+            }
+            _ => {}
         }
         if let Some(name) = self
             .reserved

@@ -4716,7 +4716,7 @@ impl Scanner<'_> {
     /// named with a leading `.` is never read. One without `SKILL.md` is
     /// read only when the location is recursive, and one above the
     /// location's depth always is, where only folders at the depth are
-    /// skills.
+    /// skills. Nothing below the location's `max_depth` is read.
     fn read_skills(
         &mut self,
         home: &FoundHome,
@@ -4732,6 +4732,9 @@ impl Scanner<'_> {
         let mut seen = BTreeSet::new();
         while let Some((folder, folder_depth)) = folders.pop() {
             let child_depth = folder_depth + 1;
+            if format.max_depth.is_some_and(|max| child_depth > max) {
+                continue;
+            }
             let above = !format.recursive && child_depth < format.depth;
             if !seen.insert(paths::canonical_key(fs, &folder)) {
                 continue;
