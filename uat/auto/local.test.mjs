@@ -117,7 +117,7 @@ test("the check names a file of the checkout that was changed before the run and
   assert.deepEqual(changed(before, snapshot({ env, checkout })), [`the working tree of ${checkout}: ?? notes.md`]);
 });
 
-// The local script in a copy of the checkout whose three tools are stubs:
+// The local script in a copy of the checkout whose two tools are stubs:
 // each keeps the real one's param block, notes the parameters it was given
 // in calls.txt, by name, runs `runsFirst`, and writes the results the real one
 // writes, or runs `fail` instead. It runs in Windows PowerShell on the
@@ -134,7 +134,6 @@ function localScript(t, { fail = {}, runsFirst = {} } = {}) {
     const call = `New-Item -ItemType Directory -Force $Work | Out-Null; Add-Content -LiteralPath (Join-Path '${pc}' calls.txt) -Value ('${tool} ' + (${given}))`;
     writeFileSync(file, [params, call, runsFirst[tool] ?? "", fail[tool] ?? writes].join("\n"));
   };
-  stub("sandbox/build-update.ps1", "");
   stub("sandbox/run.ps1", `Set-Content -LiteralPath (Join-Path $Work uat-results.json) -Value '${JSON.stringify([result("9.1"), result("9.2")])}' -Encoding utf8`);
   stub("webdriver/run.ps1", `Set-Content -LiteralPath (Join-Path $Work webdriver.json) -Value '${JSON.stringify([result("7.1", { looks: [] }), result("7.2")])}'`);
   execFileSync("git", ["-C", checkout, "add", "."], { stdio: "pipe" });
@@ -152,14 +151,13 @@ function localScript(t, { fail = {}, runsFirst = {} } = {}) {
 const app = join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 const appVersion = execFileSync("powershell.exe", ["-NoProfile", "-Command", `(Get-Item '${app}').VersionInfo.ProductVersion`], { encoding: "utf8" }).trim();
 
-test("the command runs build-update.ps1, the Sandbox walk and the WebDriver walk in order, and writes one uat-results.json of both", (t) => {
+test("the command runs the Sandbox walk and the WebDriver walk in order, and writes one uat-results.json of both", (t) => {
   const { work, run, calls } = localScript(t);
   const root = "E:\\cd-throwaway";
   const ran = run(["-Version", appVersion, "-App", app, "-Work", work, "-Root", root]);
   assert.equal(ran.status, 0, ran.stderr + ran.stdout);
   assert.deepEqual(calls(), [
-    `sandbox/build-update.ps1 -Commit v${appVersion} -Work ${join(work, "update")}`,
-    `sandbox/run.ps1 -Update ${join(work, "update", "installers")} -Version ${appVersion} -Work ${join(work, "sandbox")}`,
+    `sandbox/run.ps1 -Version ${appVersion} -Work ${join(work, "sandbox")}`,
     `webdriver/run.ps1 -App ${app} -Root ${root} -Work ${work}`,
   ]);
   const results = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8"));
@@ -175,16 +173,16 @@ test("the command stops at the tool that fails, saying which and what did not ru
   const ran = run(["-Version", appVersion, "-App", app, "-Work", work]);
   assert.notEqual(ran.status, 0);
   assert.match(ran.stderr, /The Sandbox walk failed: gh release download v9\.9\.9 failed\. The WebDriver walk did not run\./);
-  assert.deepEqual(calls().map((call) => call.split(" ")[0]), ["sandbox/build-update.ps1", "sandbox/run.ps1"]);
+  assert.deepEqual(calls().map((call) => call.split(" ")[0]), ["sandbox/run.ps1"]);
   assert.equal(existsSync(join(work, "uat-results.json")), false, "an earlier run's file is gone");
 });
 
 test("a tool that exits with a code fails the command too", (t) => {
-  const { work, run, calls } = localScript(t, { fail: { "sandbox/build-update.ps1": "exit 3" } });
+  const { work, run, calls } = localScript(t, { fail: { "sandbox/run.ps1": "exit 3" } });
   const ran = run(["-Version", appVersion, "-App", app, "-Work", work]);
   assert.notEqual(ran.status, 0);
-  assert.match(ran.stderr, /build-update\.ps1 failed with exit code 3: see its output above\. The Sandbox walk and the WebDriver walk did not run\./);
-  assert.deepEqual(calls().map((call) => call.split(" ")[0]), ["sandbox/build-update.ps1"]);
+  assert.match(ran.stderr, /The Sandbox walk failed with exit code 3: see its output above\. The WebDriver walk did not run\./);
+  assert.deepEqual(calls().map((call) => call.split(" ")[0]), ["sandbox/run.ps1"]);
 });
 
 test("the command refuses an -App that reports another version than -Version, before running anything", (t) => {

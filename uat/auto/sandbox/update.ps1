@@ -70,6 +70,10 @@ Step "12.2" {
     Note "12.2" "About before the check: $(WaitAppText $w 'Last checked: [^.]*\.')"
     Click (AppElement $w "Button" "^Check now$")
     Check "12.2" "the update is offered" (WaitAppText $w "config-digger \S+ is available\.") "config-digger $versionB is available."
+    # The lists and settings, in the roaming data folder, just before the
+    # update.
+    $roaming = FolderState $dataRoaming
+    Note "12.2" "roaming data before the update: $roaming"
     Click (AppElement $w "Button" "^Install and restart$")
 
     $end = (Get-Date).AddSeconds(240)
@@ -85,6 +89,7 @@ Step "12.2" {
     Check "12.2" "config-digger --version in a new terminal" $out[0] "config-digger $versionB"
     Check "12.2" "Get-Command in a new terminal" $out[1] "$installDir\config-digger.exe"
     Check "12.2" "History keeps its Operations" (OperationCount) $operations
+    Check "12.2" "the roaming data folder is as before the update" (FolderState $dataRoaming) $roaming
     Get-Content "$results\serve.log" -ErrorAction SilentlyContinue | ForEach-Object { Note "12.2" "served: $_" }
     Get-ChildItem "$dataLocal\logs\*.log" -ErrorAction SilentlyContinue | ForEach-Object {
         Get-Content $_.FullName | Select-String "update|app started" | ForEach-Object { Note "12.2" "app log: $($_.Line)" }
