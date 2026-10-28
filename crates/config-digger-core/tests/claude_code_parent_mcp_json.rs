@@ -33,6 +33,11 @@ fn claude_json() -> PathBuf {
     Path::new(HOME).join(".claude.json")
 }
 
+/// A `~/.claude.json` in which the user trusts the Project `deep`, so that
+/// its own approvals count.
+const TRUSTED: &str =
+    r#"{ "projects": { "E:/outer/repo/sub/deep": { "hasTrustDialogAccepted": true } } }"#;
+
 /// `.mcp.json` in `outer`, `repo` and `sub`, with no approval yet.
 fn unapproved() -> FakeFileSystem {
     FakeFileSystem::new()
@@ -44,9 +49,11 @@ fn unapproved() -> FakeFileSystem {
 }
 
 /// `fs` with every `.mcp.json` server approved in the settings of the
-/// Project `project`.
+/// Project `project`, which the user trusts, so that they count.
 fn approved(fs: FakeFileSystem, project: &str) -> FakeFileSystem {
-    fs.with_file(
+    let mut state: Value = serde_json::from_slice(&fs.contents(claude_json()).unwrap()).unwrap();
+    state["projects"][project.replace('\\', "/")] = json!({ "hasTrustDialogAccepted": true });
+    fs.with_file(claude_json(), state.to_string()).with_file(
         Path::new(project).join(r".claude\settings.json"),
         r#"{ "enableAllProjectMcpServers": true }"#,
     )
@@ -182,12 +189,12 @@ fn a_parent_s_server_waits_for_the_project_s_own_approval() {
     // Approved in the Project's state in `~/.claude.json`.
     fs.put_file(
         claude_json(),
-        r#"{ "projects": { "E:/outer/repo/sub/deep": { "enabledMcpjsonServers": ["cd-outer"] } } }"#,
+        r#"{ "projects": { "E:/outer/repo/sub/deep": { "hasTrustDialogAccepted": true, "enabledMcpjsonServers": ["cd-outer"] } } }"#,
     );
     assert_eq!(outer_state(&fs), ("effective".to_owned(), None));
 
     // Approved in the Project's local settings.
-    fs.put_file(claude_json(), "{}");
+    fs.put_file(claude_json(), TRUSTED);
     fs.put_file(
         settings_local(),
         r#"{ "enabledMcpjsonServers": ["cd-outer"] }"#,
@@ -223,7 +230,15 @@ fn disabled_mcpjson_servers_in_the_project_s_settings_disables_a_parent_s_server
 
 #[test]
 fn disable_of_a_parent_s_server_writes_the_project_s_local_settings() {
-    let fs = fixture().with_file(mcp_json(DEEP), servers("deep"));
+    // Approved in the user's settings: Claude Code has not recorded the
+    // Project, so the `/mcp` toggle in its state is skipped.
+    let fs = unapproved()
+        .with_folder(Path::new(REPO).join(".git"))
+        .with_file(
+            Path::new(HOME).join(r".claude\settings.json"),
+            r#"{ "enableAllProjectMcpServers": true }"#,
+        )
+        .with_file(mcp_json(DEEP), servers("deep"));
     let core = core(&fs);
     let disable = |folder: &str, name: &str| {
         let snapshot = core

@@ -1818,7 +1818,7 @@ pub(crate) fn gates(
                 Some((Check::Policy, reason))
             }
             Gate::ApprovalList(block) => {
-                let approved = (0..block.sources.len()).any(|source| {
+                let values = |source: usize| {
                     let owner = SettingOwner::Gate {
                         gate: index,
                         source,
@@ -1826,10 +1826,27 @@ pub(crate) fn gates(
                     snapshot
                         .settings_for(entry, location.kind, owner, project)
                         .filter_map(|value| value.value.as_ref())
-                        .any(|value| block.approves(source, value, &entry.name))
-                });
-                let reason =
-                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt);
+                };
+                let trusted = block
+                    .trust_index()
+                    .is_some_and(|trust| values(trust).any(|value| *value == true));
+                let approves = |source: usize| {
+                    values(source).any(|value| block.approves(source, value, &entry.name))
+                };
+                let (counted, waiting): (Vec<usize>, Vec<usize>) =
+                    (0..block.sources.len()).partition(|&source| block.counts(source, trusted));
+                let approved = counted.into_iter().any(approves);
+                // Approvals that would count once the user trusts the Project.
+                let reason = if waiting.into_iter().any(approves) {
+                    explain::not_approved_untrusted(
+                        agent_name,
+                        &entry.name,
+                        &entry.path,
+                        block.prompt,
+                    )
+                } else {
+                    explain::not_approved(agent_name, &entry.name, &entry.path, block.prompt)
+                };
                 (!approved).then_some((Check::Approval, reason))
             }
             Gate::PolicyField(block) => {

@@ -2020,7 +2020,7 @@
         {
           "id": "20.1",
           "title": "Un nombre en texto plano aprueba o deshabilita ese servidor",
-          "goal": "En los settings de un Project, enabledMcpjsonServers y disabledMcpjsonServers escritos como un solo nombre en texto plano aprueban o deshabilitan ese servidor, como hace Claude Code desde 2.1.299, y ningún otro.",
+          "goal": "En un archivo de settings, enabledMcpjsonServers y disabledMcpjsonServers escritos como un solo nombre en texto plano aprueban o deshabilitan ese servidor, como hace Claude Code desde 2.1.299, y ningún otro; las aprobaciones de los settings de un Project en el que el usuario no confía no cuentan.",
           "instructions": [
             "Abre config-digger.",
             "Ve a Projects & homes.",
@@ -2034,6 +2034,8 @@
             "Elige el home E:\\cd-throwaway\\claude-code-home.",
             "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project-plain.",
             "Busca cd-throwaway-plain en la lista Items.",
+            "Abre el Item cd-throwaway-plain-listed.",
+            "Lee la razón de su Entry.",
             "Abre el Item cd-throwaway-plain-off.",
             "Lee la razón de su Entry.",
             "Abre el Item cd-throwaway-plain-other.",
@@ -2042,7 +2044,8 @@
           "commands": [],
           "expect": [
             "El Item «cd-throwaway-plain-on» sale «Effective».",
-            "El Item «cd-throwaway-plain-listed» sale «Effective».",
+            "El Item «cd-throwaway-plain-listed» sale «Blocked», porque el usuario no ha confiado en el Project.",
+            "Su Entry da la razón «Blocked: Claude Code has not approved `cd-throwaway-plain-listed` from E:\\cd-throwaway\\project-plain\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; the Project's own approvals count only once you trust the Project in Claude Code. config-digger never approves servers, nor trusts a Project.».",
             "El Item «cd-throwaway-plain-off» sale «Disabled».",
             "Su Entry da la razón «Disabled by name: `cd-throwaway-plain-off` is in `disabledMcpjsonServers` in E:\\cd-throwaway\\project-plain\\.claude\\settings.local.json for this Project, so Claude Code skips the Entries with that name.».",
             "El Item «cd-throwaway-plain-other» sale «Blocked».",
@@ -2053,7 +2056,7 @@
             "shell": "powershell",
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -PlainString"
           },
-          "covers": ["#172"]
+          "covers": ["#172", "#293"]
         },
         {
           "id": "20.2",
@@ -2098,7 +2101,7 @@
             "Tras el primer Undo, la orden muestra otra vez «\"disabledMcpjsonServers\": \"cd-throwaway-plain-off\"», sin corchetes.",
             "Enable acaba con «Enabled 1 Entry. Operation <id>: verified.».",
             "Tras Enable, la orden ya no muestra «disabledMcpjsonServers», y sí «\"enabledMcpjsonServers\": \"cd-throwaway-plain-on\"».",
-            "Tras Enable, el Item «cd-throwaway-plain-off» sale «Effective».",
+            "Tras Enable, el Item «cd-throwaway-plain-off» sale «Blocked», porque nada que cuente lo aprueba.",
             "Tras el segundo Undo, la orden muestra el archivo como al principio, con «\"disabledMcpjsonServers\": \"cd-throwaway-plain-off\"» en su línea.",
             "Al final, el Item «cd-throwaway-plain-off» vuelve a salir «Disabled»."
           ],

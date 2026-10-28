@@ -10,8 +10,9 @@ use tempfile::TempDir;
 const CLAUDE_JSON: &str =
     include_str!("../../config-digger-core/tests/fixtures/claude-code-home/.claude.json");
 
-/// A Project's shared settings approving every `.mcp.json` server, which
-/// Claude Code otherwise Blocks.
+/// Settings approving every `.mcp.json` server, which Claude Code otherwise
+/// Blocks. The user's count in any Project, a Project's own only once the
+/// user trusts the Project.
 const APPROVE_ALL: &str = r#"{"enableAllProjectMcpServers": true}"#;
 
 /// A temporary user home folder the binary is pointed at.
@@ -101,6 +102,16 @@ impl Harness {
             "projects": { key: { "mcpServers": { "linear": { "url": "https://local" } } } }
         });
         self.with_file(".claude.json", &claude_json.to_string())
+    }
+
+    /// The `.claude.json` written, trusting the Project at the existing
+    /// `folder` too, so that the approvals of its own settings count.
+    fn trusting(self, folder: &Path) -> Self {
+        let mut state: Value =
+            serde_json::from_slice(&std::fs::read(self.path(".claude.json")).unwrap()).unwrap();
+        let key = real_path(folder).display().to_string().replace('\\', "/");
+        state["projects"][key]["hasTrustDialogAccepted"] = json!(true);
+        self.with_file(".claude.json", &state.to_string())
     }
 
     fn run(&self, args: &[&str]) -> Run {
@@ -228,6 +239,8 @@ fn the_current_directory_is_the_default_project() {
             r#"{"mcpServers": {"supabase": {"url": "https://p"}}}"#,
         )
         .with_cwd_file(r".claude\settings.json", APPROVE_ALL);
+    let cwd = harness.cwd();
+    let harness = harness.trusting(&cwd);
 
     let run = harness.run(&["list", "--json"]);
 
@@ -252,7 +265,7 @@ fn the_current_directory_is_evaluated_even_when_no_registry_knows_it() {
             ".mcp.json",
             r#"{"mcpServers": {"linear": {"url": "https://p"}}}"#,
         )
-        .with_cwd_file(r".claude\settings.json", APPROVE_ALL);
+        .with_file(r".claude\settings.json", APPROVE_ALL);
 
     let run = harness.run(&["list", "--json"]);
 
@@ -298,6 +311,7 @@ fn project_picks_another_folder() {
         )
         .with_file(r"work\app\.claude\settings.json", APPROVE_ALL);
     let app = harness.path(r"work\app");
+    let harness = harness.trusting(&app);
 
     let run = harness.run(&["list", "--json", "--project", app.to_str().unwrap()]);
 

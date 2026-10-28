@@ -880,6 +880,38 @@ pub(crate) fn not_approved(
     path: &Path,
     prompt: ApprovalPrompt,
 ) -> Reason {
+    unapproved(
+        agent_name,
+        name,
+        path,
+        prompt,
+        "config-digger never approves servers.",
+    )
+}
+
+/// [`not_approved`], for an Entry the Project's own files approve in a
+/// Project the user has not trusted in `agent_name`, which counts those
+/// approvals only once they do.
+pub(crate) fn not_approved_untrusted(
+    agent_name: &str,
+    name: &str,
+    path: &Path,
+    prompt: ApprovalPrompt,
+) -> Reason {
+    let then = format!(
+        "the Project's own approvals count only once you trust the Project in {agent_name}. config-digger never approves servers, nor trusts a Project."
+    );
+    unapproved(agent_name, name, path, prompt, &then)
+}
+
+/// A reason with `not_approved`, whose sentence ends with `then`.
+fn unapproved(
+    agent_name: &str,
+    name: &str,
+    path: &Path,
+    prompt: ApprovalPrompt,
+    then: &str,
+) -> Reason {
     let asks = match prompt {
         ApprovalPrompt::OnStart => "which asks about it when it starts in this Project",
         ApprovalPrompt::McpSettings => "which asks about it in its MCP settings",
@@ -889,7 +921,7 @@ pub(crate) fn not_approved(
         effective: None,
         switch: None,
         sentence: format!(
-            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {asks}; config-digger never approves servers.",
+            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {asks}; {then}",
             path.display()
         ),
     }

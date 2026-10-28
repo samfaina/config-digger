@@ -775,7 +775,11 @@ fn a_personal_skill_s_skill_manager_is_its_provenance() {
 
 #[test]
 fn a_shared_file_is_also_read_by_another_agent_with_its_own_state() {
-    let fs = with_project(with_home(vscode()), "shared");
+    // Claude Code counts the Project's own approval once the user trusts it.
+    let fs = with_project(with_home(vscode()), "shared").with_file(
+        Path::new(HOME).join(".claude.json"),
+        r#"{ "projects": { "E:/projects/shared": { "hasTrustDialogAccepted": true } } }"#,
+    );
     let inventory = inventory_at(&fs, &project("shared"));
 
     let dot_mcp = format!(r"{PROJECTS}\shared\.mcp.json#mcpServers.supabase");

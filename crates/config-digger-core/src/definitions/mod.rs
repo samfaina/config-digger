@@ -3886,6 +3886,74 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
         );
     }
 
+    /// [`RULES_AND_GATES`] with its approval-list source counting only in a
+    /// trusted Project, and the gate's `trust` as `trust`, if any.
+    fn trusted_only(trust: Option<&str>) -> String {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"key_path = ["projects", "{project}", "approved"] }"#,
+            r#"key_path = ["projects", "{project}", "approved"], trusted_only = true, forward_slashes = true }"#,
+        );
+        match trust {
+            Some(trust) => text.replace(
+                r#"prompt = "on-start""#,
+                &format!("prompt = \"on-start\"\ntrust = {trust}"),
+            ),
+            None => text,
+        }
+    }
+
+    #[test]
+    fn an_approval_lists_source_can_count_only_in_a_project_its_state_trusts() {
+        let text = trusted_only(Some(
+            r#"{ anchor = { block = "home", root = "state" }, key_path = ["projects", "{project}", "trusted"], forward_slashes = true }"#,
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_source_counting_only_in_a_trusted_project_needs_a_field_of_the_projects_state() {
+        let text = trusted_only(None);
+        assert!(
+            error(&text).contains("a trusted_only source needs the gate's trust"),
+            "{}",
+            error(&text)
+        );
+        let text = trusted_only(Some(
+            r#"{ anchor = { block = "home", root = "state" }, key_path = ["trusted"] }"#,
+        ));
+        assert!(
+            error(&text).contains("trust is a field of the Project's state"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn trusted_only_is_read_only_on_an_approval_lists_sources() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"key_path = ["denied"] }"#,
+            r#"key_path = ["denied"], trusted_only = true }"#,
+        );
+        assert!(
+            error(&text).contains("trusted_only is read only on an approval-list gate's sources"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn forward_slashes_needs_a_key_path_keyed_by_project() {
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+            r#"key_path = ["denied"] }"#,
+            r#"key_path = ["denied"], forward_slashes = true }"#,
+        );
+        assert!(
+            error(&text).contains("forward_slashes needs `{project}` in the key path"),
+            "{}",
+            error(&text)
+        );
+    }
+
     #[test]
     fn a_settings_anchor_names_declared_settings() {
         let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(

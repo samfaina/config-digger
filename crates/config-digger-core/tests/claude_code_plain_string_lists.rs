@@ -26,9 +26,11 @@ fn mcp_json() -> PathBuf {
 }
 
 /// A Claude Code home whose Project petme-app has the state
-/// `project_state` in `~/.claude.json`, and whose `.mcp.json` declares the
-/// servers `a`, `b`, `a.b` and `a b`.
-fn project_home(project_state: Value) -> FakeFileSystem {
+/// `project_state` in `~/.claude.json`, the user trusting it so that its
+/// own approvals count, and whose `.mcp.json` declares the servers `a`,
+/// `b`, `a.b` and `a b`.
+fn project_home(mut project_state: Value) -> FakeFileSystem {
+    project_state["hasTrustDialogAccepted"] = json!(true);
     let server = json!({ "command": "server-mcp" });
     FakeFileSystem::new()
         .with_file(

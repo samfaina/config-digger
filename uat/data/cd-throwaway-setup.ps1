@@ -48,8 +48,9 @@ $slash = $Root -replace '\\', '/'
 $long = "paths-that-wrap\in-the-smallest-window\of-config-digger"
 $longSlash = $long -replace '\\', '/'
 
-# Claude Code home: a user server, a Project with a local server, a missing
-# Project with one leftover, a missing Project with nothing but a trust, as
+# Claude Code home: a user server, a Project the user trusts, so that its
+# own settings approve its server, with a local server, a missing Project
+# with one leftover, a missing Project with nothing but a trust, as
 # Claude Code keeps for a deleted worktree, a Project to hide, and a Project
 # whose path wraps.
 Write-TestFile "$Root\claude-code-home\.claude.json" @"
@@ -63,6 +64,7 @@ Write-TestFile "$Root\claude-code-home\.claude.json" @"
   },
   "projects": {
     "$slash/project": {
+      "hasTrustDialogAccepted": true,
       "mcpServers": {
         "cd-throwaway-local": {
           "type": "http",
@@ -160,7 +162,7 @@ Write-TestFile "$Root\claude-code-shape-home\.claude.json" @"
     "cd-throwaway-shape-user": { "command": "npx", "args": ["-y", "cd-throwaway-shape-user"] }
   },
   "projects": {
-    "$slash/project": { "mcpServers": [] }
+    "$slash/project": { "hasTrustDialogAccepted": true, "mcpServers": [] }
   }
 }
 "@
@@ -339,8 +341,15 @@ description: Throwaway skill for testing config-digger. Does nothing.
 # `enabledMcpjsonServers` and `disabledMcpjsonServers` as plain strings, which
 # Claude Code reads as one-item lists since 2.1.299. Claude Code has not
 # recorded it, so that Disable writes its local settings; the tester adds it
-# by hand. The default data has none, so that no other step counts it.
+# by hand. Nor has the user trusted it, so its own approvals count for
+# nothing: the user's settings approve one server by a plain string. The
+# default data has none, so that no other step counts it.
 if ($PlainString) {
+    Write-TestFile "$Root\claude-code-home\.claude\settings.json" @"
+{
+  "enabledMcpjsonServers": "cd-throwaway-plain-on"
+}
+"@
     Write-TestFile "$Root\project-plain\.mcp.json" @"
 {
   "mcpServers": {

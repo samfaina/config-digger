@@ -3279,6 +3279,16 @@
           "type": "boolean",
           "default": false
         },
+        "trusted_only": {
+          "description": "Of an approval-list gate's source, whether its approvals count only\nin a Project the gate's `trust` trusts, such as those of Claude\nCode's Project settings.",
+          "type": "boolean",
+          "default": false
+        },
+        "forward_slashes": {
+          "description": "With `{project}` in the key path, whether the Agent looks the\nProject up only under a key spelled with forward slashes, such as\n`E:/projects/app` in Claude Code's `~/.claude.json`, still without\nregard to case. Omitted, any spelling of the Project's key counts.",
+          "type": "boolean",
+          "default": false
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -4418,6 +4428,17 @@
               "items": {
                 "$ref": "#/$defs/SettingPlace"
               }
+            },
+            "trust": {
+              "description": "Where the Agent records that the user trusts the Project: a field of\nthe Project's state, keyed by `{project}`, that holds `true` once\nthey do, such as Claude Code's `hasTrustDialogAccepted`. Needed by a\n`trusted_only` source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SettingPlace"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "prompt": {
               "description": "Where the Agent asks the user to approve an Entry.",

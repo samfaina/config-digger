@@ -6057,6 +6057,17 @@ pub(crate) struct SettingPlace {
     /// digits, `-` or `_` counts; any other string names nothing.
     #[serde(default)]
     pub plain_string_name: bool,
+    /// Of an approval-list gate's source, whether its approvals count only
+    /// in a Project the gate's `trust` trusts, such as those of Claude
+    /// Code's Project settings.
+    #[serde(default)]
+    pub trusted_only: bool,
+    /// With `{project}` in the key path, whether the Agent looks the
+    /// Project up only under a key spelled with forward slashes, such as
+    /// `E:/projects/app` in Claude Code's `~/.claude.json`, still without
+    /// regard to case. Omitted, any spelling of the Project's key counts.
+    #[serde(default)]
+    pub forward_slashes: bool,
 }
 
 impl SettingPlace {
@@ -6129,6 +6140,12 @@ impl SettingPlace {
                 super::PROJECT_KEY
             ));
         }
+        if projects == 0 && self.forward_slashes {
+            return Err(format!(
+                "forward_slashes needs `{}` in the key path",
+                super::PROJECT_KEY
+            ));
+        }
         if self.key_path.iter().any(|key| key == NAME_KEY) {
             return Err(format!("a setting key path cannot hold `{NAME_KEY}`"));
         }
@@ -6169,6 +6186,9 @@ impl Validate for SettingPlace {
     fn validate(&self) -> Result<(), String> {
         if self.plain_string_name {
             return Err("plain_string_name is read only on an approval-list gate's sources".into());
+        }
+        if self.trusted_only {
+            return Err("trusted_only is read only on an approval-list gate's sources".into());
         }
         self.validate_place()
     }
@@ -6713,16 +6733,21 @@ impl Gate {
     }
 
     /// Every setting it reads: its sources, in their order, then any
-    /// setting that lifts it.
+    /// setting that lifts it, or that some of its sources need.
     pub fn settings(&self) -> impl Iterator<Item = &SettingPlace> {
         let lifted_by = match self {
             Gate::TrustedFolders(block) => block.trust_all.as_ref(),
             Gate::FolderTrust(block) => block.trust_all.as_ref(),
             _ => None,
         };
+        let trust = match self {
+            Gate::ApprovalList(block) => block.trust.as_ref(),
+            _ => None,
+        };
         self.sources()
             .iter()
             .chain(lifted_by.into_iter().flat_map(|setting| &setting.sources))
+            .chain(trust)
     }
 
     /// The ids of the locations it names.
@@ -7023,6 +7048,11 @@ pub(crate) struct ApprovalList {
     /// Where approvals are: a list of the names approved, or `true`,
     /// which approves every Entry.
     pub sources: Vec<SettingPlace>,
+    /// Where the Agent records that the user trusts the Project: a field of
+    /// the Project's state, keyed by `{project}`, that holds `true` once
+    /// they do, such as Claude Code's `hasTrustDialogAccepted`. Needed by a
+    /// `trusted_only` source.
+    pub trust: Option<SettingPlace>,
     /// Where the Agent asks the user to approve an Entry.
     pub prompt: ApprovalPrompt,
 }
@@ -7215,11 +7245,41 @@ impl Validate for ApprovalList {
         if self.sources.iter().any(|source| source.policy) {
             return Err("an approval is no policy".into());
         }
-        Ok(())
+        let trusted_only = self.sources.iter().any(|source| source.trusted_only);
+        match &self.trust {
+            None if trusted_only => Err(
+                "a trusted_only source needs the gate's trust, a field of the Project's state"
+                    .into(),
+            ),
+            None => Ok(()),
+            Some(_) if !trusted_only => Err("trust needs a trusted_only source".into()),
+            Some(trust) => {
+                trust.validate().map_err(|e| format!("trust: {e}"))?;
+                if !trust.key_path.iter().any(|key| key == super::PROJECT_KEY) {
+                    return Err(format!(
+                        "trust is a field of the Project's state, keyed by `{}`",
+                        super::PROJECT_KEY
+                    ));
+                }
+                Ok(())
+            }
+        }
     }
 }
 
 impl ApprovalList {
+    /// The index of its `trust` among the gate's settings, which come after
+    /// its sources.
+    pub fn trust_index(&self) -> Option<usize> {
+        self.trust.as_ref().map(|_| self.sources.len())
+    }
+
+    /// Whether the approvals of the source at `source` count, in a Project
+    /// the gate's `trust` trusts when `trusted`.
+    pub fn counts(&self, source: usize, trusted: bool) -> bool {
+        trusted || !self.sources[source].trusted_only
+    }
+
     /// Whether `value`, what the source at `source` holds, approves the
     /// Entry named `name`.
     pub fn approves(&self, source: usize, value: &Value, name: &str) -> bool {

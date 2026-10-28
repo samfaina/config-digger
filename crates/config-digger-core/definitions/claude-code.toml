@@ -453,29 +453,36 @@ checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
 # `~/.claude.json`, `enableAllProjectMcpServers` included [docs, test].
 # `disabledMcpjsonServers` wins over an approval [docs], so it is checked
 # first. The approvals of the Project's state, its settings and its local
-# settings count only while the Project's state, under its path with
-# forward slashes, holds `hasTrustDialogAccepted: true`; the user's count
-# in any Project [test]. config-digger does not check that trust yet
-# (#293). Since 2.1.299 a list written as one plain-string name, of
-# letters, digits, `-` or `_`, no longer voids its settings file [docs]:
-# in a settings file it approves that one server, and in the Project's
-# state none [test], so only the settings files' sources read it
-# (`plain_string_name`).
+# settings count only while the Project's state holds
+# `hasTrustDialogAccepted: true` (`trusted_only`, `trust`); the user's
+# count in any Project [test]. Claude Code reads the Project's state only
+# under its path with forward slashes: under one with backslashes,
+# neither the trust nor the approvals count [test] (`forward_slashes`).
+# config-digger never trusts a Project. Since 2.1.299 a list written as
+# one plain-string name, of letters, digits, `-` or `_`, no longer voids
+# its settings file [docs]: in a settings file it approves that one
+# server, and in the Project's state none [test], so only the settings
+# files' sources read it (`plain_string_name`).
 [[items.mcp.gates]]
+unverified = [
+  "The Project's state is taken to be looked up under its path with forward slashes without regard to case, as changelog 2.1.285 suggests for trust.",
+  "The managed settings' approvals are taken to count in any Project, trusted or not, as the user's do.",
+]
 block = "approval-list"
 locations = ["project-mcp"]
 prompt = "on-start"
+trust = { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "hasTrustDialogAccepted"], forward_slashes = true }
 sources = [
   { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "settings", settings = "managed" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
-  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
-  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enableAllProjectMcpServers"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true, trusted_only = true },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enableAllProjectMcpServers"], trusted_only = true },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true, trusted_only = true },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enableAllProjectMcpServers"], trusted_only = true },
   { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledMcpjsonServers"], plain_string_name = true },
   { anchor = { block = "home", root = "settings_file" }, key_path = ["enableAllProjectMcpServers"] },
-  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enabledMcpjsonServers"] },
-  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enableAllProjectMcpServers"] },
+  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enabledMcpjsonServers"], trusted_only = true, forward_slashes = true },
+  { anchor = { block = "home", root = "state_file" }, key_path = ["projects", "{project}", "enableAllProjectMcpServers"], trusted_only = true, forward_slashes = true },
 ]
 
 # `deniedMcpServers` keeps out every server one of its items names, by
