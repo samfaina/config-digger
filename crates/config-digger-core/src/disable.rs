@@ -17,6 +17,7 @@ use crate::resolve;
 use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// The context's Project as Disable needs it.
@@ -602,14 +603,14 @@ struct FieldTable<'d> {
 }
 
 /// The table of the fallback's file where Disable writes a Stand-in.
-struct StandIn<'d> {
+struct StandInTable<'d> {
     path: PathBuf,
     key_path: Vec<String>,
     layer: &'d LocationDefinition,
     /// The fields that fix the server's transport, one of which it holds.
-    fields: &'d [String],
+    transports: &'d [String],
     /// The field that turns the server off.
-    field: &'d str,
+    switch: &'d str,
 }
 
 /// What Disable writes for `entry`, an Entry of a server its Agent builds
@@ -702,13 +703,13 @@ fn through_merged_field(
                     && other.path == path
                     && other.key_path == key_path
             });
-        if let Some(fields) = block.stand_in.as_deref().filter(|_| fallback && !declared) {
-            let table = StandIn {
+        if let Some(transports) = block.stand_in.as_deref().filter(|_| fallback && !declared) {
+            let table = StandInTable {
                 path,
                 key_path,
                 layer,
-                fields,
-                field,
+                transports,
+                switch: field,
             };
             return stand_in(definition, snapshot, entry, project, merge, table);
         }
@@ -722,7 +723,8 @@ fn through_merged_field(
             explain::disable_switch(&edits, &entry.name, &path, false),
             explain::turns_off_built(agent, &entry.name)
         );
-        // The fallback's file is read in every folder.
+        // Validation keeps a fallback out of Projects, so every folder reads
+        // its file.
         let elsewhere = if fallback {
             vec![explain::turns_off_everywhere(
                 agent,
@@ -780,14 +782,14 @@ fn stand_in(
     entry: &ScannedEntry,
     project: Option<&ContextProject>,
     merge: &Merge,
-    table: StandIn,
+    table: StandInTable,
 ) -> Result<Choice, (DisableNotOffered, String)> {
     let agent = &definition.agent.name;
     let context = project.map(|project| project.key);
     let transport = server_entries(definition, snapshot, entry, context, merge)
         .into_iter()
         .find_map(|layer| {
-            table.fields.iter().find_map(|field| {
+            table.transports.iter().find_map(|field| {
                 let value = layer.config.get(field)?.as_str()?;
                 Some((layer, field, stand_in_value(value)?))
             })
@@ -795,51 +797,56 @@ fn stand_in(
     let Some((source, transport, value)) = transport else {
         return Err((
             DisableNotOffered::NoMechanism,
-            explain::stand_in_without_transport(agent, &entry.name, table.fields),
+            explain::stand_in_without_transport(agent, &entry.name, table.transports),
         ));
     };
-    let mut others: Vec<PathBuf> = Vec::new();
-    let mut stopped: Vec<PathBuf> = Vec::new();
-    for other in declaring_projects(definition, snapshot, entry, merge) {
-        let Some(key) = other.project.as_deref().filter(|key| Some(*key) != context) else {
-            continue;
-        };
-        let Some(folder) = snapshot.project(key).map(|project| project.path.clone()) else {
-            continue;
-        };
-        let other_transport = table
-            .fields
-            .iter()
-            .any(|field| field != transport && other.config.get(field).is_some());
-        if other_transport && !stopped.contains(&folder) {
-            stopped.push(folder.clone());
-        }
-        if !others.contains(&folder) {
-            others.push(folder);
-        }
-    }
+    // Every known Project, trusted or not: trusting it later would stop the
+    // Agent there.
+    let others: Vec<&ScannedEntry> = declaring_projects(definition, snapshot, entry, merge)
+        .into_iter()
+        .filter(|other| other.project.as_deref() != context)
+        .collect();
+    let stopped = folders_of(
+        snapshot,
+        others.iter().copied().filter(|other| {
+            table
+                .transports
+                .iter()
+                .any(|field| field != transport && other.config.get(field).is_some())
+        }),
+    );
     if !stopped.is_empty() {
-        stopped.sort();
         return Err((
             DisableNotOffered::StopsAgent,
             explain::stand_in_stops_agent(agent, &entry.name, transport, &stopped),
         ));
     }
-    others.sort();
+    // A Project whose own layer sets the switch decides it there.
+    let deciding = folders_of(
+        snapshot,
+        others
+            .iter()
+            .copied()
+            .filter(|other| other.config.get(table.switch).is_some()),
+    );
+    let mut turned_off = folders_of(snapshot, others.iter().copied());
+    turned_off.retain(|folder| !deciding.contains(folder));
     let mut stand_in = serde_json::Map::new();
     stand_in.insert(transport.clone(), Value::String(value));
-    stand_in.insert(table.field.to_owned(), Value::Bool(false));
+    stand_in.insert(table.switch.to_owned(), Value::Bool(false));
     let edits = vec![Edit::Set {
         key_path: table.key_path,
         value: Value::Object(stand_in),
     }];
     let sentence = format!(
         "{} {}",
-        explain::disable_stand_in(&entry.name, transport, table.field, &table.path),
+        explain::disable_stand_in(&entry.name, transport, table.switch, &table.path),
         explain::turns_off_built(agent, &entry.name)
     );
-    let mut elsewhere = vec![explain::stand_in_reach(agent, &entry.name, &others)];
-    if let Some(project) = project {
+    let mut elsewhere = vec![explain::stand_in_reach(agent, &entry.name, &turned_off)];
+    // The transport it copies is the Project layer's only when it comes
+    // from one.
+    if let Some(project) = project.filter(|_| source.project.is_some()) {
         elsewhere.push(explain::stand_in_drift(
             agent,
             &entry.name,
@@ -885,19 +892,46 @@ fn declaring_projects<'s>(
     entry: &ScannedEntry,
     merge: &Merge,
 ) -> Vec<&'s ScannedEntry> {
-    let kind = definition.location(&entry.location).kind;
     snapshot
         .entries
         .iter()
-        .filter(|other| {
-            other.project.is_some()
-                && other.agent_index == entry.agent_index
-                && other.home == entry.home
-                && other.name == entry.name
-                && definition.location(&other.location).kind == kind
-                && merge.covers(&other.location)
-        })
+        .filter(|other| other.project.is_some() && same_server(definition, entry, other, merge))
         .collect()
+}
+
+/// Whether `other` is an Entry of the server of `entry` that `merge`
+/// merges, in any context.
+fn same_server(
+    definition: &AgentDefinition,
+    entry: &ScannedEntry,
+    other: &ScannedEntry,
+    merge: &Merge,
+) -> bool {
+    other.agent_index == entry.agent_index
+        && other.home == entry.home
+        && other.name == entry.name
+        && definition.location(&other.location).kind == definition.location(&entry.location).kind
+        && merge.covers(&other.location)
+}
+
+/// The folders of the Projects of `entries`, sorted, each once.
+fn folders_of<'s>(
+    snapshot: &Snapshot,
+    entries: impl Iterator<Item = &'s ScannedEntry>,
+) -> Vec<PathBuf> {
+    let folders: BTreeSet<PathBuf> = entries
+        .filter_map(|other| snapshot.project(other.project.as_deref()?))
+        .map(|project| project.path.clone())
+        .collect();
+    folders.into_iter().collect()
+}
+
+/// Whether, of `server`, the Entries of a server in one context, a Project
+/// layer gives it a transport: a Stand-in for it stands in for that one.
+fn stands_in_here(definition: &AgentDefinition, server: &[&ScannedEntry]) -> bool {
+    server
+        .iter()
+        .any(|other| other.project.is_some() && gives_transport(definition, other))
 }
 
 /// The merged-field block of the Item kind of `entry`, when its Agent has
@@ -959,9 +993,8 @@ pub(crate) fn stand_in_outside(
     }
     let kind = definition.location(&entry.location).kind;
     let merge = definition.rules(kind).merge.as_ref()?;
-    let in_project = server_entries(definition, snapshot, entry, project, merge)
-        .iter()
-        .any(|other| other.project.is_some() && gives_transport(definition, other));
+    let server = server_entries(definition, snapshot, entry, project, merge);
+    let in_project = stands_in_here(definition, &server);
     let projects = stood_in_for(definition, snapshot, entry);
     (!in_project && !projects.is_empty()).then_some(projects)
 }
@@ -985,14 +1018,40 @@ pub(crate) fn stood_in_for(
     let Some(merge) = definition.rules(kind).merge.as_ref() else {
         return Vec::new();
     };
-    let mut folders: Vec<PathBuf> = declaring_projects(definition, snapshot, entry, merge)
-        .into_iter()
-        .filter(|other| gives_transport(definition, other))
-        .filter_map(|other| snapshot.project(other.project.as_deref()?))
-        .map(|project| project.path.clone())
-        .collect();
-    folders.sort();
-    folders.dedup();
+    let declaring = declaring_projects(definition, snapshot, entry, merge);
+    folders_of(
+        snapshot,
+        declaring
+            .into_iter()
+            .filter(|other| gives_transport(definition, other)),
+    )
+}
+
+/// The folders of the known Projects a Remove of the Stand-in `entry` turns
+/// its server back on in: those it stands in for, but for any whose own
+/// layer sets the field that turns the server off, which decides there.
+pub(crate) fn freed_by_remove(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Vec<PathBuf> {
+    let kind = definition.location(&entry.location).kind;
+    let Some((merge, field)) = definition
+        .rules(kind)
+        .merge
+        .as_ref()
+        .and_then(|merge| Some((merge, merge.enabled()?)))
+    else {
+        return Vec::new();
+    };
+    let deciding = folders_of(
+        snapshot,
+        declaring_projects(definition, snapshot, entry, merge)
+            .into_iter()
+            .filter(|other| other.config.get(field).is_some()),
+    );
+    let mut folders = stood_in_for(definition, snapshot, entry);
+    folders.retain(|folder| !deciding.contains(folder));
     folders
 }
 
@@ -1027,16 +1086,11 @@ fn server_entries<'s>(
     project: Option<&str>,
     merge: &Merge,
 ) -> Vec<&'s ScannedEntry> {
-    let kind = definition.location(&entry.location).kind;
     let mut entries: Vec<&ScannedEntry> = snapshot
         .entries
         .iter()
         .filter(|other| {
-            other.agent_index == entry.agent_index
-                && other.home == entry.home
-                && other.name == entry.name
-                && definition.location(&other.location).kind == kind
-                && merge.covers(&other.location)
+            same_server(definition, entry, other, merge)
                 && (other.project.is_none() || other.project.as_deref() == project)
                 && resolve::gates(definition, snapshot, other, project).is_empty()
         })
@@ -1102,17 +1156,12 @@ pub(crate) fn deleted_by_enable(
     else {
         return Ok(Vec::new());
     };
-    let server = server_entries(definition, snapshot, entry, project, merge);
     // A Stand-in stands in for a server whose Project layer gives it a
     // transport, which deleting the Stand-in leaves it.
-    let in_project = server
-        .iter()
-        .any(|other| other.project.is_some() && gives_transport(definition, other));
+    let server = server_entries(definition, snapshot, entry, project, merge);
+    let in_project = stands_in_here(definition, &server);
     let mut deleted = Vec::new();
-    for setter in server
-        .iter()
-        .filter(|other| other.config.get(field).is_some())
-    {
+    for setter in setters(definition, snapshot, entry, project, merge, field) {
         if setter.config.get(field) != Some(&Value::Bool(false)) {
             break;
         }

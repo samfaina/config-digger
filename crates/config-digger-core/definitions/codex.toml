@@ -295,10 +295,10 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # a git-versioned Project layer Disable writes `enabled = false` in the
 # user's table of that server, which turns it off in every folder, or else
 # a Stand-in there: `command` as the layer has it, or `url` without its
-# userinfo and query, and `enabled = false`. In the Project the layer's
-# fields win, and elsewhere Codex starts and lists a Disabled server with
-# that field alone; a Stand-in of the other transport than the layer's
-# stops Codex in the Project [test]. Disable is not offered when a known
+# userinfo, query and fragment, and `enabled = false`. In the Project the
+# layer's fields win, and elsewhere Codex starts and lists a Disabled
+# server with that field alone [test]; a Stand-in of the other transport
+# than the layer's stops Codex in the Project [test]. Disable is not offered when a known
 # Project declares the server with the other transport (#297). Enable
 # deletes `enabled = false` from the highest layer that sets it and from
 # each lower one down to the first that sets it otherwise, whoever wrote

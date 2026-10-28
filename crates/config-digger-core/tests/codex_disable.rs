@@ -374,6 +374,30 @@ fn the_preview_of_a_stand_in_names_the_other_known_projects_it_turns_the_server_
     );
 }
 
+// web's own `enabled` decides there, over the Stand-in's.
+#[test]
+fn the_preview_of_a_stand_in_leaves_out_a_known_project_whose_layer_sets_enabled() {
+    let fs = app_and_web(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = true\n",
+    );
+    let core = core_versioning(&fs, &[layer("app"), layer("web")]);
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    let info = info(&plan);
+    let web = project("web").display().to_string();
+    assert!(
+        !info.iter().any(|sentence| sentence.contains(&web)),
+        "{info:?}"
+    );
+}
+
 // Codex stops in a Project where the Stand-in's `command` meets a `url`.
 #[test]
 fn disable_is_not_offered_when_a_known_project_declares_the_server_with_the_other_transport() {
@@ -498,6 +522,29 @@ fn outside_the_project_a_stand_in_is_disabled_with_a_note_and_only_remove() {
             .any(|sentence| sentence.contains("back on") && sentence.contains(&app_folder)),
         "{info:?}"
     );
+}
+
+#[test]
+fn undo_of_a_disable_in_the_user_s_table_of_the_server_takes_its_enabled_out() {
+    let user = format!("[mcp_servers.docs]\nargs = [\"--user\"]\n{APP_TRUST}");
+    let fs = app(
+        "[mcp_servers.docs]\nargs = [\"--user\"]\n",
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+    );
+    let core = core_versioning(&fs, &[layer("app")]);
+    let disable = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    let outcome = core.execute(disable, &[WarningClass::WideReach]).unwrap();
+
+    let undo = core.plan_undo(&outcome.operation).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(text(&fs, &user_config()), user);
 }
 
 #[test]

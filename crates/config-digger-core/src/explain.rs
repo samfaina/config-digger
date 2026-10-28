@@ -693,10 +693,9 @@ pub(crate) fn stand_in_reach(agent_name: &str, name: &str, others: &[PathBuf]) -
     let known = if others.is_empty() {
         "no other known Project declares it".to_owned()
     } else {
-        let others: Vec<&Path> = others.iter().map(PathBuf::as_path).collect();
         format!(
             "it turns it off in the known Projects {} too",
-            path_list(&others)
+            folder_list(others)
         )
     };
     format!(
@@ -738,10 +737,9 @@ pub(crate) fn stand_in_stops_agent(
     transport: &str,
     projects: &[PathBuf],
 ) -> String {
-    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
     format!(
         "Disable is not offered: the Stand-in it would write holds the `{transport}` of `{name}`, and the known Projects {} declare `{name}` with another transport, so {agent_name} would stop starting there.",
-        path_list(&projects)
+        folder_list(projects)
     )
 }
 
@@ -781,20 +779,18 @@ pub(crate) fn stand_in_note(agent_name: &str, name: &str, projects: &[PathBuf]) 
 /// What a Remove of a Stand-in for the server `name` turns back on: the
 /// server in the known `projects` it stands in for.
 pub(crate) fn stand_in_removed(name: &str, projects: &[PathBuf]) -> String {
-    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
     format!(
         "Removing this Stand-in turns `{name}` back on in the Projects whose layers declare it: {}.",
-        path_list(&projects)
+        folder_list(projects)
     )
 }
 
 /// A Stand-in for the server `name`, and the known `projects` whose layers
 /// declare it, as a sentence names it.
 fn stand_in_for(name: &str, projects: &[PathBuf]) -> String {
-    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
     format!(
         "a Stand-in for `{name}`, which turns it off in the Projects whose layers declare it: {}",
-        path_list(&projects)
+        folder_list(projects)
     )
 }
 
@@ -1535,6 +1531,12 @@ fn path_list(paths: &[&Path]) -> String {
         .map(|path| path.display().to_string())
         .collect();
     names.join(", ")
+}
+
+/// Folders as a sentence lists them, separated by commas.
+fn folder_list(folders: &[PathBuf]) -> String {
+    let folders: Vec<&Path> = folders.iter().map(PathBuf::as_path).collect();
+    path_list(&folders)
 }
 
 /// What the preview of a Delete backup says in place of the backup note.

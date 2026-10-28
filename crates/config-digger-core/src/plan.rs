@@ -632,7 +632,7 @@ impl Targeted<'_> {
                 if !disable::is_stand_in(definition, scanned) {
                     return None;
                 }
-                let projects = disable::stood_in_for(definition, self.snapshot, scanned);
+                let projects = disable::freed_by_remove(definition, self.snapshot, scanned);
                 (!projects.is_empty()).then(|| Info {
                     code: InfoCode::ReachesOtherFolders,
                     path: entry.path.clone(),
@@ -784,13 +784,13 @@ impl Targeted<'_> {
                             syntax,
                             sqlite,
                             by_name_everywhere,
-                            elsewhere: sentences,
+                            elsewhere: reach,
                             ..
                         } => {
                             if by_name_everywhere && !by_name.contains(&scanned.name) {
                                 by_name.push(scanned.name.clone());
                             }
-                            for sentence in sentences {
+                            for sentence in reach {
                                 if !elsewhere.iter().any(|known| known.sentence == sentence) {
                                     elsewhere.push(Info {
                                         code: InfoCode::ReachesOtherFolders,
