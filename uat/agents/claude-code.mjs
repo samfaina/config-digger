@@ -57,6 +57,14 @@ async function mcpList(home, cwd) {
 
 const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
 
+// A skill folder named `folder` in `dir`, whose `SKILL.md` has no `name`.
+// `\\?\` keeps the spaces Windows would otherwise trim from a folder name.
+function verbatimSkill(dir, folder) {
+  const target = `\\\\?\\${path.join(dir, folder)}`;
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(`${target}\\SKILL.md`, "---\ndescription: folder rule\n---\nbody\n");
+}
+
 // ---------------------------------------------------------------- .mcp.json
 
 {
@@ -363,12 +371,7 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     dot: "cd-throwaway-f.dot",
     "non-ASCII letters": "cd-throwaway-fÑ",
   };
-  for (const folder of Object.values(folders)) {
-    // `\\?\` keeps the spaces Windows would otherwise trim from a folder name.
-    const target = `\\\\?\\${path.join(rule, ".claude", "skills", folder)}`;
-    fs.mkdirSync(target, { recursive: true });
-    fs.writeFileSync(`${target}\\SKILL.md`, "---\ndescription: folder rule\n---\nbody\n");
-  }
+  for (const folder of Object.values(folders)) verbatimSkill(path.join(rule, ".claude", "skills"), folder);
   const s = await session(home, rule);
   await p.check("items.skill", "the name rule refuses a frontmatter `name` with any blank, `/`, `<`, `>`, a hidden or direction character, or over 256 characters", async () => {
     const refused = keys.filter((k, i) => !s.listed.some((l) => l.startsWith(`- fold-n${i} (`)));
@@ -431,8 +434,13 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
 
   await p.check("locations[plugin-manifest-mcp]", "a bundle is recorded in `.mcpb-cache/<hash>.metadata.json` with its `source` and the absolute `extractedPath` it went to, and its server is named by its manifest's `name`, the folder in place of `${__dirname}`", async () => {
     const cache = path.join(pb, ".mcpb-cache");
-    const metadata = fs.readdirSync(cache).filter((f) => f.endsWith(".metadata.json")).map((f) => json(path.join(cache, f)));
-    const extracted = metadata.map((m) => ({ source: m.source, inCache: path.dirname(m.extractedPath) === cache, manifest: fs.existsSync(path.join(m.extractedPath, "manifest.json")) }));
+    const metadata = fs.readdirSync(cache).filter((f) => /^[0-9a-f]+\.metadata\.json$/.test(f)).map((f) => json(path.join(cache, f)));
+    const extracted = metadata.map((m) => ({
+      source: m.source,
+      // `.mcpb-cache/<content hash>`, the hash the metadata records.
+      inCache: m.extractedPath === path.join(cache, m.contentHash),
+      manifest: fs.existsSync(path.join(m.extractedPath, "manifest.json")),
+    }));
     // `claude mcp get` shows no command for a bundle's server; `mcp list` does.
     const { text } = await mcpList(home, proj);
     const command = text.match(/^plugin:cd-throwaway-pb:cd-throwaway-bundled: (.*) - /m)?.[1];
@@ -447,16 +455,21 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
   });
 
   await p.check("locations[plugin-manifest-mcp]", "a manifest `mcpServers` of the wrong shape fails the plugin whole, the servers of its `.mcp.json` and its skills with it", async () => {
-    const seen = {};
-    for (const wrong of [42, true, [42], null]) {
-      write(manifest, { name: "cd-throwaway-pw", version: "1.0.0", mcpServers: wrong });
-      const t = await session(home, proj);
-      seen[JSON.stringify(wrong)] = [...t.plugins, ...t.servers, ...t.skills].filter((n) => n.includes("cd-throwaway-pw"));
+    const loaded = (t) => [...t.plugins, ...t.servers, ...t.skills].filter((n) => n.includes("cd-throwaway-pw"));
+    const kept = fs.readFileSync(manifest, "utf8");
+    // With a manifest of the right shape, the plugin loads all it carries.
+    const seen = { valid: loaded(s) };
+    try {
+      for (const wrong of [42, true, [42], null]) {
+        write(manifest, { ...JSON.parse(kept), mcpServers: wrong });
+        const { stdout } = await claude(home, proj, "plugin", "list");
+        seen[JSON.stringify(wrong)] = { loaded: loaded(await session(home, proj)), error: stdout.includes("Manifest validation failed: mcpServers: Invalid input") };
+      }
+    } finally {
+      write(manifest, kept);
     }
-    const { stdout } = await claude(home, proj, "plugin", "list");
-    write(manifest, { name: "cd-throwaway-pw", version: "1.0.0" });
-    const error = stdout.includes("Manifest validation failed: mcpServers: Invalid input");
-    return same({ seen, error }, { seen: { 42: [], true: [], "[42]": [], null: [] }, error: true });
+    const failed = { loaded: [], error: true };
+    return same(seen, { valid: ["cd-throwaway-pw", "plugin:cd-throwaway-pw:cd-throwaway-pwsrv", "cd-throwaway-pw:fold-w"], 42: failed, true: failed, "[42]": failed, null: failed });
   });
 }
 
@@ -468,6 +481,7 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
   const home = path.join(dir, "home");
   const plugin = path.join(dir, "cd-throwaway-pn");
   const prefix = "cd-throwaway-pn:";
+  const stem = "cd-throwaway-";
   // Each frontmatter `name` of a declared folder that is one skill, and the
   // name Claude Code gives that skill.
   const names = {
@@ -481,12 +495,15 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     "CD_Throwaway": "CD_Throwaway",
     '"  cd-throwaway-padded  "': "cd-throwaway-padded",
     "cd-throwaway-pn:cd-throwaway-pref": "cd-throwaway-pref",
-    [`cd-throwaway-${"x".repeat(256 - prefix.length - 13)}`]: `cd-throwaway-${"x".repeat(256 - prefix.length - 13)}`,
-    [`cd-throwaway-${"x".repeat(257 - prefix.length - 13)}`]: null,
   };
-  const ones = Object.keys(names);
-  write(path.join(plugin, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-pn", version: "1.0.0", skills: ones.map((_, i) => `./one/n${i}`) });
-  ones.forEach((name, i) => skill(path.join(plugin, "one", `n${i}`), [`name: ${name}`, `description: one n${i}`]));
+  // Two more, whose `<plugin>:<name>` is 256 characters once rewritten,
+  // padded and prefixed before, and 257.
+  const x256 = `${stem}${"x".repeat(256 - prefix.length - stem.length - 1)}.`;
+  const x257 = `${stem}${"x".repeat(257 - prefix.length - stem.length)}`;
+  const long = { kept: `"  ${prefix}${x256}  "`, skipped: x257 };
+  const declared = [...Object.keys(names), long.kept, long.skipped];
+  write(path.join(plugin, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-pn", version: "1.0.0", skills: declared.map((_, i) => `./one/n${i}`) });
+  declared.forEach((name, i) => skill(path.join(plugin, "one", `n${i}`), [`name: ${name}`, `description: one n${i}`]));
   // Each folder name in the plugin's `skills` folder, and its skill's name.
   const folders = {
     " cd-throwaway-f-lead": "-cd-throwaway-f-lead",
@@ -496,12 +513,7 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     "cd-throwaway-fÑ": "cd-throwaway-f-",
     "cd-throwaway-f😀": "cd-throwaway-f--",
   };
-  for (const folder of Object.keys(folders)) {
-    // `\\?\` keeps the spaces Windows would otherwise trim from a folder name.
-    const target = `\\\\?\\${path.join(plugin, "skills", folder)}`;
-    fs.mkdirSync(target, { recursive: true });
-    fs.writeFileSync(`${target}\\SKILL.md`, "---\ndescription: folder rule\n---\nbody\n");
-  }
+  for (const folder of Object.keys(folders)) verbatimSkill(path.join(plugin, "skills"), folder);
   skill(path.join(plugin, "skills", "fold-a"), ["name: cd throwaway alias", "description: alias"]);
   const s = await session(home, fresh("empty", dir), { args: ["--plugin-dir", plugin] });
 
@@ -509,14 +521,17 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     return same(Object.keys(folders).map((f) => s.skills.includes(`${prefix}${folders[f]}`)), Object.keys(folders).map(() => true));
   });
   await p.check("locations[plugin-skills]", "a declared skill's frontmatter `name` the rule refuses is not counted as none: it is trimmed, rid of a leading `<plugin>:` and rewritten the same way", async () => {
-    // A `name` the rule keeps, such as `cd-throwaway.dot`, is an alias too.
-    const named = ones.slice(0, -2).map((name, i) => s.listed.some((l) => l.startsWith(`- ${prefix}${names[name]}`) && l.endsWith(`: one n${i}`)));
-    return same(named, ones.slice(0, -2).map(() => true));
+    // A skill's line is `- <name>: <description>`, or `- <name> (<alias>):
+    // <description>` when the `name` as written, such as
+    // `cd-throwaway.dot`, differs from the rewritten one.
+    const line = (name, i) => new RegExp(`^- ${prefix}${names[name]}( \\(.*\\))?: one n${i}$`);
+    const named = Object.keys(names).map((name, i) => s.listed.some((l) => line(name, i).test(l)));
+    return same(named, Object.keys(names).map(() => true));
   });
   await p.check("locations[plugin-skills]", "the folder name rule takes the rewritten `<plugin>:<name>`: one of 257 characters is skipped, one of 256 kept", async () => {
-    const [kept, long] = ones.slice(-2);
     const listed = (name) => s.skills.includes(`${prefix}${name}`);
-    return same({ kept: listed(names[kept]), long: listed(long) || listed(`n${ones.length - 1}`) }, { kept: true, long: false });
+    const skipped = declared.length - 1;
+    return same({ kept: listed(x256.replace(".", "-")), skipped: listed(x257) || listed(`n${skipped}`) }, { kept: true, skipped: false });
   });
   await p.check("locations[plugin-skills]", "in a folder of skill folders, a frontmatter `name` the rule refuses is no alias, the skill named by its folder", async () => {
     return same(s.listed.filter((l) => l.includes("fold-a")), [`- ${prefix}fold-a: alias`]);
