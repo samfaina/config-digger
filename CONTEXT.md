@@ -46,6 +46,10 @@ _Avoid_: Flag, experiment, rollout
 An Agent home whose content another tool copies from a source Agent home, such as the Codex home Orca keeps in sync with `~/.codex`. config-digger never writes to it: actions on its Entries go to the Entry they were copied from.
 _Avoid_: Managed home, runtime home, shadow home
 
+**Overlay home**:
+An Agent home whose folder the Agent sees laid over the folder of another of its homes, path by path: what the overlay holds wins, and the other home's is read otherwise, as a Claude Desktop MSIX package sees its `LocalCache` over `%APPDATA%\Claude`. An Entry it reads from the other home's folder belongs to both homes, with an Item and a State in each.
+_Avoid_: Virtual home, merged home, layered home
+
 **Last-opened home**:
 The Agent home an Agent last opened a Project in, as the Agent itself records it, such as the VS Code profile a workspace was last opened in. config-digger shows that Project in this home first. The Agent can open the Project in another home next time, so the Entries of its other homes are not Unread for it.
 _Avoid_: Default home, preferred home, profile association
@@ -65,7 +69,7 @@ The category of an Item. v0.1 knows two: MCP server and skill.
 _Avoid_: Type, category
 
 **Entry**:
-One declaration at one concrete location — a key inside a configuration file, or a skill folder on disk. A location is its real path once links in its parent folders are resolved, so a skill reached through a linked `skills` folder is one Entry, not two. An Item may have several Entries. Several Agents may read the same Entry; it then belongs to one Item in each of them, and its state is given per Agent.
+One declaration at one concrete location — a key inside a configuration file, or a skill folder on disk. A location is its real path once links in its parent folders are resolved, so a skill reached through a linked `skills` folder is one Entry, not two. An Item may have several Entries. Several Agents may read the same Entry, and so may an Overlay home and the home under it; it then belongs to one Item in each of them, and its state is given per Agent and Agent home.
 _Avoid_: Record, definition, setting
 
 **Linked Entry**:
