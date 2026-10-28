@@ -187,7 +187,7 @@ registries = [
 # folder [docs].
 [[plugins]]
 id = "installed"
-unverified = "A plugin of a `directory` marketplace whose manifest is missing or does not parse, does not list the plugin, or gives it a `source` that is not a path, such as a `github` object, is taken to be read from its copy in the cache."
+unverified = "A plugin of a `directory` marketplace whose manifest is missing or does not parse, does not list the plugin, or gives it a `source` that is not a path below the marketplace's folder, such as a `github` object or `../x`, is taken to be read from its copy in the cache."
 superseded_marker = ".orphaned_at"
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
 id_separator = "@"
@@ -207,16 +207,16 @@ version = "version"
 # entry in the marketplace's `.claude-plugin/marketplace.json` names, its
 # `source` being a path relative to the marketplace's folder [test]. Its
 # servers and skills, `${CLAUDE_PLUGIN_ROOT}` and every path config-digger
-# shows or writes for it are there. Claude Code records the marketplace in
+# shows or writes for it are there; `.orphaned_at` is still looked for in
+# the copy its record names. Claude Code records the marketplace in
 # `known_marketplaces.json`, with the folder in `installLocation` and in
 # its `source`, and the user settings record that `source` under
 # `extraKnownMarketplaces` [disk].
 [plugins.registry.marketplaces]
 anchor = { block = "home", root = "plugins", path = "known_marketplaces.json" }
 settings = [{ anchor = { block = "home", root = "settings_file" }, key_path = ["extraKnownMarketplaces"] }]
-separator = "@"
 kind = ["source", "source"]
-directory = "directory"
+folder_kind = "directory"
 folder = [["installLocation"], ["source", "path"]]
 manifest = ".claude-plugin/marketplace.json"
 plugins = ["plugins"]

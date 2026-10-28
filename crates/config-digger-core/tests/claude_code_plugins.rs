@@ -1872,3 +1872,27 @@ fn a_plugin_of_a_directory_marketplace_is_removed_only_by_uninstalling_it_and_no
     );
     assert_eq!(untouched(&fs), before);
 }
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_whose_cache_copy_is_superseded_is_not_read() {
+    let fs = localp_in_market().with_file(localp_cache().join(".orphaned_at"), "1");
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(localp_items(&inventory), Vec::<&str>::new());
+}
+
+#[test]
+fn an_entry_source_that_climbs_out_of_the_marketplace_folder_is_read_from_the_install_path() {
+    let fs = with_localp(json!("../elsewhere/localp")).with_file(
+        known_marketplaces(),
+        json!({ "my-market": my_market_record() }).to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:cached-skill", "plugin:localp:cached"]
+    );
+}

@@ -2139,7 +2139,7 @@
       ]
     },
     "FolderMarketplaces": {
-      "description": "The marketplaces plugins are installed from, as far as they say where a\nplugin's files are, such as Claude Code's `directory` marketplaces: a\nplugin whose id names a marketplace in a folder is read from the folder\nits entry in the marketplace's manifest names, a path relative to the\nmarketplace's folder. A plugin of a marketplace of another kind, or one\nwhose manifest is missing, does not parse, does not list it or names no\npath for it, is read from its record's folder.",
+      "description": "The marketplaces plugins are installed from, as far as they say where a\nplugin's files are, such as Claude Code's `directory` marketplaces: a\nplugin whose id names a marketplace in a folder, after the plugins'\n`id_separator`, is read from the folder its entry in the marketplace's\nmanifest names, a path relative to the marketplace's folder. A plugin\nof a marketplace of another kind, or one whose manifest is missing,\ndoes not parse, does not list it or names no folder below the\nmarketplace's for it, is read from its record's folder.",
       "type": "object",
       "properties": {
         "anchor": {
@@ -2153,10 +2153,6 @@
             "$ref": "#/$defs/MarketplaceSettings"
           }
         },
-        "separator": {
-          "description": "The text between a plugin's name and its marketplace's in its id,\nsuch as `@`.",
-          "type": "string"
-        },
         "kind": {
           "description": "The key path, in a marketplace's record, of its kind.",
           "type": "array",
@@ -2164,7 +2160,7 @@
             "type": "string"
           }
         },
-        "directory": {
+        "folder_kind": {
           "description": "What the kind holds for a marketplace in a folder, such as\n`directory`.",
           "type": "string"
         },
@@ -2194,7 +2190,7 @@
           "type": "string"
         },
         "source": {
-          "description": "The field of an entry that holds where the plugin's files are: as a\nrelative path, a folder below the marketplace's.",
+          "description": "The field of an entry that holds where the plugin's files are: as a\nrelative path, a folder below the marketplace's or that folder.",
           "type": "string"
         },
         "unverified": {
@@ -2204,9 +2200,8 @@
       "additionalProperties": false,
       "required": [
         "anchor",
-        "separator",
         "kind",
-        "directory",
+        "folder_kind",
         "folder",
         "manifest",
         "plugins",

@@ -801,6 +801,13 @@ impl PluginsDefinition {
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
         }
+        let marketplaces = matches!(
+            &self.registry,
+            PluginRegistry::JsonPluginRecords(block) if block.marketplaces.is_some()
+        );
+        if marketplaces && self.id_separator.is_none() {
+            return Err("a registry's marketplaces need id_separator to find a plugin's".into());
+        }
         if self
             .id_template
             .as_ref()
@@ -4497,12 +4504,18 @@ checks = {CHECKS}
     #[test]
     fn a_plugin_registry_s_marketplaces_lie_in_the_home_or_the_machine_and_name_their_fields() {
         let marketplaces = |registry: &str, settings: &str, manifest: &str, name: &str| {
-            with_plugins("").replace(
-                r#"folder = "path" }"#,
-                &format!(
-                    r#"folder = "path", marketplaces = {{ anchor = {registry}, settings = [{{ anchor = {settings}, key_path = ["extra"] }}], separator = "@", kind = ["source", "kind"], directory = "directory", folder = [["location"], ["source", "path"]], manifest = "{manifest}", plugins = ["plugins"], name = "{name}", source = "source" }} }}"#
-                ),
-            )
+            with_plugins("")
+                .replace(
+                    r#"folder = "path" }"#,
+                    &format!(
+                        r#"folder = "path", marketplaces = {{ anchor = {registry}, settings = [{{ anchor = {settings}, key_path = ["extra"] }}], kind = ["source", "kind"], folder_kind = "directory", folder = [["location"], ["source", "path"]], manifest = "{manifest}", plugins = ["plugins"], name = "{name}", source = "source" }} }}"#
+                    ),
+                )
+                .replace(
+                    "uninstall = \"agent plugin uninstall",
+                    "id_separator = \"@\"
+uninstall = \"agent plugin uninstall",
+                )
         };
         let home = r#"{ block = "home", root = "plugins", path = "known.json" }"#;
         let machine = r#"{ block = "machine", path = "~/.agent/settings.json" }"#;
@@ -4525,6 +4538,16 @@ checks = {CHECKS}
         let text = marketplaces(home, machine, ".agent/marketplace.json", "");
         assert!(
             error(&text).contains("must not be empty"),
+            "{}",
+            error(&text)
+        );
+        let text = marketplaces(home, machine, ".agent/marketplace.json", "name").replace(
+            "id_separator = \"@\"
+",
+            "",
+        );
+        assert!(
+            error(&text).contains("need id_separator"),
             "{}",
             error(&text)
         );
