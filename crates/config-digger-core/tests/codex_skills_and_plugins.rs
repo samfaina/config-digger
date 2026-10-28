@@ -314,11 +314,13 @@ fn a_frontmatter_codex_cannot_read_even_quoted_is_invalid() {
         // A stray line.
         "---\nname: review\njust text\ndescription: Use when: x\n---\n",
         // An indented `name`.
-        "---\n  name: review\ndescription: Use when: x\n---\n",
+        "---\n  name: review\ndescription: Reviews.\n---\n",
         // Two `name` lines.
         "---\nname: review\nname: other\ndescription: Reviews.\n---\n",
         // A value holding `: ` that goes on.
         "---\nname: review\ndescription: Use when: x\n  and y\n---\n",
+        // A value ending in `:` without `: `.
+        "---\nname: review\ndescription: Use for the following:\n---\n",
         // A quote that never closes.
         "---\nname: \"review\ndescription: Use when: x\n---\n",
     ] {
@@ -326,11 +328,23 @@ fn a_frontmatter_codex_cannot_read_even_quoted_is_invalid() {
 
         for sentence in invalid_reasons(&inventory) {
             assert!(
-                sentence.contains("is not valid YAML") || sentence.contains("has no `name`"),
+                sentence.contains("is not valid YAML"),
                 "{text:?}: {sentence}"
             );
         }
     }
+}
+
+#[test]
+fn a_value_ending_in_a_colon_is_read_quoted_when_it_holds_a_colon_and_space() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Use when: asked for:\n---\n");
+
+    let review = item(&inventory, "review");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"]["description"],
+        "Use when: asked for:"
+    );
 }
 
 #[test]

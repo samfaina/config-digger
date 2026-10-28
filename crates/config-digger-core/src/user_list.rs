@@ -175,11 +175,19 @@ pub(crate) fn home_to_add<'a>(
     folder: &Path,
     agent: &str,
 ) -> Result<(&'a AgentDefinition, PathBuf), Error> {
-    let definition = definitions
+    let definition = definition_of(definitions, agent)?;
+    Ok((definition, existing(ports.fs.as_ref(), folder, false)?))
+}
+
+/// The definition of the Agent `agent`, in any case.
+pub(crate) fn definition_of<'a>(
+    definitions: &'a [AgentDefinition],
+    agent: &str,
+) -> Result<&'a AgentDefinition, Error> {
+    definitions
         .iter()
         .find(|definition| definition.agent.id.eq_ignore_ascii_case(agent))
-        .ok_or_else(|| Error::no_agent(agent))?;
-    Ok((definition, existing(ports.fs.as_ref(), folder, false)?))
+        .ok_or_else(|| Error::no_agent(agent))
 }
 
 /// Adds the folder `folder` as an Agent home of the Agent `agent`, once.

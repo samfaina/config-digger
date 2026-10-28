@@ -184,6 +184,8 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     continued: "name: cd-throwaway-fm-continued\ndescription: d-fm one\n  two\n---",
     continuedcolon: "name: cd-throwaway-fm-continuedcolon\ndescription: d-fm: one\n  two\n---",
     unclosedquote: "name: \"cd-throwaway-fm-unclosedquote\ndescription: d-fm: x\n---",
+    trailing: "name: cd-throwaway-fm-trailing\ndescription: d-fm for the following:\n---",
+    trailingcolon: "name: cd-throwaway-fm-trailingcolon\ndescription: d-fm: for the following:\n---",
     unclosed: "name: cd-throwaway-fm-unclosed\ndescription: d-fm: x",
     number: "name: 123\ndescription: d-fm-number: x\n---",
     noname: "description: d-fm: x\n---",
@@ -220,6 +222,9 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
   });
   await p.check("items.skill", "a stray line, an indented `name`, two `name` lines, a quote that never closes and a `: ` value going on over indented lines skip the skill", async () => {
     return same(readOf("stray", "indented", "twonames", "continuedcolon", "unclosedquote"), { stray: null, indented: null, twonames: null, continuedcolon: null, unclosedquote: null });
+  });
+  await p.check("items.skill", "a value ending in `:` skips the skill, unless it holds `: ` too, which Codex quotes", async () => {
+    return same(readOf("trailing", "trailingcolon"), { trailing: null, trailingcolon: "cd-throwaway-fm-trailingcolon: d-fm: for the following:" });
   });
   await p.check("items.skill", "a plain `description` goes on over indented lines", async () => {
     return same(readOf("continued"), { continued: "cd-throwaway-fm-continued: d-fm one two" });

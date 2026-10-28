@@ -794,17 +794,13 @@ impl Core {
     }
 
     /// What the skill folder at `folder` holds, as a skill Entry of the
-    /// Agent `agent` shows it: each file's relative path and size, and the
-    /// `name` and `description` of its `SKILL.md` frontmatter, read as the
-    /// Agent's skill locations read it. File content is never shown, since
-    /// a skill folder can hold Secrets, such as a `.env` file.
+    /// Agent `agent`, in any case, shows it: each file's relative path and
+    /// size, and the `name` and `description` of its `SKILL.md`
+    /// frontmatter, read as the Agent's first skill location reads it, as
+    /// every skill location of a built-in Agent does. File content is never
+    /// shown, since a skill folder can hold Secrets, such as a `.env` file.
     pub fn skill_content(&self, folder: &Path, agent: &str) -> Result<SkillContent, Error> {
-        let definition = self
-            .definitions
-            .iter()
-            .find(|definition| definition.agent.id == agent)
-            .ok_or_else(|| Error::no_agent(agent))?;
-        let reading = definition
+        let reading = user_list::definition_of(&self.definitions, agent)?
             .locations
             .iter()
             .find_map(|location| location.format.skill_folder())

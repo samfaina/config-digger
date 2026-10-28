@@ -142,18 +142,19 @@ pub(crate) fn frontmatter(
     let yaml = read.as_ref().filter(|read| match reading {
         SkillFallback::Skip | SkillFallback::FolderName => !read.any(|scalar| scalar.colon),
         SkillFallback::QuoteValues => {
-            // Quoted, a value holding `: ` is YAML while it stays on its line.
-            !read.any(|scalar| (scalar.colon && scalar.continued) || scalar.unclosed)
+            !read.indented_first
+                && !read.any(Scalar::refused_quoted)
                 && !["name", "description"]
                     .iter()
                     .any(|key| read.twice.contains(*key))
         }
         SkillFallback::LineByLine => {
-            !read.any(|scalar| scalar.colon || scalar.unclosed)
+            !read.indented_first
+                && !read.any(Scalar::refused)
                 && read.twice.is_empty()
                 && ["name", "description"]
                     .iter()
-                    .all(|key| read.keys.get(*key).is_some_and(|scalar| scalar.string))
+                    .all(|key| read.keys.get(*key).is_some_and(|scalar| scalar.yaml_string))
         }
     });
     match (yaml, reading) {
@@ -198,6 +199,9 @@ struct Scalars {
     /// The keys given more than once, which YAML refuses. The later wins in
     /// `keys`.
     twice: BTreeSet<String>,
+    /// Whether an indented line comes before the first key, which YAML
+    /// refuses.
+    indented_first: bool,
 }
 
 impl Scalars {
@@ -209,15 +213,34 @@ impl Scalars {
 /// The value of a top-level key.
 struct Scalar {
     value: String,
-    /// A plain value holding `: `, which would start a mapping in YAML.
+    /// Whether it is a plain value holding `: `, which would start a mapping
+    /// in YAML.
     colon: bool,
-    /// Whether a plain value goes on over indented lines.
+    /// Whether it is a plain value with a line ending in `:`, which would
+    /// start a mapping in YAML too.
+    colon_at_end: bool,
+    /// Whether it is a plain value going on over indented lines.
     continued: bool,
-    /// A quoted value whose quote does not close on its line.
+    /// Whether it is a quoted value whose quote does not close on its line.
     unclosed: bool,
-    /// Whether YAML reads the value, when it reads it, as a string rather
-    /// than null, a boolean, a number, a date or a collection.
-    string: bool,
+    /// Whether YAML reads it, when it reads it, as a string rather than
+    /// null, a boolean, a number, a date or a collection.
+    yaml_string: bool,
+}
+
+impl Scalar {
+    /// Whether YAML refuses the value.
+    fn refused(&self) -> bool {
+        self.colon || self.colon_at_end || self.unclosed
+    }
+
+    /// Whether YAML still refuses the value once Codex quotes it, which it
+    /// does to a plain value holding `: `: quoted, such a value is YAML
+    /// while it stays on its line.
+    fn refused_quoted(&self) -> bool {
+        let quoted = self.colon && !self.continued;
+        self.unclosed || (!quoted && (self.colon || self.colon_at_end))
+    }
 }
 
 /// The top-level keys of the frontmatter `lines`: plain, quoted, and `|` or
@@ -227,12 +250,17 @@ fn scalars(lines: &[&str]) -> Option<Scalars> {
     let mut read = Scalars {
         keys: BTreeMap::new(),
         twice: BTreeSet::new(),
+        indented_first: false,
     };
     let mut index = 0;
     while index < lines.len() {
         let line = lines[index];
         index += 1;
         if line.trim().is_empty() || line.starts_with([' ', '\t', '#']) {
+            read.indented_first |= read.keys.is_empty()
+                && line.starts_with([' ', '\t'])
+                && !line.trim().is_empty()
+                && !line.trim_start().starts_with('#');
             continue;
         }
         let (key, value) = line.split_once(':')?;
@@ -247,9 +275,10 @@ fn scalars(lines: &[&str]) -> Option<Scalars> {
         let mut scalar = Scalar {
             value: String::new(),
             colon: false,
+            colon_at_end: false,
             continued: false,
             unclosed: false,
-            string: true,
+            yaml_string: true,
         };
         match value.chars().next() {
             Some('|') => scalar.value = continued.join("\n").trim_end().to_owned(),
@@ -268,15 +297,16 @@ fn scalars(lines: &[&str]) -> Option<Scalars> {
                     .iter()
                     .any(|line| line.contains(": ") || line.starts_with("- ")) =>
             {
-                scalar.string = false;
+                scalar.yaml_string = false;
             }
             _ => {
                 let lines = [&[value][..], &continued].concat();
                 // `: ` would start a mapping inside a plain scalar.
                 scalar.colon = lines.iter().any(|line| line.contains(": "));
+                scalar.colon_at_end = lines.iter().any(|line| line.ends_with(':'));
                 scalar.continued = continued.iter().any(|line| !line.is_empty());
                 scalar.value = fold(&lines);
-                scalar.string = !no_yaml_string(&scalar.value);
+                scalar.yaml_string = !no_yaml_string(&scalar.value);
             }
         }
         let key = key.trim().to_owned();
@@ -292,7 +322,7 @@ fn scalars(lines: &[&str]) -> Option<Scalars> {
 /// collection, an alias, a tag or a character no plain value starts with.
 fn no_yaml_string(value: &str) -> bool {
     value.is_empty()
-        || value.starts_with(['[', '{', '*', '&', '!', '@', '`', '#'])
+        || value.starts_with(['[', '{', '*', '!', '@', '`', '#'])
         || NO_STRING.is_match(value)
 }
 

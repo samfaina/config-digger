@@ -2871,12 +2871,12 @@
           "const": "folder-name"
         },
         {
-          "description": "For a malformed frontmatter alone: it reads the frontmatter again\nwith each plain value that holds `: ` quoted, as Codex does, and\nskips the skill when that still fails: when such a value goes on\nover more lines, a quote never closes, a line is no key, or `name`\nor `description` is given twice. An unclosed frontmatter is no\nfrontmatter.",
+          "description": "For a malformed frontmatter alone: it reads the frontmatter again\nwith each plain value that holds `: ` quoted, as Codex does, a value\nstarting with a `[` YAML cannot read being one already, and skips\nthe skill when that still fails: when such a value goes on over more\nlines, a value ends in `:` without holding `: `, a quote never\ncloses, a line is no key, an indented line comes first, or `name` or\n`description` is given twice. An unclosed frontmatter is no\nfrontmatter.",
           "type": "string",
           "const": "quote-values"
         },
         {
-          "description": "For a malformed frontmatter alone: it reads `name` and\n`description` line by line, as Gemini CLI does, whenever YAML would\nfail or give either of them as no string. A line holding `name:`,\nafter any blanks, gives the name, quotes kept, and a later one wins;\none holding `description:` gives the description, joined with each\nfollowing indented line. A skill without either line is skipped. An\nunclosed frontmatter is no frontmatter.",
+          "description": "For a malformed frontmatter alone: it reads `name` and\n`description` line by line, as Gemini CLI does, whenever YAML would\nfail or give either of them as no string. A line holding `name:`,\nafter any blanks, gives the name, quotes kept, and a later one wins;\none holding `description:` gives the description, joined with each\nfollowing indented line. Without a `name` line the frontmatter has\nno `name`, and without a `description` line the skill is skipped.\nAn unclosed frontmatter is no frontmatter.",
           "type": "string",
           "const": "line-by-line"
         }

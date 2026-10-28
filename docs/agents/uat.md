@@ -69,7 +69,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 `-CodexLayer` adds `codex-project`, a git repo made with `git init` that the Codex home trusts, whose `.codex\config.toml`, added to the git index, declares `cd-throwaway-codex-layer`, a server the Codex home does not declare. Disable of it writes a Stand-in in the home's `config.toml`; step 22.1 walks it.
 
-`-Frontmatter` adds two skills to the Codex home's `skills` folder whose frontmatter is not YAML: `cd-throwaway-fm-colon`, whose `description` holds `: `, which Codex reads quoted, and `cd-throwaway-fm-stray`, with a line that is no key, which Codex skips. Step 23.1 walks them.
+`-Frontmatter` adds two skills to the Codex home's `skills` folder whose frontmatter is not YAML: `cd-throwaway-fm-colon`, whose `description` holds `: `, which Codex reads quoted, and `cd-throwaway-fm-stray`, with a line that is no key, which Codex skips. Step 23.1 walks them. It also adds `gemini-home`, a Gemini CLI home whose `.gemini\skills` holds the same two, which Gemini CLI reads line by line, and `cd-throwaway-fm-gemini-noname`, with no `name` line, which it skips. Step 23.2 adds the home, walks them and takes the home off the list again.
 
 `-Cursor` writes Cursor's files as they would be in an `%APPDATA%` of their own, `cursor-appdata`: Cursor has run and opened `cursor-project`, a git repo, made with `git init`, whose `packages\app\.cursor\skills` holds a skill. A step that needs them starts the app with `APPDATA` set to that folder, as step 17.1 does.
 

@@ -907,12 +907,15 @@ fn a_skill_without_frontmatter_is_invalid() {
     assert_eq!(code(reason.code), "malformed_skill");
 }
 
-/// The one Gemini CLI skill of `fs`'s user skills folder.
-fn only_skill(inventory: &Inventory) -> &Item {
+/// The reason of the one Gemini CLI skill of `inventory`, which is Invalid.
+fn invalid_reason(inventory: &Inventory) -> String {
     let mut skills = gemini_items(inventory).filter(|item| code(item.kind) == "skill");
     let skill = skills.next().expect("the skill is listed");
     assert!(skills.next().is_none(), "one skill");
-    skill
+    assert_eq!(states(skill), ["invalid"]);
+    let reason = skill.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "malformed_skill");
+    reason.sentence.clone()
 }
 
 /// The inventory of a Gemini CLI home whose one user skill's `SKILL.md`
@@ -985,48 +988,25 @@ fn an_unclosed_bracket_names_the_skill_as_written() {
 
 #[test]
 fn a_frontmatter_without_a_name_line_is_invalid() {
-    let inventory = with_skill_md("---\ndescription: Use when: x\n---\n");
+    let sentence = invalid_reason(&with_skill_md("---\ndescription: Use when: x\n---\n"));
 
-    let skill = only_skill(&inventory);
-    assert_eq!(states(skill), ["invalid"]);
-    let reason = skill.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "malformed_skill");
-    assert!(
-        reason.sentence.contains("has no `name`"),
-        "{}",
-        reason.sentence
-    );
+    assert!(sentence.contains("has no `name`"), "{sentence}");
 }
 
 #[test]
 fn a_frontmatter_without_a_description_line_is_invalid() {
-    let inventory = with_skill_md("---\nname: review\n---\n");
+    let sentence = invalid_reason(&with_skill_md("---\nname: review\n---\n"));
 
-    let skill = only_skill(&inventory);
-    assert_eq!(states(skill), ["invalid"]);
-    let reason = skill.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "malformed_skill");
-    assert!(
-        reason.sentence.contains("has no `description`"),
-        "{}",
-        reason.sentence
-    );
+    assert!(sentence.contains("has no `description`"), "{sentence}");
 }
 
 #[test]
 fn an_unclosed_frontmatter_is_no_frontmatter() {
-    let inventory = with_skill_md("---\nname: review\ndescription: Reviews.\n");
+    let sentence = invalid_reason(&with_skill_md("---\nname: review\ndescription: Reviews.\n"));
 
-    let skill = only_skill(&inventory);
-    assert_eq!(states(skill), ["invalid"]);
-    let reason = skill.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "malformed_skill");
     assert!(
-        reason
-            .sentence
-            .contains("does not open with a `---` frontmatter"),
-        "{}",
-        reason.sentence
+        sentence.contains("does not open with a `---` frontmatter"),
+        "{sentence}"
     );
 }
 

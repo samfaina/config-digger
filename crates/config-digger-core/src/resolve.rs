@@ -273,8 +273,8 @@ pub(crate) fn resolve(
                         let folder = definition.location(&entry.location).format.skill_folder();
                         match (entry.defect, folder) {
                             (Some(defect), Some(folder)) => match folder.fallback(defect) {
-                                // A frontmatter read again that still fails
-                                // is skipped.
+                                // `fallback` gives the readings as Skip, and
+                                // validation keeps them off the other defects.
                                 SkillFallback::Skip
                                 | SkillFallback::QuoteValues
                                 | SkillFallback::LineByLine => (Some(defect), None),

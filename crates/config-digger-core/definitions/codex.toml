@@ -526,9 +526,13 @@ on_read_failure = "ignores_file"
 # that is not YAML it reads again with each plain value that holds `: `
 # quoted, as `quote-values` says: `description: Use when: x` loads, and
 # `name: [unclosed` names a skill `[unclosed` [source, test]. A stray line,
-# an indented `name`, two `name` lines, a quote that never closes and such
-# a value going on over indented lines still skip the skill, and a
-# frontmatter that never closes is none [source, test].
+# an indented `name`, two `name` lines, a quote that never closes, such a
+# value going on over indented lines and a value ending in `:` without
+# holding `: ` still skip the skill, and a frontmatter that never closes is
+# none [source, test]. A frontmatter without a `name`, or with an empty one,
+# names the skill after its folder [source, test], which `no_name = "skip"`
+# does not say, and one without a `description` skips it [source], which
+# config-digger does not: a ticket, not filed yet.
 [items.skill]
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }

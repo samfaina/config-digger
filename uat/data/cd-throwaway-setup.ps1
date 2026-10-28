@@ -404,9 +404,32 @@ env = { CD_THROWAWAY_TOKEN = "not-a-real-secret" }
 
 # With -Frontmatter, Codex skills whose frontmatter is not YAML: one whose
 # description holds `: `, which Codex reads quoted, and one with a stray
-# line, which it skips. The default data has none, so that no other step
-# counts them.
+# line, which it skips. And a Gemini CLI home, gemini-home, whose skills
+# Gemini CLI reads line by line: the same two, which it loads, and one with
+# no `name` line, which it skips. The default data has none, so that no
+# other step counts them.
 if ($Frontmatter) {
+    $gemini = "$Root\gemini-home\.gemini"
+    Write-TestFile "$gemini\settings.json" "{}"
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-colon\SKILL.md" @"
+---
+name: cd-throwaway-fm-gemini-colon
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-stray\SKILL.md" @"
+---
+name: cd-throwaway-fm-gemini-stray
+just text
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-noname\SKILL.md" @"
+---
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+
     $skills = "$Root\codex-home\skills"
     Write-TestFile "$skills\cd-throwaway-fm-colon\SKILL.md" @"
 ---

@@ -3639,19 +3639,19 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     #[test]
     fn only_a_malformed_frontmatter_is_read_again() {
         let anchor = r#"{ block = "home", root = "state" }"#;
-        let format = |no_frontmatter: &str, malformed: &str, no_name: &str| {
+        let skill_format = |no_frontmatter: &str, malformed: &str, no_name: &str| {
             format!(
                 r#"{{ block = "skill-folder", name_from = "frontmatter", no_frontmatter = "{no_frontmatter}", malformed_frontmatter = "{malformed}", no_name = "{no_name}" }}"#
             )
         };
         for reading in ["quote-values", "line-by-line"] {
-            let text = with_skills(anchor, &format("skip", reading, "skip"), CHECKS);
+            let text = with_skills(anchor, &skill_format("skip", reading, "skip"), CHECKS);
             assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
-            for format in [
-                format(reading, "skip", "skip"),
-                format("skip", "skip", reading),
+            for refused in [
+                skill_format(reading, "skip", "skip"),
+                skill_format("skip", "skip", reading),
             ] {
-                let text = with_skills(anchor, &format, CHECKS);
+                let text = with_skills(anchor, &refused, CHECKS);
                 assert!(
                     error(&text)
                         .contains("only malformed_frontmatter can be quote-values or line-by-line"),

@@ -3239,10 +3239,12 @@ pub(crate) enum SkillFallback {
     /// frontmatter field: Effective, with a note.
     FolderName,
     /// For a malformed frontmatter alone: it reads the frontmatter again
-    /// with each plain value that holds `: ` quoted, as Codex does, and
-    /// skips the skill when that still fails: when such a value goes on
-    /// over more lines, a quote never closes, a line is no key, or `name`
-    /// or `description` is given twice. An unclosed frontmatter is no
+    /// with each plain value that holds `: ` quoted, as Codex does, a value
+    /// starting with a `[` YAML cannot read being one already, and skips
+    /// the skill when that still fails: when such a value goes on over more
+    /// lines, a value ends in `:` without holding `: `, a quote never
+    /// closes, a line is no key, an indented line comes first, or `name` or
+    /// `description` is given twice. An unclosed frontmatter is no
     /// frontmatter.
     QuoteValues,
     /// For a malformed frontmatter alone: it reads `name` and
@@ -3250,8 +3252,9 @@ pub(crate) enum SkillFallback {
     /// fail or give either of them as no string. A line holding `name:`,
     /// after any blanks, gives the name, quotes kept, and a later one wins;
     /// one holding `description:` gives the description, joined with each
-    /// following indented line. A skill without either line is skipped. An
-    /// unclosed frontmatter is no frontmatter.
+    /// following indented line. Without a `name` line the frontmatter has
+    /// no `name`, and without a `description` line the skill is skipped.
+    /// An unclosed frontmatter is no frontmatter.
     LineByLine,
 }
 
