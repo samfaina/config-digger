@@ -19,12 +19,20 @@ function PlanQuotes($plan, [string]$id, [string]$about, [string]$version) {
 # for the same files with the same bytes.
 function FolderState([string]$folder) {
     if (-not (Test-Path -LiteralPath $folder)) { return "(no folder)" }
-    $root = (Resolve-Path -LiteralPath $folder).Path.TrimEnd('\')
+    # Each file's path relative to $folder is built from the names under it,
+    # not cut from its full path: Get-ChildItem spells that path long where
+    # $folder may be spelled short (8.3), as %TEMP% is on a CI runner.
+    function Files([string]$dir, [string]$relative) {
+        Get-ChildItem -LiteralPath $dir -Force | ForEach-Object {
+            if ($_.PSIsContainer) { Files $_.FullName "$relative$($_.Name)\" }
+            else { [pscustomobject]@{ Relative = "$relative$($_.Name)"; Path = $_.FullName } }
+        }
+    }
     # SHA-256 from .NET: Get-FileHash's module may not load, as 9.5's
     # Expand-Archive's doesn't.
     $sha = [Security.Cryptography.SHA256]::Create()
-    @(Get-ChildItem -LiteralPath $root -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
-        $hash = -join ($sha.ComputeHash([IO.File]::ReadAllBytes($_.FullName)) | ForEach-Object { $_.ToString("X2") })
-        "$($_.FullName.Substring($root.Length + 1)) $hash"
+    @(Files $folder "" | Sort-Object Relative | ForEach-Object {
+        $hash = -join ($sha.ComputeHash([IO.File]::ReadAllBytes($_.Path)) | ForEach-Object { $_.ToString("X2") })
+        "$($_.Relative) $hash"
     }) -join ", "
 }
