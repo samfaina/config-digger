@@ -375,8 +375,8 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # its `.mcp.json` and its skills with it [test], and so does one whose
 # `mcpServers` is of a shape the manifest's schema refuses, such as a
 # number, `true`, `null` or a list holding a number ("Manifest validation
-# failed") [test]; config-digger leaves out this file's Entries alone
-# (#295).
+# failed") [test]: every server and skill of the plugin is Invalid
+# (`fails_plugin`).
 [[locations]]
 id = "plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
@@ -390,13 +390,15 @@ provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-" }
 plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
-on_read_failure = "ignores_file"
+on_read_failure = "fails_plugin"
+on_shape_failure = "fails_plugin"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 # A synced plugin's servers, in its `.mcp.json` and its manifest's
 # `mcpServers`, read as an installed plugin's are, at user Scope.
 [[locations]]
 id = "synced-plugin-manifest-mcp"
+unverified = "A synced plugin whose manifest does not parse, or whose `mcpServers` has a shape the manifest's schema refuses, is taken to fail whole, as an installed plugin does."
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
 when = [{ block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
@@ -409,11 +411,13 @@ provenance = "cloud-mirror"
 store_class = "plain"
 interpolation = { block = "braces", default_separator = ":-" }
 plugin_root = { reference = "${CLAUDE_PLUGIN_ROOT}", fields = ["command", "args", "env", "url", "headers", "headersHelper"], forward_slashes = true }
-on_read_failure = "ignores_file"
+on_read_failure = "fails_plugin"
+on_shape_failure = "fails_plugin"
 shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "synced-plugin-mcp"
+unverified = "A synced plugin's `.mcp.json` servers are taken to fail with the plugin when its manifest does not parse, or its `mcpServers` has a shape the manifest's schema refuses, as an installed plugin's do."
 anchor = { block = "plugin", plugins = "synced", path = ".mcp.json" }
 when = [{ block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
@@ -436,13 +440,17 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # [docs]. Of two plugins' servers with one endpoint, the server of the plugin
 # that comes first in `enabledPlugins` wins, the key merged from the user's,
 # the Project's and the local settings in that order, each plugin keeping
-# its first place [test] (`plugin_order`).
+# its first place [test] (`plugin_order`). A plugin Claude Code does not
+# load, its manifest failing, has none of its servers compete [test]; one
+# that is off or forced off stays Disabled or Blocked, its manifest a
+# secondary reason.
 [items.mcp]
+unverified = "A plugin that is off, or forced off by the managed settings, and whose manifest fails is taken to be Disabled or Blocked rather than Invalid, since Claude Code does not load an off plugin."
 precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-manifest-mcp", "plugin-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 # An exclusive `managed-mcp.json` suppresses the other servers, and an
 # unapproved server is not loaded: neither competes. The allow and deny
 # lists apply after precedence, to the server that wins [docs].
-checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
+checks = ["policy", "shape", "disable", "plugin-load", "approval", "precedence", "rules"]
 
 [items.mcp.competition]
 block = "exact-name"
@@ -785,13 +793,16 @@ kind = "skill"
 scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
-on_read_failure = "ignores_file"
+on_read_failure = "fails_plugin"
 
 # A synced plugin's skills, read as an installed plugin's are, at user
 # Scope.
 [[locations]]
 id = "synced-plugin-skills"
-unverified = "A synced plugin's skills are taken to be named as an installed plugin's are (#429)."
+unverified = [
+  "A synced plugin's skills are taken to be named as an installed plugin's are (#429).",
+  "A synced plugin's skills are taken to fail with the plugin when its manifest does not parse, or its `mcpServers` has a shape the manifest's schema refuses, as an installed plugin's do.",
+]
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
 when = [{ block = "signed-in-account" }]
 format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
@@ -801,7 +812,7 @@ kind = "skill"
 scope = "user"
 provenance = "cloud-mirror"
 store_class = "plain"
-on_read_failure = "ignores_file"
+on_read_failure = "fails_plugin"
 
 # Skills synced from claude.ai sit one level deeper than the docs say, in
 # `synced/<org>_<account>/<folder>` [disk], next to `manifest.json` and a
@@ -852,16 +863,18 @@ on_read_failure = "ignores_file"
 # `:` or a `:` at either end; a frontmatter `name` holds letters, marks,
 # digits, `_`, `:`, `.` and `-` alone, and none of those; both count at most
 # 256 UTF-16 code units, as JavaScript's `length` does [binary]. The marks
-# say which of these were tested.
+# say which of these were tested. A plugin's skills fail with it [test],
+# after its switches, as its servers do.
 [items.skill]
 unverified = [
+  "A plugin that is off, or forced off by the managed settings, and whose manifest fails is taken to have its skills Disabled or Blocked rather than Invalid, since Claude Code does not load an off plugin.",
   "Every character the name rule refuses is taken from the 2.1.302 binary, with config-digger's Unicode tables, but for those the probe tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E and U+00A0 in a frontmatter `name`, and the length of an ASCII `name`. Among the rest, a frontmatter `name` holding any character but letters, marks, digits, `_`, `:`, `.` and `-`, such as `+` or `@`, is taken to be refused.",
   "`<` and `>` in a folder name, which a Windows folder name cannot hold, are taken to break the name rule, as the binary says.",
   "Claude Code keeps a joiner or a variation selector inside an emoji sequence on Unicode's recommended list; config-digger takes any well-formed emoji sequence for one.",
 ]
 precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
 competition = { block = "exact-name" }
-checks = ["frontmatter", "disable", "precedence", "rules"]
+checks = ["frontmatter", "disable", "plugin-load", "precedence", "rules"]
 
 # `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]: Claude
 # Code then reads no synced skill, and deletes those it downloaded, in the

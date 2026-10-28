@@ -1080,6 +1080,10 @@ pub(crate) enum ReadFailureReaction {
     /// What it does is not known: every Item of the location's kinds in the
     /// contexts it reaches gets a caveat.
     Unknown,
+    /// It does not load the plugin the location is in, so every Entry of
+    /// every location in that plugin is Invalid, at the `plugin-load`
+    /// check. Only a location in plugins takes it.
+    FailsPlugin,
     /// It refuses to start in the contexts the location reaches.
     StopsAgent,
 }
@@ -1187,6 +1191,14 @@ impl LocationDefinition {
     /// Whether the location's Entries are keyed by Project inside the file.
     pub fn keyed_by_project(&self) -> bool {
         self.root.iter().any(|key| key == PROJECT_KEY)
+    }
+
+    /// Whether the Agent does not load the plugin the location is in when
+    /// it cannot read the location, or the location holds a value of
+    /// another shape.
+    pub fn fails_plugin(&self) -> bool {
+        self.on_read_failure == ReadFailureReaction::FailsPlugin
+            || self.on_shape_failure == Some(ReadFailureReaction::FailsPlugin)
     }
 
     /// What the Agent does about a shape here: `unknown` unless the
@@ -1345,6 +1357,13 @@ pub(crate) enum Check {
     /// Required when a location of the kind is in plugins whose list refuses
     /// same names, and refused otherwise.
     PluginName,
+    /// The Agent does not load the plugin the Entry is part of, since a
+    /// file of the plugin whose location reacts with `fails_plugin` cannot
+    /// be read: Invalid, with `plugin_failed_to_load`. An Entry of a plugin
+    /// the Agent does not load does not compete. Required when a location of
+    /// the kind is in plugins a location reacting with `fails_plugin` is in
+    /// too, and refused otherwise.
+    PluginLoad,
 }
 
 impl AgentDefinition {
@@ -1606,6 +1625,11 @@ impl AgentDefinition {
             }
             for source in &settings.sources {
                 source.validate().map_err(context)?;
+                if source.on_read_failure() == Some(ReadFailureReaction::FailsPlugin) {
+                    return Err(context(
+                        "a source of settings is in no plugin to react with `fails_plugin`".into(),
+                    ));
+                }
             }
             if let Some(merge) = &settings.merge
                 && !settings.control_keys.contains(&merge.key)
@@ -1731,6 +1755,11 @@ impl AgentDefinition {
                 if location.format.file().is_none() {
                     return Err(context("settings are read in a file format".into()));
                 }
+            }
+            if location.fails_plugin() && location.anchor.plugin().is_none() {
+                return Err(context(
+                    "only a location in plugins reacts with `fails_plugin`".into(),
+                ));
             }
             if let Some(anchor) = location.anchor.plugin() {
                 for id in anchor.plugins.all() {
@@ -2062,6 +2091,34 @@ impl AgentDefinition {
                     refused,
                     "which plugins that refuse same names need",
                     "but no location is in plugins that refuse same names",
+                )
+                .map_err(context)?;
+            // The plugin lists in which a file the Agent cannot read fails
+            // the plugin whole.
+            let failing: BTreeSet<&str> = self
+                .locations
+                .iter()
+                .filter(|location| location.fails_plugin())
+                .filter_map(|location| location.anchor.plugin())
+                .flat_map(|anchor| anchor.plugins.all())
+                .map(String::as_str)
+                .collect();
+            let in_failing = self.locations.iter().any(|location| {
+                location.kind == *kind
+                    && location.anchor.plugin().is_some_and(|anchor| {
+                        anchor
+                            .plugins
+                            .all()
+                            .iter()
+                            .any(|id| failing.contains(id.as_str()))
+                    })
+            });
+            rules
+                .check_when(
+                    Check::PluginLoad,
+                    in_failing,
+                    "which a location that fails its plugin needs",
+                    "but no location of the kind is in plugins a location fails",
                 )
                 .map_err(context)?;
             rules
@@ -2486,6 +2543,7 @@ impl Check {
             Check::Shape => "shape",
             Check::Frontmatter => "frontmatter",
             Check::PluginName => "plugin-name",
+            Check::PluginLoad => "plugin-load",
         }
     }
 }
@@ -4280,6 +4338,67 @@ locations = {locations}
         );
         assert!(
             error(&text).contains("plugin_order: every source reads the same key path"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    /// [`with_plugins`], its location in plugins reacting to a Read failure
+    /// with `reaction`, and the kind checking `checks`.
+    fn with_plugin_reaction(reaction: &str, checks: &str) -> String {
+        with_plugins("")
+            .replace(
+                "provenance = \"plugin\"\nstore_class = \"plain\"\non_read_failure = \"ignores_file\"",
+                &format!("provenance = \"plugin\"\nstore_class = \"plain\"\n{reaction}"),
+            )
+            .replace(r#"checks = ["disable", "precedence"]"#, checks)
+    }
+
+    const PLUGIN_LOAD: &str = r#"checks = ["disable", "plugin-load", "precedence"]"#;
+
+    /// A location's reactions that fail its plugin: to a Read failure, and
+    /// to a shape alone.
+    const FAILING: [&str; 2] = [
+        r#"on_read_failure = "fails_plugin""#,
+        "on_read_failure = \"ignores_file\"\non_shape_failure = \"fails_plugin\"",
+    ];
+
+    #[test]
+    fn a_location_that_fails_its_plugin_needs_the_plugin_load_check() {
+        for reaction in FAILING {
+            let text = with_plugin_reaction(reaction, PLUGIN_LOAD);
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+            let text = with_plugin_reaction(reaction, r#"checks = ["disable", "precedence"]"#);
+            assert!(
+                error(&text).contains("checks leaves out `plugin-load`"),
+                "{}",
+                error(&text)
+            );
+        }
+        let text = with_plugin_reaction(r#"on_read_failure = "ignores_file""#, PLUGIN_LOAD);
+        assert!(
+            error(&text).contains("checks holds `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn only_a_location_in_plugins_reacts_with_fails_plugin() {
+        for reaction in FAILING {
+            let text = VALID.replace(r#"on_read_failure = "ignores_file""#, reaction);
+            assert!(
+                error(&text).contains("only a location in plugins reacts with `fails_plugin`"),
+                "{}",
+                error(&text)
+            );
+        }
+        let text = with_policy("", r#"["disable", "precedence"]"#).replace(
+            r#"value = "Settings" }"#,
+            r#"value = "Settings", on_read_failure = "fails_plugin" }"#,
+        );
+        assert!(
+            error(&text).contains("a source of settings is in no plugin"),
             "{}",
             error(&text)
         );

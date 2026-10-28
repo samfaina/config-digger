@@ -141,7 +141,7 @@ Said of a Parked Entry whose origin config-digger cannot find: no definition of 
 _Avoid_: Orphan, lost, dangling
 
 **Invalid**:
-Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, or Codex Entries that merge into a server with two transports, which stops the Agent from starting.
+Said of an Entry the Agent rejects, on its own or in combination: a server missing what the Agent requires, a skill whose `SKILL.md` the Agent skips, Codex Entries that merge into a server with two transports, which stops the Agent from starting, or every Entry of a plugin the Agent fails to load, such as a Claude Code plugin whose manifest does not parse.
 _Avoid_: Broken, conflicting, error
 
 **Read failure**:

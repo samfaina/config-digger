@@ -1623,6 +1623,11 @@ export type ReadFailureReaction =
  */
 "unknown" | 
 /**
+ *  It does not load the plugin the location is in, so every Entry of
+ *  the plugin is Invalid.
+ */
+"fails_plugin" | 
+/**
  *  It refuses to start in the contexts the location reaches, which
  *  flags it as unable to start there.
  */
@@ -1703,6 +1708,12 @@ export type ReasonCode =
  *  its plugins has the same name.
  */
 "duplicate_plugin_name" | 
+/**
+ *  The Agent does not load the plugin the Entry is part of, since it
+ *  cannot read a file of the plugin, such as a manifest that does not
+ *  parse.
+ */
+"plugin_failed_to_load" | 
 /**
  *  config-digger parked the Entry in its parked-Entry store, out of the
  *  Agent's reach, since the Agent has no switch for it. Enable puts it
