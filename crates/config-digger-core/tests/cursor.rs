@@ -2038,7 +2038,8 @@ fn a_manifest_s_list_names_skill_folders_or_folders_of_them() {
 }
 
 #[test]
-fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_is_rejected_whole() {
+fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_has_its_skills_in_the_default_folder()
+ {
     let mut fs = cursor();
     for (name, servers) in [
         ("number", json!(42)),

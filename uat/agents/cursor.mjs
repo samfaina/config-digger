@@ -438,7 +438,8 @@ if (runs("plugins")) {
 
 // Local plugins whose first manifest names a skills folder, `custom`, each
 // with a skill in `custom`, in `other` and in the default `skills` folder,
-// and a server in `.mcp.json`: one whose manifest is well formed, and
+// and a server in `.mcp.json`: one whose manifest is well formed, two
+// whose `mcpServers` is a path or a list of a path and an object, and
 // others whose `mcpServers` is neither a path, an object nor a list of
 // either, alone or before a manifest that names `other`. The probe reads
 // the `/` menu for each skill, Customize's list of skills, and the
@@ -452,6 +453,9 @@ if (runs("wrong-shape")) {
     "cd-throwaway-ws-number": first("cd-throwaway-ws-number", { mcpServers: 42 }),
     "cd-throwaway-ws-list": first("cd-throwaway-ws-list", { mcpServers: [42] }),
     "cd-throwaway-ws-null": first("cd-throwaway-ws-null", { mcpServers: null }),
+    // A path, and a list of a path and an object, which Cursor accepts.
+    "cd-throwaway-ws-path": { ...first("cd-throwaway-ws-path", { mcpServers: "./servers.json" }), "servers.json": { mcpServers: {} } },
+    "cd-throwaway-ws-mixed": { ...first("cd-throwaway-ws-mixed", { mcpServers: ["./servers.json", {}] }), "servers.json": { mcpServers: {} } },
     "cd-throwaway-ws-next": { ...first("cd-throwaway-ws-next", { mcpServers: 42 }), ".claude-plugin/plugin.json": { name: "cd-throwaway-ws-next", skills: "./other" } },
   };
   const tag = (name) => name.replace("cd-throwaway-", "");
@@ -486,6 +490,8 @@ if (runs("wrong-shape")) {
       "cd-throwaway-ws-number": read("skills"),
       "cd-throwaway-ws-list": read("skills"),
       "cd-throwaway-ws-null": read("skills"),
+      "cd-throwaway-ws-path": read("custom"),
+      "cd-throwaway-ws-mixed": read("custom"),
       "cd-throwaway-ws-next": read("other"),
     }),
   );
