@@ -219,6 +219,10 @@ export default [
   },
   {
     id: "11.5",
+    // The cause is Windows' own text, in its display language. The rest of
+    // the step needs none, and 11.11 needs its Operation.
+    ciLacks: "Windows en español, que escribe «Acceso denegado. (os error 5)» en la causa: el del runner la escribe en inglés",
+    ciRuns: true,
     async run(t) {
       const { s } = t;
       const file = `${t.root}\\codex-home\\config.toml`;
@@ -233,7 +237,7 @@ export default [
         t.check(steps.some((x) => /Back up/.test(x) && x.includes("✓")) && steps.some((x) => /Write failed/.test(x) && x.includes("✗")) && steps.some((x) => /Rollback/.test(x) && x.includes("✓")), "el diálogo muestra «Back up ✓», «Write failed ✗» y «Rollback ✓»", steps.join(" | "));
         t.check(result.text.includes("Nothing of this Operation was kept"), "el diálogo muestra un recuadro rojo «Nothing of this Operation was kept»");
         const cause = `cannot write ${file}: Acceso denegado. (os error 5)`;
-        t.check(result.text.includes(cause), `la causa dice «${cause}»`, result.text.split("\n").find((l) => l.includes("cannot write")));
+        if (!t.ciLacks) t.check(result.text.includes(cause), `la causa dice «${cause}»`, result.text.split("\n").find((l) => l.includes("cannot write")));
         const id = operationId(result.text);
         t.shared.failed115 = id;
         await press(s, "Close", ".dialog");

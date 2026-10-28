@@ -65,7 +65,7 @@ Tauri's WebDriver guide supports `tauri-driver` on Windows and Linux only. Its W
 - Every write flow on real files: Add Agent home, Add Project, Hide, Remove leftovers, Disable, Undo, refused and failed Operations, Delete backup, Dismiss, the log lines, the updater's first check. The fake backend can't reach any of them, because its write commands change nothing.
 - The Windows folder picker is a native dialog, outside the webview. Both Add dialogs have a text field (`aria-label="Folder"` and `"Path"`), so the tests type the path and check the picker separately. UI Automation can drive the common file dialog. I did not try it.
 - Files the steps edit by hand in Notepad (11.4, 11.6) are edited by the tests directly, with the app closed when the step closes it.
-- Plan text spells paths as `E:\cd-throwaway`. A runner has no `E:` drive, so the CI job runs `subst E: <workspace>\uat-drive` (no admin rights needed) before the setup script, and the assertions keep the plan's own text.
+- Plan text spells paths as `E:\cd-throwaway`. A runner has no `E:` drive, so the CI job mounts a VHDX at `E:` with `diskpart` (the runner is elevated) before the setup script, and the assertions keep the plan's own text. `subst` was tried first: the app resolves a `subst` drive to its target folder, so its paths read `D:\a\_temp\…` (#388).
 - Process detection reads the real processes. On CI no Agent is running. On the tester's machine, the local script runs Claude Desktop on purpose for 7.2.
 
 ### Where it runs

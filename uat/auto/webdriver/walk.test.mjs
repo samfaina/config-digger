@@ -396,6 +396,59 @@ test("on CI, a step that needs what a runner lacks is Blocked, naming it, withou
   assert.equal(result.notes.split("\n")[0], "Bloqueado: el runner de CI no tiene los homes de un tester");
 });
 
+test("on CI, a step that runs without what a runner lacks keeps its other checks and is Blocked, naming it", async () => {
+  let lacks;
+  const { result } = await walkOnCi({
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      lacks = t.ciLacks;
+      t.check(true, "sale «Rollback ✓»");
+      if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
+    },
+  });
+  assert.equal(lacks, "Windows en español");
+  assert.equal(result.status, "blocked");
+  assert.deepEqual(result.notes.split("\n").slice(0, 2), ["Bloqueado: el runner de CI no tiene Windows en español", "Comprobado (1/1): sale «Rollback ✓»"]);
+});
+
+test("on CI, a step that runs without what a runner lacks is KO when one of its other checks fails", async () => {
+  const { result } = await walkOnCi({
+    id: "11.5",
+    ciLacks: "Windows en español",
+    ciRuns: true,
+    async run(t) {
+      t.check(false, "sale «Rollback ✓»", "«Rollback ✗»");
+    },
+  });
+  assert.equal(result.status, "ko");
+  assert.deepEqual(result.notes.split("\n").slice(0, 2), ["KO: sale «Rollback ✓»: «Rollback ✗»", "Sin comprobar: el runner de CI no tiene Windows en español"]);
+});
+
+test("off CI, a step that runs without what a runner lacks checks everything", async () => {
+  const shots = mkdtempSync(join(tmpdir(), "uat-shots-"));
+  try {
+    const result = await walkStep({ s: new QuietPage(), version: "0.1.0" }, { id: "11.5" }, {
+      id: "11.5",
+      ciLacks: "Windows en español",
+      ciRuns: true,
+      async run(t) {
+        if (!t.ciLacks) t.check(false, "la causa dice «Acceso denegado»");
+      },
+    }, { shots, ci: null });
+    assert.equal(result.status, "ko");
+  } finally {
+    rmSync(shots, { recursive: true, force: true });
+  }
+});
+
+test("on CI, 11.5 runs its other checks without the cause, which Windows writes in the runner's English", () => {
+  const step = steps.find((s) => s.id === "11.5");
+  assert.equal(step.ciLacks, "Windows en español, que escribe «Acceso denegado. (os error 5)» en la causa: el del runner la escribe en inglés");
+  assert.equal(step.ciRuns, true);
+});
+
 test("on a runner without Claude Desktop, 7.2, 7.6 and 13.1 are Blocked naming it, and 14.2 naming the tester's homes", async () => {
   const reasons = {};
   for (const id of ["7.2", "7.6", "13.1", "14.2"]) {
