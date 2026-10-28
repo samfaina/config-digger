@@ -258,32 +258,284 @@ fn disable_is_not_offered_below_a_layer_that_sets_enabled_and_is_offered_there()
     assert_eq!(code(item(&docs, "docs").state), "disabled");
 }
 
+/// The trust table of the Project app, as [`app`] writes it.
+const APP_TRUST: &str = "\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n";
+
+/// The Disable of the server `name` of the git-versioned layer of app,
+/// applied, with the user's `config.toml` afterwards.
+fn disable_in_app(fs: &FakeFileSystem, name: &str) -> String {
+    let core = core_versioning(fs, &[layer("app")]);
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), name)],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+    text(fs, &user_config())
+}
+
 // A table holding `enabled` alone in the user's `config.toml` would stop
-// Codex in every folder whose layers do not declare the server, so a server
-// of a git-versioned layer has no Disable.
+// Codex in every folder whose layers do not declare the server, so Disable
+// writes a Stand-in: the field that fixes the transport, and `enabled`.
 #[test]
-fn a_server_of_a_git_versioned_layer_has_no_disable() {
-    let fs = app("", "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n");
+fn disable_of_a_stdio_server_of_a_git_versioned_layer_writes_a_stand_in() {
+    let layer_text = "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--fast\"]\nenv = { TOKEN = \"secret\" }\n";
+    let fs = app("", layer_text);
+
+    let user = disable_in_app(&fs, "docs");
+
+    assert_eq!(
+        user,
+        format!("{APP_TRUST}\n[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = false\n")
+    );
+    assert_eq!(text(&fs, &layer("app")), layer_text);
+    let core = core_versioning(&fs, &[layer("app")]);
+    let after = inventory(&core, &in_app());
+    assert_eq!(code(item(&after, "docs").state), "disabled");
+}
+
+/// The sentences the preview of `plan` says besides its edits.
+fn info(plan: &Plan) -> Vec<String> {
+    plan.preview()
+        .info
+        .iter()
+        .map(|info| info.sentence.clone())
+        .collect()
+}
+
+#[test]
+fn disable_writes_enabled_false_in_the_user_s_table_of_the_server_which_turns_it_off_everywhere() {
+    let user = "[mcp_servers.docs]\nargs = [\"--user\"]\n";
+    let fs = app(user, "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n");
     let core = core_versioning(&fs, &[layer("app")]);
 
-    let inventory = inventory(&core, &in_app());
-    let disable = json_of(&item(&inventory, "docs").entries[0].disable);
-    assert_eq!(disable["status"], "not_offered", "{disable}");
-    assert_eq!(disable["code"], "git_versioned", "{disable}");
-
-    let Err(error) = plan(
+    let plan = plan(
         &core,
         &in_app(),
         Action::Disable,
         &[&server(&layer("app"), "docs")],
-    ) else {
-        panic!("a Disable of a git-versioned layer's server is planned");
-    };
-    assert!(error.message.contains("git"), "{}", error.message);
+    )
+    .unwrap();
+    let info = info(&plan);
+    assert!(
+        info.iter()
+            .any(|sentence| sentence.contains("in every folder")),
+        "{info:?}"
+    );
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
     assert_eq!(
         text(&fs, &user_config()),
-        "\n[projects.'e:\\projects\\app']\ntrust_level = \"trusted\"\n"
+        format!("[mcp_servers.docs]\nargs = [\"--user\"]\nenabled = false\n{APP_TRUST}")
     );
+}
+
+/// The Project app as [`app`] makes it with no user server, its layer
+/// holding `app_layer`, and the Project web, which Codex knows and trusts,
+/// its layer holding `web_layer`.
+fn app_and_web(app_layer: &str, web_layer: &str) -> FakeFileSystem {
+    app(
+        "[projects.'e:\\projects\\web']\ntrust_level = \"trusted\"\n",
+        app_layer,
+    )
+    .with_folder(project(r"web\.git"))
+    .with_file(layer("web"), web_layer)
+}
+
+#[test]
+fn the_preview_of_a_stand_in_names_the_other_known_projects_it_turns_the_server_off_in() {
+    let fs = app_and_web(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        "[mcp_servers.docs]\ncommand = \"other-docs-mcp\"\n",
+    );
+    let core = core_versioning(&fs, &[layer("app"), layer("web")]);
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    let info = info(&plan);
+    let web = project("web").display().to_string();
+    assert!(
+        info.iter().any(|sentence| sentence.contains(&web)),
+        "{info:?}"
+    );
+    // Should app's layer change the transport, Codex stops there.
+    let app = project("app").display().to_string();
+    assert!(
+        info.iter()
+            .any(|sentence| sentence.contains("stops starting") && sentence.contains(&app)),
+        "{info:?}"
+    );
+}
+
+// Codex stops in a Project where the Stand-in's `command` meets a `url`.
+#[test]
+fn disable_is_not_offered_when_a_known_project_declares_the_server_with_the_other_transport() {
+    let fs = app_and_web(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+        "[mcp_servers.docs]\nurl = \"https://docs.example.com/mcp\"\n",
+    );
+    let core = core_versioning(&fs, &[layer("app"), layer("web")]);
+
+    let inventory = inventory(&core, &in_app());
+    let disable = json_of(&item(&inventory, "docs").entries[0].disable);
+    assert_eq!(disable["status"], "not_offered", "{disable}");
+    assert_eq!(disable["code"], "stops_agent", "{disable}");
+    let sentence = disable["sentence"].as_str().unwrap();
+    assert!(
+        sentence.contains(&project("web").display().to_string()),
+        "{sentence}"
+    );
+    assert!(
+        plan(
+            &core,
+            &in_app(),
+            Action::Disable,
+            &[&server(&layer("app"), "docs")],
+        )
+        .is_err(),
+        "a Disable that stops Codex in web is planned"
+    );
+}
+
+// Deleting `enabled` alone would leave the Stand-in turning the server on in
+// every folder.
+#[test]
+fn enable_in_the_project_deletes_a_stand_in_whole() {
+    let user = "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = false\n";
+    let fs = app(
+        user,
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--fast\"]\n",
+    );
+    let core = core_versioning(&fs, &[layer("app")]);
+
+    let before = inventory(&core, &in_app());
+    let enable = json_of(&item(&before, "docs").entries[0].enable);
+    assert_eq!(enable["status"], "offered", "{enable}");
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(text(&fs, &user_config()), APP_TRUST);
+    let after = inventory(&core, &in_app());
+    assert_eq!(code(item(&after, "docs").state), "effective");
+}
+
+#[test]
+fn enable_in_the_project_deletes_only_enabled_from_a_table_holding_more_than_a_stand_in() {
+    let fs = app(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--user\"]\nenabled = false\n",
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+    );
+    let core = core_versioning(&fs, &[layer("app")]);
+
+    let plan = plan(
+        &core,
+        &in_app(),
+        Action::Enable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        text(&fs, &user_config()),
+        format!("[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--user\"]\n{APP_TRUST}")
+    );
+}
+
+// Outside app the Stand-in is a server of its own, which Codex lists as
+// Disabled.
+#[test]
+fn outside_the_project_a_stand_in_is_disabled_with_a_note_and_only_remove() {
+    let fs = app(
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nenabled = false\n",
+        "[mcp_servers.docs]\ncommand = \"docs-mcp\"\nargs = [\"--fast\"]\n",
+    );
+    let core = core_versioning(&fs, &[layer("app")]);
+    let app_folder = project("app").display().to_string();
+
+    let inventory = inventory(&core, &context(None));
+    let entry = &item(&inventory, "docs").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    let notes: Vec<&str> = entry
+        .notes
+        .iter()
+        .map(|note| note.sentence.as_str())
+        .collect();
+    assert!(
+        notes
+            .iter()
+            .any(|note| note.contains("Stand-in") && note.contains(&app_folder)),
+        "{notes:?}"
+    );
+    let enable = json_of(&entry.enable);
+    assert_eq!(enable["status"], "not_offered", "{enable}");
+    assert_eq!(json_of(&entry.remove)["status"], "offered");
+
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Remove,
+        &[&server(&user_config(), "docs")],
+    )
+    .unwrap();
+    let info = info(&plan);
+    assert!(
+        info.iter()
+            .any(|sentence| sentence.contains("back on") && sentence.contains(&app_folder)),
+        "{info:?}"
+    );
+}
+
+#[test]
+fn undo_of_a_stand_in_s_disable_gives_the_user_s_config_toml_back() {
+    let fs = app("", "[mcp_servers.docs]\ncommand = \"docs-mcp\"\n");
+    let core = core_versioning(&fs, &[layer("app")]);
+    let disable = plan(
+        &core,
+        &in_app(),
+        Action::Disable,
+        &[&server(&layer("app"), "docs")],
+    )
+    .unwrap();
+    let outcome = core.execute(disable, &[WarningClass::WideReach]).unwrap();
+
+    let undo = core.plan_undo(&outcome.operation).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(text(&fs, &user_config()), APP_TRUST);
+    let after = inventory(&core, &in_app());
+    assert_eq!(code(item(&after, "docs").state), "effective");
+}
+
+// No Secret of the URL is copied: its userinfo and query go.
+#[test]
+fn disable_of_an_http_server_of_a_git_versioned_layer_writes_its_url_without_secrets() {
+    let layer_text = "[mcp_servers.search]\nurl = \"https://me:pw@mcp.example.com/v1?key=abc#frag\"\nbearer_token_env_var = \"SEARCH_TOKEN\"\n";
+    let fs = app("", layer_text);
+
+    let user = disable_in_app(&fs, "search");
+
+    assert_eq!(
+        user,
+        format!(
+            "{APP_TRUST}\n[mcp_servers.search]\nurl = \"https://mcp.example.com/v1\"\nenabled = false\n"
+        )
+    );
+    assert_eq!(text(&fs, &layer("app")), layer_text);
 }
 
 #[test]

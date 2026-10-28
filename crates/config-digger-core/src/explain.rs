@@ -676,6 +676,128 @@ pub(crate) fn merged_field_set_above(
     )
 }
 
+/// What Disable writes for the server `name`: a Stand-in in `path`, its
+/// table holding `transport` and `switch = false` alone.
+pub(crate) fn disable_stand_in(name: &str, transport: &str, switch: &str, path: &Path) -> String {
+    format!(
+        "Disable writes a Stand-in for `{name}` in {}: a table holding only its `{transport}`, as its layer has it, and `{switch} = false`.",
+        path.display()
+    )
+}
+
+/// Where a Stand-in for the server `name` that `agent_name` reads in every
+/// folder turns it off: in every Project whose layers declare it, among them
+/// the known Projects `others` besides the context's; elsewhere it is a
+/// Disabled server of its own.
+pub(crate) fn stand_in_reach(agent_name: &str, name: &str, others: &[PathBuf]) -> String {
+    let known = if others.is_empty() {
+        "no other known Project declares it".to_owned()
+    } else {
+        let others: Vec<&Path> = others.iter().map(PathBuf::as_path).collect();
+        format!(
+            "it turns it off in the known Projects {} too",
+            path_list(&others)
+        )
+    };
+    format!(
+        "{agent_name} reads it in every folder: it turns `{name}` off in every Project whose layers declare it, and {known}; in any other folder {agent_name} lists it as a Disabled server of its own."
+    )
+}
+
+/// What becomes of a Stand-in for the server `name` once `layer`, where its
+/// transport comes from, changes the transport: `agent_name` stops starting
+/// in `project`.
+pub(crate) fn stand_in_drift(agent_name: &str, name: &str, layer: &Path, project: &Path) -> String {
+    format!(
+        "If {} later changes the transport of `{name}`, {agent_name} stops starting in {}.",
+        layer.display(),
+        project.display()
+    )
+}
+
+/// What `switch = false` written in the table of the server `name` in
+/// `path`, a file `agent_name` reads in every folder, turns off.
+pub(crate) fn turns_off_everywhere(
+    agent_name: &str,
+    name: &str,
+    switch: &str,
+    path: &Path,
+) -> String {
+    format!(
+        "{agent_name} reads {} in every folder, so `{switch} = false` there turns `{name}` off in every folder, not only in this Project.",
+        path.display()
+    )
+}
+
+/// Why Disable is not offered when the Stand-in for the server `name` would
+/// hold `transport`, and the known `projects` declare it with another
+/// transport, where `agent_name` would stop starting.
+pub(crate) fn stand_in_stops_agent(
+    agent_name: &str,
+    name: &str,
+    transport: &str,
+    projects: &[PathBuf],
+) -> String {
+    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
+    format!(
+        "Disable is not offered: the Stand-in it would write holds the `{transport}` of `{name}`, and the known Projects {} declare `{name}` with another transport, so {agent_name} would stop starting there.",
+        path_list(&projects)
+    )
+}
+
+/// Why Disable is not offered for the server `name` when no layer gives it
+/// one of the `fields` a Stand-in holds.
+pub(crate) fn stand_in_without_transport(
+    agent_name: &str,
+    name: &str,
+    fields: &[String],
+) -> String {
+    let fields: Vec<String> = fields.iter().map(|field| format!("`{field}`")).collect();
+    format!(
+        "Disable is not offered: no layer {agent_name} reads here gives `{name}` a {} for the Stand-in to hold.",
+        fields.join(" or ")
+    )
+}
+
+/// Why Enable is not offered for a Stand-in for the server `name` outside
+/// the known `projects` it stands in for.
+pub(crate) fn stand_in_enable(name: &str, projects: &[PathBuf]) -> String {
+    format!(
+        "Enable is not offered here: this table is {}. Enable it in one of them, or Remove it to turn `{name}` back on there.",
+        stand_in_for(name, projects)
+    )
+}
+
+/// The note on a Stand-in for the server `name` outside the known
+/// `projects` it stands in for, where `agent_name` lists it as a Disabled
+/// server of its own.
+pub(crate) fn stand_in_note(agent_name: &str, name: &str, projects: &[PathBuf]) -> String {
+    format!(
+        "This table is {}. Here {agent_name} lists it as a Disabled server of its own.",
+        stand_in_for(name, projects)
+    )
+}
+
+/// What a Remove of a Stand-in for the server `name` turns back on: the
+/// server in the known `projects` it stands in for.
+pub(crate) fn stand_in_removed(name: &str, projects: &[PathBuf]) -> String {
+    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
+    format!(
+        "Removing this Stand-in turns `{name}` back on in the Projects whose layers declare it: {}.",
+        path_list(&projects)
+    )
+}
+
+/// A Stand-in for the server `name`, and the known `projects` whose layers
+/// declare it, as a sentence names it.
+fn stand_in_for(name: &str, projects: &[PathBuf]) -> String {
+    let projects: Vec<&Path> = projects.iter().map(PathBuf::as_path).collect();
+    format!(
+        "a Stand-in for `{name}`, which turns it off in the Projects whose layers declare it: {}",
+        path_list(&projects)
+    )
+}
+
 /// What Disable through the switch of the plugin `plugin` takes with it.
 pub(crate) fn takes_whole_plugin(plugin: &str) -> String {
     format!("This Disables the whole plugin {plugin}, with every server and skill it carries.")

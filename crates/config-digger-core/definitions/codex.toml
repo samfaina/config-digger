@@ -291,16 +291,28 @@ checks = ["trust", "rules", "merge", "disable", "precedence"]
 # table, and is not offered below a layer that sets it. A table holding
 # `enabled` alone, where no other layer declares the server, stops Codex
 # with "invalid transport" [test]: one in the user's `config.toml` for a
-# Project layer's server stops it in every other folder. So an Entry of a
-# git-versioned Project layer has no Disable (#297). Enable deletes
-# `enabled = false` from the highest layer that sets it and from each lower
-# one down to the first that sets it otherwise, whoever wrote it, and
-# leaves the table even when it is empty; it is not offered while one of
-# them is in a git-versioned or managed layer (#287).
+# Project layer's server stops it in every other folder. So for an Entry of
+# a git-versioned Project layer Disable writes `enabled = false` in the
+# user's table of that server, which turns it off in every folder, or else
+# a Stand-in there: `command` as the layer has it, or `url` without its
+# userinfo and query, and `enabled = false`. In the Project the layer's
+# fields win, and elsewhere Codex starts and lists a Disabled server with
+# that field alone; a Stand-in of the other transport than the layer's
+# stops Codex in the Project [test]. Disable is not offered when a known
+# Project declares the server with the other transport (#297). Enable
+# deletes `enabled = false` from the highest layer that sets it and from
+# each lower one down to the first that sets it otherwise, whoever wrote
+# it, and leaves the table even when it is empty; it deletes a Stand-in
+# whole, since taking `enabled` alone out of it turns the server on in
+# every folder [test], and only in a Project whose layer gives the server
+# its transport. It is not offered while one of them is in a git-versioned
+# or managed layer (#287).
 [[items.mcp.disable]]
 block = "merged-field"
 locations = ["project-mcp", "user-mcp"]
 requires_unset_above = true
+fallback = "user-mcp"
+stand_in = ["command", "url"]
 
 # A plugin's server has its own switch, `enabled = false` under
 # `[plugins."<id>".mcp_servers.<name>]`, the only key `config.toml` can set

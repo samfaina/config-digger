@@ -5108,6 +5108,15 @@ pub(crate) struct MergedField {
     /// read only, such as Codex's user `config.toml`. Omitted, such an Entry
     /// has no Disable.
     pub fallback: Option<String>,
+    /// The fields that fix a server's transport, such as Codex's `command`
+    /// and `url`, when the Agent refuses a table holding the field alone:
+    /// where the fallback's file has no table of the Entry's name, Disable
+    /// writes a Stand-in there, the first of these fields the server has,
+    /// as the highest layer has it, a URL without its userinfo, query and
+    /// fragment, and the field. Enable deletes a Stand-in whole, and only in
+    /// a Project whose layer gives the server its transport. Only with a
+    /// `fallback`.
+    pub stand_in: Option<Vec<String>>,
 }
 
 impl Validate for MergedField {
@@ -5117,6 +5126,14 @@ impl Validate for MergedField {
         }
         if self.fallback.as_ref().is_some_and(String::is_empty) {
             return Err("a merged field's fallback must not be empty".into());
+        }
+        if let Some(fields) = &self.stand_in {
+            if fields.is_empty() || fields.iter().any(String::is_empty) {
+                return Err("a merged field's stand_in needs its fields listed".into());
+            }
+            if self.fallback.is_none() {
+                return Err("a merged field's stand_in needs a fallback".into());
+            }
         }
         Ok(())
     }

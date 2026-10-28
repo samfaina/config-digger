@@ -519,7 +519,13 @@ export type DisableNotOffered =
  *  Managed policy forces the Entry on or off, and config-digger never
  *  overrides it.
  */
-"policy";
+"policy" | 
+/**
+ *  Its only write, a Stand-in in a user file, would stop the Agent from
+ *  starting in a known Project that declares the server with another
+ *  transport.
+ */
+"stops_agent";
 
 /**
  *  What Disable would do to an Entry in its context: write the Agent's own
@@ -1001,7 +1007,14 @@ export type InfoCode =
  *  It Removes a Stranded Entry, which has no State to change. Its path
  *  is the parked-Entry store.
  */
-"removes_stranded";
+"removes_stranded" | 
+/**
+ *  It writes or Removes a server's table in a user file the Agent reads
+ *  in every folder, for a server of a Project's layer, such as a
+ *  Stand-in: what that does outside the context's Project. Its path is
+ *  that file.
+ */
+"reaches_other_folders";
 
 /**  A launchable copy of an Agent, with its own version. */
 export type Installation = {
@@ -1218,7 +1231,13 @@ export type NoteCode =
  *  The Agent's own command that lists servers shows the server built
  *  from this Entry and another as that other alone, hiding this one.
  */
-"cli_view_differs";
+"cli_view_differs" | 
+/**
+ *  The Entry is a Stand-in, written to Disable the server of a Project's
+ *  layer, and the context is no Project it stands in for: here it is a
+ *  Disabled server of its own, which only Remove takes away.
+ */
+"stand_in";
 
 /**  One Operation as `history show` details it. */
 export type OperationDetail = {

@@ -602,6 +602,7 @@ impl Targeted<'_> {
         let breaks = self.breaks_links(&planned_folders);
         let mut planned = self.planned(files, planned_folders, changes, effective, breaks)?;
         planned.preview.info.extend(self.approvals_kept());
+        planned.preview.info.extend(self.stand_ins_removed());
         if let Some(store) = &self.snapshot.parked_store {
             planned
                 .preview
@@ -616,6 +617,29 @@ impl Targeted<'_> {
                 }));
         }
         Ok(planned)
+    }
+
+    /// The notes of a Remove on the Stand-ins it takes away: one per Entry
+    /// it targets that is a Stand-in for a server known Projects declare,
+    /// which it turns back on there.
+    fn stand_ins_removed(&self) -> Vec<Info> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.state != State::Unread)
+            .filter_map(|entry| {
+                let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+                let definition = &self.definitions[scanned.agent_index];
+                if !disable::is_stand_in(definition, scanned) {
+                    return None;
+                }
+                let projects = disable::stood_in_for(definition, self.snapshot, scanned);
+                (!projects.is_empty()).then(|| Info {
+                    code: InfoCode::ReachesOtherFolders,
+                    path: entry.path.clone(),
+                    sentence: explain::stand_in_removed(&scanned.name, &projects),
+                })
+            })
+            .collect()
     }
 
     /// The notes of a Remove on the approvals it leaves as they are: one per
@@ -727,6 +751,8 @@ impl Targeted<'_> {
         let mut parks: Vec<&ScannedEntry> = Vec::new();
         // The names written to switches that hold them in every context.
         let mut by_name: Vec<String> = Vec::new();
+        // What the writes do outside the context, as the preview says it.
+        let mut elsewhere: Vec<Info> = Vec::new();
         for entry in self.entries {
             // Its switches would be offered as for any Entry of the Project.
             if entry.state == State::Unread {
@@ -758,10 +784,20 @@ impl Targeted<'_> {
                             syntax,
                             sqlite,
                             by_name_everywhere,
+                            elsewhere: sentences,
                             ..
                         } => {
                             if by_name_everywhere && !by_name.contains(&scanned.name) {
                                 by_name.push(scanned.name.clone());
+                            }
+                            for sentence in sentences {
+                                if !elsewhere.iter().any(|known| known.sentence == sentence) {
+                                    elsewhere.push(Info {
+                                        code: InfoCode::ReachesOtherFolders,
+                                        path: path.clone(),
+                                        sentence,
+                                    });
+                                }
                             }
                             // Entries Disabled by one name share its switch.
                             let shared = by_file.iter().any(|file| {
@@ -900,7 +936,9 @@ impl Targeted<'_> {
         .map_err(Error::unexpected)?;
         let (changes, effective) = self.reach(&after);
         let wide = self.wide_reach(&changes, &by_name);
-        self.planned(files, planned_folders, changes, effective, wide)
+        let mut planned = self.planned(files, planned_folders, changes, effective, wide)?;
+        planned.preview.info.extend(elsewhere);
+        Ok(planned)
     }
 
     /// Adds the edits that park `parks` to `by_file`, and the moves to

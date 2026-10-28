@@ -984,6 +984,23 @@ pub(crate) fn resolve(
                                 entry,
                                 agent_name,
                             ))
+                            .chain(
+                                disable::stand_in_outside(
+                                    definition,
+                                    snapshot,
+                                    entry,
+                                    project_key.map(String::as_str),
+                                )
+                                .map(|projects| api::Note {
+                                    code: api::NoteCode::StandIn,
+                                    switch: None,
+                                    sentence: explain::stand_in_note(
+                                        agent_name,
+                                        &entry.name,
+                                        &projects,
+                                    ),
+                                }),
+                            )
                             .collect(),
                         config: entry.config.clone(),
                         masked: entry.masked.clone(),
