@@ -10,7 +10,7 @@
 // `claude plugin list`, the init event of `claude -p --output-format
 // stream-json`, and the request it sends its model: the skill listing
 // (`- <name> (<alias>): <description>`) and the body of a skill a prompt
-// runs.
+// runs, and what Claude Code extracts into a plugin's `.mcpb-cache`.
 import fs from "node:fs";
 import path from "node:path";
 import { fresh, gitInit, json, modelServer, probe, run, same, skill, subst, unsubst, write } from "./lib.mjs";
@@ -56,6 +56,14 @@ async function mcpList(home, cwd) {
 }
 
 const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
+
+// A skill folder named `folder` in `dir`, whose `SKILL.md` has no `name`.
+// `\\?\` keeps the spaces Windows would otherwise trim from a folder name.
+function verbatimSkill(dir, folder) {
+  const target = `\\\\?\\${path.join(dir, folder)}`;
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(`${target}\\SKILL.md`, "---\ndescription: folder rule\n---\nbody\n");
+}
 
 // ---------------------------------------------------------------- .mcp.json
 
@@ -363,12 +371,7 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
     dot: "cd-throwaway-f.dot",
     "non-ASCII letters": "cd-throwaway-fÑ",
   };
-  for (const folder of Object.values(folders)) {
-    // `\\?\` keeps the spaces Windows would otherwise trim from a folder name.
-    const target = `\\\\?\\${path.join(rule, ".claude", "skills", folder)}`;
-    fs.mkdirSync(target, { recursive: true });
-    fs.writeFileSync(`${target}\\SKILL.md`, "---\ndescription: folder rule\n---\nbody\n");
-  }
+  for (const folder of Object.values(folders)) verbatimSkill(path.join(rule, ".claude", "skills"), folder);
   const s = await session(home, rule);
   await p.check("items.skill", "the name rule refuses a frontmatter `name` with any blank, `/`, `<`, `>`, a hidden or direction character, or over 256 characters", async () => {
     const refused = keys.filter((k, i) => !s.listed.some((l) => l.startsWith(`- fold-n${i} (`)));
@@ -385,6 +388,189 @@ const throwaway = (names) => names.filter((n) => /throwaway|fold/i.test(n));
   await p.check("locations[synced-skills]", "with an API key, the synced skills folder is not read, whatever the gate", async () => {
     const t = await session(synced, fresh("empty", dir));
     return same(t.skills.filter((n) => n.includes("cd-throwaway-sync")), []);
+  });
+}
+
+// ---------------------------------------------------------------- bundles and declared skills
+
+{
+  const dir = fresh("bundles", base);
+  const home = path.join(dir, "home");
+  const proj = path.join(dir, "proj");
+  const market = path.join(dir, "market");
+  fs.mkdirSync(proj, { recursive: true });
+
+  // An MCP bundle is a zip of a `manifest.json` and the server it runs.
+  const source = path.join(dir, "bundle-source");
+  write(path.join(source, "manifest.json"), {
+    manifest_version: "0.2",
+    name: "cd-throwaway-bundled",
+    version: "1.0.0",
+    description: "throwaway",
+    author: { name: "cd-throwaway" },
+    server: { type: "node", entry_point: "server.js", mcp_config: { command: "node", args: ["${__dirname}/server.js"] } },
+  });
+  write(path.join(source, "server.js"), "process.exit(0)\n");
+  const pb = path.join(market, "cd-throwaway-pb");
+  const tar = path.join(process.env.SystemRoot, "System32", "tar.exe");
+  fs.mkdirSync(pb, { recursive: true });
+  await run(tar, ["-a", "-c", "--format", "zip", "-f", path.join(pb, "cd-throwaway.mcpb"), "-C", source, "manifest.json", "server.js"]);
+  write(path.join(pb, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-pb", version: "1.0.0", mcpServers: "./cd-throwaway.mcpb", skills: ["./one", "./unnamed"] });
+  skill(path.join(pb, "one"), ["name: cd-throwaway-onename", "description: one"]);
+  skill(path.join(pb, "unnamed"), ["description: unnamed"]);
+
+  // A plugin whose manifest the probe rewrites, with a server in its
+  // `.mcp.json` and a skill.
+  const pw = path.join(market, "cd-throwaway-pw");
+  const manifest = path.join(pw, ".claude-plugin", "plugin.json");
+  write(manifest, { name: "cd-throwaway-pw", version: "1.0.0" });
+  write(path.join(pw, ".mcp.json"), { mcpServers: { "cd-throwaway-pwsrv": stdio("pw") } });
+  skill(path.join(pw, "skills", "fold-w"), ["name: cd-throwaway-wname", "description: wrong"]);
+
+  write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: ["cd-throwaway-pb", "cd-throwaway-pw"].map((name) => ({ name, source: `./${name}` })) });
+  await claude(home, proj, "plugin", "marketplace", "add", market);
+  for (const name of ["cd-throwaway-pb", "cd-throwaway-pw"]) await claude(home, proj, "plugin", "install", `${name}@cd-throwaway-market`);
+  const s = await session(home, proj);
+
+  await p.check("locations[plugin-manifest-mcp]", "a bundle is recorded in `.mcpb-cache/<hash>.metadata.json` with its `source` and the absolute `extractedPath` it went to, and its server is named by its manifest's `name`, the folder in place of `${__dirname}`", async () => {
+    const cache = path.join(pb, ".mcpb-cache");
+    const metadata = fs.readdirSync(cache).filter((f) => /^[0-9a-f]+\.metadata\.json$/.test(f)).map((f) => json(path.join(cache, f)));
+    const extracted = metadata.map((m) => ({
+      source: m.source,
+      // `.mcpb-cache/<content hash>`, the hash the metadata records.
+      inCache: m.extractedPath === path.join(cache, m.contentHash),
+      manifest: fs.existsSync(path.join(m.extractedPath, "manifest.json")),
+    }));
+    // `claude mcp get` shows no command for a bundle's server; `mcp list` does.
+    const { text } = await mcpList(home, proj);
+    const command = text.match(/^plugin:cd-throwaway-pb:cd-throwaway-bundled: (.*) - /m)?.[1];
+    return same(
+      { extracted, servers: s.servers.filter((n) => n.includes("cd-throwaway-pb")), command },
+      { extracted: [{ source: "./cd-throwaway.mcpb", inCache: true, manifest: true }], servers: ["plugin:cd-throwaway-pb:cd-throwaway-bundled"], command: `node ${metadata[0]?.extractedPath}/server.js` },
+    );
+  });
+
+  await p.check("locations[plugin-skills]", "a folder the manifest's `skills` declares that holds a `SKILL.md` is one skill named by its frontmatter `name`, or by its folder without one", async () => {
+    return same(s.listed.filter((l) => l.includes("cd-throwaway-pb")).sort(), ["- cd-throwaway-pb:cd-throwaway-onename: one", "- cd-throwaway-pb:unnamed: unnamed"]);
+  });
+
+  await p.check("locations[plugin-manifest-mcp]", "a manifest `mcpServers` of the wrong shape fails the plugin whole, the servers of its `.mcp.json` and its skills with it", async () => {
+    const loaded = (t) => [...t.plugins, ...t.servers, ...t.skills].filter((n) => n.includes("cd-throwaway-pw"));
+    const kept = fs.readFileSync(manifest, "utf8");
+    // With a manifest of the right shape, the plugin loads all it carries.
+    const seen = { valid: loaded(s) };
+    try {
+      for (const wrong of [42, true, [42], null]) {
+        write(manifest, { ...JSON.parse(kept), mcpServers: wrong });
+        const { stdout } = await claude(home, proj, "plugin", "list");
+        seen[JSON.stringify(wrong)] = { loaded: loaded(await session(home, proj)), error: stdout.includes("Manifest validation failed: mcpServers: Invalid input") };
+      }
+    } finally {
+      write(manifest, kept);
+    }
+    const failed = { loaded: [], error: true };
+    return same(seen, { valid: ["cd-throwaway-pw", "plugin:cd-throwaway-pw:cd-throwaway-pwsrv", "cd-throwaway-pw:fold-w"], 42: failed, true: failed, "[42]": failed, null: failed });
+  });
+}
+
+// A plugin's skill names: no name rule skips its folder or refuses its
+// `name`; Claude Code rewrites them, then holds the whole
+// `<plugin>:<name>` to the folder name rule.
+{
+  const dir = fresh("plugin-names", base);
+  const home = path.join(dir, "home");
+  const plugin = path.join(dir, "cd-throwaway-pn");
+  const prefix = "cd-throwaway-pn:";
+  const stem = "cd-throwaway-";
+  // Each frontmatter `name` of a declared folder that is one skill, and the
+  // name Claude Code gives that skill.
+  const names = {
+    "cd throwaway spaced": "cd-throwaway-spaced",
+    '"cd-throwaway\\ttab"': "cd-throwaway-tab",
+    "cd-throwaway<lt": "cd-throwaway-lt",
+    "cd-throwaway​zwsp": "cd-throwaway-zwsp",
+    "cd-throwaway.dot": "cd-throwaway-dot",
+    "cd-throwaway-ñandú": "cd-throwaway--and-",
+    "cd-throwaway-😀": "cd-throwaway---",
+    "CD_Throwaway": "CD_Throwaway",
+    '"  cd-throwaway-padded  "': "cd-throwaway-padded",
+    "cd-throwaway-pn:cd-throwaway-pref": "cd-throwaway-pref",
+  };
+  // Two more, whose `<plugin>:<name>` is 256 characters once rewritten,
+  // padded and prefixed before, and 257.
+  const x256 = `${stem}${"x".repeat(256 - prefix.length - stem.length - 1)}.`;
+  const x257 = `${stem}${"x".repeat(257 - prefix.length - stem.length)}`;
+  const long = { kept: `"  ${prefix}${x256}  "`, skipped: x257 };
+  const declared = [...Object.keys(names), long.kept, long.skipped];
+  write(path.join(plugin, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-pn", version: "1.0.0", skills: declared.map((_, i) => `./one/n${i}`) });
+  declared.forEach((name, i) => skill(path.join(plugin, "one", `n${i}`), [`name: ${name}`, `description: one n${i}`]));
+  // Each folder name in the plugin's `skills` folder, and its skill's name.
+  const folders = {
+    " cd-throwaway-f-lead": "-cd-throwaway-f-lead",
+    "cd-throwaway-f​zw": "cd-throwaway-f-zw",
+    "cd-throwaway-f　ideo": "cd-throwaway-f-ideo",
+    "cd-throwaway-f.dot": "cd-throwaway-f-dot",
+    "cd-throwaway-fÑ": "cd-throwaway-f-",
+    "cd-throwaway-f😀": "cd-throwaway-f--",
+  };
+  for (const folder of Object.keys(folders)) verbatimSkill(path.join(plugin, "skills"), folder);
+  skill(path.join(plugin, "skills", "fold-a"), ["name: cd throwaway alias", "description: alias"]);
+  const s = await session(home, fresh("empty", dir), { args: ["--plugin-dir", plugin] });
+
+  await p.check("locations[plugin-skills]", "no name rule skips a plugin's skill folder: each UTF-16 unit of its name but `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-` becomes `-`", async () => {
+    return same(Object.keys(folders).map((f) => s.skills.includes(`${prefix}${folders[f]}`)), Object.keys(folders).map(() => true));
+  });
+  await p.check("locations[plugin-skills]", "a declared skill's frontmatter `name` the rule refuses is not counted as none: it is trimmed, rid of a leading `<plugin>:` and rewritten the same way", async () => {
+    // A skill's line is `- <name>: <description>`, or `- <name> (<alias>):
+    // <description>` when the `name` as written, such as
+    // `cd-throwaway.dot`, differs from the rewritten one.
+    const line = (name, i) => new RegExp(`^- ${prefix}${names[name]}( \\(.*\\))?: one n${i}$`);
+    const named = Object.keys(names).map((name, i) => s.listed.some((l) => line(name, i).test(l)));
+    return same(named, Object.keys(names).map(() => true));
+  });
+  await p.check("locations[plugin-skills]", "the folder name rule takes the rewritten `<plugin>:<name>`: one of 257 characters is skipped, one of 256 kept", async () => {
+    const listed = (name) => s.skills.includes(`${prefix}${name}`);
+    const skipped = declared.length - 1;
+    return same({ kept: listed(x256.replace(".", "-")), skipped: listed(x257) || listed(`n${skipped}`) }, { kept: true, skipped: false });
+  });
+  await p.check("locations[plugin-skills]", "in a folder of skill folders, a frontmatter `name` the rule refuses is no alias, the skill named by its folder", async () => {
+    return same(s.listed.filter((l) => l.includes("fold-a")), [`- ${prefix}fold-a: alias`]);
+  });
+}
+
+// ---------------------------------------------------------------- wrong shapes
+
+{
+  const dir = fresh("wrong-shapes", base);
+  const home = path.join(dir, "home");
+  const proj = path.join(dir, "proj");
+  fs.mkdirSync(proj, { recursive: true });
+  const key = proj.replaceAll("\\", "/");
+  const user = { "cd-throwaway-user": stdio("user") };
+  const local = { "cd-throwaway-local": stdio("local") };
+
+  await p.check("locations[user-mcp]", "a `mcpServers` of `~/.claude.json` that is not an object, the user's or a Project's, is skipped with a diagnostic, the file's other servers read and the value left as written", async () => {
+    const seen = {};
+    for (const [label, state] of [
+      ["user list", { mcpServers: [stdio("x")], projects: { [key]: { mcpServers: local } } }],
+      ["user text", { mcpServers: "x", projects: { [key]: { mcpServers: local } } }],
+      ["project list", { mcpServers: user, projects: { [key]: { mcpServers: [stdio("x")] } } }],
+      ["project number", { mcpServers: user, projects: { [key]: { mcpServers: 3 } } }],
+    ]) {
+      fs.rmSync(home, { recursive: true, force: true });
+      write(path.join(home, ".claude.json"), state);
+      const servers = throwaway((await session(home, proj)).servers);
+      const list = await mcpList(home, proj);
+      const after = json(path.join(home, ".claude.json"));
+      seen[label] = {
+        servers,
+        diagnostic: list.text.match(/\[Failed to parse\] (User|Local) config/)?.[1] ?? null,
+        kept: same([after.mcpServers, after.projects[key].mcpServers], [state.mcpServers, state.projects[key].mcpServers]).pass,
+      };
+    }
+    const userBroken = { servers: ["cd-throwaway-local"], diagnostic: "User", kept: true };
+    const projectBroken = { servers: ["cd-throwaway-user"], diagnostic: "Local", kept: true };
+    return same(seen, { "user list": userBroken, "user text": userBroken, "project list": projectBroken, "project number": projectBroken });
   });
 }
 
