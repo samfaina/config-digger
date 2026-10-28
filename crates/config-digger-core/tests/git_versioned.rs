@@ -484,3 +484,27 @@ fn an_enable_asks_the_git_index_once_per_repository_of_the_folders_it_brings_bac
     assert!(versioned("review"));
     assert!(!versioned("lint"));
 }
+
+#[test]
+fn counting_the_operations_asks_the_git_index_nothing() {
+    // History holds the Disables that moved both skills out of a dotfiles
+    // repo at the home folder.
+    let env = FakeEnvironment::with_home(HOME)
+        .with_var("APPDATA", APP_DATA)
+        .with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let (fs, _) = parked_cursor_skills(&env);
+    let mut ports = fake::ports(fs, env);
+    let git = FakeGitIndex::default().with_repository(HOME);
+    ports.git = Box::new(git.clone());
+    let core = Core::new(ports).unwrap();
+
+    let count = core.operation_count().unwrap();
+
+    assert_eq!(count, 2);
+    assert_eq!(git.asked(), Vec::<PathBuf>::new());
+    core.history().unwrap();
+    assert!(
+        !git.asked().is_empty(),
+        "History asks about the moved folders"
+    );
+}

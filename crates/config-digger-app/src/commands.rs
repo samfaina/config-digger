@@ -369,7 +369,7 @@ pub async fn read_settings() -> Result<SettingsRead, api::Error> {
 pub(crate) fn settings_read(core: Core) -> Result<SettingsRead, api::Error> {
     let settings = core.settings()?;
     let folders = core.data_folders()?;
-    let operations = u32::try_from(core.history()?.len()).unwrap_or(u32::MAX);
+    let operations = u32::try_from(core.operation_count()?).unwrap_or(u32::MAX);
     let retention = core.retention();
     let parked = Session::scan(core)?.parked();
     Ok(SettingsRead {
@@ -593,6 +593,71 @@ fn start(mut explorer: Command) -> Result<(), api::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config_digger_core::api::{Action, Context, ScanOptions, Targets};
+    use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeGitIndex};
+
+    const HOME: &str = r"C:\Users\fixture";
+    const LOCAL_APP_DATA: &str = r"C:\Users\fixture\AppData\Local";
+
+    fn env() -> FakeEnvironment {
+        FakeEnvironment::with_home(HOME)
+            .with_var("APPDATA", r"C:\Users\fixture\AppData\Roaming")
+            .with_var("LOCALAPPDATA", LOCAL_APP_DATA)
+    }
+
+    /// A core over `fs` whose git index is `git`.
+    fn core(fs: &FakeFileSystem, git: &FakeGitIndex) -> Core {
+        let mut ports = fake::ports(fs.clone(), env());
+        ports.git = Box::new(git.clone());
+        Core::new(ports).unwrap()
+    }
+
+    /// A Cursor whose user skill `review`, in a dotfiles repo at the home
+    /// folder, a Disable moved to config-digger's store.
+    fn parked_skill() -> FakeFileSystem {
+        let skill = PathBuf::from(HOME).join(r".cursor\skills\review");
+        let fs = FakeFileSystem::new()
+            .with_file(
+                PathBuf::from(HOME).join(r"AppData\Roaming\Cursor\User\settings.json"),
+                "{}\n",
+            )
+            .with_file(skill.join("SKILL.md"), "---\nname: review\n---\n");
+        let core = core(&fs, &FakeGitIndex::default().with_repository(HOME));
+        let snapshot = core.scan(&ScanOptions { projects: vec![] }).unwrap();
+        let targets = Targets {
+            selectors: vec![skill.display().to_string()],
+            all: false,
+        };
+        let plan = core
+            .plan(&snapshot, &Context::default(), Action::Disable, &targets)
+            .unwrap();
+        core.execute(plan, &[WarningClass::WideReach]).unwrap();
+        fs
+    }
+
+    /// What Settings reads over `fs`, and the repositories that asks the
+    /// git index about, sorted.
+    fn settings_asks(fs: &FakeFileSystem) -> (SettingsRead, Vec<PathBuf>) {
+        let git = FakeGitIndex::default().with_repository(HOME);
+        let read = settings_read(core(fs, &git)).unwrap();
+        let mut asked = git.asked();
+        asked.sort();
+        (read, asked)
+    }
+
+    #[test]
+    fn settings_asks_the_git_index_nothing_about_history() {
+        let fs = parked_skill();
+        let (with_history, asked_with_history) = settings_asks(&fs);
+        fs.delete_folder(PathBuf::from(LOCAL_APP_DATA).join(r"config-digger\backups"));
+
+        let (without_history, asked_without_history) = settings_asks(&fs);
+
+        assert_eq!(with_history.operations, 1);
+        assert_eq!(without_history.operations, 0);
+        assert_eq!(with_history.parked.len(), 1);
+        assert_eq!(asked_with_history, asked_without_history);
+    }
 
     #[test]
     fn only_a_folder_is_opened_from_the_inside() {
