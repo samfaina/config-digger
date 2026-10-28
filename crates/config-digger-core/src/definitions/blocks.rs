@@ -7268,9 +7268,16 @@ impl Validate for ApprovalList {
 }
 
 impl ApprovalList {
-    /// The index, among the gate's settings, of its `trust`: after its sources.
-    pub fn trust_source(&self) -> Option<usize> {
+    /// The index of its `trust` among the gate's settings, which come after
+    /// its sources.
+    pub fn trust_index(&self) -> Option<usize> {
         self.trust.as_ref().map(|_| self.sources.len())
+    }
+
+    /// Whether the approvals of the source at `source` count, in a Project
+    /// the gate's `trust` trusts when `trusted`.
+    pub fn counts(&self, source: usize, trusted: bool) -> bool {
+        trusted || !self.sources[source].trusted_only
     }
 
     /// Whether `value`, what the source at `source` holds, approves the

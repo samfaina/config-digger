@@ -2049,7 +2049,7 @@
             "El Item «cd-throwaway-plain-off» sale «Disabled».",
             "Su Entry da la razón «Disabled by name: `cd-throwaway-plain-off` is in `disabledMcpjsonServers` in E:\\cd-throwaway\\project-plain\\.claude\\settings.local.json for this Project, so Claude Code skips the Entries with that name.».",
             "El Item «cd-throwaway-plain-other» sale «Blocked».",
-            "Su Entry da la razón «Blocked: Claude Code has not approved `cd-throwaway-plain-other` from E:\\cd-throwaway\\project-plain\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; the Project's own approvals count only once you trust the Project in Claude Code. config-digger never approves servers, nor trusts a Project.»."
+            "Su Entry da la razón «Blocked: Claude Code has not approved `cd-throwaway-plain-other` from E:\\cd-throwaway\\project-plain\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; config-digger never approves servers.»."
           ],
           "setup": {
             "label": "Crear los datos de prueba con listas en texto plano",

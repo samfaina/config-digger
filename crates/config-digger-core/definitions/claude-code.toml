@@ -455,14 +455,14 @@ checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
 # first. The approvals of the Project's state, its settings and its local
 # settings count only while the Project's state holds
 # `hasTrustDialogAccepted: true` (`trusted_only`, `trust`); the user's
-# count in any Project [test]. Claude Code reads the Project's state only under its path with
-# forward slashes: under one with backslashes, neither the trust nor the
-# approvals count [test] (`forward_slashes`). config-digger never trusts a
-# Project. Since 2.1.299 a list written as one plain-string name, of
-# letters, digits, `-` or `_`, no longer voids its settings file [docs]:
-# in a settings file it approves that one server, and in the Project's
-# state none [test], so only the settings files' sources read it
-# (`plain_string_name`).
+# count in any Project [test]. Claude Code reads the Project's state only
+# under its path with forward slashes: under one with backslashes,
+# neither the trust nor the approvals count [test] (`forward_slashes`).
+# config-digger never trusts a Project. Since 2.1.299 a list written as
+# one plain-string name, of letters, digits, `-` or `_`, no longer voids
+# its settings file [docs]: in a settings file it approves that one
+# server, and in the Project's state none [test], so only the settings
+# files' sources read it (`plain_string_name`).
 [[items.mcp.gates]]
 unverified = [
   "The Project's state is taken to be looked up under its path with forward slashes without regard to case, as changelog 2.1.285 suggests for trust.",

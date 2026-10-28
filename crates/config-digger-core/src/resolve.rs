@@ -1828,14 +1828,16 @@ pub(crate) fn gates(
                         .filter_map(|value| value.value.as_ref())
                 };
                 let trusted = block
-                    .trust_source()
+                    .trust_index()
                     .is_some_and(|trust| values(trust).any(|value| *value == true));
-                let approved = (0..block.sources.len())
-                    .filter(|&source| trusted || !block.sources[source].trusted_only)
-                    .any(|source| {
-                        values(source).any(|value| block.approves(source, value, &entry.name))
-                    });
-                let reason = if block.trust.is_some() && !trusted {
+                let approves = |source: usize| {
+                    values(source).any(|value| block.approves(source, value, &entry.name))
+                };
+                let (counted, waiting): (Vec<usize>, Vec<usize>) =
+                    (0..block.sources.len()).partition(|&source| block.counts(source, trusted));
+                let approved = counted.into_iter().any(approves);
+                // Approvals that would count once the user trusts the Project.
+                let reason = if waiting.into_iter().any(approves) {
                     explain::not_approved_untrusted(
                         agent_name,
                         &entry.name,

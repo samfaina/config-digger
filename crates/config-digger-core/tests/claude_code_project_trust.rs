@@ -52,33 +52,38 @@ fn supabase(fs: &FakeFileSystem) -> Value {
     serde_json::to_value(&item.entries[0]).unwrap()
 }
 
-/// `home`, with `supabase` approved by the Project's own `source`: its
-/// settings, its local settings or its state, which also holds `state`.
-fn approved_by_the_project(source: &str, state: Value) -> FakeFileSystem {
-    let approval = json!({ "enabledMcpjsonServers": ["supabase"] });
-    let mut project_state = state;
-    if source == "state" {
-        project_state["enabledMcpjsonServers"] = json!(["supabase"]);
-    }
-    let fs = home(json!({ "E:/projects/petme-app": project_state }));
-    match source {
-        "settings" => fs.with_file(in_project(r".claude\settings.json"), approval.to_string()),
-        "local settings" => fs.with_file(
-            in_project(r".claude\settings.local.json"),
-            approval.to_string(),
-        ),
-        _ => fs,
-    }
+/// Where the Project's own files approve a server.
+#[derive(Clone, Copy, Debug)]
+enum Own {
+    Settings,
+    LocalSettings,
+    State,
 }
 
-const SOURCES: [&str; 3] = ["settings", "local settings", "state"];
+const OWN: [Own; 3] = [Own::Settings, Own::LocalSettings, Own::State];
+
+/// `home`, with `supabase` approved by the Project's own `source`, and the
+/// Project's state holding `state` besides.
+fn approved_by_the_project(source: Own, mut state: Value) -> FakeFileSystem {
+    let approval = json!({ "enabledMcpjsonServers": ["supabase"] });
+    if let Own::State = source {
+        state["enabledMcpjsonServers"] = approval["enabledMcpjsonServers"].clone();
+    }
+    let fs = home(json!({ "E:/projects/petme-app": state }));
+    let settings = match source {
+        Own::Settings => r".claude\settings.json",
+        Own::LocalSettings => r".claude\settings.local.json",
+        Own::State => return fs,
+    };
+    fs.with_file(in_project(settings), approval.to_string())
+}
 
 #[test]
 fn an_untrusted_projects_own_approvals_do_not_count() {
-    for source in SOURCES {
+    for source in OWN {
         let entry = supabase(&approved_by_the_project(source, json!({})));
 
-        assert_eq!(entry["state"], "blocked", "{source}");
+        assert_eq!(entry["state"], "blocked", "{source:?}");
         assert_eq!(
             entry["reason"],
             json!({
@@ -87,19 +92,19 @@ fn an_untrusted_projects_own_approvals_do_not_count() {
                 "switch": null,
                 "sentence": r"Blocked: Claude Code has not approved `supabase` from E:\projects\petme-app\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; the Project's own approvals count only once you trust the Project in Claude Code. config-digger never approves servers, nor trusts a Project.",
             }),
-            "{source}"
+            "{source:?}"
         );
     }
 }
 
 #[test]
 fn a_trusted_projects_own_approvals_count() {
-    for source in SOURCES {
+    for source in OWN {
         let trusted = json!({ "hasTrustDialogAccepted": true });
 
         let entry = supabase(&approved_by_the_project(source, trusted));
 
-        assert_eq!(entry["state"], "effective", "{source}: {entry}");
+        assert_eq!(entry["state"], "effective", "{source:?}: {entry}");
     }
 }
 
@@ -142,4 +147,15 @@ fn trust_is_looked_up_without_regard_to_case() {
     let entry = supabase(&fs);
 
     assert_eq!(entry["state"], "effective", "{entry}");
+}
+
+#[test]
+fn a_server_nothing_approves_in_an_untrusted_project_says_nothing_of_trust() {
+    let entry = supabase(&home(json!({ "E:/projects/petme-app": {} })));
+
+    assert_eq!(entry["state"], "blocked", "{entry}");
+    assert_eq!(
+        entry["reason"]["sentence"],
+        r"Blocked: Claude Code has not approved `supabase` from E:\projects\petme-app\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; config-digger never approves servers."
+    );
 }

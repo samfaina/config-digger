@@ -104,6 +104,16 @@ impl Harness {
         self.with_file(".claude.json", &claude_json.to_string())
     }
 
+    /// The `.claude.json` written, trusting the Project at the existing
+    /// `folder` too, so that the approvals of its own settings count.
+    fn trusting(self, folder: &Path) -> Self {
+        let mut state: Value =
+            serde_json::from_slice(&std::fs::read(self.path(".claude.json")).unwrap()).unwrap();
+        let key = real_path(folder).display().to_string().replace('\\', "/");
+        state["projects"][key]["hasTrustDialogAccepted"] = json!(true);
+        self.with_file(".claude.json", &state.to_string())
+    }
+
     fn run(&self, args: &[&str]) -> Run {
         self.run_with_env(args, &[])
     }
@@ -228,7 +238,9 @@ fn the_current_directory_is_the_default_project() {
             ".mcp.json",
             r#"{"mcpServers": {"supabase": {"url": "https://p"}}}"#,
         )
-        .with_file(r".claude\settings.json", APPROVE_ALL);
+        .with_cwd_file(r".claude\settings.json", APPROVE_ALL);
+    let cwd = harness.cwd();
+    let harness = harness.trusting(&cwd);
 
     let run = harness.run(&["list", "--json"]);
 
@@ -297,8 +309,9 @@ fn project_picks_another_folder() {
             r"work\app\.mcp.json",
             r#"{"mcpServers": {"linear": {"url": "https://p"}}}"#,
         )
-        .with_file(r".claude\settings.json", APPROVE_ALL);
+        .with_file(r"work\app\.claude\settings.json", APPROVE_ALL);
     let app = harness.path(r"work\app");
+    let harness = harness.trusting(&app);
 
     let run = harness.run(&["list", "--json", "--project", app.to_str().unwrap()]);
 

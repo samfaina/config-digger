@@ -880,41 +880,50 @@ pub(crate) fn not_approved(
     path: &Path,
     prompt: ApprovalPrompt,
 ) -> Reason {
-    Reason {
-        code: ReasonCode::NotApproved,
-        effective: None,
-        switch: None,
-        sentence: format!(
-            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {}; config-digger never approves servers.",
-            path.display(),
-            asks(prompt)
-        ),
-    }
+    unapproved(
+        agent_name,
+        name,
+        path,
+        prompt,
+        "config-digger never approves servers.",
+    )
 }
 
-/// [`not_approved`], in a Project the user has not trusted in `agent_name`,
-/// which counts the approvals of the Project's own files only once they do.
+/// [`not_approved`], for an Entry the Project's own files approve in a
+/// Project the user has not trusted in `agent_name`, which counts those
+/// approvals only once they do.
 pub(crate) fn not_approved_untrusted(
     agent_name: &str,
     name: &str,
     path: &Path,
     prompt: ApprovalPrompt,
 ) -> Reason {
-    Reason {
-        sentence: format!(
-            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {}; the Project's own approvals count only once you trust the Project in {agent_name}. config-digger never approves servers, nor trusts a Project.",
-            path.display(),
-            asks(prompt)
-        ),
-        ..not_approved(agent_name, name, path, prompt)
-    }
+    let then = format!(
+        "the Project's own approvals count only once you trust the Project in {agent_name}. config-digger never approves servers, nor trusts a Project."
+    );
+    unapproved(agent_name, name, path, prompt, &then)
 }
 
-/// Where an Agent asks the user to approve an Entry, as `prompt` says.
-fn asks(prompt: ApprovalPrompt) -> &'static str {
-    match prompt {
+/// A reason with `not_approved`, whose sentence ends with `then`.
+fn unapproved(
+    agent_name: &str,
+    name: &str,
+    path: &Path,
+    prompt: ApprovalPrompt,
+    then: &str,
+) -> Reason {
+    let asks = match prompt {
         ApprovalPrompt::OnStart => "which asks about it when it starts in this Project",
         ApprovalPrompt::McpSettings => "which asks about it in its MCP settings",
+    };
+    Reason {
+        code: ReasonCode::NotApproved,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Blocked: {agent_name} has not approved `{name}` from {}. Approve it in {agent_name}, {asks}; {then}",
+            path.display()
+        ),
     }
 }
 
