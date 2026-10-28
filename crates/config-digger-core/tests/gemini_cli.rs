@@ -1614,28 +1614,34 @@ fn extensions_that_share_a_name_stop_gemini_cli_where_extension_enablement_disab
     // `extension-enablement.json` goes by name, so its rule turns off both
     // extensions in `app`; Gemini CLI still refuses the second one.
     let folder = project("app");
-    let fs = trusting(
-        with_extension_folder(
+    let with_kit = |fs: FakeFileSystem| {
+        trusting(
             with_extension_folder(
-                FakeFileSystem::new().with_file(user_settings(), "{}"),
+                fs.with_file(user_settings(), "{}").with_file(
+                    extensions().join("extension-enablement.json"),
+                    json!({ "kit": { "overrides": ["!/E:/projects/app/*"] } }).to_string(),
+                ),
                 "kit",
                 &manifest("kit", json!({ "first": { "command": "a" } })),
             ),
-            "kit-copy",
-            &manifest("kit", json!({ "second": { "command": "b" } })),
+            &folder,
         )
-        .with_file(
-            extensions().join("extension-enablement.json"),
-            json!({ "kit": { "overrides": ["!/E:/projects/app/*"] } }).to_string(),
-        ),
-        &folder,
+    };
+    // Alone, the extension is Disabled in `app`.
+    let alone = inventory_at(&with_kit(FakeFileSystem::new()), &folder);
+    assert_eq!(states(server(&alone, "first")), ["disabled"]);
+    assert!(gemini_flags(&alone).is_empty());
+    let fs = with_extension_folder(
+        with_kit(FakeFileSystem::new()),
+        "kit-copy",
+        &manifest("kit", json!({ "second": { "command": "b" } })),
     );
 
     for inventory in [inventory_at(&fs, &folder), inventory(&fs)] {
         let flags = gemini_flags(&inventory);
         assert_eq!(flags.len(), 1, "{flags:?}");
         assert!(
-            flags[0].sentence.contains("Disabled"),
+            flags[0].sentence.contains("even a Disabled one"),
             "{}",
             flags[0].sentence
         );

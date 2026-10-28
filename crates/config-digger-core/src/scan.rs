@@ -3750,7 +3750,7 @@ impl Scanner<'_> {
         let mut found = Vec::new();
         // Whether each plugin of `found` is named by its record or manifest,
         // rather than by its id.
-        let mut named_by_it = Vec::new();
+        let mut named_by_plugin = Vec::new();
         for record in records {
             let folder = paths::lexical(Path::new(&record.folder));
             if !paths::is_absolute(&folder) {
@@ -3801,7 +3801,7 @@ impl Scanner<'_> {
                     (!named.is_empty()).then(|| named.to_owned())
                 })
             });
-            named_by_it.push(named.is_some());
+            named_by_plugin.push(named.is_some());
             let name = named.unwrap_or_else(|| {
                 let id = record.id.as_str();
                 let separator = plugins.id_separator.as_deref();
@@ -3831,7 +3831,7 @@ impl Scanner<'_> {
             });
         }
         if plugins.same_names_invalid {
-            self.name_clashes(home, &mut found, &named_by_it);
+            self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
         found
     }
@@ -3841,14 +3841,17 @@ impl Scanner<'_> {
     /// folders of the others. Only a name the Agent reads counts: a plugin
     /// named by its id, since its manifest gives no name it can read, is
     /// one the Agent skips.
-    fn name_clashes(
+    fn record_name_clashes(
         &mut self,
         home: &FoundHome,
         found: &mut [ScannedPlugin],
-        named_by_it: &[bool],
+        named_by_plugin: &[bool],
     ) {
+        let named: Vec<usize> = (0..found.len())
+            .filter(|&index| named_by_plugin[index])
+            .collect();
         let mut clashes: Vec<ScannedNameClash> = Vec::new();
-        for (plugin, _) in found.iter().zip(named_by_it).filter(|(_, named)| **named) {
+        for plugin in named.iter().map(|&index| &found[index]) {
             match clashes.iter_mut().find(|clash| clash.name == plugin.name) {
                 Some(clash) => {
                     clash.folders.push(plugin.installed.clone());
@@ -3866,11 +3869,8 @@ impl Scanner<'_> {
             }
         }
         clashes.retain(|clash| clash.folders.len() > 1);
-        for (plugin, _) in found
-            .iter_mut()
-            .zip(named_by_it)
-            .filter(|(_, named)| **named)
-        {
+        for &index in &named {
+            let plugin = &mut found[index];
             if let Some(clash) = clashes.iter().find(|clash| clash.name == plugin.name) {
                 plugin.shared_with = clash
                     .folders
