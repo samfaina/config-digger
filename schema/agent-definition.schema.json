@@ -2607,6 +2607,17 @@
               "type": "boolean",
               "default": false
             },
+            "rejected_unless_path_or_object": {
+              "description": "The key paths of fields that hold a path, an object or a list of\neither, such as the `mcpServers` of a Cursor plugin's manifest: the\nAgent rejects a manifest whose field holds anything else whole, as\none that does not parse, so it declares none. A field that is\nabsent leaves it read.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default": []
+            },
             "block": {
               "type": "string",
               "const": "manifest-skills"

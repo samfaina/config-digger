@@ -1211,6 +1211,8 @@ fn of_two_nested_skills_at_one_path_the_first_folder_s_wins_and_in_one_folder_cu
         r"a\b\c\.cursor\skills\deep",
         r"x\.agents\skills\holder",
         r"x\.cursor\skills\holder",
+        r"a-b\.cursor\skills\separator",
+        r"a\b\.cursor\skills\separator",
     ]);
 
     let inventory = inventory_at(&fs, &project("app"));
@@ -1230,6 +1232,11 @@ fn of_two_nested_skills_at_one_path_the_first_folder_s_wins_and_in_one_folder_cu
             "holder",
             r"app\x\.cursor\skills\holder",
             r"app\x\.agents\skills\holder",
+        ),
+        (
+            "separator",
+            r"app\a\b\.cursor\skills\separator",
+            r"app\a-b\.cursor\skills\separator",
         ),
     ] {
         assert_eq!(
@@ -2028,6 +2035,46 @@ fn a_manifest_s_list_names_skill_folders_or_folders_of_them() {
             "{name} is read"
         );
     }
+}
+
+#[test]
+fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_is_rejected_whole() {
+    let mut fs = cursor();
+    for (name, servers) in [
+        ("number", json!(42)),
+        ("list", json!([42])),
+        ("null", json!(null)),
+        ("kept", json!(["./servers.json", {}])),
+    ] {
+        let folder = local_plugin(name);
+        fs = with_files(
+            fs,
+            &folder,
+            &[(
+                r".cursor-plugin\plugin.json",
+                json!({ "name": name, "skills": "./custom", "mcpServers": servers }),
+            )],
+        );
+        fs = with_skill(fs, folder.join(format!(r"custom\{name}-custom")));
+        fs = with_skill(fs, folder.join(format!(r"skills\{name}-default")));
+    }
+
+    let inventory = inventory(&fs);
+
+    for name in ["number", "list", "null"] {
+        assert_eq!(
+            code(item(&inventory, &format!("{name}-default")).state),
+            "effective",
+            "{name}"
+        );
+        assert!(
+            cursor_items(&inventory).all(|item| item.name != format!("{name}-custom")),
+            "{name}-custom is read"
+        );
+    }
+    // Paths and objects, in a list or not, leave the manifest read.
+    assert_eq!(code(item(&inventory, "kept-custom").state), "effective");
+    assert!(cursor_items(&inventory).all(|item| item.name != "kept-default"));
 }
 
 #[test]

@@ -2695,11 +2695,21 @@ pub(crate) struct ManifestSkills {
     /// an item that is no path, declares none.
     #[serde(default)]
     pub dot_slash: bool,
+    /// The key paths of fields that hold a path, an object or a list of
+    /// either, such as the `mcpServers` of a Cursor plugin's manifest: the
+    /// Agent rejects a manifest whose field holds anything else whole, as
+    /// one that does not parse, so it declares none. A field that is
+    /// absent leaves it read.
+    #[serde(default)]
+    pub rejected_unless_path_or_object: Vec<Vec<String>>,
 }
 
 impl Validate for ManifestSkills {
     fn validate(&self) -> Result<(), String> {
         validate_key_path(&self.field)?;
+        for key_path in &self.rejected_unless_path_or_object {
+            validate_key_path(key_path)?;
+        }
         validate_relative(&self.default)?;
         if let Some(one_skill) = &self.one_skill {
             one_skill.validate()?;
@@ -2722,9 +2732,25 @@ impl ManifestSkills {
     /// default folder when it declares none; the default folder first,
     /// whatever it declares, when they add to it. A manifest that does not
     /// parse declares none; a field that is neither a path nor a list of
-    /// paths declares no skills, unless `dot_slash` reads it as none.
+    /// paths declares no skills, unless `dot_slash` reads it as none. A
+    /// manifest the Agent rejects for one of `rejected_unless_path_or_object`
+    /// declares none.
     pub fn paths(&self, manifest: Option<&str>) -> Vec<DeclaredSkills> {
-        let document = manifest.and_then(|text| JsonFormat::STRICT.parse(text).ok());
+        let path_or_object = |value: &Value| matches!(value, Value::String(_) | Value::Object(_));
+        let document = manifest
+            .and_then(|text| JsonFormat::STRICT.parse(text).ok())
+            .filter(|document| {
+                self.rejected_unless_path_or_object.iter().all(|key_path| {
+                    let value = key_path
+                        .iter()
+                        .try_fold(document, |value, key| value.get(key));
+                    match value {
+                        None => true,
+                        Some(Value::Array(items)) => items.iter().all(path_or_object),
+                        Some(value) => path_or_object(value),
+                    }
+                })
+            });
         let declared = document.as_ref().and_then(|document| {
             self.field
                 .iter()
