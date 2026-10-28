@@ -1648,9 +1648,9 @@ fn the_git_asks_of_an_enable_of_two_parked_skill_folders_are_summed_in_one_line(
 
     assert_eq!(run.code, 0, "{}{}", run.stdout, run.stderr);
     let line = git_ask_line(&run, "plan");
-    // Each folder it moves back is asked about in a `git ls-files` of its own.
+    // The two folders it moves back, asked about in one `git ls-files`.
     assert!(line.contains("paths=2"), "{line}");
-    assert!(line.contains("git_calls=2"), "{line}");
+    assert!(line.contains("git_calls=1"), "{line}");
 }
 
 #[test]

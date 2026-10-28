@@ -720,6 +720,9 @@ impl Targeted<'_> {
         // The edits of each file, in the order its Entries were selected.
         let mut by_file: Vec<FileEdits> = Vec::new();
         let mut planned_folders: Vec<PlannedFolder> = Vec::new();
+        // The parked skill folders an Enable brings back, asked about the
+        // git index together once they are all planned.
+        let mut brought_back: Vec<PlannedFolder> = Vec::new();
         let mut lifted: Vec<Hit> = Vec::new();
         let mut parks: Vec<&ScannedEntry> = Vec::new();
         // The names written to switches that hold them in every context.
@@ -831,13 +834,7 @@ impl Targeted<'_> {
                         )));
                     }
                     if parked.is_some() {
-                        self.put_back(
-                            &mut by_file,
-                            &mut planned_folders,
-                            entry,
-                            scanned,
-                            git_asks,
-                        )?;
+                        self.put_back(&mut by_file, &mut brought_back, entry, scanned)?;
                     }
                     for field in deleted {
                         // Entries of one server share its field.
@@ -870,6 +867,8 @@ impl Targeted<'_> {
                 }
             }
         }
+        mark_git_versioned(self.ports, &mut brought_back, git_asks);
+        planned_folders.extend(brought_back);
         self.park(&mut by_file, &mut planned_folders, &parks)?;
 
         let mut files = Vec::new();
@@ -1031,19 +1030,18 @@ impl Targeted<'_> {
     }
 
     /// Adds the edits that put the parked Entry `entry` back to `by_file`,
-    /// and the moves to `planned_folders`: its key goes back into its file,
-    /// or a skill's folder or link back where it was, and the Entry out of
-    /// the store. Refused when an Entry is at its key or folder again, which
-    /// it would overwrite, or when the folder it goes in is gone. A missing
-    /// file whose folder exists is created with the minimal structure. What
-    /// it asks the git index is counted in `git_asks`.
+    /// and the moves to `brought_back`: its key goes back into its file, or
+    /// a skill's folder or link back where it was, and the Entry out of the
+    /// store. Refused when an Entry is at its key or folder again, which it
+    /// would overwrite, or when the folder it goes in is gone. A missing
+    /// file whose folder exists is created with the minimal structure. The
+    /// folder's `git_versioned` is left for the caller to fill in.
     fn put_back(
         &self,
         by_file: &mut Vec<FileEdits>,
-        planned_folders: &mut Vec<PlannedFolder>,
+        brought_back: &mut Vec<PlannedFolder>,
         entry: &api::Entry,
         scanned: &ScannedEntry,
-        git_asks: &mut GitAsks,
     ) -> Result<(), Error> {
         let store = &entry.path;
         let bytes = read(self.ports, store)?;
@@ -1065,7 +1063,7 @@ impl Targeted<'_> {
             .file()
             .is_none()
         {
-            planned_folders.push(self.unparked_folder(entry, scanned, &parked, git_asks)?);
+            brought_back.push(self.unparked_folder(entry, scanned, &parked)?);
             add_edit(by_file, store.clone(), Syntax::Jsonc, remove_record, false);
             return Ok(());
         }
@@ -1111,14 +1109,13 @@ impl Targeted<'_> {
     /// as the store holds it: it moves the folder back from the store, or
     /// creates the link again. Refused when something is at the folder
     /// again, when the Project it applies in is gone, or when the store no
-    /// longer keeps the folder. What it asks the git index is counted in
-    /// `git_asks`.
+    /// longer keeps the folder. Its `git_versioned` is left for the caller
+    /// to fill in.
     fn unparked_folder(
         &self,
         entry: &api::Entry,
         scanned: &ScannedEntry,
         parked: &park::ParkedEntry,
-        git_asks: &mut GitAsks,
     ) -> Result<PlannedFolder, Error> {
         let fs = self.ports.fs.as_ref();
         let origin = &parked.origin.path;
@@ -1166,13 +1163,11 @@ impl Targeted<'_> {
                 )));
             }
         };
-        let versioned =
-            scan::versioned_paths(self.ports, std::iter::once(origin.as_path()), git_asks);
         Ok(PlannedFolder {
             path: origin.clone(),
             op,
             size,
-            git_versioned: !versioned.is_empty(),
+            git_versioned: false,
             readers: self.snapshot.readers_of_folder(origin),
         })
     }
@@ -1943,15 +1938,22 @@ pub(crate) fn undo_folders(
             size,
         });
     }
+    mark_git_versioned(ports, &mut planned, asks);
+    Ok(planned)
+}
+
+/// Sets the `git_versioned` of each of `folders`, asking the git index about
+/// them all together, once per repo they are in. What it asks is counted in
+/// `asks`.
+fn mark_git_versioned(ports: &Ports, folders: &mut [PlannedFolder], asks: &mut GitAsks) {
     let versioned = scan::versioned_paths(
         ports,
-        planned.iter().map(|folder| folder.path.as_path()),
+        folders.iter().map(|folder| folder.path.as_path()),
         asks,
     );
-    for folder in &mut planned {
+    for folder in folders {
         folder.git_versioned = versioned.contains(&folder.path);
     }
-    Ok(planned)
 }
 
 /// A touched file whose Undo is refused.
