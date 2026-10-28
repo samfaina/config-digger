@@ -1119,3 +1119,235 @@ fn remote_settings_force_a_plugin_off_as_the_one_managed_source() {
     assert_eq!(entry["state"], "blocked");
     assert_eq!(entry["reason"]["code"], "policy");
 }
+
+// --- Two plugins' servers with one endpoint -----------------------------------
+
+const SUPABASE: &str = "supabase@claude-plugins-official";
+const CONTEXT7: &str = "context7@claude-plugins-official";
+
+/// The fixture, where supabase's and context7's `.mcp.json` each carry a
+/// server at `https://other.example.com/mcp`.
+fn one_endpoint() -> FakeFileSystem {
+    let other = json!({ "type": "http", "url": "https://other.example.com/mcp" });
+    fixture()
+        .with_file(
+            in_cache(r"claude-plugins-official\supabase\0.1.4\.mcp.json"),
+            json!({ "mcpServers": { "supa": other } }).to_string(),
+        )
+        .with_file(
+            in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json"),
+            json!({ "mcpServers": {
+                "context7": { "type": "http", "url": "https://MCP.context7.com:443/mcp/" },
+                "c7": other,
+            } })
+            .to_string(),
+        )
+}
+
+/// `enabledPlugins` holding `plugins`, each turned on or off, in that order.
+fn enabled_plugins(plugins: &[(&str, bool)]) -> String {
+    let enabled: serde_json::Map<String, Value> = plugins
+        .iter()
+        .map(|(id, on)| ((*id).to_owned(), Value::Bool(*on)))
+        .collect();
+    json!({ "enabledPlugins": enabled }).to_string()
+}
+
+/// The supabase and context7 servers of [`one_endpoint`], by their files.
+fn supa() -> PathBuf {
+    in_cache(r"claude-plugins-official\supabase\0.1.4\.mcp.json")
+}
+
+fn c7() -> PathBuf {
+    in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json")
+}
+
+/// The Item of the servers of [`one_endpoint`], its name and the State of
+/// each of the two, supabase's first.
+fn one_endpoint_states(inventory: &Inventory) -> (String, String, String) {
+    let supa = entry_at(inventory, &supa(), &["mcpServers", "supa"]);
+    let c7 = entry_at(inventory, &c7(), &["mcpServers", "c7"]);
+    let item = inventory
+        .items
+        .iter()
+        .find(|item| item.entries.iter().any(|entry| entry.path == supa.path))
+        .unwrap();
+    assert!(
+        item.entries.iter().any(|entry| entry.path == c7.path),
+        "the two servers are one Item"
+    );
+    (item.name.clone(), code(supa.state), code(c7.state))
+}
+
+#[test]
+fn of_two_plugins_servers_with_one_endpoint_the_plugin_first_in_enabled_plugins_wins() {
+    let fs = one_endpoint().with_file(
+        user_settings(),
+        enabled_plugins(&[(SUPABASE, true), (CONTEXT7, true)]),
+    );
+    assert_eq!(
+        one_endpoint_states(&no_project(&fs)),
+        (
+            "plugin:supabase:supa".to_owned(),
+            "effective".to_owned(),
+            "shadowed".to_owned()
+        )
+    );
+
+    let fs = one_endpoint().with_file(
+        user_settings(),
+        enabled_plugins(&[(CONTEXT7, true), (SUPABASE, true)]),
+    );
+    assert_eq!(
+        one_endpoint_states(&no_project(&fs)),
+        (
+            "plugin:context7:c7".to_owned(),
+            "shadowed".to_owned(),
+            "effective".to_owned()
+        )
+    );
+}
+
+const TOOLBOX: &str = "toolbox@claude-plugins-official";
+
+fn tb() -> PathBuf {
+    in_cache(r"claude-plugins-official\toolbox\2.0.0\.mcp.json")
+}
+
+/// [`one_endpoint`], where toolbox's `.mcp.json` carries a server at the
+/// same endpoint too.
+fn one_endpoint_of_three() -> FakeFileSystem {
+    let fs = one_endpoint();
+    let mut servers = json_of(&fs, tb());
+    servers["mcpServers"]["tb"] = json!({ "type": "http", "url": "https://other.example.com/mcp" });
+    fs.with_file(tb(), servers.to_string())
+}
+
+/// The files of the Entries of the Item holding supabase's server of
+/// [`one_endpoint`], in the Item's order, each with its State.
+fn one_endpoint_order(inventory: &Inventory) -> Vec<(PathBuf, String)> {
+    inventory
+        .items
+        .iter()
+        .find(|item| item.entries.iter().any(|entry| entry.path == supa()))
+        .unwrap()
+        .entries
+        .iter()
+        .map(|entry| (entry.path.clone(), code(entry.state)))
+        .collect()
+}
+
+fn petme_settings() -> PathBuf {
+    PathBuf::from(PETME).join(r".claude\settings.json")
+}
+
+#[test]
+fn enabled_plugins_is_ordered_by_the_users_then_the_projects_then_the_local_settings() {
+    let fs = one_endpoint_of_three()
+        .with_file(user_settings(), enabled_plugins(&[(TOOLBOX, true)]))
+        .with_file(petme_settings(), enabled_plugins(&[(CONTEXT7, true)]))
+        .with_file(petme_local_settings(), enabled_plugins(&[(SUPABASE, true)]));
+
+    let in_petme = inventory(&core(&fs), &in_petme());
+
+    assert_eq!(
+        one_endpoint_order(&in_petme),
+        [
+            (tb(), "effective".to_owned()),
+            (c7(), "shadowed".to_owned()),
+            (supa(), "shadowed".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn a_plugin_the_local_settings_name_again_keeps_its_place_from_the_users() {
+    let fs = one_endpoint_of_three()
+        .with_file(
+            user_settings(),
+            enabled_plugins(&[(SUPABASE, true), (CONTEXT7, true)]),
+        )
+        .with_file(
+            petme_local_settings(),
+            enabled_plugins(&[(CONTEXT7, true), (TOOLBOX, true)]),
+        );
+
+    let in_petme = inventory(&core(&fs), &in_petme());
+
+    assert_eq!(
+        one_endpoint_order(&in_petme),
+        [
+            (supa(), "effective".to_owned()),
+            (c7(), "shadowed".to_owned()),
+            (tb(), "shadowed".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn when_the_plugin_first_in_enabled_plugins_is_off_the_next_plugins_server_is_effective() {
+    let fs = one_endpoint().with_file(
+        user_settings(),
+        enabled_plugins(&[(SUPABASE, false), (CONTEXT7, true)]),
+    );
+
+    let (_, supa, c7) = one_endpoint_states(&no_project(&fs));
+
+    assert_eq!((supa.as_str(), c7.as_str()), ("disabled", "effective"));
+}
+
+#[test]
+fn a_server_shadowed_by_another_plugins_says_that_plugin_comes_first_in_enabled_plugins() {
+    let fs = one_endpoint().with_file(
+        user_settings(),
+        enabled_plugins(&[(SUPABASE, true), (CONTEXT7, true)]),
+    );
+
+    let inventory = no_project(&fs);
+
+    let reason = entry_at(&inventory, &c7(), &["mcpServers", "c7"])
+        .reason
+        .as_ref()
+        .unwrap();
+    let winner = format!(r"{}#mcpServers.supa", supa().display());
+    assert_eq!(code(reason.code), "shadowed_by_precedence");
+    assert_eq!(reason.effective.as_deref(), Some(winner.as_str()));
+    assert_eq!(
+        reason.sentence,
+        format!(
+            "Shadowed by the plugin Entry {winner}, which has the same endpoint and Claude Code ranks first, since its plugin comes first in `enabledPlugins`."
+        )
+    );
+}
+
+#[test]
+fn between_two_plugins_enabled_plugins_decides_over_the_file_a_server_comes_from() {
+    // supabase's manifest declares its servers in `agents/claude/.mcp.json`,
+    // which ranks above a plugin's own `.mcp.json` within one plugin.
+    let manifest_servers =
+        in_cache(r"claude-plugins-official\supabase\0.1.4\agents\claude\.mcp.json");
+    let fs = one_endpoint()
+        .with_file(
+            &manifest_servers,
+            json!({ "mcpServers": {
+                "manifest-supa": { "type": "http", "url": "https://other.example.com/mcp" },
+            } })
+            .to_string(),
+        )
+        .with_file(
+            user_settings(),
+            enabled_plugins(&[(CONTEXT7, true), (SUPABASE, true)]),
+        );
+
+    let inventory = no_project(&fs);
+
+    let c7 = entry_at(&inventory, &c7(), &["mcpServers", "c7"]);
+    let manifest_supa = entry_at(
+        &inventory,
+        &manifest_servers,
+        &["mcpServers", "manifest-supa"],
+    );
+    assert_eq!(code(c7.state), "effective");
+    assert_eq!(code(manifest_supa.state), "shadowed");
+    assert_eq!(item(&inventory, "plugin:context7:c7").entries.len(), 3);
+}

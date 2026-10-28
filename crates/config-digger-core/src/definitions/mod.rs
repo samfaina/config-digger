@@ -1948,6 +1948,13 @@ impl AgentDefinition {
                 .only_while()
                 .iter()
                 .flat_map(|setting| &setting.sources)
+                .chain(
+                    rules
+                        .competition
+                        .plugin_order()
+                        .iter()
+                        .flat_map(|order| &order.sources),
+                )
             {
                 self.validate_setting(&source.anchor).map_err(context)?;
             }
@@ -4214,6 +4221,68 @@ locations = {locations}
     fn plugins_and_their_switch_load() {
         let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", r#"["plugin-mcp"]"#));
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    /// `with_plugins`, its plugin servers competing by endpoint and ranked
+    /// by `plugin_order`, read at `anchor` for the locations `locations`.
+    fn with_plugin_order(locations: &str, anchor: &str) -> String {
+        let competition = format!(
+            r#"competition = {{ block = "exact-name", by_endpoint = ["plugin-mcp"], plugin_order = {{ locations = {locations}, sources = [{{ anchor = {anchor}, key_path = ["enabledPlugins"] }}] }} }}"#
+        );
+        with_plugins("").replace(r#"competition = { block = "exact-name" }"#, &competition)
+    }
+
+    #[test]
+    fn a_plugin_order_ranks_locations_that_compete_by_endpoint() {
+        let text = with_plugin_order(r#"["plugin-mcp"]"#, STATE);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_plugin_order(r#"["user-mcp"]"#, STATE);
+        assert!(
+            error(&text).contains("plugin_order: `user-mcp` does not compete by endpoint"),
+            "{}",
+            error(&text)
+        );
+        let text = with_plugin_order("[]", STATE);
+        assert!(
+            error(&text).contains("plugin_order: locations needs a location"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_plugin_order_reads_declared_settings() {
+        let text = with_plugin_order(
+            r#"["plugin-mcp"]"#,
+            r#"{ block = "home", root = "settings" }"#,
+        );
+        assert!(
+            error(&text).contains("declares no root `settings`"),
+            "{}",
+            error(&text)
+        );
+        let text = with_plugin_order(
+            r#"["plugin-mcp"]"#,
+            r#"{ block = "settings", settings = "managed" }"#,
+        );
+        assert!(
+            error(&text).contains("undeclared settings `managed`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn every_source_of_a_plugin_order_reads_one_key_path() {
+        let text = with_plugin_order(r#"["plugin-mcp"]"#, STATE).replace(
+            r#"key_path = ["enabledPlugins"] }]"#,
+            r#"key_path = ["enabledPlugins"] }, { anchor = { block = "home", root = "state" }, key_path = ["plugins"] }]"#,
+        );
+        assert!(
+            error(&text).contains("plugin_order: every source reads the same key path"),
+            "{}",
+            error(&text)
+        );
     }
 
     const MANIFEST_SKILLS: &str = r#"{ block = "manifest-skills", field = ["skills"], default = "skills", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "skip", no_name = "folder-name" } }"#;

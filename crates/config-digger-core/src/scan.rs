@@ -274,6 +274,10 @@ pub(crate) enum SettingOwner {
     Competition {
         source: usize,
     },
+    /// A source of the setting the Item kind's competition ranks plugins by.
+    PluginOrder {
+        source: usize,
+    },
     /// A source of the setting of the `when` condition `condition` of the
     /// location at `location` among the definition's.
     Condition {
@@ -2345,6 +2349,12 @@ fn read_rules(
                 .into_iter()
                 .flat_map(|setting| setting.sources.iter().enumerate())
                 .map(|(source, setting)| (SettingOwner::Competition { source }, setting));
+            let plugin_order_sources = rules
+                .competition
+                .plugin_order()
+                .into_iter()
+                .flat_map(|order| order.sources.iter().enumerate())
+                .map(|(source, setting)| (SettingOwner::PluginOrder { source }, setting));
             let condition_sources =
                 definition
                     .locations
@@ -2389,6 +2399,7 @@ fn read_rules(
             let sources = rule_sources
                 .chain(gate_sources)
                 .chain(competition_sources)
+                .chain(plugin_order_sources)
                 .chain(condition_sources)
                 .chain(feature_gate_sources);
             for (owner, setting) in sources {

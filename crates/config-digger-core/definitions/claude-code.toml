@@ -436,15 +436,37 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # [docs]. Of two plugins' servers with one endpoint, the server of the plugin
 # that comes first in `enabledPlugins` wins, the key merged from the user's,
 # the Project's and the local settings in that order, each plugin keeping
-# its first place [test]; config-digger does not order them yet
-# (#294).
+# its first place [test] (`plugin_order`).
 [items.mcp]
 precedence = ["managed-mcp", "managed-settings-mcp", "local-mcp", "project-mcp", "user-mcp", "plugin-manifest-mcp", "plugin-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
-competition = { block = "exact-name", by_endpoint = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"] }
 # An exclusive `managed-mcp.json` suppresses the other servers, and an
 # unapproved server is not loaded: neither competes. The allow and deny
 # lists apply after precedence, to the server that wins [docs].
 checks = ["policy", "shape", "disable", "approval", "precedence", "rules"]
+
+[items.mcp.competition]
+block = "exact-name"
+by_endpoint = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
+
+# An installed plugin's servers rank by the plugin's place in
+# `enabledPlugins`, a key the user's settings hold before the Project's and
+# the local settings keeping the user's place when they hold it again
+# [test]. Outside a Project, only the user's settings count. A plugin
+# turned off keeps its place and is Disabled, so the next one wins. Within
+# one plugin, the manifest's server still replaces the same-named server
+# of its `.mcp.json`.
+[items.mcp.competition.plugin_order]
+unverified = [
+  "The managed settings' `enabledPlugins` are taken not to count toward the order: only the user's, the Project's and the local settings do.",
+  "A synced plugin is taken to have no place in `enabledPlugins`: its servers rank after every installed plugin's, as they do by `precedence` (#354).",
+  "Between two plugins, the order of `enabledPlugins` is taken to decide whatever file of the plugin a server comes from: the manifest's `mcpServers`, its `.mcp.json` or a bundle.",
+]
+locations = ["plugin-manifest-mcp", "plugin-mcp"]
+sources = [
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins"] },
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins"] },
+]
 
 # Claude Code loads a `.mcp.json` server only once the user approves it,
 # which it asks about when it starts in the Project [docs]. Approvals are

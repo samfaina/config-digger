@@ -51,6 +51,32 @@ pub(crate) fn shadowed_by_precedence(
     }
 }
 
+/// A Shadowed Entry's reason, pointing at the Effective Entry `effective`
+/// of another plugin, which `agent_name` ranks first because that plugin
+/// comes first in the setting at `key_path`, joined with `.`.
+/// `same_endpoint` says they compete because they have the same endpoint.
+pub(crate) fn shadowed_by_plugin_order(
+    agent_name: &str,
+    effective_scope: &str,
+    effective: &str,
+    same_endpoint: bool,
+    key_path: &str,
+) -> Reason {
+    let endpoint = if same_endpoint {
+        "has the same endpoint and "
+    } else {
+        ""
+    };
+    Reason {
+        code: ReasonCode::ShadowedByPrecedence,
+        effective: Some(effective.to_owned()),
+        switch: None,
+        sentence: format!(
+            "Shadowed by the {effective_scope} Entry {effective}, which {endpoint}{agent_name} ranks first, since its plugin comes first in `{key_path}`."
+        ),
+    }
+}
+
 /// The fields `fields`, each named by its key path joined with `.`, as a
 /// sentence lists them.
 fn field_list<S: AsRef<str>>(fields: &[S]) -> String {

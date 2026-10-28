@@ -3562,6 +3562,17 @@
               },
               "default": []
             },
+            "plugin_order": {
+              "description": "How the Agent ranks the Entries of some `by_endpoint` locations by\nthe place of their plugin in a setting. Omitted, by location alone.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginOrder"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "exact-name"
@@ -3682,6 +3693,34 @@
             "block"
           ]
         }
+      ]
+    },
+    "PluginOrder": {
+      "description": "The order in which the Agent ranks plugins, as Claude Code ranks two\nplugins' servers with one endpoint by `enabledPlugins`: the keys of an\nobject, each a plugin's id, merged from its sources in order, each key\nkeeping the place where it first appears. The Entries of `locations`\nrank together where the first of them ranks: by their plugin's place,\na plugin no source names last, and within one plugin by location.",
+      "type": "object",
+      "properties": {
+        "locations": {
+          "description": "The ids of the `by_endpoint` locations whose Entries it ranks.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "description": "Where the object is, in the order the Agent merges it, the first\nfirst. Every source reads the same key path.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingPlace"
+          }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "locations",
+        "sources"
       ]
     },
     "SettingIs": {
