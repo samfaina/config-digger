@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { changedFiles, realData } from "../untouched.mjs";
 import { profileEnv, Session, startTauriDriver } from "./driver.mjs";
-import { setupSwitches } from "./lib.mjs";
+import { PLAN_ROOT, setupSwitches } from "./lib.mjs";
 import { jobSummary, reason, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import sections from "./steps/index.mjs";
 
@@ -38,7 +38,7 @@ const { values: opt } = parseArgs({
     only: { type: "string" },
     from: { type: "string" },
     attach: { type: "string" },
-    root: { type: "string", default: "E:\\cd-throwaway" },
+    root: { type: "string", default: PLAN_ROOT },
     port: { type: "string", default: "4444" },
     // With a port, the walk starts the app itself and msedgedriver attaches
     // to its WebView2 on that port, as an elevated app needs (driver.mjs).

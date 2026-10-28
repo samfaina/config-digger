@@ -1,7 +1,7 @@
 // Section 7: the action dialog and the buttons that delete.
 import { KEY, ref, unwrap } from "../driver.mjs";
 import { buttonEl, fieldValue, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
-import { act, addHome, confirm, DESKTOP_HOME, dialog, done, inventoryOf, openItem, operationId, project, rootSlash, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
+import { act, addHome, confirm, DESKTOP_HOME, dialog, done, inventoryOf, openItem, operationId, project, slashPath, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
 
 // Claude Code Disables a user Entry per Project, so Disable is offered only
 // with a Project chosen. The steps that Disable cd-throwaway-user name none:
@@ -67,7 +67,7 @@ export default [
     id: "7.1",
     async run(t) {
       const { s } = t;
-      const gone = rootSlash(t, "project-gone");
+      const gone = slashPath(t, "project-gone");
       await openRemoveLeftovers(t, gone);
       const block = await s.exec(`
         const body = [...document.querySelectorAll(".dialog .dialog-section")].find((e) => e.querySelector(".dialog-section-title")?.firstChild?.textContent.trim() === "What changes");
@@ -218,7 +218,7 @@ export default [
       const listed = await s.exec(`return [...document.querySelectorAll(".place-name")].some((e) => e.textContent.trim() === arguments[0]);`, `${t.root}\\claude-code-many-home`);
       if (!listed) await addHome(t, "Claude Code", `${t.root}\\claude-code-many-home`, { checks: false });
       else t.note("claude-code-many-home ya estaba en la lista desde el paso 4.1, así que no se añade otra vez.");
-      await openRemoveLeftovers(t, rootSlash(t, "many/project-gone"));
+      await openRemoveLeftovers(t, slashPath(t, "many/project-gone"));
       const layout = await s.exec(`
         const d = document.querySelector(".dialog"), r = d.getBoundingClientRect();
         const sec = (title) => [...d.querySelectorAll(".dialog-section")].find((e) => e.querySelector(".dialog-section-title")?.firstChild?.textContent.trim().startsWith(title));

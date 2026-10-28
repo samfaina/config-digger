@@ -1,6 +1,7 @@
 // Tests of the WebDriver walk's parts that run without the app: the steps
-// it knows match the plan, the throwaway profile, opening a group on the
-// Projects tab, step 10.10's counts of the lines of a label and of where a
+// it knows match the plan, no step module holds the plan's root, the
+// throwaway profile, opening a group on the Projects tab, step 10.5 on a root
+// outside E:, step 10.10's counts of the lines of a label and of where a
 // path wraps, confirming an action dialog up to its result, reading an
 // Operation id, step 11.11's command that marks an Operation, and the walk's
 // CI mode: no screenshot, the steps a runner can't do, uat-results.json and
@@ -108,9 +109,9 @@ test("the profile holds both AppData folders, the known folders and a Claude Cod
 });
 
 // Runs a script of the walk on a fake page's `document`, with its `args` as
-// `arguments`.
+// `arguments`. Every element's computed style is empty.
 function runScript(document, { script, args }) {
-  return new Function("document", "args", `return (function () {${script}}).apply(null, args);`)(document, args);
+  return new Function("document", "getComputedStyle", "args", `return (function () {${script}}).apply(null, args);`)(document, () => ({}), args);
 }
 
 // A session whose page is only the group toggles of a Projects tab, each
@@ -201,7 +202,7 @@ class ProjectsPage extends Session {
     if (path === "/element" && body.value.startsWith(".rail button")) return ref("rail");
     if (path === "/execute/sync") {
       const document = { querySelectorAll: (css) => (css === "[role=tab]" ? this.tabs : css === ".places .scroll > *" ? this.children : []) };
-      const value = new Function("document", "getComputedStyle", "args", `return (function () {${body.script}}).apply(null, args);`)(document, () => ({}), body.args);
+      const value = runScript(document, body);
       return this.tabs.includes(value) ? ref(value.id) : value;
     }
     if (/^\/element\/[^/]+\/click$/.test(path)) return null;

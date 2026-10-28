@@ -94,7 +94,7 @@ Each step's checks are the plan's `expect`, one by one. What a style can't show,
 
 When a step leaves the window blank, the walk notes what the page logged and its last commands, opens the app again and runs the step once more.
 
-When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, that each step it walks lists `webdriver` in its `automation` with a `test` ending in its id, that no step module holds `manual`, and the parts of the walk that need no app.
+When a step of the plan changes, change its module in `steps/` with it. `node --test uat/auto/webdriver/walk.test.mjs` checks that every step the walk knows is a step of the plan, that every step of a section it walks has a module, but those the Sandbox walks, that each step it walks lists `webdriver` in its `automation` with a `test` ending in its id, that no step module holds `manual`, that no step module holds the plan's root, `E:\cd-throwaway`, so that each builds its paths from the walk's `--root`, and the parts of the walk that need no app.
 
 ### The Sandbox walk
 
