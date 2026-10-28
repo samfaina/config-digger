@@ -156,7 +156,7 @@ The name rule, on 2.1.299 to 2.1.309 with `tengu_slate_wicket` at its default:
 
 | Mark | What the probe saw | Outcome |
 |---|---|---|
-| `:93` `plugins[extensions]`: two extensions with one name are both refused | Gemini CLI does not start at all: "Extension with name … already was loaded" | Ticket [#300](https://github.com/samfaina/config-digger/issues/300) |
+| `:93` `plugins[extensions]`: two extensions with one name are both refused | Gemini CLI does not start at all: "Extension with name … already was loaded". It does not either where `extension-enablement.json`, which goes by name and so turns off both, Disables them | Ticket [#300](https://github.com/samfaina/config-digger/issues/300), done, tested on 0.62.0: the home has a `cannot_start` flag in every context for each name its extensions share, Disabled or not, naming each folder that holds one; their Entries stay Invalid, each reason naming the other folders |
 | `:192` `locations[extension-mcp]`: unparsable manifest | The extension is skipped with a warning; the others load | Corrected: `ignores_file` |
 | `:278` `items.mcp.disable[1]`: the drive letter is upper case | Gemini CLI spells it as the folder it starts in is spelled: upper case from PowerShell, lower case after `cd /d e:\…` in cmd, and compares with regard to case | Corrected: the comment says so; config-digger keeps upper case, PowerShell's spelling |
 | `:279` `items.mcp.disable[1]`: a rule on another drive reaches the folders below | Confirmed for a folder and for the drive's root | Confirmed |

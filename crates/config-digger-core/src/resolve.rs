@@ -307,7 +307,7 @@ pub(crate) fn resolve(
                     && !entries[index]
                         .plugin
                         .as_ref()
-                        .is_some_and(|plugin| plugin.name_shared)
+                        .is_some_and(|plugin| !plugin.shared_with.is_empty())
                     && (malformed[index].is_none()
                         || definition
                             .location(&entries[index].location)
@@ -664,13 +664,19 @@ pub(crate) fn resolve(
                                 }
                             }
                             Check::PluginName => {
-                                if let Some(plugin) =
-                                    entry.plugin.as_ref().filter(|plugin| plugin.name_shared)
+                                if let Some(plugin) = entry
+                                    .plugin
+                                    .as_ref()
+                                    .filter(|plugin| !plugin.shared_with.is_empty())
                                 {
                                     failed.push((
                                         check,
                                         api::State::Invalid,
-                                        explain::duplicate_plugin_name(agent_name, &plugin.name),
+                                        explain::duplicate_plugin_name(
+                                            agent_name,
+                                            &plugin.name,
+                                            &plugin.shared_with,
+                                        ),
                                     ));
                                 }
                             }
@@ -1154,6 +1160,28 @@ pub(crate) fn resolve(
                 sentence: explain::cannot_start(&agent.name, &failure.path),
             }
         })
+        // An Agent that refuses plugins sharing a name does not start with them.
+        .chain(
+            snapshot
+                .name_clashes
+                .iter()
+                .filter(|clash| clash.reaches(project_key.map(String::as_str)))
+                .map(|clash| {
+                    let agent = &definitions[clash.agent_index].agent;
+                    api::AgentFlag {
+                        agent: agent.id.clone(),
+                        agent_name: agent.name.clone(),
+                        home: clash.home.clone(),
+                        code: api::AgentFlagCode::CannotStart,
+                        path: clash.folders[0].clone(),
+                        sentence: explain::cannot_start_shared_name(
+                            &agent.name,
+                            &clash.name,
+                            &clash.folders,
+                        ),
+                    }
+                }),
+        )
         .chain(conflicts)
         .collect();
 

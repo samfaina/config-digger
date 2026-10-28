@@ -1845,7 +1845,7 @@
           "default": false
         },
         "same_names_invalid": {
-          "description": "Whether the Agent refuses plugins that share a name, as Gemini CLI\nrefuses two extensions whose manifests give one `name`: the Entries\nof each are Invalid, with `duplicate_plugin_name`.",
+          "description": "Whether the Agent refuses plugins that share a name, as Gemini CLI\nrefuses two extensions whose manifests give one `name`: the Agent\nhome cannot start, whether they are Disabled or not, and the Entries\nof each are Invalid, with `duplicate_plugin_name`. Only a name the\nmanifest gives counts, never one taken from the plugin's id.",
           "type": "boolean",
           "default": false
         },
