@@ -86,6 +86,62 @@ pub(crate) struct Snapshot {
     /// The files each Agent, by its index, skips without reading them,
     /// since someone other than an administrator can change them.
     pub not_admin_owned: NotAdminOwned,
+    /// `switches` and `setting_values` grouped by what an Entry looks them
+    /// up by. It is built from them with the Snapshot, and nothing changes
+    /// them after; code that does must build it again.
+    lookups: Lookups,
+}
+
+/// The indices of a Snapshot's switches and setting values, grouped by
+/// what an Entry looks them up by: its Agent home, then its Agent index,
+/// the Item kind, and the mechanism or the owner. Each group keeps the
+/// Snapshot's order.
+#[derive(Clone)]
+struct Lookups {
+    switches: ByHome<(usize, ItemKind, usize)>,
+    setting_values: ByHome<(usize, ItemKind, SettingOwner)>,
+}
+
+/// Indices into a list, by Agent home and then by `K`.
+type ByHome<K> = BTreeMap<String, BTreeMap<K, Vec<usize>>>;
+
+impl Lookups {
+    fn of(switches: &[ScannedSwitch], setting_values: &[ScannedSetting]) -> Lookups {
+        Lookups {
+            switches: by_home(switches, |switch| {
+                (
+                    &switch.home,
+                    (switch.agent_index, switch.kind, switch.mechanism),
+                )
+            }),
+            setting_values: by_home(setting_values, |value| {
+                (&value.home, (value.agent_index, value.kind, value.owner))
+            }),
+        }
+    }
+}
+
+/// The indices of `items`, by the Agent home and key `key` gives each.
+fn by_home<T, K: Ord>(items: &[T], key: impl Fn(&T) -> (&str, K)) -> ByHome<K> {
+    let mut indices = ByHome::new();
+    for (index, item) in items.iter().enumerate() {
+        let (home, key) = key(item);
+        indices
+            .entry(home.to_owned())
+            .or_default()
+            .entry(key)
+            .or_default()
+            .push(index);
+    }
+    indices
+}
+
+/// The indices among `indices` of the Agent home `home` and key `key`.
+fn indices_of<'i, K: Ord>(indices: &'i ByHome<K>, home: &str, key: &K) -> &'i [usize] {
+    indices
+        .get(home)
+        .and_then(|of_home| of_home.get(key))
+        .map_or(&[], Vec::as_slice)
 }
 
 /// A parked Entry: one at `key_path` in the parked-Entry store, moved there
@@ -204,7 +260,7 @@ pub(crate) struct ScannedSetting {
 /// The rule or gate a setting is read for, by its index among those of its
 /// Item kind, or the setting its competition depends on, and the source
 /// among its sources.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum SettingOwner {
     Rule {
         rule: usize,
@@ -243,14 +299,14 @@ impl Snapshot {
         owner: SettingOwner,
         project: Option<&'s str>,
     ) -> impl Iterator<Item = &'s ScannedSetting> {
-        self.setting_values.iter().filter(move |value| {
-            value.agent_index == entry.agent_index
-                && value.home == entry.home
-                && value.kind == kind
-                && value.owner == owner
-                && (value.project.is_none() || value.project.as_deref() == project)
-                && applies(value.file_of.as_ref(), entry)
-        })
+        let key = (entry.agent_index, kind, owner);
+        indices_of(&self.lookups.setting_values, &entry.home, &key)
+            .iter()
+            .map(|&index| &self.setting_values[index])
+            .filter(move |value| {
+                (value.project.is_none() || value.project.as_deref() == project)
+                    && applies(value.file_of.as_ref(), entry)
+            })
     }
 }
 
@@ -780,13 +836,11 @@ impl Snapshot {
         kind: ItemKind,
         mechanism: usize,
     ) -> impl Iterator<Item = &'s ScannedSwitch> + Clone {
-        self.switches.iter().filter(move |switch| {
-            switch.agent_index == entry.agent_index
-                && switch.home == entry.home
-                && switch.kind == kind
-                && switch.mechanism == mechanism
-                && applies(switch.file_of.as_ref(), entry)
-        })
+        let key = (entry.agent_index, kind, mechanism);
+        indices_of(&self.lookups.switches, &entry.home, &key)
+            .iter()
+            .map(|&index| &self.switches[index])
+            .filter(move |switch| applies(switch.file_of.as_ref(), entry))
     }
 
     /// The Agent homes whose Disable switches are in the file at `path`,
@@ -1625,6 +1679,7 @@ fn read_as_if(
             .iter()
             .any(|failure| failure.fails_whole(entry.agent_index, &entry.home, &entry.path))
     });
+    let lookups = Lookups::of(&switches, &setting_values);
     Ok(Snapshot {
         read_at,
         installations,
@@ -1668,6 +1723,7 @@ fn read_as_if(
         storage: scanner.storage,
         cached: scanner.cached,
         not_admin_owned: scanner.reader.not_admin_owned,
+        lookups,
     })
 }
 
@@ -5441,4 +5497,255 @@ impl<'p> Projects<'p> {
 pub(crate) fn is_workspace(path: &Path) -> bool {
     path.extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("code-workspace"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HOMES: [(usize, &str); 3] = [(0, "a"), (0, "b"), (1, "a")];
+    const KINDS: [ItemKind; 2] = [ItemKind::Mcp, ItemKind::Skill];
+    const OWNERS: [SettingOwner; 4] = [
+        SettingOwner::Rule { rule: 0, source: 0 },
+        SettingOwner::Rule { rule: 0, source: 1 },
+        SettingOwner::Gate { gate: 0, source: 0 },
+        SettingOwner::Competition { source: 0 },
+    ];
+
+    fn file_owners() -> [Option<Owner>; 4] {
+        [
+            None,
+            Some(Owner::Plugin("x@market".to_owned())),
+            Some(Owner::Entry(PathBuf::from(r"C:\e\one.json"))),
+            Some(Owner::Entry(PathBuf::from(r"C:\e\two.json"))),
+        ]
+    }
+
+    /// Switches across Agent homes, kinds, mechanisms, Projects and the
+    /// files of plugins and Entries, listed so that no two of one Agent
+    /// home, kind and mechanism are next to each other. Each has its index
+    /// as its key path.
+    fn switches() -> Vec<ScannedSwitch> {
+        let mut switches = Vec::new();
+        for file_of in file_owners() {
+            for project in [None, Some("p"), Some("q")] {
+                for mechanism in 0..2 {
+                    for kind in KINDS {
+                        for (agent_index, home) in HOMES {
+                            switches.push(ScannedSwitch {
+                                agent_index,
+                                home: home.to_owned(),
+                                kind,
+                                mechanism,
+                                path: PathBuf::from(r"C:\switches.json"),
+                                project: project.map(str::to_owned),
+                                file_of: file_of.clone(),
+                                key_path: vec![switches.len().to_string()],
+                                value: None,
+                                named_by: None,
+                                ignore_case: false,
+                                later_wins: false,
+                                store_class: StoreClass::Plain,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        switches
+    }
+
+    /// Setting values across the same, by owner in place of mechanism.
+    fn setting_values() -> Vec<ScannedSetting> {
+        let mut values = Vec::new();
+        for file_of in file_owners() {
+            for project in [None, Some("p"), Some("q")] {
+                for owner in OWNERS {
+                    for kind in KINDS {
+                        for (agent_index, home) in HOMES {
+                            values.push(ScannedSetting {
+                                agent_index,
+                                home: home.to_owned(),
+                                kind,
+                                owner,
+                                path: PathBuf::from(r"C:\settings.json"),
+                                project: project.map(str::to_owned),
+                                file_of: file_of.clone(),
+                                key_path: vec![values.len().to_string()],
+                                value: None,
+                                cached_at: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        values
+    }
+
+    fn snapshot(switches: Vec<ScannedSwitch>, setting_values: Vec<ScannedSetting>) -> Snapshot {
+        let lookups = Lookups::of(&switches, &setting_values);
+        Snapshot {
+            read_at: SystemTime::UNIX_EPOCH,
+            homes: Vec::new(),
+            installations: Vec::new(),
+            projects: Vec::new(),
+            entries: Vec::new(),
+            read_failures: Vec::new(),
+            readers: Vec::new(),
+            versioned: BTreeSet::new(),
+            switches,
+            unreadable_switches: BTreeSet::new(),
+            gates: Vec::new(),
+            accounts: Vec::new(),
+            exclusive: BTreeSet::new(),
+            settings: Vec::new(),
+            setting_values,
+            unreadable_settings: BTreeSet::new(),
+            parked_store: None,
+            parked: Vec::new(),
+            stranded: Vec::new(),
+            store_failures: Vec::new(),
+            storage: Vec::new(),
+            cached: BTreeMap::new(),
+            not_admin_owned: NotAdminOwned::default(),
+            lookups,
+        }
+    }
+
+    fn entry(agent_index: usize, home: &str, path: &str, plugin: Option<&str>) -> ScannedEntry {
+        ScannedEntry {
+            agent_index,
+            home: home.to_owned(),
+            location: "location".to_owned(),
+            path: PathBuf::from(path),
+            key_path: Vec::new(),
+            name: "entry".to_owned(),
+            project: None,
+            config: serde_json::Value::Null,
+            masked: Vec::new(),
+            depth: 0,
+            found_in: None,
+            defect: None,
+            unruled: None,
+            link: None,
+            manager: None,
+            plugin: plugin.map(|id| ScannedPlugin {
+                plugins: "plugins".to_owned(),
+                id: id.to_owned(),
+                name: "x".to_owned(),
+                folder: PathBuf::from(r"C:\plugins\x"),
+                scope: None,
+                project: None,
+                version: None,
+                name_shared: false,
+            }),
+            switch_id: None,
+            config_hash: None,
+        }
+    }
+
+    /// An Entry of each Agent home, and of homes with no switch or value,
+    /// in and out of a plugin, at the paths a file is the file of and at
+    /// one none is.
+    fn entries() -> Vec<ScannedEntry> {
+        let mut entries = Vec::new();
+        for (agent_index, home) in HOMES.into_iter().chain([(2, "a"), (0, "c")]) {
+            for path in [r"C:\e\one.json", r"C:\e\two.json", r"C:\e\three.json"] {
+                for plugin in [None, Some("x@market"), Some("y@market")] {
+                    entries.push(entry(agent_index, home, path, plugin));
+                }
+            }
+        }
+        entries
+    }
+
+    /// The key paths of `switches`, each one index.
+    fn switch_indices<'s>(switches: impl Iterator<Item = &'s ScannedSwitch>) -> Vec<&'s str> {
+        switches.map(|switch| switch.key_path[0].as_str()).collect()
+    }
+
+    /// The key paths of `values`, each one index.
+    fn value_indices<'s>(values: impl Iterator<Item = &'s ScannedSetting>) -> Vec<&'s str> {
+        values.map(|value| value.key_path[0].as_str()).collect()
+    }
+
+    #[test]
+    fn an_entry_s_switches_are_those_of_its_home_kind_and_mechanism_in_the_snapshot_s_order() {
+        let snapshot = snapshot(switches(), Vec::new());
+        let entry = entry(0, "b", r"C:\e\one.json", Some("x@market"));
+        // In every Project, of every file but another Entry's.
+        assert_eq!(
+            switch_indices(snapshot.switches_of(&entry, ItemKind::Skill, 1)),
+            ["10", "22", "34", "46", "58", "70", "82", "94", "106"]
+        );
+    }
+
+    #[test]
+    fn an_entry_s_switches_are_those_a_walk_of_every_switch_finds() {
+        let snapshot = snapshot(switches(), Vec::new());
+        let mut found_any = false;
+        for entry in entries() {
+            for kind in KINDS {
+                for mechanism in 0..3 {
+                    let walked = switch_indices(snapshot.switches.iter().filter(|switch| {
+                        switch.agent_index == entry.agent_index
+                            && switch.home == entry.home
+                            && switch.kind == kind
+                            && switch.mechanism == mechanism
+                            && applies(switch.file_of.as_ref(), &entry)
+                    }));
+                    let found = switch_indices(snapshot.switches_of(&entry, kind, mechanism));
+                    assert_eq!(found, walked);
+                    found_any |= !found.is_empty();
+                }
+            }
+        }
+        assert!(found_any);
+    }
+
+    #[test]
+    fn an_entry_s_setting_values_are_those_of_its_home_kind_owner_and_project_in_the_snapshot_s_order()
+     {
+        let snapshot = snapshot(Vec::new(), setting_values());
+        let entry = entry(1, "a", r"C:\e\two.json", None);
+        let owner = SettingOwner::Rule { rule: 0, source: 1 };
+        // In every context and in `q`, of every file and its own.
+        assert_eq!(
+            value_indices(snapshot.settings_for(&entry, ItemKind::Mcp, owner, Some("q"))),
+            ["8", "56", "224", "272"]
+        );
+    }
+
+    #[test]
+    fn an_entry_s_setting_values_are_those_a_walk_of_every_value_finds() {
+        let snapshot = snapshot(Vec::new(), setting_values());
+        let mut found_any = false;
+        let owners = OWNERS
+            .into_iter()
+            .chain([SettingOwner::Gate { gate: 1, source: 0 }]);
+        for entry in entries() {
+            for kind in KINDS {
+                for owner in owners.clone() {
+                    for project in [None, Some("p"), Some("q"), Some("r")] {
+                        let walked =
+                            value_indices(snapshot.setting_values.iter().filter(|value| {
+                                value.agent_index == entry.agent_index
+                                    && value.home == entry.home
+                                    && value.kind == kind
+                                    && value.owner == owner
+                                    && (value.project.is_none()
+                                        || value.project.as_deref() == project)
+                                    && applies(value.file_of.as_ref(), &entry)
+                            }));
+                        let found =
+                            value_indices(snapshot.settings_for(&entry, kind, owner, project));
+                        assert_eq!(found, walked);
+                        found_any |= !found.is_empty();
+                    }
+                }
+            }
+        }
+        assert!(found_any);
+    }
 }
