@@ -324,6 +324,49 @@ fn history_shows_an_incomplete_rollback_as_needing_attention() {
     assert!(history[0].cause.is_some());
 }
 
+#[test]
+fn the_operation_count_counts_every_operation_history_lists() {
+    // One that needs attention, one done, its Undo, and one rolled back.
+    let fs = two_files()
+        .failing_writes_to_after(mcp_json(), 1)
+        .failing_writes_to(claude_json());
+    remove_both_linear(&core(&fs)).err().unwrap();
+    fs.stop_failing_writes();
+    let done = remove(&fs, "notes").unwrap().operation;
+    let undo = core(&fs).plan_undo(&done).unwrap();
+    core(&fs).execute(undo, &[]).unwrap();
+    let fs = fs.failing_writes_to(claude_json());
+    remove(&fs, "linear").err().unwrap();
+
+    let count = core(&fs).operation_count().unwrap();
+
+    let history = core(&fs).history().unwrap();
+    assert_eq!(count, history.len());
+    let mut statuses: Vec<&str> = history.iter().map(|op| op.status_text.as_str()).collect();
+    statuses.sort_unstable();
+    assert_eq!(statuses.len(), 4);
+    assert_eq!(statuses[..2], ["Failed, rolled back", "Needs attention"]);
+    assert_eq!(statuses[2], format!("Undo of {done}"));
+    assert!(statuses[3].starts_with("Undone by "), "{}", statuses[3]);
+}
+
+#[test]
+fn the_operation_count_leaves_out_a_backup_whose_manifest_does_not_parse() {
+    let fs = FakeFileSystem::new().with_file(claude_json(), TWO_USER_SERVERS);
+    remove(&fs, "linear").unwrap();
+    fs.put_file(
+        backups()
+            .join("20261001T120000Z-broken")
+            .join("manifest.json"),
+        "{ not json",
+    );
+
+    let count = core(&fs).operation_count().unwrap();
+
+    assert_eq!(core(&fs).history().unwrap().len(), 1);
+    assert_eq!(count, 1);
+}
+
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// An Operation whose Rollback is incomplete, then 51 more, then 40 days.

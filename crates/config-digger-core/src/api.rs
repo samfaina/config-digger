@@ -332,6 +332,13 @@ impl Core {
         ))
     }
 
+    /// How many Operations [`history`](Self::history) lists, counted from
+    /// their manifests alone: it checks no Undo and asks the git index
+    /// nothing.
+    pub fn operation_count(&self) -> Result<usize, Error> {
+        Ok(history::load_all(&self.ports)?.len())
+    }
+
     /// Prunes History, as the front-ends do at startup: it keeps at least the
     /// last 50 Operations and every one from the last 30 days, never prunes
     /// one that needs attention, and removes an Operation with its backup.
