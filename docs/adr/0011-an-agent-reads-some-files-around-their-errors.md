@@ -1,0 +1,11 @@
+# An Agent reads some files around their errors
+
+VS Code starts both servers of an agent plugin's `.mcp.json` with `,,` between them, and opens the folders of a `.code-workspace` file with `,,` after `folders`, applying its other settings but skipping its `settings.mcp` (#322). config-digger read nothing of a file that did not parse, so it listed none of those servers and gave the workspace file's Project no member folders. So `on_read_failure = "reads_around_error"` says the Agent keeps what parses on both sides of an error: the file is still a Read failure, shown with its error, and the location contributes the Entries config-digger recovers the way VS Code's `node-jsonc-parser` does, through a port of that parser's recovery. We rejected a JSONC dialect that recovers, since in one workspace file VS Code reads the folders around the error and skips the servers, so the recovery belongs to the reader, not the file; and recovering `,,` alone, which leaves every other error read unlike VS Code.
+
+## Consequences
+
+- `reads_around_error` is the mildest reaction. A file several locations read still shows the strongest reaction on its Read failure, but each location reading around the error contributes what it recovers.
+- A setting a definition reads, such as `chat.mcp.discovery.enabled`, can read around the error too, with the same field; it takes no other reaction.
+- A workspace file's member folders are always read around the error, for every Agent: they belong to the Project, not to one Agent's reading.
+- An Operation that would write the file is refused, as for any Read failure. A Disable whose switch lives in another file, such as VS Code's `state.vscdb`, still works.
+- Only `,,` is tested against the real VS Code; the other errors follow `node-jsonc-parser`'s code, under an Unverified mark until the release gate tests them.
