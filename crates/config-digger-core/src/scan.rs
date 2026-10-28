@@ -2701,12 +2701,26 @@ fn switch_files(
     files
 }
 
-/// What a scan or a plan asked the git index: how many paths, and in how
-/// many calls, one per repo the paths are in.
+/// What a scan, a plan or a History read asked the git index: how many
+/// paths, and in how many calls, one per repo the paths are in.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct GitAsks {
     pub paths: usize,
     pub calls: usize,
+}
+
+impl GitAsks {
+    /// Logs these asks as `<reader> asked the git index`, when they are
+    /// about any path.
+    pub(crate) fn log(self, reader: &str) {
+        if self.paths > 0 {
+            tracing::info!(
+                paths = self.paths,
+                git_calls = self.calls,
+                "{reader} asked the git index"
+            );
+        }
+    }
 }
 
 /// The files and folders among `paths` that are in the index of their git

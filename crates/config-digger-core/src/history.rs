@@ -392,22 +392,31 @@ pub(crate) fn next_sequence(ports: &Ports) -> Result<u64, Error> {
 
 /// What History says of each Operation in `manifests`, in their order.
 pub(crate) fn summaries(ports: &Ports, manifests: &[Manifest]) -> Vec<OperationSummary> {
-    manifests
+    let mut git_asks = scan::GitAsks::default();
+    let summaries = manifests
         .iter()
-        .map(|manifest| summary(ports, manifest, manifests))
-        .collect()
+        .map(|manifest| summary(ports, manifest, manifests, &mut git_asks))
+        .collect();
+    git_asks.log("history");
+    summaries
 }
 
 /// What History says of one Operation. Whether it can be undone is checked
-/// as its Undo would be planned, against the files as they are now.
-fn summary(ports: &Ports, manifest: &Manifest, manifests: &[Manifest]) -> OperationSummary {
+/// as its Undo would be planned, against the files as they are now, counting
+/// in `git_asks` what that asks the git index.
+fn summary(
+    ports: &Ports,
+    manifest: &Manifest,
+    manifests: &[Manifest],
+    git_asks: &mut scan::GitAsks,
+) -> OperationSummary {
     let undone_by = undone_by(&manifest.id, manifests).map(|undo| undo.id.clone());
     let not_undoable = not_undoable(manifest, manifests).or_else(|| {
         plan::undo_files(ports, manifest)
             .err()
             .map(|blocked| blocked.message())
             .or_else(|| {
-                plan::undo_folders(ports, manifest, &mut scan::GitAsks::default())
+                plan::undo_folders(ports, manifest, git_asks)
                     .err()
                     .map(|error| error.message)
             })
@@ -497,7 +506,8 @@ fn undone_by<'m>(id: &str, manifests: &'m [Manifest]) -> Option<&'m Manifest> {
 }
 
 /// The Operation `id`, with its edits, backed-up files and what it changed
-/// in each, masked for the locations that read them now.
+/// in each, masked for the locations that read them now. What its summary
+/// and its Undo refusal ask the git index is logged once.
 pub(crate) fn detail(
     definitions: &Definitions,
     ports: &Ports,
@@ -508,8 +518,9 @@ pub(crate) fn detail(
     let folder = operation_folder(ports, id)?;
     let projects: Vec<PathBuf> = manifest.project.iter().cloned().collect();
     let snapshot = scan::scan(definitions, ports, &projects).map_err(Error::unexpected)?;
-    Ok(OperationDetail {
-        summary: summary(ports, manifest, &manifests),
+    let mut git_asks = scan::GitAsks::default();
+    let detail = OperationDetail {
+        summary: summary(ports, manifest, &manifests, &mut git_asks),
         project: manifest.project.clone(),
         changes: manifest.changes.clone(),
         locations: manifest
@@ -554,10 +565,12 @@ pub(crate) fn detail(
             .unwrap_or_default(),
         undo_refusal: not_undoable(manifest, &manifests)
             .is_none()
-            .then(|| plan::undo_refusal(definitions, ports, manifest, &snapshot))
+            .then(|| plan::undo_refusal(definitions, ports, manifest, &snapshot, &mut git_asks))
             .flatten(),
         backup: folder,
-    })
+    };
+    git_asks.log("history");
+    Ok(detail)
 }
 
 /// The copies of the file at `path`, in any spelling, that History still
@@ -591,7 +604,7 @@ pub(crate) fn backups_of(ports: &Ports, path: &Path) -> Result<Vec<Backup>, Erro
 }
 
 /// Dismisses the Operation `id`, under the global lock, when it needs
-/// attention.
+/// attention. What its summary asks the git index is logged once.
 pub(crate) fn dismiss(ports: &Ports, id: &str) -> Result<OperationSummary, Error> {
     let data = data_folder(ports.env.as_ref())?;
     // With no History yet there is no data folder to take the lock in.
@@ -613,7 +626,10 @@ pub(crate) fn dismiss(ports: &Ports, id: &str) -> Result<OperationSummary, Error
         Some(humantime::format_rfc3339_seconds(ports.clock.now()).to_string());
     record(ports, &backups_folder(&data).join(id), &manifests[index]).map_err(Error::unexpected)?;
     tracing::info!(operation = %id, "operation dismissed");
-    Ok(summary(ports, &manifests[index], &manifests))
+    let mut git_asks = scan::GitAsks::default();
+    let summary = summary(ports, &manifests[index], &manifests, &mut git_asks);
+    git_asks.log("history");
+    Ok(summary)
 }
 
 /// The copies in the Operation's backup that are still there. Only the copies
