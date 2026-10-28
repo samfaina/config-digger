@@ -216,10 +216,12 @@ uatStep("2.3", async ({ page, open, check }) => {
   await home.click();
   await panel(page).waitFor();
 
-  await check("El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo.", async () => {
-    const [box, below] = [await home.boundingBox(), await panel(page).boundingBox()];
-    expect(box!.y + box!.height).toBeGreaterThan(SMALLEST.height / 2);
-    expect(below!.y).toBeGreaterThanOrEqual(box!.y + box!.height - 2);
+  await check("El panel de la fila de Claude Code, cerca del borde de abajo de la ventana, se abre debajo del campo si cabe entero, y encima si no.", async () => {
+    const [box, opened] = [(await home.boundingBox())!, (await panel(page).boundingBox())!];
+    expect(box.y + box.height).toBeGreaterThan(SMALLEST.height / 2);
+    const below = opened.y >= box.y + box.height - 2;
+    const above = opened.y + opened.height <= box.y + 2 && SMALLEST.height - (box.y + box.height) < opened.height;
+    expect(below || above).toBe(true);
   });
   await check("Ese panel sale entero, sin pasar del borde de la ventana.", async () => {
     const box = (await panel(page).boundingBox())!;

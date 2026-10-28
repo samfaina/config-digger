@@ -576,10 +576,13 @@ export default [
       const { s } = t;
       await go(s, "Projects & homes");
       await tab(s, "Projects");
+      // After 10.7, project-gone has no leftovers: its row is in the closed
+      // group «Missing, no leftovers».
+      if (noLeftoversGroup(await projectGroups(s))) await openGroup(s, "Missing, no leftovers");
       const groups = await projectGroups(s);
       const project = inGroup(groups, "Projects", `${t.root}\\project`);
       const extra = inGroup(groups, "Projects", `${t.root}\\project-extra`);
-      const gone = missingGroup(groups)?.rows.find((r) => /project-gone$/.test(r.name));
+      const gone = [missingGroup(groups), noLeftoversGroup(groups)].flatMap((g) => g?.rows ?? []).find((r) => r.name?.replaceAll("/", "\\") === `${t.root}\\project-gone`);
       t.eq(project?.tags.join("|"), "known to Claude Code", `la fila de «${t.root}\\project» lleva la etiqueta «known to Claude Code»`);
       t.eq(extra?.tags.join("|"), "added by you", `la fila de «${t.root}\\project-extra» lleva solo la etiqueta «added by you»`);
       t.eq(gone?.tags.join("|"), "known to Claude Code", "la fila de «E:/cd-throwaway/project-gone» lleva la etiqueta «known to Claude Code»");

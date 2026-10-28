@@ -17,6 +17,7 @@ import { profileEnv, ref, Session } from "./driver.mjs";
 import { setupSwitches } from "./lib.mjs";
 import { jobSummary, resultDocument, unwalkedStep, walkStep } from "./step.mjs";
 import { confirm, operationId } from "./steps/common.mjs";
+import { causeOnCi } from "./steps/history.mjs";
 import { openGroup, textLines, wrapFault } from "./steps/places.mjs";
 import sections from "./steps/index.mjs";
 
@@ -444,6 +445,15 @@ test("on CI, 11.5 runs its other checks without the cause, which Windows writes 
   const step = steps.find((s) => s.id === "11.5");
   assert.equal(step.ciLacks, "Windows en español, que escribe «Acceso denegado. (os error 5)» en la causa: el del runner la escribe en inglés");
   assert.equal(step.ciRuns, true);
+});
+
+test("on CI, 11.5's cause is its path and «(os error 5)», whatever Windows' words between them, and the rollback after them", () => {
+  const file = "E:\\cd-throwaway\\codex-home\\config.toml";
+  assert.equal(causeOnCi(`cannot write ${file}: Access is denied. (os error 5); Operation 20261028-082652-134 was rolled back`, file), true);
+  assert.equal(causeOnCi(`cannot write ${file}: Acceso denegado. (os error 5)`, file), true);
+  assert.equal(causeOnCi(`cannot write ${file}: The system cannot find the file specified. (os error 2)`, file), false);
+  assert.equal(causeOnCi("cannot write D:\\a\\_temp\\e-drive\\cd-throwaway\\codex-home\\config.toml: Access is denied. (os error 5)", file), false);
+  assert.equal(causeOnCi(undefined, file), false);
 });
 
 test("on a runner without Claude Desktop, 7.2, 7.6 and 13.1 are Blocked naming it, and 14.2 naming the tester's homes", async () => {

@@ -19,6 +19,11 @@ async function codex(t) {
   return openItem(t, "cd-throwaway-codex");
 }
 
+// Whether the dialog's line `said` gives the refused write of `file` by its
+// path and its code, whatever Windows' words between them: on CI they are in
+// the runner's language. The line goes on with the rollback.
+export const causeOnCi = (said, file) => / \(os error 5\)/.test(said?.split(`cannot write ${file}: `)[1] ?? "");
+
 function card(s) {
   return s.exec(`
     const c = document.querySelector(".panel.detail .entry-card");
@@ -239,7 +244,7 @@ export default [
         const cause = `cannot write ${file}: Acceso denegado. (os error 5)`;
         const said = result.text.split("\n").find((l) => l.includes("cannot write"));
         // On CI the path and the code are checked, not Windows' words between them.
-        if (t.ciLacks) t.check(said?.includes(`cannot write ${file}: `) && said.trimEnd().endsWith("(os error 5)"), `la causa dice «cannot write ${file}: … (os error 5)»`, said);
+        if (t.ciLacks) t.check(causeOnCi(said, file), `la causa dice «cannot write ${file}: … (os error 5)»`, said);
         else t.check(result.text.includes(cause), `la causa dice «${cause}»`, said);
         const id = operationId(result.text);
         t.shared.failed115 = id;
