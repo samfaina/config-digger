@@ -907,6 +907,146 @@ fn a_skill_without_frontmatter_is_invalid() {
     assert_eq!(code(reason.code), "malformed_skill");
 }
 
+/// The one Gemini CLI skill of `fs`'s user skills folder.
+fn only_skill(inventory: &Inventory) -> &Item {
+    let mut skills = gemini_items(inventory).filter(|item| code(item.kind) == "skill");
+    let skill = skills.next().expect("the skill is listed");
+    assert!(skills.next().is_none(), "one skill");
+    skill
+}
+
+/// The inventory of a Gemini CLI home whose one user skill's `SKILL.md`
+/// holds `text`.
+fn with_skill_md(text: &str) -> Inventory {
+    inventory(
+        &FakeFileSystem::new()
+            .with_file(user_settings(), "{}")
+            .with_file(skill(&user_skills(), "folder"), text),
+    )
+}
+
+#[test]
+fn a_description_holding_a_colon_and_space_is_read_line_by_line() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Use when: the user asks\n---\n");
+
+    let review = skill_item(&inventory, "review");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"],
+        json!({ "name": "review", "description": "Use when: the user asks" })
+    );
+}
+
+#[test]
+fn a_frontmatter_with_a_stray_line_is_read_line_by_line() {
+    let inventory = with_skill_md(
+        "---\n  name: \"review\"\njust text\nname: 123\ndescription: Reviews\n  the diff.\n\n  Not this.\n---\n",
+    );
+
+    // A later `name` line wins, and a blank line ends the description.
+    let review = skill_item(&inventory, "123");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"],
+        json!({ "name": "123", "description": "Reviews the diff." })
+    );
+}
+
+#[test]
+fn a_name_read_line_by_line_keeps_its_quotes_rewritten_with_hyphens() {
+    let inventory = with_skill_md("---\nname: \"team:review\"\ndescription: Use when: x\n---\n");
+
+    let review = skill_item(&inventory, "-team-review-");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"]["name"],
+        "\"team:review\""
+    );
+}
+
+#[test]
+fn a_name_yaml_reads_as_a_number_is_read_line_by_line() {
+    let inventory = with_skill_md("---\nname: 123\ndescription: \"Reviews.\"\n---\n");
+
+    let review = skill_item(&inventory, "123");
+    assert_eq!(states(review), ["effective"]);
+    assert_eq!(
+        entry_json(&review.entries[0])["config"]["description"],
+        "\"Reviews.\""
+    );
+}
+
+#[test]
+fn an_unclosed_bracket_names_the_skill_as_written() {
+    let inventory = with_skill_md("---\nname: [unclosed\ndescription: Reviews.\n---\n");
+
+    assert_eq!(states(skill_item(&inventory, "[unclosed")), ["effective"]);
+}
+
+#[test]
+fn a_frontmatter_without_a_name_line_is_invalid() {
+    let inventory = with_skill_md("---\ndescription: Use when: x\n---\n");
+
+    let skill = only_skill(&inventory);
+    assert_eq!(states(skill), ["invalid"]);
+    let reason = skill.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "malformed_skill");
+    assert!(
+        reason.sentence.contains("has no `name`"),
+        "{}",
+        reason.sentence
+    );
+}
+
+#[test]
+fn a_frontmatter_without_a_description_line_is_invalid() {
+    let inventory = with_skill_md("---\nname: review\n---\n");
+
+    let skill = only_skill(&inventory);
+    assert_eq!(states(skill), ["invalid"]);
+    let reason = skill.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "malformed_skill");
+    assert!(
+        reason.sentence.contains("has no `description`"),
+        "{}",
+        reason.sentence
+    );
+}
+
+#[test]
+fn an_unclosed_frontmatter_is_no_frontmatter() {
+    let inventory = with_skill_md("---\nname: review\ndescription: Reviews.\n");
+
+    let skill = only_skill(&inventory);
+    assert_eq!(states(skill), ["invalid"]);
+    let reason = skill.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "malformed_skill");
+    assert!(
+        reason
+            .sentence
+            .contains("does not open with a `---` frontmatter"),
+        "{}",
+        reason.sentence
+    );
+}
+
+#[test]
+fn skill_content_reads_the_frontmatter_as_the_inventory_does() {
+    let fs = FakeFileSystem::new().with_file(
+        skill(&user_skills(), "folder"),
+        "---\nname: review\ndescription: Use when: x\n---\n",
+    );
+
+    let content = core_with(&fs, env())
+        .skill_content(&user_skills().join("folder"), "gemini-cli")
+        .unwrap();
+
+    assert_eq!(
+        (content.name.as_deref(), content.description.as_deref()),
+        (Some("review"), Some("Use when: x"))
+    );
+}
+
 #[test]
 fn project_skills_beat_the_user_s_in_a_trusted_folder_and_are_blocked_in_another() {
     let trusted = project("trusted");

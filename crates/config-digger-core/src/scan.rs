@@ -5076,7 +5076,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
     let mut config = serde_json::Map::new();
     let mut found = None;
     let mut named = None;
-    match skill::frontmatter(text) {
+    match skill::frontmatter(text, format.malformed_frontmatter) {
         Ok(keys) => {
             for key in ["name", "description"] {
                 if let Some(value) = keys.get(key) {

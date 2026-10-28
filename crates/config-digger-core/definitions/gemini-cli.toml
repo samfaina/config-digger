@@ -289,16 +289,18 @@ locations = ["extension-mcp"]
 # not read. A skill is named by the `name` of its frontmatter, each
 # character a file name cannot hold replaced by `-` [source, disk]. One
 # without a frontmatter, or whose frontmatter lacks a `name` or a
-# `description`, is skipped [source]. Gemini CLI reads a frontmatter that is
-# not YAML line by line instead [source], which config-digger does not, so
-# it shows such a skill as skipped.
+# `description`, is skipped [source]. When YAML fails on a frontmatter, or
+# gives its `name` or `description` as no string, such as `name: 123`,
+# Gemini CLI reads both line by line, as `line-by-line` says: a `: ` in a
+# value, a stray line and an indented `name` load the skill, quotes kept,
+# and a frontmatter that never closes is none [source, test].
 #
 # `<folder>\.agents\skills` and `<folder>\.gemini\skills`, read only in a
 # folder the user trusts [source].
 [[locations]]
 id = "project-agents-skills"
 anchor = { block = "project", path = ".agents/skills" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -308,7 +310,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-skills"
 anchor = { block = "project", path = ".gemini/skills" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -320,7 +322,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "agents-skills"
 anchor = { block = "home", root = "agents_skills" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -332,7 +334,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-skills"
 anchor = { block = "home", root = "skills" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -343,7 +345,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "extension-skills"
 anchor = { block = "plugin", plugins = "extensions", path = "skills" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "extension"
 provenance = "extension"
@@ -356,7 +358,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "npm-builtin-skills"
 anchor = { block = "machine", path = "%APPDATA%/npm/node_modules/@google/gemini-cli/bundle/builtin" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "system"
 provenance = "built-in"
@@ -366,7 +368,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "volta-builtin-skills"
 anchor = { block = "machine", path = "%LOCALAPPDATA%/Volta/tools/image/packages/@google/gemini-cli/node_modules/@google/gemini-cli/bundle/builtin" }
-format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "skip", no_name = "skip" }
+format = { block = "skill-folder", name_from = "frontmatter", sanitize = "path-chars", no_frontmatter = "skip", malformed_frontmatter = "line-by-line", no_name = "skip" }
 kind = "skill"
 scope = "system"
 provenance = "built-in"

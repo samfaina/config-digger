@@ -3136,7 +3136,10 @@ pub(crate) struct SkillFolder {
     /// What the Agent does with a `SKILL.md` that does not open with a
     /// `---` frontmatter.
     pub no_frontmatter: SkillFallback,
-    /// What the Agent does with a frontmatter that is not YAML it reads.
+    /// What the Agent does with a frontmatter that is not YAML it reads:
+    /// besides `skip` and `folder-name`, it may read it another way,
+    /// `quote-values` or `line-by-line`, and skip only a skill that way
+    /// fails.
     pub malformed_frontmatter: SkillFallback,
     /// What the Agent does with a frontmatter without a `name`, when
     /// `name_from` is `frontmatter`.
@@ -3235,6 +3238,28 @@ pub(crate) enum SkillFallback {
     /// It loads the skill under its folder's name, with no other
     /// frontmatter field: Effective, with a note.
     FolderName,
+    /// For a malformed frontmatter alone: it reads the frontmatter again
+    /// with each plain value that holds `: ` quoted, as Codex does, and
+    /// skips the skill when that still fails: when such a value goes on
+    /// over more lines, a quote never closes, a line is no key, or `name`
+    /// or `description` is given twice. An unclosed frontmatter is no
+    /// frontmatter.
+    QuoteValues,
+    /// For a malformed frontmatter alone: it reads `name` and
+    /// `description` line by line, as Gemini CLI does, whenever YAML would
+    /// fail or give either of them as no string. A line holding `name:`,
+    /// after any blanks, gives the name, quotes kept, and a later one wins;
+    /// one holding `description:` gives the description, joined with each
+    /// following indented line. A skill without either line is skipped. An
+    /// unclosed frontmatter is no frontmatter.
+    LineByLine,
+}
+
+impl SkillFallback {
+    /// Whether the Agent reads a malformed frontmatter another way.
+    pub fn reads_again(self) -> bool {
+        matches!(self, SkillFallback::QuoteValues | SkillFallback::LineByLine)
+    }
 }
 
 /// Why an Agent may not read a skill's `SKILL.md` as it is written.
@@ -3246,6 +3271,8 @@ pub(crate) enum SkillDefect {
     MalformedFrontmatter,
     /// Its frontmatter has no `name`, which the Agent names it by.
     NoName,
+    /// Its frontmatter, read line by line, has no `description`.
+    NoDescription,
     /// Its folder has a name the Agent keeps for itself.
     Reserved,
     /// Its folder's name breaks the Agent's name rule.
@@ -3277,6 +3304,11 @@ impl Validate for SkillFolder {
             }
             _ => {}
         }
+        if self.no_frontmatter.reads_again() || self.no_name.reads_again() {
+            return Err(
+                "only malformed_frontmatter can be quote-values or line-by-line: they read a frontmatter again".into(),
+            );
+        }
         if let Some(name) = self
             .reserved
             .iter()
@@ -3293,9 +3325,16 @@ impl SkillFolder {
     pub fn fallback(&self, defect: SkillDefect) -> SkillFallback {
         match defect {
             SkillDefect::NoFrontmatter => self.no_frontmatter,
+            // A frontmatter the Agent reads again is malformed only when
+            // that fails too.
+            SkillDefect::MalformedFrontmatter if self.malformed_frontmatter.reads_again() => {
+                SkillFallback::Skip
+            }
             SkillDefect::MalformedFrontmatter => self.malformed_frontmatter,
             SkillDefect::NoName => self.no_name,
-            SkillDefect::Reserved | SkillDefect::FolderName(_) => SkillFallback::Skip,
+            SkillDefect::NoDescription | SkillDefect::Reserved | SkillDefect::FolderName(_) => {
+                SkillFallback::Skip
+            }
             SkillDefect::RefusedName(_) => self.no_name,
         }
     }

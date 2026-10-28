@@ -273,7 +273,11 @@ pub(crate) fn resolve(
                         let folder = definition.location(&entry.location).format.skill_folder();
                         match (entry.defect, folder) {
                             (Some(defect), Some(folder)) => match folder.fallback(defect) {
-                                SkillFallback::Skip => (Some(defect), None),
+                                // A frontmatter read again that still fails
+                                // is skipped.
+                                SkillFallback::Skip
+                                | SkillFallback::QuoteValues
+                                | SkillFallback::LineByLine => (Some(defect), None),
                                 SkillFallback::FolderName => (None, Some(defect)),
                             },
                             _ => (None, None),

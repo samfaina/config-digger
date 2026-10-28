@@ -109,4 +109,54 @@ await p.check("locations[extension-mcp]", "an extension manifest that does not p
   return same({ warning: /Skipping extension in .*cd-throwaway-e2/.test(out), servers: (out.match(/cd-throwaway-e\d-srv/g) ?? []).sort() }, { warning: true, servers: ["cd-throwaway-e1-srv", "cd-throwaway-e3-srv"] });
 });
 
+// ---------------------------------------------------------------- skills
+
+// Frontmatters that are not YAML, each in the folder `cd-throwaway-fm-<case>`
+// of `~\.gemini\skills`.
+const frontmatters = {
+  colon: "name: cd-throwaway-fm-colon\ndescription: Use when: x\n---",
+  stray: "name: cd-throwaway-fm-stray\njust text\ndescription: d-stray\n---",
+  continued: "name: cd-throwaway-fm-continued\ndescription: Use when: one\n  two\n\n  three\n---",
+  number: "name: 123\ndescription: d-number\n---",
+  indented: "  name: cd-throwaway-fm-indented\ndescription: Use when: x\n---",
+  twonames: "name: cd-throwaway-fm-first\nname: cd-throwaway-fm-second\ndescription: d-twonames\n---",
+  quoted: "name: \"cd-throwaway-fm:quoted\"\ndescription: Use when: x\n---",
+  noname: "description: Use when: x\n---",
+  unclosed: "name: cd-throwaway-fm-unclosed\ndescription: Use when: x",
+};
+for (const [name, frontmatter] of Object.entries(frontmatters)) {
+  write(path.join(home, ".gemini", "skills", `cd-throwaway-fm-${name}`, "SKILL.md"), `---\n${frontmatter}\nbody\n`);
+}
+// Each `cd-throwaway-fm-<case>` skill `gemini skills list` lists, as
+// `{ name, description }`.
+const listed = await (async () => {
+  const { stdout, stderr } = await gemini(proj, "skills", "list");
+  const blocks = [...(stdout + stderr).matchAll(/^(.*) \[\w+\]\r?\n\s*Description: (.*?)\r?\n\s*Location: .*\\cd-throwaway-fm-([a-z]+)\\SKILL\.md/gm)];
+  return Object.fromEntries(blocks.map(([, name, description, folder]) => [folder, { name, description: description.trim() }]));
+})();
+const listedOf = (...folders) => Object.fromEntries(folders.map((folder) => [folder, listed[folder] ?? null]));
+
+await p.check("items.skill", "a frontmatter YAML refuses is read line by line: `description: Use when: x`, a stray line and an indented `name` load the skill", async () => {
+  return same(listedOf("colon", "stray", "indented"), {
+    colon: { name: "cd-throwaway-fm-colon", description: "Use when: x" },
+    stray: { name: "cd-throwaway-fm-stray", description: "d-stray" },
+    indented: { name: "cd-throwaway-fm-indented", description: "Use when: x" },
+  });
+});
+await p.check("items.skill", "read line by line, a `description` goes on over the indented lines up to a blank one, and a later `name` wins", async () => {
+  return same(listedOf("continued", "twonames"), {
+    continued: { name: "cd-throwaway-fm-continued", description: "Use when: one two" },
+    twonames: { name: "cd-throwaway-fm-second", description: "d-twonames" },
+  });
+});
+await p.check("items.skill", "`name: 123`, no string to YAML, is read line by line as `123`", async () => {
+  return same(listedOf("number"), { number: { name: "123", description: "d-number" } });
+});
+await p.check("items.skill", "read line by line, a name keeps its quotes, and `path-chars` rewrites them", async () => {
+  return same(listedOf("quoted"), { quoted: { name: "-cd-throwaway-fm-quoted-", description: "Use when: x" } });
+});
+await p.check("items.skill", "a frontmatter without a `name` line, or that never closes, skips the skill", async () => {
+  return same(listedOf("noname", "unclosed"), { noname: null, unclosed: null });
+});
+
 p.finish();

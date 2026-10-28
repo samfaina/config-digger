@@ -2,7 +2,9 @@
 //! DTOs it returns. Domain types stay internal. The DTOs also derive
 //! `specta::Type`, from which the app's TypeScript bindings are generated.
 
-use crate::definitions::blocks::{FindsBy, Locate, Provenance as DefinitionProvenance};
+use crate::definitions::blocks::{
+    FindsBy, Locate, Provenance as DefinitionProvenance, SkillFallback,
+};
 use crate::definitions::{self, Definitions, ItemKind as DefinitionItemKind};
 use crate::edit::Edit;
 use crate::ports::{Environment, Ports};
@@ -791,12 +793,23 @@ impl Core {
             .ok_or_else(|| Error::no_project(path))
     }
 
-    /// What the skill folder at `folder` holds, as a skill Entry shows it:
-    /// each file's relative path and size, and the `name` and `description`
-    /// of its `SKILL.md` frontmatter. File content is never shown, since a
-    /// skill folder can hold Secrets, such as a `.env` file.
-    pub fn skill_content(&self, folder: &Path) -> Result<SkillContent, Error> {
-        skill::content(self.ports.fs.as_ref(), folder)
+    /// What the skill folder at `folder` holds, as a skill Entry of the
+    /// Agent `agent` shows it: each file's relative path and size, and the
+    /// `name` and `description` of its `SKILL.md` frontmatter, read as the
+    /// Agent's skill locations read it. File content is never shown, since
+    /// a skill folder can hold Secrets, such as a `.env` file.
+    pub fn skill_content(&self, folder: &Path, agent: &str) -> Result<SkillContent, Error> {
+        let definition = self
+            .definitions
+            .iter()
+            .find(|definition| definition.agent.id == agent)
+            .ok_or_else(|| Error::no_agent(agent))?;
+        let reading = definition
+            .locations
+            .iter()
+            .find_map(|location| location.format.skill_folder())
+            .map_or(SkillFallback::Skip, |format| format.malformed_frontmatter);
+        skill::content(self.ports.fs.as_ref(), folder, reading)
     }
 
     /// How the skill folder at `after` differs from the one at `before`,

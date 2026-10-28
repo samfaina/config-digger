@@ -2214,6 +2214,7 @@ fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
             "its SKILL.md frontmatter is not valid YAML".to_owned()
         }
         SkillDefect::NoName => "its SKILL.md frontmatter has no `name`".to_owned(),
+        SkillDefect::NoDescription => "its SKILL.md frontmatter has no `description`".to_owned(),
         SkillDefect::Reserved => format!("{agent_name} keeps its folder's name for itself"),
         SkillDefect::FolderName(NameRule::VisibleChars) => format!(
             "its folder's name breaks {agent_name}'s name rule, which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters"

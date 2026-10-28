@@ -48,7 +48,7 @@ fn file(path: &str, size: u64) -> SkillFile {
 fn a_skill_is_its_files_paths_and_sizes_and_its_frontmatter_name_and_description() {
     let fs = with_skill(FakeFileSystem::new(), skill());
 
-    let content = core(&fs).skill_content(&skill()).unwrap();
+    let content = core(&fs).skill_content(&skill(), "claude-code").unwrap();
 
     assert_eq!(
         content,
@@ -126,7 +126,7 @@ fn a_skill_folder_that_is_gone_holds_no_files() {
 #[test]
 fn the_summary_of_a_missing_skill_folder_fails() {
     let error = core(&FakeFileSystem::new())
-        .skill_content(&skill())
+        .skill_content(&skill(), "claude-code")
         .unwrap_err();
 
     assert_eq!(error.code, ErrorCode::Blocked);
@@ -139,7 +139,7 @@ fn a_multi_line_or_quoted_description_is_read_from_the_frontmatter() {
         "---\nname: \"deploy\"\ndescription: >\n  Deploys the app\n  to staging.\nallowed-tools: Bash\n---\nBody\n",
     );
 
-    let content = core(&fs).skill_content(&skill()).unwrap();
+    let content = core(&fs).skill_content(&skill(), "claude-code").unwrap();
 
     assert_eq!(content.name.as_deref(), Some("deploy"));
     assert_eq!(
@@ -152,7 +152,7 @@ fn a_multi_line_or_quoted_description_is_read_from_the_frontmatter() {
 fn a_skill_md_without_frontmatter_has_no_name_or_description() {
     let fs = FakeFileSystem::new().with_file(skill().join("SKILL.md"), "# Deploy\n");
 
-    let content = core(&fs).skill_content(&skill()).unwrap();
+    let content = core(&fs).skill_content(&skill(), "claude-code").unwrap();
 
     assert_eq!((content.name, content.description), (None, None));
     assert_eq!(content.files, [file("SKILL.md", 9)]);
