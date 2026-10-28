@@ -4350,6 +4350,16 @@
                 "null"
               ]
             },
+            "stand_in": {
+              "description": "The fields that fix a server's transport, such as Codex's `command`\nand `url`, when the Agent refuses a table holding the field alone:\nwhere the fallback's file has no table of the Entry's name, Disable\nwrites a Stand-in there, the first of these fields the server has,\nas the highest layer has it, a URL without its userinfo, query and\nfragment, and the field. Enable deletes a Stand-in whole, and only in\na Project whose layer gives the server its transport. Only with a\n`fallback`.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
             "block": {
               "type": "string",
               "const": "merged-field"

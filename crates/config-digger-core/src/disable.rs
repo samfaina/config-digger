@@ -12,10 +12,12 @@ use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
 use crate::explain;
 use crate::locator;
+use crate::mask::MASK;
 use crate::resolve;
 use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// The context's Project as Disable needs it.
@@ -372,6 +374,9 @@ pub(crate) enum Choice {
         by_name_everywhere: bool,
         /// What Disable writes, as a sentence.
         sentence: String,
+        /// What the write does outside the context, as sentences the
+        /// preview says too, for a write in a fallback's file.
+        elsewhere: Vec<String>,
     },
     /// It moves the Entry into the parked-Entry store at `store`.
     Park {
@@ -389,7 +394,18 @@ pub(crate) fn option(
     project: Option<&ContextProject>,
 ) -> DisableOption {
     match choose(definition, snapshot, entry, project) {
-        Ok(Choice::Switch { path, sentence, .. }) => DisableOption::Offered { path, sentence },
+        Ok(Choice::Switch {
+            path,
+            sentence,
+            elsewhere,
+            ..
+        }) => DisableOption::Offered {
+            path,
+            sentence: std::iter::once(sentence)
+                .chain(elsewhere)
+                .collect::<Vec<_>>()
+                .join(" "),
+        },
         Ok(Choice::Park { store, sentence }) => DisableOption::Offered {
             path: store,
             sentence,
@@ -526,6 +542,7 @@ pub(crate) fn choose(
             sqlite: switch.sqlite(),
             by_name_everywhere: by_name_everywhere(mechanism),
             sentence,
+            elsewhere: Vec::new(),
         });
     }
     let agent = &definition.agent.name;
@@ -581,14 +598,28 @@ struct FieldTable<'d> {
     /// higher, the deepest Project layer first.
     rank: (usize, usize),
     location: &'d LocationDefinition,
+    /// It is in the fallback's file, not the Entry's own table.
+    fallback: bool,
+}
+
+/// The table of the fallback's file where Disable writes a Stand-in.
+struct StandInTable<'d> {
+    path: PathBuf,
+    key_path: Vec<String>,
+    layer: &'d LocationDefinition,
+    /// The fields that fix the server's transport, one of which it holds.
+    transports: &'d [String],
+    /// The field that turns the server off.
+    switch: &'d str,
 }
 
 /// What Disable writes for `entry`, an Entry of a server its Agent builds
 /// from same-named Entries, through the field `block` writes: `false` in
 /// the Entry's own table, or when that file is git-versioned or read only,
-/// in a table holding the field alone in the fallback's file. A write counts
-/// only where no higher layer sets the field, when the block requires it,
-/// and none goes in a git-versioned file.
+/// in the fallback's file: in its table of the Entry's name, or else in a
+/// Stand-in when the block declares one, and else in a table holding the
+/// field alone. A write counts only where no higher layer sets the field,
+/// when the block requires it, and none goes in a git-versioned file.
 fn through_merged_field(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -626,6 +657,7 @@ fn through_merged_field(
         key_path: entry.key_path.clone(),
         rank: rank(entry),
         location,
+        fallback: false,
     }];
     if let Some(fallback) = block.fallback.as_deref().map(|id| definition.location(id))
         && let Some(path) = snapshot.file_for(entry, &fallback.anchor, None)
@@ -636,6 +668,7 @@ fn through_merged_field(
             key_path: fallback.root.iter().chain(name).cloned().collect(),
             rank: (definition.rank(fallback), 0),
             location: fallback,
+            fallback: true,
         });
     }
     let mut versioned: Vec<PathBuf> = Vec::new();
@@ -646,6 +679,7 @@ fn through_merged_field(
             mut key_path,
             rank,
             location: layer,
+            fallback,
         } = target;
         if snapshot.versioned.contains(&path) {
             if !versioned.contains(&path) {
@@ -660,6 +694,25 @@ fn through_merged_field(
             set_above.get_or_insert(above);
             continue;
         }
+        let agent = &definition.agent.name;
+        let declared = fallback
+            && snapshot.entries.iter().any(|other| {
+                other.agent_index == entry.agent_index
+                    && other.home == entry.home
+                    && other.location == layer.id
+                    && other.path == path
+                    && other.key_path == key_path
+            });
+        if let Some(transports) = block.stand_in.as_deref().filter(|_| fallback && !declared) {
+            let table = StandInTable {
+                path,
+                key_path,
+                layer,
+                transports,
+                switch: field,
+            };
+            return stand_in(definition, snapshot, entry, project, merge, table);
+        }
         key_path.push(field.to_owned());
         let edits = vec![Edit::Set {
             key_path,
@@ -668,8 +721,20 @@ fn through_merged_field(
         let sentence = format!(
             "{} {}",
             explain::disable_switch(&edits, &entry.name, &path, false),
-            explain::turns_off_built(&definition.agent.name, &entry.name)
+            explain::turns_off_built(agent, &entry.name)
         );
+        // Validation keeps a fallback out of Projects, so every folder reads
+        // its file.
+        let elsewhere = if fallback {
+            vec![explain::turns_off_everywhere(
+                agent,
+                &entry.name,
+                field,
+                &path,
+            )]
+        } else {
+            Vec::new()
+        };
         return Ok(Choice::Switch {
             path,
             edits,
@@ -677,6 +742,7 @@ fn through_merged_field(
             sqlite: false,
             by_name_everywhere: false,
             sentence,
+            elsewhere,
         });
     }
     let agent = &definition.agent.name;
@@ -705,6 +771,290 @@ fn through_merged_field(
     })
 }
 
+/// The Stand-in Disable writes for `entry` in `table`: the first of its
+/// fields the server has, as the highest layer that gives it one has it,
+/// and the field that turns it off. Or why Disable is not offered: no layer
+/// gives the server one of the fields, or a known Project declares it with
+/// another of them, where the Agent would stop starting.
+fn stand_in(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&ContextProject>,
+    merge: &Merge,
+    table: StandInTable,
+) -> Result<Choice, (DisableNotOffered, String)> {
+    let agent = &definition.agent.name;
+    let context = project.map(|project| project.key);
+    let transport = server_entries(definition, snapshot, entry, context, merge)
+        .into_iter()
+        .find_map(|layer| {
+            table.transports.iter().find_map(|field| {
+                let value = layer.config.get(field)?.as_str()?;
+                Some((layer, field, stand_in_value(value)?))
+            })
+        });
+    let Some((source, transport, value)) = transport else {
+        return Err((
+            DisableNotOffered::NoMechanism,
+            explain::stand_in_without_transport(agent, &entry.name, table.transports),
+        ));
+    };
+    // Every known Project, trusted or not: trusting it later would stop the
+    // Agent there.
+    let others: Vec<&ScannedEntry> = declaring_projects(definition, snapshot, entry, merge)
+        .into_iter()
+        .filter(|other| other.project.as_deref() != context)
+        .collect();
+    let stopped = folders_of(
+        snapshot,
+        others.iter().copied().filter(|other| {
+            table
+                .transports
+                .iter()
+                .any(|field| field != transport && other.config.get(field).is_some())
+        }),
+    );
+    if !stopped.is_empty() {
+        return Err((
+            DisableNotOffered::StopsAgent,
+            explain::stand_in_stops_agent(agent, &entry.name, transport, &stopped),
+        ));
+    }
+    // A Project whose own layer sets the switch decides it there.
+    let deciding = folders_of(
+        snapshot,
+        others
+            .iter()
+            .copied()
+            .filter(|other| other.config.get(table.switch).is_some()),
+    );
+    let mut turned_off = folders_of(snapshot, others.iter().copied());
+    turned_off.retain(|folder| !deciding.contains(folder));
+    let mut stand_in = serde_json::Map::new();
+    stand_in.insert(transport.clone(), Value::String(value));
+    stand_in.insert(table.switch.to_owned(), Value::Bool(false));
+    let edits = vec![Edit::Set {
+        key_path: table.key_path,
+        value: Value::Object(stand_in),
+    }];
+    let sentence = format!(
+        "{} {}",
+        explain::disable_stand_in(&entry.name, transport, table.switch, &table.path),
+        explain::turns_off_built(agent, &entry.name)
+    );
+    let mut elsewhere = vec![explain::stand_in_reach(agent, &entry.name, &turned_off)];
+    // The transport it copies is the Project layer's only when it comes
+    // from one.
+    if let Some(project) = project.filter(|_| source.project.is_some()) {
+        elsewhere.push(explain::stand_in_drift(
+            agent,
+            &entry.name,
+            &source.path,
+            project.path,
+        ));
+    }
+    Ok(Choice::Switch {
+        path: table.path,
+        edits,
+        syntax: merged_syntax(table.layer),
+        sqlite: false,
+        by_name_everywhere: false,
+        sentence,
+        elsewhere,
+    })
+}
+
+/// `value` as a Stand-in holds it: a URL without its userinfo, query and
+/// fragment, where Secrets go. `None` when it holds a masked Secret still.
+fn stand_in_value(value: &str) -> Option<String> {
+    let mut value = value.to_owned();
+    if let Some(start) = value.find("://").map(|at| at + "://".len()) {
+        if let Some(end) = value[start..].find(['?', '#']) {
+            value.truncate(start + end);
+        }
+        let authority_end = value[start..]
+            .find('/')
+            .map_or(value.len(), |slash| start + slash);
+        if let Some(at) = value[start..authority_end].rfind('@') {
+            value.replace_range(start..=start + at, "");
+        }
+    }
+    (!value.contains(MASK)).then_some(value)
+}
+
+/// The Entries of the Item of `entry` that `merge` merges, in the layers of
+/// any known Project: those of every Project config-digger scans for its
+/// Agent home.
+fn declaring_projects<'s>(
+    definition: &AgentDefinition,
+    snapshot: &'s Snapshot,
+    entry: &ScannedEntry,
+    merge: &Merge,
+) -> Vec<&'s ScannedEntry> {
+    snapshot
+        .entries
+        .iter()
+        .filter(|other| other.project.is_some() && same_server(definition, entry, other, merge))
+        .collect()
+}
+
+/// Whether `other` is an Entry of the server of `entry` that `merge`
+/// merges, in any context.
+fn same_server(
+    definition: &AgentDefinition,
+    entry: &ScannedEntry,
+    other: &ScannedEntry,
+    merge: &Merge,
+) -> bool {
+    other.agent_index == entry.agent_index
+        && other.home == entry.home
+        && other.name == entry.name
+        && definition.location(&other.location).kind == definition.location(&entry.location).kind
+        && merge.covers(&other.location)
+}
+
+/// The folders of the Projects of `entries`, sorted, each once.
+fn folders_of<'s>(
+    snapshot: &Snapshot,
+    entries: impl Iterator<Item = &'s ScannedEntry>,
+) -> Vec<PathBuf> {
+    let folders: BTreeSet<PathBuf> = entries
+        .filter_map(|other| snapshot.project(other.project.as_deref()?))
+        .map(|project| project.path.clone())
+        .collect();
+    folders.into_iter().collect()
+}
+
+/// Whether, of `server`, the Entries of a server in one context, a Project
+/// layer gives it a transport: a Stand-in for it stands in for that one.
+fn stands_in_here(definition: &AgentDefinition, server: &[&ScannedEntry]) -> bool {
+    server
+        .iter()
+        .any(|other| other.project.is_some() && gives_transport(definition, other))
+}
+
+/// The merged-field block of the Item kind of `entry`, when its Agent has
+/// one.
+fn merged_field<'d>(
+    definition: &'d AgentDefinition,
+    entry: &ScannedEntry,
+) -> Option<&'d MergedField> {
+    let kind = definition.location(&entry.location).kind;
+    definition
+        .rules(kind)
+        .disable
+        .iter()
+        .find_map(DisableMechanism::merged_field)
+}
+
+/// Whether `entry` is a Stand-in, told by its shape whoever wrote it: a
+/// table of the fallback of its merged-field block, when the block declares
+/// a Stand-in, that holds nothing but `false` in the field that turns the
+/// server off and one of the block's transport fields.
+pub(crate) fn is_stand_in(definition: &AgentDefinition, entry: &ScannedEntry) -> bool {
+    let Some(block) = merged_field(definition, entry) else {
+        return false;
+    };
+    let (Some(fields), Some(fallback)) = (&block.stand_in, &block.fallback) else {
+        return false;
+    };
+    let kind = definition.location(&entry.location).kind;
+    let Some(field) = definition
+        .rules(kind)
+        .merge
+        .as_ref()
+        .and_then(Merge::enabled)
+    else {
+        return false;
+    };
+    let Some(table) = entry.config.as_object() else {
+        return false;
+    };
+    entry.location == *fallback
+        && table.len() == 2
+        && table.get(field) == Some(&Value::Bool(false))
+        && fields.iter().any(|transport| table.contains_key(transport))
+}
+
+/// For a Stand-in seen in the context of the Project with the key
+/// `project`, where no layer of the server it names gives a transport, the
+/// known Projects it stands in for: there it is a server of its own. `None`
+/// for any other Entry, and for a Stand-in in a Project it stands in for or
+/// with no known Project to stand in for, which is the user's own server.
+pub(crate) fn stand_in_outside(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<Vec<PathBuf>> {
+    if !is_stand_in(definition, entry) {
+        return None;
+    }
+    let kind = definition.location(&entry.location).kind;
+    let merge = definition.rules(kind).merge.as_ref()?;
+    let server = server_entries(definition, snapshot, entry, project, merge);
+    let in_project = stands_in_here(definition, &server);
+    let projects = stood_in_for(definition, snapshot, entry);
+    (!in_project && !projects.is_empty()).then_some(projects)
+}
+
+/// Whether `entry` holds one of the transport fields of its merged-field
+/// block's Stand-in.
+fn gives_transport(definition: &AgentDefinition, entry: &ScannedEntry) -> bool {
+    merged_field(definition, entry)
+        .and_then(|block| block.stand_in.as_ref())
+        .is_some_and(|fields| fields.iter().any(|field| entry.config.get(field).is_some()))
+}
+
+/// The folders of the known Projects a Stand-in such as `entry` stands in
+/// for: those whose layers give the server it names a transport, sorted.
+pub(crate) fn stood_in_for(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Vec<PathBuf> {
+    let kind = definition.location(&entry.location).kind;
+    let Some(merge) = definition.rules(kind).merge.as_ref() else {
+        return Vec::new();
+    };
+    let declaring = declaring_projects(definition, snapshot, entry, merge);
+    folders_of(
+        snapshot,
+        declaring
+            .into_iter()
+            .filter(|other| gives_transport(definition, other)),
+    )
+}
+
+/// The folders of the known Projects a Remove of the Stand-in `entry` turns
+/// its server back on in: those it stands in for, but for any whose own
+/// layer sets the field that turns the server off, which decides there.
+pub(crate) fn freed_by_remove(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> Vec<PathBuf> {
+    let kind = definition.location(&entry.location).kind;
+    let Some((merge, field)) = definition
+        .rules(kind)
+        .merge
+        .as_ref()
+        .and_then(|merge| Some((merge, merge.enabled()?)))
+    else {
+        return Vec::new();
+    };
+    let deciding = folders_of(
+        snapshot,
+        declaring_projects(definition, snapshot, entry, merge)
+            .into_iter()
+            .filter(|other| other.config.get(field).is_some()),
+    );
+    let mut folders = stood_in_for(definition, snapshot, entry);
+    folders.retain(|folder| !deciding.contains(folder));
+    folders
+}
+
 /// How the Agent ranks the layer of `entry`, as a merge orders Entries:
 /// lower is higher, the deepest Project layer first.
 fn layer_rank(definition: &AgentDefinition, entry: &ScannedEntry) -> (usize, usize) {
@@ -722,23 +1072,31 @@ fn setters<'s>(
     merge: &Merge,
     field: &str,
 ) -> Vec<&'s ScannedEntry> {
-    let kind = definition.location(&entry.location).kind;
-    let mut setters: Vec<&ScannedEntry> = snapshot
+    let mut setters = server_entries(definition, snapshot, entry, project, merge);
+    setters.retain(|setter| setter.config.get(field).is_some());
+    setters
+}
+
+/// The Entries of the Item of `entry` that `merge` merges in the context of
+/// the Project with the key `project`, highest first.
+fn server_entries<'s>(
+    definition: &AgentDefinition,
+    snapshot: &'s Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+    merge: &Merge,
+) -> Vec<&'s ScannedEntry> {
+    let mut entries: Vec<&ScannedEntry> = snapshot
         .entries
         .iter()
         .filter(|other| {
-            other.agent_index == entry.agent_index
-                && other.home == entry.home
-                && other.name == entry.name
-                && definition.location(&other.location).kind == kind
-                && merge.covers(&other.location)
+            same_server(definition, entry, other, merge)
                 && (other.project.is_none() || other.project.as_deref() == project)
-                && other.config.get(field).is_some()
                 && resolve::gates(definition, snapshot, other, project).is_empty()
         })
         .collect();
-    setters.sort_by_key(|setter| layer_rank(definition, setter));
-    setters
+    entries.sort_by_key(|other| layer_rank(definition, other));
+    entries
 }
 
 /// The key path of `field` in the table of `entry`.
@@ -793,23 +1151,32 @@ pub(crate) fn deleted_by_enable(
         .merge
         .as_ref()
         .filter(|merge| merge.covers(&entry.location))
-        .filter(|_| {
-            rules
-                .disable
-                .iter()
-                .any(|block| block.merged_field().is_some())
-        })
+        .filter(|_| merged_field(definition, entry).is_some())
         .and_then(|merge| Some((merge, merge.enabled()?)))
     else {
         return Ok(Vec::new());
     };
+    // A Stand-in stands in for a server whose Project layer gives it a
+    // transport, which deleting the Stand-in leaves it.
+    let server = server_entries(definition, snapshot, entry, project, merge);
+    let in_project = stands_in_here(definition, &server);
     let mut deleted = Vec::new();
     for setter in setters(definition, snapshot, entry, project, merge, field) {
         if setter.config.get(field) != Some(&Value::Bool(false)) {
             break;
         }
         let layer = definition.location(&setter.location);
-        let key_path = field_of(setter, field);
+        if let Some(projects) = stand_in_outside(definition, snapshot, setter, project) {
+            return Err(explain::stand_in_enable(&setter.name, &projects));
+        }
+        let stand_in = in_project && is_stand_in(definition, setter);
+        // Deleting a Stand-in's field alone would turn the server on in
+        // every folder.
+        let key_path = if stand_in {
+            setter.key_path.clone()
+        } else {
+            field_of(setter, field)
+        };
         let versioned = snapshot.versioned.contains(&setter.path);
         if versioned || layer.provenance.read_only() {
             let at = locator::render(&setter.path, &key_path);

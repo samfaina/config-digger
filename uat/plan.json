@@ -2110,6 +2110,78 @@
       ]
     },
     {
+      "id": "22",
+      "title": "Un servidor de una capa de Codex versionada en git",
+      "steps": [
+        {
+          "id": "22.1",
+          "title": "Disable escribe un Stand-in, y Enable lo borra entero",
+          "goal": "Disable de un servidor que solo declara la capa .codex\\config.toml versionada en git de un Project escribe un Stand-in en el config.toml del usuario, con su command y enabled = false, sin tocar la capa; la preview dice qué hace fuera del Project; fuera del Project el Stand-in sale Disabled con su nota y sin Enable; y Enable en el Project borra la tabla entera.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Codex.",
+            "En Agent home, elige codex-home.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\codex-project.",
+            "En la lista Items, elige cd-throwaway-codex-layer.",
+            "Pulsa Disable.",
+            "Lee las notas de Before you apply.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Disable.",
+            "Pulsa Done.",
+            "Ejecuta en PowerShell la orden «Ver el config.toml de Codex».",
+            "Ejecuta la orden «Ver la capa del Project».",
+            "En el campo Project de la cabecera, elige No Project.",
+            "En la lista Items, elige cd-throwaway-codex-layer.",
+            "Lee la nota de su Entry y mira sus botones.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\codex-project.",
+            "En la lista Items, elige cd-throwaway-codex-layer.",
+            "Pulsa Enable.",
+            "Si en Before you apply hay casillas de aviso, márcalas.",
+            "Pulsa Enable.",
+            "Pulsa Done.",
+            "Ejecuta la orden «Ver el config.toml de Codex» otra vez."
+          ],
+          "commands": [
+            {
+              "label": "Ver el config.toml de Codex",
+              "shell": "powershell",
+              "text": "Get-Content E:\\cd-throwaway\\codex-home\\config.toml"
+            },
+            {
+              "label": "Ver la capa del Project",
+              "shell": "powershell",
+              "text": "Get-Content E:\\cd-throwaway\\codex-project\\.codex\\config.toml"
+            }
+          ],
+          "expect": [
+            "Antes de Disable, el Item «cd-throwaway-codex-layer» sale «Effective».",
+            "Before you apply dice «Codex reads it in every folder: it turns `cd-throwaway-codex-layer` off in every Project whose layers declare it, and no other known Project declares it; in any other folder Codex lists it as a Disabled server of its own.».",
+            "Before you apply dice «If E:\\cd-throwaway\\codex-project\\.codex\\config.toml later changes the transport of `cd-throwaway-codex-layer`, Codex stops starting in E:\\cd-throwaway\\codex-project.».",
+            "Disable acaba con «Disabled 1 Entry. Operation <id>: verified.».",
+            "Tras Disable, el config.toml de Codex acaba con la tabla «[mcp_servers.cd-throwaway-codex-layer]».",
+            "Esa tabla tiene la línea «command = \"npx\"».",
+            "Esa tabla tiene la línea «enabled = false».",
+            "Esa tabla no tiene más líneas.",
+            "La capa del Project sigue con sus «args» y su «env», sin «enabled».",
+            "Tras Disable, el Item «cd-throwaway-codex-layer» sale «Disabled» en el Project.",
+            "Con No Project, el Item «cd-throwaway-codex-layer» sale «Disabled».",
+            "Con No Project, su Entry lleva la nota «This table is a Stand-in for `cd-throwaway-codex-layer`, which turns it off in the Projects whose layers declare it: E:\\cd-throwaway\\codex-project. Here Codex lists it as a Disabled server of its own.».",
+            "Con No Project, su Entry no ofrece Enable, y sí Remove.",
+            "Enable acaba con «Enabled 1 Entry. Operation <id>: verified.».",
+            "Tras Enable, el config.toml de Codex ya no tiene «[mcp_servers.cd-throwaway-codex-layer]».",
+            "Tras Enable, el Item «cd-throwaway-codex-layer» vuelve a salir «Effective»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con una capa de Codex versionada en git",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -CodexLayer"
+          },
+          "covers": ["#297"]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [

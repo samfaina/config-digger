@@ -11,6 +11,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    adds Cursor in cursor-appdata and a git Project with a nested skill
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   adds a git Project whose git-versioned Codex layer declares a server
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
@@ -18,7 +19,8 @@ param(
     [switch]$VsCode,
     [switch]$Cursor,
     [switch]$NameRule,
-    [switch]$PlainString
+    [switch]$PlainString,
+    [switch]$CodexLayer
 )
 $ErrorActionPreference = "Stop"
 
@@ -371,6 +373,31 @@ if ($PlainString) {
   "disabledMcpjsonServers": "cd-throwaway-plain-off"
 }
 "@
+}
+
+# With -CodexLayer, a git Project Codex trusts, whose `.codex\config.toml`,
+# in the git index, declares a server the Codex home does not: Disable
+# writes a Stand-in for it in the home's `config.toml`. The default data has
+# none, so that no other step counts it.
+if ($CodexLayer) {
+    $folder = "$Root\codex-project"
+    $key = $folder.ToLower()
+    $trust = "`n`n[projects.'$key']`ntrust_level = `"trusted`"`n"
+    [IO.File]::AppendAllText("$Root\codex-home\config.toml", $trust, [Text.UTF8Encoding]::new($false))
+    Write-TestFile "$folder\.codex\config.toml" @"
+[mcp_servers.cd-throwaway-codex-layer]
+command = "npx"
+args = ["-y", "cd-throwaway-codex-layer"]
+env = { CD_THROWAWAY_TOKEN = "not-a-real-secret" }
+"@
+    git init -q $folder
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot run git init in ${folder}: install Git for Windows."
+    }
+    git -C $folder add .codex/config.toml
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot add .codex\config.toml to the git index of $folder."
+    }
 }
 
 Write-Host "Created the throwaway homes and Projects in $Root"

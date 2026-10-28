@@ -4,7 +4,7 @@ Codex turns off a server with `enabled = false` in any layer, but Disable never 
 
 ## Consequences
 
-- Enable deletes a Stand-in whole, recognised by its shape whoever wrote it, since deleting only `enabled` would turn the server on in every folder. It is offered only in a Project that declares the server; elsewhere, and when no known Project declares it, only Remove is.
+- Enable deletes a Stand-in whole, recognised by its shape whoever wrote it, since deleting only `enabled` would turn the server on in every folder. It is offered only in a Project whose layer gives the server its transport; elsewhere only Remove is. A table of that shape that no known Project's layer declares is the user's own server with `enabled = false`, which Enable turns on again by deleting the field.
 - A Stand-in turns the server off in every Project that declares it. The preview names the known ones, and Disable is not offered when one of them declares the server with the other transport, since Codex would stop there.
 - When the layer later changes its transport, Codex stops in the Project; the merged Entries show as Invalid, and the preview of the Disable warns of it.
 - When the user's layer already declares the server, Disable writes `enabled = false` in that table instead, which turns the server off in every folder.

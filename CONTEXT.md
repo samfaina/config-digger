@@ -113,7 +113,7 @@ Said of a Disabled Entry that config-digger moved out of its Agent's reach into 
 _Avoid_: Stashed, archived, moved
 
 **Stand-in**:
-A table in a user file that holds just enough of a server for its Agent to accept it, and the switch that turns it off, written to Disable a server of a git-versioned layer without writing to that layer. It turns the server off in every Project that declares it; in any other folder it is a Disabled server of its own, which only Remove takes away. Enable deletes it whole, whoever wrote it.
+A table in a user file that holds just enough of a server for its Agent to accept it, and the switch that turns it off, written to Disable a server of a git-versioned layer without writing to that layer. It turns the server off in every Project that declares it; in any other folder it is a Disabled server of its own, which only Remove takes away. Enable deletes it whole, whoever wrote it. A table of its shape that no known Project declares is the user's own server, not a Stand-in.
 _Avoid_: Placeholder, dummy, shadow table
 
 **Partial switch**:

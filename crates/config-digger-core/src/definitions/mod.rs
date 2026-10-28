@@ -2668,6 +2668,28 @@ on_read_failure = "ignores_file"
         assert!(parse("test.toml", VALID).is_ok());
     }
 
+    /// `VALID` whose servers merge, with a merged-field Disable holding
+    /// `extra`.
+    fn with_merged_field(extra: &str) -> String {
+        let text = VALID.replace(
+            r#"checks = ["disable", "precedence"]"#,
+            r#"checks = ["merge", "disable", "precedence"]"#,
+        );
+        format!(
+            "{text}merge = {{ block = \"deep-merge\", exclusive = [\"command\", \"url\"], enabled = \"enabled\", locations = [\"user-mcp\"] }}\n\n[[items.mcp.disable]]\nblock = \"merged-field\"\nlocations = [\"user-mcp\"]\n{extra}\n"
+        )
+    }
+
+    #[test]
+    fn a_merged_field_s_stand_in_needs_its_fields_and_a_fallback() {
+        let text = with_merged_field("fallback = \"user-mcp\"\nstand_in = [\"command\", \"url\"]");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let empty = error(&with_merged_field("fallback = \"user-mcp\"\nstand_in = []"));
+        assert!(empty.contains("stand_in needs its fields"), "{empty}");
+        let alone = error(&with_merged_field("stand_in = [\"command\"]"));
+        assert!(alone.contains("stand_in needs a fallback"), "{alone}");
+    }
+
     #[test]
     fn a_definition_with_projects_loads() {
         let text = with_projects(STATE, STATE, r#"["projects", "{project}", "servers"]"#);

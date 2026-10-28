@@ -30,6 +30,16 @@ async function mcpList(home, cwd) {
   return error ? { error } : status;
 }
 
+// `codex mcp list --json` as `{ name: { enabled, transport } }`, the
+// transport without its null fields, or the error Codex stopped with.
+async function mcpJson(home, cwd) {
+  const { stdout, stderr } = await codex(home, cwd, "mcp", "list", "--json");
+  const error = (stdout + stderr).match(/Caused by:\s*\n\s*(.*)/)?.[1].trim();
+  if (error) return { error };
+  const set = (transport) => Object.fromEntries(Object.entries(transport).filter(([, v]) => v !== null && !(Array.isArray(v) && !v.length)));
+  return Object.fromEntries(JSON.parse(stdout).map((s) => [s.name, { enabled: s.enabled, transport: set(s.transport) }]));
+}
+
 // The skills `codex debug prompt-input` lists, by the description each
 // probe skill carries, `d-<name>`.
 async function skills(home, cwd) {
@@ -61,6 +71,44 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     const inProject = (await mcpList(home, proj))["cd-throwaway-only"];
     const elsewhere = (await mcpList(home, fresh("elsewhere", dir))).error;
     return same({ inProject, elsewhere }, { inProject: "disabled", elsewhere: "invalid transport" });
+  });
+  // A Stand-in: the user table Disable writes for a git-versioned Project
+  // layer's server (#297).
+  const user = path.join(home, "config.toml");
+  const layer = path.join(proj, ".codex", "config.toml");
+  await p.check("items.mcp.disable[0]", "a Stand-in with `command` alone turns a stdio layer's server off in the Project, its fields winning, and elsewhere is a Disabled server of its own", async () => {
+    write(user, `${trusted(proj)}[mcp_servers.cd-throwaway-sa]\ncommand = "cmd"\nenabled = false\n`);
+    write(layer, `[mcp_servers.cd-throwaway-sa]\n${stdio("layer")}env = { CD_THROWAWAY = "not-a-real-secret" }\n`);
+    const inProject = (await mcpJson(home, proj))["cd-throwaway-sa"];
+    const elsewhere = (await mcpJson(home, fresh("elsewhere", dir)))["cd-throwaway-sa"];
+    return same({ inProject, elsewhere }, {
+      inProject: { enabled: false, transport: { type: "stdio", command: "cmd", args: ["/c", "layer"], env: { CD_THROWAWAY: "not-a-real-secret" } } },
+      elsewhere: { enabled: false, transport: { type: "stdio", command: "cmd" } },
+    });
+  });
+  await p.check("items.mcp.disable[0]", "a Stand-in with `url` alone turns an http layer's server off in the Project, its `url` and `bearer_token_env_var` winning, and elsewhere is a Disabled server of its own", async () => {
+    write(user, `${trusted(proj)}[mcp_servers.cd-throwaway-sh]\nurl = "https://cd-throwaway.invalid/mcp"\nenabled = false\n`);
+    write(layer, `[mcp_servers.cd-throwaway-sh]\nurl = "https://cd-throwaway.invalid/mcp?key=not-a-real-secret"\nbearer_token_env_var = "CD_THROWAWAY_TOKEN"\n`);
+    const inProject = (await mcpJson(home, proj))["cd-throwaway-sh"];
+    const elsewhere = (await mcpJson(home, fresh("elsewhere", dir)))["cd-throwaway-sh"];
+    return same({ inProject, elsewhere }, {
+      inProject: { enabled: false, transport: { type: "streamable_http", url: "https://cd-throwaway.invalid/mcp?key=not-a-real-secret", bearer_token_env_var: "CD_THROWAWAY_TOKEN" } },
+      elsewhere: { enabled: false, transport: { type: "streamable_http", url: "https://cd-throwaway.invalid/mcp" } },
+    });
+  });
+  await p.check("items.mcp.disable[0]", "a Stand-in of the other transport than the layer's stops Codex in the Project, and elsewhere Codex starts", async () => {
+    write(user, `${trusted(proj)}[mcp_servers.cd-throwaway-sx]\nurl = "https://cd-throwaway.invalid/mcp"\nenabled = false\n`);
+    write(layer, `[mcp_servers.cd-throwaway-sx]\n${stdio("layer")}`);
+    const inProject = (await mcpJson(home, proj)).error;
+    const elsewhere = (await mcpJson(home, fresh("elsewhere", dir)))["cd-throwaway-sx"]?.enabled;
+    return same({ inProject, elsewhere }, { inProject: "url is not supported for stdio", elsewhere: false });
+  });
+  await p.check("items.mcp.disable[0]", "taking only `enabled = false` out of a Stand-in turns the server on in every folder", async () => {
+    write(user, `${trusted(proj)}[mcp_servers.cd-throwaway-sa]\ncommand = "cmd"\n`);
+    write(layer, `[mcp_servers.cd-throwaway-sa]\n${stdio("layer")}`);
+    const inProject = (await mcpJson(home, proj))["cd-throwaway-sa"]?.enabled;
+    const elsewhere = (await mcpJson(home, fresh("elsewhere", dir)))["cd-throwaway-sa"]?.enabled;
+    return same({ inProject, elsewhere }, { inProject: true, elsewhere: true });
   });
 }
 
