@@ -18,16 +18,18 @@
 # in-sandbox.ps1, and waits for it to close, since only one runs at a time.
 # Needs Windows Sandbox (Pro, Enterprise or Education), gh, and for the
 # build what release.yml's needs. Everything it installs stays in the
-# Sandbox. Everything it writes on this PC is under -Work, which each run
-# starts again: the checkout of the commit, the builds, the key, the .wsb
-# files, the Sandbox's results and uat-results.json, but for npm's, cargo's
-# and tauri's shared caches, which any build fills. It takes no screenshot,
-# and writes nothing in the repository.
+# Sandbox. Everything it writes on this PC is under -Work: the copy of the
+# commit, the builds, the key, the .wsb files, the Sandbox's results and
+# uat-results.json, but for npm's, cargo's and tauri's shared caches, which
+# any build fills. Each run deletes what an earlier one wrote there, and
+# build-update.ps1 its own when it builds. It takes no screenshot, and
+# writes nothing in the repository.
 param(
     [Parameter(Mandatory)] [string]$Version,
     [string]$Work = "$env:TEMP\cd-uat-sandbox",
     [ValidateSet("walk", "update")] [string[]]$Runs = @("walk", "update"),
-    # The commit installers A and B are built from.
+    # The commit installers A and B are built from. With -From, the commit
+    # of that build, which has no tag.
     [string]$Commit = "v$Version",
     # The installers folder build-update.ps1 wrote before, to update between
     # its installers instead of building them.

@@ -2,11 +2,12 @@
 # windows they read, so that sandbox.test.mjs runs them outside the Sandbox.
 # Runs in Windows PowerShell 5.1.
 
+function PlanStep($plan, [string]$id) { $plan.sections | ForEach-Object { $_.steps } | Where-Object { $_.id -eq $id } }
+
 # The exact texts, between « and », of the line of step $id's expect that
 # names $about, with <versión> as $version.
 function PlanQuotes($plan, [string]$id, [string]$about, [string]$version) {
-    $step = $plan.sections | ForEach-Object { $_.steps } | Where-Object { $_.id -eq $id }
-    $line = $step.expect | Where-Object { $_.Contains($about) } | Select-Object -First 1
+    $line = (PlanStep $plan $id).expect | Where-Object { $_.Contains($about) } | Select-Object -First 1
     if (-not $line) { throw "step $id expects nothing about '$about'" }
     # The marks as code points: Windows PowerShell 5.1 reads this file
     # without a byte order mark as ANSI.

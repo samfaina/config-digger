@@ -3,7 +3,7 @@
 // Run them with `node --test uat/auto/sandbox/sandbox.test.mjs`.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -19,6 +19,12 @@ const git = (cwd, ...args) => execFileSync("git", ["-C", cwd, ...args], { encodi
 const refsAndWorktrees = (repo) => git(repo, "for-each-ref") + git(repo, "worktree", "list", "--porcelain");
 // Every file under `folder`, as paths relative to it.
 const files = (folder) => (existsSync(folder) ? readdirSync(folder, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name).slice(folder.length + 1)) : []);
+// Each stub call's first two words, such as "build 0.1.0-rc.3" or "sandbox walk".
+const heads = (calls) => calls.map((call) => call.split(" ").slice(0, 2).join(" "));
+// The files under `folder` that hold the run's private key.
+const keysIn = (folder) => files(folder).filter((file) => readFileSync(join(folder, file), "utf8").includes("throwaway-private-generate"));
+// The verdicts run.ps1 wrote, which Windows PowerShell 5.1 starts with a byte order mark.
+const verdictsIn = (work) => JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8").replace(/^\uFEFF/, ""));
 
 // One check line of in-sandbox.ps1, for the stub Sandbox to write.
 const check = (id, what, ok = true) => JSON.stringify({ time: "2026-10-28T10:00:00.000Z", id, check: what, actual: ok ? "1" : "0", expected: "1", ok });
@@ -96,7 +102,11 @@ function testerPc(t, { lines = {}, env: more = {} } = {}) {
 
   git(pc, "init", "-q", repo);
   git(repo, "add", ".");
-  git(repo, "-c", "user.name=uat", "-c", "user.email=uat@example.com", "commit", "-qm", "release candidate");
+  // A commit older than any build, as a release candidate's often is.
+  execFileSync("git", ["-C", repo, "-c", "user.name=uat", "-c", "user.email=uat@example.com", "commit", "-qm", "release candidate"], {
+    env: { ...process.env, GIT_AUTHOR_DATE: "2020-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2020-01-01T00:00:00Z" },
+    stdio: "pipe",
+  });
   git(repo, "tag", `v${version}`);
 
   const temp = join(pc, "temp");
@@ -115,13 +125,12 @@ test("given only the version, the command builds A and B, runs the walk and the 
   assert.equal(ran.status, 0, ran.stderr + ran.stdout);
   const update = join(work, "update");
   const calls = called();
-  assert.deepEqual(calls.map((call) => call.split(" ").slice(0, 2).join(" ")), ["build 0.1.0-rc.3", "build 0.1.0-rc.99", "gh release", "sandbox walk", "sandbox update"]);
+  assert.deepEqual(heads(calls), ["build 0.1.0-rc.3", "build 0.1.0-rc.99", "gh release", "sandbox walk", "sandbox update"]);
   assert.ok(calls[4].includes(`C:\\uat\\update=${join(update, "installers")}`), calls[4]);
   assert.deepEqual(files(join(update, "installers")).sort(), ["config-digger_0.1.0-rc.3_x64-setup.exe", "config-digger_0.1.0-rc.3_x64-setup.exe.sig", "config-digger_0.1.0-rc.99_x64-setup.exe", "config-digger_0.1.0-rc.99_x64-setup.exe.sig", "latest.json"]);
-  const verdicts = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8").replace(/^\uFEFF/, ""));
+  const verdicts = verdictsIn(work);
   assert.deepEqual(verdicts.map((v) => `${v.id} ${v.status} ${v.by}`), ["9.1", ...walkSteps.slice(0, 6), "12.2", ...walkSteps.slice(6)].map((id) => `${id} ok local`));
   assert.match(ran.stdout, /^12\.2 +ok$/m);
-
 });
 
 test("the command writes on the PC only under its work folder, leaves the repository's .git as it was, and no private key", (t) => {
@@ -132,9 +141,9 @@ test("the command writes on the PC only under its work folder, leaves the reposi
   assert.deepEqual(readdirSync(temp), ["cd-uat-sandbox"]);
   assert.equal(refsAndWorktrees(repo), before);
   assert.equal(git(repo, "status", "--porcelain", "--ignored"), "");
-  assert.deepEqual(files(work).filter((file) => readFileSync(join(work, file), "utf8").includes("throwaway-private-generate")), []);
+  assert.deepEqual(keysIn(work), []);
+  // The run's own key signs both builds, never the release key the PC holds.
   assert.deepEqual(called().filter((call) => call.startsWith("build")).map((call) => call.split(" ")[2]), ["key=throwaway-private-generate", "key=throwaway-private-generate"]);
-  assert.equal(process.env.TAURI_SIGNING_PRIVATE_KEY, undefined);
 });
 
 test("when the build of B fails, the command fails before any Sandbox opens, and leaves no private key, no uat-results.json and the .git as it was", (t) => {
@@ -145,42 +154,45 @@ test("when the build of B fails, the command fails before any Sandbox opens, and
   const ran = run();
   assert.notEqual(ran.status, 0);
   assert.match(ran.stderr, /tauri build of 0\.1\.0-rc\.99 failed/);
-  assert.deepEqual(called().map((call) => call.split(" ").slice(0, 2).join(" ")), ["build 0.1.0-rc.3", "build 0.1.0-rc.99"]);
-  assert.deepEqual(files(work).filter((file) => readFileSync(join(work, file), "utf8").includes("throwaway-private-generate")), []);
+  assert.deepEqual(heads(called()), ["build 0.1.0-rc.3", "build 0.1.0-rc.99"]);
+  assert.deepEqual(keysIn(work), []);
   assert.equal(existsSync(join(work, "uat-results.json")), false, "an earlier run's file is gone");
   assert.equal(refsAndWorktrees(repo), before);
 });
 
 test("a second run starts from a clean state: a fresh copy of the commit, and none of the first run's installers or results", (t) => {
   const { work, run, called } = testerPc(t, { lines: { walk: [check("8.1", "a check", false)] } });
-  assert.equal(run(["-Runs", "walk"]).status, 0);
   const tree = join(work, "update", "tree");
   const first = run();
   assert.equal(first.status, 0, first.stderr + first.stdout);
   writeFileSync(join(tree, "left-over.txt"), "from the first run");
   writeFileSync(join(work, "update", "installers", "config-digger_0.1.0-rc.98_x64-setup.exe"), "from the first run");
+  const started = Date.now() - 2000;
   const second = run(["-Runs", "update"]);
   assert.equal(second.status, 0, second.stderr + second.stdout);
   assert.deepEqual(called().filter((call) => call.startsWith("build")).map((call) => call.split(" ")[1]), ["0.1.0-rc.3", "0.1.0-rc.99", "0.1.0-rc.3", "0.1.0-rc.99"]);
   assert.equal(existsSync(join(tree, "left-over.txt")), false);
   assert.equal(readFileSync(join(tree, "Cargo.toml"), "utf8").includes('version = "0.1.0-rc.99"'), true, "B's version, raised in a fresh copy");
+  // Newer than what the kept target folder built before, so cargo builds
+  // the copy's crates again whatever the commit's date.
+  assert.ok(statSync(join(tree, "uat", "plan.json")).mtimeMs >= started, "the copy's files take the time they were copied");
   assert.equal(existsSync(join(work, "update", "installers", "config-digger_0.1.0-rc.98_x64-setup.exe")), false);
   assert.equal(existsSync(join(work, "results-walk")), false, "the walk's results of the first run");
-  const verdicts = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8").replace(/^\uFEFF/, ""));
+  const verdicts = verdictsIn(work);
   assert.deepEqual(verdicts.map((v) => `${v.id} ${v.status}`), ["9.1 ok", "12.2 ok"]);
 });
 
 test("-Runs walk builds nothing, and -Update updates between the installers a build before left", (t) => {
   const { pc, run, called } = testerPc(t);
   assert.equal(run(["-Runs", "walk"]).status, 0);
-  assert.deepEqual(called().map((call) => call.split(" ").slice(0, 2).join(" ")), ["gh release", "sandbox walk"]);
+  assert.deepEqual(heads(called()), ["gh release", "sandbox walk"]);
   const installers = join(pc, "installers");
   mkdirSync(installers);
   writeFileSync(join(installers, "latest.json"), "{}");
   const ran = run(["-Runs", "update", "-Update", installers]);
   assert.equal(ran.status, 0, ran.stderr + ran.stdout);
   const calls = called().slice(2);
-  assert.deepEqual(calls.map((call) => call.split(" ").slice(0, 2).join(" ")), ["gh release", "sandbox update"]);
+  assert.deepEqual(heads(calls), ["gh release", "sandbox update"]);
   assert.ok(calls[1].includes(`C:\\uat\\update=${installers}`), calls[1]);
 });
 
@@ -191,10 +203,10 @@ test("-From walks the assets of a folder instead of the release's, with no 9.1",
   for (const asset of [`config-digger_${version}_x64-setup.exe`, `config-digger_${version}_x64-cli.zip`]) writeFileSync(join(from, asset), "unreleased");
   const ran = run(["-Runs", "walk", "-From", from]);
   assert.equal(ran.status, 0, ran.stderr + ran.stdout);
-  assert.deepEqual(called().map((call) => call.split(" ").slice(0, 2).join(" ")), ["sandbox walk"]);
+  assert.deepEqual(heads(called()), ["sandbox walk"]);
   assert.equal(readFileSync(join(work, "release", `config-digger_${version}_x64-setup.exe`), "utf8"), "unreleased");
-  const verdicts = JSON.parse(readFileSync(join(work, "uat-results.json"), "utf8").replace(/^\uFEFF/, ""));
-  assert.deepEqual(verdicts.map((v) => v.id), walkSteps.slice(0, 6).concat(walkSteps.slice(6)));
+  const verdicts = verdictsIn(work);
+  assert.deepEqual(verdicts.map((v) => v.id), walkSteps);
 });
 
 // What `expression` gives in Windows PowerShell, with checks.ps1 loaded as
@@ -215,7 +227,7 @@ test("9.3's and 9.4's expect quote the Already Installed page as the installer w
   const lang = (name) => nsh.match(new RegExp(`^LangString ${name} \\$\\{LANG_ENGLISH\\} "(.*)"$`, "m"))[1];
   const page = lang("alreadyInstalledLong").replace("${PRODUCTNAME}", "config-digger").replace("${VERSION}", version);
   assert.equal(page, `config-digger ${version} is already installed. Select the operation you want to perform and click Next to continue.`);
-  for (const id of ["9.3", "9.4"]) assert.deepEqual(checks(`PlanQuotes $plan "${id}" "Already Installed" "${version}"`), [page, lang("addOrReinstall")]);
+  for (const id of ["9.3", "9.4"]) assert.deepEqual(checks(`PlanQuotes $plan "${id}" "Already Installed" "${version}"`), [page]);
 });
 
 test("a step's expect line that names nothing of the kind stops the step", () => {

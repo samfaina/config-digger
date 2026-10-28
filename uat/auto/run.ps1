@@ -17,7 +17,7 @@
 #   .\uat\auto\run.ps1 -Version 0.1.0-rc.4 -App target\release\config-digger-app.exe
 #
 # The tools write in -Root, the throwaway profile and -Work, and the builds
-# in cargo's and npm's caches. A check at the end compares config-digger's
+# in npm's, cargo's and tauri's caches. A check at the end compares config-digger's
 # real data, the real Codex and Claude Desktop configuration and the
 # checkout's working tree with how they were before it ran.
 param(

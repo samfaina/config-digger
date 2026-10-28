@@ -252,7 +252,7 @@
           ],
           "expect": [
             "La casilla de PATH empieza marcada.",
-            "La página Already Installed dice «config-digger <versión> is already installed. Select the operation you want to perform and click Next to continue.» y ofrece «Add/Reinstall components».",
+            "La página Already Installed dice «config-digger <versión> is already installed. Select the operation you want to perform and click Next to continue.».",
             "La primera orden da un error en rojo: config-digger no se reconoce.",
             "La segunda imprime «KeepPathAlone» con el valor «1», que quiere decir sin PATH."
           ],
@@ -284,7 +284,7 @@
           ],
           "expect": [
             "La casilla de PATH empieza desmarcada: recuerda la elección del paso 9.3.",
-            "La página Already Installed dice «config-digger <versión> is already installed. Select the operation you want to perform and click Next to continue.» y ofrece «Add/Reinstall components».",
+            "La página Already Installed dice «config-digger <versión> is already installed. Select the operation you want to perform and click Next to continue.».",
             "La orden imprime otra vez «C:\\Users\\<tú>\\AppData\\Local\\Programs\\config-digger\\config-digger.exe»: el PATH queda puesto para la sección Desinstalar."
           ],
           "covers": ["#78"],

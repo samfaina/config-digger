@@ -33,15 +33,21 @@ $out = "$Work\installers"
 # A key a run that was stopped left behind goes too.
 foreach ($folder in $keys, $out) { if (Test-Path $folder) { Remove-Item $folder -Recurse -Force } }
 New-Item -ItemType Directory -Force $tree, $keys, $out | Out-Null
-Get-ChildItem $tree -Force | Where-Object { $_.Name -ne "target" } | Remove-Item -Recurse -Force
+# With the \\?\ prefix, node_modules' long paths delete in Windows
+# PowerShell 5.1 too.
+Get-ChildItem $tree -Force | Where-Object { $_.Name -ne "target" } | ForEach-Object {
+    if ($_.PSIsContainer) { [IO.Directory]::Delete("\\?\$($_.FullName)", $true) } else { Remove-Item -LiteralPath $_.FullName -Force }
+}
 
 git -C $Repo rev-parse --quiet --verify "$Commit^{commit}" | Out-Null
 if ($LASTEXITCODE) { throw "no commit $Commit in ${Repo}: run git fetch --tags first" }
 $archive = "$Work\tree.tar"
 git -C $Repo archive --format=tar --output=$archive $Commit
 if ($LASTEXITCODE) { throw "git archive $Commit failed" }
-# Windows' own tar: Git's would read C: as a host name.
-& "$env:SystemRoot\System32\tar.exe" -xf $archive -C $tree
+# Windows' own tar: Git's would read C: as a host name. -m dates the files
+# now, not at the commit's time, so cargo never takes what the kept target
+# folder built before from an older run as fresh.
+& "$env:SystemRoot\System32\tar.exe" -xmf $archive -C $tree
 if ($LASTEXITCODE) { throw "unpacking $archive failed" }
 Remove-Item $archive
 $ui = "$tree\crates\config-digger-app\ui"
@@ -54,8 +60,11 @@ Push-Location $ui
 # The bundle takes the CLI from <checkout>\target\release, so the copy
 # builds into its own target folder, whatever cargo's config says.
 $saved = @{}
-foreach ($name in "CARGO_TARGET_DIR", "TAURI_SIGNING_PRIVATE_KEY", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD") { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+foreach ($name in "CARGO_TARGET_DIR", "GIT_CEILING_DIRECTORIES", "TAURI_SIGNING_PRIVATE_KEY", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD") { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 $env:CARGO_TARGET_DIR = "$tree\target"
+# The copy is no repository, so the app's build.rs records no commit for
+# About, as from any source archive: never that of a repository -Work is in.
+$env:GIT_CEILING_DIRECTORIES = $Work
 $key = "$keys\uat-update.key"
 try {
     npm ci --no-audit --no-fund

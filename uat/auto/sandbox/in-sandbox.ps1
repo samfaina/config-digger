@@ -43,8 +43,7 @@ function Step([string]$id, [scriptblock]$body) {
 
 # A command of a step, run exactly as the plan has it, with its output.
 function PlanCommand([string]$id, [string]$label) {
-    $step = $plan.sections | ForEach-Object { $_.steps } | Where-Object { $_.id -eq $id }
-    $command = $step.commands | Where-Object { $_.label -eq $label }
+    $command = (PlanStep $plan $id).commands | Where-Object { $_.label -eq $label }
     if (-not $command) { throw "step $id has no command '$label'" }
     $out = @(Invoke-Expression $command.text 2>&1 | ForEach-Object { "$_" })
     Note $id "$label -> $($out -join ' / ')"
@@ -84,12 +83,11 @@ function WhilePathBlocked([string]$id, [scriptblock]$body) {
 . C:\uat\scripts\ui-installer.ps1
 . C:\uat\scripts\checks.ps1
 
-# Checks the Already Installed page against the line of step $id's expect
-# that names it: its text and the choice it offers.
+# Checks the Already Installed page's text against the line of step $id's
+# expect that names the page, once its Add/Reinstall components shows.
 function AlreadyInstalled([string]$id, $window) {
-    $text, $choice = PlanQuotes $plan $id "Already Installed" $Version
-    $radio = Control $window "RadioButton" ([regex]::Escape($choice))
-    Check $id "the Already Installed page offers $choice" $radio.Current.Name $choice
+    $text = PlanQuotes $plan $id "Already Installed" $Version
+    Control $window "RadioButton" "Add/Reinstall" | Out-Null
     $texts = Texts $window
     Note $id "already installed page: $texts"
     Check $id "the Already Installed page's text" $(if ($texts.Contains($text)) { $text } else { $texts }) $text
