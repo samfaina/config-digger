@@ -1124,6 +1124,27 @@ fn remote_settings_force_a_plugin_off_as_the_one_managed_source() {
 
 const SUPABASE: &str = "supabase@claude-plugins-official";
 const CONTEXT7: &str = "context7@claude-plugins-official";
+const TOOLBOX: &str = "toolbox@claude-plugins-official";
+
+/// supabase's `.mcp.json`, which carries the server `supa` in [`one_endpoint`].
+fn supa() -> PathBuf {
+    in_cache(r"claude-plugins-official\supabase\0.1.4\.mcp.json")
+}
+
+/// context7's `.mcp.json`, which carries the server `c7` in [`one_endpoint`].
+fn c7() -> PathBuf {
+    in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json")
+}
+
+/// toolbox's `.mcp.json`, which carries the server `tb` in
+/// [`one_endpoint_of_three`].
+fn tb() -> PathBuf {
+    in_cache(r"claude-plugins-official\toolbox\2.0.0\.mcp.json")
+}
+
+fn petme_settings() -> PathBuf {
+    PathBuf::from(PETME).join(r".claude\settings.json")
+}
 
 /// The fixture, where supabase's and context7's `.mcp.json` each carry a
 /// server at `https://other.example.com/mcp`.
@@ -1131,17 +1152,26 @@ fn one_endpoint() -> FakeFileSystem {
     let other = json!({ "type": "http", "url": "https://other.example.com/mcp" });
     fixture()
         .with_file(
-            in_cache(r"claude-plugins-official\supabase\0.1.4\.mcp.json"),
+            supa(),
             json!({ "mcpServers": { "supa": other } }).to_string(),
         )
         .with_file(
-            in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json"),
+            c7(),
             json!({ "mcpServers": {
                 "context7": { "type": "http", "url": "https://MCP.context7.com:443/mcp/" },
                 "c7": other,
             } })
             .to_string(),
         )
+}
+
+/// [`one_endpoint`], where toolbox's `.mcp.json` carries a server at the
+/// same endpoint too.
+fn one_endpoint_of_three() -> FakeFileSystem {
+    let fs = one_endpoint();
+    let mut servers = json_of(&fs, tb());
+    servers["mcpServers"]["tb"] = json!({ "type": "http", "url": "https://other.example.com/mcp" });
+    fs.with_file(tb(), servers.to_string())
 }
 
 /// `enabledPlugins` holding `plugins`, each turned on or off, in that order.
@@ -1151,15 +1181,6 @@ fn enabled_plugins(plugins: &[(&str, bool)]) -> String {
         .map(|(id, on)| ((*id).to_owned(), Value::Bool(*on)))
         .collect();
     json!({ "enabledPlugins": enabled }).to_string()
-}
-
-/// The supabase and context7 servers of [`one_endpoint`], by their files.
-fn supa() -> PathBuf {
-    in_cache(r"claude-plugins-official\supabase\0.1.4\.mcp.json")
-}
-
-fn c7() -> PathBuf {
-    in_cache(r"claude-plugins-official\context7\1.0.0\.mcp.json")
 }
 
 /// The Item of the servers of [`one_endpoint`], its name and the State of
@@ -1177,6 +1198,20 @@ fn one_endpoint_states(inventory: &Inventory) -> (String, String, String) {
         "the two servers are one Item"
     );
     (item.name.clone(), code(supa.state), code(c7.state))
+}
+
+/// The files of the Entries of the Item holding supabase's server of
+/// [`one_endpoint`], in the Item's order, each with its State.
+fn one_endpoint_order(inventory: &Inventory) -> Vec<(PathBuf, String)> {
+    inventory
+        .items
+        .iter()
+        .find(|item| item.entries.iter().any(|entry| entry.path == supa()))
+        .unwrap()
+        .entries
+        .iter()
+        .map(|entry| (entry.path.clone(), code(entry.state)))
+        .collect()
 }
 
 #[test]
@@ -1208,39 +1243,6 @@ fn of_two_plugins_servers_with_one_endpoint_the_plugin_first_in_enabled_plugins_
     );
 }
 
-const TOOLBOX: &str = "toolbox@claude-plugins-official";
-
-fn tb() -> PathBuf {
-    in_cache(r"claude-plugins-official\toolbox\2.0.0\.mcp.json")
-}
-
-/// [`one_endpoint`], where toolbox's `.mcp.json` carries a server at the
-/// same endpoint too.
-fn one_endpoint_of_three() -> FakeFileSystem {
-    let fs = one_endpoint();
-    let mut servers = json_of(&fs, tb());
-    servers["mcpServers"]["tb"] = json!({ "type": "http", "url": "https://other.example.com/mcp" });
-    fs.with_file(tb(), servers.to_string())
-}
-
-/// The files of the Entries of the Item holding supabase's server of
-/// [`one_endpoint`], in the Item's order, each with its State.
-fn one_endpoint_order(inventory: &Inventory) -> Vec<(PathBuf, String)> {
-    inventory
-        .items
-        .iter()
-        .find(|item| item.entries.iter().any(|entry| entry.path == supa()))
-        .unwrap()
-        .entries
-        .iter()
-        .map(|entry| (entry.path.clone(), code(entry.state)))
-        .collect()
-}
-
-fn petme_settings() -> PathBuf {
-    PathBuf::from(PETME).join(r".claude\settings.json")
-}
-
 #[test]
 fn enabled_plugins_is_ordered_by_the_users_then_the_projects_then_the_local_settings() {
     let fs = one_endpoint_of_three()
@@ -1262,6 +1264,8 @@ fn enabled_plugins_is_ordered_by_the_users_then_the_projects_then_the_local_sett
 
 #[test]
 fn a_plugin_the_local_settings_name_again_keeps_its_place_from_the_users() {
+    // Were context7 to move to where the local settings name it, after
+    // toolbox, toolbox would rank second.
     let fs = one_endpoint_of_three()
         .with_file(
             user_settings(),
@@ -1269,7 +1273,7 @@ fn a_plugin_the_local_settings_name_again_keeps_its_place_from_the_users() {
         )
         .with_file(
             petme_local_settings(),
-            enabled_plugins(&[(CONTEXT7, true), (TOOLBOX, true)]),
+            enabled_plugins(&[(TOOLBOX, true), (CONTEXT7, true)]),
         );
 
     let in_petme = inventory(&core(&fs), &in_petme());
@@ -1286,14 +1290,28 @@ fn a_plugin_the_local_settings_name_again_keeps_its_place_from_the_users() {
 
 #[test]
 fn when_the_plugin_first_in_enabled_plugins_is_off_the_next_plugins_server_is_effective() {
-    let fs = one_endpoint().with_file(
+    // By folder alone, context7's server would win.
+    let fs = one_endpoint_of_three().with_file(
         user_settings(),
-        enabled_plugins(&[(SUPABASE, false), (CONTEXT7, true)]),
+        enabled_plugins(&[(SUPABASE, false), (TOOLBOX, true), (CONTEXT7, true)]),
     );
 
-    let (_, supa, c7) = one_endpoint_states(&no_project(&fs));
+    let inventory = no_project(&fs);
 
-    assert_eq!((supa.as_str(), c7.as_str()), ("disabled", "effective"));
+    assert_eq!(
+        one_endpoint_order(&inventory),
+        [
+            (supa(), "disabled".to_owned()),
+            (tb(), "effective".to_owned()),
+            (c7(), "shadowed".to_owned()),
+        ]
+    );
+    let reason = entry_at(&inventory, &c7(), &["mcpServers", "c7"])
+        .reason
+        .as_ref()
+        .unwrap();
+    let winner = format!(r"{}#mcpServers.tb", tb().display());
+    assert_eq!(reason.effective.as_deref(), Some(winner.as_str()));
 }
 
 #[test]

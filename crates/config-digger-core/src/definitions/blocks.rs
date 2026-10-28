@@ -3820,21 +3820,6 @@ impl PluginOrder {
     pub fn key_path(&self) -> &[String] {
         &self.sources[0].key_path
     }
-
-    /// The plugin ids, merged from the objects each source holds, in its
-    /// order: each id at its first place.
-    pub fn merged<'v>(&self, objects: impl Iterator<Item = &'v Value>) -> Vec<&'v str> {
-        let mut order: Vec<&str> = Vec::new();
-        for id in objects
-            .filter_map(Value::as_object)
-            .flat_map(|object| object.keys())
-        {
-            if !order.contains(&id.as_str()) {
-                order.push(id);
-            }
-        }
-        order
-    }
 }
 
 impl Compete for ExactName {

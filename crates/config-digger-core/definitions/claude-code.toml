@@ -449,8 +449,9 @@ block = "exact-name"
 by_endpoint = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 
 # An installed plugin's servers rank by the plugin's place in
-# `enabledPlugins`, a key the user's settings hold before the Project's and
-# the local settings keeping the user's place when they hold it again
+# `enabledPlugins`, read from the user's settings, then the Project's, then
+# the local settings. A plugin keeps the place where it first appears: when
+# a later file names it again, its value can change but its place does not
 # [test]. Outside a Project, only the user's settings count. A plugin
 # turned off keeps its place and is Disabled, so the next one wins. Within
 # one plugin, the manifest's server still replaces the same-named server

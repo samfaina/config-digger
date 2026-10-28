@@ -211,9 +211,10 @@ pub(crate) fn resolve(
         .into_iter()
         .map(|((agent, home, kind, _), mut entries)| {
             let definition = &definitions[agent];
-            // Within a group of `precedence`, the folder an Entry was found in
-            // comes first. A later file of a settings source overrides an
-            // earlier one.
+            // Entries the competition ranks by plugin rank together, by their
+            // plugin's place. Within a group of `precedence`, the folder an
+            // Entry was found in comes first. A later file of a settings
+            // source overrides an earlier one.
             let rank = |entry: &ScannedEntry| {
                 let (item, in_group) = definition.group_rank(definition.location(&entry.location));
                 let folder = entry
@@ -412,10 +413,10 @@ pub(crate) fn resolve(
                 let same_url = urls[index].is_some() && urls[index] == urls[winner];
                 let effective_scope = &definition.location(&entries[winner].location).scope;
                 let effective = locator::render(&entries[winner].path, &entries[winner].key_path);
-                // The winner's plugin comes first in the order the Agent ranks plugins by.
                 let place = |entry: &ScannedEntry| {
                     plugin_place(definition, snapshot, entry, project_key.map(String::as_str))
                 };
+                // The winner's plugin comes first in the order the Agent ranks plugins by.
                 if let (Some(order), Some(lost), Some(won)) = (
                     competition.plugin_order(),
                     place(entries[index]),
@@ -1515,12 +1516,12 @@ fn item_key(
     }
 }
 
-/// Where `entry` ranks before the place of its location's item in
-/// `precedence` does, in the context of the Project with the key
-/// `project`: for an Entry its competition ranks by plugin, the place of
-/// the highest item of that order's locations and its plugin's place in
-/// the order; for any other, the place of its own item, first among those
-/// of that place.
+/// The first part of the rank of `entry` among its kind, in the context of
+/// the Project with the key `project`, a pair: for an Entry of a location
+/// its competition ranks by plugin, the place in `precedence` of the
+/// highest of that order's locations, then its plugin's place in the order;
+/// for any other Entry, the place of its own location, then 0. The place of
+/// its own location breaks a tie.
 fn plugin_rank(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -1564,7 +1565,16 @@ fn plugin_place(
             .settings_for(entry, location.kind, owner, project)
             .filter_map(|setting| setting.value.as_ref())
     });
-    let merged = order.merged(objects);
+    // Each plugin id keeps the place where it first appears.
+    let mut merged: Vec<&str> = Vec::new();
+    for id in objects
+        .filter_map(serde_json::Value::as_object)
+        .flat_map(|object| object.keys())
+    {
+        if !merged.contains(&id.as_str()) {
+            merged.push(id);
+        }
+    }
     let id = entry.plugin.as_ref().map(|plugin| plugin.id.as_str());
     Some(
         id.and_then(|id| merged.iter().position(|known| *known == id))
