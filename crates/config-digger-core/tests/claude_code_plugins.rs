@@ -1543,3 +1543,66 @@ fn a_plugin_that_fails_to_load_leaves_the_other_plugins_alone_and_shadows_none_o
         assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
     }
 }
+
+#[test]
+fn a_plugins_mcp_json_the_manifest_names_that_does_not_parse_leaves_out_only_its_own_servers() {
+    let fs = fixture()
+        .with_file(
+            supabase_manifest(),
+            json!({ "name": "supabase", "mcpServers": "./.mcp.json" }).to_string(),
+        )
+        .with_file(supa(), r#"{ "mcpServers": "#);
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        code(item(&inventory, "supabase:supabase-postgres").state),
+        "effective"
+    );
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.path == supa())
+        .unwrap();
+    assert_eq!(code(failure.reaction), "ignores_file");
+}
+
+#[test]
+fn a_plugin_installed_for_one_project_that_fails_to_load_has_every_entry_invalid_there() {
+    let ponytail = PathBuf::from(CACHE).join(r"ponytail\ponytail\0.2.0");
+    let fs = fixture()
+        .with_file(
+            ponytail.join(".mcp.json"),
+            json!({ "mcpServers": { "mane": { "command": "mane" } } }).to_string(),
+        )
+        .with_file(
+            ponytail.join(r".claude-plugin\plugin.json"),
+            r#"{ "name": "#,
+        );
+
+    let inventory = inventory(&core(&fs), &in_petme());
+
+    let mane = item(&inventory, "plugin:ponytail:mane");
+    assert_eq!(code(mane.state), "invalid");
+    let reason = mane.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "plugin_failed_to_load");
+}
+
+#[test]
+fn servers_of_another_shape_in_a_file_the_manifest_names_leave_the_plugin_loaded() {
+    let servers = in_cache(r"claude-plugins-official\supabase\0.1.4\agents\claude\.mcp.json");
+    let fs = fixture().with_file(&servers, json!({ "mcpServers": 42 }).to_string());
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        code(item(&inventory, "supabase:supabase-postgres").state),
+        "effective"
+    );
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.path == servers)
+        .unwrap();
+    assert_eq!(code(failure.reaction), "unknown");
+}

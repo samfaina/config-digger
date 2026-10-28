@@ -863,8 +863,8 @@ on_read_failure = "ignores_file"
 # `:` or a `:` at either end; a frontmatter `name` holds letters, marks,
 # digits, `_`, `:`, `.` and `-` alone, and none of those; both count at most
 # 256 UTF-16 code units, as JavaScript's `length` does [binary]. The marks
-# say which of these were tested. A plugin's skills fail with it, after its
-# switches, as its servers do.
+# say which of these were tested. A plugin's skills fail with it [test],
+# after its switches, as its servers do.
 [items.skill]
 unverified = [
   "A plugin that is off, or forced off by the managed settings, and whose manifest fails is taken to have its skills Disabled or Blocked rather than Invalid, since Claude Code does not load an off plugin.",

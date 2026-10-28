@@ -2103,7 +2103,7 @@ impl AgentDefinition {
                 .flat_map(|anchor| anchor.plugins.all())
                 .map(String::as_str)
                 .collect();
-            let fails = self.locations.iter().any(|location| {
+            let in_failing = self.locations.iter().any(|location| {
                 location.kind == *kind
                     && location.anchor.plugin().is_some_and(|anchor| {
                         anchor
@@ -2116,7 +2116,7 @@ impl AgentDefinition {
             rules
                 .check_when(
                     Check::PluginLoad,
-                    fails,
+                    in_failing,
                     "which a location that fails its plugin needs",
                     "but no location of the kind is in plugins a location fails",
                 )
@@ -4356,12 +4356,16 @@ locations = {locations}
 
     const PLUGIN_LOAD: &str = r#"checks = ["disable", "plugin-load", "precedence"]"#;
 
+    /// A location's reactions that fail its plugin: to a Read failure, and
+    /// to a shape alone.
+    const FAILING: [&str; 2] = [
+        r#"on_read_failure = "fails_plugin""#,
+        "on_read_failure = \"ignores_file\"\non_shape_failure = \"fails_plugin\"",
+    ];
+
     #[test]
     fn a_location_that_fails_its_plugin_needs_the_plugin_load_check() {
-        for reaction in [
-            r#"on_read_failure = "fails_plugin""#,
-            "on_read_failure = \"ignores_file\"\non_shape_failure = \"fails_plugin\"",
-        ] {
+        for reaction in FAILING {
             let text = with_plugin_reaction(reaction, PLUGIN_LOAD);
             assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
             let text = with_plugin_reaction(reaction, r#"checks = ["disable", "precedence"]"#);
@@ -4381,10 +4385,7 @@ locations = {locations}
 
     #[test]
     fn only_a_location_in_plugins_reacts_with_fails_plugin() {
-        for reaction in [
-            r#"on_read_failure = "fails_plugin""#,
-            "on_read_failure = \"ignores_file\"\non_shape_failure = \"fails_plugin\"",
-        ] {
+        for reaction in FAILING {
             let text = VALID.replace(r#"on_read_failure = "ignores_file""#, reaction);
             assert!(
                 error(&text).contains("only a location in plugins reacts with `fails_plugin`"),

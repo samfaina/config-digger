@@ -12,7 +12,7 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
-use crate::scan::{Expected, OffBy, ScannedShape, ValueType};
+use crate::scan::{Expected, OffBy, ScannedReadFailure, ScannedShape, ValueType};
 use crate::{locator, park};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -155,38 +155,42 @@ pub(crate) fn plugin_not_loaded(agent_name: &str, plugin: &str, cause: &str) -> 
     format!("{agent_name} does not load the plugin `{plugin}`, since {cause}.")
 }
 
-/// Why `agent_name` cannot read the file `path`, of `kind`, read in
-/// `dialect`: the error's `position`, or for a shape, `shape`. It never
-/// quotes the file.
+/// Why `agent_name` cannot read the file of `failure`, read in `dialect`.
+/// It never quotes the file.
 pub(crate) fn file_failure_cause(
     agent_name: &str,
-    path: &Path,
-    kind: ReadFailureKind,
+    failure: &ScannedReadFailure,
     dialect: &str,
-    position: Option<(usize, usize)>,
-    shape: Option<&ScannedShape>,
 ) -> String {
-    if let Some(shape) = shape {
+    if let Some(shape) = &failure.shape {
         let (items, found, expected) = shape_words(shape);
         return format!(
             "the {items} at {} are {found}, not {expected}",
-            locator::render(path, &shape.key_path)
+            locator::render(&failure.path, &shape.key_path)
         );
     }
-    let path = path.display();
-    match kind {
+    let path = failure.path.display();
+    match failure.kind {
         ReadFailureKind::Parse => {
-            let at = match position {
-                Some((line, column)) => format!(" (line {line}, column {column})"),
-                None => String::new(),
-            };
+            let at = position_at(failure.position);
             format!("{path} does not parse as {dialect}{at}")
         }
         ReadFailureKind::Shape => format!("{path} is {dialect} but not an object"),
         ReadFailureKind::Decode => format!("{path} is not text {agent_name} can decode"),
-        ReadFailureKind::Permission | ReadFailureKind::Io | ReadFailureKind::Sqlite => {
-            format!("{path} cannot be read")
+        ReadFailureKind::Permission => format!(
+            "config-digger has no permission to read {path}, and {agent_name} is taken to have none either"
+        ),
+        ReadFailureKind::Io | ReadFailureKind::Sqlite => {
+            format!("config-digger cannot read {path}, and {agent_name} is taken not to either")
         }
+    }
+}
+
+/// Where in a file a parse error is, as a sentence puts it after the file.
+fn position_at(position: Option<(usize, usize)>) -> String {
+    match position {
+        Some((line, column)) => format!(" (line {line}, column {column})"),
+        None => String::new(),
     }
 }
 
@@ -1547,10 +1551,7 @@ pub(crate) fn read_failure(
     let path = path.display();
     match kind {
         ReadFailureKind::Parse => {
-            let at = match position {
-                Some((line, column)) => format!(" (line {line}, column {column})"),
-                None => String::new(),
-            };
+            let at = position_at(position);
             format!(
                 "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
             )

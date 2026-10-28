@@ -284,7 +284,7 @@ pub(crate) fn resolve(
             // the Agent from loading the plugin, with what the Agent does.
             let plugin_failures: Vec<Option<(&ScannedReadFailure, &Reaction)>> = entries
                 .iter()
-                .map(|entry| failed_plugin(snapshot, &reactions, entry))
+                .map(|entry| plugin_failure(snapshot, &reactions, entry))
                 .collect();
             let checks = &definition.rules(kind).checks;
             // A gate or rule checked before precedence takes the Entry out of
@@ -674,7 +674,11 @@ pub(crate) fn resolve(
                                 if let (Some((failure, reaction)), Some(plugin)) =
                                     (plugin_failures[index], entry.plugin.as_ref())
                                 {
-                                    let cause = file_failure_cause(agent_name, failure, reaction);
+                                    let cause = explain::file_failure_cause(
+                                        agent_name,
+                                        failure,
+                                        reaction.dialect,
+                                    );
                                     failed.push((
                                         check,
                                         api::State::Invalid,
@@ -1080,7 +1084,8 @@ pub(crate) fn resolve(
                 reaction: reaction.strongest.into(),
                 sentence: match (&failure.shape, &failure.plugin) {
                     (_, Some(plugin)) if reaction.strongest == ReadFailureReaction::FailsPlugin => {
-                        let cause = file_failure_cause(&agent.name, failure, reaction);
+                        let cause =
+                            explain::file_failure_cause(&agent.name, failure, reaction.dialect);
                         explain::plugin_not_loaded(&agent.name, &plugin.name, &cause)
                     }
                     (Some(shape), _) => explain::shape_failure(&agent.name, &failure.path, shape),
@@ -1717,20 +1722,31 @@ fn reaction(
     // A file of valid text holding a value of another shape, even at its
     // top level, is no file that does not parse: the Agent does what its
     // locations say of a shape, with none of the risks of the other.
-    // The Agent fails a plugin on the file a location is anchored on in it,
-    // and ignores a file the location's references name, as it does any
-    // file it cannot read in a plugin it loads.
-    let in_plugin = |reaction: ReadFailureReaction| match reaction {
-        ReadFailureReaction::FailsPlugin if failure.plugin.is_none() => {
-            ReadFailureReaction::IgnoresFile
-        }
+    // A location fails its plugin on the file it is anchored on there. A
+    // file its references name takes the defaults instead: ignored when it
+    // does not parse, and what the Agent does about a shape not known.
+    let anchored = |location: &LocationDefinition| {
+        let (Some(plugin), Some(anchor)) = (&failure.plugin, location.anchor.plugin()) else {
+            return false;
+        };
+        anchor
+            .path
+            .all()
+            .iter()
+            .any(|relative| blocks::join_relative(&plugin.folder, relative) == failure.path)
+    };
+    let unless_referenced = |location: &LocationDefinition, reaction, default| match reaction {
+        ReadFailureReaction::FailsPlugin if !anchored(location) => default,
         reaction => reaction,
     };
     if failure.kind == api::ReadFailureKind::Shape {
         return Reaction {
             strongest: locations
                 .iter()
-                .map(|location| in_plugin(location.shape_failure_reaction()))
+                .map(|location| {
+                    let reaction = location.shape_failure_reaction();
+                    unless_referenced(location, reaction, ReadFailureReaction::Unknown)
+                })
                 .max()
                 .unwrap_or(ReadFailureReaction::IgnoresFile),
             risks: BTreeSet::new(),
@@ -1756,7 +1772,10 @@ fn reaction(
     Reaction {
         strongest: locations
             .iter()
-            .map(|location| in_plugin(reaction_to_failure(location)))
+            .map(|location| {
+                let reaction = reaction_to_failure(location);
+                unless_referenced(location, reaction, ReadFailureReaction::IgnoresFile)
+            })
             .max()
             .unwrap_or(ReadFailureReaction::IgnoresFile),
         risks: locations
@@ -1769,9 +1788,9 @@ fn reaction(
 }
 
 /// The Read failure, with what the Agent does about it, of a file of the
-/// plugin `entry` is part of that keeps its Agent home from loading the
-/// plugin, if any.
-fn failed_plugin<'s>(
+/// plugin `entry` is part of, for which the Agent does not load the plugin
+/// in the Entry's Agent home, if any.
+fn plugin_failure<'s>(
     snapshot: &'s Snapshot,
     reactions: &'s [Reaction],
     entry: &ScannedEntry,
@@ -1789,23 +1808,6 @@ fn failed_plugin<'s>(
                     failed.plugins == plugin.plugins && failed.folder == plugin.folder
                 })
         })
-}
-
-/// Why the Agent named `agent_name` cannot read the file of `failure`, as a
-/// sentence words it.
-fn file_failure_cause(
-    agent_name: &str,
-    failure: &ScannedReadFailure,
-    reaction: &Reaction,
-) -> String {
-    explain::file_failure_cause(
-        agent_name,
-        &failure.path,
-        failure.kind,
-        reaction.dialect,
-        failure.position,
-        failure.shape.as_ref(),
-    )
 }
 
 /// The path of the scanned Project whose key is `key`.

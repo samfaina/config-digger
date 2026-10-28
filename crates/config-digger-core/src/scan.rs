@@ -1163,8 +1163,7 @@ pub(crate) struct ScannedReadFailure {
     /// For a shape, where it is: only that location fails, and the rest of
     /// the file is read. `None` when the whole file fails.
     pub shape: Option<ScannedShape>,
-    /// The plugin a location in plugins found the file in, when it is the
-    /// file the location is anchored on there, not one its references name.
+    /// The plugin a location in plugins found the file in.
     pub plugin: Option<ScannedPlugin>,
 }
 
@@ -4284,21 +4283,18 @@ impl Scanner<'_> {
         let failures = self.reader.failures.len();
         match &location.references {
             None if let Format::ManifestSkills(block) = &location.format => {
-                self.read_manifest_skills(home, location, block, plugin, path.clone());
+                self.read_manifest_skills(home, location, block, plugin, path);
             }
             None => {
                 let project = plugin.project.clone();
-                self.read_location(home, definition, location, path.clone(), project, 0);
+                self.read_location(home, definition, location, path, project, 0);
             }
             Some(references) => {
-                let file = path.clone();
-                self.read_references(home, definition, location, references, plugin, file);
+                self.read_references(home, definition, location, references, plugin, path);
             }
         }
         for failure in &mut self.reader.failures[failures..] {
-            if failure.path == path {
-                failure.plugin = Some(plugin.clone());
-            }
+            failure.plugin = Some(plugin.clone());
         }
         for entry in &mut self.entries[start..] {
             entry.rename(|name| {
