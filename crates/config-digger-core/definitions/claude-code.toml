@@ -38,7 +38,9 @@ versions = [{ block = "json-value", file = "node_modules/@anthropic-ai/claude-co
 # install [docs] and virtualised into its MSIX package [disk]. 2.1.284 sat in
 # its version folder; 2.1.286 and 2.1.299 sit one hash-named folder further
 # down [disk]. A package that moved its data folder to
-# `%LOCALAPPDATA%\Claude-Data\<family>` keeps the copy there [disk, bundle].
+# `%LOCALAPPDATA%\Claude-Data\<family>` keeps the copy there: the Store
+# package's on disk [disk], the `AnthropicPBC.Claude` package's by its
+# bundle [bundle].
 [[installations]]
 id = "claude-desktop"
 folder = "%APPDATA%/Claude/claude-code/{*,*/*}"

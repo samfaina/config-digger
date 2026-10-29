@@ -819,12 +819,15 @@ fn read_instead_names_only_a_home_that_is_listed() {
     assert!(not_read.sentence.contains(CLASSIC), "{}", not_read.sentence);
 }
 
+/// `%LOCALAPPDATA%\Claude-Data`.
+fn claude_data() -> PathBuf {
+    PathBuf::from(LOCAL_APP_DATA).join("Claude-Data")
+}
+
 /// Where the MSIX package of the family `family` moves its data folder:
 /// `%LOCALAPPDATA%\Claude-Data\<family>`, the family in lower case.
 fn moved_folder(family: &str) -> PathBuf {
-    PathBuf::from(LOCAL_APP_DATA)
-        .join("Claude-Data")
-        .join(family.to_lowercase())
+    claude_data().join(family.to_lowercase())
 }
 
 /// The package of the family `family` with its data folder moved out of
@@ -836,7 +839,7 @@ fn moved_of(fs: FakeFileSystem, family: &str) -> FakeFileSystem {
     load(fs, &fixture_folder("msix"), &moved_folder(family))
         .with_file(msix_folder(family).join(marker), "")
         .with_file(
-            PathBuf::from(LOCAL_APP_DATA).join(r"Claude-Data\README.txt"),
+            claude_data().join("README.txt"),
             "This folder holds the data Claude keeps for this Windows account.",
         )
 }
@@ -909,8 +912,7 @@ fn a_moved_data_folder_comes_before_a_classic_folder_beside_it() {
 
 #[test]
 fn claude_data_on_a_network_share_comes_before_a_moved_data_folder() {
-    let claude_data = PathBuf::from(LOCAL_APP_DATA).join("Claude-Data");
-    let fs = with_classic_at(moved(), &claude_data);
+    let fs = with_classic_at(moved(), &claude_data());
     let roaming = env().with_var("APPDATA", r"\\fileserver\profiles\fixture\AppData\Roaming");
 
     let on_share = inventory_with(&fs, roaming);

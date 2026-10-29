@@ -167,9 +167,10 @@ await p.check("(top)", "the classic app started with `--user-data-dir=<folder>` 
 // ---------------------------------------------------------------- the MSIX package
 
 let aumid = null;
+let family = null;
 await p.check("(top)", "the MSIX package installs beside the classic app", async () => {
   await powershell(`Add-AppxPackage -Path '${path.join(installers, "claude-msix.msix")}'`);
-  const family = await powershell("(Get-AppxPackage -Name Claude).PackageFamilyName");
+  family = await powershell("(Get-AppxPackage -Name Claude).PackageFamilyName");
   // The package holds helper apps too, such as `SshAskpass`: the app is the first.
   const app = (await powershell("(Get-AppxPackage -Name Claude | Get-AppxPackageManifest).Package.Applications.Application.Id")).split(/\s+/)[0];
   aumid = `${family}!${app}`;
@@ -214,9 +215,8 @@ await p.check("(top)", "the packaged app started from its folder with `--user-da
 // latches into its config's `preferences.userDataOutsidePackageAnswer`
 // (`userDataFolderAnswer` before Windows 11), reads on [bundle]. Nobody
 // signs in here, so the probe writes the latched answer itself.
-const family = () => path.basename(path.dirname(path.dirname(path.dirname(localCache))));
-const movedData = () => path.join(localAppData, "Claude-Data", family().toLowerCase());
-const answer = process.env.CD_PROBE_MOVE_ANSWER ?? (Number((await powershell("[Environment]::OSVersion.Version.Build")) || 0) < 22000 ? "userDataFolderAnswer" : "userDataOutsidePackageAnswer");
+const movedData = () => path.join(localAppData, "Claude-Data", family.toLowerCase());
+const answer = Number(await powershell("[Environment]::OSVersion.Version.Build")) < 22000 ? "userDataFolderAnswer" : "userDataOutsidePackageAnswer";
 
 await p.check("(top)", "the packaged app with no classic folder keeps its data in its `LocalCache` over several launches and writes no `Claude-Data\\<family>`", async () => {
   fs.rmSync(classicData, { recursive: true, force: true });
@@ -239,7 +239,7 @@ await p.check("(top)", "with the move's answer latched true in its config, the p
   const copied = fs.existsSync(path.join(movedData(), "claude_desktop_config.json"));
   if (copied) write(path.join(movedData(), "claude_desktop_config.json"), { ...config("moved"), preferences: { [answer]: true } });
   moved = copied ? { ...(await started(packaged)), folders: folders() } : null;
-  const left = `.user-data-left.${family().toLowerCase()}`;
+  const left = `.user-data-left.${family.toLowerCase()}`;
   const seen = {
     copied,
     readme: fs.existsSync(path.join(localAppData, "Claude-Data", "README.txt")),

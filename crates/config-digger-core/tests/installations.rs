@@ -245,11 +245,15 @@ fn every_installation_that_reads_the_home_is_checked_and_any_out_of_range_flags_
 }
 
 #[test]
-fn claude_desktop_s_copy_is_found_in_a_package_s_moved_data_folder() {
+fn claude_desktop_s_copy_is_found_in_each_package_s_moved_data_folder() {
+    let anthropic_pbc = PathBuf::from(LOCAL_APP_DATA).join(
+        r"Claude-Data\anthropicpbc.claude_fnn82j28hfe8t\claude-code\2.1.299\635c1867224a\claude.exe",
+    );
     let moved = PathBuf::from(LOCAL_APP_DATA)
         .join(r"Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.299\635c1867224a\claude.exe");
     let fs = fixture()
         .with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])))
+        .with_file(&anthropic_pbc, fake::executable(Some([2, 1, 299, 0])))
         .with_file(&moved, fake::executable(Some([2, 1, 299, 0])));
 
     let home = home(&core_with_app_data(&fs), "claude-code");
@@ -263,6 +267,7 @@ fn claude_desktop_s_copy_is_found_in_a_package_s_moved_data_folder() {
         installed,
         [
             ("native", native_claude().as_path()),
+            ("claude-desktop-msix", anthropic_pbc.as_path()),
             ("claude-desktop-msix", moved.as_path()),
         ]
     );

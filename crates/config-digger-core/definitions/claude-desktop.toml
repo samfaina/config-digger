@@ -4,7 +4,9 @@
 # gate's probe, uat/agents/claude-desktop.mjs in Windows Sandbox
 # (docs/research/release-gate.md), run on 3.6556.2, with the move of a
 # package's data folder to `Claude-Data` (#305). Facts tagged [bundle] about
-# that move were read in 3.6556.2 and 4.29.
+# that move were read in 3.6556.2 and 4.29. `verified` starts at the
+# research's 2.16120, on which the probe never ran, and ends at the version
+# it passes on.
 
 format_version = 1
 verified = { min = "2.16120", max = "3.6556.2" }
@@ -15,13 +17,13 @@ verified = { min = "2.16120", max = "3.6556.2" }
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
 # share [bundle]. A package's app reads the folder it moved its data to,
 # `%LOCALAPPDATA%\Claude-Data\<family>`, whenever that folder exists, a
-# classic folder beside it or not [test, bundle]. Each package's app ends with its
-# own `LocalCache`, which no other app sees [docs]. A package's app sees
-# `%APPDATA%\Claude` with its
-# `LocalCache` laid over it file by file: beside a classic folder it reads
-# the classic files and creates no `LocalCache`, but a file its `LocalCache`
-# holds wins [test]. A lookup order picks a whole folder, the classic one
-# here (#306).
+# classic folder beside it or not [test, bundle]. Each package's app ends
+# with its own `LocalCache`, which no other app sees [docs]. A package's app
+# sees `%APPDATA%\Claude` with its `LocalCache` laid over it file by file:
+# beside a classic folder it reads the classic files and creates no
+# `LocalCache`, but a file its `LocalCache` holds wins [test]. A lookup
+# order picks a whole folder, the classic one before a package's
+# `LocalCache` (#306).
 lookup_orders = [
   ["claude-data", "msix-moved", "classic", "msix"],
   ["claude-data", "msix-anthropicpbc-moved", "classic", "msix-anthropicpbc"],
@@ -129,8 +131,9 @@ skills = "local-agent-mode-sessions/skills-plugin"
 # A package moves its data folder out of its `LocalCache`, at a start, to
 # `%LOCALAPPDATA%\Claude-Data\<family>`, the family in lower case, which
 # the package writes to its real path [test, disk]. It moves only while its
-# data is in its `LocalCache` alone, `%APPDATA%\Claude` holding none, and a
-# rollout flag latched into its config's preferences says so [bundle, test].
+# data is in its `LocalCache` alone, `%APPDATA%\Claude` holding none
+# [bundle], and once a rollout flag latched into its config's preferences
+# says so [test, bundle].
 # Its `LocalCache` keeps only the marker `.user-data-left.<family>` [test, disk].
 [[homes]]
 id = "msix-moved"

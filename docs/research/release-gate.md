@@ -82,7 +82,7 @@ CLAUDE_CONFIG_DIR='E:\cd-throwaway-agents\claude-account-home' claude auth logou
 | Gemini CLI | 0.62.0 | unchanged |
 | VS Code | 1.129.1, 1.135.0, 1.141.0, `vscode.mjs`, its `policy` check signed in to the owner's GitHub account, with #412's checks too; 1.143.1 every check but the `.mcp.json` references one, which stays outside `verified` | 1.129.1 to 1.141.0 (was 1.129.1) |
 | Cursor | 3.27.12, `cursor.mjs`, with #411's checks too; 3.22.12 every check but the `plugins[project]` ones, since Cursor updated itself before they ran, and those of #317 and #411, written later | 3.27.12 (was 3.22.12) |
-| Claude Desktop | 3.6556.2, `claude-desktop.mjs` only, with #305's checks of the move to `Claude-Data` on 2026-10-29 | 2.16120 to 3.6556.2 (was 2.16120). 4.29, which the Store installed on the reference machine, is read in its bundle only: claude.ai still served 3.6556.2 |
+| Claude Desktop | 3.6556.2, `claude-desktop.mjs` only, with #305's checks of the move to `Claude-Data` on 2026-10-29 | 2.16120 to 3.6556.2 (was 2.16120). 2.16120 is the research's version, on which the probe never ran. 4.29, which the Store installed on the reference machine, is read in its bundle only: claude.ai still served 3.6556.2 |
 | Orca, for Codex's Mirrored home | 1.4.239, `orca-codex.mjs` | none: Orca has no definition, and `codex.toml` names the version it describes |
 
 Claude Code 2.1.286 fails 7 checks, all on what 2.1.299 changed: a plain-string `enabledMcpjsonServers` or `disabledMcpjsonServers` voids its settings file, there is no name rule, and the skill listing gives no alias. The definition describes 2.1.299 and later, so the range starts there.
