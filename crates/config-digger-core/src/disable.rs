@@ -118,13 +118,6 @@ impl Hit<'_> {
     pub fn holds(&self) -> String {
         let per_project = self.per_project();
         match self.mechanism {
-            // An item of a partial list says no more than that it is there.
-            Switched::ItemList(block) if block.partial.is_some() => explain::in_list(
-                &self.key,
-                &self.key_path[self.key_path.len().saturating_sub(2)],
-                &self.switch.path,
-                per_project,
-            ),
             Switched::NameList(_) => explain::in_list(
                 &self.key,
                 self.key_path.last().expect("validation requires a key"),
@@ -138,13 +131,21 @@ impl Hit<'_> {
                 &self.switch.path,
                 per_project,
             ),
-            Switched::ItemList(_) => explain::item_in_list(
-                &self.key,
-                self.value.unwrap_or(&Value::Null),
-                &self.key_path[self.key_path.len().saturating_sub(2)],
-                &self.switch.path,
-                per_project,
-            ),
+            Switched::ItemList(block) => {
+                let list = &self.key_path[self.key_path.len().saturating_sub(2)];
+                // An item of a partial list says no more than that it is there.
+                if block.partial.is_some() {
+                    explain::in_list(&self.key, list, &self.switch.path, per_project)
+                } else {
+                    explain::item_in_list(
+                        &self.key,
+                        self.value.unwrap_or(&Value::Null),
+                        list,
+                        &self.switch.path,
+                        per_project,
+                    )
+                }
+            }
             Switched::PathRules(_) => explain::path_rule_holds(
                 self.folder
                     .and_then(|folder| JsonPathRules::deciding(self.value, folder))

@@ -6200,11 +6200,11 @@ impl Disables for JsonItemList {
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
-        let disabled = self
-            .disabled_item
-            .as_ref()
-            .map(|template| Self::item(template, name));
-        Self::replace(&key_path, value, disabled)
+        // A partial list, which takes none, is never written.
+        let Some(template) = &self.disabled_item else {
+            return Vec::new();
+        };
+        Self::replace(&key_path, value, Some(Self::item(template, name)))
     }
 
     fn enable_edits(
