@@ -1446,6 +1446,11 @@
           "const": "reads_around_error"
         },
         {
+          "description": "It reads the next path of the location's plugin anchor in its\nplace, such as the next manifest of a Cursor plugin, and so on down\nthe list: the file contributes no Entries, and when no path is\nleft, neither does the location, but for the default folder of\nmanifest skills. Only a location anchored on several paths in\nplugins takes it.",
+          "type": "string",
+          "const": "reads_next_path"
+        },
+        {
           "description": "It starts without the location's Entries.",
           "type": "string",
           "const": "ignores_file"
@@ -2394,6 +2399,17 @@
             "type": "string"
           }
         },
+        "rejected_unless_path_object_or_list": {
+          "description": "The key paths of fields that make the Agent reject the file whole\nunless they hold a path, an object or a list of either, as a\nlocation's `rejected_unless_path_object_or_list` says: a rejected\nfile names no plugin, and the next place is tried.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -2474,6 +2490,17 @@
         "on_read_failure": {
           "description": "What the Agent does when it cannot open, decode or parse the location.",
           "$ref": "#/$defs/ReadFailureReaction"
+        },
+        "rejected_unless_path_object_or_list": {
+          "description": "The key paths of fields of a manifest in plugins that hold a path,\nan object or a list of either, such as the `mcpServers` of a Cursor\nplugin's manifest: the Agent rejects a manifest whose field holds\nanything else whole, as one that does not parse, and the manifest\nis one Read failure. A field that is absent leaves it read.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
         },
         "on_shape_failure": {
           "description": "What the Agent does when the location holds, where its Entries are,\na value of a shape config-digger cannot enumerate, such as a list\nwhere servers should be, the other locations in the file being read.\nA file of valid text that is not an object fails every location in\nit, which take the strongest of their reactions to a shape.\n`unknown` when omitted. `on_read_failure` and the risks do not apply.",
@@ -2797,17 +2824,6 @@
               "description": "Whether a declared path counts only when it starts with `./`, as\nCodex requires of its plugins' manifests: one that does not is\nignored, and a field holding no path that counts, or a list with\nan item that is no path, declares none.",
               "type": "boolean",
               "default": false
-            },
-            "rejected_unless_path_object_or_list": {
-              "description": "The key paths of fields that hold a path, an object or a list of\neither, such as the `mcpServers` of a Cursor plugin's manifest: the\nAgent rejects a manifest whose field holds anything else whole, as\none that does not parse, so it declares none. A field that is\nabsent leaves it read.",
-              "type": "array",
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "default": []
             },
             "block": {
               "type": "string",

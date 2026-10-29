@@ -236,6 +236,25 @@ $manyProjects
 }
 "@
 
+# Cursor as the fake backend sees it, with appdata as %APPDATA% and
+# claude-code-home as the user's folder: Cursor has run, and its local
+# plugin cd-throwaway-kit has a first manifest that does not parse and a
+# next one that declares a server, which Cursor reads instead. Step 27.1
+# starts the app with both variables set to them.
+Write-TestFile "$Root\appdata\Cursor\User\settings.json" "{}`n"
+$kit = "$Root\claude-code-home\.cursor\plugins\local\cd-throwaway-kit"
+Write-TestFile "$kit\.cursor-plugin\plugin.json" @"
+{ "name": "cd-throwaway-kit",, "mcpServers": {} }
+"@
+Write-TestFile "$kit\.claude-plugin\plugin.json" @"
+{
+  "name": "cd-throwaway-kit",
+  "mcpServers": {
+    "cd-throwaway-next": { "command": "npx", "args": ["-y", "cd-throwaway-next"] }
+  }
+}
+"@
+
 # With -VsCode, VS Code's files as they would be in an %APPDATA% of their
 # own, vscode-appdata, which the app reads when started with APPDATA set to
 # it: the default profile, a profile Work with its own mcp.json, and a

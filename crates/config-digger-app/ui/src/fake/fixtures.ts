@@ -502,6 +502,41 @@ export const fixtures: Fixtures = {
             ]
           },
           {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
             "agent": "codex",
             "agent_name": "Codex",
             "home": "codex-home",
@@ -2230,7 +2265,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -2309,6 +2352,130 @@ export const fixtures: Fixtures = {
             "caveats": []
           },
           {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
             "agent": "codex",
             "home": "codex-home",
             "kind": "mcp",
@@ -2380,7 +2547,27 @@ export const fixtures: Fixtures = {
             "caveats": []
           }
         ],
-        "read_failures": [],
+        "read_failures": [
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          }
+        ],
         "store_read_failures": [],
         "agent_flags": []
       }
@@ -2879,6 +3066,41 @@ export const fixtures: Fixtures = {
                 "code": "no_installation_found",
                 "installation": null,
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
               }
             ]
           },
@@ -4619,7 +4841,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -4839,7 +5069,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -4884,7 +5122,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -4963,6 +5209,190 @@ export const fixtures: Fixtures = {
             "caveats": []
           },
           {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-project-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-project-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-project-skill` out of E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-many-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
             "agent": "codex",
             "home": "codex-home",
             "kind": "mcp",
@@ -5034,7 +5464,27 @@ export const fixtures: Fixtures = {
             "caveats": []
           }
         ],
-        "read_failures": [],
+        "read_failures": [
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          }
+        ],
         "store_read_failures": [],
         "agent_flags": []
       }
@@ -5533,6 +5983,41 @@ export const fixtures: Fixtures = {
                 "code": "no_installation_found",
                 "installation": null,
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
               }
             ]
           },
@@ -7385,7 +7870,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -7464,6 +7957,130 @@ export const fixtures: Fixtures = {
             "caveats": []
           },
           {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
             "agent": "codex",
             "home": "codex-home",
             "kind": "mcp",
@@ -7535,7 +8152,27 @@ export const fixtures: Fixtures = {
             "caveats": []
           }
         ],
-        "read_failures": [],
+        "read_failures": [
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          }
+        ],
         "store_read_failures": [],
         "agent_flags": []
       }
@@ -8926,7 +9563,7 @@ export const fixtures: Fixtures = {
         "built_in": true,
         "tested": {
           "min": "2.16120",
-          "max": "2.16120"
+          "max": "3.6556.2"
         },
         "home_variables": [],
         "homes": [
@@ -8984,7 +9621,43 @@ export const fixtures: Fixtures = {
           "max": "3.27.12"
         },
         "home_variables": [],
-        "homes": []
+        "homes": [
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "codex",
@@ -10406,7 +11079,7 @@ export const fixtures: Fixtures = {
           "built_in": true,
           "tested": {
             "min": "2.16120",
-            "max": "2.16120"
+            "max": "3.6556.2"
           },
           "home_variables": [],
           "homes": [
@@ -10464,7 +11137,43 @@ export const fixtures: Fixtures = {
             "max": "3.27.12"
           },
           "home_variables": [],
-          "homes": []
+          "homes": [
+            {
+              "agent": "cursor",
+              "agent_name": "Cursor",
+              "home": "default",
+              "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "source": {
+                "kind": "default"
+              },
+              "hidden": false,
+              "not_read": null,
+              "mirror": null,
+              "no_configuration": null,
+              "scopes": [
+                "user",
+                "project",
+                "built-in",
+                "plugin"
+              ],
+              "installations": [],
+              "out_of_range": false,
+              "last_ran": null,
+              "entries": 2,
+              "notes": [
+                {
+                  "code": "marketplace_plugins_not_on_disk",
+                  "installation": null,
+                  "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+                },
+                {
+                  "code": "no_installation_found",
+                  "installation": null,
+                  "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "codex",
@@ -10548,7 +11257,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-ebc",
+      "id": "20261001-120000-def",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10574,7 +11283,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-bbe",
+      "id": "20261001-120000-e2a",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10597,10 +11306,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a"
     },
     {
-      "id": "20261001-120000-ad2",
+      "id": "20261001-120000-3fc",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -10628,7 +11337,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-ebc",
+        "id": "20261001-120000-def",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11077,7 +11786,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11097,7 +11806,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -11116,7 +11825,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -11125,7 +11834,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-bbe",
+        "id": "20261001-120000-e2a",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -11148,7 +11857,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a"
       },
       "project": null,
       "changes": [
@@ -11574,7 +12283,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -11612,16 +12321,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -11636,7 +12345,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-ad2",
+        "id": "20261001-120000-3fc",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -12084,7 +12793,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -12104,7 +12813,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -12117,10 +12826,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-ad2",
+          "operation": "20261001-120000-3fc",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc\\1-config.toml"
         }
       ]
     },
@@ -12128,10 +12837,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-ebc",
+          "operation": "20261001-120000-def",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def\\2-manifest.json"
         }
       ]
     }
@@ -14178,14 +14887,35 @@ export const fixtures: Fixtures = {
               "project": null,
               "before": "effective",
               "after": "removed"
+            },
+            {
+              "agent": "cursor",
+              "agent_name": "Cursor",
+              "home": "default",
+              "item": "cd-throwaway-user-skill",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+              "project": null,
+              "before": "effective",
+              "after": "removed"
             }
           ],
           "effective": [],
           "info": [
             {
+              "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+              "sentence": "Cursor couldn't read E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json, so its States after this change may differ."
+            },
+            {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [],
@@ -15570,6 +16300,11 @@ export const fixtures: Fixtures = {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [
@@ -15637,14 +16372,35 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project",
               "before": "effective",
               "after": "removed"
+            },
+            {
+              "agent": "cursor",
+              "agent_name": "Cursor",
+              "home": "default",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "removed"
             }
           ],
           "effective": [],
           "info": [
             {
+              "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+              "sentence": "Cursor couldn't read E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json, so its States after this change may differ."
+            },
+            {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [],
@@ -15877,6 +16633,11 @@ export const fixtures: Fixtures = {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [
@@ -16439,14 +17200,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-ebc"
+        "operation": "20261001-120000-def"
       },
       "preview": {
         "plan_id": "plan-52",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-ebc \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-ebc",
+          "title": "Undo 20261001-120000-def \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-def",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -16502,15 +17263,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-ebc"
+        "operation": "20261001-120000-def"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-ebc \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-def \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-ebc",
+          "backup_of": "20261001-120000-def",
           "project": null,
           "changes": [],
           "effective": [],
@@ -16518,11 +17279,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ebc",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-ebc can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-def",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-def can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -16531,15 +17292,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-bbe"
+        "operation": "20261001-120000-e2a"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-bbe \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-e2a \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-bbe",
+          "backup_of": "20261001-120000-e2a",
           "project": null,
           "changes": [],
           "effective": [],
@@ -16547,10 +17308,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-bbe",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-bbe can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e2a",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-e2a can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -16559,14 +17320,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-ad2"
+        "operation": "20261001-120000-3fc"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-ad2 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-ad2",
+          "title": "Undo 20261001-120000-3fc \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-3fc",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -17041,15 +17802,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-ad2"
+        "operation": "20261001-120000-3fc"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-ad2 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-3fc \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-ad2",
+          "backup_of": "20261001-120000-3fc",
           "project": null,
           "changes": [],
           "effective": [],
@@ -17057,10 +17818,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-ad2 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-3fc can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -17070,11 +17831,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-ad2",
+      "operation": "20261001-120000-3fc",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-ad2",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-ad2: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3fc",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-3fc: verified.",
       "hints": []
     }
   },
@@ -17122,8 +17883,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "e3a7743",
-    "date": "2026-10-28",
+    "commit": "da12c55",
+    "date": "2026-10-29",
     "platform": "Windows x64",
     "pages": [
       {

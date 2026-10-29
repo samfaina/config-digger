@@ -1138,6 +1138,9 @@ pub(crate) fn resolve(
                         explain::plugin_not_loaded(&agent.name, &plugin.name, &cause)
                     }
                     (Some(shape), _) => explain::shape_failure(&agent.name, &failure.path, shape),
+                    (None, _) if let Some(rejection) = &failure.rejection => {
+                        explain::rejected_manifest(&agent.name, &failure.path, rejection)
+                    }
                     (None, _) if reaction.reads_around_error => explain::parse_failure_read_around(
                         &agent.name,
                         &failure.path,
@@ -1158,6 +1161,8 @@ pub(crate) fn resolve(
                     reaction
                         .reads_around_error
                         .then(|| explain::reads_around_error(&agent.name)),
+                    (reaction.strongest == ReadFailureReaction::ReadsNextPath)
+                        .then(|| explain::reads_next_path(&agent.name, &reaction.next_paths)),
                 ]
                 .into_iter()
                 .flatten()
@@ -1776,6 +1781,9 @@ struct Reaction {
     /// Whether one of those locations reads around a parse error, and so
     /// still contributes Entries, whatever the strongest reaction.
     reads_around_error: bool,
+    /// The paths of the plugin's list after the file that the Agent tries
+    /// in its place, when it reads the next path.
+    next_paths: Vec<String>,
 }
 
 fn reaction(
@@ -1825,7 +1833,8 @@ fn reaction(
         ReadFailureReaction::FailsPlugin if !anchored(location) => default,
         reaction => reaction,
     };
-    if failure.kind == api::ReadFailureKind::Shape {
+    // A manifest the Agent rejects whole is no shape it reads around.
+    if failure.kind == api::ReadFailureKind::Shape && failure.rejection.is_none() {
         return Reaction {
             strongest: locations
                 .iter()
@@ -1839,6 +1848,7 @@ fn reaction(
             dialect,
             kinds,
             reads_around_error: false,
+            next_paths: Vec::new(),
         };
     }
     // A source of settings can say what the Agent does about its own files.
@@ -1856,15 +1866,30 @@ fn reaction(
             })
             .unwrap_or(location.on_read_failure)
     };
-    Reaction {
-        strongest: locations
+    let strongest = locations
+        .iter()
+        .map(|location| {
+            let reaction = reaction_to_failure(location);
+            unless_referenced(location, reaction, ReadFailureReaction::IgnoresFile)
+        })
+        .max()
+        .unwrap_or(ReadFailureReaction::IgnoresFile);
+    let next_paths = match (strongest, &failure.plugin) {
+        (ReadFailureReaction::ReadsNextPath, Some(plugin)) => locations
             .iter()
-            .map(|location| {
-                let reaction = reaction_to_failure(location);
-                unless_referenced(location, reaction, ReadFailureReaction::IgnoresFile)
+            .filter_map(|location| location.anchor.plugin())
+            .find_map(|anchor| {
+                let paths = anchor.path.all();
+                let at = paths.iter().position(|relative| {
+                    blocks::join_relative(&plugin.folder, relative) == failure.path
+                })?;
+                Some(paths[at + 1..].to_vec())
             })
-            .max()
-            .unwrap_or(ReadFailureReaction::IgnoresFile),
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    Reaction {
+        strongest,
         risks: locations
             .iter()
             .flat_map(|location| location.risks.iter().copied())
@@ -1874,6 +1899,7 @@ fn reaction(
         reads_around_error: locations
             .iter()
             .any(|location| location.reads_around_error()),
+        next_paths,
     }
 }
 

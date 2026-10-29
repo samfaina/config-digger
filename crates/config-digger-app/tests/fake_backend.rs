@@ -118,8 +118,12 @@ fn every_item_is_a_throwaway_one() {
         .collect();
     assert!(names.contains(&"cd-throwaway-codex"), "{names:?}");
     assert!(names.contains(&"cd-throwaway-project"), "{names:?}");
+    // Cursor names a plugin's server `plugin-<plugin>-<server>`.
     assert!(
-        names.iter().all(|name| name.starts_with("cd-throwaway-")),
+        names.iter().all(|name| name
+            .strip_prefix("plugin-")
+            .unwrap_or(name)
+            .starts_with("cd-throwaway-")),
         "{names:?}"
     );
 }

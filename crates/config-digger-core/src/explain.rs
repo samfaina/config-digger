@@ -12,7 +12,7 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
-use crate::scan::{Expected, OffBy, ScannedReadFailure, ScannedShape, ValueType};
+use crate::scan::{Expected, OffBy, ScannedReadFailure, ScannedRejection, ScannedShape, ValueType};
 use crate::{locator, park};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -195,6 +195,14 @@ pub(crate) fn file_failure_cause(
         return format!(
             "the {items} at {} are {found}, not {expected}",
             locator::render(&failure.path, &shape.key_path)
+        );
+    }
+    if let Some(rejection) = &failure.rejection {
+        let (found, expected) = rejection_words(rejection);
+        return format!(
+            "{agent_name} rejects {} whole: {} holds {found}, not {expected}",
+            failure.path.display(),
+            locator::render(&failure.path, &rejection.key_path)
         );
     }
     let path = failure.path.display();
@@ -1773,6 +1781,31 @@ pub(crate) fn shape_failure(agent_name: &str, path: &Path, shape: &ScannedShape)
     )
 }
 
+/// What a manifest that `agent_name` rejects whole for the value
+/// `rejection` names means. It never quotes the file.
+pub(crate) fn rejected_manifest(
+    agent_name: &str,
+    path: &Path,
+    rejection: &ScannedRejection,
+) -> String {
+    let (found, expected) = rejection_words(rejection);
+    format!(
+        "{agent_name} rejects {} whole: {} holds {found}, not {expected}, so it reads no Entries from it.",
+        path.display(),
+        locator::render(path, &rejection.key_path)
+    )
+}
+
+/// The value a manifest is rejected for and what was expected in its
+/// place, as a sentence words them.
+fn rejection_words(rejection: &ScannedRejection) -> (&'static str, &'static str) {
+    let expected = match rejection.in_list {
+        true => "a path or an object",
+        false => "a path, an object or a list of either",
+    };
+    (value_words(rejection.found), expected)
+}
+
 /// The Items a location of another shape holds, the shape it holds and the
 /// one expected, as a sentence words them.
 fn shape_words(shape: &ScannedShape) -> (&'static str, &'static str, &'static str) {
@@ -1780,20 +1813,25 @@ fn shape_words(shape: &ScannedShape) -> (&'static str, &'static str, &'static st
         ItemKind::Mcp => "MCP servers",
         ItemKind::Skill => "skills",
     };
-    let found = match shape.found {
-        ValueType::Null => "null",
-        ValueType::Boolean => "true or false",
-        ValueType::Number => "a number",
-        ValueType::String => "a string",
-        ValueType::List => "a list",
-        ValueType::Object => "an object",
-    };
+    let found = value_words(shape.found);
     let expected = match shape.expected {
         Expected::Object => "an object",
         Expected::List => "a list",
         Expected::ObjectOrPath => "an object or a path",
     };
     (items, found, expected)
+}
+
+/// A JSON value of type `found`, as a sentence words it.
+fn value_words(found: ValueType) -> &'static str {
+    match found {
+        ValueType::Null => "null",
+        ValueType::Boolean => "true or false",
+        ValueType::Number => "a number",
+        ValueType::String => "a string",
+        ValueType::List => "a list",
+        ValueType::Object => "an object",
+    }
 }
 
 /// The note of a Read failure in a file `agent_name` asks about at startup.
@@ -1804,6 +1842,24 @@ pub(crate) fn asks_user(agent_name: &str) -> String {
 /// The note of a Read failure in a file `agent_name` reads around the error.
 pub(crate) fn reads_around_error(agent_name: &str) -> String {
     format!("{agent_name} reads what is around the error, and config-digger lists what it keeps.")
+}
+
+/// The note of a Read failure in a file of a plugin in whose place
+/// `agent_name` reads the first it can of `next`, the paths of the
+/// plugin's list after it.
+pub(crate) fn reads_next_path(agent_name: &str, next: &[String]) -> String {
+    match next {
+        [] => format!(
+            "{agent_name} reads no other file of the plugin instead of this file: it is the last it tries."
+        ),
+        [next] => {
+            format!("{agent_name} reads the plugin's `{next}` instead of this file, if it can.")
+        }
+        next => format!(
+            "{agent_name} reads the first it can of the plugin's {} instead of this file.",
+            any_of(next)
+        ),
+    }
 }
 
 /// The warning of a Read failure in a file whose recovery by `agent_name`

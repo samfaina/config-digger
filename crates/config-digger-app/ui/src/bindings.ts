@@ -1641,6 +1641,12 @@ export type ReadFailureReaction =
  *  contributes the Entries config-digger recovers there.
  */
 "reads_around_error" | 
+/**
+ *  It reads the next file of the plugin's list in its place, such as
+ *  the next manifest of a Cursor plugin, and the file contributes no
+ *  Entries.
+ */
+"reads_next_path" | 
 /**  It starts without the location's Entries. */
 "ignores_file" | 
 /**  It asks about the file at startup, and otherwise starts without its Entries. */

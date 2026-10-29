@@ -6,8 +6,8 @@
 //! Agents' folders, and the Projects it records.
 
 use config_digger_core::api::{
-    Action, Context, Core, EnableOption, Entry, Inventory, Item, Plan, ScanOptions, Targets,
-    WarningClass,
+    Action, Context, Core, EnableOption, Entry, Inventory, Item, Plan, ReadFailure, ScanOptions,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -2085,6 +2085,55 @@ fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_ha
 }
 
 #[test]
+fn past_a_manifest_that_does_not_parse_or_is_rejected_the_next_manifest_s_skills_are_read() {
+    let mut fs = cursor();
+    for (name, first) in [
+        ("broken", UNPARSABLE.to_owned()),
+        (
+            "rejected",
+            json!({ "skills": "./custom", "mcpServers": 42 }).to_string(),
+        ),
+    ] {
+        for (plugin, next) in [(name.to_owned(), true), (format!("{name}-alone"), false)] {
+            let folder = local_plugin(&plugin);
+            fs = fs.with_file(folder.join(r".cursor-plugin\plugin.json"), first.as_str());
+            if next {
+                fs = with_files(
+                    fs,
+                    &folder,
+                    &[(
+                        r".claude-plugin\plugin.json",
+                        json!({ "name": plugin, "skills": "./other" }),
+                    )],
+                );
+            }
+            for skills in ["custom", "other", "skills"] {
+                fs = with_skill(fs, folder.join(format!(r"{skills}\{plugin}-{skills}")));
+            }
+        }
+    }
+
+    let inventory = inventory(&fs);
+
+    let listed = |plugin: &str, skills: &str| {
+        cursor_items(&inventory).any(|item| item.name == format!("{plugin}-{skills}"))
+    };
+    for name in ["broken", "rejected"] {
+        assert!(listed(name, "other"), "{name}");
+        let alone = format!("{name}-alone");
+        assert!(listed(&alone, "skills"), "{alone}");
+        for (plugin, unread) in [
+            (name, ["custom", "skills"]),
+            (alone.as_str(), ["custom", "other"]),
+        ] {
+            for skills in unread {
+                assert!(!listed(plugin, skills), "{plugin}-{skills} is listed");
+            }
+        }
+    }
+}
+
+#[test]
 fn a_plugin_s_manifests_are_tried_in_cursor_s_order() {
     let folder = local_plugin("kit-folder");
     let fs = with_files(
@@ -2250,7 +2299,7 @@ fn reaction(inventory: &Inventory, path: &Path) -> String {
 }
 
 #[test]
-fn cursor_skips_an_mcp_file_it_cannot_parse_but_not_a_plugin_s_manifest_or_mcp_json() {
+fn cursor_skips_an_mcp_file_it_cannot_parse_and_reads_a_plugin_s_next_manifest_but_not_mcp_json() {
     let broken = r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
     let kit = local_plugin("kit");
     let project_mcp = project(r"app\.cursor\mcp.json");
@@ -2288,16 +2337,246 @@ fn cursor_skips_an_mcp_file_it_cannot_parse_but_not_a_plugin_s_manifest_or_mcp_j
 
     assert_eq!(reaction(&inventory, &user_mcp()), "ignores_file");
     assert_eq!(reaction(&inventory, &project_mcp), "ignores_file");
-    // Cursor reads the plugin's next manifest instead, which config-digger
-    // does not (#338), and starts the servers around an `mcp.json`'s
-    // error, which config-digger cannot read (#322).
-    for file in [&kit_manifest, &context7_manifest, &kit_mcp, &docs_mcp] {
+    // Cursor reads the plugin's next manifest instead.
+    for file in [&kit_manifest, &context7_manifest] {
+        assert_eq!(
+            reaction(&inventory, file),
+            "reads_next_path",
+            "{}",
+            file.display()
+        );
+    }
+    // It starts the servers around an `mcp.json`'s error, which
+    // config-digger cannot read (#438).
+    for file in [&kit_mcp, &docs_mcp] {
         assert_eq!(reaction(&inventory, file), "unknown", "{}", file.display());
     }
     // A plugin whose manifest does not parse still has its `.mcp.json` read.
     assert_eq!(code(item(&inventory, "plugin-kit-lint").state), "effective");
     assert_eq!(
         code(item(&inventory, "plugin-context7-context7").state),
+        "effective"
+    );
+}
+
+/// The Cursor Read failure of `path`.
+fn read_failure<'i>(inventory: &'i Inventory, path: &Path) -> &'i ReadFailure {
+    inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.agent == "cursor" && failure.path == path)
+        .unwrap_or_else(|| panic!("{} is no Read failure", path.display()))
+}
+
+/// The text of a manifest that does not parse.
+const UNPARSABLE: &str = r#"{ "name": "broken",, "mcpServers": { "a": { "command": "a" } } }"#;
+
+#[test]
+fn of_a_local_plugin_whose_first_manifest_does_not_parse_cursor_reads_the_next() {
+    let kit = local_plugin("kit");
+    let broken = kit.join(r".cursor-plugin\plugin.json");
+    let fs = with_files(
+        cursor(),
+        &kit,
+        &[
+            (
+                r".claude-plugin\plugin.json",
+                json!({ "name": "kit", "mcpServers": { "next": { "command": "kit-next" } } }),
+            ),
+            (
+                ".mcp.json",
+                json!({ "mcpServers": { "lint": { "command": "kit-lint" } } }),
+            ),
+        ],
+    )
+    .with_file(&broken, UNPARSABLE);
+
+    let inventory = inventory(&fs);
+
+    let next = &item(&inventory, "plugin-kit-next").entries[0];
+    assert_eq!(code(next.state), "effective");
+    assert_eq!(next.path, kit.join(r".claude-plugin\plugin.json"));
+    assert_eq!(code(item(&inventory, "plugin-kit-lint").state), "effective");
+    let failure = read_failure(&inventory, &broken);
+    assert_eq!(code(failure.kind), "parse");
+    assert_eq!(code(failure.reaction), "reads_next_path");
+    assert_eq!(
+        failure.notes,
+        [
+            "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+        ]
+    );
+    assert_eq!(
+        inventory
+            .read_failures
+            .iter()
+            .filter(|failure| failure.agent == "cursor")
+            .count(),
+        1
+    );
+}
+
+/// The Cursor Read failures of files in `folder`.
+fn read_failures_in<'i>(inventory: &'i Inventory, folder: &Path) -> Vec<&'i ReadFailure> {
+    inventory
+        .read_failures
+        .iter()
+        .filter(|failure| failure.agent == "cursor" && failure.path.starts_with(folder))
+        .collect()
+}
+
+#[test]
+fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_is_rejected_whole() {
+    let shapes = [
+        ("number", json!(42)),
+        ("list", json!([42])),
+        ("null", json!(null)),
+        ("mixed", json!(["./servers.json", 42])),
+    ];
+    let mut fs = cursor();
+    for (name, servers) in &shapes {
+        for (plugin, next) in [(name.to_string(), true), (format!("{name}-alone"), false)] {
+            let folder = local_plugin(&plugin);
+            let mut files = vec![
+                (
+                    r".cursor-plugin\plugin.json",
+                    json!({ "name": plugin, "mcpServers": servers }),
+                ),
+                (
+                    "servers.json",
+                    json!({ "mcpServers": { "file": { "command": "file-mcp" } } }),
+                ),
+            ];
+            if next {
+                files.push((
+                    r".claude-plugin\plugin.json",
+                    json!({ "name": plugin, "mcpServers": { "next": { "command": "next-mcp" } } }),
+                ));
+            }
+            fs = with_files(fs, &folder, &files);
+        }
+    }
+    for (name, servers) in [
+        ("path", json!("./servers.json")),
+        ("path-and-object", json!(["./servers.json", {}])),
+    ] {
+        fs = with_files(
+            fs,
+            &local_plugin(name),
+            &[
+                (
+                    r".cursor-plugin\plugin.json",
+                    json!({ "name": name, "mcpServers": servers }),
+                ),
+                (
+                    "servers.json",
+                    json!({ "mcpServers": { "file": { "command": "file-mcp" } } }),
+                ),
+            ],
+        );
+    }
+
+    let inventory = inventory(&fs);
+
+    for (name, _) in &shapes {
+        for plugin in [name.to_string(), format!("{name}-alone")] {
+            let folder = local_plugin(&plugin);
+            let failures = read_failures_in(&inventory, &folder);
+            assert_eq!(failures.len(), 1, "{plugin}: {failures:?}");
+            let failure = failures[0];
+            assert_eq!(failure.path, folder.join(r".cursor-plugin\plugin.json"));
+            assert_eq!(code(failure.kind), "shape", "{plugin}");
+            assert_eq!(code(failure.reaction), "reads_next_path", "{plugin}");
+            assert!(failure.location.is_none(), "{plugin}");
+            assert!(
+                failure.sentence.contains("mcpServers"),
+                "{}",
+                failure.sentence
+            );
+            assert!(
+                cursor_items(&inventory).all(|item| item.name != format!("plugin-{plugin}-file")),
+                "{plugin}: a server of the rejected manifest is read"
+            );
+        }
+        assert_eq!(
+            code(item(&inventory, &format!("plugin-{name}-next")).state),
+            "effective",
+            "{name}"
+        );
+    }
+    for name in ["path", "path-and-object"] {
+        assert_eq!(
+            code(item(&inventory, &format!("plugin-{name}-file")).state),
+            "effective",
+            "{name}"
+        );
+        assert!(read_failures_in(&inventory, &local_plugin(name)).is_empty());
+    }
+}
+
+#[test]
+fn of_a_claude_code_plugin_whose_first_manifest_does_not_parse_cursor_reads_the_next() {
+    let broken = plugin_cache(r"market\kit\1.0.0\.cursor-plugin\plugin.json");
+    let fs = with_plugin_files(
+        cursor(),
+        "kit",
+        &[
+            (
+                r".claude-plugin\plugin.json",
+                json!({ "name": "kit", "mcpServers": { "next": { "command": "kit-next" } } }),
+            ),
+            (
+                ".mcp.json",
+                json!({ "mcpServers": { "lint": { "command": "kit-lint" } } }),
+            ),
+        ],
+    )
+    .with_file(&broken, UNPARSABLE);
+    let fs = with_installed(
+        with_gates(fs, &[("enable_cc_plugin_import", true)]),
+        json!({ "kit@market": user_install("kit") }),
+        json!({ "kit@market": true }),
+    );
+
+    let inventory = inventory(&fs);
+
+    let next = &item(&inventory, "plugin-kit-next").entries[0];
+    assert_eq!(code(next.state), "effective");
+    assert_eq!(
+        next.path,
+        plugin_cache(r"market\kit\1.0.0\.claude-plugin\plugin.json")
+    );
+    assert_eq!(code(item(&inventory, "plugin-kit-lint").state), "effective");
+    let failure = read_failure(&inventory, &broken);
+    assert_eq!(code(failure.reaction), "reads_next_path");
+}
+
+#[test]
+fn a_claude_code_plugin_whose_first_manifest_is_rejected_is_named_by_the_next() {
+    let fs = with_plugin_files(
+        cursor(),
+        "kit",
+        &[
+            (
+                r".cursor-plugin\plugin.json",
+                json!({ "name": "rejected-kit", "mcpServers": 42 }),
+            ),
+            (
+                r".claude-plugin\plugin.json",
+                json!({ "name": "next-kit", "mcpServers": { "next": { "command": "kit-next" } } }),
+            ),
+        ],
+    );
+    let fs = with_installed(
+        fs,
+        json!({ "kit@market": user_install("kit") }),
+        json!({ "kit@market": true }),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        code(item(&inventory, "plugin-next-kit-next").state),
         "effective"
     );
 }
