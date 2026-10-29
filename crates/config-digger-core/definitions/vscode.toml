@@ -236,7 +236,7 @@ on_read_failure = "ignores_file"
 # A `.code-workspace` file's `settings.mcp` [docs]. VS Code skips these
 # servers when the file does not parse, but still opens the file's folders
 # and applies its other settings, read around the error [test].
-# config-digger reads nothing of such a file, its folders included (#322).
+# config-digger reads the file's folders and settings around the error too.
 [[locations]]
 id = "workspace-mcp"
 anchor = { block = "project-file" }
@@ -316,10 +316,9 @@ risks = ["agent_may_drop_entries"]
 # its manifest [test], and in the file a manifest's `mcpServers` names,
 # which `plugin-manifest-mcp` reads. VS Code reads a `.mcp.json` it cannot
 # parse around the error, and starts the servers it finds there [test].
-# config-digger cannot read that much (#322), so the Items such a file
-# reaches keep a caveat.
 [[locations]]
 id = "plugin-mcp"
+unverified = "Of a plugin `.mcp.json` that does not parse, VS Code is taken to keep what `node-jsonc-parser`'s code keeps around an error other than `,,`, the one the probe tests; a probe plugin whose `.mcp.json` holds other errors would test it (#437)."
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
@@ -329,7 +328,7 @@ switch_id = "plugin.{plugin_uri}.{name}"
 scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
-on_read_failure = "unknown"
+on_read_failure = "reads_around_error"
 
 # The servers of the file an agent plugin's root `plugin.json` names in
 # `mcpServers`, such as `"./servers.json"`, which VS Code reads beside the
@@ -382,7 +381,7 @@ equals = true
 default = false
 sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
-  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
+  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc", on_read_failure = "reads_around_error" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "claude-desktop"], dialect = "jsonc" },
 ]
 
@@ -404,7 +403,7 @@ equals = true
 default = false
 sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
-  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
+  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc", on_read_failure = "reads_around_error" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "cursor-workspace"], dialect = "jsonc" },
 ]
 
@@ -426,7 +425,7 @@ equals = true
 default = false
 sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
-  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
+  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc", on_read_failure = "reads_around_error" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "cursor-global"], dialect = "jsonc" },
 ]
 
@@ -448,7 +447,7 @@ equals = true
 default = false
 sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
-  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
+  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc", on_read_failure = "reads_around_error" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.discovery.enabled", "windsurf"], dialect = "jsonc" },
 ]
 
@@ -472,7 +471,7 @@ equals = "disable"
 default = "disable"
 sources = [
   { anchor = { block = "project", path = ".vscode/settings.json" }, key_path = ["chat.mcp.collisionBehavior"], dialect = "jsonc" },
-  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.collisionBehavior"], dialect = "jsonc" },
+  { anchor = { block = "project-file" }, key_path = ["settings", "chat.mcp.collisionBehavior"], dialect = "jsonc", on_read_failure = "reads_around_error" },
   { anchor = { block = "home", root = "settings" }, key_path = ["chat.mcp.collisionBehavior"], dialect = "jsonc" },
 ]
 

@@ -6,6 +6,7 @@
 //! that must handle it.
 
 use super::ReadFailureReaction;
+use crate::around_error;
 use crate::edit::{Edit, Syntax};
 use crate::installations::pe;
 use crate::mask::MASK;
@@ -2848,9 +2849,28 @@ pub(crate) struct ParseError {
     pub position: Option<(usize, usize)>,
 }
 
+/// What a reader that reads a text around its errors keeps of one that
+/// does not parse.
+#[derive(Debug)]
+pub(crate) struct AroundError {
+    /// What parses on both sides of the errors, `None` when nothing does.
+    pub value: Option<serde_json::Value>,
+    /// Where the first error is.
+    pub error: ParseError,
+}
+
 /// Parses a location's text in the reader's dialect.
 pub(crate) trait Parse {
     fn parse(&self, text: &str) -> Result<serde_json::Value, ParseError>;
+
+    /// The text parsed, or else what a reader that keeps what parses on
+    /// both sides of an error keeps of it, as VS Code reads JSONC. Only
+    /// JSON is read around its errors; a text in another format that does
+    /// not parse keeps nothing.
+    fn parse_around_error(&self, text: &str) -> Result<serde_json::Value, AroundError> {
+        self.parse(text)
+            .map_err(|error| AroundError { value: None, error })
+    }
 
     /// The dialect, as a sentence names it, such as "strict JSON".
     fn dialect(&self) -> &'static str;
@@ -3567,6 +3587,22 @@ impl Parse for JsonFormat {
             })?;
         // An empty file holds no JSON value.
         parsed.ok_or(ParseError { position: None })
+    }
+
+    /// Read as `node-jsonc-parser` reads it, with comments and trailing
+    /// commas, whatever the dialect: the error is where it finds the first.
+    fn parse_around_error(&self, text: &str) -> Result<serde_json::Value, AroundError> {
+        self.parse(text).map_err(|error| {
+            let recovered = around_error::parse(text, true);
+            let position = recovered
+                .first_error
+                .map(|at| line_and_column(text, at))
+                .or(error.position);
+            AroundError {
+                value: recovered.value,
+                error: ParseError { position },
+            }
+        })
     }
 
     fn dialect(&self) -> &'static str {
@@ -6686,6 +6722,11 @@ pub(crate) struct SettingPlace {
     /// regard to case. Omitted, any spelling of the Project's key counts.
     #[serde(default)]
     pub forward_slashes: bool,
+    /// What the Agent does with the file when it does not parse. Only
+    /// `reads_around_error` is accepted: the value is read from what parses
+    /// around the error, as VS Code reads a workspace file's settings.
+    /// Omitted, a file that does not parse sets nothing.
+    pub on_read_failure: Option<ReadFailureReaction>,
 }
 
 impl SettingPlace {
@@ -6786,6 +6827,17 @@ impl SettingPlace {
             }
             if !is_name(table) || !is_name(&self.key_path[0]) {
                 return Err("a setting names its table and column by plain names".into());
+            }
+        }
+        match self.on_read_failure {
+            None => {}
+            Some(ReadFailureReaction::ReadsAroundError) => {
+                if self.toml || self.sqlite || self.fragments.is_some() {
+                    return Err("only a setting in a JSON file is read around its error".into());
+                }
+            }
+            Some(_) => {
+                return Err("a setting's on_read_failure can only be `reads_around_error`".into());
             }
         }
         if let Some(cached_at) = &self.cached_at {

@@ -240,7 +240,9 @@ $manyProjects
 # own, vscode-appdata, which the app reads when started with APPDATA set to
 # it: the default profile, a profile Work with its own mcp.json, and a
 # profile Shared that shares the default profile's MCP servers. VS Code last
-# opened the Project in Work and the extra Project in Shared.
+# opened the Project in Work and the extra Project in Shared. It also opened
+# a workspace file with `,,` after its folders, which it reads around the
+# error: it opens the file's folder and skips the file's own servers.
 if ($VsCode) {
     $user = "$Root\vscode-appdata\Code\User"
     Write-TestFile "$user\mcp.json" @"
@@ -274,6 +276,32 @@ if ($VsCode) {
     },
     "emptyWindows": {}
   }
+}
+"@
+    Write-TestFile "$Root\vscode-workspace\member\.vscode\mcp.json" @"
+{
+  "servers": {
+    "cd-throwaway-vscode-member": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-member"] }
+  }
+}
+"@
+    Write-TestFile "$Root\vscode-workspace\cd-throwaway.code-workspace" @"
+{
+  "folders": [
+    { "path": "member" }
+  ],,
+  "settings": {
+    "mcp": {
+      "servers": {
+        "cd-throwaway-vscode-workspace": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-workspace"] }
+      }
+    }
+  }
+}
+"@
+    Write-TestFile "$user\workspaceStorage\cd-throwaway-workspace\workspace.json" @"
+{
+  "workspace": "$uri/vscode-workspace/cd-throwaway.code-workspace"
 }
 "@
 }

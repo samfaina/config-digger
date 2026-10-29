@@ -796,3 +796,34 @@ fn a_profile_s_discovered_server_is_trusted_only_in_the_profile_s_store() {
 
     assert_eq!(code(item(&inventory, "filesystem").state), "blocked");
 }
+
+/// The fixture agent plugin's folder, in VS Code's clone of its marketplace.
+fn review_kit() -> PathBuf {
+    Path::new(HOME).join(r".vscode\agent-plugins\github.com\acme\review-market\plugins\review-kit")
+}
+
+/// The message `action` on the fixture plugin's server `linear` is refused
+/// with, its `.mcp.json` holding `text`.
+fn refused_on_plugin_server(action: Action, text: &str) -> String {
+    let mcp_json = review_kit().join(".mcp.json");
+    let fs = with_home(vscode()).with_file(&mcp_json, text);
+    let linear = format!(r"{}#mcpServers.linear", mcp_json.display());
+    let error = plan(&core(&fs), &context(None), action, &[&linear])
+        .err()
+        .expect("the plan is refused");
+    assert_eq!(code(error.code), "blocked");
+    error.message
+}
+
+#[test]
+fn a_server_read_around_the_error_of_a_plugin_mcp_json_takes_the_answers_of_one_that_parses() {
+    let parses = r#"{ "mcpServers": { "linear": { "url": "https://mcp.linear.app/mcp" }, "fetch": { "command": "uvx" } } }"#;
+    let broken = parses.replace("},", "},,");
+    for action in [Action::Disable, Action::Remove] {
+        // VS Code keeps no switch per plugin, and a plugin goes whole.
+        assert_eq!(
+            refused_on_plugin_server(action, &broken),
+            refused_on_plugin_server(action, parses),
+        );
+    }
+}

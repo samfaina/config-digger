@@ -4,6 +4,7 @@
 
 use config_digger_core::api::{
     Action, Context, Core, Error, ErrorCode, Info, InfoCode, Plan, ScanOptions, Targets,
+    WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -915,4 +916,130 @@ fn switches_in_a_file_that_is_a_read_failure_for_their_agent_disable_nothing_and
         github["disable"]["path"],
         json!(PathBuf::from(PROJECT).join(r".claude\settings.local.json"))
     );
+}
+
+/// Servers `a` and `b` with `,,` between them.
+const TWO_COMMAS_JSON: &str = "{\n  \"servers\": {\n    \"a\": { \"command\": \"a\" },,\n    \"b\": { \"command\": \"b\" }\n  }\n}\n";
+
+/// The User Agent reading `~/.user-agent.json` around its error, with a
+/// Disable switch in `~/.user-agent-state.json`.
+fn user_agent_reading_around_the_error() -> String {
+    let definition = user_agent(".user-agent.json", JSONC, "reads_around_error").replace(
+        "roots.config = \".user-agent.json\"",
+        "roots.config = \".user-agent.json\"
+roots.state = \".user-agent-state.json\"",
+    );
+    format!(
+        r#"{definition}
+[[items.mcp.disable]]
+block = "json-name-list"
+switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["disabledServers"], store_class = "plain" }}
+target = "name"
+context = "all"
+enable_action = "remove-item"
+reason = "disabled_by_name"
+"#
+    )
+}
+
+#[test]
+fn a_location_read_around_its_error_lists_what_it_keeps_and_its_file_is_never_written() {
+    let definition = user_agent_reading_around_the_error();
+    let definitions = [("user-agent.toml", definition.as_str())];
+    let fs = FakeFileSystem::new()
+        .with_file(in_home(".user-agent.json"), TWO_COMMAS_JSON)
+        .with_file(in_home(".user-agent-state.json"), "{}");
+    let inventory = inventory(fs.clone(), &definitions);
+
+    assert_eq!(
+        items(&inventory),
+        [
+            item("user-agent", "a", "effective"),
+            item("user-agent", "b", "effective")
+        ]
+    );
+    assert_eq!(inventory["items"][0]["caveats"], json!([]));
+    assert_eq!(
+        failures(&inventory),
+        [("parse".to_owned(), json!({ "line": 3, "column": 29 }))]
+    );
+    assert_eq!(
+        inventory["read_failures"][0]["reaction"],
+        "reads_around_error"
+    );
+
+    let core = core(fs.clone(), &definitions);
+    let error = plan(&core, Action::Remove, "a").err().unwrap();
+    assert_eq!(error.code, ErrorCode::Blocked, "{}", error.message);
+    assert!(
+        error.message.contains("is a Read failure"),
+        "{}",
+        error.message
+    );
+
+    // A switch in another file still Disables what the Agent keeps.
+    let disable = plan(&core, Action::Disable, "a").unwrap();
+    assert_eq!(
+        disable.preview().files[0].path,
+        in_home(".user-agent-state.json")
+    );
+    core.execute(disable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(
+        items(&inventory_with(&core)),
+        [
+            item("user-agent", "a", "disabled"),
+            item("user-agent", "b", "effective")
+        ]
+    );
+}
+
+/// The inventory in the Project, from `core`.
+fn inventory_with(core: &Core) -> Value {
+    let options = ScanOptions {
+        projects: vec![PathBuf::from(PROJECT)],
+    };
+    let snapshot = core.scan(&options).unwrap();
+    let context = Context {
+        project: Some(PathBuf::from(PROJECT)),
+    };
+    serde_json::to_value(core.resolve(&snapshot, &context)).unwrap()
+}
+
+#[test]
+fn of_two_locations_in_a_file_only_the_one_read_around_the_error_keeps_entries() {
+    let definition = user_agent(".user-agent.json", JSONC, "reads_around_error").replace(
+        "[items.mcp]\nprecedence = [\"user-mcp\"]",
+        r#"[[locations]]
+id = "more-mcp"
+anchor = { block = "home", root = "config" }
+format = { block = "json", dialect = "jsonc" }
+root = ["more"]
+kind = "mcp"
+scope = "user"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.mcp]
+precedence = ["user-mcp", "more-mcp"]"#,
+    );
+    let text = TWO_COMMAS_JSON.replacen(
+        "{\n",
+        "{\n  \"more\": { \"c\": { \"command\": \"c\" } },\n",
+        1,
+    );
+    let fs = FakeFileSystem::new().with_file(in_home(".user-agent.json"), text);
+    let inventory = inventory(fs, &[("user-agent.toml", &definition)]);
+
+    assert_eq!(
+        items(&inventory),
+        [
+            item("user-agent", "a", "effective"),
+            item("user-agent", "b", "effective")
+        ]
+    );
+    // The file shows the strongest reaction of the locations reading it.
+    let failures = inventory["read_failures"].as_array().unwrap();
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert_eq!(failures[0]["reaction"], "ignores_file");
 }

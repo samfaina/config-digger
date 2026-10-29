@@ -1138,6 +1138,14 @@ pub(crate) fn resolve(
                         explain::plugin_not_loaded(&agent.name, &plugin.name, &cause)
                     }
                     (Some(shape), _) => explain::shape_failure(&agent.name, &failure.path, shape),
+                    (None, _) if reaction.strongest == ReadFailureReaction::ReadsAroundError => {
+                        explain::parse_failure_read_around(
+                            &agent.name,
+                            &failure.path,
+                            reaction.dialect,
+                            failure.position,
+                        )
+                    }
                     (None, _) => explain::read_failure(
                         &agent.name,
                         &failure.path,
@@ -1146,10 +1154,13 @@ pub(crate) fn resolve(
                         failure.position,
                     ),
                 },
-                notes: (reaction.strongest == ReadFailureReaction::AsksUser)
-                    .then(|| explain::asks_user(&agent.name))
-                    .into_iter()
-                    .collect(),
+                notes: match reaction.strongest {
+                    ReadFailureReaction::AsksUser => vec![explain::asks_user(&agent.name)],
+                    ReadFailureReaction::ReadsAroundError => {
+                        vec![explain::reads_around_error(&agent.name)]
+                    }
+                    _ => Vec::new(),
+                },
                 warnings: reaction
                     .risks
                     .iter()

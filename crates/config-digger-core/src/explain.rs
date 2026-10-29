@@ -1738,6 +1738,21 @@ pub(crate) fn read_failure(
     }
 }
 
+/// What a file at `path` that `agent_name` reads around its error, and that
+/// does not parse in `dialect`, means. Its note says what is read.
+pub(crate) fn parse_failure_read_around(
+    agent_name: &str,
+    path: &Path,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    let at = position_at(position);
+    format!(
+        "{agent_name} cannot parse {} as {dialect}{at}.",
+        path.display()
+    )
+}
+
 /// What a location that holds a value of another shape where its Entries
 /// are in `path`, as `shape` says, means: only that location fails. It
 /// never quotes the file.
@@ -1775,6 +1790,11 @@ fn shape_words(shape: &ScannedShape) -> (&'static str, &'static str, &'static st
 /// The note of a Read failure in a file `agent_name` asks about at startup.
 pub(crate) fn asks_user(agent_name: &str) -> String {
     format!("{agent_name} will ask about this file at startup.")
+}
+
+/// The note of a Read failure in a file `agent_name` reads around the error.
+pub(crate) fn reads_around_error(agent_name: &str) -> String {
+    format!("{agent_name} reads what is around the error, and config-digger lists what it keeps.")
 }
 
 /// The warning of a Read failure in a file whose recovery by `agent_name`

@@ -577,7 +577,7 @@ impl Targeted<'_> {
         for (path, syntax, edits) in by_file {
             let read = read(self.ports, &path)?;
             let mut edited = apply_edits(&read, syntax, &edits, &Medium::File)
-                .map_err(|failure| failure.into_error(&path))?;
+                .map_err(|failure| self.edit_error(failure, &path))?;
             // Undo puts the Entry back without the comments above it.
             if keeps_comments_out(self.definitions, self.snapshot, &path) {
                 for applied in &mut edited.edits {
@@ -944,7 +944,7 @@ impl Targeted<'_> {
                 None => return Err(Error::blocked(explain::store_missing(&path))),
             };
             let edited = apply_edits(&read, file.syntax, &file.edits, &medium)
-                .map_err(|failure| failure.into_error(&path))?;
+                .map_err(|failure| self.edit_error(failure, &path))?;
             let mut planned = self.planned_file(path, file.syntax, read, created, edited);
             planned.parking = file.parking;
             planned.medium = medium;
@@ -1027,7 +1027,7 @@ impl Targeted<'_> {
                 .collect();
             let read = read(self.ports, path)?;
             let edited = apply_edits(&read, syntax, &removals, &Medium::File)
-                .map_err(|failure| failure.into_error(path))?;
+                .map_err(|failure| self.edit_error(failure, path))?;
             for edit in removals {
                 add_edit(by_file, path.to_path_buf(), syntax, edit, true);
             }
@@ -1317,6 +1317,24 @@ impl Targeted<'_> {
                 advice: vec![advice],
             }
         })
+    }
+
+    /// Why the edits of the file at `path` failed: a file that does not
+    /// parse and is a Read failure, whose Entries an Agent reads around the
+    /// error, is one config-digger never writes, rather than one that
+    /// changed since the scan.
+    fn edit_error(&self, failure: EditFailure, path: &Path) -> Error {
+        let unread = self
+            .before
+            .read_failures
+            .iter()
+            .find(|known| known.location.is_none() && known.path == path);
+        match (failure, unread) {
+            (EditFailure::Edit(EditError::Parse), Some(known)) => {
+                Error::blocked(explain::read_failure_target(path, &known.sentence))
+            }
+            (failure, _) => failure.into_error(path),
+        }
     }
 
     fn planned_file(

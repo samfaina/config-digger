@@ -2632,6 +2632,9 @@ pub struct FailedLocation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFailureReaction {
+    /// It keeps what parses on both sides of an error, and the location
+    /// contributes the Entries config-digger recovers there.
+    ReadsAroundError,
     /// It starts without the location's Entries.
     IgnoresFile,
     /// It asks about the file at startup, and otherwise starts without its Entries.
@@ -2650,6 +2653,9 @@ pub enum ReadFailureReaction {
 impl From<definitions::ReadFailureReaction> for ReadFailureReaction {
     fn from(reaction: definitions::ReadFailureReaction) -> Self {
         match reaction {
+            definitions::ReadFailureReaction::ReadsAroundError => {
+                ReadFailureReaction::ReadsAroundError
+            }
             definitions::ReadFailureReaction::IgnoresFile => ReadFailureReaction::IgnoresFile,
             definitions::ReadFailureReaction::AsksUser => ReadFailureReaction::AsksUser,
             definitions::ReadFailureReaction::Unknown => ReadFailureReaction::Unknown,
