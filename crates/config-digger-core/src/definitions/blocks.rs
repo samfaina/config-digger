@@ -742,6 +742,11 @@ impl Anchored for HomeAnchor {
 
 /// A path in the Project folder, and with `walk`, in its parents or the
 /// folders below it too.
+///
+/// A location reads it in each folder Project, and also in each member
+/// folder of a workspace file the Agent opens, for that workspace file.
+/// Anywhere else, such as in a setting source, it is read in a folder
+/// Project only: a workspace file's member folders set no setting.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProjectAnchor {

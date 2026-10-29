@@ -272,6 +272,30 @@ fn a_folder_s_own_settings_set_the_collision_behavior_in_that_project() {
     assert_eq!(item(&inventory, "GitHub").entries.len(), 3);
 }
 
+#[test]
+fn a_member_folder_s_settings_set_no_collision_behavior_in_a_workspace_file() {
+    let fs = with_project(vscode(), "multi").with_file(
+        project(r"multi\api\.vscode\settings.json"),
+        r#"{ "chat.mcp.collisionBehavior": "suffix" }"#,
+    );
+    let inventory = inventory_at(&fs, &workspace());
+
+    // The two member folders' `shared` still compete, as with `"disable"`.
+    assert_eq!(
+        states(item(&inventory, "shared")),
+        [
+            (
+                "effective".to_owned(),
+                format!(r"{PROJECTS}\multi\api\.vscode\mcp.json#servers.shared")
+            ),
+            (
+                "shadowed".to_owned(),
+                format!(r"{PROJECTS}\multi\web\.vscode\mcp.json#servers.shared")
+            ),
+        ]
+    );
+}
+
 /// The folder of the profile at `location` below `User\profiles`.
 fn profile(location: &str) -> String {
     format!(r"{USER}\profiles\{location}")
@@ -1362,6 +1386,83 @@ fn another_app_s_servers_are_unread_until_discovery_is_turned_on_for_it() {
     assert_eq!(desktop, [("claude-desktop", "effective".to_owned())]);
 }
 
+/// The State of Claude Desktop's `filesystem` and the code of its reason.
+fn discovered(inventory: &Inventory) -> (String, String) {
+    let filesystem = item(inventory, "filesystem");
+    let reason = filesystem.entries[0].reason.as_ref().unwrap();
+    (code(filesystem.state), code(reason.code))
+}
+
+// VS Code reads `chat.mcp.discovery.enabled` for the window: in a
+// workspace file, from its own `settings` and the user's, never from a
+// member folder's `.vscode\settings.json`.
+
+#[test]
+fn a_member_folder_s_settings_turn_on_no_discovery_in_a_workspace_file() {
+    let fs = with_claude_desktop(with_project(vscode(), "multi")).with_file(
+        project(r"multi\api\.vscode\settings.json"),
+        r#"{ "chat.mcp.discovery.enabled": { "claude-desktop": true } }"#,
+    );
+    let inventory = inventory_at(&fs, &workspace());
+
+    assert_eq!(
+        discovered(&inventory),
+        ("unread".to_owned(), "setting_value".to_owned())
+    );
+}
+
+#[test]
+fn a_member_folder_s_settings_turn_off_no_discovery_in_a_workspace_file() {
+    let fs = with_claude_desktop(with_project(vscode(), "multi"))
+        .with_file(
+            project(r"multi\api\.vscode\settings.json"),
+            r#"{ "chat.mcp.discovery.enabled": { "claude-desktop": false } }"#,
+        )
+        .with_file(
+            format!(r"{USER}\settings.json"),
+            r#"{ "chat.mcp.discovery.enabled": { "claude-desktop": true } }"#,
+        );
+    let inventory = inventory_at(&fs, &workspace());
+
+    // The user's settings turn the source on: only the user's trust in
+    // each server keeps it from starting.
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
+}
+
+#[test]
+fn a_folder_s_own_settings_turn_on_discovery_in_that_project() {
+    let fs = with_claude_desktop(with_project(vscode(), "app")).with_file(
+        project(r"app\.vscode\settings.json"),
+        r#"{ "chat.mcp.discovery.enabled": { "claude-desktop": true } }"#,
+    );
+    let inventory = inventory_at(&fs, &project("app"));
+
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
+}
+
+#[test]
+fn a_workspace_file_s_own_settings_turn_on_discovery_in_its_context() {
+    let fs = with_claude_desktop(with_project(vscode(), "multi")).with_file(
+        workspace(),
+        r#"{
+	"folders": [{ "path": "api" }, { "path": "web" }],
+	"settings": { "chat.mcp.discovery.enabled": { "claude-desktop": true } }
+}"#,
+    );
+    let inventory = inventory_at(&fs, &workspace());
+
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
+}
+
 #[test]
 fn a_discovered_server_ranks_below_every_other_collection() {
     let fs = with_claude_desktop(vscode())
@@ -1615,10 +1716,10 @@ fn a_workspace_file_with_an_error_still_turns_on_another_app_s_servers() {
 
     // The setting turns them on: only the user's trust in each keeps it
     // from starting, as with the setting in the user's own settings.
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "blocked");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "not_approved");
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
 }
 
 #[test]

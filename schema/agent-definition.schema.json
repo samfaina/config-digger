@@ -460,7 +460,7 @@
           ]
         },
         {
-          "description": "A path in the Project folder, and with `walk`, in its parents or the\nfolders below it too.",
+          "description": "A path in the Project folder, and with `walk`, in its parents or the\nfolders below it too.\n\nA location reads it in each folder Project, and also in each member\nfolder of a workspace file the Agent opens, for that workspace file.\nAnywhere else, such as in a setting source, it is read in a folder\nProject only: a workspace file's member folders set no setting.",
           "type": "object",
           "properties": {
             "path": {

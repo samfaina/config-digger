@@ -362,8 +362,8 @@ on_read_failure = "unknown"
 # the window [binary]. A folder opened alone reads its own
 # `.vscode\settings.json`, over the user's [test]. A workspace file reads
 # its own `settings`, over the user's, and never the `.vscode\settings.json`
-# of its folders [test]; config-digger reads those too, first, as for a
-# folder (#323).
+# of its folders [test]; nor does config-digger, whose `project` anchor in
+# a setting source is read in a folder Project only.
 [[locations]]
 id = "claude-desktop-mcp"
 anchor = { block = "machine", path = "%APPDATA%/Claude/claude_desktop_config.json" }
@@ -457,7 +457,11 @@ sources = [
 # names match without regard to case form a group, and VS Code leaves every
 # one but the first of the lowest-order collection off [docs]. With
 # `"suffix"` every one of them runs, its tools numbered apart [docs].
-# Settings rank a folder's over a workspace file's over the user's [docs].
+# A resource setting ranks a folder's over a workspace file's over the
+# user's [docs], but VS Code reads `chat.mcp.collisionBehavior` for the
+# window, as it reads `chat.mcp.discovery.enabled` (see
+# `claude-desktop-mcp`), so a workspace file's member folders set neither
+# [binary].
 # For a profile that shares the default profile's settings, its own
 # `settings.json` is read all the same.
 [items.mcp]
