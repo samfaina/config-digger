@@ -3,8 +3,10 @@
 # once per C:\probe\claude\<version>\claude.exe, and writes the output to
 # C:\probe\results\<probe>.log and the results to <probe>.json, the Claude
 # Code version after the probe's name, then done.txt. Shuts the Sandbox down
-# unless sandbox.ps1 was given -KeepOpen.
-param([string]$Probes, [string]$Codex = "codex.exe")
+# unless sandbox.ps1 was given -KeepOpen; then it runs the probes again
+# whenever C:\probe\results\rerun.txt appears, and deletes it. -SignedIn
+# runs claude-desktop with --signed-in.
+param([string]$Probes, [string]$Codex = "codex.exe", [switch]$SignedIn)
 $results = "C:\probe\results"
 $env:CD_PROBE_ROOT = "C:\cd-throwaway-agents"
 $env:CD_PROBE_VERBOSE = "1"
@@ -23,14 +25,24 @@ $runs = foreach ($probe in $Probes -split ",") {
             }
         }
         "codex-machine" { Planned $probe $probe "--bin C:\probe\codex\$Codex" }
-        "claude-desktop" { Planned $probe $probe "--installers C:\probe\desktop" }
+        "claude-desktop" { Planned $probe $probe "--installers C:\probe\desktop$(if ($SignedIn) { ' --signed-in' })" }
     }
 }
-foreach ($run in $runs) {
-    $env:CD_PROBE_JSON = "$results\$($run.Name).json"
-    # Through cmd, so that the log keeps Node's UTF-8, which Windows
-    # PowerShell's redirection would rewrite as UTF-16.
-    cmd /c "C:\probe\node\node.exe C:\probe\agents\$($run.Probe).mjs $($run.Arguments) > $results\$($run.Name).log 2>&1"
+function RunAll {
+    foreach ($run in $runs) {
+        $env:CD_PROBE_JSON = "$results\$($run.Name).json"
+        # Through cmd, so that the log keeps Node's UTF-8, which Windows
+        # PowerShell's redirection would rewrite as UTF-16.
+        cmd /c "C:\probe\node\node.exe C:\probe\agents\$($run.Probe).mjs $($run.Arguments) > $results\$($run.Name).log 2>&1"
+    }
+    Set-Content "$results\done.txt" (Get-Date).ToString("o")
 }
-Set-Content "$results\done.txt" (Get-Date).ToString("o")
-if (-not (Test-Path C:\probe\agents\keep-open)) { shutdown /s /t 5 }
+RunAll
+if (-not (Test-Path C:\probe\agents\keep-open)) { shutdown /s /t 5; exit }
+while ($true) {
+    if (Test-Path "$results\rerun.txt") {
+        Remove-Item "$results\rerun.txt", "$results\done.txt" -Force -ErrorAction SilentlyContinue
+        RunAll
+    }
+    Start-Sleep -Seconds 5
+}
