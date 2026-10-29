@@ -219,6 +219,7 @@ fn plan(core: &Core, action: Action, selectors: &[&str]) -> Result<Plan, Error> 
             .map(|selector| (*selector).to_owned())
             .collect(),
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &Context::default(), action, &targets)
 }

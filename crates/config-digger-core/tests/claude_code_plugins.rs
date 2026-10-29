@@ -4,8 +4,8 @@
 //! and Enable of a whole plugin through `enabledPlugins`.
 
 use config_digger_core::api::{
-    Action, Context, Core, DisableOption, Entry, Error, Inventory, Item, Plan, ScanOptions,
-    Targets, WarningClass,
+    Action, Context, Core, DisableOption, Entry, Error, Inventory, Item, Narrowing, Plan,
+    ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -546,6 +546,7 @@ fn plan(core: &Core, context: &Context, action: Action, selectors: &[&str]) -> R
             .map(|selector| (*selector).to_owned())
             .collect(),
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, context, action, &targets)
 }
@@ -703,7 +704,12 @@ fn a_plugin_entry_shows_how_to_remove_it_in_place_of_remove() {
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
 
     let skill = core
-        .show(&snapshot, &Context::default(), "supabase:supabase-postgres")
+        .show(
+            &snapshot,
+            &Context::default(),
+            "supabase:supabase-postgres",
+            &Narrowing::default(),
+        )
         .unwrap();
     let command = "claude plugin uninstall supabase@claude-plugins-official --scope user";
     assert_eq!(

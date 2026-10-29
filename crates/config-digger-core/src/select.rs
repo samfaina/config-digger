@@ -1,55 +1,57 @@
 //! Selectors: an Item name, or the `<path>#<key path>` locator of an Entry.
 
-use crate::api::{Entry, Error, ErrorCode, Inventory, Item, Leftovers};
+use crate::api::{Entry, Error, ErrorCode, Inventory, Item, Leftovers, Narrowing};
 use crate::{locator, paths};
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// The Items with an Entry at the locator `selector`, or else the Items named
-/// `selector`. Locator paths compare like any other path; key paths exactly.
-pub(crate) fn select<'i>(inventory: &'i Inventory, selector: &str) -> Vec<&'i Item> {
+/// Among the Items `narrowing` leaves, those with an Entry at the locator
+/// `selector`, or else those named `selector`. Locator paths compare like
+/// any other path; key paths exactly.
+pub(crate) fn select<'i>(
+    inventory: &'i Inventory,
+    selector: &str,
+    narrowing: &Narrowing,
+) -> Vec<&'i Item> {
+    let items = || inventory.items.iter().filter(|item| narrowing.admits(item));
     let at_locator = at_locator(selector);
-    let by_locator: Vec<&Item> = inventory
-        .items
-        .iter()
+    let by_locator: Vec<&Item> = items()
         .filter(|item| item.entries.iter().any(|entry| at_locator(&entry)))
         .collect();
     if !by_locator.is_empty() {
         return by_locator;
     }
-    inventory
-        .items
-        .iter()
-        .filter(|item| item.name == selector)
-        .collect()
+    items().filter(|item| item.name == selector).collect()
 }
 
 /// The Entries an action targets, each once, in selector order. Without
 /// `all`, each selector must name exactly one Entry: the one at a locator, or
 /// the only Entry of the Items with a name. With `all`, it must name exactly
-/// one Item, and stands for every Entry of it. A locator that names no Entry
-/// of the inventory can name one of `leftovers`, the Unread Entries of
-/// missing Projects outside the context.
+/// one Item, and stands for every Entry of it. Either way, only among the
+/// Items `narrowing` leaves. A locator that names no Entry of the inventory
+/// can name one of `leftovers`, the Unread Entries of missing Projects
+/// outside the context.
 pub(crate) fn select_entries<'i>(
     inventory: &'i Inventory,
     leftovers: &'i [Leftovers],
     selectors: &[String],
     all: bool,
+    narrowing: &Narrowing,
 ) -> Result<Vec<&'i Entry>, Error> {
     let mut selected: Vec<&Entry> = Vec::new();
     for selector in selectors {
         let in_context = if all {
-            match select(inventory, selector).as_slice() {
+            match select(inventory, selector, narrowing).as_slice() {
                 [item] => Ok(item.entries.iter().collect()),
                 [] => Err(Error::no_match(selector)),
-                items => Err(Error::ambiguous(selector, items)),
+                items => Err(Error::ambiguous(selector, items, inventory)),
             }
         } else {
-            one_entry(inventory, selector)
+            one_entry(inventory, selector, narrowing)
         };
         let entries = match in_context {
             Err(error) if error.code == ErrorCode::NoMatch => {
-                leftover_entries(leftovers, selector, all).ok_or(error)?
+                leftover_entries(leftovers, selector, all, narrowing).ok_or(error)?
             }
             entries => entries?,
         };
@@ -62,18 +64,24 @@ pub(crate) fn select_entries<'i>(
     Ok(selected)
 }
 
-/// The one Entry `selector` names, in a list. An Entry several Agents read
-/// belongs to an Item in each of them, so it is counted once by locator.
-fn one_entry<'i>(inventory: &'i Inventory, selector: &str) -> Result<Vec<&'i Entry>, Error> {
+/// The one Entry `selector` names among the Items `narrowing` leaves, in a
+/// list. An Entry several Agents read belongs to an Item in each of them,
+/// so it is counted once by locator.
+fn one_entry<'i>(
+    inventory: &'i Inventory,
+    selector: &str,
+    narrowing: &Narrowing,
+) -> Result<Vec<&'i Entry>, Error> {
     let at_locator = at_locator(selector);
     let mut found: Vec<&Entry> = inventory
         .items
         .iter()
+        .filter(|item| narrowing.admits(item))
         .flat_map(|item| &item.entries)
         .filter(&at_locator)
         .collect();
     if found.is_empty() {
-        found = select(inventory, selector)
+        found = select(inventory, selector, narrowing)
             .into_iter()
             .flat_map(|item| &item.entries)
             .collect();
@@ -87,17 +95,20 @@ fn one_entry<'i>(inventory: &'i Inventory, selector: &str) -> Result<Vec<&'i Ent
     }
 }
 
-/// The leftover at the locator `selector`, or with `all`, every leftover of
-/// its Item. `None` when no leftover is at it.
+/// The leftover at the locator `selector` among the Items `narrowing`
+/// leaves, or with `all`, every leftover of its Item. `None` when no
+/// leftover is at it.
 fn leftover_entries<'i>(
     leftovers: &'i [Leftovers],
     selector: &str,
     all: bool,
+    narrowing: &Narrowing,
 ) -> Option<Vec<&'i Entry>> {
     let at_locator = at_locator(selector);
     let item = leftovers
         .iter()
         .flat_map(|leftovers| &leftovers.items)
+        .filter(|item| narrowing.admits(item))
         .find(|item| item.entries.iter().any(|entry| at_locator(&entry)))?;
     Some(if all {
         item.entries.iter().collect()
@@ -200,14 +211,19 @@ mod tests {
     fn a_name_in_two_homes_selects_both() {
         let inventory = inventory(vec![item("a", "linear"), item("b", "linear")]);
 
-        assert_eq!(homes(inventory.select("linear")), ["a", "b"]);
+        assert_eq!(
+            homes(inventory.select("linear", &Narrowing::default())),
+            ["a", "b"]
+        );
     }
 
     #[test]
     fn select_one_of_an_ambiguous_name_lists_a_locator_per_item() {
         let inventory = inventory(vec![item("a", "linear"), item("b", "linear")]);
 
-        let error = inventory.select_one("linear").unwrap_err();
+        let error = inventory
+            .select_one("linear", &Narrowing::default())
+            .unwrap_err();
 
         assert_eq!(error.code, crate::api::ErrorCode::Ambiguous);
         assert_eq!(
@@ -220,11 +236,38 @@ mod tests {
     }
 
     #[test]
+    fn select_one_of_an_entry_two_agents_read_names_each_items_agent_and_home() {
+        let mut other = item("a", "linear");
+        other.agent = "cursor".to_owned();
+        let inventory = inventory(vec![item("a", "linear"), other, item("b", "linear")]);
+
+        let error = inventory
+            .select_one("linear", &Narrowing::default())
+            .unwrap_err();
+
+        assert_eq!(
+            error.candidates,
+            [
+                r"C:\a\.claude.json#mcpServers.linear --agent claude-code --home a",
+                r"C:\a\.claude.json#mcpServers.linear --agent cursor --home a",
+                r"C:\b\.claude.json#mcpServers.linear",
+            ]
+        );
+        assert_eq!(
+            error.message,
+            "`linear` matches 3 Items; select one by locator, with --agent and --home where Items share one"
+        );
+    }
+
+    #[test]
     fn a_locator_selects_the_one_home() {
         let inventory = inventory(vec![item("a", "linear"), item("b", "linear")]);
 
         assert_eq!(
-            homes(inventory.select(r"c:/B/.claude.json#mcpServers.linear")),
+            homes(inventory.select(
+                r"c:/B/.claude.json#mcpServers.linear",
+                &Narrowing::default()
+            )),
             ["b"]
         );
     }

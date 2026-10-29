@@ -371,6 +371,7 @@ fn disable(fs: &FakeFileSystem, selector: &str, acknowledged: &[WarningClass]) -
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &context, Action::Disable, &targets)

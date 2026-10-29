@@ -178,6 +178,7 @@ fn plan(core: &Core, context: &Context, action: Action, selector: &str) -> Plan 
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, context, action, &targets).unwrap()
 }

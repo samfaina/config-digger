@@ -3791,6 +3791,116 @@ fn show_names_the_other_agents_that_read_an_entry_with_their_state() {
     );
 }
 
+/// A Claude Code skill `review`, which the VS Code profile reads too.
+fn review_read_by_two_agents() -> Harness {
+    Harness::new()
+        .with_file(".claude/skills/review/SKILL.md", "---\nname: review\n---\n")
+        .with_cwd_file("AppData/Roaming/Code/User/settings.json", "{}")
+}
+
+/// The candidates of the `ambiguous` error `run` prints as JSON.
+fn ambiguous_candidates(run: &Run) -> Vec<String> {
+    assert_eq!(run.code, 3, "{}", run.stderr);
+    let document = run.document();
+    assert_eq!(document["error"]["code"], "ambiguous", "{document}");
+    document["error"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|candidate| candidate.as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn show_of_an_entry_two_agents_read_lists_a_candidate_per_agent_with_its_flags() {
+    let harness = review_read_by_two_agents();
+
+    let candidates = ambiguous_candidates(&harness.run(&["show", "review", "--json"]));
+
+    assert_eq!(candidates.len(), 2, "{candidates:?}");
+    assert_ne!(candidates[0], candidates[1]);
+    for candidate in &candidates {
+        let flags = candidate.split_once(" --agent ").map(|(_, flags)| flags);
+        assert!(
+            flags.is_some_and(|flags| flags.ends_with(" --home default")),
+            "{candidate}"
+        );
+    }
+}
+
+#[test]
+fn show_with_agent_shows_that_agents_item_of_a_name_or_a_locator() {
+    let harness = review_read_by_two_agents();
+    let folder = real_path(&harness.path(".claude/skills/review"));
+    let folder = folder.to_str().unwrap();
+
+    let by_name = harness.run(&["show", "review", "--agent", "vscode", "--json"]);
+    let by_locator = harness.run(&["show", folder, "--agent", "claude-code", "--json"]);
+
+    assert_eq!(by_name.code, 0, "{}", by_name.stderr);
+    assert_eq!(by_name.document()["item"]["agent"], "vscode");
+    assert_eq!(by_locator.code, 0, "{}", by_locator.stderr);
+    assert_eq!(by_locator.document()["item"]["agent"], "claude-code");
+}
+
+#[test]
+fn remove_all_with_agent_removes_the_folder_for_every_agent_that_reads_it() {
+    let harness = review_read_by_two_agents();
+
+    let run = harness.run(&[
+        "remove", "review", "--all", "--agent", "vscode", "--yes", "--json",
+    ]);
+
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    let mut agents: Vec<&str> = Vec::new();
+    let document = run.document();
+    for change in document["plan"]["changes"].as_array().unwrap() {
+        assert_eq!(change["after"], "removed", "{change}");
+        agents.push(change["agent"].as_str().unwrap());
+    }
+    agents.sort_unstable();
+    assert_eq!(agents, ["claude-code", "vscode"]);
+    assert!(!harness.path(".claude/skills/review").exists());
+}
+
+#[test]
+fn show_with_an_unknown_agent_or_one_with_no_such_item_exits_3() {
+    let harness = review_read_by_two_agents();
+
+    let unknown = harness.run(&["show", "review", "--agent", "nope", "--json"]);
+    let without = harness.run(&["show", "review", "--agent", "cursor", "--json"]);
+
+    assert_eq!(unknown.code, 3, "{}", unknown.stderr);
+    assert_eq!(unknown.document()["error"]["code"], "no_match");
+    assert_eq!(
+        unknown.document()["error"]["message"],
+        "no Agent `nope`; `config-digger agents` lists them"
+    );
+    assert_eq!(without.code, 3, "{}", without.stderr);
+    assert_eq!(without.document()["error"]["code"], "no_match");
+}
+
+#[test]
+fn each_candidate_of_an_entry_two_agents_read_shows_its_own_item() {
+    let harness = review_read_by_two_agents();
+    let candidates = ambiguous_candidates(&harness.run(&["show", "review", "--json"]));
+
+    let mut shown: Vec<(String, String)> = Vec::new();
+    for candidate in &candidates {
+        let (locator, flags) = candidate.split_once(" --agent ").unwrap();
+        let mut args = vec!["show", locator, "--agent"];
+        args.extend(flags.split(' '));
+        args.push("--json");
+        let run = harness.run(&args);
+        assert_eq!(run.code, 0, "{candidate}: {}", run.stderr);
+        let item = &run.document()["item"];
+        shown.push((item["agent"].to_string(), item["home"].to_string()));
+    }
+
+    assert_eq!(shown.len(), 2);
+    assert_ne!(shown[0], shown[1]);
+}
+
 /// A VS Code user `mcp.json` with the server `fetch`, and the profile's
 /// own SQLite store, with `Code.exe` installed by the user setup: a copy of
 /// Windows' `PING.EXE` under that name, which runs while it pings.

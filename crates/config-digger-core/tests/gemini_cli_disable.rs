@@ -106,6 +106,7 @@ fn plan(core: &Core, context: &Context, action: Action, selectors: &[&str]) -> R
     let targets = Targets {
         selectors: selectors.iter().map(|s| (*s).to_owned()).collect(),
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, context, action, &targets)
 }

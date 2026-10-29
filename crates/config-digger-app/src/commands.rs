@@ -628,6 +628,7 @@ mod tests {
         let targets = Targets {
             selectors: vec![skill.display().to_string()],
             all: false,
+            ..Targets::default()
         };
         let plan = core
             .plan(&snapshot, &Context::default(), Action::Disable, &targets)

@@ -249,6 +249,7 @@ fn remove_notes(core: &Core) -> Plan {
     let targets = Targets {
         selectors: vec!["notes".to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &Context::default(), Action::Remove, &targets)
         .unwrap()
@@ -364,6 +365,7 @@ fn a_plan_predicting_with_another_scan_reads_no_version_again() {
     let targets = Targets {
         selectors: vec!["notes".to_owned()],
         all: false,
+        ..Targets::default()
     };
 
     let reads = executable_reads(&fs, || {

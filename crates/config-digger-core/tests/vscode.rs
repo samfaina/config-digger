@@ -1270,6 +1270,7 @@ fn the_identity_provider_s_client_secret_in_a_workspace_file_never_shows() {
             &Targets {
                 selectors: vec![docs],
                 all: false,
+                ..Targets::default()
             },
         )
         .unwrap();
@@ -1341,6 +1342,7 @@ fn a_client_secret_under_a_nested_mcp_setting_never_shows_either() {
     let targets = Targets {
         selectors: vec![docs],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &context, Action::Remove, &targets)

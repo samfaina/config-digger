@@ -676,7 +676,11 @@ export type Entry = {
 export type Error = {
 	code: ErrorCode,
 	message: string,
-	/**  What an ambiguous selector could mean, one locator per Item or Entry. */
+	/**
+	 *  What an ambiguous selector could mean, one per Item or Entry: its
+	 *  locator, followed by `--agent` and `--home` for an Item whose locator
+	 *  alone selects another Item too.
+	 */
 	candidates: string[],
 	/**
 	 *  The backup folder of a failed Operation, or of one whose Undo was

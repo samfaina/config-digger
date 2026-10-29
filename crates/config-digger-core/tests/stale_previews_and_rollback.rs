@@ -63,6 +63,7 @@ fn remove(fs: &FakeFileSystem, selector: &str) -> Result<Outcome, Error> {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core.plan(&snapshot, &Context::default(), Action::Remove, &targets)?;
     core.execute(plan, &[])
@@ -81,6 +82,7 @@ fn remove_both_linear(core: &Core) -> Result<Outcome, Error> {
     let targets = Targets {
         selectors: vec!["linear".to_owned()],
         all: true,
+        ..Targets::default()
     };
     let plan = core.plan(&snapshot, &context, Action::Remove, &targets)?;
     core.execute(plan, &[])
@@ -116,6 +118,7 @@ fn an_entry_taken_away_after_the_preview_writes_nothing_and_records_nothing() {
     let targets = Targets {
         selectors: vec!["linear".to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Remove, &targets)
@@ -512,6 +515,7 @@ fn states_after_that_differ_from_the_prediction_are_verified_with_differences() 
     let targets = Targets {
         selectors: vec![local],
         all: false,
+        ..Targets::default()
     };
     let context = Context {
         project: Some(PathBuf::from(PROJECT)),
