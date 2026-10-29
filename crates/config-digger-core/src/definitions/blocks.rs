@@ -746,9 +746,7 @@ impl Anchored for HomeAnchor {
 /// A location reads it in each folder Project, and also in each member
 /// folder of a workspace file the Agent opens, for that workspace file.
 /// Anywhere else, such as in a setting source, it is read in a folder
-/// Project only: a workspace file's member folders set nothing, as VS Code
-/// reads a window setting from the workspace file's own `settings` and
-/// never from its folders'.
+/// Project only: a workspace file's member folders set no setting.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProjectAnchor {

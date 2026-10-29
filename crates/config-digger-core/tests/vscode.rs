@@ -1386,10 +1386,17 @@ fn another_app_s_servers_are_unread_until_discovery_is_turned_on_for_it() {
     assert_eq!(desktop, [("claude-desktop", "effective".to_owned())]);
 }
 
-/// VS Code reads `chat.mcp.discovery.enabled` and
-/// `chat.mcp.collisionBehavior` for the window: in a workspace file, from
-/// its own `settings` and the user's, never from a member folder's
-/// `.vscode\settings.json`.
+/// The State of Claude Desktop's `filesystem` and the code of its reason.
+fn discovered(inventory: &Inventory) -> (String, String) {
+    let filesystem = item(inventory, "filesystem");
+    let reason = filesystem.entries[0].reason.as_ref().unwrap();
+    (code(filesystem.state), code(reason.code))
+}
+
+// VS Code reads `chat.mcp.discovery.enabled` for the window: in a
+// workspace file, from its own `settings` and the user's, never from a
+// member folder's `.vscode\settings.json`.
+
 #[test]
 fn a_member_folder_s_settings_turn_on_no_discovery_in_a_workspace_file() {
     let fs = with_claude_desktop(with_project(vscode(), "multi")).with_file(
@@ -1398,10 +1405,10 @@ fn a_member_folder_s_settings_turn_on_no_discovery_in_a_workspace_file() {
     );
     let inventory = inventory_at(&fs, &workspace());
 
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "unread");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "setting_value");
+    assert_eq!(
+        discovered(&inventory),
+        ("unread".to_owned(), "setting_value".to_owned())
+    );
 }
 
 #[test]
@@ -1419,10 +1426,10 @@ fn a_member_folder_s_settings_turn_off_no_discovery_in_a_workspace_file() {
 
     // The user's settings turn the source on: only the user's trust in
     // each server keeps it from starting.
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "blocked");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "not_approved");
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
 }
 
 #[test]
@@ -1433,10 +1440,10 @@ fn a_folder_s_own_settings_turn_on_discovery_in_that_project() {
     );
     let inventory = inventory_at(&fs, &project("app"));
 
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "blocked");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "not_approved");
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
 }
 
 #[test]
@@ -1450,10 +1457,10 @@ fn a_workspace_file_s_own_settings_turn_on_discovery_in_its_context() {
     );
     let inventory = inventory_at(&fs, &workspace());
 
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "blocked");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "not_approved");
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
 }
 
 #[test]
@@ -1709,10 +1716,10 @@ fn a_workspace_file_with_an_error_still_turns_on_another_app_s_servers() {
 
     // The setting turns them on: only the user's trust in each keeps it
     // from starting, as with the setting in the user's own settings.
-    let filesystem = item(&inventory, "filesystem");
-    assert_eq!(json(filesystem.state), "blocked");
-    let reason = filesystem.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "not_approved");
+    assert_eq!(
+        discovered(&inventory),
+        ("blocked".to_owned(), "not_approved".to_owned())
+    );
 }
 
 #[test]
