@@ -785,6 +785,7 @@ fn plan(core: &Core, action: Action, selector: &str) -> Result<Plan, Error> {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &context, action, &targets)
 }

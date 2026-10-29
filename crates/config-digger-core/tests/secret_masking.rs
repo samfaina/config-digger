@@ -5,8 +5,8 @@
 //! fixtures is the fake `not-a-real-secret`.
 
 use config_digger_core::api::{
-    Action, Context, Core, DiffUnavailable, Entry, Error, ErrorCode, Inventory, Plan, ScanOptions,
-    Targets,
+    Action, Context, Core, DiffUnavailable, Entry, Error, ErrorCode, Inventory, Narrowing, Plan,
+    ScanOptions, Targets,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -31,7 +31,9 @@ fn entry(servers: Value, name: &str) -> Entry {
     let fs = FakeFileSystem::new().with_file(claude_json(), text);
     let core = core(&fs);
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    let item = core.show(&snapshot, &Context::default(), name).unwrap();
+    let item = core
+        .show(&snapshot, &Context::default(), name, &Narrowing::default())
+        .unwrap();
     item.entries.into_iter().next().unwrap()
 }
 
@@ -233,6 +235,7 @@ fn plan_with(core: &Core, action: Action, selector: &str) -> Plan {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &Context::default(), action, &targets)
         .unwrap()
@@ -310,6 +313,7 @@ fn remove_both_linear(fs: &FakeFileSystem) -> Error {
     let targets = Targets {
         selectors: vec!["linear".to_owned()],
         all: true,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &context, Action::Remove, &targets)

@@ -149,6 +149,7 @@ impl Actions {
                 let targets = Targets {
                     selectors: vec![locator.clone()],
                     all: false,
+                    ..Targets::default()
                 };
                 self.core
                     .plan(&snapshot, &context, (*verb).into(), &targets)

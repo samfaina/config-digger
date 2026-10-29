@@ -94,6 +94,7 @@ fn plan(core: &Core, action: Action, selectors: &[&str]) -> Result<Plan, Error> 
             .map(|&selector| selector.to_owned())
             .collect(),
         all: false,
+        ..Targets::default()
     };
     core.plan(&scan(core), &Context::default(), action, &targets)
 }
@@ -359,6 +360,7 @@ fn parked_alpha() -> FakeFileSystem {
     let targets = Targets {
         selectors: vec!["alpha".to_owned()],
         all: false,
+        ..Targets::default()
     };
     let context = Context {
         project: Some(PathBuf::from(PROJECT)),

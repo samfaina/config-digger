@@ -1,7 +1,7 @@
 //! Claude Code's local, project and user Scopes resolved per Project through
 //! the core `api`, with fake ports: snapshot fixture in, States out.
 
-use config_digger_core::api::{Context, Core, ErrorCode, ScanOptions, Snapshot};
+use config_digger_core::api::{Context, Core, ErrorCode, Narrowing, ScanOptions, Snapshot};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -367,7 +367,12 @@ fn show_finds_an_item_by_name() {
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
 
     let github = core
-        .show(&snapshot, &context(Some(PETME)), "github")
+        .show(
+            &snapshot,
+            &context(Some(PETME)),
+            "github",
+            &Narrowing::default(),
+        )
         .unwrap();
 
     assert_eq!(github.name, "github");
@@ -387,7 +392,12 @@ fn show_finds_an_item_by_the_locator_of_any_entry() {
         r#"C:\Users\fixture\.claude.json#"projects"."E:/projects/petme-app".mcpServers."github""#,
     ] {
         let item = core
-            .show(&snapshot, &context(Some(PETME)), locator)
+            .show(
+                &snapshot,
+                &context(Some(PETME)),
+                locator,
+                &Narrowing::default(),
+            )
             .unwrap_or_else(|e| panic!("{locator}: {e}"));
 
         assert_eq!(item.name, "github", "{locator}");
@@ -405,7 +415,9 @@ fn show_of_an_unknown_selector_is_no_match() {
         "dart",
         r"C:\Users\fixture\.claude.json#mcpServers.nothing",
     ] {
-        let error = core.show(&snapshot, &context(None), selector).unwrap_err();
+        let error = core
+            .show(&snapshot, &context(None), selector, &Narrowing::default())
+            .unwrap_err();
 
         assert_eq!(error.code, ErrorCode::NoMatch, "{selector}");
         assert!(error.message.contains(selector), "{}", error.message);

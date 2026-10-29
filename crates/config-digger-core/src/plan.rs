@@ -259,7 +259,13 @@ fn plan_with(
             &first.origin,
         )));
     }
-    let selected = select::select_entries(before, &leftovers, &selectors, targets.all)?;
+    let selected = select::select_entries(
+        before,
+        &leftovers,
+        &selectors,
+        targets.all,
+        &targets.narrowing,
+    )?;
     let (targeted, mirrored) = redirected(definitions, snapshot, before, selected, action)?;
     let targeted_entries = Targeted {
         definitions,
@@ -412,6 +418,7 @@ pub(crate) fn plan_remove_leftovers(
     let targets = Targets {
         selectors: found.entries().map(|entry| entry.locator.clone()).collect(),
         all: false,
+        ..Targets::default()
     };
     let context = Context {
         project: Some(found.project),
@@ -445,6 +452,7 @@ pub(crate) fn plan_remove_stranded(
             .map(|stranded| crate::locator::render(store, &stranded.key_path))
             .collect(),
         all: false,
+        ..Targets::default()
     };
     plan(
         definitions,

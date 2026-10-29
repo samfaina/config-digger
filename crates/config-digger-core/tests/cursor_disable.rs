@@ -173,6 +173,7 @@ fn targets(selectors: &[&str]) -> Targets {
     Targets {
         selectors: selectors.iter().map(|s| (*s).to_owned()).collect(),
         all: false,
+        ..Targets::default()
     }
 }
 

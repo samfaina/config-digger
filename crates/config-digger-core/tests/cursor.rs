@@ -809,6 +809,7 @@ fn claude_code_s_disable_of_a_plugin_reaches_cursor_through_enabled_plugins() {
     let targets = Targets {
         selectors: vec!["plugin:supabase:supabase-claude".to_owned()],
         all: false,
+        ..Targets::default()
     };
 
     let plan = core
@@ -1891,6 +1892,7 @@ fn plan_in_app(fs: &FakeFileSystem, action: Action, selectors: &[&str]) -> (Core
             .map(|&selector| selector.to_owned())
             .collect(),
         all: false,
+        ..Targets::default()
     };
     let plan = core.plan(&snapshot, &context, action, &targets).unwrap();
     (core, plan)

@@ -40,6 +40,7 @@ fn remove_with(core: &Core, selector: &str) -> Result<Outcome, Error> {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core.plan(&snapshot, &Context::default(), Action::Remove, &targets)?;
     core.execute(plan, &[])
@@ -320,6 +321,7 @@ fn undo_of_a_remove_is_refused_when_the_location_is_gone() {
     let targets = Targets {
         selectors: vec!["supabase".to_owned()],
         all: false,
+        ..Targets::default()
     };
     let context = Context {
         project: Some(PathBuf::from(project)),

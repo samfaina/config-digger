@@ -127,6 +127,7 @@ fn remove_linear(core: &Core) -> Result<Outcome, Error> {
     let targets = Targets {
         selectors: vec!["linear".to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core.plan(&snapshot, &Context::default(), Action::Remove, &targets)?;
     core.execute(plan, &[])

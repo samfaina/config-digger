@@ -5,7 +5,7 @@
 
 use config_digger_core::api::{
     Action, Advice, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Item,
-    Plan, ScanOptions, Targets, WarningClass,
+    Narrowing, Plan, ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
@@ -444,9 +444,14 @@ fn a_skill_is_selected_by_its_name_or_by_its_folder() {
     );
     let inventory = no_project(&fs);
 
-    let by_name = inventory.select_one("deploy").unwrap();
+    let by_name = inventory
+        .select_one("deploy", &Narrowing::default())
+        .unwrap();
     let by_folder = inventory
-        .select_one(r"c:/users/fixture/.claude/skills/deploy")
+        .select_one(
+            r"c:/users/fixture/.claude/skills/deploy",
+            &Narrowing::default(),
+        )
         .unwrap();
 
     assert_eq!(by_name, by_folder);
@@ -728,6 +733,7 @@ fn plan(core: &Core, context: &Context, action: Action, selectors: &[&str]) -> R
             .map(|selector| (*selector).to_owned())
             .collect(),
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, context, action, &targets)
 }

@@ -85,6 +85,7 @@ fn plan_with(core: &Core, action: Action, selector: &str) -> Result<Plan, Error>
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &Context::default(), action, &targets)
 }
@@ -329,6 +330,7 @@ fn plan_in_project(core: &Core, action: Action) -> Result<Plan, Error> {
     let targets = Targets {
         selectors: vec!["alpha".to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &context, action, &targets)
 }
@@ -1026,6 +1028,7 @@ fn disable_of_every_entry_of_an_item_parks_one_and_switches_the_extension_off() 
     let targets = Targets {
         selectors: vec!["weather".to_owned()],
         all: true,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Disable, &targets)

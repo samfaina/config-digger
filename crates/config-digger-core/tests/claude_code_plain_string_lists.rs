@@ -194,6 +194,7 @@ fn plan(core: &Core, action: Action, name: &str) -> Plan {
     let targets = Targets {
         selectors: vec![format!("{}#mcpServers.{name}", mcp_json().display())],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &in_petme(), action, &targets).unwrap()
 }
@@ -274,6 +275,7 @@ fn disable_over_a_plain_string_with_any_other_character_is_refused_and_writes_no
     let targets = Targets {
         selectors: vec![format!("{}#mcpServers.b", mcp_json().display())],
         all: false,
+        ..Targets::default()
     };
 
     let error = core

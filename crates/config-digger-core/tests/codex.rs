@@ -821,6 +821,7 @@ fn enable_of_a_managed_entry_a_merged_field_turns_off_is_refused_with_why() {
         &Targets {
             selectors: vec![server(&system_config(), "docs")],
             all: false,
+            ..Targets::default()
         },
     ) else {
         panic!("an Enable of a managed Entry is planned");

@@ -106,6 +106,7 @@ fn scan_plan_and_write(definition: &str) -> (serde_json::Value, serde_json::Valu
             &Targets {
                 selectors: vec!["linear".to_owned()],
                 all: false,
+                ..Targets::default()
             },
         )
         .unwrap();

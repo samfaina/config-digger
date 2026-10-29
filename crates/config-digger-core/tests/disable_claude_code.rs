@@ -255,6 +255,7 @@ fn targets(selectors: &[&str], all: bool) -> Targets {
     Targets {
         selectors: selectors.iter().map(|s| (*s).to_owned()).collect(),
         all,
+        ..Targets::default()
     }
 }
 

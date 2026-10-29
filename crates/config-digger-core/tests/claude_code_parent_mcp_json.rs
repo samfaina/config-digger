@@ -249,6 +249,7 @@ fn disable_of_a_parent_s_server_writes_the_project_s_local_settings() {
         let targets = Targets {
             selectors: vec![format!("{}#mcpServers.{name}", mcp_json(folder).display())],
             all: false,
+            ..Targets::default()
         };
         let context = Context {
             project: Some(PathBuf::from(DEEP)),

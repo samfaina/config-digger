@@ -661,6 +661,7 @@ fn running_warning(running: &[RunningProcess], selector: &str) -> Option<String>
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Remove, &targets)

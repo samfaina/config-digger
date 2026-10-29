@@ -8,8 +8,8 @@ mod terminal;
 use anstyle::{AnsiColor, Style};
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use config_digger_core::api::{
-    self, Action, Context, Core, Inventory, Plan, SCHEMA_VERSION, ScanOptions, Snapshot, Targets,
-    WarningClass,
+    self, Action, Context, Core, Inventory, Narrowing, Plan, SCHEMA_VERSION, ScanOptions, Snapshot,
+    Targets, WarningClass,
 };
 use config_digger_core::ports::Ports;
 use serde::Serialize;
@@ -94,6 +94,8 @@ enum Command {
     Show {
         /// An Item name, or the `<path>#<key path>` locator of one of its Entries.
         selector: String,
+        #[command(flatten)]
+        narrow: Narrow,
     },
     /// Remove Entries for good, from where they live, for every Agent that reads them.
     ///
@@ -182,6 +184,8 @@ struct EntryWrite {
     #[arg(long)]
     all: bool,
     #[command(flatten)]
+    narrow: Narrow,
+    #[command(flatten)]
     confirm: Confirm,
 }
 
@@ -197,16 +201,39 @@ struct RemoveWrite {
     /// Target every Entry of the one Item each selector names.
     #[arg(long)]
     all: bool,
+    #[command(flatten)]
+    narrow: Narrow,
     /// Target every leftover of the missing Project --project names, but
     /// those in the Agent homes the user hid.
-    #[arg(long, conflicts_with_all = ["selectors", "all"])]
+    #[arg(long, conflicts_with_all = ["selectors", "all", "agent", "home"])]
     leftovers: bool,
     /// Target every Stranded Entry: those config-digger parked whose
     /// origin is no longer found.
-    #[arg(long, conflicts_with_all = ["selectors", "all", "leftovers"])]
+    #[arg(long, conflicts_with_all = ["selectors", "all", "leftovers", "agent", "home"])]
     stranded: bool,
     #[command(flatten)]
     confirm: Confirm,
+}
+
+/// What narrows the Items each selector names, before it must name one
+/// Item, or one Entry without --all. An Entry several Agents read belongs to
+/// an Item of each, so its locator alone can name several.
+#[derive(clap::Args)]
+struct Narrow {
+    /// Narrow the Items each selector names to those of this Agent, by its
+    /// id as `agents` lists it.
+    #[arg(long, value_name = "ID")]
+    agent: Option<String>,
+    /// Narrow the Items each selector names to those of this Agent home, by
+    /// its id as `homes list` shows it.
+    #[arg(long, value_name = "ID")]
+    home: Option<String>,
+}
+
+impl Narrow {
+    fn narrowing(&self, core: &Core) -> Result<Narrowing, api::Error> {
+        core.narrowing(self.agent.as_deref(), self.home.as_deref())
+    }
 }
 
 /// How a write is confirmed.
@@ -516,8 +543,11 @@ fn run(cli: &Cli) -> Result<(), Failure> {
                 inventory.without_hidden()
             };
             if let Some(selector) = selector {
-                let selected: Vec<api::Item> =
-                    inventory.select(selector).into_iter().cloned().collect();
+                let selected: Vec<api::Item> = inventory
+                    .select(selector, &Narrowing::default())
+                    .into_iter()
+                    .cloned()
+                    .collect();
                 if selected.is_empty() {
                     return Err(api::Error::no_match(selector).into());
                 }
@@ -535,9 +565,10 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             }
             Ok(())
         }
-        Command::Show { selector } => {
+        Command::Show { selector, narrow } => {
+            let narrowing = narrow.narrowing(&core)?;
             let inventory = scanned(cli, &core)?.inventory;
-            let item = inventory.select_one(selector)?;
+            let item = inventory.select_one(selector, &narrowing)?;
             if cli.json {
                 print_json(&ShowBody {
                     project: &inventory.project,
@@ -560,15 +591,15 @@ fn run(cli: &Cli) -> Result<(), Failure> {
             ..
         }) => remove_stranded(cli, &core, confirm),
         Command::Remove(write) => {
-            let targets = targets(&write.selectors, write.all);
+            let targets = targets(&write.selectors, write.all, write.narrow.narrowing(&core)?);
             write_entries(cli, &core, Action::Remove, &targets, &write.confirm)
         }
         Command::Disable(write) => {
-            let targets = targets(&write.selectors, write.all);
+            let targets = targets(&write.selectors, write.all, write.narrow.narrowing(&core)?);
             write_entries(cli, &core, Action::Disable, &targets, &write.confirm)
         }
         Command::Enable(write) => {
-            let targets = targets(&write.selectors, write.all);
+            let targets = targets(&write.selectors, write.all, write.narrow.narrowing(&core)?);
             write_entries(cli, &core, Action::Enable, &targets, &write.confirm)
         }
         Command::History { command: None } => {
@@ -692,11 +723,13 @@ fn load_core(cli: &Cli) -> Result<Core, Failure> {
     ))
 }
 
-/// The Entries `selectors` name, or with `all`, every Entry of their Items.
-fn targets(selectors: &[String], all: bool) -> Targets {
+/// The Entries `selectors` name, or with `all`, every Entry of their Items,
+/// among the Items `narrowing` leaves.
+fn targets(selectors: &[String], all: bool, narrowing: Narrowing) -> Targets {
     Targets {
         selectors: selectors.to_vec(),
         all,
+        narrowing,
     }
 }
 

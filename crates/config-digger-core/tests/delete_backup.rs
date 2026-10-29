@@ -57,6 +57,7 @@ fn removed(fs: &FakeFileSystem, selector: &str) -> String {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Remove, &targets)
@@ -86,6 +87,7 @@ fn needs_attention(fs: &FakeFileSystem) -> String {
     let targets = Targets {
         selectors: vec!["linear".to_owned()],
         all: true,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &context, Action::Remove, &targets)

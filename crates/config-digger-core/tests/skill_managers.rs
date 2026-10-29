@@ -334,6 +334,7 @@ fn remove_of_one_npx_skills_skill_touches_that_folder_alone() {
     let targets = Targets {
         selectors: vec![agents_skill("deploy").display().to_string()],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Remove, &targets)

@@ -928,6 +928,7 @@ mod tests {
         let targets = Targets {
             selectors: vec!["linear".to_owned()],
             all: false,
+            ..Targets::default()
         };
         let mut plan = core
             .plan(&snapshot, &Context::default(), Action::Remove, &targets)
@@ -1048,6 +1049,7 @@ checks = ["disable", "precedence"]
         let targets = Targets {
             selectors: vec!["linear".to_owned()],
             all: false,
+            ..Targets::default()
         };
         let mut plan = core
             .plan(&snapshot, &Context::default(), Action::Remove, &targets)

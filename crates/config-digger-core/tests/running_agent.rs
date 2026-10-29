@@ -119,6 +119,7 @@ fn remove(core: &Core, selector: &str) -> Plan {
     let targets = Targets {
         selectors: vec![selector.to_owned()],
         all: false,
+        ..Targets::default()
     };
     core.plan(&snapshot, &context, Action::Remove, &targets)
         .unwrap()
@@ -606,6 +607,7 @@ fn an_agent_running_for_two_of_its_homes_gets_one_hint() {
             format!("{}#servers.search", other.display()),
         ],
         all: false,
+        ..Targets::default()
     };
     let plan = core
         .plan(&snapshot, &Context::default(), Action::Remove, &targets)
@@ -1075,6 +1077,7 @@ fn a_single_second_listing_covers_every_process_with_a_hidden_path() {
             format!("{}#servers.search", other.display()),
         ],
         all: false,
+        ..Targets::default()
     };
 
     let plan = core

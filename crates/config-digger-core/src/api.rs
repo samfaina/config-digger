@@ -233,17 +233,32 @@ impl Core {
         resolve::stranded(&self.definitions, &snapshot.scanned)
     }
 
-    /// The one Item `selector` names in `context`: an Item name, or the
-    /// `<path>#<key path>` locator of any of its Entries.
+    /// The one Item `selector` names in `context`, among those `narrowing`
+    /// leaves: an Item name, or the `<path>#<key path>` locator of any of
+    /// its Entries.
     pub fn show(
         &self,
         snapshot: &Snapshot,
         context: &Context,
         selector: &str,
+        narrowing: &Narrowing,
     ) -> Result<Item, Error> {
         self.resolve(snapshot, context)
-            .select_one(selector)
+            .select_one(selector, narrowing)
             .cloned()
+    }
+
+    /// What narrows the Items a selector names to those of the Agent
+    /// `agent` and of the Agent home `home`, each when given. `agent` is an
+    /// Agent definition's id in any case; it fails when none has it.
+    pub fn narrowing(&self, agent: Option<&str>, home: Option<&str>) -> Result<Narrowing, Error> {
+        let agent = agent
+            .map(|agent| user_list::definition_of(&self.definitions, agent))
+            .transpose()?;
+        Ok(Narrowing {
+            agent: agent.map(|definition| definition.agent.id.clone()),
+            home: home.map(str::to_owned),
+        })
     }
 
     /// Plans `action` on the Entries `targets` names in `context`, without
@@ -893,6 +908,30 @@ pub struct Targets {
     /// Each selector stands for every Entry of the one Item it names, instead
     /// of the one Entry it names.
     pub all: bool,
+    /// Narrows the Items each selector names, before it must name one Item
+    /// or one Entry.
+    pub narrowing: Narrowing,
+}
+
+/// What narrows the Items a selector names: to those of one Agent, of one
+/// Agent home, or of both. The default narrows nothing; [`Core::narrowing`]
+/// makes the others.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Narrowing {
+    /// The id of an Agent definition.
+    agent: Option<String>,
+    /// The id of an Agent home, as [`Home::home`] has it.
+    home: Option<String>,
+}
+
+impl Narrowing {
+    /// Whether `item` is of the Agent and the Agent home this narrows to.
+    pub(crate) fn admits(&self, item: &Item) -> bool {
+        let agent = self.agent.as_ref();
+        let home = self.home.as_ref();
+        agent.is_none_or(|agent| item.agent.eq_ignore_ascii_case(agent))
+            && home.is_none_or(|home| item.home.eq_ignore_ascii_case(home))
+    }
 }
 
 /// An Operation planned and not yet executed. It never leaves the process:
@@ -1573,18 +1612,20 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    /// The Items a selector names: those with an Entry at a `<path>#<key
-    /// path>` locator, or else those with that name.
-    pub fn select(&self, selector: &str) -> Vec<&Item> {
-        select::select(self, selector)
+    /// The Items a selector names among those `narrowing` leaves: those
+    /// with an Entry at a `<path>#<key path>` locator, or else those with
+    /// that name.
+    pub fn select(&self, selector: &str, narrowing: &Narrowing) -> Vec<&Item> {
+        select::select(self, selector, narrowing)
     }
 
-    /// The one Item a selector names, as [`Core::show`] finds it.
-    pub fn select_one(&self, selector: &str) -> Result<&Item, Error> {
-        match self.select(selector).as_slice() {
+    /// The one Item a selector names among those `narrowing` leaves, as
+    /// [`Core::show`] finds it.
+    pub fn select_one(&self, selector: &str, narrowing: &Narrowing) -> Result<&Item, Error> {
+        match self.select(selector, narrowing).as_slice() {
             [item] => Ok(item),
             [] => Err(Error::no_match(selector)),
-            items => Err(Error::ambiguous(selector, items)),
+            items => Err(Error::ambiguous(selector, items, self)),
         }
     }
 
@@ -2963,19 +3004,36 @@ impl Error {
         )
     }
 
-    /// Each candidate is the locator of an Item's first Entry.
-    pub(crate) fn ambiguous(selector: &str, items: &[&Item]) -> Self {
+    /// Each candidate is the locator of an Item's first Entry, followed by
+    /// the Item's Agent and home as flags when that locator also selects
+    /// another Item of `inventory`, so that each candidate selects its Item
+    /// alone.
+    pub(crate) fn ambiguous(selector: &str, items: &[&Item], inventory: &Inventory) -> Self {
+        let candidates: Vec<String> = items
+            .iter()
+            .map(|item| {
+                let locator = &item.entries[0].locator;
+                if inventory.select(locator, &Narrowing::default()).len() > 1 {
+                    format!("{locator} --agent {} --home {}", item.agent, item.home)
+                } else {
+                    locator.clone()
+                }
+            })
+            .collect();
+        let shared = candidates
+            .iter()
+            .zip(items)
+            .any(|(candidate, item)| *candidate != item.entries[0].locator);
+        let how = if shared {
+            "select one by locator, with --agent and --home where Items share one"
+        } else {
+            "select one by locator"
+        };
         Self {
-            candidates: items
-                .iter()
-                .map(|item| item.entries[0].locator.clone())
-                .collect(),
+            candidates,
             ..Self::new(
                 ErrorCode::Ambiguous,
-                format!(
-                    "`{selector}` matches {} Items; select one by locator",
-                    items.len()
-                ),
+                format!("`{selector}` matches {} Items; {how}", items.len()),
             )
         }
     }

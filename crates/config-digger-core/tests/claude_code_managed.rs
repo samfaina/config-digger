@@ -535,6 +535,7 @@ fn enable_of_an_entry_disabled_by_rule_is_refused() {
     let targets = Targets {
         selectors: vec!["notes".to_owned()],
         all: false,
+        ..Targets::default()
     };
 
     let error = core
