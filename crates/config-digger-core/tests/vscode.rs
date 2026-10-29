@@ -1108,6 +1108,53 @@ fn an_item_whose_plugin_uri_is_not_a_file_uri_or_that_has_none_is_skipped() {
 }
 
 #[test]
+fn two_marketplaces_plugins_of_one_name_are_two_plugins() {
+    let plugins = "file:///c%3A/Users/fixture/.vscode/agent-plugins/github.com";
+    let listed = serde_json::json!({
+        "version": 1,
+        "installed": [
+            { "pluginUri": format!("{plugins}/acme/one/plugins/kit"), "name": "kit" },
+            { "pluginUri": format!("{plugins}/other/two/plugins/kit"), "name": "kit" },
+        ],
+    });
+    let folder = |market: &str| {
+        Path::new(HOME).join(format!(
+            r".vscode\agent-plugins\github.com\{market}\plugins\kit"
+        ))
+    };
+    let fs = with_home(vscode())
+        .with_file(installed_json(), listed.to_string())
+        .with_file(
+            folder(r"acme\one").join(".mcp.json"),
+            r#"{ "mcpServers": { "one": { "command": "one" } } }"#,
+        )
+        .with_file(
+            folder(r"other\two").join(".mcp.json"),
+            r#"{ "mcpServers": { "two": { "command": "two" } } }"#,
+        );
+    let inventory = inventory(&fs);
+
+    let plugin = |server: &str| {
+        let plugin = item(&inventory, server).entries[0].plugin.clone().unwrap();
+        (plugin.id, plugin.name)
+    };
+    assert_eq!(
+        plugin("one"),
+        (
+            "github.com/acme/one/plugins/kit".to_owned(),
+            "kit".to_owned()
+        )
+    );
+    assert_eq!(
+        plugin("two"),
+        (
+            "github.com/other/two/plugins/kit".to_owned(),
+            "kit".to_owned()
+        )
+    );
+}
+
+#[test]
 fn a_folder_in_agent_plugins_that_installed_json_does_not_list_holds_no_plugin() {
     let inventory = inventory(&with_home(vscode()));
 

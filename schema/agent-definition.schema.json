@@ -1749,7 +1749,7 @@
       ]
     },
     "Spelling": {
-      "description": "How a registry spells a Project.",
+      "description": "How a registry spells a folder: a Project, or a plugin's.",
       "oneOf": [
         {
           "description": "A path, such as `E:\\x` or `E:/x`.",
@@ -1757,7 +1757,7 @@
           "const": "path"
         },
         {
-          "description": "A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,\nsuch as a remote folder's, names no Project on this machine.",
+          "description": "A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,\nsuch as a remote folder's, names no folder on this machine.",
           "type": "string",
           "const": "file-uri"
         }
@@ -1949,7 +1949,7 @@
           ]
         },
         {
-          "description": "A list in a strict JSON file whose items each name a plugin's folder,\nsuch as the `installed` of VS Code's `agent-plugins\\installed.json`,\neach naming its folder by a `file:` URI in `pluginUri`. Those folders\nare the plugins, in the list's order. A plugin's id is its folder's\npath below the file's folder, `/`-separated, or its whole path when it\nlies elsewhere. An item that names no folder on this machine is skipped.",
+          "description": "A list in a strict JSON file whose items each name a plugin's folder,\nsuch as the `installed` of VS Code's `agent-plugins\\installed.json`,\neach naming its folder by a `file:` URI in `pluginUri`. Those folders\nare the plugins, in the list's order. A plugin's id is its folder's\npath below the file's folder, `/`-separated, or its whole path when it\nlies elsewhere. An item without the field, or whose field spells no path\non this machine, such as a URI of another scheme, is skipped.",
           "type": "object",
           "properties": {
             "anchor": {

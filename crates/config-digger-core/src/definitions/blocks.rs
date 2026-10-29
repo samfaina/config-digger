@@ -1429,7 +1429,7 @@ impl Register for Registry {
     }
 }
 
-/// How a registry spells a Project.
+/// How a registry spells a folder: a Project, or a plugin's.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Spelling {
@@ -1437,7 +1437,7 @@ pub(crate) enum Spelling {
     #[default]
     Path,
     /// A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,
-    /// such as a remote folder's, names no Project on this machine.
+    /// such as a remote folder's, names no folder on this machine.
     FileUri,
 }
 
@@ -2514,13 +2514,19 @@ impl FolderMarketplaces {
     }
 }
 
+/// A JSON plugin registry lies in one file of the Agent home or the machine.
+fn validate_plugin_registry_anchor(anchor: &Anchor) -> Result<(), String> {
+    anchor.validate()?;
+    anchor.one_file()?;
+    if anchor.home_root().is_none() && anchor.machine().is_none() {
+        return Err("a plugin registry must lie in the Agent home or the machine".into());
+    }
+    Ok(())
+}
+
 impl Validate for JsonPluginRecords {
     fn validate(&self) -> Result<(), String> {
-        self.anchor.validate()?;
-        self.anchor.one_file()?;
-        if self.anchor.home_root().is_none() && self.anchor.machine().is_none() {
-            return Err("a plugin registry must lie in the Agent home or the machine".into());
-        }
+        validate_plugin_registry_anchor(&self.anchor)?;
         if self.root.is_empty() || self.root.iter().any(String::is_empty) {
             return Err("a plugin registry needs a root key path, with no empty key".into());
         }
@@ -2594,7 +2600,8 @@ impl JsonPluginRecords {
 /// each naming its folder by a `file:` URI in `pluginUri`. Those folders
 /// are the plugins, in the list's order. A plugin's id is its folder's
 /// path below the file's folder, `/`-separated, or its whole path when it
-/// lies elsewhere. An item that names no folder on this machine is skipped.
+/// lies elsewhere. An item without the field, or whose field spells no path
+/// on this machine, such as a URI of another scheme, is skipped.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonPluginList {
@@ -2616,11 +2623,7 @@ pub(crate) struct JsonPluginList {
 
 impl Validate for JsonPluginList {
     fn validate(&self) -> Result<(), String> {
-        self.anchor.validate()?;
-        self.anchor.one_file()?;
-        if self.anchor.home_root().is_none() && self.anchor.machine().is_none() {
-            return Err("a plugin registry must lie in the Agent home or the machine".into());
-        }
+        validate_plugin_registry_anchor(&self.anchor)?;
         if self.list.is_empty() || self.list.iter().any(String::is_empty) {
             return Err("a plugin list needs a key path, with no empty key".into());
         }
@@ -2678,21 +2681,16 @@ impl JsonPluginList {
     }
 }
 
-/// The path of `folder` below `base`, `/`-separated, compared without
-/// regard to case; its whole path when it does not lie below it.
+/// The path of `folder` below `base`, `/`-separated; its whole path when it
+/// does not lie below it.
 fn id_below(folder: &Path, base: &Path) -> String {
-    let mut parts = folder.components();
-    let below = base.components().all(|part| {
-        parts.next().is_some_and(|own| {
-            paths::key(Path::new(own.as_os_str())) == paths::key(Path::new(part.as_os_str()))
-        })
-    });
-    let rest: Vec<_> = parts
-        .map(|part| part.as_os_str().to_string_lossy())
-        .collect();
-    match below && !rest.is_empty() {
-        true => rest.join("/"),
-        false => folder.display().to_string(),
+    match crate::folders::below(folder, base) {
+        Some(rest) if !rest.is_empty() => rest
+            .iter()
+            .map(|part| part.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+        _ => folder.display().to_string(),
     }
 }
 

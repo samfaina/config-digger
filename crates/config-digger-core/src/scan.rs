@@ -6,11 +6,11 @@ use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, Conform, DisableMechanism, Disables,
     DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
-    InstallationFolders, JsonDialect, JsonFormat, JsonPluginList, JsonPluginRecords,
-    LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache,
-    NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache, PluginFolders, PluginRecord,
-    PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
-    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
+    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator,
+    LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse,
+    ParseError, PluginCache, PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys,
+    ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect,
+    SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -3844,8 +3844,14 @@ impl Scanner<'_> {
         installation_folders: &[&Path],
     ) -> Vec<ScannedPlugin> {
         let records = match &plugins.registry {
-            PluginRegistry::JsonPluginRecords(block) => self.plugin_records(home, block),
-            PluginRegistry::JsonPluginList(block) => self.plugin_list(home, block),
+            PluginRegistry::JsonPluginRecords(block) => {
+                self.json_plugin_records(home, &block.anchor, |text, _| block.records(text))
+            }
+            PluginRegistry::JsonPluginList(block) => {
+                self.json_plugin_records(home, &block.anchor, |text, path| {
+                    block.records(text, path)
+                })
+            }
             PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
             PluginRegistry::InstallationFolders(block) => {
                 self.installation_folders(block, installation_folders)
@@ -3998,33 +4004,22 @@ impl Scanner<'_> {
         self.name_clashes.extend(clashes);
     }
 
-    /// The records of a JSON file of plugin records, in its order.
-    fn plugin_records(&mut self, home: &FoundHome, block: &JsonPluginRecords) -> Vec<PluginRecord> {
-        let Some(path) = block.anchor.path(&home.roots, None) else {
+    /// The records `records` reads in the text of a JSON plugin registry's
+    /// file at `anchor`, given the file's path: none when the file is
+    /// missing, and a Read failure when it does not parse.
+    fn json_plugin_records(
+        &mut self,
+        home: &FoundHome,
+        anchor: &Anchor,
+        records: impl FnOnce(&str, &Path) -> Result<Vec<PluginRecord>, ParseError>,
+    ) -> Vec<PluginRecord> {
+        let Some(path) = anchor.path(&home.roots, None) else {
             return Vec::new();
         };
         let Some(text) = self.reader.text(home, &path, None) else {
             return Vec::new();
         };
-        match block.records(text) {
-            Ok(records) => records,
-            Err(error) => {
-                self.reader
-                    .fail(home, &path, None, ReadFailureKind::Parse, error.position);
-                Vec::new()
-            }
-        }
-    }
-
-    /// The records of a JSON file listing plugins, in its order.
-    fn plugin_list(&mut self, home: &FoundHome, block: &JsonPluginList) -> Vec<PluginRecord> {
-        let Some(path) = block.anchor.path(&home.roots, None) else {
-            return Vec::new();
-        };
-        let Some(text) = self.reader.text(home, &path, None) else {
-            return Vec::new();
-        };
-        match block.records(text, &path) {
+        match records(text, &path) {
             Ok(records) => records,
             Err(error) => {
                 self.reader
