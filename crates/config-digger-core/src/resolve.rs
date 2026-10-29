@@ -1000,7 +1000,7 @@ pub(crate) fn resolve(
                             .chain(partial.iter().map(|hit| api::Note {
                                 code: api::NoteCode::PartialSwitch,
                                 switch: Some(hit.locator()),
-                                sentence: explain::partial_switch(&hit.holds(), agent_name),
+                                sentence: hit.partial_note(agent_name),
                             }))
                             .chain(origin.by_name_only)
                             .chain(needs_trusted_folder(

@@ -6,7 +6,7 @@
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
-    MechanismTarget, Merge, MergedField, NAME_KEY, OWN_NAME_KEY, Switched,
+    MechanismTarget, Merge, MergedField, NAME_KEY, OWN_NAME_KEY, PartialLimit, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
@@ -104,10 +104,27 @@ impl Hit<'_> {
         (self.mechanism.target() == MechanismTarget::Plugin).then_some(&*self.key)
     }
 
+    /// The note on the Entry the switch limits part of, as a partial switch.
+    pub fn partial_note(&self, agent_name: &str) -> String {
+        match self.mechanism {
+            Switched::ItemList(block) if block.partial == Some(PartialLimit::HiddenFromUser) => {
+                explain::hidden_from_user(&self.holds(), agent_name)
+            }
+            _ => explain::partial_switch(&self.holds(), agent_name),
+        }
+    }
+
     /// What the switch holds, as a sentence says it.
     pub fn holds(&self) -> String {
         let per_project = self.per_project();
         match self.mechanism {
+            // An item of a partial list says no more than that it is there.
+            Switched::ItemList(block) if block.partial.is_some() => explain::in_list(
+                &self.key,
+                &self.key_path[self.key_path.len().saturating_sub(2)],
+                &self.switch.path,
+                per_project,
+            ),
             Switched::NameList(_) => explain::in_list(
                 &self.key,
                 self.key_path.last().expect("validation requires a key"),

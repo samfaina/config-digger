@@ -1056,6 +1056,14 @@ pub(crate) fn partial_switch(holds: &str, agent_name: &str) -> String {
     )
 }
 
+/// The note on an Entry the partial switch `holds` hides from the user,
+/// while `agent_name` still gives it to its model.
+pub(crate) fn hidden_from_user(holds: &str, agent_name: &str) -> String {
+    format!(
+        "Partial switch: {holds}. The user cannot run it in {agent_name}, but {agent_name} still gives it to its model."
+    )
+}
+
 /// The State a Disabled Entry would have once Enabled: Effective, or
 /// Shadowed by the `scope` Entry `effective`.
 pub(crate) fn what_if(state: State, shadowed_by: Option<(&str, &str)>) -> String {

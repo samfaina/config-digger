@@ -3209,6 +3209,75 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
+    /// A list of items in the home file, each named by its `path`, with
+    /// `extra` fields.
+    fn item_list(extra: &str) -> String {
+        format!(
+            r#"{{ block = "json-item-list", switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["skipped", "{{name}}"], named_by = "path", store_class = "plain" }}, target = "entry", context = "all", enable_action = "remove-item"{extra} }}"#
+        )
+    }
+
+    const PARTIAL: &str = r#", partial = "hidden_from_user", enable_offered = false"#;
+
+    #[test]
+    fn an_item_list_loads_with_a_reason_and_a_disabled_item_or_as_a_partial_switch() {
+        for extra in [
+            r#", reason = "disabled_natively", disabled_item = { path = "{name}" }"#,
+            PARTIAL,
+        ] {
+            let text = with_disable(&item_list(extra));
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn an_item_list_that_is_no_partial_switch_needs_a_reason_and_a_disabled_item() {
+        for extra in [
+            r#", reason = "disabled_natively""#,
+            r#", disabled_item = { path = "{name}" }"#,
+        ] {
+            let text = with_disable(&item_list(extra));
+            assert!(
+                error(&text).contains("an item list needs a reason and a disabled_item"),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn a_partial_item_list_is_never_written_and_disables_nothing() {
+        for (extra, message) in [
+            (
+                r#", partial = "hidden_from_user""#.to_owned(),
+                "a partial item list takes enable_offered = false",
+            ),
+            (
+                format!(r#"{PARTIAL}, reason = "disabled_natively""#),
+                "a partial item list takes no reason and no disabled_item",
+            ),
+            (
+                format!(r#"{PARTIAL}, disabled_item = {{ path = "{{name}}" }}"#),
+                "a partial item list takes no reason and no disabled_item",
+            ),
+            (
+                format!(r#"{PARTIAL}, enabled_item = {{ path = "{{name}}" }}"#),
+                "a partial item list takes no enabled_item and is not layered",
+            ),
+            (
+                format!("{PARTIAL}, layered = true"),
+                "a partial item list takes no enabled_item and is not layered",
+            ),
+        ] {
+            let text = with_disable(&item_list(&extra));
+            assert!(error(&text).contains(message), "{extra}: {}", error(&text));
+        }
+    }
+
     /// A field per name in the home file at `key_path`, under the further
     /// keys `also_names`, with `switch` fields in its switch and `extra`
     /// fields.
