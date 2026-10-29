@@ -2402,6 +2402,7 @@ fn under_name_rule<'e>(
     Cow::Owned(ScannedEntry {
         name: unruled.name.clone(),
         defect: unruled.defect,
+        own_name: unruled.own_name.clone(),
         ..entry.clone()
     })
 }

@@ -4564,6 +4564,14 @@
           "type": "boolean",
           "default": false
         },
+        "also_names": {
+          "description": "Further keys the switch holds an Entry under, besides `{name}`: what\nthe `{name}` segment of the key path also takes, each a template of\n`{name}`, the Entry's name, and `{own_name}`, its own name as read,\nbefore its location's `name_template` renamed it, such as `{own_name}` for Claude Code's\n`skillOverrides`, which turns a synced skill off by\n`anthropic-skills:<folder>` or by `<folder>`. A key that comes out as\nanother is one key. The Entry is Disabled when any of its keys holds\nthe disabled value; Disable writes `{name}`, and Enable lifts every\nkey that Disables it.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
         "trusted_only": {
           "description": "Whether the Agent reads the switch, in a Project's file, only when it\nstarts in a folder its Item kind's folder-trust gates trust, such as\nGemini CLI, which ignores a Project's settings in a folder the user\nhas not trusted. Elsewhere it Disables nothing and Disable skips it.",
           "type": "boolean",

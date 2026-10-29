@@ -5673,6 +5673,20 @@ impl Validate for JsonField {
         if self.policy && self.enable_offered {
             return Err("a policy switch is only read: enable_offered must be false".into());
         }
+        // Of several keys, none would say which one's layer decides, which
+        // one's missing value the default stands for, or which one policy
+        // forces the Entry on or off by.
+        if !self.switch.also_names.is_empty()
+            && (self.target != MechanismTarget::Name
+                || self.layered
+                || self.policy
+                || self.default_value.is_some())
+        {
+            return Err(
+                "also_names needs target `name`, and takes no layered, no policy and no default_value"
+                    .into(),
+            );
+        }
         match (self.enable_action, &self.enabled_value) {
             (EnableAction::RemoveItem, _) => {
                 Err("a field's enable_action must be `delete-key` or `set`".into())
@@ -6317,6 +6331,17 @@ pub(crate) struct Switch {
     /// names that differ in case alone share one switch.
     #[serde(default)]
     pub lower_names: bool,
+    /// Further keys the switch holds an Entry under, besides `{name}`: what
+    /// the `{name}` segment of the key path also takes, each a template of
+    /// `{name}`, the Entry's name, and `{own_name}`, its own name as read,
+    /// before its location's `name_template` renamed it, such as `{own_name}` for Claude Code's
+    /// `skillOverrides`, which turns a synced skill off by
+    /// `anthropic-skills:<folder>` or by `<folder>`. A key that comes out as
+    /// another is one key. The Entry is Disabled when any of its keys holds
+    /// the disabled value; Disable writes `{name}`, and Enable lifts every
+    /// key that Disables it.
+    #[serde(default)]
+    pub also_names: Vec<String>,
     /// Whether the Agent reads the switch, in a Project's file, only when it
     /// starts in a folder its Item kind's folder-trust gates trust, such as
     /// Gemini CLI, which ignores a Project's settings in a folder the user
@@ -6327,6 +6352,10 @@ pub(crate) struct Switch {
 
 /// The switch `key_path` segment that stands for the Entry's name.
 pub(crate) const NAME_KEY: &str = "{name}";
+
+/// What a switch's `also_names` key holds that stands for the Entry's own
+/// name, before its location's `name_template`.
+pub(crate) const OWN_NAME_KEY: &str = "{own_name}";
 
 /// The switch `key_path` segment that stands for the id of the plugin the
 /// Entry is part of.
@@ -6379,6 +6408,22 @@ impl Validate for Switch {
             return Err(format!(
                 "lower_names needs `{NAME_KEY}` in the key path, keying an object"
             ));
+        }
+        if !self.also_names.is_empty() {
+            if !self.names() || self.named_by.is_some() || self.lower_names || self.plugins() {
+                return Err(format!(
+                    "also_names needs `{NAME_KEY}` in the key path, keying an object, with no named_by, no lower_names and no `{PLUGIN_KEY}`"
+                ));
+            }
+            if let Some(key) = self
+                .also_names
+                .iter()
+                .find(|key| !key.contains(NAME_KEY) && !key.contains(OWN_NAME_KEY))
+            {
+                return Err(format!(
+                    "also_names key `{key}` holds neither `{NAME_KEY}` nor `{OWN_NAME_KEY}`"
+                ));
+            }
         }
         let position = |template: &str| self.key_path.iter().position(|key| key == template);
         let count = |template: &str| self.key_path.iter().filter(|key| *key == template).count();

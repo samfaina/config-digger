@@ -3127,6 +3127,81 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
+    /// A field per name in the home file at `key_path`, under the further
+    /// keys `also_names`, with `switch` fields in its switch and `extra`
+    /// fields.
+    fn also_named(key_path: &str, also_names: &str, switch: &str, extra: &str) -> String {
+        format!(
+            r#"{{ block = "json-field", switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = {key_path}, also_names = {also_names}, store_class = "plain"{switch} }}, target = "name", context = "all", enable_action = "delete-key", reason = "disabled_by_name", disabled_value = "off"{extra} }}"#
+        )
+    }
+
+    const OVERRIDES: &str = r#"["overrides", "{name}"]"#;
+
+    #[test]
+    fn a_json_field_with_further_keys_of_the_entry_s_names_loads() {
+        for also_names in [r#"["{own_name}"]"#, r#"["{own_name}", "x-{name}"]"#] {
+            let text = with_disable(&also_named(OVERRIDES, also_names, "", ""));
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        }
+    }
+
+    #[test]
+    fn a_further_key_needs_a_placeholder_of_the_entry() {
+        let text = with_disable(&also_named(OVERRIDES, r#"["{own_name}", "pdf"]"#, "", ""));
+        assert!(
+            error(&text).contains("also_names key `pdf` holds neither"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn further_keys_need_a_name_keying_an_object_with_no_named_by_lower_names_or_plugin_id() {
+        for (key_path, switch, extra) in [
+            (r#"["overrides"]"#, "", ""),
+            (OVERRIDES, ", lower_names = true", ""),
+            (
+                OVERRIDES,
+                r#", named_by = "id""#,
+                ", enable_offered = false",
+            ),
+            (r#"["plugins", "{plugin_id}", "{name}"]"#, "", ""),
+        ] {
+            let text = with_disable(&also_named(key_path, r#"["{own_name}"]"#, switch, extra));
+            assert!(
+                error(&text).contains("also_names needs `{name}` in the key path"),
+                "{key_path} {switch}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn further_keys_need_target_name_and_take_no_layers_policy_or_default() {
+        for extra in [
+            r#", default_value = "off""#,
+            ", layered = true",
+            ", policy = true, enable_offered = false",
+        ] {
+            let text = with_disable(&also_named(OVERRIDES, r#"["{own_name}"]"#, "", extra));
+            assert!(
+                error(&text).contains("also_names needs target `name`"),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+        let text = with_disable(
+            &also_named(OVERRIDES, r#"["{own_name}"]"#, "", "")
+                .replace(r#"target = "name""#, r#"target = "entry""#),
+        );
+        assert!(
+            error(&text).contains("also_names needs target `name`"),
+            "{}",
+            error(&text)
+        );
+    }
+
     #[test]
     fn a_json_field_set_on_enable_needs_an_enabled_value() {
         let text = with_disable(&json_field(r#", enable_action = "set""#));
