@@ -34,15 +34,17 @@ const powershell = async (command) => (await run("powershell.exe", ["-NoProfile"
 const version = await powershell(`(Get-Item '${path.join(installers, "claude-exe.exe")}').VersionInfo.ProductVersion`);
 const p = probe("Claude Desktop", version);
 // A check that runs only signed out, which `--signed-in` leaves to the run
-// without it.
+// without it, and one that runs only with `--signed-in`.
 const signedOut = (table, title, fn) => (signedIn ? null : p.check(table, title, fn));
+const signedInOnly = (table, title, fn) => (signedIn ? p.check(table, title, fn) : null);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitFor(fn, seconds) {
   const end = Date.now() + seconds * 1000;
   while (Date.now() < end) {
     const value = await fn();
     if (value) return value;
-    await new Promise((r) => setTimeout(r, 2000));
+    await sleep(2000);
   }
   return null;
 }
@@ -187,12 +189,14 @@ await p.check("(top)", "the MSIX package installs beside the classic app", async
 
 const packaged = () => detached("explorer.exe", [`shell:AppsFolder\\${aumid}`]);
 const movedData = () => path.join(localAppData, "Claude-Data", family.toLowerCase());
+// The data folders the packaged app may read, in the order it picks one.
+const dataFolders = () => [movedData(), localCache, classicData];
 
 // The lines of the app's logs that match `pattern`: its real
 // `%LOCALAPPDATA%\Claude\logs`, which no package virtualises, and those of
 // each data folder.
 function logLines(pattern) {
-  const dirs = [path.join(localAppData, "Claude", "logs"), path.join(classicData, "logs"), path.join(localCache, "logs"), path.join(movedData(), "logs")];
+  const dirs = [path.join(localAppData, "Claude", "logs"), ...dataFolders().map((dir) => path.join(dir, "logs"))];
   return dirs
     .filter((dir) => fs.existsSync(dir))
     .flatMap((dir) => fs.readdirSync(dir).map((file) => path.join(dir, file)))
@@ -207,7 +211,7 @@ function logLines(pattern) {
 // data folder the app reads: the first one holding a `manifest.json` that
 // lists skills, or null.
 function mirror() {
-  const roots = [movedData(), localCache, classicData].map((dir) => path.join(dir, "local-agent-mode-sessions", "skills-plugin"));
+  const roots = dataFolders().map((dir) => path.join(dir, "local-agent-mode-sessions", "skills-plugin"));
   for (const root of roots.filter((dir) => fs.existsSync(dir))) {
     for (const org of fs.readdirSync(root)) {
       if (!fs.statSync(path.join(root, org)).isDirectory()) continue;
@@ -230,86 +234,86 @@ if (signedIn) {
   await stop();
   packaged();
   console.log("SIGN IN: sign in to Claude Desktop in the Sandbox's window, with your email and the code claude.ai sends; leave the window open");
-  const synced = await waitFor(async () => mirror(), 20 * 60);
+  const synced = await waitFor(mirror, 20 * 60);
   console.log(synced ? `signed in: the mirror is ${synced}` : "no sign-in after 20 minutes");
   // Let the app write its cookies before it is stopped.
-  await new Promise((r) => setTimeout(r, 30_000));
+  await sleep(30_000);
   await stop();
 }
 
-// A `SKILL.md` the app cannot fully read: a frontmatter that is not YAML,
-// and bytes that are not UTF-8.
-const unreadable = Buffer.concat([Buffer.from("---\nname: [unclosed\ndescription: cd-throwaway: not: yaml\n---\n"), Buffer.from([0xff, 0xfe, 0xfd]), Buffer.from("\nbody\n")]);
+// Two `SKILL.md` files the app cannot fully read, each with one fault: a
+// frontmatter that is not YAML, and, under a frontmatter naming the skill as
+// its manifest does, a body whose bytes are not UTF-8.
+const notYaml = Buffer.from("---\nname: [unclosed\ndescription: cd-throwaway: not: yaml\n---\nbody\n");
+const notUtf8 = (name) => Buffer.concat([Buffer.from(`---\nname: ${name}\ndescription: cd-throwaway\n---\n`), Buffer.from([0xff, 0xfe, 0xfd]), Buffer.from("\n")]);
 
-// What became of a `SKILL.md` the probe planted over `original`: `restored`
-// to it, `kept` as planted, `removed`, or `other`.
-function outcome(file, original) {
+// What became of a `SKILL.md` the probe planted, `planted`, over
+// `original`: `kept` as planted, `restored` to the original, `removed`, or
+// `other`.
+function plantedFate(file, planted, original) {
   if (!fs.existsSync(file)) return "removed";
   const now = fs.readFileSync(file);
-  if (now.equals(unreadable)) return "kept";
+  if (now.equals(planted)) return "kept";
   return original && now.equals(original) ? "restored" : "other";
 }
 
 // The account syncs its skills into the mirror. The app seeds the skills it
 // ships only for an organization that serves those alone, so they are left
 // out. The account validates a skill on upload, so only a hand edit gives
-// the mirror a `SKILL.md` it cannot read: the probe plants one in a skill
-// the account syncs from Anthropic, in a user's skill, and in a folder the
-// manifest does not list, then starts the app and reads each after its next
-// sync round.
-if (signedIn) await p.check("locations[mirrored-skills]", "after its next sync, the app keeps a `SKILL.md` it cannot read in a skill the account syncs, whether Anthropic's or a user's, removes a folder the manifest does not list, and its manifest still lists each synced skill as it did", async () => {
+// the mirror a `SKILL.md` the app cannot read. In the Sandbox's copy of the
+// mirror, the probe plants a frontmatter that is not YAML in a skill the
+// account syncs from Anthropic, a body that is not UTF-8 in another and in a
+// user's skill, and a folder the manifest does not list, then starts the
+// app and reads each after its next sync round.
+await signedInOnly("locations[mirrored-skills]", "after its next sync round, the app keeps a `SKILL.md` whose frontmatter is not YAML, or whose body is not UTF-8, in a skill the account syncs, whether Anthropic's or a user's, its manifest still listing the skill on, and removes a folder the manifest does not list", async () => {
   const before = mirror();
   if (!before) return { pass: false, observed: "no mirror: nobody signed in" };
-  const listed = json(path.join(before, "manifest.json")).skills;
-  const folder = (entry) => path.join(before, "skills", entry.name);
-  const pick = (test) => listed.find((entry) => test(entry) && fs.existsSync(path.join(folder(entry), "SKILL.md"))) ?? null;
-  const kinds = {
-    anthropic: pick((e) => e.creatorType === "anthropic"),
-    user: pick((e) => e.creatorType === "user"),
-  };
-  const originals = {};
-  for (const [kind, entry] of Object.entries(kinds)) {
-    if (!entry) continue;
-    originals[kind] = fs.readFileSync(path.join(folder(entry), "SKILL.md"));
-    write(path.join(folder(entry), "SKILL.md"), unreadable);
+  const skillMd = (dir, name) => path.join(dir, "skills", name, "SKILL.md");
+  const listed = json(path.join(before, "manifest.json")).skills.filter((e) => fs.existsSync(skillMd(before, e.name)));
+  const anthropic = listed.filter((e) => e.creatorType === "anthropic");
+  const user = listed.find((e) => e.creatorType === "user");
+  const plants = [
+    { label: "anthropic, not YAML", entry: anthropic[0], content: notYaml },
+    { label: "anthropic, not UTF-8", entry: anthropic[1], content: anthropic[1] && notUtf8(anthropic[1].name) },
+    { label: "user, not UTF-8", entry: user, content: user && notUtf8(user.name) },
+  ];
+  for (const plant of plants.filter((pl) => pl.entry)) {
+    plant.original = fs.readFileSync(skillMd(before, plant.entry.name));
+    write(skillMd(before, plant.entry.name), plant.content);
   }
-  const unlisted = path.join(before, "skills", "cd-throwaway-unlisted");
-  write(path.join(unlisted, "SKILL.md"), unreadable);
+  const unlisted = "cd-throwaway-unlisted";
+  write(skillMd(before, unlisted), notYaml);
 
   const rounds = () => logLines(/\[SkillsPlugin\] Sync complete/).length;
   const earlier = rounds();
   packaged();
   const synced = await waitFor(async () => rounds() > earlier, 300);
-  // The bundled skills are checked once the round's downloads are done.
-  await new Promise((r) => setTimeout(r, 20_000));
+  await sleep(20_000);
   await stop();
 
   const after = mirror() ?? before;
   const relisted = json(path.join(after, "manifest.json")).skills;
-  const seen = {};
-  for (const [kind, entry] of Object.entries(kinds)) {
-    // An account with no such skill says so, and the check fails on it.
-    if (!entry) {
-      seen[kind] = `the account syncs no ${kind} skill`;
+  const seen = { synced: !!synced };
+  for (const plant of plants) {
+    // An account without such a skill says so, and the check fails on it.
+    if (!plant.entry) {
+      seen[plant.label] = "the account syncs no such skill";
       continue;
     }
-    const now = relisted.find((e) => e.name === entry.name);
-    seen[kind] = { file: outcome(path.join(after, "skills", entry.name, "SKILL.md"), originals[kind]), listed: now ? now.enabled === entry.enabled && now.skillId === entry.skillId : false };
+    const now = relisted.find((e) => e.name === plant.entry.name);
+    seen[plant.label] = { file: plantedFate(skillMd(after, plant.entry.name), plant.content, plant.original), listed: !!now && now.enabled === plant.entry.enabled && now.skillId === plant.entry.skillId };
   }
-  seen.unlisted = { file: outcome(path.join(after, "skills", "cd-throwaway-unlisted", "SKILL.md"), null), listed: relisted.some((e) => e.name === "cd-throwaway-unlisted") };
+  seen.unlisted = { file: plantedFate(skillMd(after, unlisted), notYaml, null), listed: relisted.some((e) => e.name === unlisted) };
   const expected = {
-    anthropic: { file: "kept", listed: true },
-    user: { file: "kept", listed: true },
+    synced: true,
+    "anthropic, not YAML": { file: "kept", listed: true },
+    "anthropic, not UTF-8": { file: "kept", listed: true },
+    "user, not UTF-8": { file: "kept", listed: true },
     unlisted: { file: "removed", listed: false },
   };
-  const log = logLines(/\[SkillsPlugin\]/).slice(-40);
-  // The start of each file as it is now, to tell what `other` is.
-  const head = (dir, name) => {
-    const file = path.join(dir, "skills", name, "SKILL.md");
-    return fs.existsSync(file) ? fs.readFileSync(file).subarray(0, 120).toString("latin1") : null;
-  };
-  const heads = Object.fromEntries(Object.entries(kinds).filter(([, e]) => e).map(([kind, e]) => [kind, { now: head(after, e.name), before: after === before ? null : head(before, e.name) }]));
-  return { ...same(seen, expected), observed: JSON.stringify({ seen, synced, moved: after !== before, mirror: after, heads, kinds, log }) };
+  const skills = Object.fromEntries(plants.map((pl) => [pl.label, pl.entry?.name ?? null]));
+  const log = logLines(/\[SkillsPlugin\]/).slice(-20);
+  return { ...same(seen, expected), observed: JSON.stringify({ seen, skills, moved: after !== before, mirror: after, log }) };
 });
 
 // What each data folder holds of the app's own files, and whether the
@@ -364,7 +368,7 @@ function loggedExtensions(lines) {
 // is told by its name and its version. Signed out, as in Windows Sandbox,
 // 3.6556.2 names no extension in its logs, so the check runs only with
 // `--signed-in`, on an app someone signed in to.
-if (signedIn) await p.check("homes[msix]", "the packaged app beside a classic `%APPDATA%\\Claude` sees an extension held only in the classic folder, one held only in its `LocalCache`, and the `LocalCache` copy of one held in both", async () => {
+await signedInOnly("homes[msix]", "the packaged app beside a classic `%APPDATA%\\Claude` sees an extension held only in the classic folder, one held only in its `LocalCache`, and the `LocalCache` copy of one held in both", async () => {
   extension(classicData, "extclassic", "extclassic", "1.0.0-classic");
   extension(localCache, "extcache", "extcache", "1.0.0-cache");
   extension(classicData, "extboth", "extbothclassic", "1.0.0-classic");
@@ -377,7 +381,7 @@ if (signedIn) await p.check("homes[msix]", "the packaged app beside a classic `%
     return logged.tags.includes("extclassic") && logged.tags.includes("extcache") ? logged : null;
   }, 120);
   // Whatever names the copy of the one held in both comes a moment later.
-  await new Promise((r) => setTimeout(r, 15_000));
+  await sleep(15_000);
   const lines = extensionLines();
   const logged = loggedExtensions(lines);
   await stop();

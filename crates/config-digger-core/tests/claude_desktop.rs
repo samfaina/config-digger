@@ -742,6 +742,42 @@ fn account_skills_mirrored_on_disk_are_cloud_mirror_and_read_only() {
     assert_eq!(entry["remove"]["code"], "read_only");
 }
 
+/// The Store home with `contents` as the mirror's `SKILL.md` of `pdf`,
+/// as a hand edit leaves it (#313).
+fn store_with_pdf_skill_md(contents: &[u8]) -> FakeFileSystem {
+    store().with_file(
+        mirrored_skills().join(r"skills\pdf\SKILL.md"),
+        contents.to_vec(),
+    )
+}
+
+#[test]
+fn a_mirrored_skill_whose_frontmatter_is_not_yaml_goes_by_its_folder() {
+    let inventory = inventory(&store_with_pdf_skill_md(
+        b"---\nname: [unclosed\ndescription: not: yaml\n---\nbody\n",
+    ));
+
+    let pdf = item(&inventory, "pdf");
+    assert_eq!(json(pdf.state), "effective");
+    assert!(inventory.read_failures.is_empty());
+}
+
+#[test]
+fn a_mirrored_skill_md_that_is_not_utf_8_puts_a_caveat_on_every_mirrored_skill() {
+    let inventory = inventory(&store_with_pdf_skill_md(
+        b"---\nname: pdf\ndescription: d\n---\n\xff\xfe\n",
+    ));
+
+    let failure = &inventory.read_failures[0];
+    assert_eq!(failure.path, mirrored_skills().join(r"skills\pdf\SKILL.md"));
+    assert_eq!(json(failure.reaction), "unknown");
+    let notes = item(&inventory, "my-notes");
+    assert_eq!(
+        json(&notes.caveats[0])["path"],
+        json(mirrored_skills().join(r"skills\pdf\SKILL.md"))
+    );
+}
+
 #[test]
 fn a_mirrored_skill_takes_its_state_from_the_enabled_flag_it_mirrors() {
     let inventory = inventory(&store());

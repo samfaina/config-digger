@@ -3,8 +3,9 @@
 # once per C:\probe\claude\<version>\claude.exe, and writes the output to
 # C:\probe\results\<probe>.log and the results to <probe>.json, the Claude
 # Code version after the probe's name, then done.txt. Shuts the Sandbox down
-# unless sandbox.ps1 was given -KeepOpen; then it runs the probes again
-# whenever C:\probe\results\rerun.txt appears, and deletes it. -SignedIn
+# unless sandbox.ps1 was given -KeepOpen; then, until the Sandbox is closed,
+# it runs the probes again whenever C:\probe\results\rerun.txt appears, and
+# deletes it. -SignedIn
 # runs claude-desktop with --signed-in.
 param([string]$Probes, [string]$Codex = "codex.exe", [switch]$SignedIn)
 $results = "C:\probe\results"
