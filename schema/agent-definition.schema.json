@@ -3182,7 +3182,7 @@
       "description": "The minimal shape of the Entries of a location.",
       "oneOf": [
         {
-          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads.",
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `one_of`; each field of `required`, in\nits order, then the other fields of `values` and `prefixes`, each field\nchecked for being held, then against `values`, then `prefixes`;\n`forbidden`; `types`; `no_references`; then `name`.",
           "type": "object",
           "properties": {
             "one_of": {
@@ -3192,6 +3192,67 @@
                 "type": "string"
               },
               "default": []
+            },
+            "required": {
+              "description": "The Entry must hold each of these, such as `type` and `url`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "values": {
+              "description": "For a field, the strings it may hold, when the Entry holds it.",
+              "type": "object",
+              "properties": {
+                "unverified": {
+                  "$ref": "#/$defs/Unverified"
+                }
+              },
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default": {}
+            },
+            "prefixes": {
+              "description": "For a field, the prefix its string must start with, when the Entry\nholds it, such as `https://` for `url`.",
+              "type": "object",
+              "properties": {
+                "unverified": {
+                  "$ref": "#/$defs/Unverified"
+                }
+              },
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {}
+            },
+            "forbidden": {
+              "description": "The Entry must hold none of these, such as `command`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "no_references": {
+              "description": "Whether no string the Entry holds, at any depth, may hold a `${...}`\nreference, as for an Agent that does not expand them.",
+              "type": "boolean",
+              "default": false
+            },
+            "name": {
+              "description": "The characters the Entry's name may hold.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NameChars"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "types": {
               "description": "The type of each field, when the Entry holds it.",
@@ -3222,6 +3283,16 @@
           "required": [
             "block"
           ]
+        }
+      ]
+    },
+    "NameChars": {
+      "description": "The characters an Entry's name may hold.",
+      "oneOf": [
+        {
+          "description": "ASCII letters and digits, `-` and `_`.",
+          "type": "string",
+          "const": "letters-digits-dash-underscore"
         }
       ]
     },
