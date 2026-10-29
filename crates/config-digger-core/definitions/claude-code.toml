@@ -277,14 +277,15 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # HKLM value, `managed-settings.json` or drop-in that Claude Code cannot
 # parse stops it, even beside a source that parses; an HKCU value it cannot
 # parse is skipped [test]. Each source says so. Claude Code never reads
-# `managedMcpServers` from the HKCU value [docs, test], which config-digger
-# still reads (#303). It drops an entry with a command or at an `http://`
-# URL, loading only remote servers at an `https://` URL [docs, test], which
-# this shape does not check (#304).
+# `managedMcpServers` from the HKCU value [docs, test], though it applies
+# the value's other settings when no admin source holds any: the location
+# leaves the HKCU value out, `skips_user_writable`. It drops an entry with a
+# command or at an `http://` URL, loading only remote servers at an
+# `https://` URL [docs, test], which this shape does not check (#304).
 [[locations]]
 id = "managed-settings-mcp"
 unverified = { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" }
-anchor = { block = "settings", settings = "managed" }
+anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }
 root = ["managedMcpServers"]
 kind = "mcp"

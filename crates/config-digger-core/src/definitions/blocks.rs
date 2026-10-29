@@ -908,12 +908,19 @@ impl Anchored for MachineAnchor {
 /// The settings a definition's `[[settings]]` names, in every file of each
 /// of its sources. A location reads them all, and lists the Entries of the
 /// sources the Agent skips as Unread; a rule or gate reads only the source
-/// the Agent reads. Where one file is needed, it is refused.
+/// the Agent reads. A location may also skip the sources the user can
+/// write, in every context. Where one file is needed, it is refused.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SettingsAnchor {
     /// The id of a declared `[[settings]]`.
     pub settings: String,
+    /// Whether the Agent skips the location in the sources the user can
+    /// write, whichever source it reads its settings from, such as Claude
+    /// Code's `managedMcpServers`, which it never reads from the `HKCU`
+    /// policy. Only a location's anchor says so.
+    #[serde(default)]
+    pub skips_user_writable: bool,
 }
 
 impl Validate for SettingsAnchor {
@@ -1015,6 +1022,11 @@ impl Anchor {
             | Anchor::ProjectFile(_)
             | Anchor::ProjectStorage(_) => None,
         }
+    }
+
+    /// Whether it reads settings, and skips the sources the user can write.
+    pub fn skips_user_writable(&self) -> bool {
+        matches!(self, Anchor::Settings(block) if block.skips_user_writable)
     }
 
     /// The `[[plugins]]` id and the path in each plugin's folder, if the
@@ -1173,7 +1185,8 @@ impl Validate for SettingsSource {
 
 impl SettingsSource {
     /// Whether the user can write the source, such as an `HKCU` policy, so
-    /// that the Agent never merges it with another source.
+    /// that the Agent never merges it with another source, and a location
+    /// that `skips_user_writable` is never read from it.
     pub fn user_writable(&self) -> bool {
         match self {
             SettingsSource::RegistryValue(block) => block.user_writable,
@@ -1262,7 +1275,8 @@ pub(crate) struct RegistryValueSource {
     /// The value's name.
     pub value: String,
     /// Whether the user can write it, so that the Agent never merges it
-    /// with another source.
+    /// with another source, and a location that `skips_user_writable` is
+    /// never read from it.
     #[serde(default)]
     pub user_writable: bool,
     /// What the Agent does when it cannot parse the value, where that
@@ -1329,7 +1343,8 @@ pub(crate) struct FilesSource {
     /// The drop-in folder, written as `path` is.
     pub drop_ins: Option<String>,
     /// Whether the user can write it, so that the Agent never merges it
-    /// with another source.
+    /// with another source, and a location that `skips_user_writable` is
+    /// never read from it.
     #[serde(default)]
     pub user_writable: bool,
     /// What the Agent does when it cannot read or parse one of the files,

@@ -2259,6 +2259,52 @@
       ]
     },
     {
+      "id": "24",
+      "title": "Servidores gestionados en la política HKCU de Claude Code",
+      "steps": [
+        {
+          "id": "24.1",
+          "title": "Un servidor de managedMcpServers en la política HKCU sale Unread",
+          "goal": "Claude Code nunca lee managedMcpServers del valor Settings de HKCU\\SOFTWARE\\Policies\\ClaudeCode, que el usuario puede escribir, así que config-digger lista su servidor como Unread con esa razón, aunque ninguna fuente de administrador tenga settings.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Escribir la política HKCU».",
+            "Si la orden dice que ya hay una política HKCU de Claude Code, marca el paso Blocked y no sigas: es tuya y no hay que tocarla.",
+            "La política que escribe la orden es real y tu Claude Code la ve: si dejas el paso a medias, ejecuta igualmente la orden «Borrar la política HKCU», que solo borra la de prueba.",
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "Elige el home E:\\cd-throwaway\\claude-code-home.",
+            "Busca cd-throwaway-hkcu-managed en la lista Items.",
+            "Abre el Item cd-throwaway-hkcu-managed.",
+            "Lee el locator y la razón de su Entry.",
+            "Cierra config-digger.",
+            "Ejecuta la orden «Borrar la política HKCU»."
+          ],
+          "commands": [
+            {
+              "label": "Escribir la política HKCU",
+              "shell": "powershell",
+              "text": "$k = 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode'; if (Get-ItemProperty -Path $k -Name Settings -ErrorAction SilentlyContinue) { 'Ya hay una política HKCU de Claude Code.' } else { if (-not (Test-Path $k)) { New-Item -Path $k | Out-Null }; New-ItemProperty -Path $k -Name Settings -PropertyType String -Value '{\"managedMcpServers\":{\"cd-throwaway-hkcu-managed\":{\"type\":\"http\",\"url\":\"https://cd-throwaway.invalid/mcp\"}}}' | Out-Null; 'Política escrita.' }"
+            },
+            {
+              "label": "Borrar la política HKCU",
+              "shell": "powershell",
+              "text": "$k = 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode'; if ((Get-ItemProperty -Path $k -Name Settings -ErrorAction SilentlyContinue).Settings -notlike '*cd-throwaway-hkcu-managed*') { 'No hay política de prueba que borrar.' } else { Remove-ItemProperty -Path $k -Name Settings; if (-not (Get-Item $k).Property -and -not (Get-ChildItem $k)) { Remove-Item $k }; 'Política borrada.' }"
+            }
+          ],
+          "expect": [
+            "La primera orden acaba con «Política escrita.».",
+            "El Item «cd-throwaway-hkcu-managed» sale «Unread».",
+            "Su Entry tiene el locator «HKCU\\SOFTWARE\\Policies\\ClaudeCode\\Settings#managedMcpServers.cd-throwaway-hkcu-managed».",
+            "Su Entry da la razón «Claude Code never reads `managedMcpServers` from HKCU\\SOFTWARE\\Policies\\ClaudeCode\\Settings, which the user can write.».",
+            "La última orden acaba con «Política borrada.»."
+          ],
+          "covers": ["#303"]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [

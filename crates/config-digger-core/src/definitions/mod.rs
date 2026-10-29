@@ -1760,7 +1760,14 @@ impl AgentDefinition {
             }
             self.validate_home_root(&location.anchor).map_err(context)?;
             if let Some(id) = location.anchor.settings() {
-                self.declared_settings(id).map_err(context)?;
+                let settings = self.declared_settings(id).map_err(context)?;
+                if location.anchor.skips_user_writable()
+                    && !settings.sources.iter().any(|source| source.user_writable())
+                {
+                    return Err(context(format!(
+                        "settings `{id}` have no source the user can write to skip"
+                    )));
+                }
                 if location.format.file().is_none() {
                     return Err(context("settings are read in a file format".into()));
                 }
@@ -2456,9 +2463,13 @@ impl AgentDefinition {
         Ok(())
     }
 
-    /// A setting's anchor needs the root or the `[[settings]]` it names.
+    /// A setting's anchor needs the root or the `[[settings]]` it names. It
+    /// reads the source the Agent reads, so it skips none the user can write.
     fn validate_setting(&self, anchor: &Anchor) -> Result<(), String> {
         self.validate_home_root(anchor)?;
+        if anchor.skips_user_writable() {
+            return Err("only a location skips the sources the user can write".into());
+        }
         match anchor.settings() {
             Some(id) => self.declared_settings(id).map(|_| ()),
             None => Ok(()),
@@ -4122,6 +4133,63 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
         );
         assert!(
             error(&text).contains("undeclared settings `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    /// `text` with a source of the managed settings that the user can write.
+    fn with_user_writable_source(text: &str) -> String {
+        text.replace(
+            r#"value = "Settings" },"#,
+            r#"value = "Settings" },
+  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\Test', value = "Settings", user_writable = true },"#,
+        )
+    }
+
+    #[test]
+    fn a_location_skips_user_writable_sources_only_where_settings_have_one() {
+        let skipping =
+            r#"anchor = { block = "settings", settings = "managed", skips_user_writable = true }"#;
+        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replacen(
+            r#"anchor = { block = "settings", settings = "managed" }"#,
+            skipping,
+            1,
+        );
+        assert!(
+            error(&text).contains("settings `managed` have no source the user can write"),
+            "{}",
+            error(&text)
+        );
+        parse("test.toml", &with_user_writable_source(&text)).unwrap();
+    }
+
+    #[test]
+    fn only_a_location_skips_user_writable_sources() {
+        let text = with_user_writable_source(&with_policy(RULES_AND_GATES, POLICY_CHECKS)).replace(
+            r#"settings = "managed" }, key_path = ["denied"]"#,
+            r#"settings = "managed", skips_user_writable = true }, key_path = ["denied"]"#,
+        );
+        assert!(
+            error(&text).contains("only a location skips the sources the user can write"),
+            "{}",
+            error(&text)
+        );
+        let switch = name_list(false, "")
+            .replace(
+                r#"{ block = "home", root = "state" }"#,
+                r#"{ block = "settings", settings = "managed", skips_user_writable = true }"#,
+            )
+            .replace(
+                r#"reason = "disabled_by_name""#,
+                r#"reason = "disabled_by_name", enable_offered = false"#,
+            );
+        let text = with_user_writable_source(&with_policy(
+            &format!("disable = [{switch}]\n"),
+            r#"["disable", "precedence"]"#,
+        ));
+        assert!(
+            error(&text).contains("only a location skips the sources the user can write"),
             "{}",
             error(&text)
         );

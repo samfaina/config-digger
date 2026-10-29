@@ -1718,6 +1718,11 @@ export type ReasonCode =
  */
 "source_skipped" | 
 /**
+ *  The Entry is in a source of settings the user can write, which the
+ *  Agent never reads the Entry's location from.
+ */
+"user_writable_source" | 
+/**
  *  The Entry is in a system file the Agent skips unread, since someone
  *  other than an administrator can change it or a folder above it.
  */
