@@ -1121,6 +1121,9 @@ pub(crate) struct ScannedEntry {
     /// What the Agent's Disable switches hold it by, made by its location's
     /// `switch_id`; `None` for a location without one.
     pub switch_id: Option<String>,
+    /// Its own name before its location's `name_template`, when one gave it
+    /// another, such as `pdf` for Claude Code's synced `anthropic-skills:pdf`.
+    pub own_name: Option<String>,
     /// The hash of its configuration as written, Secrets included, for an
     /// Entry the Agent approves by it; never shown.
     pub config_hash: Option<String>,
@@ -1143,10 +1146,19 @@ impl ScannedEntry {
     /// Names the Entry, and its reading while its name rule does not
     /// apply, with what `name` makes of the name each has.
     pub fn rename(&mut self, name: impl Fn(&str) -> String) {
-        self.name = name(&self.name);
+        let renamed = name(&self.name);
+        let own = std::mem::replace(&mut self.name, renamed);
+        self.own_name.get_or_insert(own);
         if let Some(unruled) = &mut self.unruled {
-            unruled.name = name(&unruled.name);
+            let renamed = name(&unruled.name);
+            let own = std::mem::replace(&mut unruled.name, renamed);
+            unruled.own_name.get_or_insert(own);
         }
+    }
+
+    /// Its own name before its location's `name_template`.
+    pub fn own_name(&self) -> &str {
+        self.own_name.as_deref().unwrap_or(&self.name)
     }
 
     /// The file `anchor` names for this Entry, as [`Anchor::path_for`]
@@ -4381,6 +4393,7 @@ impl Scanner<'_> {
                 manager: None,
                 plugin: None,
                 switch_id: None,
+                own_name: None,
                 config_hash: None,
                 malformed: malformed_as_written(location, &parked_entry.entry),
             };
@@ -4456,6 +4469,7 @@ impl Scanner<'_> {
                     manager: None,
                     plugin: None,
                     switch_id: None,
+                    own_name: None,
                     config_hash: None,
                     malformed: None,
                 });
@@ -4910,6 +4924,7 @@ impl Scanner<'_> {
                     manager: None,
                     plugin: None,
                     switch_id: None,
+                    own_name: None,
                     config_hash: hash.and_then(|hash| hash.of(found.value)),
                     malformed: None,
                 });
@@ -5019,6 +5034,7 @@ impl Scanner<'_> {
                         manager: None,
                         plugin: None,
                         switch_id: None,
+                        own_name: None,
                         config_hash: None,
                         malformed: None,
                     });
@@ -5083,6 +5099,7 @@ impl Scanner<'_> {
             manager: None,
             plugin: None,
             switch_id: None,
+            own_name: None,
             config_hash: None,
             malformed: None,
         });
@@ -5289,6 +5306,9 @@ struct ReadSkill {
 pub(crate) struct SkillReading {
     pub name: String,
     pub defect: Option<SkillDefect>,
+    /// Its own name before its location's `name_template`, once one gave it
+    /// another.
+    pub own_name: Option<String>,
 }
 
 /// The skill in the folder named `folder`, whose `SKILL.md` holds `text`,
@@ -5329,6 +5349,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
         SkillReading {
             name: format.sanitize(&name),
             defect,
+            own_name: None,
         }
     };
     let unruled = read(named.as_ref(), None, None);
@@ -5935,6 +5956,7 @@ mod tests {
                 shared_with: Vec::new(),
             }),
             switch_id: None,
+            own_name: None,
             config_hash: None,
             malformed: None,
         }

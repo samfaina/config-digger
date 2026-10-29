@@ -940,10 +940,12 @@ sources = [
 # menu: partial switches. `"on"` is the default. It does not apply to plugin
 # skills [docs]. It turns a synced skill off by `anthropic-skills:<folder>`,
 # or by `<folder>` alone, which a local skill of that folder answers to too
-# [test]; config-digger reads the first only (#309).
+# [test]: config-digger reads both, `also_names`, and Disable writes the
+# first.
 [[items.skill.disable]]
+unverified = "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309)."
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
 context = "project"
 enable_action = "delete-key"
@@ -957,7 +959,7 @@ locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
 # settings, which apply in every Project.
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
 context = "project"
 enable_action = "delete-key"
@@ -969,7 +971,7 @@ enable_offered = false
 
 [[items.skill.disable]]
 block = "json-field"
-switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["skillOverrides", "{name}"], store_class = "plain" }
+switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
 context = "all"
 enable_action = "delete-key"

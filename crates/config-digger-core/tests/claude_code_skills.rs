@@ -1008,3 +1008,134 @@ fn skill_overrides_turns_a_synced_skill_off_by_its_anthropic_skills_name() {
         Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.anthropic-skills:pdf")
     );
 }
+
+/// A Project whose Claude Code home holds the synced skill `pdf`, with the
+/// file at `settings` holding `overrides` as its `skillOverrides`.
+fn synced_pdf_overridden(settings: &Path, overrides: Value) -> FakeFileSystem {
+    with_skill(
+        claude_home().with_folder(PROJECT),
+        in_home(r".claude\skills\synced\org_acct\pdf"),
+        &skill_md("pdf"),
+    )
+    .with_file(
+        settings.to_owned(),
+        json!({ "skillOverrides": overrides }).to_string(),
+    )
+}
+
+#[test]
+fn skill_overrides_turns_a_synced_skill_off_by_its_folder_alone_in_each_settings_file() {
+    let local = settings_local();
+    let shared = Path::new(PROJECT).join(r".claude\settings.json");
+    let user = in_home(r".claude\settings.json");
+    for settings in [local, shared, user] {
+        let fs = synced_pdf_overridden(&settings, json!({ "pdf": "off" }));
+
+        let inventory = inventory(&core(&fs), &in_project());
+
+        let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+        assert_eq!(code(entry.state), "disabled", "{}", settings.display());
+        assert_eq!(
+            entry.reason.as_ref().unwrap().switch,
+            Some(format!("{}#skillOverrides.pdf", settings.display()))
+        );
+    }
+}
+
+#[test]
+fn a_partial_value_under_a_synced_skill_s_folder_alone_limits_it_as_under_its_full_name() {
+    let notes = |key: &str| {
+        let fs = synced_pdf_overridden(&settings_local(), json!({ key: "name-only" }));
+        let inventory = inventory(&core(&fs), &in_project());
+        let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+        assert_eq!(code(entry.state), "effective", "{key}");
+        entry
+            .notes
+            .iter()
+            .map(|note| (code(note.code), note.switch.clone()))
+            .collect::<Vec<_>>()
+    };
+
+    let switch = |key: &str| {
+        Some(format!(
+            r"E:\projects\app\.claude\settings.local.json#skillOverrides.{key}"
+        ))
+    };
+    assert_eq!(
+        notes("anthropic-skills:pdf"),
+        [("partial_switch".to_owned(), switch("anthropic-skills:pdf"))]
+    );
+    assert_eq!(notes("pdf"), [("partial_switch".to_owned(), switch("pdf"))]);
+}
+
+#[test]
+fn off_under_either_key_of_a_synced_skill_disables_it_whatever_the_other_holds() {
+    let fs = synced_pdf_overridden(
+        &settings_local(),
+        json!({ "anthropic-skills:pdf": "on", "pdf": "off" }),
+    );
+
+    let inventory = inventory(&core(&fs), &in_project());
+
+    let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.reason.as_ref().unwrap().switch.as_deref(),
+        Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.pdf")
+    );
+}
+
+#[test]
+fn a_synced_skill_off_under_both_keys_stays_read_only() {
+    let fs = synced_pdf_overridden(
+        &settings_local(),
+        json!({ "anthropic-skills:pdf": "off", "pdf": "off" }),
+    );
+    let core = core(&fs);
+
+    let inventory = inventory(&core, &in_project());
+
+    let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert!(
+        matches!(&entry.enable, Some(EnableOption::NotOffered { sentence }) if sentence.contains("only reads it")),
+        "{:?}",
+        entry.enable
+    );
+    let refused = plan(
+        &core,
+        &in_project(),
+        Action::Enable,
+        &["anthropic-skills:pdf"],
+    )
+    .err()
+    .unwrap();
+    assert_eq!(code(refused.code), "blocked");
+    assert!(
+        refused.message.contains("only reads it"),
+        "{}",
+        refused.message
+    );
+}
+
+#[test]
+fn a_local_skill_off_by_its_folder_is_read_and_enabled_by_that_one_key() {
+    let fs = deploy_in_project(r#"{ "skillOverrides": { "deploy": "off" } }"#);
+    let core = core(&fs);
+    let before = inventory(&core, &in_project());
+    let entry = &skill(&before, "deploy").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.reason.as_ref().unwrap().switch.as_deref(),
+        Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.deploy")
+    );
+
+    let enable = plan(&core, &in_project(), Action::Enable, &["deploy"]).unwrap();
+    assert_eq!(enable.warnings(), []);
+    core.execute(enable, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, settings_local()),
+        json!({ "skillOverrides": {} })
+    );
+}

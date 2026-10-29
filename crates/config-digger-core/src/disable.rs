@@ -6,7 +6,7 @@
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
-    MechanismTarget, Merge, MergedField, Switched,
+    MechanismTarget, Merge, MergedField, NAME_KEY, OWN_NAME_KEY, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
@@ -232,24 +232,22 @@ fn set_for<'a>(
         let switches = snapshot
             .switches_of(entry, location.kind, index)
             .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project);
-        let Some(key) = switch_key(mechanism, entry) else {
-            continue;
-        };
-        for switch in switches {
+        let keys = switch_keys(mechanism, entry);
+        for (switch, key) in switches.flat_map(|switch| keys.iter().map(move |key| (switch, key))) {
             // Of the files of one layer, such as merged managed settings,
             // the first that holds a value decides too.
             if mechanism.layered() && layer_decided {
                 break;
             }
-            let value = switch.value_for(&key);
+            let value = switch.value_for(key);
             // Enable taking a switch away leaves the next layer to decide.
             let unset =
-                every_layer && mechanism.enable_unsets() && mechanism.disables(value, &key, folder);
+                every_layer && mechanism.enable_unsets() && mechanism.disables(value, key, folder);
             layer_decided |= mechanism.layered() && value.is_some() && !unset;
             let hit = Hit {
                 mechanism,
                 switch,
-                key_path: switch.key_path_for(&key),
+                key_path: switch.key_path_for(key),
                 value,
                 key: key.clone(),
                 folder,
@@ -259,7 +257,7 @@ fn set_for<'a>(
                 by_default = Some(hit);
                 continue;
             }
-            if mechanism.disables(value, &key, folder) {
+            if mechanism.disables(value, key, folder) {
                 disabling.push(hit);
             } else if mechanism.partial(value) {
                 partial.push(hit);
@@ -301,19 +299,21 @@ fn policy_hold<'a>(
                 && switch_read(definition, snapshot, entry, *mechanism, project)
         })
         .find_map(|(index, mechanism)| {
-            let key = switch_key(mechanism, entry)?;
+            let keys = switch_keys(mechanism, entry);
             snapshot
                 .switches_of(entry, location.kind, index)
                 .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project)
                 .find_map(|switch| {
-                    let value = switch.value_for(&key)?;
-                    Some(Hit {
-                        mechanism,
-                        switch,
-                        key_path: switch.key_path_for(&key),
-                        value: Some(value),
-                        key: key.clone(),
-                        folder,
+                    keys.iter().find_map(|key| {
+                        let value = switch.value_for(key)?;
+                        Some(Hit {
+                            mechanism,
+                            switch,
+                            key_path: switch.key_path_for(key),
+                            value: Some(value),
+                            key: key.clone(),
+                            folder,
+                        })
                     })
                 })
         })
@@ -340,6 +340,26 @@ fn switch_key<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Option<Cow<'e
     } else {
         Some(entry.name.as_str().into())
     }
+}
+
+/// Every key the switch of `mechanism` holds `entry` under: the one
+/// [`switch_key`] finds, which Disable writes, then each of its switch's
+/// `also_names`, a key that comes out as another left out. None where
+/// `switch_key` finds none.
+fn switch_keys<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Vec<Cow<'e, str>> {
+    let Some(key) = switch_key(mechanism, entry) else {
+        return Vec::new();
+    };
+    let mut keys = vec![key];
+    for template in &mechanism.switch().also_names {
+        let key = template
+            .replace(OWN_NAME_KEY, entry.own_name())
+            .replace(NAME_KEY, &entry.name);
+        if !keys.iter().any(|known| *known == key) {
+            keys.push(key.into());
+        }
+    }
+    keys
 }
 
 /// What Enable writes to lift `disabling`, the switches that Disable an
