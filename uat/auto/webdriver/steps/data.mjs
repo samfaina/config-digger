@@ -1,7 +1,7 @@
 // Section 1: the throwaway data, and the Agent homes added through the app.
 import { KEY } from "../driver.mjs";
 import { panel, press, wait } from "../lib.mjs";
-import { addHome, inventoryOf, openItem, project } from "./common.mjs";
+import { addHome, inventoryOf, openItem, project, showsProject } from "./common.mjs";
 
 export default [
   {
@@ -79,7 +79,7 @@ export default [
         const p = await s.until(() => panel(s), { what: "the panel" });
         await s.keys(KEY.Escape);
         await wait(200);
-        return p.options.find((o) => o.text === path || o.text.startsWith(`${path} · `))?.text ?? null;
+        return p.options.find((o) => showsProject(o.text, path))?.text ?? null;
       };
       t.eq(await label(), path, `con claude-code-home, la opción sale como «${path}», sin «couldn't be read»`);
       await project(t, path);

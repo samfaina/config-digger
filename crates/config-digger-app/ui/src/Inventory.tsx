@@ -44,7 +44,6 @@ import {
   projectFailures,
   readerItem,
   samePath,
-  selectionPicking,
   stateCounts,
   withHomeChosen,
   withProjectChosen,
@@ -348,9 +347,8 @@ type BannerProps = {
 /**
  * The Project field's value, its options and what a choice does: `selectProject`
  * loads the chosen Project, or no Project, whether a click or a key chose it.
- * Each option counts the Read failures of its Project that picking it shows:
- * the selected Project's under `selection`, another's under the selection
- * picking it gives from `choices`.
+ * Each option counts the Read failures of its Project that picking it shows,
+ * as `projectFailures` counts them.
  */
 export function projectField(
   inventory: Inventory | null,
@@ -361,9 +359,7 @@ export function projectField(
 ): { value: string; options: DropdownOption[]; onChange: (value: string) => void } {
   const projects = inventory?.projects ?? [];
   const option = (path: string, group?: string): DropdownOption => {
-    const under =
-      !inventory || (project !== null && samePath(path, project)) ? selection : selectionPicking(inventory, choices, selection.agent, path);
-    const failed = projectFailures(inventory?.read_failures ?? [], path, under);
+    const failed = inventory ? projectFailures(inventory, path, choices, selection) : 0;
     return { value: path, label: failed > 0 ? `${path} · ${couldNotBeRead(failed)}` : path, group };
   };
   const present = projects.filter((p) => !p.missing).map((p) => p.path);
@@ -393,7 +389,7 @@ export function Banner({ inventory, project, choices, selection, agentName, stat
       <div>
         <div className="caption">
           Project
-          {project !== null && <FailureBadge count={projectFailures(inventory?.read_failures ?? [], project, selection)} where="this Project" />}
+          {project !== null && inventory && <FailureBadge count={projectFailures(inventory, project, choices, selection)} where="this Project" />}
         </div>
         <Select
           className="banner-select"

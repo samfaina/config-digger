@@ -353,9 +353,16 @@ describe("the Project field and the notice of the Read failures", () => {
     warnings: [],
   };
 
-  /** The Project field's label of `path`, the banner and the notice, with `shown` read and the home `chosen` for Claude Code. */
-  function screenWith(shown: string | null, chosen: string) {
-    const read = inventory({ project: shown, projects: [project(picked), project(other)], homes, read_failures: [failure] });
+  const opened = lastOpened(shapeHome, { agent: "claude-code", name: null, sentence: "" });
+
+  /**
+   * The Project field's label of a path, the banner and the notice, with the
+   * home `chosen` for Claude Code and `shown` in the field, while the
+   * inventory of `readFor` is shown, `shown`'s once it is read.
+   */
+  function screenWith(shown: string | null, chosen: string, { last_opened = [] as LastOpened[], readFor = shown } = {}) {
+    const projects = [project(picked, false, last_opened), project(other)];
+    const read = inventory({ project: readFor, projects, homes, read_failures: [failure] });
     const choices = withProjectChosen(withHomeChosen(homeChoices(), "claude-code", chosen), read.projects, shown);
     const selection = { agent: "all", homes: chosenHomes(read.homes, choices, read.items, lastOpenedHomes(read)) };
     const label = (path: string) => projectField(read, shown, selection, choices, () => {}).options.find((o) => o.value === path)?.label;
@@ -373,7 +380,7 @@ describe("the Project field and the notice of the Read failures", () => {
         selectProject={() => {}}
       />,
     );
-    const notice = renderToStaticMarkup(<FailuresNotice failures={failuresInContext(read.read_failures, shown, selection)} onView={() => {}} />);
+    const notice = renderToStaticMarkup(<FailuresNotice failures={failuresInContext(read.read_failures, read.project, selection)} onView={() => {}} />);
     return { label, banner, notice };
   }
   const badge = (banner: string) => banner.match(/<span class="badge">.*?<\/span>/)?.[0] ?? null;
@@ -392,6 +399,19 @@ describe("the Project field and the notice of the Read failures", () => {
     expect(after.label(picked)).toBe(`${picked} · 1 location couldn't be read`);
     expect(badge(after.banner)).toMatch(/>1<\/span>$/);
     expect(after.notice).toContain("1 location couldn&#x27;t be read.");
+  });
+
+  test("count a failure in the Project's Last-opened home before it is picked and in the notice after", () => {
+    expect(screenWith(null, "default", { last_opened: [opened] }).label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    const after = screenWith(picked, "default", { last_opened: [opened] });
+    expect(badge(after.banner)).toMatch(/>1<\/span>$/);
+    expect(after.notice).toContain("1 location couldn&#x27;t be read.");
+  });
+
+  test("count what the Project picked opens on while it is read, not the homes of the Project read before", () => {
+    const reading = screenWith(picked, "default", { last_opened: [opened], readFor: null });
+    expect(reading.label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    expect(badge(reading.banner)).toMatch(/>1<\/span>$/);
   });
 });
 
