@@ -182,6 +182,17 @@ pub(crate) fn uri_path(path: &Path) -> String {
     }
 }
 
+/// `path` as VS Code's `fsPath` of its `file:` URI writes it: its lexical
+/// normalisation with the drive letter in lower case, such as `c:\Users\x`
+/// for `C:\Users\x`.
+pub(crate) fn fs_path(path: &Path) -> String {
+    let mut text = lexical(path).to_string_lossy().into_owned();
+    if is_drive(&text) {
+        text[..1].make_ascii_lowercase();
+    }
+    text
+}
+
 /// The `file:` URI of `path` as VS Code writes one: the drive letter in
 /// lower case, its `:` and every character outside the unreserved ones
 /// percent-encoded, such as `file:///c%3A/Users/x` for `C:\Users\x`, or

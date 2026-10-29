@@ -4,13 +4,13 @@
 
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bundles, Bypasses, Cached, Conform, DisableMechanism, Disables,
-    DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
-    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator,
-    LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse,
-    ParseError, PluginCache, PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys,
-    ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect,
-    SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
+    self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
+    Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
+    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
+    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NonceHash,
+    PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord, PluginRegistry,
+    ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource,
+    SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -1126,7 +1126,8 @@ pub(crate) struct ScannedEntry {
     /// `anthropic-skills:pdf`; `None` while nothing renamed it.
     pub own_name: Option<String>,
     /// The hash of its configuration as written, Secrets included, for an
-    /// Entry the Agent approves by it; never shown.
+    /// Entry the Agent approves by it, or the nonce of its launch for one
+    /// the Agent trusts by it; never shown.
     pub config_hash: Option<String>,
     /// Why its value as written lacks the minimal shape its location
     /// declares, its name aside; `None` when it has the shape, or its
@@ -1470,6 +1471,7 @@ fn read_as_if(
         cached: BTreeMap::new(),
         opened_in: Vec::new(),
         walk_below: None,
+        project_folder: None,
         name_clashes: Vec::new(),
     };
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
@@ -1645,8 +1647,10 @@ fn read_as_if(
                     let key = Some(key.clone());
                     let start = scanner.entries.len();
                     scanner.walk_below = down.cloned();
+                    scanner.project_folder = Some(folder.clone());
                     scanner.read_location(home, definition, location, path, key, depth);
                     scanner.walk_below = None;
+                    scanner.project_folder = None;
                     if down.is_some() {
                         for entry in &mut scanner.entries[start..] {
                             entry.found_in = Some(folder.clone());
@@ -3522,7 +3526,18 @@ struct Scanner<'p> {
     /// The rules of the walk down that found the location being read, if
     /// one did: no folder they skip is read below it either.
     walk_below: Option<DownWalk>,
+    /// The folder of a Project the location being read is in, if it is in
+    /// one: for a workspace file, the member folder.
+    project_folder: Option<PathBuf>,
     name_clashes: Vec<ScannedNameClash>,
+}
+
+/// How an Agent hashes an Entry of a location, as its gates say.
+enum Hash {
+    /// The configuration of an Entry it approves.
+    Config(ConfigHash),
+    /// The launch of an Entry it trusts, in the folder given.
+    Nonce(NonceHash, PathBuf),
 }
 
 /// A value the registry at `registry` of the Agent at `agent_index` keeps
@@ -5026,14 +5041,23 @@ impl Scanner<'_> {
         depth: usize,
         objects: Vec<RootObject>,
     ) {
-        // How the Agent hashes the configuration of an Entry it approves.
+        // How the Agent hashes the configuration of an Entry it approves,
+        // or the launch of one it trusts.
+        let user_folder = self.projects.ports.env.home_dir();
         let hash = definition
             .rules(location.kind)
             .gates
             .iter()
             .find_map(|gate| match gate {
                 Gate::ApprovalHash(block) if block.locations.contains(&location.id) => {
-                    Some(block.hash)
+                    Some(Hash::Config(block.hash))
+                }
+                Gate::NonceTrust(block) if block.locations.contains(&location.id) => {
+                    let cwd = match block.cwd {
+                        LaunchFolder::UserFolder => user_folder.clone(),
+                        LaunchFolder::ProjectFolder => self.project_folder.clone(),
+                    };
+                    Some(Hash::Nonce(block.hash, cwd?))
                 }
                 _ => None,
             });
@@ -5075,7 +5099,10 @@ impl Scanner<'_> {
                     plugin: None,
                     switch_id: None,
                     own_name: None,
-                    config_hash: hash.and_then(|hash| hash.of(found.value)),
+                    config_hash: hash.as_ref().and_then(|hash| match hash {
+                        Hash::Config(hash) => hash.of(found.value),
+                        Hash::Nonce(hash, cwd) => hash.of(found.value, cwd),
+                    }),
                     malformed: None,
                 });
             }
