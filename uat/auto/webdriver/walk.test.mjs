@@ -210,18 +210,30 @@ class ProjectsPage extends Session {
   }
 }
 
-test("step 10.5 finds the missing Project under the walk's root, wherever it is, and says so", async () => {
-  const root = "D:\\uat\\cd-throwaway";
+// The Projects tab of step 10.5, under `root`, its missing Project's row
+// named `gone`.
+const projectsTab = (root, gone) => {
   const known = { subs: ["Folder"], tags: ["known to Claude Code"] };
-  const page = new ProjectsPage([
+  return new ProjectsPage([
     { title: "Projects · 2", rows: [{ name: `${root}\\project`, ...known }, { name: `${root}\\project-hide`, ...known }] },
-    { title: "Missing · 1", open: true, rows: [{ name: "D:/uat/cd-throwaway/project-gone", subs: ["The folder no longer exists"], tags: ["known to Claude Code"], count: "1 leftover" }] },
+    { title: "Missing · 1", open: true, rows: [{ name: gone, subs: ["The folder no longer exists"], tags: ["known to Claude Code"], count: "1 leftover" }] },
     { title: "Missing, no leftovers · 1", open: false, rows: [] },
   ]);
-  const { result } = await walkOnCi(steps.find((step) => step.id === "10.5"), { s: page, root });
+};
+
+test("step 10.5 finds the missing Project under the walk's root, wherever it is, spelled as the app shows it", async () => {
+  const root = "D:\\uat\\cd-throwaway";
+  const { result } = await walkOnCi(steps.find((step) => step.id === "10.5"), { s: projectsTab(root, `${root}\\project-gone`), root });
   assert.equal(result.status, "ok", result.notes);
-  assert.match(result.notes, /en Missing sale «D:\/uat\/cd-throwaway\/project-gone»/);
-  assert.doesNotMatch(result.notes, /E:/);
+  assert.match(result.notes, /en Missing sale «D:\\uat\\cd-throwaway\\project-gone»/);
+  assert.doesNotMatch(result.notes, /E:|La ruta sale como/);
+});
+
+test("step 10.5 fails when the missing Project's path shows with /, as the plan no longer writes it", async () => {
+  const root = "D:\\uat\\cd-throwaway";
+  const { result } = await walkOnCi(steps.find((step) => step.id === "10.5"), { s: projectsTab(root, "D:/uat/cd-throwaway/project-gone"), root });
+  assert.equal(result.status, "ko", result.notes);
+  assert.match(result.notes, /en Missing sale «D:\\uat\\cd-throwaway\\project-gone»/);
 });
 
 test("step 10.10's paths fail when none takes more than one line", () => {

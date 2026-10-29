@@ -196,12 +196,7 @@ export default [
       await go(s, "History · Undo");
       await pickOperation(s, id);
       const d = await detail(s);
-      const refusal = `mcp_servers.cd-throwaway-codex.enabled in ${file} changed since the Operation, so the Undo is refused;`;
-      // The app shows the key between backticks, as the core writes it; the
-      // plan's text has none. Same words otherwise, and a note says so.
-      const plain = (x) => x.replaceAll("`", "");
-      for (const c of d.callouts) c.text = plain(c.text);
-      if (d.text.includes("`mcp_servers.cd-throwaway-codex.enabled`")) t.note("El rechazo muestra la clave entre comillas invertidas, «`mcp_servers.cd-throwaway-codex.enabled`», tal cual: la interfaz no les da formato. El plan la escribe sin ellas.");
+      const refusal = `\`mcp_servers.cd-throwaway-codex.enabled\` in ${file} changed since the Operation, so the Undo is refused;`;
       t.check(d.callouts.some((c) => c.text.includes(refusal)), "antes de pulsar Undo, el detalle ya muestra un aviso con el mismo texto del rechazo", d.callouts.map((c) => c.text).join(" | "));
       const changes = (d.states ?? "").split("\n").filter((l) => /→/.test(l));
       t.check(changes.length > 0 && new Set(changes).size === changes.length, "en «States changed», cada cambio sale una sola vez", changes.join(" | "));
@@ -211,7 +206,6 @@ export default [
       await wait(400);
       t.check(!(await dialog(s)), "al pulsar Undo no se abre ningún diálogo");
       const after = await detail(s);
-      for (const c of after.callouts) c.text = plain(c.text);
       const box = after.callouts.find((c) => c.cls.includes("danger") && c.text.startsWith("Can't undo"));
       t.check(box && box.visible, "en el acto, arriba del detalle y a la vista, sale un recuadro rojo «Can't undo»", JSON.stringify(box));
       t.check(box?.text.includes(refusal), `el recuadro dice «${refusal} …»`, box?.text);

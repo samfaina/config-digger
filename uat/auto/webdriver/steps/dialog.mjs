@@ -1,18 +1,7 @@
 // Section 7: the action dialog and the buttons that delete.
 import { KEY, ref, unwrap } from "../driver.mjs";
-import { buttonEl, fieldValue, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
+import { buttonEl, go, hoverFresh, press, rowButton, tab, tabTo, tooltip, wait, waitNotice } from "../lib.mjs";
 import { act, addHome, confirm, DESKTOP_HOME, dialog, done, inventoryOf, openItem, operationId, project, slashPath, tickAll, waitPreview, withClaudeDesktop, withClaudeDesktopIn } from "./common.mjs";
-
-// Claude Code Disables a user Entry per Project, so Disable is offered only
-// with a Project chosen. The steps that Disable cd-throwaway-user name none:
-// the manual walk still has the one the dropdown steps left. With none, the
-// step picks the root's project and says so.
-async function withProject(t) {
-  if ((await fieldValue(t.s, "Project")) === "No Project") {
-    await project(t, `${t.root}\\project`);
-    t.note(`El paso no dice qué Project elegir, y con «No Project» Claude Code no ofrece Disable: se elige «${t.root}\\project», como deja la sección 2.`);
-  }
-}
 
 const rgb = (c) => (c?.match(/\d+(\.\d+)?/g) ?? []).map(Number);
 const red = (c) => {
@@ -32,12 +21,7 @@ async function openRemoveLeftovers(t, project) {
   const { s } = t;
   await go(s, "Projects & homes");
   await tab(s, "Projects");
-  const name = await s.exec(
-    `return [...document.querySelectorAll(".place-row .place-name")].map((e) => e.textContent.trim()).find((n) => n.replaceAll("/", "\\\\") === arguments[0].replaceAll("/", "\\\\")) ?? null;`,
-    project,
-  );
-  t.path(name, project);
-  await s.click(await s.until(() => rowButton(s, name, "Remove leftovers"), { what: `Remove leftovers of ${project}` }));
+  await s.click(await s.until(() => rowButton(s, project, "Remove leftovers"), { what: `Remove leftovers of ${project}` }));
   return waitPreview(s);
 }
 
@@ -67,7 +51,7 @@ export default [
     id: "7.1",
     async run(t) {
       const { s } = t;
-      const gone = slashPath(t, "project-gone");
+      const gone = `${t.root}\\project-gone`;
       await openRemoveLeftovers(t, gone);
       const block = await s.exec(`
         const body = [...document.querySelectorAll(".dialog .dialog-section")].find((e) => e.querySelector(".dialog-section-title")?.firstChild?.textContent.trim() === "What changes");
@@ -78,16 +62,18 @@ export default [
         const row = body.querySelector(".change-row"), rc = getComputedStyle(row);
         return { project: p.innerText.trim(), file: f.innerText.trim(), parts, keyColor: kc.color, keyFont: kc.fontFamily, labelColor: label.color, labelCase: label.textTransform,
           box: rc.borderTopStyle !== "none" || rc.backgroundColor !== "rgba(0, 0, 0, 0)", gaps: parts.slice(1).map((x, i) => Math.round(x.top - parts[i].bottom)) };`);
-      t.path(block.project.replace(/^PROJECT\s+/i, ""), gone, `arriba sale «PROJECT ${gone}» en su línea`);
+      t.eq(block.project.replace(/^PROJECT\s+/i, ""), gone, `arriba sale «PROJECT ${gone}» en su línea`);
       t.check(/^PROJECT\s/i.test(block.project), "con la etiqueta «PROJECT»", block.project);
       t.check(/^FILE\s+\.claude\.json$/i.test(block.file), "debajo sale «FILE .claude.json»", block.file);
       const labels = block.parts.map((p) => p.label.toUpperCase());
       t.check(block.box && block.labelCase === "uppercase" && grey(block.labelColor) && new Set(block.parts.map((p) => Math.round(p.left))).size === 1, "el cambio sale en su recuadro, con una etiqueta gris en mayúsculas a la izquierda de cada línea, en una columna", `${labels.join(", ")}; ${block.labelColor}`);
       const part = (l) => block.parts.find((p) => p.label.toUpperCase() === l);
       t.check(labels[0] === "ENTRY" && part("ENTRY")?.text === "cd-throwaway-leftover" && Number(part("ENTRY").weight) >= 600, "la primera línea es «ENTRY cd-throwaway-leftover», en negrita", JSON.stringify(part("ENTRY")));
-      t.check(labels[1] === "AGENT" && part("AGENT")?.text.startsWith("Claude Code"), "luego sale «AGENT Claude Code»", part("AGENT")?.text);
-      if (part("AGENT")?.text !== "Claude Code") t.note(`La línea AGENT dice «${part("AGENT")?.text}»; el plan espera «AGENT Claude Code».`);
-      t.check(labels[2] === "KEY" && part("KEY")?.text === `projects.${gone}.mcpServers.cd-throwaway-leftover` && grey(block.keyColor) && /mono|consol/i.test(block.keyFont), `luego sale «KEY projects.${gone}.mcpServers.cd-throwaway-leftover», en gris y monoespaciada`, `${part("KEY")?.text}; ${block.keyColor}`);
+      const agent = `Claude Code (${t.root}\\claude-code-home)`;
+      t.check(labels[1] === "AGENT" && part("AGENT")?.text === agent, `luego sale «AGENT ${agent}»`, part("AGENT")?.text);
+      // The key keeps the / of the Project's path, as Claude Code's file has it.
+      const keyText = `projects.${slashPath(t, "project-gone")}.mcpServers.cd-throwaway-leftover`;
+      t.check(labels[2] === "KEY" && part("KEY")?.text === keyText && grey(block.keyColor) && /mono|consol/i.test(block.keyFont), `luego sale «KEY ${keyText}», en gris y monoespaciada`, `${part("KEY")?.text}; ${block.keyColor}`);
       t.check(labels.at(-1) === "STATE" && /^Unread\s*→\s*Removed$/.test(part("STATE")?.text ?? ""), "al final sale «STATE Unread → Removed»", part("STATE")?.text);
       t.check(block.gaps.length > 0 && block.gaps.every((g) => g >= 3), "hay espacio entre las líneas", block.gaps.join(", "));
       const key = await s.find(".dialog .change-key");
@@ -186,7 +172,7 @@ export default [
     async run(t) {
       const { s } = t;
       await inventoryOf(t, "Claude Code", "claude-code-home");
-      await withProject(t);
+      await project(t, `${t.root}\\project`);
       await openItem(t, "cd-throwaway-user");
       const result = await act(t, "Disable");
       const grey1 = await s.exec(`return [...document.querySelectorAll(".dialog *")].filter((e) => e.children.length === 0 && /^Operation /.test(e.textContent.trim())).map((e) => e.textContent.trim());`);
@@ -218,7 +204,7 @@ export default [
       const listed = await s.exec(`return [...document.querySelectorAll(".place-name")].some((e) => e.textContent.trim() === arguments[0]);`, `${t.root}\\claude-code-many-home`);
       if (!listed) await addHome(t, "Claude Code", `${t.root}\\claude-code-many-home`, { checks: false });
       else t.note("claude-code-many-home ya estaba en la lista desde el paso 4.1, así que no se añade otra vez.");
-      await openRemoveLeftovers(t, slashPath(t, "many/project-gone"));
+      await openRemoveLeftovers(t, `${t.root}\\many\\project-gone`);
       const layout = await s.exec(`
         const d = document.querySelector(".dialog"), r = d.getBoundingClientRect();
         const sec = (title) => [...d.querySelectorAll(".dialog-section")].find((e) => e.querySelector(".dialog-section-title")?.firstChild?.textContent.trim().startsWith(title));
@@ -273,7 +259,7 @@ export default [
       const { s } = t;
       await s.setWindow(1440, 900);
       await inventoryOf(t, "Claude Code", "claude-code-home");
-      await withProject(t);
+      await project(t, `${t.root}\\project`);
       await openItem(t, "cd-throwaway-user");
       const reds = [];
       const card = await buttons(s, ["Disable", "Remove"], ".panel.detail .entry-card");

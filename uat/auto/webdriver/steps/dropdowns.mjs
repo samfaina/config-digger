@@ -1,7 +1,7 @@
 // Section 2: the app's dropdowns, by mouse and by keyboard.
 import { KEY, ref, unwrap } from "../driver.mjs";
-import { choose, fieldValue, focused, go, panel, press, tab, tabTo, wait } from "../lib.mjs";
-import { inventoryOf, showsProject } from "./common.mjs";
+import { choose, fieldValue, focused, go, panel, press, rowButton, tab, tabTo, wait, waitNotice } from "../lib.mjs";
+import { addHome, homeGroups, inventoryOf, showsProject } from "./common.mjs";
 
 const rgb = (c) => (c?.match(/\d+(\.\d+)?/g) ?? []).map(Number);
 const dark = (c) => {
@@ -188,36 +188,52 @@ export default [
     async run(t) {
       const { s } = t;
       await s.setWindow(1100, 640);
+      // Claude Code's row of Agent home has its dropdown with two homes: with
+      // only the one of step 1.2, the step adds another and takes it off the
+      // list again at the end.
+      await go(s, "Projects & homes");
+      await tab(s, "Agent homes");
+      const claudeHomes = async () => (await homeGroups(s)).filter((g) => g.agent === "Claude Code").flatMap((g) => g.rows.map((r) => r.name));
+      const before = await claudeHomes();
+      const many = `${t.root}\\claude-code-many-home`;
+      const added = before.length === 1;
+      if (added) await addHome(t, "Claude Code", many, { checks: false });
       await go(s, "Inventory");
       await s.click(await s.waitText(".agent-tile .agent-name", "All Agents"));
       await wait(400);
       const row = await s
         .exec(`return [...document.querySelectorAll(".home-row")].find((r) => r.textContent.includes("Claude Code") && r.querySelector("[role=combobox]")) ?? null;`)
         .then(unwrap);
-      if (!t.check(row, "la fila de Claude Code de Agent home tiene su desplegable (dos homes)")) return;
-      await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(row));
-      const combo = await s.find("[role=combobox]", row);
-      await s.click(combo);
-      let p = await s.until(() => panel(s), { what: "the panel" });
-      const fieldRect = await s.rect(combo);
-      await t.shot("home", "el panel de la fila de Claude Code sale entero, debajo del campo si cabe y encima si no");
-      // The app opens it above when the room below can't hold it whole (placePanel in ui/src/dropdown.ts).
-      const fieldBottom = fieldRect.y + fieldRect.height;
-      const below = p.rect.top >= fieldBottom - 2;
-      const above = p.rect.bottom <= fieldRect.y + 2 && p.vh - fieldBottom < p.rect.bottom - p.rect.top;
-      t.check(below || above, "el panel de la fila de Claude Code se abre debajo del campo si cabe entero, y encima si no", `panel de ${p.rect.top} a ${p.rect.bottom}, campo de ${fieldRect.y} a ${fieldBottom}, ventana de ${p.vh}`);
-      t.check(p.rect.bottom <= p.vh && p.rect.left >= 0 && p.rect.right <= p.vw, "ese panel sale entero, sin pasar del borde de la ventana", JSON.stringify(p.rect));
-      await s.keys(KEY.Escape);
+      if (t.check(row, "la fila de Claude Code de Agent home tiene su desplegable (dos homes)")) {
+        await s.exec("arguments[0].scrollIntoView({ block: 'nearest' });", ref(row));
+        const combo = await s.find("[role=combobox]", row);
+        await s.click(combo);
+        const p = await s.until(() => panel(s), { what: "the panel" });
+        const fieldRect = await s.rect(combo);
+        await t.shot("home", "el panel de la fila de Claude Code sale entero, debajo del campo si cabe y encima si no");
+        // The app opens it above when the room below can't hold it whole (placePanel in ui/src/dropdown.ts).
+        const fieldBottom = fieldRect.y + fieldRect.height;
+        const below = p.rect.top >= fieldBottom - 2;
+        const above = p.rect.bottom <= fieldRect.y + 2 && p.vh - fieldBottom < p.rect.bottom - p.rect.top;
+        t.check(below || above, "el panel de la fila de Claude Code se abre debajo del campo si cabe entero, y encima si no", `panel de ${p.rect.top} a ${p.rect.bottom}, campo de ${fieldRect.y} a ${fieldBottom}, ventana de ${p.vh}`);
+        t.check(p.rect.bottom <= p.vh && p.rect.left >= 0 && p.rect.right <= p.vw, "ese panel sale entero, sin pasar del borde de la ventana", JSON.stringify(p.rect));
+        await s.keys(KEY.Escape);
+      }
       await go(s, "Projects & homes");
       await tab(s, "Agent homes");
       await press(s, "Add Agent home", ".places");
       const agent = await field(s, "Agent");
       await s.click(agent);
-      p = await s.until(() => panel(s), { what: "the Agent panel" });
+      const p = await s.until(() => panel(s), { what: "the Agent panel" });
       const agentRect = await s.rect(agent);
       t.check(p.rect.top >= agentRect.y + agentRect.height - 2 && p.rect.bottom <= p.vh, "el panel de Agent se abre entero debajo de su campo", JSON.stringify(p.rect));
       await s.keys(KEY.Escape);
       await press(s, "Cancel", ".dialog");
+      if (added) {
+        await s.click(await s.until(() => rowButton(s, many, "Remove from list"), { what: "Remove from list" }));
+        await waitNotice(s, `Removed ${many}`);
+      }
+      t.eq((await claudeHomes()).join(", "), before.join(", "), "al final, el grupo Claude Code de la pestaña Agent homes tiene las mismas filas que al empezar");
     },
   },
   {

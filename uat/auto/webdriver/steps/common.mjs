@@ -8,7 +8,8 @@ import { choose, go, press, tab, wait, waitNotice } from "../lib.mjs";
 export const DESKTOP_HOME = "paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home";
 
 // The folder `name` under the walk's root, with /, as Claude Code keys its
-// Projects and the plan writes them: «<root>/project-gone».
+// Projects, «projects.<root>/project-gone…», and as some steps still write
+// them. The app shows the path with \.
 export const slashPath = (t, name) => `${t.root.replaceAll("\\", "/")}/${name}`;
 
 // Add Agent home with `agent` and `folder` typed in, as 1.2, 10.2 and 10.3 do,
