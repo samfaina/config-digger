@@ -243,9 +243,26 @@ export function failuresInContext(failures: ReadFailure[], project: string | nul
   );
 }
 
-/** The Read failures that reach only the Project at `project`, in its folder or keyed to it, which badge it. */
-export function projectFailures(failures: ReadFailure[], project: string): number {
-  return failures.filter((failure) => failure.project !== null && samePath(failure.project, project)).length;
+/**
+ * The Read failures that reach only the Project at `project`, in its folder
+ * or keyed to it, which badge it: those in the homes `selection` chooses for
+ * its Agents, the homes the Inventory shows them in.
+ */
+export function projectFailures(failures: ReadFailure[], project: string, selection: Selection): number {
+  return failures.filter((failure) => failure.project !== null && samePath(failure.project, project) && isShown(failure, selection))
+    .length;
+}
+
+/**
+ * The selection picking the Project at `project` gives, with `agent`
+ * selected: each Agent on the home `chosenHomes` opens it on after
+ * `withProjectChosen`, by that Project's Last-opened homes. Its leftovers are
+ * not known until it is read, so none of them chooses a home.
+ */
+export function selectionPicking(inventory: Inventory, choices: HomeChoices, agent: string, project: string): Selection {
+  const lastOpened = inventory.projects.find((p) => samePath(p.path, project))?.last_opened ?? [];
+  const homes = chosenHomes(inventory.homes, withProjectChosen(choices, inventory.projects, project), [], lastOpened);
+  return { agent, homes };
 }
 
 /** The Read failures outside any Project in an Agent home, which badge it. */

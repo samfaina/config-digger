@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Agent, Home, Inventory, Item, ReadFailure } from "./bindings";
+import type { Agent, Home, Inventory, Item, LastOpened, ReadFailure } from "./bindings";
 import { inventoryStart } from "./places";
 import { entry } from "./testData";
 import {
@@ -19,6 +19,7 @@ import {
   leftoversNotShown,
   projectFailures,
   readerItem,
+  selectionPicking,
   stateCounts,
 } from "./view";
 
@@ -341,8 +342,51 @@ describe("read failures in context", () => {
     ];
 
     expect(homeFailures(failures, home())).toBe(1);
-    expect(projectFailures(failures, String.raw`e:\app`)).toBe(1);
-    expect(projectFailures(failures, String.raw`E:\other`)).toBe(0);
+    expect(projectFailures(failures, String.raw`e:\app`, { agent: "all", homes })).toBe(1);
+    expect(projectFailures(failures, String.raw`E:\other`, { agent: "all", homes })).toBe(0);
+  });
+});
+
+describe("the Read failures of a Project once it is picked", () => {
+  const picked = String.raw`E:\cd-throwaway\project`;
+  const shapeHome = String.raw`E:\cd-throwaway\claude-code-shape-home`;
+  const homes = [home(), home({ home: shapeHome, folder: shapeHome, source: { kind: "added" } }), home({ agent: "codex", agent_name: "Codex" })];
+  const failures = [failure({ home: shapeHome, project: picked })];
+  const read = (last_opened: LastOpened[] = []) =>
+    inventory({
+      homes,
+      read_failures: failures,
+      projects: [{ path: picked, missing: false, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened }],
+    });
+  /** How many of the failures picking the Project with `agent` selected shows, from the homes in `choice`. */
+  const onPicking = (agent: string, choice: Record<string, string>, last_opened: LastOpened[] = []) =>
+    projectFailures(failures, picked, selectionPicking(read(last_opened), homeChoices(choice), agent, picked));
+
+  test("leave out one in a home picking it doesn't open on", () => {
+    expect(onPicking("all", { "claude-code": "default" })).toBe(0);
+  });
+
+  test("count one in the home chosen for its Agent", () => {
+    expect(onPicking("all", { "claude-code": shapeHome })).toBe(1);
+    expect(onPicking("claude-code", { "claude-code": shapeHome })).toBe(1);
+  });
+
+  test("count one in the Project's Last-opened home, which picking it opens on over the home chosen", () => {
+    const opened: LastOpened = { agent: "claude-code", home: shapeHome, name: null, shares_home: false, hidden: false, sentence: "" };
+    expect(onPicking("all", { "claude-code": "default" }, [opened])).toBe(1);
+  });
+
+  test("leave out one of an Agent not selected", () => {
+    expect(onPicking("codex", { "claude-code": shapeHome })).toBe(0);
+  });
+
+  test("of a missing Project leave out the leftovers the inventory read holds, which are not its own", () => {
+    const leftover = entry({ reason: { code: "project_missing", effective: null, switch: null, sentence: "Its Project is missing." } });
+    const gone = read();
+    gone.projects[0].missing = true;
+    gone.items = [item({ home: shapeHome, state: "unread", entries: [leftover] })];
+
+    expect(projectFailures(failures, picked, selectionPicking(gone, homeChoices({ "claude-code": "default" }), "all", picked))).toBe(0);
   });
 });
 

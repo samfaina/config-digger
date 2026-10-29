@@ -14,7 +14,8 @@ const purple = (c) => {
 };
 
 // Whether an option or the field shows the Project at `path`: from step 1.3
-// on, the root's project reads "<path> · 1 location couldn't be read".
+// on, while claude-code-shape-home is chosen, the root's project reads
+// "<path> · 1 location couldn't be read".
 const showsProject = (text, path) => text === path || (text ?? "").startsWith(`${path} · `);
 
 async function field(s, label) {
