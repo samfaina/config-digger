@@ -33,7 +33,7 @@ The documented path `%APPDATA%\Claude` **does not exist** for an MSIX install wh
 - `%APPDATA%\Claude`;
 - the `LocalCache\Roaming\Claude` path above.
 
-config-digger should probe the same three. Third-party-inference deployments (Bedrock, Vertex and similar) use the separate folder `%LOCALAPPDATA%\Claude-3p`.
+A package can also move its data folder out of its `LocalCache`, to `%LOCALAPPDATA%\Claude-Data\<family>`, which it then reads before the other two (§1.1.1). config-digger probes the same folders. Third-party-inference deployments (Bedrock, Vertex and similar) use the separate folder `%LOCALAPPDATA%\Claude-3p`.
 
 Precedence is per server name. A name in `claude_desktop_config.json` replaces an extension's server of the same name outright, with no field merge. Extensions are keyed by their display name.
 
@@ -61,6 +61,7 @@ The app rewrites `claude_desktop_config.json` while it runs, because the same fi
 | Classic installer (`.exe`) or unpackaged | `%APPDATA%\Claude\` | same | [docs] ([MCP quickstart](https://modelcontextprotocol.io/docs/develop/connect-local-servers): "**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`"). Not present on this machine [disk] |
 | MSIX, Store package `Claude_pzs8sxrjxfjjc` | `%APPDATA%\Claude\` as the app sees it | `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\` | [disk]. [contradicts docs]: Anthropic documents only `%APPDATA%\Claude` |
 | MSIX, enterprise package `AnthropicPBC.Claude_fnn82j28hfe8t` | same scheme | `%LOCALAPPDATA%\Packages\AnthropicPBC.Claude_fnn82j28hfe8t\LocalCache\Roaming\Claude\` | [bundle]: the app lists both package family names. Not installed here [disk] |
+| MSIX, either package, once it moved its data out of the package (3.6556 and 4.29) | `%LOCALAPPDATA%\Claude-Data\<family>`, the package family in lower case, such as `claude_pzs8sxrjxfjjc` | same: the package writes `Claude-Data` to its real path | [bundle], [disk], [test]. See [§1.1.1](#111-the-move-to-claude-datafamily) |
 | `%APPDATA%` on a UNC share (redirected roaming profile) | `%LOCALAPPDATA%\Claude-Data\` | same | [bundle]: chosen only when `%APPDATA%` is a `\\server\…` path. The managed key `relocateUncUserData` also exists. The folder exists here but is empty [disk] |
 | Third-party inference mode ("3P") | `%LOCALAPPDATA%\Claude-3p\`. Older releases used `%APPDATA%\Claude-3p\` and migrated it | same | [docs] ([3P data storage](https://claude.com/docs/third-party/claude-desktop/data-storage)). [bundle] confirms. Exists here but is empty [disk] |
 | Override | `--user-data-dir=<folder>` on the command line. The `CLAUDE_USER_DATA_DIR` env var sets `userData` only in unsigned builds: signed builds ignore it and use the default data folder, so config-digger takes no home from it (#368) | same | [test, bundle]. `CLAUDE_E2E_1P_USERDATA` and `CLAUDE_E2E_3P_USERDATA` are test-only absolute-path overrides [bundle] |
@@ -75,16 +76,49 @@ Verified here:
 The resolution order, as coded [bundle]. On Windows, the first-party data folder candidates are, in order:
 
 1. `%LOCALAPPDATA%\Claude-Data` (only when `%APPDATA%\Claude` is UNC);
-2. `%APPDATA%\Claude`;
-3. `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude`.
+2. for a package, `%LOCALAPPDATA%\Claude-Data\<family>` once it moved there (§1.1.1, read in 3.6556 and 4.29);
+3. `%APPDATA%\Claude`;
+4. `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude`.
 
 The first one that exists wins, with a fallback to `%APPDATA%\Claude`. config-digger, which is unpackaged, should probe the same list and add the `AnthropicPBC.Claude_fnn82j28hfe8t` LocalCache path.
 
 **Caveat (inference, since tested: see below):** if a user has both a classic install and an MSIX install, both `%APPDATA%\Claude` and `LocalCache\Roaming\Claude` can exist. Microsoft says a packaged app reads "from the per-user, per-package location first", so the MSIX app would see its LocalCache copy. Each folder should be reported as a separate Entry location with its own install attribution.
 
-**Tested on 3.6556.2 in Windows Sandbox** (release gate, #80; [`release-gate.md`](release-gate.md)) [test]. The classic installer claude.ai serves (`claude.ai/api/desktop/win32/x64/exe/latest/redirect`) is Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude` (a launcher `claude.exe`, `Update.exe`, `app-<version>\claude.exe`), with the uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AnthropicClaude`, and the classic app reads `%APPDATA%\Claude`. The packaged app's data folder is `%APPDATA%\Claude` too, as its `--user-data-dir` shows, with the package's `LocalCache` laid over it file by file, as Microsoft says: beside a classic folder it reads the classic files and creates no `LocalCache`, and a file its `LocalCache` holds wins over the classic one. Neither app starts an MCP server before someone signs in. On the reference machine, 3.6556.2 has moved the package's data to `%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc` (#305).
+**Tested on 3.6556.2 in Windows Sandbox** (release gate, #80; [`release-gate.md`](release-gate.md)) [test]. The classic installer claude.ai serves (`claude.ai/api/desktop/win32/x64/exe/latest/redirect`) is Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude` (a launcher `claude.exe`, `Update.exe`, `app-<version>\claude.exe`), with the uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AnthropicClaude`, and the classic app reads `%APPDATA%\Claude`. The packaged app's data folder is `%APPDATA%\Claude` too, as its `--user-data-dir` shows, with the package's `LocalCache` laid over it file by file, as Microsoft says: beside a classic folder it reads the classic files and creates no `LocalCache`, and a file its `LocalCache` holds wins over the classic one. Neither app starts an MCP server before someone signs in. On the reference machine, the package has moved its data to `%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc` (§1.1.1).
 
 **A data folder outside the lookup order, tested on 3.6556.2 in Windows Sandbox** (#211) [test]. The signed app ignores `CLAUDE_USER_DATA_DIR`: started with it set to a throwaway folder, it reads `%APPDATA%\Claude`, and each of its Chromium children names `%APPDATA%\Claude` in `--user-data-dir` while the main process names none. Its bundle has the warning "CLAUDE_USER_DATA_DIR is set and signed builds ignore it" [bundle]. Started with `--user-data-dir=<folder>` on its command line instead, the classic app from its `app-<version>` folder and the packaged app from its package folder alike, it reads that folder, and every one of its processes names it in `--user-data-dir`, the main one too. With a space in the folder, the switch is quoted, the whole argument on the main process and one child (`"--user-data-dir=C:\x y"`) and the value on the other children (`--user-data-dir="C:\x y"`); without one, some children quote the value and one does not. So the switch tells which folder a running Claude Desktop reads, and config-digger reads it from the processes to tell whether one reads an Agent home the user added.
+
+### 1.1.1 The move to `Claude-Data\<family>`
+
+Issue: [#305](https://github.com/samfaina/config-digger/issues/305). A packaged app can move its data folder out of its package's `LocalCache`, to `%LOCALAPPDATA%\Claude-Data\<family>`. Read in the bundle of 3.6556.2.0 (`claude.ai`'s download on 2026-10-29) and of 4.29.0.0 (the Store package on the reference machine), `.vite/build/index.pre.js`, which runs before the app picks `<userData>` [bundle]; seen on the reference machine's disk [disk]; and tested on 3.6556.2 in Windows Sandbox, `uat/agents/claude-desktop.mjs` [test].
+
+Where each install keeps its data folder:
+
+| Install | Data folder | Tag |
+|---|---|---|
+| Classic app | `%APPDATA%\Claude`. It never moves: the move is only for a packaged app | [test], [bundle] |
+| A package, before it moves | `%APPDATA%\Claude` as it sees it: its `LocalCache\Roaming\Claude` laid over any classic folder (§1.1) | [test] |
+| A package, once it moved | `%LOCALAPPDATA%\Claude-Data\<family>`, `<family>` being the package family in lower case: `claude_pzs8sxrjxfjjc` or `anthropicpbc.claude_fnn82j28hfe8t`. The manifest's `FileSystemWriteVirtualization` excludes `Claude-Data`, so the folder is at its real path | [bundle], [disk], [test] |
+| `%APPDATA%` on a UNC share | `%LOCALAPPDATA%\Claude-Data` itself. A package never moves then | [bundle] |
+| `--user-data-dir`, or a third-party deployment | the folder the switch names, or `%LOCALAPPDATA%\Claude-3p`. Neither moves | [bundle] |
+
+When it moves. The decision is one function (`AQ` in 4.29, `CQ` in 3.6556) [bundle]. At a start, a packaged app in first-party mode, with no UNC `%APPDATA%` and no `--user-data-dir`, moves when:
+
+- `Claude-Data\<family>` does not exist yet, nor anything else by that name;
+- Windows is build 19041 or later;
+- its data lives in its package alone: with data in a real `%APPDATA%\Claude`, beside the package's or not, it stays (`data_in_roaming`, `data_in_roaming_and_package`). So a package installed beside a classic app does not move while the classic folder holds data;
+- its config's `preferences.userDataOutsidePackageAnswer` is `true`, or `preferences.userDataFolderAnswer` before Windows 11 (build 22000). Otherwise it stays, `stay_rollout_off`. The main bundle latches a rollout flag into that preference (flag `2177080227` on Windows 11, `2363431316` before), whenever a fresh payload of flags says on; it latches off only for a signed-in account. Before Windows 11 the move also waits on the age of the `Claude-Data` folder, which a helper app of the package creates (3.6556 names it `MakeDataFolder`);
+- no other instance of the app is running.
+
+It copies the data folder to `Claude-Data\~copying.<family>`, renames that to `Claude-Data\<family>`, writes `Claude-Data\README.txt`, which tells the user not to move or delete the folder, and empties the package's `LocalCache\Roaming\Claude` down to markers named `.user-data-<state>.<family>`, the states being `left`, `blocked`, `back`, `copied`, `uncopied`, `parent` and, in 4.29, `whole`. `.user-data-leaving.<family>` sits beside that folder while it leaves [bundle]. On the reference machine the `LocalCache` holds only `.user-data-left.claude_pzs8sxrjxfjjc`, empty, and `Claude-Data\claude_pzs8sxrjxfjjc` holds the whole data folder: `claude_desktop_config.json` with `preferences.userDataOutsidePackageAnswer: true`, `config.json`, `claude-code`, `claude-code-vm`, `vm_bundles`, `local-agent-mode-sessions` and the rest [disk].
+
+Once `Claude-Data\<family>` is a folder, or a link to one, the app reads it, whether a classic `%APPDATA%\Claude` exists or not and whatever the marker says (`use_moved`). Only while the answer reads `false`, and the `LocalCache` is clear, does it move the folder back into the package (`move_back`); 4.29 also moves it back on Windows builds before 19044 [bundle]. Moved, every process names the moved folder in `--user-data-dir` [test].
+
+The Sandbox run (3.6556.2, Windows 11 build 26300, nobody signed in) [test]:
+
+- A fresh install wrote no `Claude-Data\<family>` over six launches: two beside a classic folder, one with `--user-data-dir`, and three with the classic folder gone, which kept its data in `LocalCache`.
+- With `preferences.userDataOutsidePackageAnswer: true` written into its `LocalCache` config by the probe, the next start moved the data folder to `Claude-Data\claude_pzs8sxrjxfjjc`, wrote `README.txt` beside it and left `.user-data-left.claude_pzs8sxrjxfjjc` in the `LocalCache`. The app then read the moved config and named the moved folder in `--user-data-dir`, also with a classic `%APPDATA%\Claude` written beside it.
+- Not tried, since writing the latched answer reached the move: updating from an older package, signing in, and using Cowork. Which of these turns the rollout flag on for a real account is not known. The flag needs a fresh payload of flags, which a signed-out app in the Sandbox never latched.
 
 ### 1.2 MCP sources per Scope
 

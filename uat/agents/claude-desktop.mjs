@@ -167,9 +167,10 @@ await p.check("(top)", "the classic app started with `--user-data-dir=<folder>` 
 // ---------------------------------------------------------------- the MSIX package
 
 let aumid = null;
+let family = null;
 await p.check("(top)", "the MSIX package installs beside the classic app", async () => {
   await powershell(`Add-AppxPackage -Path '${path.join(installers, "claude-msix.msix")}'`);
-  const family = await powershell("(Get-AppxPackage -Name Claude).PackageFamilyName");
+  family = await powershell("(Get-AppxPackage -Name Claude).PackageFamilyName");
   // The package holds helper apps too, such as `SshAskpass`: the app is the first.
   const app = (await powershell("(Get-AppxPackage -Name Claude | Get-AppxPackageManifest).Package.Applications.Application.Id")).split(/\s+/)[0];
   aumid = `${family}!${app}`;
@@ -182,7 +183,7 @@ const packaged = () => detached("explorer.exe", [`shell:AppsFolder\\${aumid}`]);
 // What each data folder holds of the app's own files, and whether the
 // package moved its data to `Claude-Data`.
 function folders() {
-  const files = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /config|Local State|Preferences|lockfile|user-data/.test(f)).sort() : null);
+  const files = (dir) => (fs.existsSync(dir) && fs.statSync(dir).isDirectory() ? fs.readdirSync(dir).filter((f) => /config|Local State|Preferences|lockfile|user-data/.test(f)).sort() : null);
   const claudeData = path.join(localAppData, "Claude-Data");
   const data = fs.existsSync(claudeData) ? Object.fromEntries(fs.readdirSync(claudeData).map((f) => [f, files(path.join(claudeData, f))])) : null;
   return { classic: files(classicData), localCache: files(localCache), claudeData: data };
@@ -207,6 +208,54 @@ await p.check("(top)", "the packaged app started from its folder with `--user-da
   write(path.join(userDataDir, "claude_desktop_config.json"), config("packaged"));
   write(path.join(localCache, "claude_desktop_config.json"), config("notpackaged"));
   return readsSwitchFolder(await started(() => detached(exe, [`--user-data-dir=${userDataDir}`])), userDataDir, "packaged");
+});
+
+// The move out of the package (#305). The app moves its data folder to
+// `%LOCALAPPDATA%\Claude-Data\<family>` once a rollout flag, which it
+// latches into its config's `preferences.userDataOutsidePackageAnswer`
+// (`userDataFolderAnswer` before Windows 11), reads on [bundle]. Nobody
+// signs in here, so the probe writes the latched answer itself.
+const movedData = () => path.join(localAppData, "Claude-Data", family.toLowerCase());
+const answer = Number(await powershell("[Environment]::OSVersion.Version.Build")) < 22000 ? "userDataFolderAnswer" : "userDataOutsidePackageAnswer";
+
+await p.check("(top)", "the packaged app with no classic folder keeps its data in its `LocalCache` over several launches and writes no `Claude-Data\\<family>`", async () => {
+  fs.rmSync(classicData, { recursive: true, force: true });
+  const launches = [];
+  for (const tag of ["cachea", "cacheb", "cachec"]) {
+    write(path.join(localCache, "claude_desktop_config.json"), config(tag));
+    launches.push({ ...(await started(packaged)), folders: folders() });
+  }
+  const seen = { tags: launches.map((l) => l.tags), dirs: launches.map((l) => l.dir), moved: fs.existsSync(movedData()) };
+  return { ...same(seen, { tags: [["cachea"], ["cacheb"], ["cachec"]], dirs: [classicData, classicData, classicData], moved: false }), observed: JSON.stringify(launches) };
+});
+
+let moved = null;
+await p.check("(top)", "with the move's answer latched true in its config, the packaged app moves its data folder to `%LOCALAPPDATA%\\Claude-Data\\<family>` in lower case, beside a `README.txt`, leaves `.user-data-left.<family>` in its `LocalCache`, and reads and names the moved folder from then on", async () => {
+  write(path.join(localCache, "claude_desktop_config.json"), { ...config("tomove"), preferences: { [answer]: true } });
+  const launches = [];
+  for (let i = 0; i < 3 && !fs.existsSync(path.join(movedData(), "claude_desktop_config.json")); i++) {
+    launches.push({ ...(await started(packaged)), folders: folders() });
+  }
+  const copied = fs.existsSync(path.join(movedData(), "claude_desktop_config.json"));
+  if (copied) write(path.join(movedData(), "claude_desktop_config.json"), { ...config("moved"), preferences: { [answer]: true } });
+  moved = copied ? { ...(await started(packaged)), folders: folders() } : null;
+  const left = `.user-data-left.${family.toLowerCase()}`;
+  const seen = {
+    copied,
+    readme: fs.existsSync(path.join(localAppData, "Claude-Data", "README.txt")),
+    left: fs.existsSync(path.join(localCache, left)),
+    tags: moved?.tags ?? null,
+    dir: moved?.dir ?? null,
+  };
+  return { ...same(seen, { copied: true, readme: true, left: true, tags: ["moved"], dir: movedData() }), observed: JSON.stringify({ answer, launches, moved }) };
+});
+
+await p.check("(top)", "the packaged app reads its moved data folder before a classic `%APPDATA%\\Claude` beside it", async () => {
+  if (!moved) return { pass: false, observed: "the app never moved its data folder" };
+  write(path.join(classicData, "claude_desktop_config.json"), config("besideclassic"));
+  write(path.join(movedData(), "claude_desktop_config.json"), { ...config("besidemoved"), preferences: { [answer]: true } });
+  const seen = await started(packaged);
+  return { ...same({ tags: seen.tags, dir: seen.dir }, { tags: ["besidemoved"], dir: movedData() }), observed: JSON.stringify({ ...seen, folders: folders() }) };
 });
 
 await stop();
