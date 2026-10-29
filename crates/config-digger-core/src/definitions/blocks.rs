@@ -1863,6 +1863,10 @@ pub(crate) struct PluginRecord {
     pub name: Option<String>,
     /// The folder the plugin's files are in, as recorded.
     pub folder: String,
+    /// The folder the Agent installed the plugin in, when it reads the
+    /// plugin's files from another, as from the folder a linked plugin
+    /// links.
+    pub installed: Option<String>,
     /// The Scope it is installed at, as recorded.
     pub scope: Option<String>,
     /// The Project it applies in, as recorded; `None` when it applies in every one.
@@ -2559,6 +2563,7 @@ impl JsonPluginRecords {
                     id: id.clone(),
                     name: None,
                     folder,
+                    installed: None,
                     scope: text_of(record, self.scope.as_ref()),
                     project: text_of(record, self.project.as_ref()),
                     version: text_of(record, self.version.as_ref()),

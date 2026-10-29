@@ -723,6 +723,229 @@ fn two_extensions_whose_manifests_share_a_name_are_invalid() {
     assert_eq!(code(server(&inventory, "third").state), "effective");
 }
 
+/// `fs` with an extension installed by copy in the folder `folder` of
+/// `~\.gemini\extensions`, whose manifest is `manifest`.
+fn with_extension_folder(fs: FakeFileSystem, folder: &str, manifest: &str) -> FakeFileSystem {
+    let folder = extensions().join(folder);
+    fs.with_file(
+        folder.join(".gemini-extension-install.json"),
+        json!({ "source": "https://github.com/example/ext", "type": "git" }).to_string(),
+    )
+    .with_file(folder.join("gemini-extension.json"), manifest)
+}
+
+/// The manifest of an extension named `name` declaring `servers`.
+fn manifest(name: &str, servers: Value) -> String {
+    json!({ "name": name, "version": "1.0.0", "mcpServers": servers }).to_string()
+}
+
+/// The Gemini CLI flags of `inventory`.
+fn gemini_flags(inventory: &Inventory) -> Vec<&config_digger_core::api::AgentFlag> {
+    inventory
+        .agent_flags
+        .iter()
+        .filter(|flag| flag.agent == "gemini-cli")
+        .collect()
+}
+
+/// Whether `sentence` names each folder of `~\.gemini\extensions` in `folders`.
+fn names_folders(sentence: &str, folders: &[&str]) -> bool {
+    folders
+        .iter()
+        .all(|folder| sentence.contains(&extensions().join(folder).display().to_string()))
+}
+
+#[test]
+fn two_extensions_whose_manifests_share_a_name_stop_gemini_cli_in_every_context() {
+    let folder = project("app");
+    let fs = with_extension_folder(
+        with_extension_folder(
+            FakeFileSystem::new().with_file(user_settings(), "{}"),
+            "kit",
+            &manifest("kit", json!({ "first": { "command": "a" } })),
+        ),
+        "a-copy",
+        &manifest("kit", json!({ "second": { "command": "b" } })),
+    );
+
+    for inventory in [inventory(&fs), inventory_at(&fs, &folder)] {
+        let flags = gemini_flags(&inventory);
+        assert_eq!(flags.len(), 1, "{flags:?}");
+        let flag = flags[0];
+        assert_eq!(code(flag.code), "cannot_start");
+        assert_eq!(flag.home, "default");
+        // Gemini CLI loads the extensions in the order of the folder's listing.
+        assert_eq!(flag.path, extensions().join("a-copy"));
+        assert!(
+            names_folders(&flag.sentence, &["a-copy", "kit"]),
+            "{}",
+            flag.sentence
+        );
+        assert!(flag.sentence.contains("`kit`"), "{}", flag.sentence);
+    }
+}
+
+#[test]
+fn extensions_with_no_server_or_skill_that_share_a_name_still_stop_gemini_cli() {
+    let fs = with_extension_folder(
+        with_extension_folder(
+            FakeFileSystem::new().with_file(user_settings(), "{}"),
+            "kit",
+            r#"{ "name": "kit" }"#,
+        ),
+        "kit-copy",
+        r#"{ "name": "kit" }"#,
+    );
+
+    let inventory = inventory(&fs);
+
+    let flags = gemini_flags(&inventory);
+    assert_eq!(flags.len(), 1, "{flags:?}");
+    assert_eq!(flags[0].path, extensions().join("kit"));
+    assert!(
+        names_folders(&flags[0].sentence, &["kit", "kit-copy"]),
+        "{}",
+        flags[0].sentence
+    );
+}
+
+#[test]
+fn a_linked_extension_sharing_a_name_is_named_by_the_folder_gemini_cli_installed_it_in() {
+    let source = Path::new(r"E:\src\kit");
+    let fs = with_extension_folder(
+        FakeFileSystem::new()
+            .with_file(user_settings(), "{}")
+            .with_file(
+                extensions().join(r"kit\.gemini-extension-install.json"),
+                json!({ "source": source.display().to_string(), "type": "link" }).to_string(),
+            )
+            .with_file(
+                source.join("gemini-extension.json"),
+                manifest("kit", json!({ "linked": { "command": "a" } })),
+            ),
+        "kit-copy",
+        &manifest("kit", json!({ "copied": { "command": "b" } })),
+    );
+
+    let inventory = inventory(&fs);
+
+    let flags = gemini_flags(&inventory);
+    assert_eq!(flags.len(), 1, "{flags:?}");
+    assert_eq!(flags[0].path, extensions().join("kit"));
+    assert!(
+        names_folders(&flags[0].sentence, &["kit", "kit-copy"]),
+        "{}",
+        flags[0].sentence
+    );
+    assert!(
+        !flags[0].sentence.contains(&source.display().to_string()),
+        "{}",
+        flags[0].sentence
+    );
+    let copied = server(&inventory, "copied").entries[0]
+        .reason
+        .as_ref()
+        .unwrap();
+    assert!(
+        names_folders(&copied.sentence, &["kit"]),
+        "{}",
+        copied.sentence
+    );
+}
+
+#[test]
+fn three_extensions_with_one_name_give_one_flag_naming_all_three() {
+    let fs = ["kit", "kit-2", "kit-3"].into_iter().fold(
+        FakeFileSystem::new().with_file(user_settings(), "{}"),
+        |fs, folder| with_extension_folder(fs, folder, r#"{ "name": "kit" }"#),
+    );
+
+    let inventory = inventory(&fs);
+
+    let flags = gemini_flags(&inventory);
+    assert_eq!(flags.len(), 1, "{flags:?}");
+    assert!(
+        names_folders(&flags[0].sentence, &["kit", "kit-2", "kit-3"]),
+        "{}",
+        flags[0].sentence
+    );
+}
+
+#[test]
+fn two_names_each_shared_by_two_extensions_give_two_flags() {
+    let fs = [
+        ("kit", "kit"),
+        ("kit-copy", "kit"),
+        ("tools", "tools"),
+        ("tools-copy", "tools"),
+    ]
+    .into_iter()
+    .fold(
+        with_extension(
+            FakeFileSystem::new().with_file(user_settings(), "{}"),
+            "alone",
+            json!({}),
+        ),
+        |fs, (folder, name)| with_extension_folder(fs, folder, &manifest(name, json!({}))),
+    );
+
+    let inventory = inventory(&fs);
+
+    let flags: Vec<(PathBuf, bool)> = gemini_flags(&inventory)
+        .into_iter()
+        .map(|flag| (flag.path.clone(), flag.sentence.contains("alone")))
+        .collect();
+    assert_eq!(
+        flags,
+        [
+            (extensions().join("kit"), false),
+            (extensions().join("tools"), false)
+        ]
+    );
+}
+
+#[test]
+fn each_extension_sharing_a_name_is_invalid_with_a_reason_naming_the_others() {
+    let fs = ["kit", "kit-2", "kit-3"].into_iter().fold(
+        FakeFileSystem::new().with_file(user_settings(), "{}"),
+        |fs, folder| {
+            with_extension_folder(
+                fs,
+                folder,
+                &manifest(
+                    "kit",
+                    json!({ format!("{folder}-srv"): { "command": "a" } }),
+                ),
+            )
+        },
+    );
+
+    let inventory = inventory(&fs);
+
+    for (folder, others) in [
+        ("kit", ["kit-2", "kit-3"]),
+        ("kit-2", ["kit", "kit-3"]),
+        ("kit-3", ["kit", "kit-2"]),
+    ] {
+        let item = server(&inventory, &format!("{folder}-srv"));
+        assert_eq!(states(item), ["invalid"], "{folder}");
+        let reason = item.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "duplicate_plugin_name");
+        assert!(
+            names_folders(&reason.sentence, &others),
+            "{}",
+            reason.sentence
+        );
+        assert!(
+            !reason
+                .sentence
+                .contains(&format!("{},", extensions().join(folder).display())),
+            "{}",
+            reason.sentence
+        );
+    }
+}
+
 /// `fs` with `trustedFolders.json` holding `rules`, by folder.
 fn with_trust_rules(fs: FakeFileSystem, rules: &[(&Path, &str)]) -> FakeFileSystem {
     let rules: serde_json::Map<String, Value> = rules
@@ -1361,4 +1584,71 @@ fn a_folder_without_an_install_record_is_no_extension() {
     let inventory = inventory(&fs);
 
     assert!(gemini_items(&inventory).all(|item| item.name != "stray"));
+}
+
+#[test]
+fn an_extension_whose_manifest_does_not_parse_shares_no_name_with_the_folder_it_is_in() {
+    // Gemini CLI skips the extension in `kit` with a warning, so `kit` is
+    // the name of `a-kit` alone.
+    let fs = with_extension_folder(
+        with_extension_folder(
+            FakeFileSystem::new().with_file(user_settings(), "{}"),
+            "kit",
+            r#"{ "name": broken"#,
+        ),
+        "a-kit",
+        &manifest("kit", json!({ "docs": { "command": "a" } })),
+    );
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        gemini_flags(&inventory),
+        Vec::<&config_digger_core::api::AgentFlag>::new()
+    );
+    assert_eq!(states(server(&inventory, "docs")), ["effective"]);
+}
+
+#[test]
+fn extensions_that_share_a_name_stop_gemini_cli_where_extension_enablement_disables_them() {
+    // `extension-enablement.json` goes by name, so its rule turns off both
+    // extensions in `app`; Gemini CLI still refuses the second one.
+    let folder = project("app");
+    let with_kit = |fs: FakeFileSystem| {
+        trusting(
+            with_extension_folder(
+                fs.with_file(user_settings(), "{}").with_file(
+                    extensions().join("extension-enablement.json"),
+                    json!({ "kit": { "overrides": ["!/E:/projects/app/*"] } }).to_string(),
+                ),
+                "kit",
+                &manifest("kit", json!({ "first": { "command": "a" } })),
+            ),
+            &folder,
+        )
+    };
+    // Alone, the extension is Disabled in `app`.
+    let alone = inventory_at(&with_kit(FakeFileSystem::new()), &folder);
+    assert_eq!(states(server(&alone, "first")), ["disabled"]);
+    assert!(gemini_flags(&alone).is_empty());
+    let fs = with_extension_folder(
+        with_kit(FakeFileSystem::new()),
+        "kit-copy",
+        &manifest("kit", json!({ "second": { "command": "b" } })),
+    );
+
+    for inventory in [inventory_at(&fs, &folder), inventory(&fs)] {
+        let flags = gemini_flags(&inventory);
+        assert_eq!(flags.len(), 1, "{flags:?}");
+        assert!(
+            flags[0].sentence.contains("even a Disabled one"),
+            "{}",
+            flags[0].sentence
+        );
+        assert!(
+            flags[0].sentence.contains("Uninstall all but one"),
+            "{}",
+            flags[0].sentence
+        );
+    }
 }

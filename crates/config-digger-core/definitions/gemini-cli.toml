@@ -88,10 +88,13 @@ id = "system"
 # folder, which the folder then holds, or `link`, which reads the extension's
 # files from the folder `source` names [source, disk]. An extension is named
 # by its manifest's `name`. When two manifests give one `name`, Gemini CLI
-# does not start at all, with "Extension with name … already was loaded"
-# [source, test]; config-digger shows both extensions as Invalid
-# (#300). Extensions are the user's alone: no Project has its
-# own [source].
+# does not start at all, with "Extension with name … already was loaded",
+# even where `extension-enablement.json`, which goes by name, Disables them
+# [source, test]. config-digger flags the home as one that cannot start, in
+# every context, naming each extension's folder under `extensions`, and
+# shows the extensions' Entries as Invalid. An extension whose manifest
+# gives no `name` it can read is skipped, and shares no name (#300).
+# Extensions are the user's alone: no Project has its own [source].
 [[plugins]]
 id = "extensions"
 registry = { block = "plugin-folders", anchor = { block = "home", root = "extensions" }, marker = ".gemini-extension-install.json", linked = { file = ".gemini-extension-install.json", folder = "source", kind_field = "type", kind = "link" } }

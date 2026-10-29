@@ -89,14 +89,29 @@ await p.check("items.mcp.disable[1]", "Gemini CLI spells the drive letter as the
 
 // ---------------------------------------------------------------- manifests
 
-await p.check("plugins[extensions]", "two extensions whose manifests give one `name` stop Gemini CLI from starting at all", async () => {
+// Whether a run stopped since two extensions are named `cd-throwaway-e1`.
+const stopped = (r) => /critical error occurred.*Extension with name cd-throwaway-e1 already was loaded/s.test(r.stdout + r.stderr);
+// `gemini -p` and `gemini mcp list` in `proj`, with a copy of
+// `cd-throwaway-e1` installed as `cd-throwaway-zdup`, each as whether it stopped.
+async function withDuplicate() {
   const copy = path.join(extensions, "cd-throwaway-zdup");
   fs.cpSync(path.join(extensions, "cd-throwaway-e1"), copy, { recursive: true });
   const session = await gemini(proj, "-p", "hi");
   const list = await gemini(proj, "mcp", "list");
   fs.rmSync(copy, { recursive: true });
-  const stopped = (r) => /critical error occurred.*Extension with name cd-throwaway-e1 already was loaded/s.test(r.stdout + r.stderr);
-  return same({ session: stopped(session), mcpList: stopped(list) }, { session: true, mcpList: true });
+  return { session: stopped(session), mcpList: stopped(list) };
+}
+
+await p.check("plugins[extensions]", "two extensions whose manifests give one `name` stop Gemini CLI from starting at all", async () => {
+  return same(await withDuplicate(), { session: true, mcpList: true });
+});
+
+await p.check("plugins[extensions]", "two extensions with one `name` stop Gemini CLI where `extension-enablement.json`, which goes by name, turns them off", async () => {
+  rules("cd-throwaway-e1", [`!/${proj.slice(0, 2)}/*`]);
+  const duplicate = await withDuplicate();
+  const off = !(await on(proj));
+  rules("cd-throwaway-e1", []);
+  return same({ off, ...duplicate }, { off: true, session: true, mcpList: true });
 });
 
 await p.check("locations[extension-mcp]", "an extension manifest that does not parse skips that extension with a warning, and the others load", async () => {

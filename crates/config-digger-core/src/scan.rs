@@ -63,6 +63,9 @@ pub(crate) struct Snapshot {
     pub settings: Vec<ScannedSettings>,
     /// Every value a rule reads, at every place.
     pub setting_values: Vec<ScannedSetting>,
+    /// The names that plugins of one list of an Agent home share, when the
+    /// Agent refuses to start with such plugins.
+    pub name_clashes: Vec<ScannedNameClash>,
     /// The files a rule reads that cannot be read or parsed. They set
     /// nothing.
     pub unreadable_settings: BTreeSet<PathBuf>,
@@ -225,15 +228,42 @@ pub(crate) struct ScannedPlugin {
     pub name: String,
     /// The folder its files are in.
     pub folder: PathBuf,
+    /// The folder the Agent installed it in, where it installs and
+    /// uninstalls it: `folder`, but for a plugin whose files the Agent
+    /// reads from another, such as a linked Gemini CLI extension.
+    pub installed: PathBuf,
     /// The Scope it is installed at, as the Agent records it.
     pub scope: Option<String>,
     /// The key of the one Project it applies in, `None` when it applies in every one.
     pub project: Option<String>,
     /// Its version, as the Agent records it.
     pub version: Option<String>,
-    /// Another plugin of the same list has its name, and the Agent refuses
-    /// both.
-    pub name_shared: bool,
+    /// The folders of the other plugins of the same list that have its
+    /// name, in the Agent's load order, when the Agent refuses plugins that
+    /// share a name: empty when none has it.
+    pub shared_with: Vec<PathBuf>,
+}
+
+/// A name that plugins of one list of an Agent home share, which the
+/// Agent refuses to start with.
+#[derive(Clone)]
+pub(crate) struct ScannedNameClash {
+    pub agent_index: usize,
+    pub home: String,
+    /// The key of the Project the plugins apply in, `None` when they apply
+    /// in every one.
+    pub project: Option<String>,
+    pub name: String,
+    /// The folders of the plugins, in the Agent's load order.
+    pub folders: Vec<PathBuf>,
+}
+
+impl ScannedNameClash {
+    /// Whether it reaches the context whose Project key is `project_key`:
+    /// one outside any Project reaches every context.
+    pub fn reaches(&self, project_key: Option<&str>) -> bool {
+        self.project.is_none() || self.project.as_deref() == project_key
+    }
 }
 
 /// A value a rule or gate reads, at one place, for one Agent home.
@@ -1375,6 +1405,7 @@ fn read_as_if(
         cached: BTreeMap::new(),
         opened_in: Vec::new(),
         walk_below: None,
+        name_clashes: Vec::new(),
     };
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
 
@@ -1721,6 +1752,7 @@ fn read_as_if(
         exclusive,
         settings,
         setting_values,
+        name_clashes: scanner.name_clashes,
         unreadable_settings,
         parked_store: parked.store,
         parked: parked.parked,
@@ -3378,6 +3410,7 @@ struct Scanner<'p> {
     /// The rules of the walk down that found the location being read, if
     /// one did: no folder they skip is read below it either.
     walk_below: Option<DownWalk>,
+    name_clashes: Vec<ScannedNameClash>,
 }
 
 /// A value the registry at `registry` of the Agent at `agent_index` keeps
@@ -3715,6 +3748,9 @@ impl Scanner<'_> {
             },
         };
         let mut found = Vec::new();
+        // Whether each plugin of `found` is named by its record or manifest,
+        // rather than by its id.
+        let mut named_by_plugin = Vec::new();
         for record in records {
             let folder = paths::lexical(Path::new(&record.folder));
             if !paths::is_absolute(&folder) {
@@ -3743,6 +3779,10 @@ impl Scanner<'_> {
                 },
             );
             let folder = in_marketplace.unwrap_or(folder);
+            let installed = record.installed.as_ref().map_or_else(
+                || folder.clone(),
+                |installed| paths::lexical(Path::new(installed)),
+            );
             let project = match &record.project {
                 Some(spelling) => match self.projects.add(Path::new(spelling), None) {
                     Some(key) => Some(key),
@@ -3761,6 +3801,7 @@ impl Scanner<'_> {
                     (!named.is_empty()).then(|| named.to_owned())
                 })
             });
+            named_by_plugin.push(named.is_some());
             let name = named.unwrap_or_else(|| {
                 let id = record.id.as_str();
                 let separator = plugins.id_separator.as_deref();
@@ -3782,19 +3823,64 @@ impl Scanner<'_> {
                 id,
                 name,
                 folder,
+                installed,
                 scope: record.scope,
                 project,
                 version: record.version,
-                name_shared: false,
+                shared_with: Vec::new(),
             });
         }
         if plugins.same_names_invalid {
-            let names: Vec<String> = found.iter().map(|plugin| plugin.name.clone()).collect();
-            for plugin in &mut found {
-                plugin.name_shared = names.iter().filter(|name| **name == plugin.name).count() > 1;
-            }
+            self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
         found
+    }
+
+    /// Records each name that plugins of `found`, one list of the Agent
+    /// home `home` in load order, share, and gives each such plugin the
+    /// folders of the others. Only a name the Agent reads counts: a plugin
+    /// named by its id, since its manifest gives no name it can read, is
+    /// one the Agent skips.
+    fn record_name_clashes(
+        &mut self,
+        home: &FoundHome,
+        found: &mut [ScannedPlugin],
+        named_by_plugin: &[bool],
+    ) {
+        let named: Vec<usize> = (0..found.len())
+            .filter(|&index| named_by_plugin[index])
+            .collect();
+        let mut clashes: Vec<ScannedNameClash> = Vec::new();
+        for plugin in named.iter().map(|&index| &found[index]) {
+            match clashes.iter_mut().find(|clash| clash.name == plugin.name) {
+                Some(clash) => {
+                    clash.folders.push(plugin.installed.clone());
+                    if clash.project != plugin.project {
+                        clash.project = None;
+                    }
+                }
+                None => clashes.push(ScannedNameClash {
+                    agent_index: home.agent_index,
+                    home: home.home.clone(),
+                    project: plugin.project.clone(),
+                    name: plugin.name.clone(),
+                    folders: vec![plugin.installed.clone()],
+                }),
+            }
+        }
+        clashes.retain(|clash| clash.folders.len() > 1);
+        for &index in &named {
+            let plugin = &mut found[index];
+            if let Some(clash) = clashes.iter().find(|clash| clash.name == plugin.name) {
+                plugin.shared_with = clash
+                    .folders
+                    .iter()
+                    .filter(|folder| **folder != plugin.installed)
+                    .cloned()
+                    .collect();
+            }
+        }
+        self.name_clashes.extend(clashes);
     }
 
     /// The records of a JSON file of plugin records, in its order.
@@ -3908,6 +3994,7 @@ impl Scanner<'_> {
                     id: plugin.key,
                     name: Some(plugin.name),
                     folder: version.display().to_string(),
+                    installed: None,
                     scope: Some(block.scope.clone()),
                     project: Some(spelling.clone()),
                     version: version
@@ -3975,6 +4062,7 @@ impl Scanner<'_> {
                 Some(PluginRecord {
                     version: versions.get(&id).cloned(),
                     folder: linked.as_ref().unwrap_or(&child).display().to_string(),
+                    installed: linked.is_some().then(|| child.display().to_string()),
                     id,
                     name: None,
                     scope: None,
@@ -4002,6 +4090,7 @@ impl Scanner<'_> {
                 id,
                 name: None,
                 folder: folder.display().to_string(),
+                installed: None,
                 scope: None,
                 project: None,
                 version: None,
@@ -4060,6 +4149,7 @@ impl Scanner<'_> {
                     id: format!("{name}{}{marketplace}", block.separator),
                     name: Some(name),
                     folder: folder.display().to_string(),
+                    installed: None,
                     scope: None,
                     project: None,
                     version: Some(version),
@@ -5671,6 +5761,7 @@ mod tests {
             exclusive: BTreeSet::new(),
             settings: Vec::new(),
             setting_values,
+            name_clashes: Vec::new(),
             unreadable_settings: BTreeSet::new(),
             parked_store: None,
             parked: Vec::new(),
@@ -5705,10 +5796,11 @@ mod tests {
                 id: id.to_owned(),
                 name: "x".to_owned(),
                 folder: PathBuf::from(r"C:\plugins\x"),
+                installed: PathBuf::from(r"C:\plugins\x"),
                 scope: None,
                 project: None,
                 version: None,
-                name_shared: false,
+                shared_with: Vec::new(),
             }),
             switch_id: None,
             config_hash: None,

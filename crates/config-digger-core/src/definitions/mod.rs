@@ -742,8 +742,10 @@ pub(crate) struct PluginsDefinition {
     #[serde(default)]
     pub unique_names: bool,
     /// Whether the Agent refuses plugins that share a name, as Gemini CLI
-    /// refuses two extensions whose manifests give one `name`: the Entries
-    /// of each are Invalid, with `duplicate_plugin_name`.
+    /// refuses two extensions whose manifests give one `name`: the Agent
+    /// home cannot start, whether they are Disabled or not, and the Entries
+    /// of each are Invalid, with `duplicate_plugin_name`. Only a name the
+    /// manifest gives counts, never one taken from the plugin's id.
     #[serde(default)]
     pub same_names_invalid: bool,
     /// The Agent's own command that uninstalls a plugin, shown in place of

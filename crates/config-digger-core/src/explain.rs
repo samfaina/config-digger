@@ -126,16 +126,44 @@ pub(crate) fn cli_view_differs(agent_name: &str, command: &str, over: &str) -> S
 }
 
 /// An Invalid Entry's reason: `agent_name` refuses the plugin `plugin` it
-/// is part of, since another of its plugins has that name.
-pub(crate) fn duplicate_plugin_name(agent_name: &str, plugin: &str) -> Reason {
+/// is part of, since the plugins in the folders `others` have that name too.
+pub(crate) fn duplicate_plugin_name(agent_name: &str, plugin: &str, others: &[PathBuf]) -> Reason {
+    let holds = if others.len() == 1 {
+        "holds another plugin"
+    } else {
+        "hold other plugins"
+    };
     Reason {
         code: ReasonCode::DuplicatePluginName,
         effective: None,
         switch: None,
         sentence: format!(
-            "Invalid: {agent_name} refuses to load `{plugin}`, since another it installed has that name."
+            "Invalid: {agent_name} refuses to load `{plugin}`, since {} {holds} of that name.",
+            folders_and_list(others)
         ),
     }
+}
+
+/// The flag of an Agent that refuses to start because the plugins in
+/// `folders` share the name `name`, Disabled or not.
+pub(crate) fn cannot_start_shared_name(
+    agent_name: &str,
+    name: &str,
+    folders: &[PathBuf],
+) -> String {
+    format!(
+        "{agent_name} won't start: {} each hold a plugin named `{name}`, and it refuses a second plugin of that name, even a Disabled one. Uninstall all but one of them.",
+        folders_and_list(folders)
+    )
+}
+
+/// The folders `folders` as a sentence lists them, the last after "and".
+fn folders_and_list(folders: &[PathBuf]) -> String {
+    let folders: Vec<String> = folders
+        .iter()
+        .map(|folder| folder.display().to_string())
+        .collect();
+    and_list(&folders)
 }
 
 /// An Invalid Entry's reason: `agent_name` does not load the plugin
