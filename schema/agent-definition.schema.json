@@ -1949,6 +1949,59 @@
           ]
         },
         {
+          "description": "A list in a strict JSON file whose items each name a plugin's folder,\nsuch as the `installed` of VS Code's `agent-plugins\\installed.json`,\neach naming its folder by a `file:` URI in `pluginUri`. Those folders\nare the plugins, in the list's order. A plugin's id is its folder's\npath below the file's folder, `/`-separated, or its whole path when it\nlies elsewhere. An item that names no folder on this machine is skipped.",
+          "type": "object",
+          "properties": {
+            "anchor": {
+              "description": "Where the file is, in the Agent home or on the machine.",
+              "$ref": "#/$defs/Anchor"
+            },
+            "list": {
+              "description": "The key path of the list.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "folder": {
+              "description": "The field of an item that holds the plugin's folder.",
+              "type": "string"
+            },
+            "spelling": {
+              "description": "How the field spells the folder. Omitted for paths.",
+              "$ref": "#/$defs/Spelling"
+            },
+            "name": {
+              "description": "The field of an item that holds the name the Agent gives the\nplugin. Without it, the plugin is named as its `[[plugins]]` says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "description": "The field of an item that holds the plugin's version.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "block": {
+              "type": "string",
+              "const": "json-plugin-list"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "anchor",
+            "list",
+            "folder"
+          ]
+        },
+        {
           "description": "The folders, in a folder of the Agent home or the machine, that hold a\nmarker file, each a plugin whose id is the folder's name, such as Claude\nDesktop's extensions, each unpacked into `Claude Extensions\\<id>` with\nits `manifest.json`. A folder without a marker holds no plugin. Without\na marker, every folder whose name does not start with `.` is a plugin's,\nsuch as Cursor's local plugins.",
           "type": "object",
           "properties": {

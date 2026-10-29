@@ -855,9 +855,10 @@ fn a_skill_folder_two_agents_read_names_each_one_s_state() {
     assert!(item(&inventory, "fetch").entries[0].also_read_by.is_empty());
 }
 
-/// The fixture agent plugin's folder.
+/// The folder of the fixture agent plugin `installed.json` lists, in VS
+/// Code's clone of its marketplace.
 fn review_kit() -> PathBuf {
-    Path::new(HOME).join(r".vscode\agent-plugins\review-kit")
+    Path::new(HOME).join(r".vscode\agent-plugins\github.com\acme\review-market\plugins\review-kit")
 }
 
 #[test]
@@ -872,7 +873,10 @@ fn an_agent_plugin_s_servers_rank_below_the_user_s() {
     let plugin = linear.plugin.as_ref().unwrap();
     assert_eq!(
         (plugin.id.as_str(), plugin.name.as_str()),
-        ("review-kit", "review-kit")
+        (
+            "github.com/acme/review-market/plugins/review-kit",
+            "review-kit"
+        )
     );
     assert_eq!(json(&linear.remove)["code"], "plugin");
     assert_eq!(
@@ -887,6 +891,239 @@ fn an_agent_plugin_s_servers_rank_below_the_user_s() {
                 format!(r"{}\.mcp.json#mcpServers.fetch", review_kit().display())
             ),
         ]
+    );
+}
+
+/// VS Code's `installed.json`, which lists its agent plugins.
+fn installed_json() -> PathBuf {
+    Path::new(HOME).join(r".vscode\agent-plugins\installed.json")
+}
+
+/// `fs` with `installed.json` listing only the plugins `plugins`, each a
+/// folder in `plugins` of the fixture marketplace's clone and its files.
+fn with_listed(fs: FakeFileSystem, plugins: &[(&str, &[(&str, &str)])]) -> FakeFileSystem {
+    let market = "file:///c%3A/Users/fixture/.vscode/agent-plugins/github.com/acme/review-market";
+    let installed: Vec<Value> = plugins
+        .iter()
+        .map(|(folder, _)| {
+            serde_json::json!({
+                "pluginUri": format!("{market}/plugins/{folder}"),
+                "marketplace": "https://github.com/acme/review-market.git",
+                "name": folder,
+            })
+        })
+        .collect();
+    let listed = serde_json::json!({ "version": 1, "installed": installed });
+    let fs = fs.with_file(installed_json(), listed.to_string());
+    plugins.iter().fold(fs, |fs, (folder, files)| {
+        let folder = review_kit().with_file_name(folder);
+        files.iter().fold(fs, |fs, (file, text)| {
+            fs.with_file(folder.join(file), *text)
+        })
+    })
+}
+
+/// The name of the plugin of the VS Code server Item named `server`.
+fn plugin_of(inventory: &Inventory, server: &str) -> String {
+    let entry = &item(inventory, server).entries[0];
+    entry.plugin.as_ref().unwrap().name.clone()
+}
+
+#[test]
+fn a_listed_plugin_is_named_by_its_manifest_wherever_it_lies_or_else_by_its_folder() {
+    let manifest = |name: &str| format!(r#"{{ "name": "{name}" }}"#);
+    let servers =
+        |name: &str| format!(r#"{{ "mcpServers": {{ "{name}": {{ "command": "x" }} }} }}"#);
+    let (root, github, claude, open) = (
+        manifest("named-root"),
+        manifest("named-github"),
+        manifest("named-claude"),
+        manifest("named-open"),
+    );
+    let servers: Vec<String> = ["s-root", "s-github", "s-claude", "s-open", "s-bare"]
+        .into_iter()
+        .map(servers)
+        .collect();
+    let fs = with_listed(
+        with_home(vscode()),
+        &[
+            (
+                "root",
+                &[("plugin.json", &root), (".mcp.json", &servers[0])],
+            ),
+            (
+                "github",
+                &[
+                    (".github/plugin/plugin.json", &github),
+                    (".mcp.json", &servers[1]),
+                ],
+            ),
+            (
+                "claude",
+                &[
+                    (".claude-plugin/plugin.json", &claude),
+                    (".mcp.json", &servers[2]),
+                ],
+            ),
+            (
+                "open",
+                &[(".plugin/plugin.json", &open), (".mcp.json", &servers[3])],
+            ),
+            ("bare", &[(".mcp.json", &servers[4])]),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    let names: Vec<String> = ["s-root", "s-github", "s-claude", "s-open", "s-bare"]
+        .into_iter()
+        .map(|server| plugin_of(&inventory, server))
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "named-root",
+            "named-github",
+            "named-claude",
+            "named-open",
+            "bare"
+        ]
+    );
+}
+
+#[test]
+fn a_manifest_s_mcp_servers_file_adds_its_servers_to_the_plugin_s_mcp_json() {
+    let fs = with_listed(
+        with_home(vscode()),
+        &[(
+            "named",
+            &[
+                (
+                    "plugin.json",
+                    r#"{ "name": "named", "mcpServers": "./servers.json" }"#,
+                ),
+                (
+                    ".mcp.json",
+                    r#"{ "mcpServers": { "dot": { "command": "dot" } } }"#,
+                ),
+                (
+                    "servers.json",
+                    r#"{ "mcpServers": { "file": { "command": "file" } } }"#,
+                ),
+            ],
+        )],
+    );
+    let inventory = inventory(&fs);
+
+    let folder = review_kit().with_file_name("named");
+    for (server, file) in [("dot", ".mcp.json"), ("file", "servers.json")] {
+        let entry = &item(&inventory, server).entries[0];
+        assert_eq!(entry.path, folder.join(file));
+        assert_eq!(code(entry.state), "effective");
+        assert_eq!(entry.plugin.as_ref().unwrap().name, "named");
+    }
+}
+
+/// Whether a VS Code server Item of an agent plugin is listed.
+fn any_plugin_server(inventory: &Inventory) -> bool {
+    inventory
+        .items
+        .iter()
+        .filter(|item| item.agent == "vscode" && json(item.kind) == "mcp")
+        .flat_map(|item| &item.entries)
+        .any(|entry| entry.scope == "plugin")
+}
+
+#[test]
+fn an_installed_json_that_does_not_parse_is_a_read_failure_and_lists_no_plugin() {
+    let fs = with_home(vscode()).with_file(installed_json(), r#"{ "installed": [,] }"#);
+    let inventory = inventory(&fs);
+
+    let failure = inventory
+        .read_failures
+        .iter()
+        .find(|failure| failure.agent == "vscode" && failure.path == installed_json())
+        .expect("installed.json is a Read failure");
+    assert_eq!(json(failure.kind), "parse");
+    assert!(!any_plugin_server(&inventory));
+}
+
+#[test]
+fn without_installed_json_vs_code_has_no_agent_plugin() {
+    // The fixture's plugin folders, without the `installed.json` beside them.
+    let plugins = fixture_folder(r"home\.vscode\agent-plugins");
+    let fs = load(
+        vscode(),
+        &plugins.join("github.com"),
+        &review_kit().join(r"..\..\..\.."),
+    )
+    .with_folder(installed_json().with_file_name("stray"));
+    let fs = load(
+        fs,
+        &plugins.join("stray"),
+        &installed_json().with_file_name("stray"),
+    );
+    let inventory = inventory(&fs);
+
+    assert!(!any_plugin_server(&inventory));
+    assert!(
+        !inventory
+            .read_failures
+            .iter()
+            .any(|failure| failure.path == installed_json())
+    );
+}
+
+#[test]
+fn an_item_whose_plugin_uri_is_not_a_file_uri_or_that_has_none_is_skipped() {
+    let listed = serde_json::json!({
+        "version": 1,
+        "installed": [
+            { "pluginUri": "vscode-remote://ssh-remote+box/home/me/review-kit", "name": "remote" },
+            { "name": "no-uri" },
+            {
+                "pluginUri": "file:///c%3A/Users/fixture/.vscode/agent-plugins/github.com/acme/review-market/plugins/review-kit",
+                "name": "review-kit"
+            },
+        ],
+    });
+    let fs = with_home(vscode()).with_file(installed_json(), listed.to_string());
+    let inventory = inventory(&fs);
+
+    let plugins: Vec<&str> = inventory
+        .items
+        .iter()
+        .filter(|item| item.agent == "vscode")
+        .flat_map(|item| &item.entries)
+        .filter(|entry| entry.scope == "plugin")
+        .filter_map(|entry| entry.plugin.as_ref())
+        .map(|plugin| plugin.id.as_str())
+        .collect();
+    assert!(!plugins.is_empty());
+    assert!(
+        plugins
+            .iter()
+            .all(|id| *id == "github.com/acme/review-market/plugins/review-kit"),
+        "{plugins:?}"
+    );
+}
+
+#[test]
+fn a_folder_in_agent_plugins_that_installed_json_does_not_list_holds_no_plugin() {
+    let inventory = inventory(&with_home(vscode()));
+
+    assert!(
+        !inventory
+            .items
+            .iter()
+            .any(|item| item.agent == "vscode" && item.name == "stray-server"),
+        "the unlisted folder's server is listed"
+    );
+    let entries = inventory.items.iter().flat_map(|item| &item.entries);
+    assert!(
+        !entries
+            .filter_map(|entry| entry.plugin.as_ref())
+            .any(|plugin| plugin.name == "stray"),
+        "the unlisted folder is a plugin"
     );
 }
 
@@ -1216,7 +1453,7 @@ fn reaction(inventory: &Inventory, path: &Path) -> String {
 fn vs_code_skips_an_mcp_file_it_cannot_parse_but_reads_a_plugin_s_around_the_error() {
     let broken = r#"{ "servers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
     let user_mcp = PathBuf::from(USER).join("mcp.json");
-    let plugin_mcp = PathBuf::from(HOME).join(r".vscode\agent-plugins\review-kit\.mcp.json");
+    let plugin_mcp = review_kit().join(".mcp.json");
     let files = [
         project(r"app\.vscode\mcp.json"),
         project(r"app\.mcp.json"),

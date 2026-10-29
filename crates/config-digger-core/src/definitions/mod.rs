@@ -4858,6 +4858,41 @@ uninstall = \"agent plugin uninstall",
     }
 
     #[test]
+    fn a_plugin_list_lies_in_the_home_or_the_machine_and_names_its_list_and_folder() {
+        let list = |anchor: &str, list: &str, folder: &str| {
+            with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "json-plugin-list", anchor = {anchor}, list = {list}, folder = "{folder}", spelling = "file-uri" }}"#
+                ),
+            )
+        };
+        let machine = r#"{ block = "machine", path = "~/.agent/plugins/installed.json" }"#;
+        let text = list(machine, r#"["installed"]"#, "pluginUri");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = list(IN_PROJECT, r#"["installed"]"#, "pluginUri");
+        assert!(
+            error(&text).contains("must lie in the Agent home or the machine"),
+            "{}",
+            error(&text)
+        );
+        for key_path in ["[]", r#"["installed", ""]"#] {
+            let text = list(machine, key_path, "pluginUri");
+            assert!(
+                error(&text).contains("a plugin list needs a key path, with no empty key"),
+                "{key_path}: {}",
+                error(&text)
+            );
+        }
+        let text = list(machine, r#"["installed"]"#, "");
+        assert!(
+            error(&text).contains("a plugin registry field must not be empty"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn a_project_s_plugins_marketplace_is_one_folder_name() {
         let keys = |marketplace: &str| {
             with_plugins("").replace(

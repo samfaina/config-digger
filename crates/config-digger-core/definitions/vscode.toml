@@ -100,19 +100,22 @@ registries = [
 workspace_files = true
 
 # Agent plugins, which VS Code keeps in `~\.vscode\agent-plugins` [disk].
-# It reads the plugins the folder's `installed.json` lists, each
-# `installed[].pluginUri`, whatever its manifest: `plugin.json` at its root,
-# in `.github\plugin`, `.claude-plugin` or `.plugin`, or none [test]. A
-# plugin from a marketplace sits in VS Code's clone of it,
-# `<host>\<owner>\<repo>` in this folder [binary], and a folder directly
-# here that `installed.json` does not list is not read [test]. `chat.pluginLocations` adds plugins by their path [binary].
-# config-digger reads the folders directly here instead, each with one of
-# those manifests (#321). A plugin is
+# It reads the plugins the folder's `installed.json` lists, in
+# `{"version": 1, "installed": [{"pluginUri", "marketplace", "name"}]}`,
+# each `pluginUri` the `file:` URI of a plugin's folder, whatever its
+# manifest: `plugin.json` at its root, in `.github\plugin`,
+# `.claude-plugin` or `.plugin`, or none [test]. A plugin from a
+# marketplace sits in VS Code's clone of it, `<host>\<owner>\<repo>` in
+# this folder [binary], and a folder directly here that `installed.json`
+# does not list is not read [test]. A plugin's id is its folder below this
+# one, so two marketplaces' plugins of one name stay apart. A plugin is
 # named by its manifest's `name`, or else by its folder. VS Code uninstalls
-# one in the Extensions view.
+# one in the Extensions view. `chat.pluginLocations` in the user's settings
+# adds plugins by their path [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
-registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/agent-plugins" }, marker = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json", ".plugin/plugin.json"] }
+unverified = "A plugin VS Code installs from a real marketplace is taken to sit in its clone `<host>\\<owner>\\<repo>` and be listed in `installed.json` as the probe laid one out by hand; installing one from a marketplace in the probe would test it."
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri" }
 name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = ".plugin/plugin.json", key_path = ["name"] }]
 
 # The extensions that ship with each Installation, in its commit folder's
@@ -310,17 +313,40 @@ on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries"]
 
 # An agent plugin's servers are in the `.mcp.json` at its root, whatever
-# its manifest [test]. A manifest's `mcpServers` adds the file it names
-# [test], which config-digger does not read (#321). VS Code reads a
-# `.mcp.json` it cannot parse around the error, and starts the servers it
-# finds there [test]. config-digger cannot read that much (#322), so the
-# Items such a file reaches keep a caveat.
+# its manifest [test], and in the file a manifest's `mcpServers` names,
+# which `plugin-manifest-mcp` reads. VS Code reads a `.mcp.json` it cannot
+# parse around the error, and starts the servers it finds there [test].
+# config-digger cannot read that much (#322), so the Items such a file
+# reaches keep a caveat.
 [[locations]]
 id = "plugin-mcp"
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 bare = true
+kind = "mcp"
+switch_id = "plugin.{plugin_uri}.{name}"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "unknown"
+
+# The servers of the file an agent plugin's root `plugin.json` names in
+# `mcpServers`, such as `"./servers.json"`, which VS Code reads beside the
+# plugin's `.mcp.json` [test]. Its manifest is the first of the four it
+# has, as for its name. A server the two files both name ranks the
+# `.mcp.json`'s first.
+[[locations]]
+id = "plugin-manifest-mcp"
+unverified = [
+  "A manifest in `.github/plugin`, `.claude-plugin` or `.plugin` is taken to name a file of servers in `mcpServers` as the root `plugin.json` does; the probe's `plugin-named` plugin with its manifest in each of those places would test it.",
+  "An inline `mcpServers` object of a manifest, or a list of paths and objects, is taken to add its servers as a named file does; a probe plugin whose manifest holds one would test it.",
+  "Of two servers of one name in a plugin's `.mcp.json` and the file its manifest names, the `.mcp.json`'s is taken to win; a probe plugin whose two files name one server, with `chat.mcp.collisionBehavior` at `disable`, would test it.",
+]
+anchor = { block = "plugin", plugins = "agent-plugins", path = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json", ".plugin/plugin.json"] }
+references = { root = ["mcpServers"] }
+format = { block = "json", dialect = "jsonc" }
+root = ["mcpServers"]
 kind = "mcp"
 switch_id = "plugin.{plugin_uri}.{name}"
 scope = "plugin"
@@ -435,7 +461,7 @@ sources = [
 # For a profile that shares the default profile's settings, its own
 # `settings.json` is read all the same.
 [items.mcp]
-precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
 checks = ["rules", "disable", "precedence", "trust", "approval"]
 
 [items.mcp.competition]
@@ -480,7 +506,7 @@ sources = [
 [[items.mcp.rules]]
 block = "global-switch"
 off = "registry"
-locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
 sources = [
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "tokenEntitlementsFetchedAt"] },
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "mcpRegistryDataFetchedAt"] },
