@@ -4058,7 +4058,7 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
 
     #[test]
     fn every_format_of_skill_folders_says_why_the_agent_leaves_a_skill_unlisted() {
-        let unlisted = r#", unlisted = ["no-description", "disable-model-invocation"] }"#;
+        let unlisted = r#", unlisted = ["no-description", "disable-model-invocation", "malformed-frontmatter"] }"#;
         let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
         let text = with_skills(anchor, &SKILL_FORMAT.replace(" }", unlisted), CHECKS);
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
@@ -4092,7 +4092,11 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
                 .iter()
                 .map(|variant| variant["const"].clone())
                 .collect::<Vec<_>>(),
-            ["no-description", "disable-model-invocation"]
+            [
+                "no-description",
+                "disable-model-invocation",
+                "malformed-frontmatter"
+            ]
         );
     }
 

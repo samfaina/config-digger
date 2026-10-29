@@ -502,6 +502,174 @@ fn a_skill_whose_frontmatter_does_not_parse_is_read_under_its_folder_s_name() {
     }
 }
 
+/// The sentences of the `unlisted` notes of `entry`, each checked to name
+/// no switch.
+fn unlisted(entry: &Entry) -> Vec<&str> {
+    entry
+        .notes
+        .iter()
+        .filter(|note| code(note.code) == "unlisted")
+        .inspect(|note| assert!(note.switch.is_none()))
+        .map(|note| note.sentence.as_str())
+        .collect()
+}
+
+/// The skill `name` whose `SKILL.md` holds `text`, in the fixture Project
+/// `app`'s `.cursor\skills` and then in `~\.cursor\skills`, each checked to
+/// be Effective.
+fn in_project_and_user_folder(name: &str, text: &str) -> [Entry; 2] {
+    let in_project = cursor().with_file(
+        project(&format!(r"app\.cursor\skills\{name}\SKILL.md")),
+        text,
+    );
+    let at_home = cursor().with_file(in_home(&format!(r".cursor\skills\{name}\SKILL.md")), text);
+    let entries = [
+        item(&inventory_at(&in_project, &project("app")), name).entries[0].clone(),
+        item(&inventory(&at_home), name).entries[0].clone(),
+    ];
+    for (entry, scope) in entries.iter().zip(["project", "user"]) {
+        assert_eq!(entry.scope, scope);
+        assert_eq!(code(entry.state), "effective");
+    }
+    entries
+}
+
+/// The sentences of the `unlisted` notes of the skill `name` whose
+/// `SKILL.md` holds `text`, in a Project and in the user's home folder, as
+/// [`in_project_and_user_folder`] reads it.
+fn unlisted_in_project_and_user_folder(name: &str, text: &str) -> Vec<Vec<String>> {
+    in_project_and_user_folder(name, text)
+        .iter()
+        .map(|entry| unlisted(entry).into_iter().map(str::to_owned).collect())
+        .collect()
+}
+
+/// The note of a skill Cursor leaves out of its model's list because its
+/// `SKILL.md` has no `description`.
+const NO_DESCRIPTION: &str = "The user can still run this skill in Cursor, but Cursor does not list it to its model: its SKILL.md has no `description`.";
+
+#[test]
+fn a_skill_with_no_frontmatter_is_one_cursor_leaves_out_of_its_model_s_list() {
+    for bare in in_project_and_user_folder("cd-throwaway-bare", "A skill with no frontmatter.\n") {
+        assert!(
+            bare.notes
+                .iter()
+                .any(|note| code(note.code) == "skill_fallback")
+        );
+        assert_eq!(unlisted(&bare), [NO_DESCRIPTION]);
+    }
+}
+
+/// The note of a skill Cursor leaves out of its model's list because it
+/// cannot parse its `SKILL.md`'s frontmatter.
+const MALFORMED: &str = "The user can still run this skill in Cursor, but Cursor does not list it to its model: its SKILL.md has a frontmatter that does not parse.";
+
+#[test]
+fn a_skill_whose_yaml_does_not_parse_is_unlisted_for_it() {
+    assert_eq!(
+        unlisted_in_project_and_user_folder(
+            "cd-throwaway-yaml",
+            "---\nname: [unclosed\ndescription: YAML that does not parse\n---\n"
+        ),
+        [[MALFORMED]; 2]
+    );
+}
+
+#[test]
+fn a_frontmatter_that_never_closes_is_unlisted_for_not_parsing() {
+    assert_eq!(
+        unlisted_in_project_and_user_folder(
+            "cd-throwaway-unclosed",
+            "---\nname: cd-throwaway-unclosed\ndescription: never closes\nbody\n"
+        ),
+        [[MALFORMED]; 2]
+    );
+}
+
+#[test]
+fn a_frontmatter_with_a_line_that_is_no_key_is_unlisted_for_not_parsing() {
+    assert_eq!(
+        unlisted_in_project_and_user_folder(
+            "cd-throwaway-no-key",
+            "---\nname: cd-throwaway-no-key\ndescription: probe\na line that is no key\n---\n"
+        ),
+        [[MALFORMED]; 2]
+    );
+}
+
+#[test]
+fn a_yaml_frontmatter_with_a_name_and_no_description_is_unlisted_for_it() {
+    assert_eq!(
+        unlisted_in_project_and_user_folder(
+            "cd-throwaway-no-description",
+            "---\nname: cd-throwaway-no-description\n---\nbody\n"
+        ),
+        [[NO_DESCRIPTION]; 2]
+    );
+}
+
+#[test]
+fn a_skill_with_a_name_and_a_description_is_listed_whatever_disable_model_invocation() {
+    for text in [
+        "---\nname: cd-throwaway-ok\ndescription: Parses.\n---\n",
+        "---\nname: cd-throwaway-ok\ndescription: Parses.\ndisable-model-invocation: true\n---\n",
+    ] {
+        assert_eq!(
+            unlisted_in_project_and_user_folder("cd-throwaway-ok", text),
+            [[""; 0]; 2],
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn a_shadowed_skill_that_does_not_parse_stays_shadowed_with_the_note() {
+    let fs = with_skill(cursor(), in_home(r".cursor\skills\review")).with_file(
+        in_home(r".claude\skills\review\SKILL.md"),
+        "---\nname: [unclosed\ndescription: Reviews.\n---\n",
+    );
+    let inventory = inventory(&fs);
+
+    let review = item(&inventory, "review");
+    assert!(unlisted(&review.entries[0]).is_empty());
+    let claude = &review.entries[1];
+    assert_eq!(
+        claude.locator,
+        in_home(r".claude\skills\review").display().to_string()
+    );
+    assert_eq!(code(claude.state), "shadowed");
+    assert_eq!(unlisted(claude), [MALFORMED]);
+}
+
+#[test]
+fn a_nested_a_claude_and_a_cursor_plugin_s_skill_with_no_description_are_unlisted() {
+    let plain = |name: &str| format!("---\nname: {name}\n---\n");
+    let kit = local_plugin("kit");
+    let fs = with_files(
+        cursor().with_folder(project(r"app\.git")),
+        &kit,
+        &[(r".cursor-plugin\plugin.json", json!({ "name": "kit" }))],
+    )
+    .with_file(
+        project(r"app\sub\.cursor\skills\nested\SKILL.md"),
+        plain("nested"),
+    )
+    .with_file(in_home(r".claude\skills\claude\SKILL.md"), plain("claude"))
+    .with_file(kit.join(r"skills\kit-review\SKILL.md"), plain("kit-review"));
+    let inventory = inventory_at(&fs, &project("app"));
+
+    for (name, provenance) in [
+        ("nested", "file"),
+        ("claude", "file"),
+        ("kit-review", "plugin"),
+    ] {
+        let entry = &item(&inventory, name).entries[0];
+        assert_eq!(code(entry.provenance), provenance, "{name}");
+        assert_eq!(code(entry.state), "effective", "{name}");
+        assert_eq!(unlisted(entry), [NO_DESCRIPTION], "{name}");
+    }
+}
+
 #[test]
 fn a_project_reads_the_skills_of_all_five_folders() {
     let mut fs = cursor();

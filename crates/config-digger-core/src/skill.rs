@@ -193,8 +193,10 @@ pub(crate) fn frontmatter(text: &str, reading: SkillFallback) -> Result<Frontmat
 /// Of `reasons`, in their order as declared, those for which an Agent
 /// leaves out of its model's list the skill whose `SKILL.md` holds `text`
 /// and whose frontmatter it reads as `read`. A frontmatter that is not
-/// YAML config-digger reads, or that never closes, gives none, as the
-/// Agent may keep values from it that config-digger does not read.
+/// YAML config-digger reads, or that never closes, gives no other reason
+/// than the malformed frontmatter, as the Agent may keep values from it
+/// that config-digger does not read; one the Agent reads as no
+/// frontmatter gives none.
 pub(crate) fn unlisted(
     text: &str,
     read: &Result<Frontmatter, SkillDefect>,
@@ -205,6 +207,8 @@ pub(crate) fn unlisted(
         (Err(SkillDefect::NoFrontmatter), Unlisted::NoDescription) => {
             matches!(lines(text), Ok(None))
         }
+        (Err(SkillDefect::MalformedFrontmatter), Unlisted::MalformedFrontmatter) => true,
+        (Ok(read), Unlisted::MalformedFrontmatter) => !read.read_as_yaml,
         (Ok(read), _) if !read.read_as_yaml => false,
         (Ok(read), Unlisted::NoDescription) => !read.keys.contains_key("description"),
         (Ok(read), Unlisted::DisableModelInvocation) => read.disables_model_invocation,
@@ -453,10 +457,15 @@ mod tests {
     const BOTH: [Unlisted; 2] = [Unlisted::NoDescription, Unlisted::DisableModelInvocation];
 
     /// Why an Agent whose `malformed_frontmatter` is `reading`, and which
-    /// leaves skills out of its model's list for both reasons, leaves out
+    /// leaves skills out of its model's list for every reason, leaves out
     /// the skill whose `SKILL.md` holds `text`.
     fn unlisted_as(reading: SkillFallback, text: &str) -> Vec<Unlisted> {
-        unlisted(text, &frontmatter(text, reading), &BOTH)
+        let every = [
+            Unlisted::NoDescription,
+            Unlisted::DisableModelInvocation,
+            Unlisted::MalformedFrontmatter,
+        ];
+        unlisted(text, &frontmatter(text, reading), &every)
     }
 
     #[test]
@@ -485,5 +494,20 @@ mod tests {
             unlisted(text, &read, &[Unlisted::DisableModelInvocation]),
             [Unlisted::DisableModelInvocation]
         );
+    }
+
+    #[test]
+    fn a_frontmatter_config_digger_reads_as_malformed_gives_that_reason_alone() {
+        for text in [
+            "---\nname: [unclosed\ndisable-model-invocation: true\n---\n",
+            "---\nname: x\nnot a key\n---\n",
+            "---\nname: x\ndisable-model-invocation: true\n",
+        ] {
+            assert_eq!(
+                unlisted_as(SkillFallback::FolderName, text),
+                [Unlisted::MalformedFrontmatter],
+                "{text}"
+            );
+        }
     }
 }

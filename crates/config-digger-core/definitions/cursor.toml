@@ -501,7 +501,7 @@ sources = [
 [[locations]]
 id = "user-cursor-skills"
 anchor = { block = "machine", path = "~/.cursor/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -511,7 +511,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-claude-skills"
 anchor = { block = "machine", path = "~/.claude/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -522,7 +522,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-codex-skills"
 anchor = { block = "machine", path = "~/.codex/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -532,7 +532,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-grok-skills"
 anchor = { block = "machine", path = "~/.grok/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -542,7 +542,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-agents-skills"
 anchor = { block = "machine", path = "~/.agents/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "user"
 provenance = "file"
@@ -552,7 +552,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-cursor-skills"
 anchor = { block = "project", path = ".cursor/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -562,7 +562,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-claude-skills"
 anchor = { block = "project", path = ".claude/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -572,7 +572,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-codex-skills"
 anchor = { block = "project", path = ".codex/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -582,7 +582,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-grok-skills"
 anchor = { block = "project", path = ".grok/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -592,7 +592,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "project-agents-skills"
 anchor = { block = "project", path = ".agents/skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -602,7 +602,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "nested-cursor-skills"
 anchor = { block = "project", path = ".cursor/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -612,7 +612,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "nested-claude-skills"
 anchor = { block = "project", path = ".claude/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -623,7 +623,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "nested-codex-skills"
 anchor = { block = "project", path = ".codex/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
-format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", reserved = ["imagegen", "openai-docs", "plugin-creator", "skill-creator", "skill-installer"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -633,7 +633,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "nested-grok-skills"
 anchor = { block = "project", path = ".grok/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -643,7 +643,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "nested-agents-skills"
 anchor = { block = "project", path = ".agents/skills", walk = { down = { needs_git = true, skip = ["node_modules", ".git", ".turbo", ".next", ".cache", ".pnpm", ".yarn", "dist", "build", "out", "target", ".vscode", ".idea", "venv", "__pycache__", "logs", "tmp", "temp"], ignore_files = true, follow_links = true } } }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "project"
 provenance = "file"
@@ -675,7 +675,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "cursor-plugin-skills"
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
-format = { block = "manifest-skills", field = ["skills"], default = "skills", skills = { recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", skills = { recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] } }
 kind = "skill"
 scope = "plugin"
 provenance = "plugin"
@@ -688,7 +688,7 @@ rejected_unless_path_object_or_list = [["mcpServers"]]
 [[locations]]
 id = "claude-plugin-skills"
 anchor = { block = "plugin", plugins = "claude-code", path = "skills" }
-format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", recursive = true, name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }
 kind = "skill"
 scope = "plugin"
 provenance = "plugin"
@@ -714,8 +714,12 @@ on_read_failure = "ignores_file"
 # user can pick it [test]; every location's skills are read by the same
 # code [code]. Its Customize page marks such a skill "Error parsing skill",
 # as it does one with no `description` [test], and Cursor leaves those out
-# of the skills its model gets [code]: config-digger still shows them
-# Effective (#345). Two skills of one name at different paths are both
+# of the skills its model gets [code]. The user can still run such a skill,
+# which keeps its State with an `unlisted` note: every location but the
+# built-in one lists `no-description`, for a `SKILL.md` with no frontmatter
+# or a YAML one without the key, and `malformed-frontmatter`, for one
+# config-digger reads as malformed. The probe never checked a skill with
+# `disable-model-invocation: true`, which gets no note. Two skills of one name at different paths are both
 # listed under `/name`, and the user picks one, which Cursor records by its
 # path below `skills` [test]. Enter takes the first listed: a user's skill
 # before a Project's until one is picked, after which the order follows
