@@ -914,6 +914,12 @@ impl Anchored for MachineAnchor {
 pub(crate) struct SettingsAnchor {
     /// The id of a declared `[[settings]]`.
     pub settings: String,
+    /// Whether the Agent skips the location in the sources the user can
+    /// write, whichever source it reads its settings from, such as Claude
+    /// Code's `managedMcpServers`, which it never reads from the `HKCU`
+    /// policy. Only a location's anchor says so.
+    #[serde(default)]
+    pub skips_user_writable: bool,
 }
 
 impl Validate for SettingsAnchor {
@@ -1015,6 +1021,11 @@ impl Anchor {
             | Anchor::ProjectFile(_)
             | Anchor::ProjectStorage(_) => None,
         }
+    }
+
+    /// Whether it reads settings, and skips the sources the user can write.
+    pub fn skips_user_writable(&self) -> bool {
+        matches!(self, Anchor::Settings(block) if block.skips_user_writable)
     }
 
     /// The `[[plugins]]` id and the path in each plugin's folder, if the

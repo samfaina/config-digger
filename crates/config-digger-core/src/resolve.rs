@@ -163,6 +163,7 @@ pub(crate) fn resolve(
                 project_key.map(String::as_str),
             )
             .is_some()
+            || in_user_writable_source(&definitions[entry.agent_index], snapshot, entry)
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
             || not_admin_owned(snapshot, entry)
     };
@@ -557,6 +558,23 @@ pub(crate) fn resolve(
                     }
                     if not_admin_owned(snapshot, entry) {
                         let reason = explain::system_file_not_admin_owned(agent_name, &entry.path);
+                        return unread_entry(
+                            definition,
+                            snapshot,
+                            entry,
+                            location,
+                            reason,
+                            gate_caveats,
+                        );
+                    }
+                    // It holds in every context, so it wins over the
+                    // source the Agent reads.
+                    if in_user_writable_source(definition, snapshot, entry) {
+                        let reason = explain::user_writable_source(
+                            agent_name,
+                            &location.root.join("."),
+                            &entry.path,
+                        );
                         return unread_entry(
                             definition,
                             snapshot,
@@ -1991,6 +2009,26 @@ fn not_admin_owned(snapshot: &Snapshot, entry: &ScannedEntry) -> bool {
     snapshot
         .not_admin_owned
         .holds(entry.agent_index, &entry.path)
+}
+
+/// Whether `entry` is in a source of settings the user can write, which the
+/// Agent never reads its location from.
+fn in_user_writable_source(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+) -> bool {
+    let anchor = &definition.location(&entry.location).anchor;
+    let Some(id) = anchor.settings().filter(|_| anchor.skips_user_writable()) else {
+        return false;
+    };
+    let declared = definition
+        .declared_settings(id)
+        .expect("validation declares the settings an anchor names");
+    snapshot
+        .settings_of(entry.agent_index, id)
+        .source_of(&entry.path)
+        .is_some_and(|source| declared.sources[source].user_writable())
 }
 
 /// For an Entry in a source of settings the Agent skips, the settings' id

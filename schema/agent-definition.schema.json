@@ -515,6 +515,11 @@
               "description": "The id of a declared `[[settings]]`.",
               "type": "string"
             },
+            "skips_user_writable": {
+              "description": "Whether the Agent skips the location in the sources the user can\nwrite, whichever source it reads its settings from, such as Claude\nCode's `managedMcpServers`, which it never reads from the `HKCU`\npolicy. Only a location's anchor says so.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "settings"

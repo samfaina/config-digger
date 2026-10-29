@@ -277,12 +277,18 @@ fn only_the_first_managed_source_holding_settings_applies() {
         skipped["reason"]["sentence"],
         r"Claude Code never reads it: it reads its managed settings only from the first source that holds any, which is HKLM\SOFTWARE\Policies\ClaudeCode\Settings."
     );
+    // Skipped as the source after the one Claude Code reads, it is never
+    // read from the user's source in any case, which the reason says.
     let mine = entry_json(&server(&inventory, "mine").entries[0]);
     assert_eq!(mine["state"], "unread");
+    assert_eq!(mine["reason"]["code"], "user_writable_source");
+    assert_eq!(mine["reason"]["sentence"], USER_POLICY_SKIPPED);
 }
 
+const USER_POLICY_SKIPPED: &str = r"Claude Code never reads `managedMcpServers` from HKCU\SOFTWARE\Policies\ClaudeCode\Settings, which the user can write.";
+
 #[test]
-fn the_user_registry_policy_applies_when_no_admin_source_holds_settings() {
+fn managed_servers_of_the_user_registry_policy_are_never_read() {
     let fs = claude_home(&json!({}))
         .with_file(in_program_files(r"ClaudeCode\managed-settings.json"), "{}");
     let env = env().with_registry_value(
@@ -299,7 +305,9 @@ fn the_user_registry_policy_applies_when_no_admin_source_holds_settings() {
         entry["locator"],
         r"HKCU\SOFTWARE\Policies\ClaudeCode\Settings#managedMcpServers.mine"
     );
-    assert_eq!(entry["state"], "effective");
+    assert_eq!(entry["state"], "unread");
+    assert_eq!(entry["reason"]["code"], "user_writable_source");
+    assert_eq!(entry["reason"]["sentence"], USER_POLICY_SKIPPED);
 }
 
 #[test]
@@ -490,6 +498,34 @@ fn a_managed_deny_list_blocks_by_policy() {
     assert_eq!(entry["state"], "blocked");
     assert_eq!(entry["enable"], Value::Null);
     assert_eq!(state_and_code(&inventory, "linear"), pair("effective", ""));
+}
+
+#[test]
+fn the_user_registry_policy_still_applies_its_other_settings() {
+    let env = env().with_registry_value(
+        Hive::CurrentUser,
+        POLICIES,
+        "Settings",
+        &json!({
+            "deniedMcpServers": [{ "serverName": "notes" }],
+            "managedMcpServers": { "mine": { "type": "http", "url": "https://mcp.example/mine" } },
+        })
+        .to_string(),
+    );
+
+    let inventory = inventory_with(&servers_home(), env, &Context::default());
+
+    let notes = entry_json(&server(&inventory, "notes").entries[0]);
+    assert_eq!(notes["state"], "blocked");
+    assert_eq!(
+        notes["reason"]["switch"],
+        r"HKCU\SOFTWARE\Policies\ClaudeCode\Settings#deniedMcpServers"
+    );
+    assert_eq!(state_and_code(&inventory, "linear"), pair("effective", ""));
+    assert_eq!(
+        state_and_code(&inventory, "mine"),
+        pair("unread", "user_writable_source")
+    );
 }
 
 #[test]
@@ -1145,10 +1181,11 @@ fn a_source_set_to_merge_is_merged_with_the_admin_sources_below_it() {
         ]
     );
     assert_eq!(state_and_code(&inventory, "tickets"), pair("effective", ""));
-    // The user-writable registry value never merges with another source.
+    // The user-writable registry value never merges with another source,
+    // and its `managedMcpServers` are never read in any case.
     assert_eq!(
         state_and_code(&inventory, "mine"),
-        pair("unread", "source_skipped")
+        pair("unread", "user_writable_source")
     );
 }
 

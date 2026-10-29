@@ -2541,6 +2541,9 @@ pub enum ReasonCode {
     /// The Entry is in a source of settings the Agent skips, since it reads
     /// only the first that holds any.
     SourceSkipped,
+    /// The Entry is in a source of settings the user can write, which the
+    /// Agent never reads the Entry's location from.
+    UserWritableSource,
     /// The Entry is in a system file the Agent skips unread, since someone
     /// other than an administrator can change it or a folder above it.
     SystemFileNotAdminOwned,

@@ -348,6 +348,20 @@ pub(crate) fn source_skipped(agent_name: &str, settings: &str, read: &Path) -> R
     }
 }
 
+/// An Unread Entry's reason: it is in `path`, a source of settings the
+/// user can write, which `agent_name` never reads `key` from.
+pub(crate) fn user_writable_source(agent_name: &str, key: &str, path: &Path) -> Reason {
+    Reason {
+        code: ReasonCode::UserWritableSource,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} never reads `{key}` from {}, which the user can write.",
+            path.display()
+        ),
+    }
+}
+
 /// An Unread Entry's reason: `agent_name` skips the system file at `path`
 /// unread, since someone other than an administrator can change it or a
 /// folder above it.
