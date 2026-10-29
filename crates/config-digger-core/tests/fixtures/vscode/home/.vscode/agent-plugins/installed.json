@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "installed": [
+    {
+      "pluginUri": "file:///c%3A/Users/fixture/.vscode/agent-plugins/github.com/acme/review-market/plugins/review-kit",
+      "marketplace": "https://github.com/acme/review-market.git",
+      "name": "review-kit"
+    }
+  ]
+}

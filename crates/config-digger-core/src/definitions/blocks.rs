@@ -1429,7 +1429,7 @@ impl Register for Registry {
     }
 }
 
-/// How a registry spells a Project.
+/// How a registry spells a folder: a Project, or a plugin's.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Spelling {
@@ -1437,7 +1437,7 @@ pub(crate) enum Spelling {
     #[default]
     Path,
     /// A `file:` URI, such as `file:///e%3A/x`. A URI of any other scheme,
-    /// such as a remote folder's, names no Project on this machine.
+    /// such as a remote folder's, names no folder on this machine.
     FileUri,
 }
 
@@ -1898,6 +1898,7 @@ pub(crate) trait ListPlugins {
 #[serde(tag = "block", rename_all = "kebab-case")]
 pub(crate) enum PluginRegistry {
     JsonPluginRecords(JsonPluginRecords),
+    JsonPluginList(JsonPluginList),
     PluginFolders(PluginFolders),
     InstallationFolders(InstallationFolders),
     ProjectPluginKeys(ProjectPluginKeys),
@@ -1908,6 +1909,7 @@ impl Validate for PluginRegistry {
     fn validate(&self) -> Result<(), String> {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.validate(),
+            PluginRegistry::JsonPluginList(block) => block.validate(),
             PluginRegistry::PluginFolders(block) => block.validate(),
             PluginRegistry::InstallationFolders(block) => block.validate(),
             PluginRegistry::ProjectPluginKeys(block) => block.validate(),
@@ -1920,6 +1922,7 @@ impl ListPlugins for PluginRegistry {
     fn anchors(&self) -> Vec<&Anchor> {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.anchors(),
+            PluginRegistry::JsonPluginList(block) => block.anchors(),
             PluginRegistry::PluginFolders(block) => block.anchors(),
             PluginRegistry::InstallationFolders(_) => Vec::new(),
             PluginRegistry::ProjectPluginKeys(block) => block.anchors(),
@@ -2511,13 +2514,19 @@ impl FolderMarketplaces {
     }
 }
 
+/// A JSON plugin registry lies in one file of the Agent home or the machine.
+fn validate_plugin_registry_anchor(anchor: &Anchor) -> Result<(), String> {
+    anchor.validate()?;
+    anchor.one_file()?;
+    if anchor.home_root().is_none() && anchor.machine().is_none() {
+        return Err("a plugin registry must lie in the Agent home or the machine".into());
+    }
+    Ok(())
+}
+
 impl Validate for JsonPluginRecords {
     fn validate(&self) -> Result<(), String> {
-        self.anchor.validate()?;
-        self.anchor.one_file()?;
-        if self.anchor.home_root().is_none() && self.anchor.machine().is_none() {
-            return Err("a plugin registry must lie in the Agent home or the machine".into());
-        }
+        validate_plugin_registry_anchor(&self.anchor)?;
         if self.root.is_empty() || self.root.iter().any(String::is_empty) {
             return Err("a plugin registry needs a root key path, with no empty key".into());
         }
@@ -2583,6 +2592,105 @@ impl JsonPluginRecords {
             }
         }
         Ok(records)
+    }
+}
+
+/// A list in a strict JSON file whose items each name a plugin's folder,
+/// such as the `installed` of VS Code's `agent-plugins\installed.json`,
+/// each naming its folder by a `file:` URI in `pluginUri`. Those folders
+/// are the plugins, in the list's order. A plugin's id is its folder's
+/// path below the file's folder, `/`-separated, or its whole path when it
+/// lies elsewhere. An item without the field, or whose field spells no path
+/// on this machine, such as a URI of another scheme, is skipped.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonPluginList {
+    /// Where the file is, in the Agent home or on the machine.
+    pub anchor: Anchor,
+    /// The key path of the list.
+    pub list: Vec<String>,
+    /// The field of an item that holds the plugin's folder.
+    pub folder: String,
+    /// How the field spells the folder. Omitted for paths.
+    #[serde(default)]
+    pub spelling: Spelling,
+    /// The field of an item that holds the name the Agent gives the
+    /// plugin. Without it, the plugin is named as its `[[plugins]]` says.
+    pub name: Option<String>,
+    /// The field of an item that holds the plugin's version.
+    pub version: Option<String>,
+}
+
+impl Validate for JsonPluginList {
+    fn validate(&self) -> Result<(), String> {
+        validate_plugin_registry_anchor(&self.anchor)?;
+        if self.list.is_empty() || self.list.iter().any(String::is_empty) {
+            return Err("a plugin list needs a key path, with no empty key".into());
+        }
+        for field in std::iter::once(&self.folder)
+            .chain(&self.name)
+            .chain(&self.version)
+        {
+            if field.is_empty() {
+                return Err("a plugin registry field must not be empty".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ListPlugins for JsonPluginList {
+    fn anchors(&self) -> Vec<&Anchor> {
+        vec![&self.anchor]
+    }
+}
+
+impl JsonPluginList {
+    /// The records the text of the file at `file` holds, in its order.
+    pub fn records(&self, text: &str, file: &Path) -> Result<Vec<PluginRecord>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        let items = self
+            .list
+            .iter()
+            .try_fold(&document, |value, key| value.get(key))
+            .and_then(Value::as_array);
+        let base = file.parent().map(paths::lexical).unwrap_or_default();
+        let text_of =
+            |item: &Value, field: Option<&String>| item.get(field?)?.as_str().map(str::to_owned);
+        Ok(items
+            .into_iter()
+            .flatten()
+            .filter_map(|item| {
+                let spelled = item.get(&self.folder)?.as_str()?;
+                let Some(folder) = self.spelling.path(spelled) else {
+                    tracing::debug!(%spelled, "plugin folder not on this machine");
+                    return None;
+                };
+                let folder = paths::lexical(&folder);
+                Some(PluginRecord {
+                    id: id_below(&folder, &base),
+                    name: text_of(item, self.name.as_ref()),
+                    folder: folder.display().to_string(),
+                    installed: None,
+                    scope: None,
+                    project: None,
+                    version: text_of(item, self.version.as_ref()),
+                })
+            })
+            .collect())
+    }
+}
+
+/// The path of `folder` below `base`, `/`-separated; its whole path when it
+/// does not lie below it.
+fn id_below(folder: &Path, base: &Path) -> String {
+    match crate::folders::below(folder, base) {
+        Some(rest) if !rest.is_empty() => rest
+            .iter()
+            .map(|part| part.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+        _ => folder.display().to_string(),
     }
 }
 
