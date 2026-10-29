@@ -19,14 +19,15 @@ verified = { min = "2.16120", max = "3.6556.2" }
 # `%LOCALAPPDATA%\Claude-Data\<family>`, whenever that folder exists, a
 # classic folder beside it or not [test, bundle]. Each package's app ends
 # with its own `LocalCache`, which no other app sees [docs]. A package's app
-# sees `%APPDATA%\Claude` with its `LocalCache` laid over it file by file:
+# sees `%APPDATA%\Claude` with its `LocalCache` laid over it, path by path:
 # beside a classic folder it reads the classic files and creates no
-# `LocalCache`, but a file its `LocalCache` holds wins [test]. A lookup
-# order picks a whole folder, the classic one before a package's
-# `LocalCache` (#306).
+# `LocalCache`, but a file its `LocalCache` holds wins [test]. So a
+# package's `LocalCache` home is an Overlay home over the classic one,
+# which the classic app's order holds alone.
 lookup_orders = [
-  ["claude-data", "msix-moved", "classic", "msix"],
-  ["claude-data", "msix-anthropicpbc-moved", "classic", "msix-anthropicpbc"],
+  ["claude-data", "classic"],
+  ["claude-data", "msix-moved", "msix"],
+  ["claude-data", "msix-anthropicpbc-moved", "msix-anthropicpbc"],
 ]
 
 [agent]
@@ -37,21 +38,22 @@ name = "Claude Desktop"
 notes = ["cloud_connectors_not_on_disk"]
 
 # Each MSIX package installs to its own folder under `WindowsApps`, whose
-# manifest gives its version [disk]. A package's app reads the homes of the
-# lookup order up to its own `LocalCache`, and the third-party home.
+# manifest gives its version [disk]. A package's app reads the homes of its
+# lookup order, its `LocalCache` laid over the classic folder, and the
+# third-party home.
 [[installations]]
 id = "msix"
 folder = "%ProgramFiles%/WindowsApps/Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["claude-data", "msix-moved", "classic", "msix", "third-party"]
+homes = ["claude-data", "msix-moved", "msix", "third-party"]
 
 [[installations]]
 id = "msix-anthropicpbc"
 folder = "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["claude-data", "msix-anthropicpbc-moved", "classic", "msix-anthropicpbc", "third-party"]
+homes = ["claude-data", "msix-anthropicpbc-moved", "msix-anthropicpbc", "third-party"]
 
 # The classic installer, which claude.ai serves beside the MSIX package, is
 # Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude`,
@@ -115,10 +117,15 @@ skills = "local-agent-mode-sessions/skills-plugin"
 # An MSIX package virtualises what the app writes to `%APPDATA%\Claude`
 # into its own `LocalCache`, where no other process sees it as
 # `%APPDATA%\Claude` [disk, docs]. The Store package is `Claude_<publisher>`
-# [disk].
+# [disk]. The app sees its `LocalCache` laid over a classic folder: a file
+# the `LocalCache` holds is read, else the classic one [test], and a folder
+# root lists the entries of both by name, the `LocalCache`'s winning
+# [docs].
 [[homes]]
 id = "msix"
+unverified = "A package is taken to list `Claude Extensions`, `Claude Extensions Settings` and its skills mirror as the entries of its `LocalCache` and of a classic folder beside it, by name, its own winning, as Microsoft says a package's files are merged with `AppData`; only `claude_desktop_config.json` was tested (#306)."
 folder = { block = "path", path = "%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude" }
+over = "classic"
 
 [homes.roots]
 config = "claude_desktop_config.json"
@@ -147,10 +154,13 @@ installations = "extensions-installations.json"
 # The mirror of the account's skills.
 skills = "local-agent-mode-sessions/skills-plugin"
 
-# The app also knows the package family `AnthropicPBC.Claude` [bundle].
+# The app also knows the package family `AnthropicPBC.Claude` [bundle],
+# whose `LocalCache` is laid over a classic folder the same way.
 [[homes]]
 id = "msix-anthropicpbc"
+unverified = "The `AnthropicPBC.Claude` package is taken to see its `LocalCache` laid over a classic folder as the Store package does, its folder roots listed by name, its own entries winning (#306)."
 folder = { block = "path", path = "%LOCALAPPDATA%/Packages/AnthropicPBC.Claude_*/LocalCache/Roaming/Claude" }
+over = "classic"
 
 [homes.roots]
 config = "claude_desktop_config.json"

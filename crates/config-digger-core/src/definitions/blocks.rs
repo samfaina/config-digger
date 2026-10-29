@@ -11,6 +11,7 @@ use crate::installations::pe;
 use crate::mask::MASK;
 use crate::paths;
 use crate::ports::{Environment, FileSystem, Hive, Ports, RegistryData};
+use crate::roots::Roots;
 use crate::version::Version;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -436,7 +437,7 @@ impl Locate for PathLocator {
 pub(crate) trait Anchored {
     /// The location's path, given the roots of the Agent home being scanned
     /// and, for an anchor inside a Project, the Project's folder.
-    fn path(&self, roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf>;
+    fn path(&self, roots: &Roots, project: Option<&Path>) -> Option<PathBuf>;
 
     /// The home root this anchor needs, if any.
     fn home_root(&self) -> Option<&str>;
@@ -483,7 +484,7 @@ impl Validate for Anchor {
 }
 
 impl Anchored for Anchor {
-    fn path(&self, roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, roots: &Roots, project: Option<&Path>) -> Option<PathBuf> {
         match self {
             Anchor::Home(block) => block.path(roots, project),
             Anchor::Project(block) => block.path(roots, project),
@@ -573,7 +574,7 @@ impl Validate for EntryAnchor {
 
 impl Anchored for EntryAnchor {
     /// There is one path per Entry, which [`EntryAnchor::of`] finds.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         None
     }
 
@@ -711,15 +712,14 @@ impl Validate for HomeAnchor {
 
 impl Anchored for HomeAnchor {
     /// `None` for a path that names one file per plugin.
-    fn path(&self, roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         if self.per_plugin() {
             return None;
         }
-        let root = roots.get(&self.root)?;
-        Some(match &self.path {
-            Some(path) => join_relative(root, path),
-            None => root.clone(),
-        })
+        match &self.path {
+            Some(path) => roots.join(&self.root, path),
+            None => roots.get(&self.root).cloned(),
+        }
     }
 
     fn home_root(&self) -> Option<&str> {
@@ -762,7 +762,7 @@ impl Validate for ProjectAnchor {
 impl Anchored for ProjectAnchor {
     /// `project` is the folder read: the Project folder, or a parent of it
     /// the walk reaches.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, project: Option<&Path>) -> Option<PathBuf> {
         Some(join_relative(project?, &self.path))
     }
 
@@ -797,7 +797,7 @@ impl Validate for ProjectFileAnchor {
 
 impl Anchored for ProjectFileAnchor {
     /// `project` is the workspace file.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, project: Option<&Path>) -> Option<PathBuf> {
         project.map(Path::to_path_buf)
     }
 
@@ -837,7 +837,7 @@ impl Validate for ProjectStorageAnchor {
 
 impl Anchored for ProjectStorageAnchor {
     /// There is one path per Project, which the scan finds.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         None
     }
 
@@ -884,7 +884,7 @@ impl Validate for MachineAnchor {
 }
 
 impl Anchored for MachineAnchor {
-    fn path(&self, roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         roots.get(&self.path).cloned()
     }
 
@@ -934,7 +934,7 @@ impl Validate for SettingsAnchor {
 
 impl Anchored for SettingsAnchor {
     /// Settings can be in several files, which the scan lists.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         None
     }
 
@@ -988,7 +988,7 @@ impl Validate for PluginAnchor {
 
 impl Anchored for PluginAnchor {
     /// There is one path per plugin, which the scan finds.
-    fn path(&self, _roots: &BTreeMap<String, PathBuf>, _project: Option<&Path>) -> Option<PathBuf> {
+    fn path(&self, _roots: &Roots, _project: Option<&Path>) -> Option<PathBuf> {
         None
     }
 
@@ -1133,7 +1133,7 @@ impl Anchor {
     /// folder, for an anchor in a Project.
     pub fn path_for(
         &self,
-        roots: &BTreeMap<String, PathBuf>,
+        roots: &Roots,
         folder: Option<&Path>,
         plugin: Option<&str>,
         entry: &Path,
@@ -1149,15 +1149,12 @@ impl Anchor {
 
     /// The file it names for the plugin with the id `plugin`, given the
     /// roots of the Agent home; `None` when it names no file per plugin.
-    pub fn plugin_path(&self, roots: &BTreeMap<String, PathBuf>, plugin: &str) -> Option<PathBuf> {
+    pub fn plugin_path(&self, roots: &Roots, plugin: &str) -> Option<PathBuf> {
         let Anchor::Home(block) = self else {
             return None;
         };
         let path = block.path.as_deref().filter(|_| block.per_plugin())?;
-        Some(join_relative(
-            roots.get(&block.root)?,
-            &path.replace(PLUGIN_KEY, plugin),
-        ))
+        roots.join(&block.root, &path.replace(PLUGIN_KEY, plugin))
     }
 }
 

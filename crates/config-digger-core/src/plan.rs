@@ -975,7 +975,7 @@ impl Targeted<'_> {
         let parked_at = humantime::format_rfc3339_seconds(self.ports.clock.now()).to_string();
         let origin_of = |entry: &ScannedEntry| park::Origin {
             agent: self.definitions[entry.agent_index].agent.id.clone(),
-            home: entry.home.clone(),
+            home: self.snapshot.home_holding(entry).to_owned(),
             location: entry.location.clone(),
             name: entry.name.clone(),
             path: entry.path.clone(),

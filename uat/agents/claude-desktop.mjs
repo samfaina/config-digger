@@ -200,6 +200,42 @@ await p.check("(top)", "the packaged app, started beside a classic `%APPDATA%\\C
   return { ...same(seen, { first: ["legacy"], firstLocalCache: null, both: ["msix"] }), observed: JSON.stringify({ first, both }) };
 });
 
+// An extension `cd-throwaway-<tag>` in the data folder `folder`, switched on
+// in its settings, whose server the app cannot start.
+function extension(folder, id, tag) {
+  write(path.join(folder, "Claude Extensions", id, "manifest.json"), {
+    manifest_version: "0.2",
+    name: `cd-throwaway-${tag}`,
+    version: "1.0.0",
+    server: { type: "binary", entry_point: "missing.exe", mcp_config: { command: "${__dirname}/missing.exe" } },
+  });
+  write(path.join(folder, "Claude Extensions Settings", `${id}.json`), { isEnabled: true });
+}
+
+// The `cd-throwaway-ext*` extensions the app's logs name: its real
+// `%LOCALAPPDATA%\Claude\logs`, which no package virtualises, and those of
+// each data folder.
+function loggedExtensions() {
+  const dirs = [path.join(localAppData, "Claude", "logs"), path.join(classicData, "logs"), path.join(localCache, "logs")];
+  const names = dirs.filter((dir) => fs.existsSync(dir)).flatMap((dir) =>
+    fs.readdirSync(dir).flatMap((file) => fs.readFileSync(path.join(dir, file), "utf8").match(/cd-throwaway-ext[a-z]+/g) ?? []),
+  );
+  return [...new Set(names)].map((n) => n.slice("cd-throwaway-".length)).sort();
+}
+
+// The folder roots of the overlay (#306): only the config file was tested
+// before, and that a folder lists the entries of both by name is inferred
+// from Microsoft's docs.
+await p.check("homes[msix]", "the packaged app beside a classic `%APPDATA%\\Claude` sees an extension held only in the classic folder, one held only in its `LocalCache`, and the `LocalCache` copy of one held in both", async () => {
+  extension(classicData, "local.mcpb.cd-throwaway.classic", "extclassic");
+  extension(localCache, "local.mcpb.cd-throwaway.cache", "extcache");
+  extension(classicData, "local.mcpb.cd-throwaway.both", "extbothclassic");
+  extension(localCache, "local.mcpb.cd-throwaway.both", "extbothcache");
+  const seen = { ...(await started(packaged)), folders: folders() };
+  const logged = loggedExtensions();
+  return { ...same({ logged }, { logged: ["extbothcache", "extcache", "extclassic"] }), observed: JSON.stringify({ logged, seen }) };
+});
+
 // UAT step 7.6 starts the packaged app from its folder when no classic app
 // is installed.
 await p.check("(top)", "the packaged app started from its folder with `--user-data-dir=<folder>` reads that folder, and each of its processes names it there, quoted, the main one too", async () => {

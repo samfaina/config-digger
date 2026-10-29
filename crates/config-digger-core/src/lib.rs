@@ -19,6 +19,7 @@ mod park;
 mod paths;
 mod plan;
 mod resolve;
+mod roots;
 mod rules;
 mod running;
 mod scan;
