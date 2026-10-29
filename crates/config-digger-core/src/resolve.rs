@@ -1138,14 +1138,12 @@ pub(crate) fn resolve(
                         explain::plugin_not_loaded(&agent.name, &plugin.name, &cause)
                     }
                     (Some(shape), _) => explain::shape_failure(&agent.name, &failure.path, shape),
-                    (None, _) if reaction.strongest == ReadFailureReaction::ReadsAroundError => {
-                        explain::parse_failure_read_around(
-                            &agent.name,
-                            &failure.path,
-                            reaction.dialect,
-                            failure.position,
-                        )
-                    }
+                    (None, _) if reaction.reads_around_error => explain::parse_failure_read_around(
+                        &agent.name,
+                        &failure.path,
+                        reaction.dialect,
+                        failure.position,
+                    ),
                     (None, _) => explain::read_failure(
                         &agent.name,
                         &failure.path,
@@ -1154,13 +1152,16 @@ pub(crate) fn resolve(
                         failure.position,
                     ),
                 },
-                notes: match reaction.strongest {
-                    ReadFailureReaction::AsksUser => vec![explain::asks_user(&agent.name)],
-                    ReadFailureReaction::ReadsAroundError => {
-                        vec![explain::reads_around_error(&agent.name)]
-                    }
-                    _ => Vec::new(),
-                },
+                notes: [
+                    (reaction.strongest == ReadFailureReaction::AsksUser)
+                        .then(|| explain::asks_user(&agent.name)),
+                    reaction
+                        .reads_around_error
+                        .then(|| explain::reads_around_error(&agent.name)),
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
                 warnings: reaction
                     .risks
                     .iter()
@@ -1772,6 +1773,9 @@ struct Reaction {
     dialect: &'static str,
     /// The Item kinds whose Entries the file could hold.
     kinds: BTreeSet<ItemKind>,
+    /// Whether one of those locations reads around a parse error, and so
+    /// still contributes Entries, whatever the strongest reaction.
+    reads_around_error: bool,
 }
 
 fn reaction(
@@ -1834,6 +1838,7 @@ fn reaction(
             risks: BTreeSet::new(),
             dialect,
             kinds,
+            reads_around_error: false,
         };
     }
     // A source of settings can say what the Agent does about its own files.
@@ -1866,6 +1871,9 @@ fn reaction(
             .collect(),
         dialect,
         kinds,
+        reads_around_error: locations
+            .iter()
+            .any(|location| location.reads_around_error()),
     }
 }
 

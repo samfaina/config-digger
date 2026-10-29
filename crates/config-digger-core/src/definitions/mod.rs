@@ -1224,6 +1224,12 @@ impl LocationDefinition {
             || self.on_shape_failure == Some(ReadFailureReaction::FailsPlugin)
     }
 
+    /// Whether the Agent keeps what parses on both sides of an error in the
+    /// location's file, which then still contributes Entries.
+    pub fn reads_around_error(&self) -> bool {
+        self.on_read_failure == ReadFailureReaction::ReadsAroundError
+    }
+
     /// What the Agent does about a shape here: `unknown` unless the
     /// definition says.
     pub fn shape_failure_reaction(&self) -> ReadFailureReaction {
@@ -1805,9 +1811,7 @@ impl AgentDefinition {
                     return Err(context("settings are read in a file format".into()));
                 }
             }
-            if location.on_read_failure == ReadFailureReaction::ReadsAroundError
-                && !matches!(location.format, Format::Json(_))
-            {
+            if location.reads_around_error() && !matches!(location.format, Format::Json(_)) {
                 return Err(context(
                     "only a location read as JSON reacts with `reads_around_error`".into(),
                 ));

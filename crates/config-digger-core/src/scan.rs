@@ -16,7 +16,7 @@ use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Stren
 use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
     LocationDefinition, NameParts, PLUGIN_NAME, PROJECT_KEY, PluginNames, PluginsDefinition,
-    ReadFailureReaction, References,
+    References,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -1742,7 +1742,7 @@ fn read_as_if(
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
         .collect();
     // A file that is a Read failure for an Agent home yields it no Entries,
-    // even from a location of it that did parse, but for those a location
+    // even from a location of it that did parse, except those a location
     // the Agent reads around the error recovers; a shape fails only its own
     // location, which yields no Entries there. One in a settings source
     // the Agent skips, or in a home its lookup order skips, is no failure
@@ -1764,7 +1764,7 @@ fn read_as_if(
     });
     scanner.entries.retain(|entry| {
         let location = definitions[entry.agent_index].location(&entry.location);
-        location.on_read_failure == ReadFailureReaction::ReadsAroundError
+        location.reads_around_error()
             || !failures
                 .iter()
                 .any(|failure| failure.fails_whole(entry.agent_index, &entry.home, &entry.path))
@@ -2505,7 +2505,7 @@ fn read_rules(
                     &setting.anchor,
                     &setting.key_path,
                     format.as_ref(),
-                    setting.on_read_failure == Some(ReadFailureReaction::ReadsAroundError),
+                    setting.reads_around_error(),
                     setting.sqlite,
                     setting.table.as_deref(),
                     setting.cached_at.as_deref(),
@@ -2735,9 +2735,7 @@ impl Places<'_> {
             };
             let document = match read {
                 Ok(None) => None,
-                Ok(Some(text)) if around_error => format
-                    .parse_around_error(&text)
-                    .map_or_else(|around| around.value, Some),
+                Ok(Some(text)) if around_error => format.kept_around_error(&text),
                 Ok(Some(text)) => match format.parse(&text) {
                     Ok(document) if sqlite => Some(serde_json::json!({ &key_path[0]: document })),
                     Ok(document) => Some(document),
@@ -3326,9 +3324,7 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
         dialect: JsonDialect::Jsonc,
     };
     let document = match reader.peek(file) {
-        Ok(Some(text)) => jsonc
-            .parse_around_error(text)
-            .map_or_else(|around| around.value, Some),
+        Ok(Some(text)) => jsonc.kept_around_error(text),
         _ => None,
     };
     let items = document
@@ -4896,7 +4892,7 @@ impl Scanner<'_> {
         }
         let format = location.format.file()?;
         let text = self.reader.text(home, path, project)?;
-        if location.on_read_failure == ReadFailureReaction::ReadsAroundError {
+        if location.reads_around_error() {
             return match format.parse_around_error(text) {
                 Ok(document) => Some(document),
                 Err(around) => {

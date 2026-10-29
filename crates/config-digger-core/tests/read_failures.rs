@@ -80,14 +80,7 @@ fn inventory(fs: FakeFileSystem, definitions: &[(&str, &str)]) -> Value {
         definitions,
     )
     .unwrap();
-    let options = ScanOptions {
-        projects: vec![PathBuf::from(PROJECT)],
-    };
-    let snapshot = core.scan(&options).unwrap();
-    let context = Context {
-        project: Some(PathBuf::from(PROJECT)),
-    };
-    serde_json::to_value(core.resolve(&snapshot, &context)).unwrap()
+    inventory_with(&core)
 }
 
 /// `(agent, name, state)` of each Item.
@@ -1042,4 +1035,13 @@ precedence = ["user-mcp", "more-mcp"]"#,
     let failures = inventory["read_failures"].as_array().unwrap();
     assert_eq!(failures.len(), 1, "{failures:?}");
     assert_eq!(failures[0]["reaction"], "ignores_file");
+    // Its card still says what the Agent reads.
+    let sentence = failures[0]["sentence"].as_str().unwrap();
+    assert!(!sentence.contains("no Entries"), "{sentence}");
+    assert_eq!(
+        failures[0]["notes"],
+        json!([
+            "User Agent reads what is around the error, and config-digger lists what it keeps."
+        ])
+    );
 }

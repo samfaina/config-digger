@@ -533,7 +533,9 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
-    //! The parse cases of `node-jsonc-parser`'s own `json.test.ts`.
+    //! The parse cases of `node-jsonc-parser`'s own `json.test.ts`, but
+    //! for those of `disallowComments`: VS Code reads comments, so the port
+    //! takes no such option.
 
     use super::*;
     use serde_json::json;
@@ -561,7 +563,7 @@ mod tests {
             json!("\"-\\-/-\u{8}-\u{c}-\n-\r-\t"),
             false,
         );
-        valid(r#""Ü""#, json!("Ü"), false);
+        valid(r#""\u00DC""#, json!("Ü"), false);
         valid("9", json!(9), false);
         valid("-9", json!(-9), false);
         valid("0.129", json!(0.129), false);
@@ -665,6 +667,16 @@ mod tests {
             false,
         );
         invalid("[ 1, 2, ]", Some(json!([1, 2])), false);
+    }
+
+    #[test]
+    fn an_escaped_surrogate_pair_is_one_character_and_a_short_escape_an_error() {
+        valid(r#""\uD83D\uDE00""#, json!("\u{1F600}"), true);
+        invalid(
+            r#"{ "a": "\u00G1", "b": 2 }"#,
+            Some(json!({ "a": "G1", "b": 2 })),
+            true,
+        );
     }
 
     #[test]

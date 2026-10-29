@@ -1320,16 +1320,16 @@ impl Targeted<'_> {
     }
 
     /// Why the edits of the file at `path` failed: a file that does not
-    /// parse and is a Read failure, whose Entries an Agent reads around the
-    /// error, is one config-digger never writes, rather than one that
-    /// changed since the scan.
+    /// parse and was a Read failure at the scan, such as one an Agent reads
+    /// around its error, is one config-digger never writes, rather than one
+    /// that changed since the scan.
     fn edit_error(&self, failure: EditFailure, path: &Path) -> Error {
-        let unread = self
+        let read_failure = self
             .before
             .read_failures
             .iter()
             .find(|known| known.location.is_none() && known.path == path);
-        match (failure, unread) {
+        match (failure, read_failure) {
             (EditFailure::Edit(EditError::Parse), Some(known)) => {
                 Error::blocked(explain::read_failure_target(path, &known.sentence))
             }

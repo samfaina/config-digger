@@ -2872,6 +2872,13 @@ pub(crate) trait Parse {
             .map_err(|error| AroundError { value: None, error })
     }
 
+    /// What [`Self::parse_around_error`] keeps of the text, whether or not
+    /// it parses.
+    fn kept_around_error(&self, text: &str) -> Option<serde_json::Value> {
+        self.parse_around_error(text)
+            .map_or_else(|around| around.value, Some)
+    }
+
     /// The dialect, as a sentence names it, such as "strict JSON".
     fn dialect(&self) -> &'static str;
 
@@ -6730,6 +6737,12 @@ pub(crate) struct SettingPlace {
 }
 
 impl SettingPlace {
+    /// Whether the value is read from what parses around an error of a file
+    /// that does not parse.
+    pub fn reads_around_error(&self) -> bool {
+        self.on_read_failure == Some(ReadFailureReaction::ReadsAroundError)
+    }
+
     /// The value `held` sets, as the Agent reads it.
     pub fn read_as(&self, held: Value) -> Option<Value> {
         if self.map.is_empty() {

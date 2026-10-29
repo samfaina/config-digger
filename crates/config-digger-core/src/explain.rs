@@ -1716,12 +1716,10 @@ pub(crate) fn read_failure(
 ) -> String {
     let path = path.display();
     match kind {
-        ReadFailureKind::Parse => {
-            let at = position_at(position);
-            format!(
-                "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
-            )
-        }
+        ReadFailureKind::Parse => format!(
+            "{}, so it reads no Entries from it.",
+            cannot_parse(agent_name, &path, dialect, position)
+        ),
         // A shape in one location is worded by `shape_failure`.
         ReadFailureKind::Shape => format!(
             "{agent_name} cannot read {path}: it is {dialect} but not an object, so it reads no Entries from it."
@@ -1746,11 +1744,22 @@ pub(crate) fn parse_failure_read_around(
     dialect: &str,
     position: Option<(usize, usize)>,
 ) -> String {
-    let at = position_at(position);
     format!(
-        "{agent_name} cannot parse {} as {dialect}{at}.",
-        path.display()
+        "{}.",
+        cannot_parse(agent_name, &path.display(), dialect, position)
     )
+}
+
+/// That `agent_name` cannot parse the file at `path` in `dialect`, with
+/// where, as the start of a sentence.
+fn cannot_parse(
+    agent_name: &str,
+    path: &impl std::fmt::Display,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    let at = position_at(position);
+    format!("{agent_name} cannot parse {path} as {dialect}{at}")
 }
 
 /// What a location that holds a value of another shape where its Entries

@@ -239,6 +239,7 @@ on_read_failure = "ignores_file"
 # config-digger reads the file's folders and settings around the error too.
 [[locations]]
 id = "workspace-mcp"
+unverified = "Of a `.code-workspace` file that does not parse, VS Code is taken to keep the folders and settings `node-jsonc-parser`'s code keeps around an error other than `,,`, the one the probe tests; a probe workspace file holding other errors would test it (#437)."
 anchor = { block = "project-file" }
 format = { block = "json", dialect = "jsonc" }
 root = ["settings", "mcp", "servers"]
