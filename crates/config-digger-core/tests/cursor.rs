@@ -2515,6 +2515,48 @@ fn a_manifest_whose_servers_are_neither_a_path_an_object_nor_a_list_of_either_is
 }
 
 #[test]
+fn past_the_last_manifest_cursor_tries_no_other() {
+    let kit = local_plugin("kit");
+    let last = kit.join("plugin.json");
+    let fs = with_skill(
+        cursor().with_file(&last, UNPARSABLE),
+        kit.join(r"skills\kit-default"),
+    );
+
+    let inventory = inventory(&fs);
+
+    let failure = read_failure(&inventory, &last);
+    assert_eq!(code(failure.reaction), "reads_next_path");
+    assert_eq!(
+        failure.notes,
+        ["Cursor tries no file of the plugin's list after this one."]
+    );
+    assert_eq!(code(item(&inventory, "kit-default").state), "effective");
+}
+
+#[test]
+fn a_file_a_manifest_points_to_is_no_path_cursor_reads_past() {
+    let kit = local_plugin("kit");
+    let servers = kit.join("servers.json");
+    let fs = with_files(
+        cursor(),
+        &kit,
+        &[(
+            r".cursor-plugin\plugin.json",
+            json!({ "name": "kit", "mcpServers": "./servers.json" }),
+        )],
+    )
+    .with_file(&servers, UNPARSABLE);
+
+    let inventory = inventory(&fs);
+
+    // Ignored, as a file references name is when it does not parse.
+    let failure = read_failure(&inventory, &servers);
+    assert_eq!(code(failure.reaction), "ignores_file");
+    assert!(failure.notes.is_empty(), "{:?}", failure.notes);
+}
+
+#[test]
 fn of_a_claude_code_plugin_whose_first_manifest_does_not_parse_cursor_reads_the_next() {
     let broken = plugin_cache(r"market\kit\1.0.0\.cursor-plugin\plugin.json");
     let fs = with_plugin_files(

@@ -543,7 +543,7 @@
               "$ref": "#/$defs/PluginIds"
             },
             "path": {
-              "description": "A `/`-separated path relative to the plugin's folder, or several,\nof which the first that exists is read, such as the first manifest\nCursor finds of `.cursor-plugin/plugin.json` and\n`.claude-plugin/plugin.json`.",
+              "description": "A `/`-separated path relative to the plugin's folder, or several,\nof which the first that exists is read, such as the first manifest\nCursor finds of `.cursor-plugin/plugin.json` and\n`.claude-plugin/plugin.json`; for a location that reacts with\n`reads_next_path`, the first that exists and is no Read failure.",
               "$ref": "#/$defs/RelativePaths"
             },
             "block": {

@@ -814,9 +814,7 @@ impl PluginsDefinition {
         for name in self.name.iter().flat_map(PluginNames::places) {
             blocks::validate_relative(&name.file)?;
             blocks::validate_key_path(&name.key_path)?;
-            for key_path in &name.rejected_unless_path_object_or_list {
-                blocks::validate_key_path(key_path)?;
-            }
+            blocks::validate_rejected(&name.rejected_unless_path_object_or_list)?;
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
@@ -1876,9 +1874,8 @@ impl AgentDefinition {
                             .into(),
                     ));
                 }
-                for key_path in &location.rejected_unless_path_object_or_list {
-                    blocks::validate_key_path(key_path).map_err(context)?;
-                }
+                blocks::validate_rejected(&location.rejected_unless_path_object_or_list)
+                    .map_err(context)?;
             }
             if location.fails_plugin() && location.anchor.plugin().is_none() {
                 return Err(context(

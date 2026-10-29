@@ -74,8 +74,6 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 `-DesktopOverlay` writes Claude Desktop's folders as they would be in an `%APPDATA%` and a `%LOCALAPPDATA%` of their own, `desktop-appdata\Roaming` and `desktop-appdata\Local`: a classic `Claude` folder whose `claude_desktop_config.json` declares `cd-throwaway-overlay`, and the Store package's `LocalCache\Roaming\Claude` beside it, which holds no config of its own and so reads the classic one through its overlay (#306). Steps 25.1 and 25.2 start the app with both variables set to those folders, so config-digger's own data folder is a throwaway one there too.
 
-The default data also holds Cursor as the fake backend sees it, with `appdata` as `%APPDATA%` and `claude-code-home` as the user's folder: Cursor has run, and its local plugin `cd-throwaway-kit` has a `.cursor-plugin\plugin.json` that does not parse and a `.claude-plugin\plugin.json` that declares `cd-throwaway-next`, which Cursor reads instead. Step 27.1 starts the app with `APPDATA` and `USERPROFILE` set to those folders; no other step sets either to them, so no other step sees this Cursor.
-
 `-Cursor` writes Cursor's files as they would be in an `%APPDATA%` of their own, `cursor-appdata`: Cursor has run and opened `cursor-project`, a git repo, made with `git init`, whose `packages\app\.cursor\skills` holds a skill. A step that needs them starts the app with `APPDATA` set to that folder, as step 17.1 does.
 
 `-VsCode` writes VS Code's files as they would be in an `%APPDATA%` of their own, `vscode-appdata`: the default profile, a profile Work with its own `mcp.json`, and a profile Shared that shares the default profile's MCP servers, with the Project last opened in Work and the extra Project in Shared. A step that needs them starts the app with `APPDATA` set to that folder, as step 16.1 does, so that the app never reads the tester's own VS Code profiles.
@@ -83,6 +81,8 @@ The default data also holds Cursor as the fake backend sees it, with `appdata` a
 `claude-code-profile`, in the default data, stands for a user folder: its `.claude.json` holds a second leftover of `project-gone`. Step 18.1 starts the app with `USERPROFILE` set to it, so that it is Claude Code's default home, which the app discovers and the tester can hide; a home the user added can't be hidden.
 
 `paths-that-wrap\in-the-smallest-window\of-config-digger`, in the default data, holds `project-long`, a Project Claude Code knows, and the Claude Desktop home, which step 10.3 adds. Under even the shortest root their paths are too long for one line of Projects & homes in the smallest window, so step 10.10 sees where a path wraps.
+
+The default data also holds Cursor as the fake backend sees it, with `appdata` as `%APPDATA%` and `claude-code-home` as the user's folder: Cursor has run, and its local plugin `cd-throwaway-kit` has a `.cursor-plugin\plugin.json` that does not parse and a `.claude-plugin\plugin.json` that declares `cd-throwaway-next`, which Cursor reads instead. Step 27.1 starts the app with `APPDATA` and `USERPROFILE` set to those folders; no other step sets either to them, so no other step sees this Cursor in the real app. The fake backend's fixtures hold it in every Inventory they record.
 
 `-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 

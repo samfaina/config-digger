@@ -972,7 +972,8 @@ pub(crate) struct PluginAnchor {
     /// A `/`-separated path relative to the plugin's folder, or several,
     /// of which the first that exists is read, such as the first manifest
     /// Cursor finds of `.cursor-plugin/plugin.json` and
-    /// `.claude-plugin/plugin.json`.
+    /// `.claude-plugin/plugin.json`; for a location that reacts with
+    /// `reads_next_path`, the first that exists and is no Read failure.
     pub path: RelativePaths,
 }
 
@@ -3028,16 +3029,25 @@ impl Validate for ManifestSkills {
     }
 }
 
+/// A value for which the Agent rejects a manifest whole.
+pub(crate) struct Rejected<'d> {
+    /// Its key path from the root of the manifest, an item's in a list.
+    pub key_path: Vec<String>,
+    pub value: &'d Value,
+    /// Whether it is an item of a list, which holds a path or an object,
+    /// rather than the field's own value.
+    pub in_list: bool,
+}
+
 /// Where `document`, a plugin's manifest, holds a value for which the Agent
 /// rejects it whole, as one that does not parse, at one of `key_paths`:
 /// the key paths of fields that hold a path, an object or a list of either,
-/// such as the `mcpServers` of a Cursor plugin's manifest. The key path of
-/// the value, an item's in a list, and the value. A field that is absent
-/// leaves the manifest read.
+/// such as the `mcpServers` of a Cursor plugin's manifest. A field that is
+/// absent leaves the manifest read.
 pub(crate) fn rejected_at<'d>(
     document: &'d Value,
     key_paths: &[Vec<String>],
-) -> Option<(Vec<String>, &'d Value)> {
+) -> Option<Rejected<'d>> {
     let path_or_object = |value: &Value| matches!(value, Value::String(_) | Value::Object(_));
     key_paths.iter().find_map(|key_path| {
         let value = key_path
@@ -3047,11 +3057,26 @@ pub(crate) fn rejected_at<'d>(
             Value::Array(items) => items.iter().enumerate().find_map(|(index, item)| {
                 let mut at = key_path.clone();
                 at.push(index.to_string());
-                (!path_or_object(item)).then_some((at, item))
+                (!path_or_object(item)).then_some(Rejected {
+                    key_path: at,
+                    value: item,
+                    in_list: true,
+                })
             }),
-            value => (!path_or_object(value)).then(|| (key_path.clone(), value)),
+            value => (!path_or_object(value)).then(|| Rejected {
+                key_path: key_path.clone(),
+                value,
+                in_list: false,
+            }),
         }
     })
+}
+
+/// Validates the key paths of a `rejected_unless_path_object_or_list`.
+pub(crate) fn validate_rejected(key_paths: &[Vec<String>]) -> Result<(), String> {
+    key_paths
+        .iter()
+        .try_for_each(|key_path| validate_key_path(key_path))
 }
 
 /// A path a plugin's manifest declares skills at, relative to the plugin's

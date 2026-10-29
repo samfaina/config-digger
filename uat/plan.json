@@ -2057,7 +2057,8 @@
               "where": "ci",
               "test": "crates/config-digger-app/ui/uat/plugins.uat.ts > 27.1"
             }
-          ]
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados; nadie más abre la app real con APPDATA y USERPROFILE sobre los datos de prueba, así que una persona recorre el paso entero en la app real."
         }
       ]
     },

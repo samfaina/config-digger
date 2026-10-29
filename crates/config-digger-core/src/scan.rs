@@ -4630,8 +4630,8 @@ impl Scanner<'_> {
     /// lists: the first that exists, or else the first; `None` when that
     /// is a manifest the Agent rejects, reported. For a location whose
     /// Agent reads the next path past a Read failure, the first that exists
-    /// and is none, each one passed reported; `None` when every path that
-    /// exists is one.
+    /// and is no Read failure, each one passed reported; `None` when every
+    /// path that exists is one.
     fn plugin_path(
         &mut self,
         home: &FoundHome,
@@ -4699,14 +4699,11 @@ impl Scanner<'_> {
         };
         let rejected =
             blocks::rejected_at(&document, &location.rejected_unless_path_object_or_list);
-        if let Some((key_path, value)) = rejected {
-            let in_list = lookup(&document, &key_path[..key_path.len() - 1])
-                .is_some_and(serde_json::Value::is_array);
-            let found = ValueType::of(value);
+        if let Some(rejected) = rejected {
             let rejection = ScannedRejection {
-                key_path,
-                found,
-                in_list,
+                found: ValueType::of(rejected.value),
+                key_path: rejected.key_path,
+                in_list: rejected.in_list,
             };
             self.reader.reject(home, path, project, rejection);
             return None;

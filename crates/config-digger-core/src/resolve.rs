@@ -1816,9 +1816,10 @@ fn reaction(
     // A file of valid text holding a value of another shape, even at its
     // top level, is no file that does not parse: the Agent does what its
     // locations say of a shape, with none of the risks of the other.
-    // A location fails its plugin on the file it is anchored on there. A
-    // file its references name takes the defaults instead: ignored when it
-    // does not parse, and what the Agent does about a shape not known.
+    // A location fails its plugin, or reads the next path, on a file it is
+    // anchored on there. A file its references name takes the defaults
+    // instead: ignored when it does not parse, and what the Agent does
+    // about a shape not known.
     let anchored = |location: &LocationDefinition| {
         let (Some(plugin), Some(anchor)) = (&failure.plugin, location.anchor.plugin()) else {
             return false;
@@ -1830,7 +1831,11 @@ fn reaction(
             .any(|relative| blocks::join_relative(&plugin.folder, relative) == failure.path)
     };
     let unless_referenced = |location: &LocationDefinition, reaction, default| match reaction {
-        ReadFailureReaction::FailsPlugin if !anchored(location) => default,
+        ReadFailureReaction::FailsPlugin | ReadFailureReaction::ReadsNextPath
+            if !anchored(location) =>
+        {
+            default
+        }
         reaction => reaction,
     };
     // A manifest the Agent rejects whole is no shape it reads around.

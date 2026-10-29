@@ -1849,9 +1849,7 @@ pub(crate) fn reads_around_error(agent_name: &str) -> String {
 /// plugin's list after it.
 pub(crate) fn reads_next_path(agent_name: &str, next: &[String]) -> String {
     match next {
-        [] => format!(
-            "{agent_name} reads no other file of the plugin instead of this file: it is the last it tries."
-        ),
+        [] => format!("{agent_name} tries no file of the plugin's list after this one."),
         [next] => {
             format!("{agent_name} reads the plugin's `{next}` instead of this file, if it can.")
         }
