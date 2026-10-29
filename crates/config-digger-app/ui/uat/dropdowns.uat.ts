@@ -227,6 +227,7 @@ uatStep("2.3", async ({ page, open, check }) => {
   await inventoryShown(page);
   // The fixtures hold more than one Claude Code home, so the step adds none.
   const before = await claudeCodeHomes(page);
+  expect(before.length, "Claude Code homes in the fixtures").toBeGreaterThan(1);
   await rail(page, "Inventory");
   await page.locator(".agent-tile", { hasText: "All Agents" }).click();
   const home = page.locator(".home-row", { hasText: "Claude Code" }).getByRole("combobox");
@@ -267,7 +268,6 @@ uatStep("2.3", async ({ page, open, check }) => {
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
 
   await check("Al final, el grupo Claude Code de la pestaña Agent homes tiene las mismas filas que al empezar.", async () => {
-    expect(before.length).toBeGreaterThan(1);
     expect(await claudeCodeHomes(page)).toEqual(before);
   });
 });
