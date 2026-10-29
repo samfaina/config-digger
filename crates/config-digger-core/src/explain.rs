@@ -8,7 +8,7 @@ use crate::api::{
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
     ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, SettingIs, SkillDefect,
-    UnseenServers,
+    Unlisted, UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
@@ -2396,6 +2396,22 @@ pub(crate) fn skill_fallback(agent_name: &str, defect: SkillDefect, folder: &str
     format!(
         "{agent_name} still loads this skill, as `{folder}`, its folder's name: {}.",
         skill_defect(agent_name, defect)
+    )
+}
+
+/// The note of a skill the user can run that `agent_name` leaves out of
+/// the skills it lists to its model, for each of `reasons`.
+pub(crate) fn unlisted(agent_name: &str, reasons: &[Unlisted]) -> String {
+    let reasons: Vec<&str> = reasons
+        .iter()
+        .map(|reason| match reason {
+            Unlisted::NoDescription => "has no `description`",
+            Unlisted::DisableModelInvocation => "sets `disable-model-invocation: true`",
+        })
+        .collect();
+    format!(
+        "The user can still run this skill in {agent_name}, but {agent_name} does not list it to its model: its SKILL.md {}.",
+        reasons.join(" and ")
     )
 }
 

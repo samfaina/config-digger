@@ -10,7 +10,7 @@ use crate::definitions::blocks::{
     Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NonceHash,
     PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord, PluginRegistry,
     ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource,
-    SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
+    SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -1108,6 +1108,9 @@ pub(crate) struct ScannedEntry {
     pub found_in: Option<PathBuf>,
     /// For a skill, why the Agent may not read its `SKILL.md` as written.
     pub defect: Option<SkillDefect>,
+    /// For a skill, why the Agent leaves it out of the skills it lists to
+    /// its model.
+    pub unlisted: Vec<Unlisted>,
     /// For a skill read under its location's name rule, its name and defect
     /// while the rule does not apply, when they differ.
     pub unruled: Option<Box<SkillReading>>,
@@ -4458,6 +4461,7 @@ impl Scanner<'_> {
                 depth: 0,
                 found_in: None,
                 defect: None,
+                unlisted: Vec::new(),
                 unruled: None,
                 link: None,
                 manager: None,
@@ -4534,6 +4538,7 @@ impl Scanner<'_> {
                     depth,
                     found_in: None,
                     defect: None,
+                    unlisted: Vec::new(),
                     unruled: None,
                     link: None,
                     manager: None,
@@ -5093,6 +5098,7 @@ impl Scanner<'_> {
                     depth,
                     found_in: None,
                     defect: None,
+                    unlisted: Vec::new(),
                     unruled: None,
                     link: None,
                     manager: None,
@@ -5206,6 +5212,7 @@ impl Scanner<'_> {
                         depth,
                         found_in: None,
                         defect: None,
+                        unlisted: Vec::new(),
                         unruled: None,
                         link: Some(link),
                         manager: None,
@@ -5273,6 +5280,7 @@ impl Scanner<'_> {
             depth,
             found_in: None,
             defect: read.defect,
+            unlisted: read.unlisted,
             unruled: read.unruled,
             link,
             manager: None,
@@ -5474,6 +5482,8 @@ struct ReadSkill {
     config: serde_json::Value,
     /// Why the Agent may not read its `SKILL.md` as written.
     defect: Option<SkillDefect>,
+    /// Why the Agent leaves it out of the skills it lists to its model.
+    unlisted: Vec<Unlisted>,
     /// How the Agent reads it while its name rule does not apply, when
     /// that differs.
     unruled: Option<Box<SkillReading>>,
@@ -5496,8 +5506,11 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
     let mut config = serde_json::Map::new();
     let mut found = None;
     let mut named = None;
-    match skill::frontmatter(text, format.malformed_frontmatter) {
-        Ok(keys) => {
+    let frontmatter = skill::frontmatter(text, format.malformed_frontmatter);
+    let unlisted = skill::unlisted(text, &frontmatter, &format.unlisted);
+    match frontmatter {
+        Ok(frontmatter) => {
+            let keys = frontmatter.keys;
             for key in ["name", "description"] {
                 if let Some(value) = keys.get(key) {
                     config.insert(key.to_owned(), value.clone().into());
@@ -5536,6 +5549,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
             name: unruled.name,
             config: config.into(),
             defect: unruled.defect,
+            unlisted,
             unruled: None,
         };
     };
@@ -5548,6 +5562,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
         name: ruled.name,
         config: config.into(),
         defect: ruled.defect,
+        unlisted,
         unruled,
     }
 }
@@ -6143,6 +6158,7 @@ mod tests {
             depth: 0,
             found_in: None,
             defect: None,
+            unlisted: Vec::new(),
             unruled: None,
             link: None,
             manager: None,

@@ -3324,6 +3324,11 @@ pub(crate) struct SkillFolder {
     /// What the Agent does with a frontmatter without a `name`, when
     /// `name_from` is `frontmatter`.
     pub no_name: SkillFallback,
+    /// Why the Agent leaves a skill it loads out of the skills it lists to
+    /// its model, if it does: the user can still run such a skill, which
+    /// keeps its State with a note. None by default.
+    #[serde(default)]
+    pub unlisted: Vec<Unlisted>,
 }
 
 /// The skill folders a list in a strict JSON file names, each by a path
@@ -3443,6 +3448,19 @@ impl SkillFallback {
     pub fn reads_again(self) -> bool {
         matches!(self, SkillFallback::QuoteValues | SkillFallback::LineByLine)
     }
+}
+
+/// Why an Agent leaves a skill out of the skills it lists to its model,
+/// because of the skill's own `SKILL.md`. config-digger tells only of a
+/// `SKILL.md` with no frontmatter or with one it reads as YAML.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Unlisted {
+    /// It has no `description`: no frontmatter, or one without the key.
+    NoDescription,
+    /// Its frontmatter sets `disable-model-invocation` to the boolean
+    /// `true`.
+    DisableModelInvocation,
 }
 
 /// Why an Agent may not read a skill's `SKILL.md` as it is written.

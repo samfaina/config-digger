@@ -1023,6 +1023,15 @@ pub(crate) fn resolve(
                                 ),
                             })
                             .into_iter()
+                            .chain(
+                                (skipped[index].is_none() && !entry.unlisted.is_empty()).then(
+                                    || api::Note {
+                                        code: api::NoteCode::Unlisted,
+                                        switch: None,
+                                        sentence: explain::unlisted(agent_name, &entry.unlisted),
+                                    },
+                                ),
+                            )
                             .chain(partial.iter().map(|hit| api::Note {
                                 code: api::NoteCode::PartialSwitch,
                                 switch: Some(hit.locator()),

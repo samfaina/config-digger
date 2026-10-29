@@ -4057,6 +4057,46 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
+    fn every_format_of_skill_folders_says_why_the_agent_leaves_a_skill_unlisted() {
+        let unlisted = r#", unlisted = ["no-description", "disable-model-invocation"] }"#;
+        let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
+        let text = with_skills(anchor, &SKILL_FORMAT.replace(" }", unlisted), CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let skills = format!(
+            r#"{{ name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name"{unlisted}"#
+        );
+        let list = format!(
+            r#"{{ block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = {skills} }}"#
+        );
+        let text = with_skills(r#"{ block = "home", root = "state" }"#, &list, CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let unknown = SKILL_FORMAT.replace(" }", r#", unlisted = ["user-invocable"] }"#);
+        let text = with_skills(anchor, &unknown, CHECKS);
+        assert!(
+            error(&text).contains("unknown variant `user-invocable`"),
+            "{}",
+            error(&text)
+        );
+
+        let schema: serde_json::Value = serde_json::from_str(&json_schema()).unwrap();
+        assert_eq!(
+            schema["$defs"]["SkillFolder"]["properties"]["unlisted"]["items"]["$ref"],
+            "#/$defs/Unlisted"
+        );
+        assert_eq!(
+            schema["$defs"]["Unlisted"]["oneOf"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|variant| variant["const"].clone())
+                .collect::<Vec<_>>(),
+            ["no-description", "disable-model-invocation"]
+        );
+    }
+
+    #[test]
     fn a_name_rule_condition_needs_a_name_rule_and_a_gate_that_affects_its_location() {
         let ruled = SKILL_FORMAT.replace(" }", r#", name_rule = "visible-chars" }"#);
         let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
