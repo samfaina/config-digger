@@ -7751,7 +7751,7 @@ impl ProjectTrust {
 /// no nonce, such as an HTTP server, it is trusted while its record's
 /// `trusted_at` field equals its `nonce` field, the nonce of the launch the
 /// Agent last ran, with a caveat that the Agent may ask again if the Entry
-/// changed since. config-digger never trusts an Entry.
+/// changed since. config-digger never records trust on the user's behalf.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NonceTrust {

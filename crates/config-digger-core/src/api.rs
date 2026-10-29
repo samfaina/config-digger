@@ -2769,9 +2769,9 @@ pub enum CaveatCode {
     /// whether the Agent applies it may take it off that account.
     MayRunOffAccount,
     /// The Entry is trusted by the nonce of the launch the Agent last ran,
-    /// as config-digger cannot compute the nonce of its configuration, such
-    /// as for a server with a URL, so the Agent may ask for trust again if
-    /// it changed since.
+    /// as config-digger cannot compute the nonce of its own launch, such as
+    /// for a server with a URL, so the Agent may ask for trust again if its
+    /// configuration changed since.
     MayAskTrustAgain,
 }
 
