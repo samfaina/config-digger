@@ -4412,7 +4412,7 @@
           ]
         },
         {
-          "description": "A list in a JSON value holding an item per Entry it switches, each named\nby its `named_by` field or index, such as the `[id, enabled]` pairs of\nVS Code's `mcp.enablement` or the skill files of its\n`chat.disabledPromptFiles.skill`. An Entry is held by the id its\nlocation's `switch_id` makes, and the switch's key path ends in\n`{name}`, standing for its item. The Agent skips an Entry whose item is\nthere and is not `enabled_item`. Disable replaces the item with\n`disabled_item`, creating the list and any missing parent; Enable takes\nit away, or with `set`, replaces it with `enabled_item`. With `partial`,\nan item there is a partial switch instead, and Disables nothing.",
+          "description": "A list in a JSON value holding an item per Entry it switches, each named\nby its `named_by` field or index, such as the `[id, enabled]` pairs of\nVS Code's `mcp.enablement` or the skill files of its\n`chat.disabledPromptFiles.skill`. An Entry is held by the id its\nlocation's `switch_id` makes, and the switch's key path ends in\n`{name}`, standing for its item. The Agent skips an Entry whose item is\nthere and is not `enabled_item`. Disable replaces the item with\n`disabled_item`, creating the list and any missing parent; Enable takes\nit away, or with `set`, replaces it with `enabled_item`. With `partial`,\nan item there is a partial switch instead, and Disables nothing: Disable\nnever writes the list, and Enable takes the item away.",
           "type": "object",
           "properties": {
             "switch": {
@@ -4445,7 +4445,7 @@
               "description": "The item Disable writes, each string `{name}` in it standing for the\nEntry's id, such as `[\"{name}\", false]`. Required, unless the list is\n`partial`, which takes none."
             },
             "partial": {
-              "description": "What an item of the Entry limits when the Agent still uses the\nEntry: the list is then a partial switch, which config-digger never\nwrites, so `enable_offered` must be `false`.",
+              "description": "What an item of the Entry limits when the Agent still uses the\nEntry: the list is then a partial switch, which Disable never\nwrites and Enable takes the item out of, with `remove-item`.",
               "anyOf": [
                 {
                   "$ref": "#/$defs/PartialLimit"
@@ -4464,7 +4464,7 @@
               "default": false
             },
             "enable_offered": {
-              "description": "Whether config-digger writes the switch: Disable through it, and\nEnable lifting it.",
+              "description": "Whether config-digger writes the switch: Disable through it, and\nEnable lifting it, or for a `partial` list, Enable only.",
               "type": "boolean",
               "default": true
             },

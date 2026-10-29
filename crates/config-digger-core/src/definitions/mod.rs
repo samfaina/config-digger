@@ -3217,13 +3217,15 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
         )
     }
 
-    const PARTIAL: &str = r#", partial = "hidden_from_user", enable_offered = false"#;
+    const PARTIAL: &str = r#", partial = "hidden_from_user""#;
 
     #[test]
     fn an_item_list_loads_with_a_reason_and_a_disabled_item_or_as_a_partial_switch() {
         for extra in [
             r#", reason = "disabled_natively", disabled_item = { path = "{name}" }"#,
             PARTIAL,
+            // Then Enable does not take the item out either.
+            &format!("{PARTIAL}, enable_offered = false"),
         ] {
             let text = with_disable(&item_list(extra));
             assert!(
@@ -3250,12 +3252,8 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     }
 
     #[test]
-    fn a_partial_item_list_is_never_written_and_disables_nothing() {
+    fn a_partial_item_list_is_never_written_by_disable_and_disables_nothing() {
         for (extra, message) in [
-            (
-                r#", partial = "hidden_from_user""#.to_owned(),
-                "a partial item list takes enable_offered = false",
-            ),
             (
                 format!(r#"{PARTIAL}, reason = "disabled_natively""#),
                 "a partial item list takes no reason and no disabled_item",

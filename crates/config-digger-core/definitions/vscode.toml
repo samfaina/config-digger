@@ -734,7 +734,8 @@ checks = ["frontmatter", "rules", "disable", "precedence"]
 # longer run it [test]: VS Code still lists it in `chat.getSkills` [test],
 # the list it builds its model's `<skills>` from [binary]. config-digger
 # shows the list as a partial switch on a skill that keeps its State, as it
-# shows Claude Code's `name-only`, and never writes it (#341).
+# shows Claude Code's `name-only`. Disable never writes it; Enable takes the
+# skill's URI out (#341).
 [[items.skill.disable]]
 block = "json-item-list"
 switch = { anchor = { block = "home", root = "state" }, key_path = ["chat.disabledPromptFiles.skill", "{name}"], named_by = "path", store_class = "sqlite" }
@@ -743,12 +744,12 @@ context = "all"
 enable_action = "remove-item"
 ignore_case = true
 partial = "hidden_from_user"
-enable_offered = false
 
 # So config-digger parks the folder of a skill it Disables in its own
 # store, and puts it back on Enable, as for Cursor; a skill listed above
-# comes back still listed. A skill in a git-versioned folder is never
-# parked, so it has no Disable, nor has a plugin's or an extension's.
+# comes back still listed, for its Enable to take out. A skill in a
+# git-versioned folder is never parked, so it has no Disable, nor has a
+# plugin's or an extension's.
 # Parking a skill of another Agent's folder, such as `~\.claude\skills`,
 # takes it from that Agent too.
 [[items.skill.disable]]

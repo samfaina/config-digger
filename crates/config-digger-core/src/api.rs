@@ -2128,6 +2128,9 @@ pub struct Entry {
     /// What Disable would do to it in this context.
     pub disable: DisableOption,
     /// For a Disabled Entry, what Enable writes, or why it is not offered.
+    /// For another, what Enable writes to take away a partial switch it
+    /// lifts, such as a skill's item in VS Code's
+    /// `chat.disabledPromptFiles.skill`.
     pub enable: Option<EnableOption>,
     /// Whether Remove is offered for it.
     pub remove: RemoveOption,
@@ -2297,12 +2300,13 @@ impl DisableOption {
 }
 
 /// What Enable would do to a Disabled Entry: lift what Disables it, or
-/// nothing, with the reason.
+/// nothing, with the reason. Or to an Entry a partial switch it lifts holds:
+/// take that switch away.
 #[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum EnableOption {
     /// Enable lifts every switch that Disables the Entry, or puts a parked
-    /// Entry back.
+    /// Entry back, and takes away the partial switches it lifts.
     Offered {
         /// What Enable writes, as a sentence rendered by the core.
         sentence: String,

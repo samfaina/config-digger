@@ -5226,6 +5226,16 @@ pub(crate) trait Disables {
     /// leaving it Effective.
     fn partial(&self, value: Option<&Value>) -> bool;
 
+    /// Whether Disable writes the switch.
+    fn disable_offered(&self) -> bool {
+        self.enable_offered()
+    }
+
+    /// Whether Enable takes a partial switch away too.
+    fn enable_lifts_partial(&self) -> bool {
+        false
+    }
+
     /// The edits that Disable the Entry held by `name` through the switch
     /// at `key_path`, which holds `value` for it now, in the context whose
     /// Project is in `folder`.
@@ -5418,6 +5428,14 @@ impl Disables for Switched<'_> {
 
     fn partial(&self, value: Option<&Value>) -> bool {
         self.block().partial(value)
+    }
+
+    fn disable_offered(&self) -> bool {
+        self.block().disable_offered()
+    }
+
+    fn enable_lifts_partial(&self) -> bool {
+        self.block().enable_lifts_partial()
     }
 
     fn disable_edits(
@@ -5987,7 +6005,8 @@ impl Disables for JsonField {
 /// there and is not `enabled_item`. Disable replaces the item with
 /// `disabled_item`, creating the list and any missing parent; Enable takes
 /// it away, or with `set`, replaces it with `enabled_item`. With `partial`,
-/// an item there is a partial switch instead, and Disables nothing.
+/// an item there is a partial switch instead, and Disables nothing: Disable
+/// never writes the list, and Enable takes the item away.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonItemList {
@@ -6005,8 +6024,8 @@ pub(crate) struct JsonItemList {
     /// `partial`, which takes none.
     pub disabled_item: Option<Value>,
     /// What an item of the Entry limits when the Agent still uses the
-    /// Entry: the list is then a partial switch, which config-digger never
-    /// writes, so `enable_offered` must be `false`.
+    /// Entry: the list is then a partial switch, which Disable never
+    /// writes and Enable takes the item out of, with `remove-item`.
     pub partial: Option<PartialLimit>,
     /// The item that Enables the Entry, likewise, such as `["{name}", true]`,
     /// which beats an item of a later layer. Enable writes it with
@@ -6017,7 +6036,7 @@ pub(crate) struct JsonItemList {
     #[serde(default)]
     pub ignore_case: bool,
     /// Whether config-digger writes the switch: Disable through it, and
-    /// Enable lifting it.
+    /// Enable lifting it, or for a `partial` list, Enable only.
     #[serde(default = "offered")]
     pub enable_offered: bool,
     /// Whether the list is one layer of a setting the Agent merges across
@@ -6048,9 +6067,6 @@ impl Validate for JsonItemList {
                 );
             }
             (Some(_), None, None) => {
-                if self.enable_offered {
-                    return Err("a partial item list takes enable_offered = false".into());
-                }
                 if self.enabled_item.is_some() || self.layered {
                     return Err(
                         "a partial item list takes no enabled_item and is not layered".into(),
@@ -6191,6 +6207,17 @@ impl Disables for JsonItemList {
     /// An item of a partial list is a partial switch.
     fn partial(&self, value: Option<&Value>) -> bool {
         self.partial.is_some() && value.is_some()
+    }
+
+    /// A partial list is never written by Disable.
+    fn disable_offered(&self) -> bool {
+        self.enable_offered && self.partial.is_none()
+    }
+
+    /// Enable takes an item of a partial list out, unless config-digger
+    /// only reads the list.
+    fn enable_lifts_partial(&self) -> bool {
+        self.enable_offered && self.partial.is_some()
     }
 
     fn disable_edits(
