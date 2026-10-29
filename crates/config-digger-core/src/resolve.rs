@@ -163,9 +163,9 @@ pub(crate) fn resolve(
                 project_key.map(String::as_str),
             )
             .is_some()
+            || not_admin_owned(snapshot, entry)
             || in_user_writable_source(&definitions[entry.agent_index], snapshot, entry)
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
-            || not_admin_owned(snapshot, entry)
     };
 
     let reactions: Vec<Reaction> = snapshot

@@ -508,7 +508,7 @@
           ]
         },
         {
-          "description": "The settings a definition's `[[settings]]` names, in every file of each\nof its sources. A location reads them all, and lists the Entries of the\nsources the Agent skips as Unread; a rule or gate reads only the source\nthe Agent reads. Where one file is needed, it is refused.",
+          "description": "The settings a definition's `[[settings]]` names, in every file of each\nof its sources. A location reads them all, and lists the Entries of the\nsources the Agent skips as Unread; a rule or gate reads only the source\nthe Agent reads. A location may also skip the sources the user can\nwrite, in every context. Where one file is needed, it is refused.",
           "type": "object",
           "properties": {
             "settings": {
@@ -1326,7 +1326,7 @@
               "type": "string"
             },
             "user_writable": {
-              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source.",
+              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source, and a location that `skips_user_writable` is\nnever read from it.",
               "type": "boolean",
               "default": false
             },
@@ -1399,7 +1399,7 @@
               ]
             },
             "user_writable": {
-              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source.",
+              "description": "Whether the user can write it, so that the Agent never merges it\nwith another source, and a location that `skips_user_writable` is\nnever read from it.",
               "type": "boolean",
               "default": false
             },

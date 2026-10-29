@@ -234,6 +234,8 @@ fn the_registry_policy_declares_managed_servers() {
     assert_eq!(entry["state"], "effective");
 }
 
+const USER_WRITABLE_SOURCE_REASON: &str = r"Claude Code never reads `managedMcpServers` from HKCU\SOFTWARE\Policies\ClaudeCode\Settings, which the user can write.";
+
 #[test]
 fn only_the_first_managed_source_holding_settings_applies() {
     let fs = claude_home(&json!({})).with_file(
@@ -282,10 +284,8 @@ fn only_the_first_managed_source_holding_settings_applies() {
     let mine = entry_json(&server(&inventory, "mine").entries[0]);
     assert_eq!(mine["state"], "unread");
     assert_eq!(mine["reason"]["code"], "user_writable_source");
-    assert_eq!(mine["reason"]["sentence"], USER_POLICY_SKIPPED);
+    assert_eq!(mine["reason"]["sentence"], USER_WRITABLE_SOURCE_REASON);
 }
-
-const USER_POLICY_SKIPPED: &str = r"Claude Code never reads `managedMcpServers` from HKCU\SOFTWARE\Policies\ClaudeCode\Settings, which the user can write.";
 
 #[test]
 fn managed_servers_of_the_user_registry_policy_are_never_read() {
@@ -307,7 +307,7 @@ fn managed_servers_of_the_user_registry_policy_are_never_read() {
     );
     assert_eq!(entry["state"], "unread");
     assert_eq!(entry["reason"]["code"], "user_writable_source");
-    assert_eq!(entry["reason"]["sentence"], USER_POLICY_SKIPPED);
+    assert_eq!(entry["reason"]["sentence"], USER_WRITABLE_SOURCE_REASON);
 }
 
 #[test]

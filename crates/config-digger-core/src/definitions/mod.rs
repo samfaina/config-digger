@@ -4138,8 +4138,17 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
         );
     }
 
+    /// `text` with a source of the managed settings that the user can write.
+    fn with_user_writable_source(text: &str) -> String {
+        text.replace(
+            r#"value = "Settings" },"#,
+            r#"value = "Settings" },
+  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\Test', value = "Settings", user_writable = true },"#,
+        )
+    }
+
     #[test]
-    fn a_location_skips_user_writable_sources_only_of_settings_with_one() {
+    fn a_location_skips_user_writable_sources_only_where_settings_have_one() {
         let skipping =
             r#"anchor = { block = "settings", settings = "managed", skips_user_writable = true }"#;
         let text = with_policy(RULES_AND_GATES, POLICY_CHECKS).replacen(
@@ -4152,26 +4161,33 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
             "{}",
             error(&text)
         );
-        let text = text.replace(
-            r#"value = "Settings" },"#,
-            r#"value = "Settings" },
-  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\Test', value = "Settings", user_writable = true },"#,
-        );
-        parse("test.toml", &text).unwrap();
+        parse("test.toml", &with_user_writable_source(&text)).unwrap();
     }
 
     #[test]
     fn only_a_location_skips_user_writable_sources() {
-        let text = with_policy(RULES_AND_GATES, POLICY_CHECKS)
+        let text = with_user_writable_source(&with_policy(RULES_AND_GATES, POLICY_CHECKS)).replace(
+            r#"settings = "managed" }, key_path = ["denied"]"#,
+            r#"settings = "managed", skips_user_writable = true }, key_path = ["denied"]"#,
+        );
+        assert!(
+            error(&text).contains("only a location skips the sources the user can write"),
+            "{}",
+            error(&text)
+        );
+        let switch = name_list(false, "")
             .replace(
-                r#"value = "Settings" },"#,
-                r#"value = "Settings" },
-  { block = "registry-value", hive = "current-user", key = 'SOFTWARE\Policies\Test', value = "Settings", user_writable = true },"#,
+                r#"{ block = "home", root = "state" }"#,
+                r#"{ block = "settings", settings = "managed", skips_user_writable = true }"#,
             )
             .replace(
-                r#"settings = "managed" }, key_path = ["denied"]"#,
-                r#"settings = "managed", skips_user_writable = true }, key_path = ["denied"]"#,
+                r#"reason = "disabled_by_name""#,
+                r#"reason = "disabled_by_name", enable_offered = false"#,
             );
+        let text = with_user_writable_source(&with_policy(
+            &format!("disable = [{switch}]\n"),
+            r#"["disable", "precedence"]"#,
+        ));
         assert!(
             error(&text).contains("only a location skips the sources the user can write"),
             "{}",
