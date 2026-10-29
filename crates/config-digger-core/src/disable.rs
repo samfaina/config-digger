@@ -6,7 +6,7 @@
 use crate::api::{DisableNotOffered, DisableOption, Reason, ReasonCode, State};
 use crate::definitions::blocks::{
     DisableMechanism, DisableReason, Disables, Holds, JsonPathRules, MechanismContext,
-    MechanismTarget, Merge, MergedField, NAME_KEY, OWN_NAME_KEY, Switched,
+    MechanismTarget, Merge, MergedField, NAME_KEY, OWN_NAME_KEY, PartialLimit, Switched,
 };
 use crate::definitions::{AgentDefinition, LocationDefinition};
 use crate::edit::{Edit, Syntax};
@@ -104,6 +104,16 @@ impl Hit<'_> {
         (self.mechanism.target() == MechanismTarget::Plugin).then_some(&*self.key)
     }
 
+    /// The note on the Entry the switch limits part of, as a partial switch.
+    pub fn partial_note(&self, agent_name: &str) -> String {
+        match self.mechanism {
+            Switched::ItemList(block) if block.partial == Some(PartialLimit::HiddenFromUser) => {
+                explain::hidden_from_user(&self.holds(), agent_name)
+            }
+            _ => explain::partial_switch(&self.holds(), agent_name),
+        }
+    }
+
     /// What the switch holds, as a sentence says it.
     pub fn holds(&self) -> String {
         let per_project = self.per_project();
@@ -121,13 +131,21 @@ impl Hit<'_> {
                 &self.switch.path,
                 per_project,
             ),
-            Switched::ItemList(_) => explain::item_in_list(
-                &self.key,
-                self.value.unwrap_or(&Value::Null),
-                &self.key_path[self.key_path.len().saturating_sub(2)],
-                &self.switch.path,
-                per_project,
-            ),
+            Switched::ItemList(block) => {
+                let list = &self.key_path[self.key_path.len().saturating_sub(2)];
+                // An item of a partial list says no more than that it is there.
+                if block.partial.is_some() {
+                    explain::in_list(&self.key, list, &self.switch.path, per_project)
+                } else {
+                    explain::item_in_list(
+                        &self.key,
+                        self.value.unwrap_or(&Value::Null),
+                        list,
+                        &self.switch.path,
+                        per_project,
+                    )
+                }
+            }
             Switched::PathRules(_) => explain::path_rule_holds(
                 self.folder
                     .and_then(|folder| JsonPathRules::deciding(self.value, folder))
@@ -183,14 +201,22 @@ pub(crate) fn hits<'a>(
 /// with the key `project`: those that Disable it, and when Enable takes a
 /// layered switch away, those of the later layers too, so that none
 /// Disables it again, as VS Code takes a server
-/// out of both its workspace's and its profile's `mcp.enablement`.
+/// out of both its workspace's and its profile's `mcp.enablement`. Then the
+/// partial switches Enable takes away, as a skill's item in VS Code's
+/// `chat.disabledPromptFiles.skill`.
 pub(crate) fn lifted_by_enable<'a>(
     definition: &'a AgentDefinition,
     snapshot: &'a Snapshot,
     entry: &'a ScannedEntry,
     project: Option<&str>,
 ) -> Vec<Hit<'a>> {
-    set_for(definition, snapshot, entry, project, true).0
+    let (mut disabling, partial) = set_for(definition, snapshot, entry, project, true);
+    disabling.extend(
+        partial
+            .into_iter()
+            .filter(|hit| hit.mechanism.enable_lifts_partial()),
+    );
+    disabling
 }
 
 /// The switches set for `entry`, as [`hits`] finds them, or with
@@ -363,10 +389,10 @@ fn switch_keys<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Vec<Cow<'e, 
 }
 
 /// What Enable writes to lift `disabling`, the switches that Disable an
-/// Entry of `location`, as a sentence. Or why it is not offered:
+/// Entry of `location` and the partial switches it takes away, as a sentence. Or why it is not offered:
 /// config-digger only reads the Entry, or one of them is a switch it only
 /// reads.
-pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result<String, String> {
+pub(crate) fn enable(location: &LocationDefinition, disabling: &[&Hit]) -> Result<String, String> {
     if location.provenance.read_only() {
         return Err(explain::read_only_enable());
     }
@@ -376,7 +402,7 @@ pub(crate) fn enable(location: &LocationDefinition, disabling: &[Hit]) -> Result
     if let Some(hit) = disabling.iter().find(|hit| !hit.mechanism.enable_offered()) {
         return Err(explain::enable_not_offered(&hit.holds()));
     }
-    let sentences: Vec<String> = disabling.iter().map(Hit::enable_sentence).collect();
+    let sentences: Vec<String> = disabling.iter().map(|hit| hit.enable_sentence()).collect();
     Ok(sentences.join(" "))
 }
 
@@ -489,7 +515,7 @@ pub(crate) fn choose(
                     *mechanism,
                     project.map(|project| project.key),
                 )
-                && mechanism.enable_offered()
+                && mechanism.disable_offered()
                 && mechanism.switch().plugins() == in_plugin
         })
         .collect();

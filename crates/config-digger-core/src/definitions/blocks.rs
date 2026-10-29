@@ -5226,6 +5226,16 @@ pub(crate) trait Disables {
     /// leaving it Effective.
     fn partial(&self, value: Option<&Value>) -> bool;
 
+    /// Whether Disable writes the switch.
+    fn disable_offered(&self) -> bool {
+        self.enable_offered()
+    }
+
+    /// Whether Enable takes a partial switch away too.
+    fn enable_lifts_partial(&self) -> bool {
+        false
+    }
+
     /// The edits that Disable the Entry held by `name` through the switch
     /// at `key_path`, which holds `value` for it now, in the context whose
     /// Project is in `folder`.
@@ -5420,6 +5430,14 @@ impl Disables for Switched<'_> {
         self.block().partial(value)
     }
 
+    fn disable_offered(&self) -> bool {
+        self.block().disable_offered()
+    }
+
+    fn enable_lifts_partial(&self) -> bool {
+        self.block().enable_lifts_partial()
+    }
+
     fn disable_edits(
         &self,
         key_path: Vec<String>,
@@ -5574,6 +5592,15 @@ pub(crate) enum EnableAction {
     DeleteKey,
     /// Sets the key to the mechanism's `enabled_value`.
     Set,
+}
+
+/// What a partial switch limits of an Entry the Agent still uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PartialLimit {
+    /// The user cannot run the Entry, while the Agent still gives it to
+    /// its model.
+    HiddenFromUser,
 }
 
 /// The reason code an Entry Disabled through a mechanism gets.
@@ -5977,7 +6004,9 @@ impl Disables for JsonField {
 /// `{name}`, standing for its item. The Agent skips an Entry whose item is
 /// there and is not `enabled_item`. Disable replaces the item with
 /// `disabled_item`, creating the list and any missing parent; Enable takes
-/// it away, or with `set`, replaces it with `enabled_item`.
+/// it away, or with `set`, replaces it with `enabled_item`. With `partial`,
+/// an item there is a partial switch instead, and Disables nothing: Disable
+/// never writes the list, and Enable takes the item away.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonItemList {
@@ -5988,10 +6017,16 @@ pub(crate) struct JsonItemList {
     pub context: MechanismContext,
     /// `remove-item`, or `set` with an `enabled_item`.
     pub enable_action: EnableAction,
-    pub reason: DisableReason,
+    /// Required, unless the list is `partial`, which takes none.
+    pub reason: Option<DisableReason>,
     /// The item Disable writes, each string `{name}` in it standing for the
-    /// Entry's id, such as `["{name}", false]`.
-    pub disabled_item: Value,
+    /// Entry's id, such as `["{name}", false]`. Required, unless the list is
+    /// `partial`, which takes none.
+    pub disabled_item: Option<Value>,
+    /// What an item of the Entry limits when the Agent still uses the
+    /// Entry: the list is then a partial switch, which Disable never
+    /// writes and Enable takes the item out of, with `remove-item`.
+    pub partial: Option<PartialLimit>,
     /// The item that Enables the Entry, likewise, such as `["{name}", true]`,
     /// which beats an item of a later layer. Enable writes it with
     /// `enable_action = "set"`.
@@ -6001,7 +6036,7 @@ pub(crate) struct JsonItemList {
     #[serde(default)]
     pub ignore_case: bool,
     /// Whether config-digger writes the switch: Disable through it, and
-    /// Enable lifting it.
+    /// Enable lifting it, or for a `partial` list, Enable only.
     #[serde(default = "offered")]
     pub enable_offered: bool,
     /// Whether the list is one layer of a setting the Agent merges across
@@ -6024,6 +6059,24 @@ pub(crate) struct JsonItemList {
 impl Validate for JsonItemList {
     fn validate(&self) -> Result<(), String> {
         validate_mechanism(&self.switch, self.target, self.context, &self.when)?;
+        match (self.partial, &self.reason, &self.disabled_item) {
+            (None, Some(_), Some(_)) => {}
+            (None, _, _) => {
+                return Err(
+                    "an item list needs a reason and a disabled_item, unless partial".into(),
+                );
+            }
+            (Some(_), None, None) => {
+                if self.enabled_item.is_some() || self.layered {
+                    return Err(
+                        "a partial item list takes no enabled_item and is not layered".into(),
+                    );
+                }
+            }
+            (Some(_), _, _) => {
+                return Err("a partial item list takes no reason and no disabled_item".into());
+            }
+        }
         if self.switch.named_by.is_none() {
             return Err("an item list needs named_by, what of each item holds its id".into());
         }
@@ -6034,7 +6087,7 @@ impl Validate for JsonItemList {
             return Err("an item list's target must be `entry`".into());
         }
         match (self.enable_action, &self.enabled_item) {
-            (_, Some(enabled)) if *enabled == self.disabled_item => {
+            (_, Some(enabled)) if self.disabled_item.as_ref() == Some(enabled) => {
                 Err("enabled_item must differ from disabled_item".into())
             }
             (EnableAction::RemoveItem, _) | (EnableAction::Set, Some(_)) => Ok(()),
@@ -6119,6 +6172,7 @@ impl Disables for JsonItemList {
 
     fn reason(&self) -> DisableReason {
         self.reason
+            .expect("validation requires a reason unless partial")
     }
 
     fn locations(&self) -> &[String] {
@@ -6139,9 +6193,9 @@ impl Disables for JsonItemList {
 
     /// An item Disables unless it holds what `enabled_item` holds: each of
     /// its fields or values, the id compared as the Agent compares ids, and
-    /// any other field left aside.
+    /// any other field left aside. An item of a partial list never does.
     fn disables(&self, value: Option<&Value>, name: &str, _folder: Option<&Path>) -> bool {
-        let Some(item) = value else {
+        let Some(item) = value.filter(|_| self.partial.is_none()) else {
             return false;
         };
         !self
@@ -6150,8 +6204,20 @@ impl Disables for JsonItemList {
             .is_some_and(|template| self.holds(template, item, name))
     }
 
-    fn partial(&self, _value: Option<&Value>) -> bool {
-        false
+    /// An item of a partial list is a partial switch.
+    fn partial(&self, value: Option<&Value>) -> bool {
+        self.partial.is_some() && value.is_some()
+    }
+
+    /// A partial list is never written by Disable.
+    fn disable_offered(&self) -> bool {
+        self.enable_offered && self.partial.is_none()
+    }
+
+    /// Enable takes an item of a partial list out, unless config-digger
+    /// only reads the list.
+    fn enable_lifts_partial(&self) -> bool {
+        self.enable_offered && self.partial.is_some()
     }
 
     fn disable_edits(
@@ -6161,8 +6227,11 @@ impl Disables for JsonItemList {
         name: &str,
         _folder: Option<&Path>,
     ) -> Vec<Edit> {
-        let disabled = Self::item(&self.disabled_item, name);
-        Self::replace(&key_path, value, Some(disabled))
+        // A partial list, which takes none, is never written.
+        let Some(template) = &self.disabled_item else {
+            return Vec::new();
+        };
+        Self::replace(&key_path, value, Some(Self::item(template, name)))
     }
 
     fn enable_edits(

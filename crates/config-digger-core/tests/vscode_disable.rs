@@ -10,7 +10,9 @@ use config_digger_core::api::{
     Action, Context, Core, Error, Inventory, Item, Plan, ScanOptions, Targets, WarningClass,
 };
 use config_digger_core::ports::RunningProcess;
-use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeProcesses};
+use config_digger_core::ports::fake::{
+    self, FakeEnvironment, FakeFileSystem, FakeGitIndex, FakeProcesses,
+};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -178,12 +180,15 @@ fn plan(core: &Core, context: &Context, action: Action, selectors: &[&str]) -> R
     core.plan(&snapshot, context, action, &targets(selectors))
 }
 
+/// The text the store at `path` holds under `key`, as it is.
+fn item_text(fs: &FakeFileSystem, path: &Path, key: &str) -> Option<String> {
+    use config_digger_core::ports::FileSystem;
+    fs.read_sqlite_item(path, key).unwrap()
+}
+
 /// What the store at `path` holds under `key`, as JSON.
 fn item_value(fs: &FakeFileSystem, path: &Path, key: &str) -> Option<Value> {
-    use config_digger_core::ports::FileSystem;
-    fs.read_sqlite_item(path, key)
-        .unwrap()
-        .map(|text| serde_json::from_str(&text).unwrap())
+    item_text(fs, path, key).map(|text| serde_json::from_str(&text).unwrap())
 }
 
 #[test]
@@ -420,25 +425,107 @@ fn copilot_skill(name: &str) -> String {
     format!(r"{HOME}\.copilot\skills\{name}")
 }
 
-#[test]
-fn a_skill_vs_code_lists_in_its_disabled_skill_files_is_disabled() {
-    // VS Code writes a URI with the drive letter as the folder holds it,
-    // and reads it back without regard to case.
-    let fs = with_home(vscode()).with_sqlite_item(
+/// The profile's `chat.disabledPromptFiles.skill` listing the `SKILL.md`
+/// of `~\.copilot\skills\jetpack-compose`, with the drive letter as the
+/// folder holds it, as VS Code writes it.
+const JETPACK_COMPOSE_LISTED: &str = r#"[{"$mid":1,"external":"file:///c%3A/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","path":"/c:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","scheme":"file"}]"#;
+
+/// `fs` with the fixture home, whose profile lists the personal skill
+/// `jetpack-compose` in `chat.disabledPromptFiles.skill`.
+fn with_jetpack_compose_listed() -> FakeFileSystem {
+    with_home(vscode()).with_sqlite_item(
         profile_store(),
         "chat.disabledPromptFiles.skill",
-        r#"[{"$mid":1,"external":"file:///c%3A/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","path":"/c:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","scheme":"file"}]"#,
-    );
-    let inventory = inventory(&core(&fs), &context(None));
-
-    let skill = item(&inventory, "jetpack-compose");
-    assert_eq!(code(skill.state), "disabled");
-    let reason = skill.entries[0].reason.as_ref().unwrap();
-    assert_eq!(code(reason.code), "disabled_natively");
+        JETPACK_COMPOSE_LISTED,
+    )
 }
 
 #[test]
-fn disable_of_a_skill_adds_its_skill_file_to_the_profile_s_disabled_skill_files() {
+fn a_skill_vs_code_lists_in_its_disabled_skill_files_stays_effective_with_a_partial_switch_note() {
+    // VS Code reads the URI back without regard to case.
+    let fs = with_jetpack_compose_listed();
+    let inventory = inventory(&core(&fs), &context(None));
+
+    let skill = item(&inventory, "jetpack-compose");
+    assert_eq!(code(skill.state), "effective");
+    let entry = &skill.entries[0];
+    assert!(entry.reason.is_none(), "{:?}", entry.reason);
+    assert!(entry.secondary.is_empty(), "{:?}", entry.secondary);
+    let [note] = &entry.notes[..] else {
+        panic!("one note: {:?}", entry.notes);
+    };
+    assert_eq!(code(note.code), "partial_switch");
+    assert_eq!(
+        note.switch.as_deref(),
+        Some(&*format!(
+            r#"{}#"chat.disabledPromptFiles.skill".0"#,
+            profile_store().display()
+        ))
+    );
+    assert_eq!(
+        note.sentence,
+        format!(
+            "Partial switch: `/C:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md` is in \
+             `chat.disabledPromptFiles.skill` in {}. The user cannot run it in VS Code, but \
+             VS Code still gives it to its model.",
+            profile_store().display()
+        )
+    );
+}
+
+/// The manifest of config-digger's parked-Entry store.
+fn parked_store() -> PathBuf {
+    PathBuf::from(LOCAL_APP_DATA).join(r"config-digger\parked\manifest.json")
+}
+
+/// The folder where config-digger's store keeps the skill parked as `id`.
+fn parked_folder(id: &str) -> PathBuf {
+    PathBuf::from(LOCAL_APP_DATA)
+        .join(r"config-digger\parked\folders")
+        .join(id)
+}
+
+/// Whether the personal skill `jetpack-compose` is in its folder.
+fn jetpack_compose_in_place(fs: &FakeFileSystem) -> bool {
+    fs.contents(format!(r"{}\SKILL.md", copilot_skill("jetpack-compose")))
+        .is_some()
+}
+
+/// Whether config-digger's store keeps the skill `jetpack-compose` parked.
+fn jetpack_compose_parked(fs: &FakeFileSystem) -> bool {
+    fs.contents(parked_folder(r"jetpack-compose\SKILL.md"))
+        .is_some()
+}
+
+/// The profile's `chat.disabledPromptFiles.skill`, as its text.
+fn disabled_skill_files(fs: &FakeFileSystem) -> Option<String> {
+    item_text(fs, &profile_store(), "chat.disabledPromptFiles.skill")
+}
+
+/// Whether the profile's `chat.disabledPromptFiles.skill` holds what
+/// [`JETPACK_COMPOSE_LISTED`] does.
+fn jetpack_compose_listed(fs: &FakeFileSystem) -> bool {
+    item_value(fs, &profile_store(), "chat.disabledPromptFiles.skill")
+        == Some(serde_json::from_str(JETPACK_COMPOSE_LISTED).unwrap())
+}
+
+/// Disables the personal skill `jetpack-compose`, outside any Project.
+fn park_jetpack_compose(fs: &FakeFileSystem) -> String {
+    let core = core(fs);
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Disable,
+        &[&copilot_skill("jetpack-compose")],
+    )
+    .unwrap();
+    core.execute(plan, &[WarningClass::WideReach])
+        .unwrap()
+        .operation
+}
+
+#[test]
+fn disable_of_a_personal_skill_parks_its_folder_and_writes_no_disabled_skill_files() {
     let fs = with_home(vscode()).with_sqlite_item(profile_store(), "other", "1");
     let core = core(&fs);
 
@@ -449,18 +536,214 @@ fn disable_of_a_skill_adds_its_skill_file_to_the_profile_s_disabled_skill_files(
         &[&copilot_skill("jetpack-compose")],
     )
     .unwrap();
+    let folder = &plan.preview().folders[0];
+    assert_eq!(folder.path, PathBuf::from(copilot_skill("jetpack-compose")));
+    assert_eq!(code(folder.change), "parked");
     core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert!(!jetpack_compose_in_place(&fs));
+    assert!(jetpack_compose_parked(&fs));
+    assert_eq!(disabled_skill_files(&fs), None);
+    let inventory = inventory(&core, &context(None));
+    let entry = &item(&inventory, "jetpack-compose").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(code(entry.reason.as_ref().unwrap().code), "parked");
+}
+
+#[test]
+fn disable_of_a_workspace_folder_s_skill_outside_any_repo_parks_its_folder() {
+    let fs = with_project(vscode(), "app");
+    let core = core(&fs);
+    let review = project("app").join(r".github\skills\review");
+
+    let plan = plan(
+        &core,
+        &context(Some(&project("app"))),
+        Action::Disable,
+        &[&review.display().to_string()],
+    )
+    .unwrap();
+    core.execute(plan, &[]).unwrap();
+
+    assert!(fs.contents(review.join("SKILL.md")).is_none());
+    assert!(fs.contents(parked_folder(r"review\SKILL.md")).is_some());
+    assert_eq!(disabled_skill_files(&fs), None);
+}
+
+#[test]
+fn enable_of_a_parked_skill_puts_its_folder_back_and_an_undo_parks_it_again() {
+    let fs = with_home(vscode());
+    let parked = park_jetpack_compose(&fs);
+    let core = core(&fs);
+
+    // An Undo of the park puts the folder back, as for any park.
+    let undo = core.plan_undo(&parked).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+    assert!(jetpack_compose_in_place(&fs));
+
+    park_jetpack_compose(&fs);
+    let selector = format!("{}#entries.jetpack-compose", parked_store().display());
+    let plan = plan(&core, &context(None), Action::Enable, &[&selector]).unwrap();
+    assert_eq!(code(plan.preview().folders[0].change), "put_back");
+    let enabled = core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert!(jetpack_compose_in_place(&fs));
+    let put_back = inventory(&core, &context(None));
+    assert_eq!(code(item(&put_back, "jetpack-compose").state), "effective");
+
+    let undo = core.plan_undo(&enabled.operation).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+    assert!(jetpack_compose_parked(&fs));
+    let inventory = inventory(&core, &context(None));
+    assert_eq!(code(item(&inventory, "jetpack-compose").state), "disabled");
+}
+
+/// The codes of the notes on the skill `jetpack-compose`, outside any
+/// Project, which is Effective.
+fn jetpack_compose_notes(core: &Core) -> Vec<String> {
+    let inventory = inventory(core, &context(None));
+    let skill = item(&inventory, "jetpack-compose");
+    assert_eq!(code(skill.state), "effective");
+    skill.entries[0]
+        .notes
+        .iter()
+        .map(|note| code(note.code))
+        .collect()
+}
+
+#[test]
+fn enable_takes_a_listed_skill_out_of_the_disabled_skill_files_and_an_undo_puts_it_back() {
+    let fs = with_jetpack_compose_listed();
+    let core = core(&fs);
+    let listed = inventory(&core, &context(None));
+    let entry = &item(&listed, "jetpack-compose").entries[0];
+    let enable = serde_json::to_value(&entry.enable).unwrap();
+    assert_eq!(enable["status"], "offered", "{enable}");
+    let sentence = enable["sentence"].as_str().unwrap();
+    assert!(
+        sentence.contains("chat.disabledPromptFiles.skill"),
+        "{sentence}"
+    );
+    // Disable still parks the skill rather than writing the list.
+    let disable = serde_json::to_value(&entry.disable).unwrap();
+    assert_eq!(disable["status"], "offered", "{disable}");
+    assert_eq!(
+        disable["path"].as_str().map(PathBuf::from),
+        Some(parked_store())
+    );
+
+    let plan = plan(
+        &core,
+        &context(None),
+        Action::Enable,
+        &[&copilot_skill("jetpack-compose")],
+    )
+    .unwrap();
+    let written: Vec<&Path> = plan
+        .preview()
+        .files
+        .iter()
+        .map(|file| file.path.as_path())
+        .collect();
+    assert_eq!(written, [profile_store().as_path()]);
+    let enabled = core.execute(plan, &[WarningClass::WideReach]).unwrap();
 
     assert_eq!(
         item_value(&fs, &profile_store(), "chat.disabledPromptFiles.skill"),
-        Some(json!([{
-            "$mid": 1,
-            "scheme": "file",
-            "path": "/C:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md"
-        }]))
+        Some(json!([]))
     );
-    let inventory = inventory(&core, &context(None));
-    assert_eq!(code(item(&inventory, "jetpack-compose").state), "disabled");
+    assert!(jetpack_compose_notes(&core).is_empty());
+
+    let undo = core.plan_undo(&enabled.operation).unwrap();
+    core.execute(undo, &[WarningClass::WideReach]).unwrap();
+    assert!(jetpack_compose_listed(&fs));
+    assert_eq!(jetpack_compose_notes(&core), ["partial_switch"]);
+}
+
+#[test]
+fn a_listed_skill_disabled_and_enabled_through_the_store_comes_back_still_listed() {
+    let fs = with_jetpack_compose_listed();
+    park_jetpack_compose(&fs);
+    let core = core(&fs);
+    assert_eq!(
+        disabled_skill_files(&fs).as_deref(),
+        Some(JETPACK_COMPOSE_LISTED)
+    );
+    assert!(jetpack_compose_parked(&fs));
+
+    let selector = format!("{}#entries.jetpack-compose", parked_store().display());
+    let put_back = plan(&core, &context(None), Action::Enable, &[&selector]).unwrap();
+    core.execute(put_back, &[WarningClass::WideReach]).unwrap();
+    assert!(jetpack_compose_in_place(&fs));
+    assert_eq!(
+        disabled_skill_files(&fs).as_deref(),
+        Some(JETPACK_COMPOSE_LISTED)
+    );
+    assert_eq!(jetpack_compose_notes(&core), ["partial_switch"]);
+
+    // Its Enable then takes it out of the list.
+    let unlisted = plan(
+        &core,
+        &context(None),
+        Action::Enable,
+        &[&copilot_skill("jetpack-compose")],
+    )
+    .unwrap();
+    core.execute(unlisted, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(
+        item_value(&fs, &profile_store(), "chat.disabledPromptFiles.skill"),
+        Some(json!([]))
+    );
+    assert!(jetpack_compose_notes(&core).is_empty());
+}
+
+#[test]
+fn disable_is_not_offered_for_a_plugin_s_an_extension_s_or_a_git_versioned_skill() {
+    let fs = with_project(with_home(vscode()), "app");
+    let github_review = project("app").join(r".github\skills\review");
+    let mut ports = fake::ports(fs.clone(), env());
+    ports.git = Box::new(FakeGitIndex::default().with_versioned(&github_review));
+    let core = Core::new(ports).unwrap();
+    let inventory = inventory(&core, &context(Some(&project("app"))));
+
+    let disable = |name: &str, path: &Path| {
+        let entry = item(&inventory, name)
+            .entries
+            .iter()
+            .find(|entry| entry.path == path)
+            .unwrap_or_else(|| panic!("no Entry of `{name}` at {}", path.display()));
+        serde_json::to_value(&entry.disable).unwrap()
+    };
+    let no_switch = "Disable is not offered: VS Code has no switch for this Entry here.";
+    let triage = review_kit().join(r"skills\triage");
+    let troubleshoot =
+        Path::new(HOME).join(r".vscode\extensions\acme.helper-1.0.0\skills\troubleshoot");
+    for (name, path, expected, says) in [
+        (
+            "triage",
+            triage.as_path(),
+            "no_mechanism",
+            no_switch.to_owned(),
+        ),
+        (
+            "troubleshoot",
+            troubleshoot.as_path(),
+            "no_mechanism",
+            no_switch.to_owned(),
+        ),
+        (
+            "review",
+            github_review.as_path(),
+            "git_versioned",
+            github_review.display().to_string(),
+        ),
+    ] {
+        let disable = disable(name, path);
+        assert_eq!(disable["status"], "not_offered", "{name}: {disable}");
+        assert_eq!(disable["code"], expected, "{name}: {disable}");
+        let sentence = disable["sentence"].as_str().unwrap();
+        assert!(sentence.contains(&says), "{name}: {sentence}");
+    }
 }
 
 /// `fs` whose application store trusts only the folders `uris` name.
@@ -753,32 +1036,6 @@ fn the_account_s_policy_replaces_the_user_s_mcp_access() {
         code(supabase.entries[0].reason.as_ref().unwrap().code),
         "policy"
     );
-}
-
-#[test]
-fn enable_of_a_skill_takes_its_skill_file_out_of_the_disabled_ones() {
-    let fs = with_home(vscode()).with_sqlite_item(
-        profile_store(),
-        "chat.disabledPromptFiles.skill",
-        r#"[{"$mid":1,"path":"/c:/Users/fixture/.copilot/skills/jetpack-compose/SKILL.md","scheme":"file"},{"$mid":1,"path":"/c:/elsewhere/SKILL.md","scheme":"file"}]"#,
-    );
-    let core = core(&fs);
-
-    let plan = plan(
-        &core,
-        &context(None),
-        Action::Enable,
-        &[&copilot_skill("jetpack-compose")],
-    )
-    .unwrap();
-    core.execute(plan, &[WarningClass::WideReach]).unwrap();
-
-    assert_eq!(
-        item_value(&fs, &profile_store(), "chat.disabledPromptFiles.skill"),
-        Some(json!([{ "$mid": 1, "path": "/c:/elsewhere/SKILL.md", "scheme": "file" }]))
-    );
-    let inventory = inventory(&core, &context(None));
-    assert_eq!(code(item(&inventory, "jetpack-compose").state), "effective");
 }
 
 #[test]

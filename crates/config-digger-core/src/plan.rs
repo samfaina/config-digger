@@ -870,7 +870,8 @@ impl Targeted<'_> {
                         )));
                     }
                     let parked = self.snapshot.parked_of(scanned);
-                    let (disabling, _) = disable::hits(definition, self.snapshot, scanned, project);
+                    let (disabling, partial) =
+                        disable::hits(definition, self.snapshot, scanned, project);
                     // A field that turns the built server off, for an Entry
                     // it Disables rather than one a gate Blocks first.
                     let deleted = if entry.state == State::Disabled {
@@ -881,7 +882,16 @@ impl Targeted<'_> {
                     } else {
                         Vec::new()
                     };
-                    if disabling.is_empty() && parked.is_none() && deleted.is_empty() {
+                    // A partial switch Enable takes away is enough, as a
+                    // skill's item in VS Code's `chat.disabledPromptFiles.skill`.
+                    let lifts_partial = partial
+                        .iter()
+                        .any(|hit| hit.mechanism.enable_lifts_partial());
+                    if disabling.is_empty()
+                        && parked.is_none()
+                        && deleted.is_empty()
+                        && !lifts_partial
+                    {
                         return Err(Error::blocked(explain::not_disabled(&entry.locator)));
                     }
                     // Every layer's switch, or a later one would Disable it again.
@@ -889,7 +899,8 @@ impl Targeted<'_> {
                         disable::lifted_by_enable(definition, self.snapshot, scanned, project);
                     let location = definition.location(&scanned.location);
                     if !lifts.is_empty()
-                        && let Err(sentence) = disable::enable(location, &lifts)
+                        && let Err(sentence) =
+                            disable::enable(location, &lifts.iter().collect::<Vec<_>>())
                     {
                         return Err(Error::blocked(explain::enable_refused(
                             &entry.locator,

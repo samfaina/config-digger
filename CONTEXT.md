@@ -117,7 +117,7 @@ A table in a user file that holds just enough of a server for its Agent to accep
 _Avoid_: Placeholder, dummy, shadow table
 
 **Partial switch**:
-A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note.
+A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note. Disable never writes one; Enable takes away the one an Agent's definition lets it, such as a skill's item in VS Code's `chat.disabledPromptFiles.skill`.
 _Avoid_: Partial disable, partly off
 
 **Blocked**:

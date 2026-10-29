@@ -939,10 +939,30 @@ pub(crate) fn resolve(
                                     false,
                                 )
                             });
-                            let lifts = (!disabling.is_empty())
-                                .then(|| disable::enable(location, disabling))
+                            // With the partial switches it takes away, such as
+                            // a skill's item in VS Code's
+                            // `chat.disabledPromptFiles.skill`.
+                            let lifting: Vec<&Hit> = disabling
+                                .iter()
+                                .chain(
+                                    partial
+                                        .iter()
+                                        .filter(|hit| hit.mechanism.enable_lifts_partial()),
+                                )
+                                .collect();
+                            let lifts = (!lifting.is_empty())
+                                .then(|| disable::enable(location, &lifting))
                                 .transpose();
                             match lifts {
+                                // Of an Entry nothing Disables, a partial switch
+                                // Enable cannot take away offers no Enable.
+                                Err(_)
+                                    if disabling.is_empty()
+                                        && unparks.is_none()
+                                        && deleted.is_empty() =>
+                                {
+                                    None
+                                }
                                 Err(sentence) => Some(api::EnableOption::NotOffered { sentence }),
                                 Ok(lifts) => {
                                     let sentences: Vec<String> =
@@ -1000,7 +1020,7 @@ pub(crate) fn resolve(
                             .chain(partial.iter().map(|hit| api::Note {
                                 code: api::NoteCode::PartialSwitch,
                                 switch: Some(hit.locator()),
-                                sentence: explain::partial_switch(&hit.holds(), agent_name),
+                                sentence: hit.partial_note(agent_name),
                             }))
                             .chain(origin.by_name_only)
                             .chain(needs_trusted_folder(
