@@ -181,6 +181,14 @@ fn a_store_package_keeps_its_data_folder_in_its_local_cache() {
         msix().join("claude_desktop_config.json")
     );
     assert_eq!(home(&inventory, "msix").folder, msix());
+    assert_eq!(home(&inventory, "msix").not_read, None);
+    assert!(
+        !inventory
+            .homes
+            .iter()
+            .any(|found| found.home == "msix-moved"),
+        "a fresh install has moved nothing to `Claude-Data`"
+    );
 }
 
 /// `fs` with the classic fixture data folder also at `folder`.
@@ -809,4 +817,113 @@ fn read_instead_names_only_a_home_that_is_listed() {
     let not_read = home(&inventory, "msix").not_read.as_ref().unwrap();
     assert_eq!(not_read.read_instead, None);
     assert!(not_read.sentence.contains(CLASSIC), "{}", not_read.sentence);
+}
+
+/// Where the MSIX package of the family `family` moves its data folder:
+/// `%LOCALAPPDATA%\Claude-Data\<family>`, the family in lower case.
+fn moved_folder(family: &str) -> PathBuf {
+    PathBuf::from(LOCAL_APP_DATA)
+        .join("Claude-Data")
+        .join(family.to_lowercase())
+}
+
+/// The package of the family `family` with its data folder moved out of
+/// its `LocalCache`, as on the reference machine: the MSIX fixture data
+/// folder in `Claude-Data\<family>`, and only the marker
+/// `.user-data-left.<family>` left in the `LocalCache`.
+fn moved_of(fs: FakeFileSystem, family: &str) -> FakeFileSystem {
+    let marker = format!(".user-data-left.{}", family.to_lowercase());
+    load(fs, &fixture_folder("msix"), &moved_folder(family))
+        .with_file(msix_folder(family).join(marker), "")
+        .with_file(
+            PathBuf::from(LOCAL_APP_DATA).join(r"Claude-Data\README.txt"),
+            "This folder holds the data Claude keeps for this Windows account.",
+        )
+}
+
+/// The Store package with its data folder moved.
+fn moved() -> FakeFileSystem {
+    moved_of(FakeFileSystem::new(), STORE_FAMILY)
+}
+
+#[test]
+fn a_store_package_that_moved_its_data_folder_reads_it_in_claude_data() {
+    let inventory = inventory(&moved());
+
+    let moved_home = home(&inventory, "msix-moved");
+    assert_eq!(moved_home.folder, moved_folder(STORE_FAMILY));
+    assert_eq!(moved_home.not_read, None);
+    let notes = item(&inventory, "notes");
+    assert_eq!(notes.home, "msix-moved");
+    assert_eq!(json(notes.state), "effective");
+    assert_eq!(
+        notes.entries[0].path,
+        moved_folder(STORE_FAMILY).join("claude_desktop_config.json")
+    );
+    let files = item(&inventory, "Files");
+    assert_eq!(files.home, "msix-moved");
+    assert_eq!(json(files.state), "effective");
+    let pdf = item(&inventory, "pdf");
+    assert_eq!(pdf.home, "msix-moved");
+    assert_eq!(
+        pdf.entries[0].path,
+        moved_folder(STORE_FAMILY)
+            .join(r"local-agent-mode-sessions\skills-plugin\org-0001\account-0001\skills\pdf")
+    );
+    assert!(
+        !inventory.homes.iter().any(|found| found.home == "msix"),
+        "the `LocalCache` holds only the marker, so it is no home"
+    );
+}
+
+#[test]
+fn a_package_signed_as_anthropic_pbc_that_moved_its_data_folder_is_found_too() {
+    let inventory = inventory(&moved_of(FakeFileSystem::new(), ANTHROPIC_PBC_FAMILY));
+
+    let notes = item(&inventory, "notes");
+    assert_eq!(notes.home, "msix-anthropicpbc-moved");
+    assert_eq!(json(notes.state), "effective");
+    assert_eq!(
+        home(&inventory, "msix-anthropicpbc-moved").folder,
+        PathBuf::from(LOCAL_APP_DATA).join(r"Claude-Data\anthropicpbc.claude_fnn82j28hfe8t")
+    );
+}
+
+#[test]
+fn a_moved_data_folder_comes_before_a_classic_folder_beside_it() {
+    let fs = with_classic_at(moved(), Path::new(CLASSIC));
+    let inventory = inventory(&fs);
+
+    assert_eq!(home(&inventory, "msix-moved").not_read, None);
+    let notes = item(&inventory, "notes");
+    assert_eq!(notes.home, "msix-moved");
+    assert_eq!(json(notes.state), "effective");
+    let filesystem = item(&inventory, "filesystem");
+    assert_eq!(filesystem.home, "classic");
+    assert_eq!(
+        json(filesystem.state),
+        "effective",
+        "the classic app reads it"
+    );
+}
+
+#[test]
+fn claude_data_on_a_network_share_comes_before_a_moved_data_folder() {
+    let claude_data = PathBuf::from(LOCAL_APP_DATA).join("Claude-Data");
+    let fs = with_classic_at(moved(), &claude_data);
+    let roaming = env().with_var("APPDATA", r"\\fileserver\profiles\fixture\AppData\Roaming");
+
+    let on_share = inventory_with(&fs, roaming);
+
+    assert_eq!(home(&on_share, "claude-data").not_read, None);
+    assert_eq!(json(item(&on_share, "filesystem").state), "effective");
+    let not_read = home(&on_share, "msix-moved").not_read.as_ref().unwrap();
+    assert_eq!(not_read.read_instead.as_deref(), Some("claude-data"));
+    assert_eq!(json(item(&on_share, "notes").state), "unread");
+
+    let local = inventory(&fs);
+    assert_eq!(home(&local, "msix-moved").not_read, None);
+    assert_eq!(json(item(&local, "notes").state), "effective");
+    let not_read = home(&local, "claude-data").not_read.as_ref().unwrap();
+    assert_eq!(not_read.read_instead.as_deref(), Some("msix-moved"));
 }

@@ -2,25 +2,29 @@
 # Claude Desktop. Facts from docs/research/claude-desktop.md
 # (verified against 2.16120.0.0), and those tagged [test] from the release
 # gate's probe, uat/agents/claude-desktop.mjs in Windows Sandbox
-# (docs/research/release-gate.md), run on 3.6556.2. 3.x keeps a package's
-# data elsewhere (#305), so `verified` stays at 2.16120.
+# (docs/research/release-gate.md), run on 3.6556.2, with the move of a
+# package's data folder to `Claude-Data` (#305). Facts tagged [bundle] about
+# that move were read in 3.6556.2 and 4.29.
 
 format_version = 1
-verified = { min = "2.16120", max = "2.16120" }
+verified = { min = "2.16120", max = "3.6556.2" }
 
 # The data folder Claude Desktop reads, `<userData>`, is the first of these
 # that exists [bundle]. The signed app ignores `CLAUDE_USER_DATA_DIR`
 # [test, bundle], so no home comes from it (#368).
 # `%LOCALAPPDATA%\Claude-Data` counts only while `%APPDATA%` is on a network
-# share [bundle]. Each package's app ends with its own `LocalCache`, which
-# no other app sees [docs]. A package's app sees `%APPDATA%\Claude` with its
+# share [bundle]. A package's app reads the folder it moved its data to,
+# `%LOCALAPPDATA%\Claude-Data\<family>`, whenever that folder exists, a
+# classic folder beside it or not [test, bundle]. Each package's app ends with its
+# own `LocalCache`, which no other app sees [docs]. A package's app sees
+# `%APPDATA%\Claude` with its
 # `LocalCache` laid over it file by file: beside a classic folder it reads
 # the classic files and creates no `LocalCache`, but a file its `LocalCache`
 # holds wins [test]. A lookup order picks a whole folder, the classic one
 # here (#306).
 lookup_orders = [
-  ["claude-data", "classic", "msix"],
-  ["claude-data", "classic", "msix-anthropicpbc"],
+  ["claude-data", "msix-moved", "classic", "msix"],
+  ["claude-data", "msix-anthropicpbc-moved", "classic", "msix-anthropicpbc"],
 ]
 
 [agent]
@@ -38,14 +42,14 @@ id = "msix"
 folder = "%ProgramFiles%/WindowsApps/Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["claude-data", "classic", "msix", "third-party"]
+homes = ["claude-data", "msix-moved", "classic", "msix", "third-party"]
 
 [[installations]]
 id = "msix-anthropicpbc"
 folder = "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*"
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
-homes = ["claude-data", "classic", "msix-anthropicpbc", "third-party"]
+homes = ["claude-data", "msix-anthropicpbc-moved", "classic", "msix-anthropicpbc", "third-party"]
 
 # The classic installer, which claude.ai serves beside the MSIX package, is
 # Squirrel's: it installs for the user in `%LOCALAPPDATA%\AnthropicClaude`,
@@ -122,10 +126,42 @@ installations = "extensions-installations.json"
 # The mirror of the account's skills.
 skills = "local-agent-mode-sessions/skills-plugin"
 
+# A package moves its data folder out of its `LocalCache`, at a start, to
+# `%LOCALAPPDATA%\Claude-Data\<family>`, the family in lower case, which
+# the package writes to its real path [test, disk]. It moves only while its
+# data is in its `LocalCache` alone, `%APPDATA%\Claude` holding none, and a
+# rollout flag latched into its config's preferences says so [bundle, test].
+# Its `LocalCache` keeps only the marker `.user-data-left.<family>` [test, disk].
+[[homes]]
+id = "msix-moved"
+folder = { block = "path", path = "%LOCALAPPDATA%/Claude-Data/claude_pzs8sxrjxfjjc" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
 # The app also knows the package family `AnthropicPBC.Claude` [bundle].
 [[homes]]
 id = "msix-anthropicpbc"
 folder = { block = "path", path = "%LOCALAPPDATA%/Packages/AnthropicPBC.Claude_*/LocalCache/Roaming/Claude" }
+
+[homes.roots]
+config = "claude_desktop_config.json"
+extensions = "Claude Extensions"
+extension_settings = "Claude Extensions Settings"
+installations = "extensions-installations.json"
+# The mirror of the account's skills.
+skills = "local-agent-mode-sessions/skills-plugin"
+
+# The `AnthropicPBC.Claude` package moves its data folder the same way
+# [bundle].
+[[homes]]
+id = "msix-anthropicpbc-moved"
+folder = { block = "path", path = "%LOCALAPPDATA%/Claude-Data/anthropicpbc.claude_fnn82j28hfe8t" }
 
 [homes.roots]
 config = "claude_desktop_config.json"
