@@ -110,6 +110,11 @@ export async function inventoryOf(t, agent, home) {
   return s.exec("return document.querySelector('.panel.items').innerText");
 }
 
+// Whether an option or the field shows the Project at `path`: from step 1.3
+// on, while claude-code-shape-home is chosen, the root's project reads
+// "<path> · 1 location couldn't be read".
+export const showsProject = (text, path) => text === path || (text ?? "").startsWith(`${path} · `);
+
 export async function project(t, path) {
   await choose(t.s, "Project", path);
   await t.s.until(() => t.s.exec("return !document.querySelector('.loading')"), { what: "the Project read" });

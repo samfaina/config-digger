@@ -399,6 +399,37 @@
           ]
         },
         {
+          "id": "1.5",
+          "title": "El campo Project cuenta las Read failures que muestra el Inventario",
+          "goal": "La opción de un Project, el distintivo «this Project» y el aviso cuentan solo las Read failures de los homes elegidos, así que dicen lo mismo y cambian al elegir otro home.",
+          "instructions": [
+            "Sigue en el Inventario del paso 1.3.",
+            "En el campo Project de la cabecera, elige No Project.",
+            "En el panel de Agents, elige Claude Code.",
+            "Elige el home claude-code-home.",
+            "Abre el campo Project y mira la opción E:\\cd-throwaway\\project.",
+            "Elige E:\\cd-throwaway\\project.",
+            "Mira junto a «Project» en la cabecera y encima de los Items.",
+            "Elige el home claude-code-shape-home.",
+            "Mira junto a «Project» en la cabecera y encima de los Items.",
+            "Abre el campo Project, mira la opción E:\\cd-throwaway\\project y cierra el panel con Escape."
+          ],
+          "commands": [],
+          "expect": [
+            "Con claude-code-home, la opción sale como «E:\\cd-throwaway\\project», sin «couldn't be read».",
+            "Con claude-code-home y el Project elegido, junto a «Project» no sale ningún distintivo.",
+            "Con claude-code-home y el Project elegido, encima de los Items no sale ningún aviso «couldn't be read».",
+            "Con claude-code-shape-home, junto a «Project» sale un distintivo con «1».",
+            "Con claude-code-shape-home, el aviso de arriba dice «1 location couldn't be read.».",
+            "Con claude-code-shape-home, la opción sale como «E:\\cd-throwaway\\project · 1 location couldn't be read»."
+          ],
+          "covers": ["#335"],
+          "automation": [
+            { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/data.mjs > 1.5" },
+            { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/data.mjs > 1.5" }
+          ]
+        },
+        {
           "id": "1.4",
           "title": "Un plugin sincronizado desde claude.ai",
           "goal": "Un plugin que Claude Code sincroniza desde claude.ai sale como cloud mirror de solo lectura, con el aviso de la gate de sincronización de plugins y sin Disable.",

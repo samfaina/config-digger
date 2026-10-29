@@ -7,6 +7,7 @@ import { commands, type ActionPreview, type Change, type Entry, type Home, type 
 import { EntryCard } from "./EntryCard";
 import { Banner, HomesPane, InventoryScreen } from "./Inventory";
 import { entry, home, inventory } from "./testData";
+import { homeChoices } from "./view";
 
 vi.mock("./bindings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./bindings")>();
@@ -87,6 +88,8 @@ describe("a keyboard user on the banner", () => {
       <Banner
         inventory={inventory({ read_at: "2026-10-20T09:30:12Z" })}
         project={null}
+        choices={homeChoices()}
+        selection={{ agent: "all", homes: {} }}
         agentName="All Agents"
         stats={{ items: 0, inUse: 0, noEffect: 0 }}
         reading={false}

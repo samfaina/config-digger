@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { rereadAfter } from "./acting";
-import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, State, Verb } from "./bindings";
+import type { AgentFlag, AlsoReadBy, BuiltServer, Entry, Home, Inventory, Item, ReadFailure, State, Verb } from "./bindings";
 import { NOTICE_MS, type Notify } from "./desktop";
 import type { DropdownOption } from "./dropdown";
 import { EmptyInventory } from "./EmptyInventory";
@@ -146,6 +146,8 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
       <Banner
         inventory={inventory}
         project={project}
+        choices={homeChoice}
+        selection={selection}
         agentName={agentName}
         stats={agentStats(shown)}
         reading={reading}
@@ -223,16 +225,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 The inventory couldn't be read: {error.message}
               </div>
             )}
-            {failures.length > 0 && (
-              <div className="alert" role="status">
-                <Icon name="flag" small />
-                {couldNotBeRead(failures.length)}.
-                <span className="grow" />
-                <button type="button" className="link" onClick={() => setDetail({ kind: "failures" })}>
-                  View
-                </button>
-              </div>
-            )}
+            <FailuresNotice failures={failures} onView={() => setDetail({ kind: "failures" })} />
             {flags.map((flag) => (
               <Tooltip key={`${flag.agent}|${flag.home}|${flag.code}|${flag.path}`} text={flag.path}>
                 <div className="alert" role="status" tabIndex={0}>
@@ -308,6 +301,21 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   );
 }
 
+/** How many locations of the context couldn't be read, over the Items, with View to list them. */
+export function FailuresNotice({ failures, onView }: { failures: ReadFailure[]; onView: () => void }) {
+  if (failures.length === 0) return null;
+  return (
+    <div className="alert" role="status">
+      <Icon name="flag" small />
+      {couldNotBeRead(failures.length)}.
+      <span className="grow" />
+      <button type="button" className="link" onClick={onView}>
+        View
+      </button>
+    </div>
+  );
+}
+
 /** A flag with how many locations couldn't be read in `where`. */
 function FailureBadge({ count, where }: { count: number; where: string }) {
   if (count === 0) return null;
@@ -324,6 +332,9 @@ function FailureBadge({ count, where }: { count: number; where: string }) {
 type BannerProps = {
   inventory: Inventory | null;
   project: string | null;
+  /** The homes the user chose, from which another Project's option counts what picking it shows. */
+  choices: HomeChoices;
+  selection: Selection;
   agentName: string;
   stats: AgentStats;
   reading: boolean;
@@ -336,15 +347,19 @@ type BannerProps = {
 /**
  * The Project field's value, its options and what a choice does: `selectProject`
  * loads the chosen Project, or no Project, whether a click or a key chose it.
+ * Each option counts the Read failures of its Project that picking it shows,
+ * as `projectFailures` counts them.
  */
 export function projectField(
   inventory: Inventory | null,
   project: string | null,
+  selection: Selection,
+  choices: HomeChoices,
   selectProject: (project: string | null) => void,
 ): { value: string; options: DropdownOption[]; onChange: (value: string) => void } {
   const projects = inventory?.projects ?? [];
   const option = (path: string, group?: string): DropdownOption => {
-    const failed = projectFailures(inventory?.read_failures ?? [], path);
+    const failed = inventory ? projectFailures(inventory, path, choices, selection) : 0;
     return { value: path, label: failed > 0 ? `${path} · ${couldNotBeRead(failed)}` : path, group };
   };
   const present = projects.filter((p) => !p.missing).map((p) => p.path);
@@ -363,9 +378,7 @@ export function projectField(
 }
 
 /** Items in use, the current Agent, the Project selector, the read time and Refresh. */
-export function Banner({ inventory, project, agentName, stats, reading, rereading, refresh, selectProject }: BannerProps) {
-  const failuresOf = (path: string) => projectFailures(inventory?.read_failures ?? [], path);
-
+export function Banner({ inventory, project, choices, selection, agentName, stats, reading, rereading, refresh, selectProject }: BannerProps) {
   return (
     <header className="panel banner">
       <Ring done={stats.inUse} total={stats.items} />
@@ -376,14 +389,14 @@ export function Banner({ inventory, project, agentName, stats, reading, rereadin
       <div>
         <div className="caption">
           Project
-          {project !== null && <FailureBadge count={failuresOf(project)} where="this Project" />}
+          {project !== null && inventory && <FailureBadge count={projectFailures(inventory, project, choices, selection)} where="this Project" />}
         </div>
         <Select
           className="banner-select"
           label="Project"
           tooltip={project ?? undefined}
           searchLabel="Search Projects"
-          {...projectField(inventory, project, selectProject)}
+          {...projectField(inventory, project, selection, choices, selectProject)}
         />
       </div>
       <div>

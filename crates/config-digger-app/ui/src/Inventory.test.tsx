@@ -1,15 +1,15 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
-import type { Item, LastOpened, LinkKind, Project, State } from "./bindings";
+import type { Item, LastOpened, LinkKind, Project, ReadFailure, State } from "./bindings";
 import { CLOSED, onKey, onOptionClick } from "./dropdown";
 import { EntryCard } from "./EntryCard";
-import { Banner, homeLabel, HomesPane, projectField, StateBars } from "./Inventory";
+import { Banner, FailuresNotice, homeLabel, HomesPane, projectField, StateBars } from "./Inventory";
 import { ReadProgress } from "./Loading";
 import { LinkTag } from "./Location";
 import { applyReaction } from "./Select";
 import { entry, home, inventory } from "./testData";
-import { chosenHomes, homeChoices, withHomeChosen, withProjectChosen } from "./view";
+import { chosenHomes, failuresInContext, homeChoices, lastOpenedHomes, withHomeChosen, withProjectChosen } from "./view";
 
 // A tooltip portals into `document.body`, which a render to markup has not.
 vi.mock("./Tooltip", () => ({ Tooltip: ({ children }: { children: ReactElement }) => children }));
@@ -273,7 +273,7 @@ describe("a key on the closed Project field", () => {
   /** The Projects the field loads on `key`, pressed on it closed while it shows `shown`, and whether its panel opens. */
   function press(key: string, shown: string | null) {
     const loaded: (string | null)[] = [];
-    const field = projectField(read, shown, (next) => loaded.push(next));
+    const field = projectField(read, shown, { agent: "all", homes: {} }, homeChoices(), (next) => loaded.push(next));
     const state = applyReaction(onKey(CLOSED, field.options, field.value, { key, altKey: false }, 0), field.onChange);
     return { loaded, open: state.open };
   }
@@ -288,7 +288,7 @@ describe("a key on the closed Project field", () => {
 
   test("loads the Project it moves to as a click on it does", () => {
     const clicked: (string | null)[] = [];
-    const field = projectField(read, first, (next) => clicked.push(next));
+    const field = projectField(read, first, { agent: "all", homes: {} }, homeChoices(), (next) => clicked.push(next));
     const at = field.options.findIndex((option) => option.value === second);
     applyReaction(onOptionClick({ ...CLOSED, open: true }, field.options, field.value, at), field.onChange);
 
@@ -312,6 +312,8 @@ describe("the banner while a newly chosen Project is read", () => {
     <Banner
       inventory={inventory({ project: before, projects: [project(before), project(chosen)] })}
       project={chosen}
+      choices={homeChoices()}
+      selection={{ agent: "all", homes: {} }}
       agentName="All Agents"
       stats={{ items: 0, inUse: 0, noEffect: 0 }}
       reading
@@ -328,6 +330,88 @@ describe("the banner while a newly chosen Project is read", () => {
   test("runs the reading bar and says Reading on Refresh", () => {
     expect(markup).toContain(renderToStaticMarkup(<ReadProgress text="Reading the inventory again" />));
     expect(markup).toMatch(/<button type="button" class="cta secondary" disabled="">.*Reading<\/button>/);
+  });
+});
+
+describe("the Project field and the notice of the Read failures", () => {
+  const picked = String.raw`E:\cd-throwaway\project`;
+  const other = String.raw`E:\cd-throwaway\project-extra`;
+  const shapeHome = String.raw`E:\cd-throwaway\claude-code-shape-home`;
+  const claudeCode = { agent: "claude-code", agent_name: "Claude Code" };
+  const homes = [home({ ...claudeCode }), home({ ...claudeCode, home: shapeHome, folder: shapeHome, source: { kind: "added" } })];
+  const failure: ReadFailure = {
+    ...claudeCode,
+    home: shapeHome,
+    path: String.raw`${shapeHome}\.claude.json`,
+    project: picked,
+    location: null,
+    kind: "shape",
+    position: null,
+    reaction: "unknown",
+    sentence: "Claude Code can't read it.",
+    notes: [],
+    warnings: [],
+  };
+
+  const opened = lastOpened(shapeHome, { agent: "claude-code", name: null, sentence: "" });
+
+  /**
+   * The Project field's label of a path, the banner and the notice, with the
+   * home `chosen` for Claude Code and `shown` in the field, while the
+   * inventory of `readFor` is shown, `shown`'s once it is read.
+   */
+  function screenWith(shown: string | null, chosen: string, { last_opened = [] as LastOpened[], readFor = shown } = {}) {
+    const projects = [project(picked, false, last_opened), project(other)];
+    const read = inventory({ project: readFor, projects, homes, read_failures: [failure] });
+    const choices = withProjectChosen(withHomeChosen(homeChoices(), "claude-code", chosen), read.projects, shown);
+    const selection = { agent: "all", homes: chosenHomes(read.homes, choices, read.items, lastOpenedHomes(read)) };
+    const label = (path: string) => projectField(read, shown, selection, choices, () => {}).options.find((o) => o.value === path)?.label;
+    const banner = renderToStaticMarkup(
+      <Banner
+        inventory={read}
+        project={shown}
+        choices={choices}
+        selection={selection}
+        agentName="All Agents"
+        stats={{ items: 0, inUse: 0, noEffect: 0 }}
+        reading={false}
+        rereading={false}
+        refresh={() => {}}
+        selectProject={() => {}}
+      />,
+    );
+    const notice = renderToStaticMarkup(<FailuresNotice failures={failuresInContext(read.read_failures, read.project, selection)} onView={() => {}} />);
+    return { label, banner, notice };
+  }
+  const badge = (banner: string) => banner.match(/<span class="badge">.*?<\/span>/)?.[0] ?? null;
+
+  test("count nothing of a failure in a home the Project doesn't open on, before or after it is picked", () => {
+    expect(screenWith(null, "default").label(picked)).toBe(picked);
+    const after = screenWith(picked, "default");
+    expect(after.label(picked)).toBe(picked);
+    expect(badge(after.banner)).toBeNull();
+    expect(after.notice).toBe("");
+  });
+
+  test("count a failure in the home chosen alike in the option, the badge and the notice", () => {
+    expect(screenWith(null, shapeHome).label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    const after = screenWith(picked, shapeHome);
+    expect(after.label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    expect(badge(after.banner)).toMatch(/>1<\/span>$/);
+    expect(after.notice).toContain("1 location couldn&#x27;t be read.");
+  });
+
+  test("count a failure in the Project's Last-opened home before it is picked and in the notice after", () => {
+    expect(screenWith(null, "default", { last_opened: [opened] }).label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    const after = screenWith(picked, "default", { last_opened: [opened] });
+    expect(badge(after.banner)).toMatch(/>1<\/span>$/);
+    expect(after.notice).toContain("1 location couldn&#x27;t be read.");
+  });
+
+  test("count what the Project picked opens on while it is read, not the homes of the Project read before", () => {
+    const reading = screenWith(picked, "default", { last_opened: [opened], readFor: null });
+    expect(reading.label(picked)).toBe(`${picked} · 1 location couldn't be read`);
+    expect(badge(reading.banner)).toMatch(/>1<\/span>$/);
   });
 });
 

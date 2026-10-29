@@ -1,6 +1,7 @@
 // Section 1: the throwaway data, and the Agent homes added through the app.
-import { press } from "../lib.mjs";
-import { addHome, inventoryOf, openItem, project } from "./common.mjs";
+import { KEY } from "../driver.mjs";
+import { panel, press, wait } from "../lib.mjs";
+import { addHome, inventoryOf, openItem, project, showsProject } from "./common.mjs";
 
 export default [
   {
@@ -55,6 +56,42 @@ export default [
       t.check(cards.length === 1 && cards[0].tags.includes("Unexpected shape"), "el panel «Read failures» tiene una sola tarjeta, con la etiqueta «Unexpected shape»", JSON.stringify(cards));
       const sentence = `Claude Code cannot read the MCP servers at ${file}#projects.${t.root.replaceAll("\\", "/")}/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.`;
       t.eq(cards[0]?.sentence, sentence, `esa tarjeta dice «${sentence}»`);
+    },
+  },
+  {
+    id: "1.5",
+    async run(t) {
+      const { s } = t;
+      const path = `${t.root}\\project`;
+      const shown = () =>
+        s.exec(`
+          const a = [...document.querySelectorAll(".panel.items .alert")].find((e) => e.textContent.includes("couldn't be read"));
+          return {
+            badge: document.querySelector(".banner .caption .badge")?.textContent.trim() ?? null,
+            notice: a ? [...a.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim() : null,
+          };`);
+      await project(t, "No Project");
+      await inventoryOf(t, "Claude Code", "claude-code-home");
+      // The text of the Project's option, read with the field's panel open, which Escape closes.
+      const label = async () => {
+        const field = await s.find(".banner [role=combobox][aria-label='Project']");
+        await s.click(field);
+        const p = await s.until(() => panel(s), { what: "the panel" });
+        await s.keys(KEY.Escape);
+        await wait(200);
+        return p.options.find((o) => showsProject(o.text, path))?.text ?? null;
+      };
+      t.eq(await label(), path, `con claude-code-home, la opción sale como «${path}», sin «couldn't be read»`);
+      await project(t, path);
+      let now = await shown();
+      t.eq(now.badge, null, "con claude-code-home y el Project elegido, junto a «Project» no sale ningún distintivo");
+      t.eq(now.notice, null, "con claude-code-home y el Project elegido, encima de los Items no sale ningún aviso «couldn't be read»");
+      await inventoryOf(t, "Claude Code", "claude-code-shape-home");
+      now = await shown();
+      t.eq(now.badge, "1", "con claude-code-shape-home, junto a «Project» sale un distintivo con «1»");
+      t.eq(now.notice, "1 location couldn't be read.", "con claude-code-shape-home, el aviso de arriba dice «1 location couldn't be read.»");
+      const counted = `${path} · 1 location couldn't be read`;
+      t.eq(await label(), counted, `con claude-code-shape-home, la opción sale como «${counted}»`);
     },
   },
   {

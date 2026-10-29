@@ -68,7 +68,12 @@ export function withProjectChosen({ choice }: HomeChoices, projects: Project[], 
 export function lastOpenedHomes(inventory: Inventory | null): LastOpened[] {
   const project = inventory?.project;
   if (!inventory || project === null || project === undefined) return [];
-  return inventory.projects.find((p) => samePath(p.path, project))?.last_opened ?? [];
+  return lastOpenedOf(inventory.projects, project);
+}
+
+/** The Last-opened homes of the Project at `project` among `projects`, none when it is not listed. */
+function lastOpenedOf(projects: Project[], project: string): LastOpened[] {
+  return projects.find((p) => samePath(p.path, project))?.last_opened ?? [];
 }
 
 /**
@@ -243,9 +248,27 @@ export function failuresInContext(failures: ReadFailure[], project: string | nul
   );
 }
 
-/** The Read failures that reach only the Project at `project`, in its folder or keyed to it, which badge it. */
-export function projectFailures(failures: ReadFailure[], project: string): number {
-  return failures.filter((failure) => failure.project !== null && samePath(failure.project, project)).length;
+/**
+ * The Read failures keyed to the Project at `project` that the Inventory
+ * shows once it is picked, which badge it. For the inventory's own Project,
+ * those among `failuresInContext` under `selection`, which the notice counts.
+ * For another, those in the homes picking it opens the selected Agents on.
+ */
+export function projectFailures(inventory: Inventory, project: string, choices: HomeChoices, selection: Selection): number {
+  const read = inventory.project !== null && samePath(inventory.project, project);
+  const under = read ? selection : selectionOnPicking(inventory, choices, selection.agent, project);
+  return failuresInContext(inventory.read_failures, project, under).filter((failure) => failure.project !== null).length;
+}
+
+/**
+ * The selection picking the Project at `project` gives, with `agent`
+ * selected: each Agent on the home `chosenHomes` opens it on after
+ * `withProjectChosen`, by that Project's Last-opened homes. Its leftovers are
+ * not known until it is read, so none of them chooses a home.
+ */
+function selectionOnPicking(inventory: Inventory, choices: HomeChoices, agent: string, project: string): Selection {
+  const { homes, projects } = inventory;
+  return { agent, homes: chosenHomes(homes, withProjectChosen(choices, projects, project), [], lastOpenedOf(projects, project)) };
 }
 
 /** The Read failures outside any Project in an Agent home, which badge it. */
