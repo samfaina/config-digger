@@ -3451,8 +3451,9 @@ impl SkillFallback {
 }
 
 /// Why an Agent leaves a skill out of the skills it lists to its model,
-/// because of the skill's own `SKILL.md`. config-digger tells only of a
-/// `SKILL.md` with no frontmatter or with one it reads as YAML.
+/// because of the skill's own `SKILL.md`. config-digger tells of
+/// `no-description` and `disable-model-invocation` only for a `SKILL.md`
+/// with no frontmatter or with one it reads as YAML.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Unlisted {
@@ -3461,6 +3462,12 @@ pub(crate) enum Unlisted {
     /// Its frontmatter sets `disable-model-invocation` to the boolean
     /// `true`.
     DisableModelInvocation,
+    /// Its frontmatter is one config-digger reads as malformed, which the
+    /// Agent cannot parse: YAML that does not parse, a `[` or `{` value
+    /// that never closes, a line that is no key, or a frontmatter that
+    /// opens with `---` and never closes, unless the Agent reads that one
+    /// as none.
+    MalformedFrontmatter,
 }
 
 /// Why an Agent may not read a skill's `SKILL.md` as it is written.

@@ -121,7 +121,7 @@ A setting that limits part of an Entry, such as some of its tools, while the Age
 _Avoid_: Partial disable, partly off
 
 **Unlisted**:
-Said of a skill the Agent loads, and the user can run, that the Agent leaves out of the skills it lists to its model because of its own `SKILL.md`: no description, or `disable-model-invocation: true`. It keeps its State, with a note. Unlike a Partial switch, no setting causes it, so Disable and Enable do not touch it.
+Said of a skill the Agent loads, and the user can run, that the Agent leaves out of the skills it lists to its model because of its own `SKILL.md`: no description, `disable-model-invocation: true`, or a frontmatter the Agent cannot parse. It keeps its State, with a note. Unlike a Partial switch, no setting causes it, so Disable and Enable do not touch it.
 _Avoid_: Hidden skill, user-only skill, model-disabled
 
 **Blocked**:

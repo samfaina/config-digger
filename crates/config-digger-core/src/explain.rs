@@ -2407,6 +2407,7 @@ pub(crate) fn unlisted(agent_name: &str, reasons: &[Unlisted]) -> String {
         .map(|reason| match reason {
             Unlisted::NoDescription => "has no `description`",
             Unlisted::DisableModelInvocation => "sets `disable-model-invocation: true`",
+            Unlisted::MalformedFrontmatter => "has a frontmatter that does not parse",
         })
         .collect();
     format!(

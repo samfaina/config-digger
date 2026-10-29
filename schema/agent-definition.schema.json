@@ -2976,7 +2976,7 @@
       ]
     },
     "Unlisted": {
-      "description": "Why an Agent leaves a skill out of the skills it lists to its model,\nbecause of the skill's own `SKILL.md`. config-digger tells only of a\n`SKILL.md` with no frontmatter or with one it reads as YAML.",
+      "description": "Why an Agent leaves a skill out of the skills it lists to its model,\nbecause of the skill's own `SKILL.md`. config-digger tells of\n`no-description` and `disable-model-invocation` only for a `SKILL.md`\nwith no frontmatter or with one it reads as YAML.",
       "oneOf": [
         {
           "description": "It has no `description`: no frontmatter, or one without the key.",
@@ -2987,6 +2987,11 @@
           "description": "Its frontmatter sets `disable-model-invocation` to the boolean\n`true`.",
           "type": "string",
           "const": "disable-model-invocation"
+        },
+        {
+          "description": "Its frontmatter is one config-digger reads as malformed, which the\nAgent cannot parse: YAML that does not parse, a `[` or `{` value\nthat never closes, a line that is no key, or a frontmatter that\nopens with `---` and never closes, unless the Agent reads that one\nas none.",
+          "type": "string",
+          "const": "malformed-frontmatter"
         }
       ]
     },
