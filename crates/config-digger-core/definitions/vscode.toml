@@ -551,28 +551,46 @@ sources = [
 # configuration changes [docs]. It records each in the `serverTools` of
 # `mcpToolCache`, in the profile's store for a profile's collection and in
 # the workspace's for a workspace's, as `[id, record]` pairs whose record's
-# `trustedAtNonce` is the nonce of the configuration the user trusted and
-# `nonce` that of the one it last ran [docs]. The nonce hashes the launch
-# configuration [docs], which config-digger does not compute. While its
-# file is unchanged, a server whose two nonces match starts without asking
-# [test]. Once its file changes, VS Code no longer starts it without
-# asking, while both nonces still match, before that launch and after it
-# [test]: VS Code writes `nonce` only when it runs the server [binary].
-# config-digger takes such a server to be trusted (#342).
+# `trustedAtNonce` is the nonce of the launch the user trusted and `nonce`
+# that of the one it last ran [docs]. VS Code trusts a server while the
+# nonce of its launch, as the file now gives it, equals `trustedAtNonce`
+# [docs]; it writes `nonce` only when it runs the server [binary], so once
+# the file changes, VS Code no longer starts the server without asking,
+# though both fields still match, before that launch and after it [test].
+#
+# config-digger computes the nonce of a stdio server as VS Code does,
+# `hash = "vscode"`: the SHA-256 of the JSON text of the launch VS Code
+# builds from the file [docs], with the user's home folder as its `cwd`,
+# its drive letter in lower case [test]. The `trustedAtNonce` VS Code
+# writes for a Claude Desktop server, with its `args` and `env`, is that
+# nonce, so the server is Effective once trusted, Blocked once its file
+# changes, and Effective again once VS Code trusts the new launch [test].
+# The launch of an HTTP server, one with a `url`, holds VS Code's own URI
+# object, which config-digger does not build: such a server is taken to be
+# trusted while its record's two fields match, with a caveat that VS Code
+# may ask again if its file changed since VS Code last ran it.
 [[items.mcp.gates]]
+unverified = "VS Code is taken to launch the servers of Cursor's `~/.cursor/mcp.json` and Windsurf's `mcp_config.json` in the user's home folder, as it does Claude Desktop's and as its code says; a probe trusting a server of each would test it."
 block = "nonce-trust"
 locations = ["claude-desktop-mcp", "cursor-global-mcp", "windsurf-mcp"]
 trusted_at = "trustedAtNonce"
 nonce = "nonce"
+hash = "vscode"
+cwd = "user-folder"
 sources = [
   { anchor = { block = "home", root = "state" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
 ]
 
+# A workspace folder's `.cursor\mcp.json` launches its servers with no
+# `cwd`, but VS Code hashes the folder's `fsPath` as one [docs].
 [[items.mcp.gates]]
+unverified = "The nonce of a server of a workspace folder's `.cursor/mcp.json` is taken to hash the folder as config-digger spells the Project, its drive letter in lower case, as VS Code's code says; a probe trusting such a server in a Project, opened by a path in another case too, would test it."
 block = "nonce-trust"
 locations = ["cursor-workspace-mcp"]
 trusted_at = "trustedAtNonce"
 nonce = "nonce"
+hash = "vscode"
+cwd = "project-folder"
 sources = [
   { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcpToolCache", "serverTools"], sqlite = true },
 ]

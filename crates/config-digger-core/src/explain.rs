@@ -1223,6 +1223,15 @@ pub(crate) fn not_trusted(agent_name: &str, name: &str, path: &Path) -> Reason {
     }
 }
 
+/// The caveat of the Entry `name` of the file `path` that `agent_name`
+/// trusts by the nonce of the launch it last ran.
+pub(crate) fn may_ask_trust_again(agent_name: &str, name: &str, path: &Path) -> String {
+    format!(
+        "{agent_name} may ask you to trust `{name}` again before it starts it, if its configuration in {} changed since {agent_name} last ran it.",
+        path.display()
+    )
+}
+
 /// A setting, by its last key, in `path`.
 pub(crate) fn setting(key: &str, path: &Path) -> String {
     format!("`{key}` in {}", path.display())

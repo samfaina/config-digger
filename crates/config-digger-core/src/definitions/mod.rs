@@ -11,9 +11,9 @@ use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
     FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, Interpolation,
-    JsonDialect, JsonFormat, LastOpenedHomes, ListPlugins, Locate, Locator, LookUp, Merge,
-    PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles, SettingOneOf,
-    SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins, Locate, Locator, LookUp,
+    Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles,
+    SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -2388,6 +2388,17 @@ impl AgentDefinition {
                                 .find(|id| !self.location(id).anchor.in_project())
                         {
                             return Err(context(format!("`{id}` is not in a Project")));
+                        }
+                        // The folder a project-folder nonce hashes is the
+                        // Project folder the location's file is read in.
+                        if let Gate::NonceTrust(block) = gate
+                            && block.cwd == LaunchFolder::ProjectFolder
+                            && let Some(id) = block.locations.iter().find(|id| {
+                                let anchor = &self.location(id).anchor;
+                                !anchor.in_project() || anchor.project_file()
+                            })
+                        {
+                            return Err(context(format!("`{id}` is not in a Project folder")));
                         }
                     }
                 }
@@ -5517,6 +5528,27 @@ checks = ["frontmatter", "disable", "precedence"]
         assert_eq!(blocks::djb2(""), "0");
     }
 
+    #[test]
+    fn the_vscode_nonce_of_a_stdio_launch_is_the_trusted_at_nonce_vs_code_wrote() {
+        // A server of Claude Desktop's config, and the `trustedAtNonce` VS
+        // Code 1.129.1, 1.135.0 and 1.141.0 wrote once the user trusted it,
+        // launched in the home folder `E:\cd-throwaway-agents\vscode\nonce\home`
+        // (`uat/agents/vscode.mjs`, its `nonce` run).
+        let server = serde_json::json!({
+            "command": r"C:\Users\kgon1\AppData\Local\Volta\tools\image\node\22.23.1\node.exe",
+            "args": [r"E:\cd-throwaway-agents\vscode\server.mjs", "serve-desktop", "changed"],
+            "env": { "CD_PROBE_SECRET": "not-a-real-secret" }
+        });
+        let home = Path::new(r"E:\cd-throwaway-agents\vscode\nonce\home");
+
+        assert_eq!(
+            blocks::NonceHash::Vscode.of(&server, home).as_deref(),
+            Some("ff8d9a278bd14179abb7585bf8cdac010c27509c2a2d43e20767e3a5e8aebee6")
+        );
+        let http = serde_json::json!({ "url": "https://mcp.example.com/mcp" });
+        assert_eq!(blocks::NonceHash::Vscode.of(&http, home), None);
+    }
+
     /// `VALID` with its location's `anchor`, `format` and `root` lines replaced.
     fn with_location(anchor: &str, format: &str, root: &str) -> String {
         VALID
@@ -5808,6 +5840,35 @@ registries = [{{ block = "json-keys", anchor = {{ block = "machine", path = "%AP
         );
         let text = gated(IN_PROJECT).replace("toml = true", "toml = true, dialect = \"jsonc\"");
         assert!(error(&text).contains("TOML setting"), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_nonce_trust_gate_hashes_a_project_folder_only_for_locations_in_a_project_folder() {
+        let gated = |anchor: &str, cwd: &str| {
+            with_location(
+                anchor,
+                r#"{ block = "json", dialect = "strict" }"#,
+                r#"["servers"]"#,
+            )
+            .replace(
+                r#"checks = ["disable", "precedence"]"#,
+                r#"checks = ["approval", "disable", "precedence"]"#,
+            ) + &format!(
+                "\n[[items.mcp.gates]]\nblock = \"nonce-trust\"\nlocations = [\"user-mcp\"]\nsources = [{{ anchor = {{ block = \"home\", root = \"state\" }}, key_path = [\"trust\"] }}]\ntrusted_at = \"trustedAtNonce\"\nnonce = \"nonce\"\nhash = \"vscode\"\ncwd = \"{cwd}\"\n"
+            )
+        };
+        for (anchor, cwd) in [(IN_PROJECT, "project-folder"), (STATE, "user-folder")] {
+            let text = gated(anchor, cwd);
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        }
+        for anchor in [STATE, r#"{ block = "project-file" }"#] {
+            let text = gated(anchor, "project-folder") + "\n[projects]\nworkspace_files = true\n";
+            assert!(
+                error(&text).contains("`user-mcp` is not in a Project folder"),
+                "{}",
+                error(&text)
+            );
+        }
     }
 
     #[test]

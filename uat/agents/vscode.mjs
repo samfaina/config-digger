@@ -6,7 +6,7 @@
 // and Claude Desktop's config, is throwaway too. It runs beside a VS Code
 // the user has open, and stops only the processes of its own launches.
 //
-//   node uat/agents/vscode.mjs [--bin <Code.exe>] [--sign-in]
+//   node uat/agents/vscode.mjs [--bin <Code.exe>] [--cli <config-digger.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
 // `files`, `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
@@ -27,7 +27,7 @@
 // profile `--sign-in` opens for the owner: `vscode-account` in the probe
 // root, or the folder `CD_PROBE_VSCODE_ACCOUNT` names there, whose name
 // starts the same. The other launches sign in to nothing.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -46,6 +46,18 @@ const commit = fs.readdirSync(path.dirname(bin)).find((f) => fs.existsSync(path.
 // and the built-in extensions.
 const app = path.join(path.dirname(bin), commit, "resources", "app");
 const version = json(path.join(app, "product.json")).version;
+// The CLI of config-digger that the `nonce` launch asks, `--cli`, or else
+// the debug build of this checkout, which `cargo build -p
+// config-digger-cli` makes.
+let cliPath = process.argv.includes("--cli") ? process.argv[process.argv.indexOf("--cli") + 1] : null;
+const configDigger = () => {
+  if (!cliPath) {
+    const metadata = spawnSync("cargo", ["metadata", "--format-version", "1", "--no-deps"], { encoding: "utf8", maxBuffer: 1 << 26 });
+    cliPath = path.join(JSON.parse(metadata.stdout).target_directory, "debug", "config-digger.exe");
+  }
+  if (!fs.existsSync(cliPath)) throw new Error(`no config-digger CLI at ${cliPath}: run cargo build -p config-digger-cli, or pass --cli`);
+  return cliPath;
+};
 
 const powershell = async (command) => (await run("powershell.exe", ["-NoProfile", "-Command", command])).stdout.trim();
 // The PowerShell that lists the processes given the data folder `data`.
@@ -631,27 +643,47 @@ if (runs("trust")) {
 
 // A server of Claude Desktop's config, which VS Code trusts at the nonce of
 // its launch configuration. It answers VS Code, which records the nonce of
-// the configuration it last ran in the profile's `mcpToolCache`.
+// the configuration it last ran in the profile's `mcpToolCache`. The CLI of
+// config-digger, built from this checkout, reads the launch's profile as a
+// home it added, with the launch's home folder and app data as the user's,
+// and says whether the server's nonce, as it computes it, is the one VS
+// Code trusted.
 if (runs("nonce")) {
   const dir = fresh("nonce", base);
   const d = folders(dir);
   const proj = path.join(dir, "proj");
   fs.mkdirSync(proj, { recursive: true });
-  const id = "claude-desktop.null.cd-throwaway-serve-desktop";
-  const desktop = (...extra) => claudeDesktop(d, { mcpServers: { "cd-throwaway-serve-desktop": server("serve-desktop", { args: [script, "serve-desktop", ...extra] }) } });
+  const name = "cd-throwaway-serve-desktop";
+  const id = `claude-desktop.null.${name}`;
+  const desktop = (...extra) =>
+    claudeDesktop(d, { mcpServers: { [name]: server("serve-desktop", { args: [script, "serve-desktop", ...extra], env: { CD_PROBE_SECRET: "not-a-real-secret" } }) } });
   const record = () => rows(d.global, ["mcpToolCache"]).mcpToolCache?.serverTools?.find(([key]) => key === id)?.[1] ?? null;
   const matching = (r) => typeof r?.nonce === "string" && r.nonce === r.trustedAtNonce;
   const settings = { "chat.mcp.discovery.enabled": { "claude-desktop": true } };
   // Starting with `promptType: "never"` starts a trusted server only.
   const untrusting = { settings, start: { promptType: "never" } };
+  const env = { USERPROFILE: d.home, APPDATA: d.appData, LOCALAPPDATA: path.join(d.home, "AppData", "Local") };
+  // The State config-digger gives the server, and its reason's code.
+  const seen = async () => {
+    const { stdout } = await run(configDigger(), ["--json", "--no-project", "show", name, "--agent", "vscode", "--home", d.user], { env });
+    const entry = JSON.parse(stdout).item?.entries?.[0];
+    return [entry?.state, entry?.reason?.code].filter(Boolean).join(" ");
+  };
   desktop();
   const trusting = await launch(dir, proj, { settings });
   const trusted = record();
+  const added = await run(configDigger(), ["homes", "add", d.user, "--agent", "vscode"], { env });
+  if (added.code !== 0) throw new Error(`config-digger homes add failed: ${added.stdout}${added.stderr}`);
+  const trustedSeen = await seen();
   const again = await launch(dir, proj, untrusting);
   desktop("changed");
   const before = record();
+  const changedSeen = await seen();
   const changed = await launch(dir, proj, untrusting);
   const after = record();
+  const retrusting = await launch(dir, proj, { settings });
+  const retrusted = record();
+  const retrustedSeen = await seen();
 
   await p.check("items.mcp.gates[1]", "once trusted, a discovered server starts without asking while its file is unchanged, its record's `trustedAtNonce` and `nonce` matching", async () =>
     same(
@@ -661,6 +693,12 @@ if (runs("nonce")) {
   );
   await p.check("items.mcp.gates[1]", "once its file changes, VS Code no longer starts it without asking, though its record's two nonces still match, before that launch and after it", async () =>
     same({ started: changed.tags, before: matching(before), after: matching(after) }, { started: [], before: true, after: true }),
+  );
+  await p.check("items.mcp.gates[1]", "the `trustedAtNonce` VS Code writes is the nonce config-digger computes for a stdio server, with its `args` and `env`, in the home folder: Effective once trusted, Blocked with `not_approved` once its file changes, and Effective again once VS Code trusts the new launch at a new nonce", async () =>
+    same(
+      { trusted: trustedSeen, changed: changedSeen, retrusted: retrustedSeen, started: retrusting.tags, renewed: typeof retrusted?.trustedAtNonce === "string" && retrusted.trustedAtNonce !== trusted?.trustedAtNonce },
+      { trusted: "effective", changed: "blocked not_approved", retrusted: "effective", started: ["serve-desktop"], renewed: true },
+    ),
   );
 }
 

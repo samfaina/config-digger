@@ -4,8 +4,8 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Disables, FolderTrust, Gate,
-    Holds, JsonFormat, ListPlugins, Malformed, Merge, Parse, PolicyField, Provenance, SettingIs,
-    SkillDefect, SkillFallback,
+    Holds, JsonFormat, ListPlugins, Malformed, Merge, NonceTrust, Parse, PolicyField, Provenance,
+    SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::Strength;
 use crate::definitions::{
@@ -464,6 +464,12 @@ pub(crate) fn resolve(
                     let mut gate_caveats =
                         gate_caveats(definition, snapshot, entry, project_key.map(String::as_str));
                     gate_caveats.extend(account_caveat(
+                        definition,
+                        snapshot,
+                        entry,
+                        project_key.map(String::as_str),
+                    ));
+                    gate_caveats.extend(nonce_caveat(
                         definition,
                         snapshot,
                         entry,
@@ -2298,22 +2304,66 @@ pub(crate) fn gates(
                 (!approved).then_some((Check::Approval, reason))
             }
             Gate::NonceTrust(block) => {
-                let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
-                let trusted = (0..block.sources.len()).any(|source| {
-                    let owner = SettingOwner::Gate {
-                        gate: index,
-                        source,
-                    };
-                    snapshot
-                        .settings_for(entry, location.kind, owner, project)
-                        .filter_map(|value| value.value.as_ref())
-                        .any(|value| block.trusts(value, id))
-                });
+                let trusted = nonce_trusted(snapshot, entry, location.kind, index, block, project);
                 let reason = explain::not_trusted(agent_name, &entry.name, &entry.path);
                 (!trusted).then_some((Check::Approval, reason))
             }
         })
         .collect()
+}
+
+/// Whether a source of the nonce-trust gate `block`, the gate at `gate`
+/// among those of `kind`, trusts `entry` in the context of the Project with
+/// the key `project`.
+fn nonce_trusted(
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    kind: ItemKind,
+    gate: usize,
+    block: &NonceTrust,
+    project: Option<&str>,
+) -> bool {
+    let id = entry.switch_id.as_deref().unwrap_or(&entry.name);
+    let nonce = entry.config_hash.as_deref();
+    (0..block.sources.len()).any(|source| {
+        let owner = SettingOwner::Gate { gate, source };
+        snapshot
+            .settings_for(entry, kind, owner, project)
+            .filter_map(|value| value.value.as_ref())
+            .any(|value| block.trusts(value, id, nonce))
+    })
+}
+
+/// The caveat of `entry` when a nonce-trust gate trusts it in the context
+/// of the Project with the key `project` by the nonce of the launch the
+/// Agent last ran, config-digger having none of its own for it.
+fn nonce_caveat(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    project: Option<&str>,
+) -> Option<api::Caveat> {
+    if entry.config_hash.is_some() {
+        return None;
+    }
+    let location = definition.location(&entry.location);
+    let trusted = definition
+        .rules(location.kind)
+        .gates
+        .iter()
+        .enumerate()
+        .any(|(index, gate)| match gate {
+            Gate::NonceTrust(block) if gate.covers(&location.id) => {
+                nonce_trusted(snapshot, entry, location.kind, index, block, project)
+            }
+            _ => false,
+        });
+    let agent_name = &definition.agent.name;
+    trusted.then(|| api::Caveat {
+        code: api::CaveatCode::MayAskTrustAgain,
+        path: entry.path.clone(),
+        sentence: explain::may_ask_trust_again(agent_name, &entry.name, &entry.path),
+    })
 }
 
 /// A folder-trust gate, the gate at `gate` among those of `kind`, as the

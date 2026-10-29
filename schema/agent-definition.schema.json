@@ -4949,7 +4949,7 @@
           ]
         },
         {
-          "description": "Entries the Agent uses only once the user trusts them, and asks about\nagain whenever their configuration changes, such as the servers VS Code\ndiscovers in other apps' files: one no source trusts is Blocked, with\n`not_approved`. A source holds a list of `[id, record]` pairs, each id\nas the location's `switch_id` makes it, and the Entry is trusted while\nits record's `trusted_at` field equals its `nonce` field. config-digger\ncannot tell whether the configuration changed since the Agent recorded\nthe nonce, and never trusts an Entry.",
+          "description": "Entries the Agent uses only once the user trusts them, and asks about\nagain whenever their configuration changes, such as the servers VS Code\ndiscovers in other apps' files: one no source trusts is Blocked, with\n`not_approved`. A source holds a list of `[id, record]` pairs, each id\nas the location's `switch_id` makes it. config-digger computes the nonce\nof the Entry's launch as the Agent does, by `hash` with `cwd`, and the\nEntry is trusted while its record's `trusted_at` field equals it, so\nthat changing a trusted Entry Blocks it again. For an Entry `hash` gives\nno nonce, such as an HTTP server, it is trusted while its record's\n`trusted_at` field equals its `nonce` field, the nonce of the launch the\nAgent last ran, with a caveat that the Agent may ask again if the Entry\nchanged since. config-digger never trusts an Entry.",
           "type": "object",
           "properties": {
             "locations": {
@@ -4971,8 +4971,16 @@
               "type": "string"
             },
             "nonce": {
-              "description": "The field of a record holding the nonce of the configuration the\nAgent last saw.",
+              "description": "The field of a record holding the nonce of the launch the Agent\nlast ran.",
               "type": "string"
+            },
+            "hash": {
+              "description": "How the Agent computes the nonce of an Entry's launch.",
+              "$ref": "#/$defs/NonceHash"
+            },
+            "cwd": {
+              "description": "The folder the nonce takes as the launch's working folder.",
+              "$ref": "#/$defs/LaunchFolder"
             },
             "block": {
               "type": "string",
@@ -4988,7 +4996,9 @@
             "locations",
             "sources",
             "trusted_at",
-            "nonce"
+            "nonce",
+            "hash",
+            "cwd"
           ]
         },
         {
@@ -5151,6 +5161,31 @@
           "description": "In its settings of MCP servers.",
           "type": "string",
           "const": "mcp-settings"
+        }
+      ]
+    },
+    "NonceHash": {
+      "description": "How an Agent computes the nonce of an Entry's launch to tell whether it\nchanged since the user trusted it. config-digger computes it from the\nEntry as written, Secrets included, and never shows it.",
+      "oneOf": [
+        {
+          "description": "VS Code's, for a server it discovers in another app's file: the\nSHA-256, in lower-case hexadecimal, of the JSON text of the stdio\nlaunch it builds, `{\"type\":1,\"args\":…,\"command\":…,\"env\":…,\"cwd\":…}`\nin that order, its `args` `[]` and its `env` `{}` when the server's\nare missing or false, its `command` left out when missing, and its\n`cwd` the folder as VS Code's `fsPath` writes it, a drive letter in\nlower case. A server with a `url` has none.",
+          "type": "string",
+          "const": "vscode"
+        }
+      ]
+    },
+    "LaunchFolder": {
+      "description": "The folder an Agent launches an Entry in, which its nonce hashes.",
+      "oneOf": [
+        {
+          "description": "The user's home folder.",
+          "type": "string",
+          "const": "user-folder"
+        },
+        {
+          "description": "The folder of the Project its file is in: for a workspace file, the\nmember folder holding it.",
+          "type": "string",
+          "const": "project-folder"
         }
       ]
     },

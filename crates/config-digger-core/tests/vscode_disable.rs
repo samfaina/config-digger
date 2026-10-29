@@ -819,16 +819,50 @@ fn with_workspace_trust_turned_off_no_folder_needs_trust() {
     assert_eq!(code(item(&inventory, "supabase").state), "effective");
 }
 
+/// Claude Desktop's server `filesystem`, as [`discovering_claude_desktop`]
+/// writes it.
+fn filesystem_server() -> Value {
+    json!({
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", r"C:\Users\fixture\Documents"],
+        "env": { "FS_TOKEN": "not-a-real-secret" }
+    })
+}
+
+/// The nonce of [`filesystem_server`]'s launch in the user's folder,
+/// `c:\Users\fixture`, as VS Code's code computes it: the SHA-256 of the
+/// JSON text of `{"type":1,"args":…,"command":"npx","env":…,"cwd":…}`.
+const FILESYSTEM_NONCE: &str = "431992294caf06e857cbf1a75a4b3a9f3b1739192c0e1f69815c97a09129d7c2";
+
 /// `fs` with Claude Desktop's server `filesystem`, which VS Code discovers.
 fn discovering_claude_desktop(fs: FakeFileSystem) -> FakeFileSystem {
-    fs.with_file(
-        format!(r"{APP_DATA}\Claude\claude_desktop_config.json"),
-        r#"{ "mcpServers": { "filesystem": { "command": "npx" } } }"#,
-    )
-    .with_file(
+    with_claude_desktop_server(fs, filesystem_server()).with_file(
         format!(r"{USER}\settings.json"),
         r#"{ "chat.mcp.discovery.enabled": { "claude-desktop": true } }"#,
     )
+}
+
+/// `fs` whose Claude Desktop config holds `server` as `filesystem`.
+fn with_claude_desktop_server(fs: FakeFileSystem, server: Value) -> FakeFileSystem {
+    fs.with_file(
+        format!(r"{APP_DATA}\Claude\claude_desktop_config.json"),
+        json!({ "mcpServers": { "filesystem": server } }).to_string(),
+    )
+}
+
+/// `fs` whose store `store` records the server `id` as trusted at
+/// `trusted_at` and last run at `nonce`, in VS Code's `mcpToolCache`.
+fn with_server_record(
+    fs: FakeFileSystem,
+    store: PathBuf,
+    id: &str,
+    trusted_at: &str,
+    nonce: &str,
+) -> FakeFileSystem {
+    let cache = json!({ "serverTools": [[id, {
+        "serverName": id, "nonce": nonce, "trustedAtNonce": trusted_at
+    }]] });
+    fs.with_sqlite_item(store, "mcpToolCache", &cache.to_string())
 }
 
 #[test]
@@ -844,30 +878,114 @@ fn a_discovered_server_is_blocked_until_the_user_trusts_it() {
 }
 
 #[test]
-fn a_discovered_server_trusted_at_the_nonce_vs_code_last_saw_is_effective() {
-    let cache = |trusted_at: &str| {
-        json!({ "serverTools": [["claude-desktop.null.filesystem", {
-            "serverName": "filesystem", "nonce": "n2", "trustedAtNonce": trusted_at
-        }]] })
-        .to_string()
-    };
-    let trusted = discovering_claude_desktop(vscode()).with_sqlite_item(
+fn a_discovered_server_trusted_at_the_nonce_of_its_launch_is_effective() {
+    let fs = with_server_record(
+        discovering_claude_desktop(vscode()),
         profile_store(),
-        "mcpToolCache",
-        &cache("n2"),
+        "claude-desktop.null.filesystem",
+        FILESYSTEM_NONCE,
+        FILESYSTEM_NONCE,
     );
-    let changed = discovering_claude_desktop(vscode()).with_sqlite_item(
-        profile_store(),
-        "mcpToolCache",
-        &cache("n1"),
-    );
+    let inventory = inventory(&core(&fs), &context(None));
 
-    let state_of = |fs: &FakeFileSystem| {
-        let inventory = inventory(&core(fs), &context(None));
-        code(item(&inventory, "filesystem").state)
+    let filesystem = item(&inventory, "filesystem");
+    assert_eq!(code(filesystem.state), "effective");
+    assert!(filesystem.entries[0].caveats.is_empty());
+}
+
+#[test]
+fn a_discovered_server_whose_file_changed_since_the_user_trusted_it_is_blocked() {
+    let mut new_args = filesystem_server();
+    new_args["args"][2] = json!(r"C:\Users\fixture\Desktop");
+    let mut new_env = filesystem_server();
+    new_env["env"]["FS_TOKEN"] = json!("another-not-a-real-secret");
+
+    for changed in [new_args, new_env] {
+        // VS Code writes `nonce` only when it runs the server, so both
+        // fields still hold the nonce of the launch the user trusted.
+        let fs = with_server_record(
+            with_claude_desktop_server(discovering_claude_desktop(vscode()), changed.clone()),
+            profile_store(),
+            "claude-desktop.null.filesystem",
+            FILESYSTEM_NONCE,
+            FILESYSTEM_NONCE,
+        );
+        let inventory = inventory(&core(&fs), &context(None));
+
+        let filesystem = item(&inventory, "filesystem");
+        assert_eq!(code(filesystem.state), "blocked", "{changed}");
+        let reason = filesystem.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "not_approved");
+    }
+}
+
+#[test]
+fn a_discovered_http_server_is_trusted_while_its_record_s_two_nonces_match_with_a_caveat() {
+    let discovering = with_claude_desktop_server(
+        discovering_claude_desktop(vscode()),
+        json!({ "url": "https://mcp.example.com/mcp" }),
+    );
+    let at = |trusted_at: &str, nonce: &str| {
+        let fs = with_server_record(
+            discovering.clone(),
+            profile_store(),
+            "claude-desktop.null.filesystem",
+            trusted_at,
+            nonce,
+        );
+        let inventory = inventory(&core(&fs), &context(None));
+        item(&inventory, "filesystem").entries[0].clone()
     };
-    assert_eq!(state_of(&trusted), "effective");
-    assert_eq!(state_of(&changed), "blocked");
+
+    let trusted = at("n2", "n2");
+    assert_eq!(code(trusted.state), "effective");
+    let caveats: Vec<(String, &str)> = trusted
+        .caveats
+        .iter()
+        .map(|caveat| (code(caveat.code), caveat.sentence.as_str()))
+        .collect();
+    assert_eq!(
+        caveats,
+        [(
+            "may_ask_trust_again".to_owned(),
+            r"VS Code may ask you to trust `filesystem` again before it starts it, if its configuration in C:\Users\fixture\AppData\Roaming\Claude\claude_desktop_config.json changed since VS Code last ran it."
+        )]
+    );
+    let changed = at("n1", "n2");
+    assert_eq!(code(changed.state), "blocked");
+    assert_eq!(code(changed.reason.unwrap().code), "not_approved");
+}
+
+#[test]
+fn the_nonce_of_a_server_of_a_project_s_cursor_file_hashes_the_project_s_folder() {
+    // The nonce of `{"command":"node","args":["server.js"]}` launched in
+    // `e:\projects\app`, and in the user's folder `c:\Users\fixture`, as
+    // VS Code's code computes them.
+    let in_project = "efd78b2cfdd6be5d1fa1bc5123bab9c5859c31fe15236c11ec1f89126cceff49";
+    let in_user_folder = "626f87c9b0cbfc3348bb5f26a1e2c9f0bc2f901d63ba0c99153d485a245fa245";
+    let discovering = with_project(vscode(), "app")
+        .with_file(
+            project("app").join(r".cursor\mcp.json"),
+            r#"{ "mcpServers": { "helper": { "command": "node", "args": ["server.js"] } } }"#,
+        )
+        .with_file(
+            format!(r"{USER}\settings.json"),
+            r#"{ "chat.mcp.discovery.enabled": { "cursor-workspace": true } }"#,
+        );
+    let state_at = |nonce: &str| {
+        let fs = with_server_record(
+            discovering.clone(),
+            app_store(),
+            "cursor-workspace.0.helper",
+            nonce,
+            nonce,
+        );
+        let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
+        code(item(&inventory, "helper").state)
+    };
+
+    assert_eq!(state_at(in_project), "effective");
+    assert_eq!(state_at(in_user_folder), "blocked");
 }
 
 /// `fs` whose application store caches the account's policy as `policy`,
@@ -1040,14 +1158,12 @@ fn the_account_s_policy_replaces_the_user_s_mcp_access() {
 
 #[test]
 fn a_profile_s_discovered_server_is_trusted_only_in_the_profile_s_store() {
-    let cache = json!({ "serverTools": [["claude-desktop.null.filesystem", {
-        "nonce": "n2", "trustedAtNonce": "n2"
-    }]] })
-    .to_string();
-    let fs = with_project(discovering_claude_desktop(vscode()), "app").with_sqlite_item(
+    let fs = with_server_record(
+        with_project(discovering_claude_desktop(vscode()), "app"),
         app_store(),
-        "mcpToolCache",
-        &cache,
+        "claude-desktop.null.filesystem",
+        FILESYSTEM_NONCE,
+        FILESYSTEM_NONCE,
     );
     let inventory = inventory(&core(&fs), &context(Some(&project("app"))));
 

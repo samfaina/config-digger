@@ -7744,10 +7744,14 @@ impl ProjectTrust {
 /// again whenever their configuration changes, such as the servers VS Code
 /// discovers in other apps' files: one no source trusts is Blocked, with
 /// `not_approved`. A source holds a list of `[id, record]` pairs, each id
-/// as the location's `switch_id` makes it, and the Entry is trusted while
-/// its record's `trusted_at` field equals its `nonce` field. config-digger
-/// cannot tell whether the configuration changed since the Agent recorded
-/// the nonce, and never trusts an Entry.
+/// as the location's `switch_id` makes it. config-digger computes the nonce
+/// of the Entry's launch as the Agent does, by `hash` with `cwd`, and the
+/// Entry is trusted while its record's `trusted_at` field equals it, so
+/// that changing a trusted Entry Blocks it again. For an Entry `hash` gives
+/// no nonce, such as an HTTP server, it is trusted while its record's
+/// `trusted_at` field equals its `nonce` field, the nonce of the launch the
+/// Agent last ran, with a caveat that the Agent may ask again if the Entry
+/// changed since. config-digger never trusts an Entry.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NonceTrust {
@@ -7757,9 +7761,75 @@ pub(crate) struct NonceTrust {
     pub sources: Vec<SettingPlace>,
     /// The field of a record holding the nonce the user trusted.
     pub trusted_at: String,
-    /// The field of a record holding the nonce of the configuration the
-    /// Agent last saw.
+    /// The field of a record holding the nonce of the launch the Agent
+    /// last ran.
     pub nonce: String,
+    /// How the Agent computes the nonce of an Entry's launch.
+    pub hash: NonceHash,
+    /// The folder the nonce takes as the launch's working folder.
+    pub cwd: LaunchFolder,
+}
+
+/// How an Agent computes the nonce of an Entry's launch to tell whether it
+/// changed since the user trusted it. config-digger computes it from the
+/// Entry as written, Secrets included, and never shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum NonceHash {
+    /// VS Code's, for a server it discovers in another app's file: the
+    /// SHA-256, in lower-case hexadecimal, of the JSON text of the stdio
+    /// launch it builds, `{"type":1,"args":…,"command":…,"env":…,"cwd":…}`
+    /// in that order, its `args` `[]` and its `env` `{}` when the server's
+    /// are missing or false, its `command` left out when missing, and its
+    /// `cwd` the folder as VS Code's `fsPath` writes it, a drive letter in
+    /// lower case. A server with a `url` has none.
+    Vscode,
+}
+
+/// The folder an Agent launches an Entry in, which its nonce hashes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum LaunchFolder {
+    /// The user's home folder.
+    UserFolder,
+    /// The folder of the Project its file is in: for a workspace file, the
+    /// member folder holding it.
+    ProjectFolder,
+}
+
+impl NonceHash {
+    /// The nonce of the launch of the Entry `config`, as written, in the
+    /// folder `cwd`; `None` for an Entry it gives none.
+    pub fn of(self, config: &Value, cwd: &Path) -> Option<String> {
+        match self {
+            NonceHash::Vscode => {
+                if truthy(config, "url") {
+                    return None;
+                }
+                let or = |field: &str, missing: Value| {
+                    config
+                        .get(field)
+                        .filter(|_| truthy(config, field))
+                        .cloned()
+                        .unwrap_or(missing)
+                };
+                let mut launch = serde_json::Map::new();
+                launch.insert("type".to_owned(), Value::from(1));
+                launch.insert("args".to_owned(), or("args", Value::Array(Vec::new())));
+                if let Some(command) = config.get("command") {
+                    launch.insert("command".to_owned(), command.clone());
+                }
+                launch.insert(
+                    "env".to_owned(),
+                    or("env", Value::Object(Default::default())),
+                );
+                launch.insert("cwd".to_owned(), Value::from(paths::fs_path(cwd)));
+                let mut text = String::new();
+                js_stringify(&Value::Object(launch), &mut text);
+                Some(crate::history::sha256(text.as_bytes()))
+            }
+        }
+    }
 }
 
 impl Validate for NonceTrust {
@@ -7775,14 +7845,20 @@ impl Validate for NonceTrust {
 }
 
 impl NonceTrust {
-    /// Whether the list `value` trusts the Entry whose id is `id`.
-    pub fn trusts(&self, value: &Value, id: &str) -> bool {
+    /// Whether the list `value` trusts the Entry whose id is `id` and whose
+    /// launch has the nonce `nonce`, or, with `None`, whose nonce config-digger
+    /// cannot compute.
+    pub fn trusts(&self, value: &Value, id: &str, nonce: Option<&str>) -> bool {
         let pairs = value.as_array().map(Vec::as_slice).unwrap_or_default();
         pairs.iter().any(|pair| {
             let record = pair.get(1);
             let field = |name: &str| record.and_then(|record| record.get(name));
+            let trusted_at = field(&self.trusted_at);
             pair.get(0).and_then(Value::as_str) == Some(id)
-                && field(&self.trusted_at).is_some_and(|nonce| Some(nonce) == field(&self.nonce))
+                && match nonce {
+                    Some(nonce) => trusted_at.and_then(Value::as_str) == Some(nonce),
+                    None => trusted_at.is_some_and(|trusted| Some(trusted) == field(&self.nonce)),
+                }
         })
     }
 }
