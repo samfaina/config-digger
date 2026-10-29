@@ -2819,7 +2819,9 @@ impl ReadFailureKind {
 pub struct Error {
     pub code: ErrorCode,
     pub message: String,
-    /// What an ambiguous selector could mean, one locator per Item or Entry.
+    /// What an ambiguous selector could mean, one per Item or Entry: its
+    /// locator, followed by `--agent` and `--home` for an Item whose locator
+    /// alone selects another Item too.
     pub candidates: Vec<String>,
     /// The backup folder of a failed Operation, or of one whose Undo was
     /// refused.
@@ -3009,21 +3011,19 @@ impl Error {
     /// another Item of `inventory`, so that each candidate selects its Item
     /// alone.
     pub(crate) fn ambiguous(selector: &str, items: &[&Item], inventory: &Inventory) -> Self {
+        let mut shared = false;
         let candidates: Vec<String> = items
             .iter()
             .map(|item| {
                 let locator = &item.entries[0].locator;
                 if inventory.select(locator, &Narrowing::default()).len() > 1 {
+                    shared = true;
                     format!("{locator} --agent {} --home {}", item.agent, item.home)
                 } else {
                     locator.clone()
                 }
             })
             .collect();
-        let shared = candidates
-            .iter()
-            .zip(items)
-            .any(|(candidate, item)| *candidate != item.entries[0].locator);
         let how = if shared {
             "select one by locator, with --agent and --home where Items share one"
         } else {

@@ -3871,6 +3871,7 @@ fn show_with_an_unknown_agent_or_one_with_no_such_item_exits_3() {
     let without = harness.run(&["show", "review", "--agent", "cursor", "--json"]);
 
     assert_eq!(unknown.code, 3, "{}", unknown.stderr);
+    assert_eq!(unknown.document()["error"]["code"], "no_match");
     assert_eq!(
         unknown.document()["error"]["message"],
         "no Agent `nope`; `config-digger agents` lists them"
