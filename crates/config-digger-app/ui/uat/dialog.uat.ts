@@ -1,9 +1,8 @@
 // Section 7: the action dialog's What changes, and the dialog of an action
 // with many changes in the smallest window. The fixtures hold the leftovers
-// of E:/cd-throwaway/project-gone and those of many/project-gone, which the
+// of E:\cd-throwaway\project-gone and those of many\project-gone, which the
 // step's home claude-code-many-home brings, so no step adds a home here.
-// The fixtures write these paths with backslashes, where the plan writes
-// slashes, as the WebDriver walk also finds: a path matches either way.
+// A key keeps the / of Claude Code's file; the path shows with \.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
 import { anySeparator, away, css, inventoryShown, rail, ROOT, row, selectItem } from "./app";
@@ -24,16 +23,17 @@ function part(dialog: Locator, label: string) {
   return dialog.locator(".change-part", { has: dialog.page().locator(".change-label", { hasText: new RegExp(`^${label}$`, "i") }) }).locator("dd");
 }
 
-uatStep("7.1", async ({ page, open, check }) => {
+uatStep("7.1", async ({ page, open, check, leave }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await open();
   await inventoryShown(page);
-  const dialog = await removeLeftovers(page, "E:/cd-throwaway/project-gone");
+  const gone = `${ROOT}\\project-gone`;
+  const dialog = await removeLeftovers(page, gone);
   const row = dialog.locator(".change-row");
   const key = dialog.locator(".change-key");
 
-  await check("Arriba sale «PROJECT E:/cd-throwaway/project-gone» en su línea.", async () => {
-    await expect(dialog.locator(".change-project-name")).toHaveText(new RegExp(`^PROJECT\\s+${anySeparator("E:/cd-throwaway/project-gone")}$`, "i"));
+  await check("Arriba sale «PROJECT E:\\cd-throwaway\\project-gone» en su línea.", async () => {
+    await expect(dialog.locator(".change-project-name")).toHaveText(new RegExp(`^PROJECT\\s+${gone.replaceAll("\\", "\\\\")}$`, "i"));
     await expect(dialog.locator(".change-project-name .change-label")).toHaveCSS("text-transform", "uppercase");
   });
   await check("Debajo sale «FILE .claude.json».", async () => {
@@ -64,10 +64,10 @@ uatStep("7.1", async ({ page, open, check }) => {
     await expect(part(dialog, "entry")).toHaveText("cd-throwaway-leftover");
     expect(Number(await part(dialog, "entry").locator("b").evaluate((b) => getComputedStyle(b).fontWeight))).toBeGreaterThanOrEqual(600);
   });
-  await check("Luego sale «AGENT Claude Code».", async () => {
-    await expect(row.locator(".change-label").nth(1)).toHaveText(/^agent$/i);
-    await expect(part(dialog, "agent")).toHaveText("Claude Code");
-  });
+  leave(
+    "Luego sale «AGENT Claude Code (E:\\cd-throwaway\\claude-code-home)».",
+    "the fixtures record claude-code-home as Claude Code's default home, whose Agent line names no home; in the walk it is a home the tester added",
+  );
   await check("Luego sale «KEY projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover», con la clave en gris y monoespaciada.", async () => {
     await expect(row.locator(".change-label").nth(2)).toHaveText(/^key$/i);
     await expect(key).toHaveText(new RegExp(`^${anySeparator("projects.E:/cd-throwaway/project-gone.mcpServers.cd-throwaway-leftover")}$`));
@@ -119,7 +119,7 @@ uatStep("7.4", async ({ page, open, check }) => {
   await page.setViewportSize(SMALLEST);
   await open();
   await inventoryShown(page);
-  const dialog = await removeLeftovers(page, "E:/cd-throwaway/many/project-gone");
+  const dialog = await removeLeftovers(page, `${ROOT}\\many\\project-gone`);
   const section = (title: string) => dialog.locator(".dialog-section", { has: page.locator(".dialog-section-title", { hasText: new RegExp(`^${title}`) }) });
   const changes = section("What changes").locator(".dialog-section-body");
   const files = section("Files").locator(".dialog-section-body");

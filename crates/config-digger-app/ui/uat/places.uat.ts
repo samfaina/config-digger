@@ -99,15 +99,15 @@ uatStep("10.5", async ({ page, open, check, leave }) => {
     "the fixtures add claude-code-many-home, whose missing Project makes the group «Missing · 2»; the walk checks it on fresh data",
   );
   await check(
-    "En ese grupo sale «E:/cd-throwaway/project-gone», con la línea «The folder no longer exists», la etiqueta «known to Claude Code» y «1 leftover».",
+    "En ese grupo sale «E:\\cd-throwaway\\project-gone», con la línea «The folder no longer exists», la etiqueta «known to Claude Code» y «1 leftover».",
     async () => {
       expect(missing.open).toBe(true);
-      const gone = missing.rows.find((each) => whole("E:/cd-throwaway/project-gone").test(each.name));
+      const gone = missing.rows.find((each) => each.name === `${ROOT}\\project-gone`);
       expect(gone).toMatchObject({ subs: ["The folder no longer exists"], tags: ["known to Claude Code"], count: "1 leftover" });
     },
   );
-  await check("«E:/cd-throwaway/project-deleted» no sale en el grupo «Missing · 1».", async () => {
-    expect(missing.rows.filter((each) => whole("E:/cd-throwaway/project-deleted").test(each.name))).toEqual([]);
+  await check("«E:\\cd-throwaway\\project-deleted» no sale en el grupo «Missing · 1».", async () => {
+    expect(missing.rows.filter((each) => whole(`${ROOT}\\project-deleted`).test(each.name))).toEqual([]);
   });
   await check("Tras Missing sale el grupo «▸ Missing, no leftovers · 1», cerrado.", async () => {
     expect(groups[groups.indexOf(missing) + 1]).toMatchObject({ title: "▸ Missing, no leftovers · 1", open: false });
@@ -166,14 +166,14 @@ uatStep("10.21", async ({ page, open, check }) => {
 uatStep("10.6", async ({ page, open, check, leave }) => {
   await open();
   await projectsTab(page);
-  await row(page, "E:/cd-throwaway/project-gone").getByRole("button", { name: "Show leftovers" }).click();
+  await row(page, `${ROOT}\\project-gone`).getByRole("button", { name: "Show leftovers" }).click();
 
   await check("Se abre el Inventario.", async () => {
     await expect(page.locator(".inventory")).toBeVisible();
     await expect(page.locator(".inventory .loading")).toHaveCount(0);
   });
-  await check("El campo Project dice «E:/cd-throwaway/project-gone».", async () => {
-    await expect(page.getByRole("combobox", { name: "Project" })).toHaveText(whole("E:/cd-throwaway/project-gone"));
+  await check("El campo Project dice «E:\\cd-throwaway\\project-gone».", async () => {
+    await expect(page.getByRole("combobox", { name: "Project" })).toHaveText(`${ROOT}\\project-gone`);
   });
   await check("Está elegido «All Agents».", async () => {
     await expect(page.locator(".inventory .banner-title")).toHaveText("All Agents");
@@ -338,7 +338,7 @@ uatStep("10.15", async ({ page, open, check, leave }) => {
     `project-gone joins that group once step 10.7 removes its leftover; ${NO_WRITE}`,
   );
   leave(
-    "Con gone, ese grupo muestra solo «E:/cd-throwaway/project-gone», sin leftovers desde el paso 10.7.",
+    "Con gone, ese grupo muestra solo «E:\\cd-throwaway\\project-gone», sin leftovers desde el paso 10.7.",
     `it needs step 10.7's Remove; ${NO_WRITE}`,
   );
 

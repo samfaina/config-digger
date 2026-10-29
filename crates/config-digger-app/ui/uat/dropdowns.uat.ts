@@ -206,10 +206,28 @@ uatStep("2.5", async ({ page, open, check }) => {
   });
 });
 
+/** The rows under Claude Code on the Agent homes tab. */
+async function claudeCodeHomes(page: Page) {
+  await rail(page, "Projects & homes");
+  await page.getByRole("tab", { name: /^Agent homes/ }).click();
+  return page.locator(".places .scroll", { has: page.locator("h3.agent-group") }).evaluate((list) => {
+    let agent = "";
+    const names: string[] = [];
+    for (const el of list.children) {
+      if (el.matches("h3.agent-group")) agent = el.firstChild?.textContent?.trim() ?? "";
+      else if (el.matches(".place-row") && agent === "Claude Code") names.push(el.querySelector(".place-name")!.textContent!.trim());
+    }
+    return names;
+  });
+}
+
 uatStep("2.3", async ({ page, open, check }) => {
   await page.setViewportSize(SMALLEST);
   await open();
   await inventoryShown(page);
+  // The fixtures hold more than one Claude Code home, so the step adds none.
+  const before = await claudeCodeHomes(page);
+  await rail(page, "Inventory");
   await page.locator(".agent-tile", { hasText: "All Agents" }).click();
   const home = page.locator(".home-row", { hasText: "Claude Code" }).getByRole("combobox");
   await home.scrollIntoViewIfNeeded();
@@ -247,6 +265,11 @@ uatStep("2.3", async ({ page, open, check }) => {
   });
   await page.keyboard.press("Escape");
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+  await check("Al final, el grupo Claude Code de la pestaña Agent homes tiene las mismas filas que al empezar.", async () => {
+    expect(before.length).toBeGreaterThan(1);
+    expect(await claudeCodeHomes(page)).toEqual(before);
+  });
 });
 
 uatStep("2.4", async ({ page, open, check }) => {
