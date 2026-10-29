@@ -972,7 +972,8 @@ pub(crate) struct PluginAnchor {
     /// A `/`-separated path relative to the plugin's folder, or several,
     /// of which the first that exists is read, such as the first manifest
     /// Cursor finds of `.cursor-plugin/plugin.json` and
-    /// `.claude-plugin/plugin.json`.
+    /// `.claude-plugin/plugin.json`; for a location that reacts with
+    /// `reads_next_path`, the first that exists and is no Read failure.
     pub path: RelativePaths,
 }
 
@@ -3015,27 +3016,67 @@ pub(crate) struct ManifestSkills {
     /// an item that is no path, declares none.
     #[serde(default)]
     pub dot_slash: bool,
-    /// The key paths of fields that hold a path, an object or a list of
-    /// either, such as the `mcpServers` of a Cursor plugin's manifest: the
-    /// Agent rejects a manifest whose field holds anything else whole, as
-    /// one that does not parse, so it declares none. A field that is
-    /// absent leaves it read.
-    #[serde(default)]
-    pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
 }
 
 impl Validate for ManifestSkills {
     fn validate(&self) -> Result<(), String> {
         validate_key_path(&self.field)?;
-        for key_path in &self.rejected_unless_path_object_or_list {
-            validate_key_path(key_path)?;
-        }
         validate_relative(&self.default)?;
         if let Some(one_skill) = &self.one_skill {
             one_skill.validate()?;
         }
         self.skills.validate()
     }
+}
+
+/// A value for which the Agent rejects a manifest whole.
+pub(crate) struct Rejected<'d> {
+    /// Its key path from the root of the manifest, an item's in a list.
+    pub key_path: Vec<String>,
+    pub value: &'d Value,
+    /// Whether it is an item of a list, which holds a path or an object,
+    /// rather than the field's own value.
+    pub in_list: bool,
+}
+
+/// Where `document`, a plugin's manifest, holds a value for which the Agent
+/// rejects it whole, as one that does not parse, at one of `key_paths`:
+/// the key paths of fields that hold a path, an object or a list of either,
+/// such as the `mcpServers` of a Cursor plugin's manifest. A field that is
+/// absent leaves the manifest read.
+pub(crate) fn rejected_at<'d>(
+    document: &'d Value,
+    key_paths: &[Vec<String>],
+) -> Option<Rejected<'d>> {
+    let path_or_object = |value: &Value| matches!(value, Value::String(_) | Value::Object(_));
+    key_paths.iter().find_map(|key_path| {
+        let value = key_path
+            .iter()
+            .try_fold(document, |value, key| value.get(key))?;
+        match value {
+            Value::Array(items) => items.iter().enumerate().find_map(|(index, item)| {
+                let mut at = key_path.clone();
+                at.push(index.to_string());
+                (!path_or_object(item)).then_some(Rejected {
+                    key_path: at,
+                    value: item,
+                    in_list: true,
+                })
+            }),
+            value => (!path_or_object(value)).then(|| Rejected {
+                key_path: key_path.clone(),
+                value,
+                in_list: false,
+            }),
+        }
+    })
+}
+
+/// Validates the key paths of a `rejected_unless_path_object_or_list`.
+pub(crate) fn validate_rejected(key_paths: &[Vec<String>]) -> Result<(), String> {
+    key_paths
+        .iter()
+        .try_for_each(|key_path| validate_key_path(key_path))
 }
 
 /// A path a plugin's manifest declares skills at, relative to the plugin's
@@ -3052,27 +3093,9 @@ impl ManifestSkills {
     /// default folder when it declares none; the default folder first,
     /// whatever it declares, when they add to it. A manifest that does not
     /// parse declares none; a field that is neither a path nor a list of
-    /// paths declares no skills, unless `dot_slash` reads it as none. A
-    /// manifest the Agent rejects for a field of
-    /// `rejected_unless_path_object_or_list` declares none.
+    /// paths declares no skills, unless `dot_slash` reads it as none.
     pub fn paths(&self, manifest: Option<&str>) -> Vec<DeclaredSkills> {
-        let path_or_object = |value: &Value| matches!(value, Value::String(_) | Value::Object(_));
-        let document = manifest
-            .and_then(|text| JsonFormat::STRICT.parse(text).ok())
-            .filter(|document| {
-                self.rejected_unless_path_object_or_list
-                    .iter()
-                    .all(|key_path| {
-                        let value = key_path
-                            .iter()
-                            .try_fold(document, |value, key| value.get(key));
-                        match value {
-                            None => true,
-                            Some(Value::Array(items)) => items.iter().all(path_or_object),
-                            Some(value) => path_or_object(value),
-                        }
-                    })
-            });
+        let document = manifest.and_then(|text| JsonFormat::STRICT.parse(text).ok());
         let declared = document.as_ref().and_then(|document| {
             self.field
                 .iter()

@@ -2635,6 +2635,10 @@ pub enum ReadFailureReaction {
     /// It keeps what parses on both sides of an error, and the location
     /// contributes the Entries config-digger recovers there.
     ReadsAroundError,
+    /// It reads the next file of the plugin's list in its place, such as
+    /// the next manifest of a Cursor plugin, and the file contributes no
+    /// Entries.
+    ReadsNextPath,
     /// It starts without the location's Entries.
     IgnoresFile,
     /// It asks about the file at startup, and otherwise starts without its Entries.
@@ -2656,6 +2660,7 @@ impl From<definitions::ReadFailureReaction> for ReadFailureReaction {
             definitions::ReadFailureReaction::ReadsAroundError => {
                 ReadFailureReaction::ReadsAroundError
             }
+            definitions::ReadFailureReaction::ReadsNextPath => ReadFailureReaction::ReadsNextPath,
             definitions::ReadFailureReaction::IgnoresFile => ReadFailureReaction::IgnoresFile,
             definitions::ReadFailureReaction::AsksUser => ReadFailureReaction::AsksUser,
             definitions::ReadFailureReaction::Unknown => ReadFailureReaction::Unknown,

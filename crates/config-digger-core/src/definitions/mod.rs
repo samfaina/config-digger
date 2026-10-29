@@ -791,6 +791,12 @@ pub(crate) struct PluginName {
     pub file: String,
     /// The key path of the string, one key per segment.
     pub key_path: Vec<String>,
+    /// The key paths of fields that make the Agent reject the file whole
+    /// unless they hold a path, an object or a list of either, as a
+    /// location's `rejected_unless_path_object_or_list` says: a rejected
+    /// file names no plugin, and the next place is tried.
+    #[serde(default)]
+    pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
 }
 
 /// The `uninstall` segment that stands for a plugin's id.
@@ -808,6 +814,7 @@ impl PluginsDefinition {
         for name in self.name.iter().flat_map(PluginNames::places) {
             blocks::validate_relative(&name.file)?;
             blocks::validate_key_path(&name.key_path)?;
+            blocks::validate_rejected(&name.rejected_unless_path_object_or_list)?;
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
@@ -912,6 +919,13 @@ pub(crate) struct LocationDefinition {
     pub secrets: SecretFields,
     /// What the Agent does when it cannot open, decode or parse the location.
     pub on_read_failure: ReadFailureReaction,
+    /// The key paths of fields of a manifest in plugins that hold a path,
+    /// an object or a list of either, such as the `mcpServers` of a Cursor
+    /// plugin's manifest: the Agent rejects a manifest whose field holds
+    /// anything else whole, as one that does not parse, and the manifest
+    /// is one Read failure. A field that is absent leaves it read.
+    #[serde(default)]
+    pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
     /// What the Agent does when the location holds, where its Entries are,
     /// a value of a shape config-digger cannot enumerate, such as a list
     /// where servers should be, the other locations in the file being read.
@@ -1095,6 +1109,13 @@ pub(crate) enum ReadFailureReaction {
     /// Entries config-digger recovers the same way. Only a location read as
     /// JSON takes it.
     ReadsAroundError,
+    /// It reads the next path of the location's plugin anchor in its
+    /// place, such as the next manifest of a Cursor plugin, and so on down
+    /// the list: the file contributes no Entries, and when no path is
+    /// left, neither does the location, but for the default folder of
+    /// manifest skills. Only a location anchored on several paths in
+    /// plugins takes it.
+    ReadsNextPath,
     /// It starts without the location's Entries.
     IgnoresFile,
     /// It asks the user at startup what to do with the file, and otherwise
@@ -1678,6 +1699,11 @@ impl AgentDefinition {
                         "a source of settings is not read around its error".into(),
                     ));
                 }
+                if source.on_read_failure() == Some(ReadFailureReaction::ReadsNextPath) {
+                    return Err(context(
+                        "a source of settings has no next path to read".into(),
+                    ));
+                }
             }
             if let Some(merge) = &settings.merge
                 && !settings.control_keys.contains(&merge.key)
@@ -1821,6 +1847,35 @@ impl AgentDefinition {
                     "a shape is never read around: on_shape_failure cannot be `reads_around_error`"
                         .into(),
                 ));
+            }
+            if location.on_read_failure == ReadFailureReaction::ReadsNextPath
+                && location
+                    .anchor
+                    .plugin()
+                    .is_none_or(|anchor| anchor.path.all().len() < 2)
+            {
+                return Err(context(
+                    "only a location anchored on several paths in plugins reacts with `reads_next_path`"
+                        .into(),
+                ));
+            }
+            if location.on_shape_failure == Some(ReadFailureReaction::ReadsNextPath) {
+                return Err(context(
+                    "a shape leaves the file read: on_shape_failure cannot be `reads_next_path`"
+                        .into(),
+                ));
+            }
+            if !location.rejected_unless_path_object_or_list.is_empty() {
+                let manifest = matches!(location.format, Format::ManifestSkills(_))
+                    || matches!(&location.format, Format::Json(json) if json.dialect == JsonDialect::Strict);
+                if location.anchor.plugin().is_none() || !manifest {
+                    return Err(context(
+                        "only a location in plugins read as strict JSON or manifest skills rejects a manifest"
+                            .into(),
+                    ));
+                }
+                blocks::validate_rejected(&location.rejected_unless_path_object_or_list)
+                    .map_err(context)?;
             }
             if location.fails_plugin() && location.anchor.plugin().is_none() {
                 return Err(context(
@@ -4807,6 +4862,76 @@ on_shape_failure = \"reads_around_error\"",
         );
         assert!(
             error(&text).contains("a source of settings is in no plugin"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    /// `with_plugins` whose location in plugins is anchored on `path` and
+    /// reacts with `reads_next_path`.
+    fn reading_next_path(path: &str) -> String {
+        with_plugins("")
+            .replace(
+                r#"plugins = "installed", path = "mcp.json" }"#,
+                &format!(r#"plugins = "installed", path = {path} }}"#),
+            )
+            .replace(
+                "provenance = \"plugin\"
+store_class = \"plain\"
+on_read_failure = \"ignores_file\"",
+                "provenance = \"plugin\"
+store_class = \"plain\"
+on_read_failure = \"reads_next_path\"",
+            )
+    }
+
+    #[test]
+    fn only_a_location_anchored_on_several_paths_in_plugins_reads_the_next_path() {
+        let several = reading_next_path(r#"["one.json", "two.json"]"#);
+        assert!(several.contains("reads_next_path"));
+        assert!(parse("test.toml", &several).is_ok(), "{}", error(&several));
+        for one in [r#""one.json""#, r#"["one.json"]"#] {
+            let text = reading_next_path(one);
+            assert!(
+                error(&text).contains("only a location anchored on several paths in plugins"),
+                "{}",
+                error(&text)
+            );
+        }
+        let text = VALID.replace(
+            r#"on_read_failure = "ignores_file""#,
+            r#"on_read_failure = "reads_next_path""#,
+        );
+        assert!(
+            error(&text).contains("only a location anchored on several paths in plugins"),
+            "{}",
+            error(&text)
+        );
+        let text = with_policy("", r#"["disable", "precedence"]"#).replace(
+            r#"value = "Settings" }"#,
+            r#"value = "Settings", on_read_failure = "reads_next_path" }"#,
+        );
+        assert!(
+            error(&text).contains("a source of settings has no next path"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn only_a_manifest_in_plugins_is_rejected_for_its_fields() {
+        let rejected = "on_read_failure = \"reads_next_path\"
+rejected_unless_path_object_or_list = [[\"mcpServers\"]]";
+        let text = reading_next_path(r#"["one.json", "two.json"]"#)
+            .replace(r#"on_read_failure = "reads_next_path""#, rejected);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = VALID.replace(
+            r#"on_read_failure = "ignores_file""#,
+            "on_read_failure = \"ignores_file\"
+rejected_unless_path_object_or_list = [[\"mcpServers\"]]",
+        );
+        assert!(
+            error(&text).contains("only a location in plugins read as strict JSON"),
             "{}",
             error(&text)
         );

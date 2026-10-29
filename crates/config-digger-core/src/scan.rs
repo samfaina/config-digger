@@ -16,7 +16,7 @@ use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Stren
 use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
     LocationDefinition, NameParts, PLUGIN_NAME, PROJECT_KEY, PluginNames, PluginsDefinition,
-    References,
+    ReadFailureReaction, References,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -1240,8 +1240,23 @@ pub(crate) struct ScannedReadFailure {
     /// For a shape, where it is: only that location fails, and the rest of
     /// the file is read. `None` when the whole file fails.
     pub shape: Option<ScannedShape>,
+    /// For a manifest the Agent rejects whole for the value of one of its
+    /// fields, where that value is; the failure's kind is a shape's.
+    pub rejection: Option<ScannedRejection>,
     /// The plugin a location in plugins found the file in.
     pub plugin: Option<ScannedPlugin>,
+}
+
+/// Where a manifest holds a value for which the Agent rejects it whole.
+#[derive(Clone)]
+pub(crate) struct ScannedRejection {
+    /// The key path of the value from the root of the file, an item's in
+    /// a list.
+    pub key_path: Vec<String>,
+    pub found: ValueType,
+    /// Whether the value is an item of a list, which holds a path or an
+    /// object, rather than the field's own.
+    pub in_list: bool,
 }
 
 /// Where a location holds a value of a shape config-digger cannot enumerate.
@@ -3923,6 +3938,10 @@ impl Scanner<'_> {
                     let file = blocks::join_relative(&folder, &name.file);
                     let text = self.reader.peek(&file).ok()??;
                     let document = JsonFormat::STRICT.parse(text).ok()?;
+                    let rejects = &name.rejected_unless_path_object_or_list;
+                    if blocks::rejected_at(&document, rejects).is_some() {
+                        return None;
+                    }
                     let named = lookup(&document, &name.key_path)?.as_str()?;
                     (!named.is_empty()).then(|| named.to_owned())
                 })
@@ -4568,27 +4587,20 @@ impl Scanner<'_> {
         plugin: &ScannedPlugin,
         relative: &RelativePaths,
     ) {
-        // The first of its paths that exists, or else the first.
-        let candidates = relative
-            .all()
-            .iter()
-            .map(|relative| blocks::join_relative(&plugin.folder, relative));
-        let path = candidates
-            .clone()
-            .find(|path| self.reader.fs.exists(path))
-            .or_else(|| candidates.clone().next())
-            .expect("validation gives a plugin anchor a path");
         let start = self.entries.len();
         let failures = self.reader.failures.len();
-        match &location.references {
-            None if let Format::ManifestSkills(block) = &location.format => {
+        let path = self.plugin_path(home, location, plugin, relative);
+        match (&location.references, path) {
+            (None, path) if let Format::ManifestSkills(block) = &location.format => {
                 self.read_manifest_skills(home, location, block, plugin, path);
             }
-            None => {
+            // Every path that exists is a Read failure the Agent reads past.
+            (_, None) => {}
+            (None, Some(path)) => {
                 let project = plugin.project.clone();
                 self.read_location(home, definition, location, path, project, 0);
             }
-            Some(references) => {
+            (Some(references), Some(path)) => {
                 self.read_references(home, definition, location, references, plugin, path);
             }
         }
@@ -4614,26 +4626,111 @@ impl Scanner<'_> {
         }
     }
 
+    /// The path of `plugin` that `location` reads of those `relative`
+    /// lists: the first that exists, or else the first; `None` when that
+    /// is a manifest the Agent rejects, reported. For a location whose
+    /// Agent reads the next path past a Read failure, the first that exists
+    /// and is no Read failure, each one passed reported; `None` when every
+    /// path that exists is one.
+    fn plugin_path(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        plugin: &ScannedPlugin,
+        relative: &RelativePaths,
+    ) -> Option<PathBuf> {
+        let candidates: Vec<PathBuf> = relative
+            .all()
+            .iter()
+            .map(|relative| blocks::join_relative(&plugin.folder, relative))
+            .collect();
+        let existing: Vec<&PathBuf> = candidates
+            .iter()
+            .filter(|path| self.reader.fs.exists(path))
+            .collect();
+        let Some(first) = existing.first() else {
+            return candidates.into_iter().next();
+        };
+        let reads_next = location.on_read_failure == ReadFailureReaction::ReadsNextPath;
+        if !reads_next && location.rejected_unless_path_object_or_list.is_empty() {
+            return Some((*first).clone());
+        }
+        let tried = if reads_next { existing.len() } else { 1 };
+        let project = plugin.project.as_deref();
+        existing
+            .into_iter()
+            .take(tried)
+            .find(|path| {
+                self.add_reader(home, location, path);
+                self.manifest_document(home, location, path, project)
+                    .is_some()
+            })
+            .cloned()
+    }
+
+    /// The file at `path` parsed as the manifest `location` reads there,
+    /// `None` when it is a Read failure, which is then reported, a manifest
+    /// the Agent rejects included.
+    fn manifest_document(
+        &mut self,
+        home: &FoundHome,
+        location: &LocationDefinition,
+        path: &Path,
+        project: Option<&str>,
+    ) -> Option<serde_json::Value> {
+        let document = match location.format {
+            Format::ManifestSkills(_) => {
+                let text = self.reader.text(home, path, project)?;
+                match JsonFormat::STRICT.parse(text) {
+                    Ok(document) => document,
+                    Err(error) => {
+                        self.reader.fail(
+                            home,
+                            path,
+                            project,
+                            ReadFailureKind::Parse,
+                            error.position,
+                        );
+                        return None;
+                    }
+                }
+            }
+            _ => self.document(home, location, path, project)?,
+        };
+        let rejected =
+            blocks::rejected_at(&document, &location.rejected_unless_path_object_or_list);
+        if let Some(rejected) = rejected {
+            let rejection = ScannedRejection {
+                found: ValueType::of(rejected.value),
+                key_path: rejected.key_path,
+                in_list: rejected.in_list,
+            };
+            self.reader.reject(home, path, project, rejection);
+            return None;
+        }
+        Some(document)
+    }
+
     /// Adds the skills at the paths the manifest `manifest` of `plugin`
-    /// declares, or else of its default folder. A folder outside the
-    /// plugin's, or one already read, is skipped.
+    /// declares, or else of its default folder, as when there is none. A
+    /// folder outside the plugin's, or one already read, is skipped.
     fn read_manifest_skills(
         &mut self,
         home: &FoundHome,
         location: &LocationDefinition,
         block: &ManifestSkills,
         plugin: &ScannedPlugin,
-        manifest: PathBuf,
+        manifest: Option<PathBuf>,
     ) {
         let project = plugin.project.clone();
-        let text = match self.reader.fs.exists(&manifest) {
-            true => {
+        let text = match manifest.filter(|manifest| self.reader.fs.exists(manifest)) {
+            Some(manifest) => {
                 self.add_reader(home, location, &manifest);
                 self.reader
                     .text(home, &manifest, project.as_deref())
                     .map(str::to_owned)
             }
-            false => None,
+            None => None,
         };
         let base = &plugin.folder;
         let mut read_folders = Vec::new();
@@ -5729,6 +5826,29 @@ impl<'p> Reader<'p> {
             kind,
             position,
             shape: None,
+            rejection: None,
+            plugin: None,
+        });
+    }
+
+    /// Reports that the Agent rejects the manifest `path` whole for the
+    /// value `rejection` names, a Read failure of the whole file.
+    fn reject(
+        &mut self,
+        home: &FoundHome,
+        path: &Path,
+        project: Option<&str>,
+        rejection: ScannedRejection,
+    ) {
+        self.report(ScannedReadFailure {
+            agent_index: home.agent_index,
+            home: home.home.clone(),
+            path: path.to_path_buf(),
+            project: project.map(str::to_owned),
+            kind: ReadFailureKind::Shape,
+            position: None,
+            shape: None,
+            rejection: Some(rejection),
             plugin: None,
         });
     }
@@ -5751,6 +5871,7 @@ impl<'p> Reader<'p> {
             kind: ReadFailureKind::Shape,
             position: None,
             shape: Some(shape),
+            rejection: None,
             plugin: None,
         });
     }

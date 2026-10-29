@@ -2015,6 +2015,54 @@
       ]
     },
     {
+      "id": "27",
+      "title": "Un plugin de Cursor con el primer manifiesto roto",
+      "steps": [
+        {
+          "id": "27.1",
+          "title": "Cursor lee el siguiente manifiesto de un plugin cuyo primero no se puede parsear",
+          "goal": "Cursor se salta el primer manifiesto de un plugin que no se puede parsear y lee el siguiente: config-digger lista el servidor del siguiente manifiesto y muestra el roto como Read failure, cuya nota dice que Cursor lee el siguiente en su lugar.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el perfil de prueba de Cursor».",
+            "En el panel Agents, elige Cursor.",
+            "Busca plugin-cd-throwaway-kit-cd-throwaway-next en la lista Items.",
+            "En el aviso encima de los Items, pulsa View.",
+            "Lee la tarjeta de Read failure del fichero.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el perfil de prueba de Cursor",
+              "shell": "powershell",
+              "text": "$env:APPDATA = 'E:\\cd-throwaway\\appdata'; $env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-home'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            }
+          ],
+          "expect": [
+            "El Item «plugin-cd-throwaway-kit-cd-throwaway-next» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next».",
+            "El aviso encima de los Items dice «1 location couldn't be read.».",
+            "La tarjeta de Read failure dice «Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.».",
+            "La tarjeta dice también «Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file.»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#338"],
+          "automation": [
+            {
+              "tool": "fake-ui",
+              "where": "ci",
+              "test": "crates/config-digger-app/ui/uat/plugins.uat.ts > 27.1"
+            }
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados; nadie más abre la app real con APPDATA y USERPROFILE sobre los datos de prueba, así que una persona recorre el paso entero en la app real."
+        }
+      ]
+    },
+    {
       "id": "17",
       "title": "Skills anidados de Cursor",
       "steps": [
