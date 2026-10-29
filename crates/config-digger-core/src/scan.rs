@@ -4,13 +4,13 @@
 
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
-    self, Anchor, Anchored, Bundles, Bypasses, Cached, DisableMechanism, Disables, DownWalk,
-    EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere, InstallationFolders,
-    JsonDialect, JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins, Locate, Locator,
-    LookUp, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY, Parse, PluginCache,
-    PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectWalk, Register,
-    Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFolder, SkillList,
-    Spelling, StoreClass, is_entry_key,
+    self, Anchor, Anchored, Bundles, Bypasses, Cached, Conform, DisableMechanism, Disables,
+    DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
+    InstallationFolders, JsonDialect, JsonFormat, JsonPluginRecords, LastOpenedHomes, ListPlugins,
+    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, PLUGIN_KEY,
+    Parse, PluginCache, PluginFolders, PluginRecord, PluginRegistry, ProjectPluginKeys,
+    ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect,
+    SkillFolder, SkillList, Spelling, StoreClass, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -716,6 +716,16 @@ fn reading<'r>(readers: &'r [LocationReader], path: &Path) -> Vec<&'r LocationRe
     spelled.into_iter().chain(linked).collect()
 }
 
+/// Why `value`, as written, lacks the minimal shape `location` declares,
+/// its name aside. It is checked before masking, which can hide what the
+/// shape looks for, such as a reference in a header.
+fn malformed_as_written(
+    location: &LocationDefinition,
+    value: &serde_json::Value,
+) -> Option<Malformed> {
+    location.shape.as_ref()?.malformed(value)
+}
+
 /// The definitions of the locations of `readers` that read the file at
 /// `path`.
 pub(crate) fn locations_reading<'d>(
@@ -1098,6 +1108,10 @@ pub(crate) struct ScannedEntry {
     /// The hash of its configuration as written, Secrets included, for an
     /// Entry the Agent approves by it; never shown.
     pub config_hash: Option<String>,
+    /// Why its value as written lacks the minimal shape its location
+    /// declares, its name aside; `None` when it has the shape, or its
+    /// location declares none.
+    pub malformed: Option<Malformed>,
 }
 
 /// The skill manager whose detectors match a skill folder most strongly.
@@ -4275,6 +4289,7 @@ impl Scanner<'_> {
                 plugin: None,
                 switch_id: None,
                 config_hash: None,
+                malformed: malformed_as_written(location, &parked_entry.entry),
             });
             read.parked.push(ScannedParked {
                 key_path,
@@ -4342,6 +4357,7 @@ impl Scanner<'_> {
                     plugin: None,
                     switch_id: None,
                     config_hash: None,
+                    malformed: None,
                 });
             }
             return;
@@ -4682,6 +4698,7 @@ impl Scanner<'_> {
             let location = definitions[entry.agent_index].location(&entry.location);
             let reading = locations_reading(definitions, &self.readers, &entry.path);
             let masked = mask::entry_read_by(location, &reading, &entry.config);
+            entry.malformed = malformed_as_written(location, &entry.config);
             entry.config = masked.value;
             entry.masked = masked.key_paths;
         }
@@ -4794,6 +4811,7 @@ impl Scanner<'_> {
                     plugin: None,
                     switch_id: None,
                     config_hash: hash.and_then(|hash| hash.of(found.value)),
+                    malformed: None,
                 });
             }
         }
@@ -4890,6 +4908,7 @@ impl Scanner<'_> {
                         plugin: None,
                         switch_id: None,
                         config_hash: None,
+                        malformed: None,
                     });
                     continue;
                 }
@@ -4953,6 +4972,7 @@ impl Scanner<'_> {
             plugin: None,
             switch_id: None,
             config_hash: None,
+            malformed: None,
         });
     }
 
@@ -5804,6 +5824,7 @@ mod tests {
             }),
             switch_id: None,
             config_hash: None,
+            malformed: None,
         }
     }
 

@@ -4705,6 +4705,16 @@ pub(crate) enum Malformed {
     Missing(Vec<String>),
     /// This field holds another type than the Agent reads.
     WrongType(String, FieldType),
+    /// This field holds none of these values.
+    NotOneOf(String, Vec<String>),
+    /// This field's value does not start with this prefix.
+    WrongPrefix(String, String),
+    /// It holds this field, which it must not.
+    Forbidden(String),
+    /// A string it holds, at any depth, holds a `${...}` reference.
+    Reference,
+    /// Its name holds a character this rule does not allow.
+    Name(NameChars),
 }
 
 /// Checks an Entry against the minimal shape its Agent requires. Keys the
@@ -4712,6 +4722,10 @@ pub(crate) enum Malformed {
 pub(crate) trait Conform {
     /// Why `value` does not conform, if it does not.
     fn malformed(&self, value: &Value) -> Option<Malformed>;
+
+    /// Why the name `name` does not conform, if it does not. An Entry's
+    /// name is checked after its value.
+    fn misnamed(&self, name: &str) -> Option<Malformed>;
 
     /// Whether an Entry that does not conform still competes by name, as
     /// when the Agent lists it and fails to start it.
@@ -4740,6 +4754,12 @@ impl Conform for Shape {
         }
     }
 
+    fn misnamed(&self, name: &str) -> Option<Malformed> {
+        match self {
+            Shape::Fields(block) => block.misnamed(name),
+        }
+    }
+
     fn still_competes(&self) -> bool {
         match self {
             Shape::Fields(block) => block.still_competes(),
@@ -4748,13 +4768,38 @@ impl Conform for Shape {
 }
 
 /// An object that holds at least one of some fields, each field it holds
-/// being of the type the Agent reads.
+/// being of the type the Agent reads. It may also need some fields, each
+/// one, and limit what some of them hold. The Entry fails the first check
+/// it does not pass, in this order: `one_of`; each field of `required`, in
+/// its order, then the other fields of `values` and `prefixes`, each field
+/// checked for being held, then against `values`, then `prefixes`;
+/// `forbidden`; `types`; `no_references`; then `name`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
     /// The Entry must hold at least one of these, such as `command` or `url`.
     #[serde(default)]
     pub one_of: Vec<String>,
+    /// The Entry must hold each of these, such as `type` and `url`.
+    #[serde(default)]
+    pub required: Vec<String>,
+    /// For a field, the strings it may hold, when the Entry holds it.
+    #[serde(default)]
+    pub values: BTreeMap<String, Vec<String>>,
+    /// For a field, the prefix its string must start with, when the Entry
+    /// holds it, such as `https://` for `url`.
+    #[serde(default)]
+    pub prefixes: BTreeMap<String, String>,
+    /// The Entry must hold none of these, such as `command`.
+    #[serde(default)]
+    pub forbidden: Vec<String>,
+    /// Whether no string the Entry holds, at any depth, may hold a `${...}`
+    /// reference, as for an Agent that does not expand them.
+    #[serde(default)]
+    pub no_references: bool,
+    /// The characters the Entry's name may hold.
+    #[serde(default)]
+    pub name: Option<NameChars>,
     /// The type of each field, when the Entry holds it.
     #[serde(default)]
     pub types: BTreeMap<String, FieldType>,
@@ -4802,14 +4847,90 @@ impl Validate for FieldShape {
             .one_of
             .iter()
             .chain(self.types.keys())
+            .chain(&self.required)
+            .chain(&self.forbidden)
+            .chain(self.values.keys())
+            .chain(self.prefixes.keys())
             .find(|field| field.is_empty())
         {
             return Err(format!("a shape field `{field}` must not be empty"));
         }
-        if self.one_of.is_empty() && self.types.is_empty() {
-            return Err("a shape needs one_of or types".into());
+        if let Some(field) = self
+            .required
+            .iter()
+            .find(|field| self.forbidden.contains(field))
+        {
+            return Err(format!(
+                "a shape field `{field}` is both required and forbidden"
+            ));
+        }
+        let checks_nothing = self.one_of.is_empty()
+            && self.types.is_empty()
+            && self.required.is_empty()
+            && self.forbidden.is_empty()
+            && self.values.is_empty()
+            && self.prefixes.is_empty()
+            && !self.no_references
+            && self.name.is_none();
+        if checks_nothing {
+            return Err("a shape needs one_of or types, or another of its checks".into());
         }
         Ok(())
+    }
+}
+
+/// The characters an Entry's name may hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum NameChars {
+    /// ASCII letters and digits, `-` and `_`.
+    LettersDigitsDashUnderscore,
+}
+
+impl NameChars {
+    fn allows(self, name: &str) -> bool {
+        match self {
+            NameChars::LettersDigitsDashUnderscore => name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+        }
+    }
+}
+
+/// Whether a string of `value`, at any depth, holds a `${...}` reference.
+fn holds_reference(value: &Value) -> bool {
+    match value {
+        Value::String(text) => text
+            .split_once("${")
+            .is_some_and(|(_, rest)| rest.contains('}')),
+        Value::Array(items) => items.iter().any(holds_reference),
+        Value::Object(object) => object.values().any(holds_reference),
+        _ => false,
+    }
+}
+
+impl FieldShape {
+    /// Why the field `field`, holding `value`, fails `required`, `values` or
+    /// `prefixes`, if it does.
+    fn field_malformed(&self, field: &String, value: Option<&Value>) -> Option<Malformed> {
+        let Some(value) = value else {
+            return self
+                .required
+                .contains(field)
+                .then(|| Malformed::Missing(vec![field.clone()]));
+        };
+        if let Some(allowed) = self.values.get(field)
+            && !value
+                .as_str()
+                .is_some_and(|value| allowed.iter().any(|allowed| allowed == value))
+        {
+            return Some(Malformed::NotOneOf(field.clone(), allowed.clone()));
+        }
+        let prefix = self.prefixes.get(field)?;
+        (!value
+            .as_str()
+            .is_some_and(|value| value.starts_with(prefix.as_str())))
+        .then(|| Malformed::WrongPrefix(field.clone(), prefix.clone()))
     }
 }
 
@@ -4821,10 +4942,38 @@ impl Conform for FieldShape {
         if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
             return Some(Malformed::Missing(self.one_of.clone()));
         }
-        self.types.iter().find_map(|(field, &kind)| {
+        let other_limited = self
+            .values
+            .keys()
+            .chain(self.prefixes.keys())
+            .filter(|field| !self.required.contains(field));
+        if let Some(malformed) = self
+            .required
+            .iter()
+            .chain(other_limited)
+            .find_map(|field| self.field_malformed(field, object.get(field)))
+        {
+            return Some(malformed);
+        }
+        if let Some(field) = self
+            .forbidden
+            .iter()
+            .find(|field| object.contains_key(*field))
+        {
+            return Some(Malformed::Forbidden(field.clone()));
+        }
+        if let Some(malformed) = self.types.iter().find_map(|(field, &kind)| {
             let value = object.get(field)?;
             (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
-        })
+        }) {
+            return Some(malformed);
+        }
+        (self.no_references && holds_reference(value)).then_some(Malformed::Reference)
+    }
+
+    fn misnamed(&self, name: &str) -> Option<Malformed> {
+        let rule = self.name?;
+        (!rule.allows(name)).then_some(Malformed::Name(rule))
     }
 
     fn still_competes(&self) -> bool {

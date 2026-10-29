@@ -7,7 +7,7 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameRule, SettingIs, SkillDefect,
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, SettingIs, SkillDefect,
     UnseenServers,
 };
 use crate::edit::Edit;
@@ -1805,21 +1805,23 @@ pub(crate) fn read_failure_caveat(agent_name: &str, path: &Path) -> String {
     )
 }
 
+/// `words` in backticks, the last one after "or": "`a`, `b` or `c`".
+fn any_of(words: &[String]) -> String {
+    let words: Vec<String> = words.iter().map(|word| format!("`{word}`")).collect();
+    match words.split_last() {
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
+        None => String::new(),
+    }
+}
+
 /// An Invalid Entry's reason: why it lacks the minimal shape `agent_name`
 /// requires. `competes` says the Agent still lists it, so that it competes
 /// by name.
 pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes: bool) -> Reason {
     let why = match malformed {
         Malformed::NotAnObject => "it is not an object".to_owned(),
-        Malformed::Missing(fields) => {
-            let fields: Vec<String> = fields.iter().map(|field| format!("`{field}`")).collect();
-            let fields = match fields.split_last() {
-                Some((last, [])) => last.clone(),
-                Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
-                None => String::new(),
-            };
-            format!("it needs {fields}")
-        }
+        Malformed::Missing(fields) => format!("it needs {}", any_of(fields)),
         Malformed::WrongType(field, kind) => {
             let kind = match kind {
                 FieldType::String => "a string",
@@ -1831,6 +1833,15 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
                 FieldType::StringMap => "an object of strings",
             };
             format!("`{field}` must be {kind}")
+        }
+        Malformed::NotOneOf(field, values) => {
+            format!("`{field}` must be one of {}", any_of(values))
+        }
+        Malformed::WrongPrefix(field, prefix) => format!("`{field}` must start with `{prefix}`"),
+        Malformed::Forbidden(field) => format!("it must not hold `{field}`"),
+        Malformed::Reference => "no value may hold a `${VAR}` reference".to_owned(),
+        Malformed::Name(NameChars::LettersDigitsDashUnderscore) => {
+            "its name may hold only letters, digits, `-` and `_`".to_owned()
         }
     };
     let sentence = if competes {

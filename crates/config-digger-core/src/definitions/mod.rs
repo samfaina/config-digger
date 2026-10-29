@@ -3216,6 +3216,56 @@ shape = { block = \"fields\" }
         assert!(error(&text).contains("one_of or types"), "{}", error(&text));
     }
 
+    /// `VALID` whose location has the shape of fields `fields`, checked.
+    fn with_shape(fields: &str) -> String {
+        VALID
+            .replace(
+                "on_read_failure = \"ignores_file\"
+",
+                &format!(
+                    "on_read_failure = \"ignores_file\"
+shape = {{ block = \"fields\", {fields} }}
+"
+                ),
+            )
+            .replace(r#"checks = ["disable""#, r#"checks = ["shape", "disable""#)
+    }
+
+    #[test]
+    fn a_shape_with_the_checks_of_a_remote_server_loads() {
+        let text = with_shape(
+            r#"required = ["type", "url"], values = { type = ["http"] }, prefixes = { url = "https://" }, forbidden = ["command"], no_references = true, name = "letters-digits-dash-underscore""#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_field_must_not_be_empty() {
+        for fields in [
+            r#"required = ["url", ""]"#,
+            r#"forbidden = [""]"#,
+            r#"values = { "" = ["http"] }"#,
+            r#"prefixes = { "" = "https://" }"#,
+        ] {
+            let text = with_shape(fields);
+            assert!(
+                error(&text).contains("a shape field `` must not be empty"),
+                "{fields}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn a_shape_field_cannot_be_both_required_and_forbidden() {
+        let text = with_shape(r#"required = ["type", "url"], forbidden = ["url"]"#);
+        assert!(
+            error(&text).contains("shape field `url` is both required and forbidden"),
+            "{}",
+            error(&text)
+        );
+    }
+
     #[test]
     fn a_location_needs_a_read_failure_reaction() {
         let text = VALID.replace(

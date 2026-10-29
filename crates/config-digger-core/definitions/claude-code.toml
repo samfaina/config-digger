@@ -279,12 +279,21 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # parse is skipped [test]. Each source says so. Claude Code never reads
 # `managedMcpServers` from the HKCU value [docs, test], though it applies
 # the value's other settings when no admin source holds any: the location
-# leaves the HKCU value out, `skips_user_writable`. It drops an entry with a
-# command or at an `http://` URL, loading only remote servers at an
-# `https://` URL [docs, test], which this shape does not check (#304).
+# leaves the HKCU value out, `skips_user_writable`. It drops an entry that
+# fails one of these checks and still loads the others: `type` is `http`,
+# `sse` or `streamable-http`, an alias of `http` [docs]; `url` starts with
+# `https://`, a plain `http://` URL refused [test], `localhost` included
+# [docs]; the entry holds no `command` [test], `args`, `env` or
+# `headersHelper` [docs]; no value holds a `${VAR}` reference, since it
+# expands none here [docs]; and the name holds only letters, digits, `-`
+# and `_` [docs]. Its rule against control and invisible formatting
+# characters in a key or value [docs] is not checked: no ticket yet.
 [[locations]]
 id = "managed-settings-mcp"
-unverified = { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" }
+unverified = [
+  { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
+  "Whether a dropped `managedMcpServers` entry still takes precedence over a same-named server of a lower Scope is not known: it is taken not to compete by name.",
+]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }
 root = ["managedMcpServers"]
@@ -292,9 +301,8 @@ kind = "mcp"
 scope = "managed"
 provenance = "managed"
 store_class = "plain"
-interpolation = { block = "braces", default_separator = ":-" }
 on_read_failure = "unknown"
-shape = { block = "fields", one_of = ["command", "url"], types = { type = "string", command = "string", args = "string-array", env = "string-map", url = "string", headers = "string-map" } }
+shape = { block = "fields", required = ["type", "url"], values = { type = ["http", "sse", "streamable-http"] }, prefixes = { url = "https://" }, forbidden = ["command", "args", "env", "headersHelper"], no_references = true, name = "letters-digits-dash-underscore", types = { type = "string", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "local-mcp"

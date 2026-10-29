@@ -257,12 +257,16 @@ pub(crate) fn resolve(
                 .iter()
                 .map(|entry| snapshot.parked_of(entry))
                 .collect();
-            // Why each Entry lacks the minimal shape its location declares.
+            // Why each Entry lacks the minimal shape its location declares:
+            // its value, checked by the scan, then its name.
             let malformed: Vec<Option<Malformed>> = entries
                 .iter()
                 .map(|entry| {
                     let shape = definition.location(&entry.location).shape.as_ref()?;
-                    shape.malformed(&entry.config)
+                    entry
+                        .malformed
+                        .clone()
+                        .or_else(|| shape.misnamed(&entry.name))
                 })
                 .collect();
             // What makes the Agent skip each skill, and what it loads anyway
