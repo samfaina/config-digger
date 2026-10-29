@@ -1139,3 +1139,38 @@ fn a_local_skill_off_by_its_folder_is_read_and_enabled_by_that_one_key() {
         json!({ "skillOverrides": {} })
     );
 }
+
+#[test]
+fn disabling_a_local_skill_also_disables_the_synced_skill_of_its_folder_and_warns_of_it() {
+    let fs = with_skill(
+        synced_pdf_overridden(&settings_local(), json!({})),
+        in_home(r".claude\skills\pdf"),
+        &skill_md("pdf"),
+    );
+    let core = core(&fs);
+    let local = in_home(r".claude\skills\pdf").display().to_string();
+    let before = inventory(&core, &in_project());
+    let synced = skill(&before, "anthropic-skills:pdf").entries[0]
+        .locator
+        .clone();
+
+    let disable = plan(&core, &in_project(), Action::Disable, &[&local]).unwrap();
+
+    let warning = disable
+        .warnings()
+        .iter()
+        .find(|warning| warning.class == WarningClass::WideReach)
+        .expect("a wide-reach warning");
+    assert!(warning.sentence.contains(&synced), "{}", warning.sentence);
+    core.execute(disable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(
+        json_of(&fs, settings_local()),
+        json!({ "skillOverrides": { "pdf": "off" } })
+    );
+    let after = inventory(&core, &in_project());
+    assert_eq!(code(skill(&after, "pdf").entries[0].state), "disabled");
+    assert_eq!(
+        code(skill(&after, "anthropic-skills:pdf").entries[0].state),
+        "disabled"
+    );
+}

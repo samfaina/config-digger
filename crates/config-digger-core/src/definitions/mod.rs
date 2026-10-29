@@ -3157,7 +3157,7 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     }
 
     #[test]
-    fn further_keys_need_a_name_keying_an_object_with_no_lower_names_or_plugin_id() {
+    fn further_keys_need_a_name_keying_an_object_with_no_named_by_lower_names_or_plugin_id() {
         for (key_path, switch, extra) in [
             (r#"["overrides"]"#, "", ""),
             (OVERRIDES, ", lower_names = true", ""),
@@ -3178,8 +3178,12 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     }
 
     #[test]
-    fn further_keys_need_target_name_and_take_no_layers_or_default() {
-        for extra in [r#", default_value = "off""#, ", layered = true"] {
+    fn further_keys_need_target_name_and_take_no_layers_policy_or_default() {
+        for extra in [
+            r#", default_value = "off""#,
+            ", layered = true",
+            ", policy = true, enable_offered = false",
+        ] {
             let text = with_disable(&also_named(OVERRIDES, r#"["{own_name}"]"#, "", extra));
             assert!(
                 error(&text).contains("also_names needs target `name`"),

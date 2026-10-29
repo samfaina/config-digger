@@ -5673,15 +5673,18 @@ impl Validate for JsonField {
         if self.policy && self.enable_offered {
             return Err("a policy switch is only read: enable_offered must be false".into());
         }
-        // Of several keys, none would say which one's layer decides, or
-        // which one's missing value the default stands for.
+        // Of several keys, none would say which one's layer decides, which
+        // one's missing value the default stands for, or which one policy
+        // forces the Entry on or off by.
         if !self.switch.also_names.is_empty()
             && (self.target != MechanismTarget::Name
                 || self.layered
+                || self.policy
                 || self.default_value.is_some())
         {
             return Err(
-                "also_names needs target `name`, and takes no layered and no default_value".into(),
+                "also_names needs target `name`, and takes no layered, no policy and no default_value"
+                    .into(),
             );
         }
         match (self.enable_action, &self.enabled_value) {
@@ -6330,8 +6333,8 @@ pub(crate) struct Switch {
     pub lower_names: bool,
     /// Further keys the switch holds an Entry under, besides `{name}`: what
     /// the `{name}` segment of the key path also takes, each a template of
-    /// `{name}`, the Entry's name, and `{own_name}`, its own name before its
-    /// location's `name_template`, such as `{own_name}` for Claude Code's
+    /// `{name}`, the Entry's name, and `{own_name}`, its own name as read,
+    /// before its location's `name_template` renamed it, such as `{own_name}` for Claude Code's
     /// `skillOverrides`, which turns a synced skill off by
     /// `anthropic-skills:<folder>` or by `<folder>`. A key that comes out as
     /// another is one key. The Entry is Disabled when any of its keys holds
@@ -6409,7 +6412,7 @@ impl Validate for Switch {
         if !self.also_names.is_empty() {
             if !self.names() || self.named_by.is_some() || self.lower_names || self.plugins() {
                 return Err(format!(
-                    "also_names needs `{NAME_KEY}` in the key path, keying an object, with no lower_names and no `{PLUGIN_KEY}`"
+                    "also_names needs `{NAME_KEY}` in the key path, keying an object, with no named_by, no lower_names and no `{PLUGIN_KEY}`"
                 ));
             }
             if let Some(key) = self
