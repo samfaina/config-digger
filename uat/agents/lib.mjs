@@ -26,7 +26,7 @@ export function fresh(name, base = root) {
 
 export function write(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, typeof content === "string" ? content : JSON.stringify(content, null, 2));
+  fs.writeFileSync(file, typeof content === "string" || Buffer.isBuffer(content) ? content : JSON.stringify(content, null, 2));
 }
 
 export function json(file) {

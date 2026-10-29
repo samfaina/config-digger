@@ -3,7 +3,8 @@
 # (verified against 2.16120.0.0), and those tagged [test] from the release
 # gate's probe, uat/agents/claude-desktop.mjs in Windows Sandbox
 # (docs/research/release-gate.md), run on 3.6556.2, with the move of a
-# package's data folder to `Claude-Data` (#305). Facts tagged [bundle] about
+# package's data folder to `Claude-Data` (#305) and, signed in, the skills
+# mirror (#313). Facts tagged [bundle] about
 # that move were read in 3.6556.2 and 4.29. `verified` starts at the
 # research's 2.16120, on which the probe never ran, and ends at the version
 # it passes on.
@@ -336,17 +337,25 @@ locations = ["extension-mcp"]
 # Skills exist on disk only as Claude Desktop's mirror of the account's
 # skills, in `skills-plugin/<org>/<account>/skills/<name>` [disk]. They are
 # managed in the account, and the app rewrites the mirror as it syncs, so
-# config-digger only reads them.
+# config-digger only reads them. The account validates a skill on upload
+# [bundle], so only a hand edit leaves a `SKILL.md` the app cannot read. At
+# its next sync round the app keeps such a file, whether its frontmatter is
+# not YAML or its body is not UTF-8, in a skill of Anthropic's or a user's;
+# its manifest still lists the skill on, and a folder the manifest does not
+# list it removes [test]. A skill whose frontmatter is not YAML goes by its
+# folder, as the fallbacks below say. A `SKILL.md` that is not UTF-8 is a
+# Read failure here, though the app keeps its skill on and hands the mirror
+# to its sessions' Claude Code, which was not tested: what it does with the
+# file is unknown.
 [[locations]]
 id = "mirrored-skills"
-unverified = "How Claude Desktop treats a `SKILL.md` it cannot fully read is not known; the account validates skills on upload."
 anchor = { block = "home", root = "skills" }
 format = { block = "skill-folder", recursive = true, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
 kind = "skill"
 scope = "user"
 provenance = "cloud-mirror"
 store_class = "plain"
-on_read_failure = "ignores_file"
+on_read_failure = "unknown"
 
 [items.skill]
 precedence = ["mirrored-skills"]

@@ -5125,6 +5125,8 @@ impl Scanner<'_> {
     ) {
         let fs = self.reader.fs;
         let skill_md = skill.folder.join(SKILL_MD);
+        // A `SKILL.md` that cannot be read takes its location's reaction.
+        self.add_reader(home, location, &skill_md);
         let Some(text) = self.reader.text(home, &skill_md, project.as_deref()) else {
             return;
         };

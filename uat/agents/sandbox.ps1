@@ -5,6 +5,7 @@
 #   .\uat\agents\sandbox.ps1
 #   .\uat\agents\sandbox.ps1 -Probes codex-machine -KeepOpen
 #   .\uat\agents\sandbox.ps1 -Probes claude-code-machine -Claude a\claude.exe, b\claude.exe
+#   .\uat\agents\sandbox.ps1 -Probes claude-desktop -SignedIn -KeepOpen
 #
 # Maps read-only into the Sandbox the probes, this machine's Node, a copy of
 # each Claude Code binary -Claude names, Codex's codex.exe, and the Claude
@@ -14,7 +15,10 @@
 # writes the output and results to -Work\results: <probe>.log and
 # <probe>.json, with the Claude Code version after the probe's name. Waits
 # for results\done.txt and for the Sandbox to close; -KeepOpen leaves it
-# open to look around. Needs Windows Sandbox (Pro, Enterprise or Education).
+# open to look around, and runs the probes again from -Work\probes, which a
+# rerun may copy over, whenever a results\rerun.txt appears. -SignedIn runs
+# claude-desktop's signed-in checks: its log says when to sign in from the
+# Sandbox's window. Needs Windows Sandbox (Pro, Enterprise or Education).
 param(
     [string]$Work = "$env:TEMP\cd-agents-sandbox",
     [ValidateSet("claude-code-machine", "codex-machine", "claude-desktop")]
@@ -23,6 +27,7 @@ param(
     [string]$Codex = "",
     [string]$Node = "",
     [switch]$KeepOpen,
+    [switch]$SignedIn,
     [int]$TimeoutMinutes = 40
 )
 $ErrorActionPreference = "Stop"
@@ -83,7 +88,7 @@ $folders = @(
     (Mapped $desktop "C:\probe\desktop"),
     (Mapped $results "C:\probe\results" $false)
 )
-$command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\probe\agents\in-sandbox.ps1 -Probes $($Probes -join ',') -Codex $(Split-Path -Leaf $Codex)"
+$command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\probe\agents\in-sandbox.ps1 -Probes $($Probes -join ',') -Codex $(Split-Path -Leaf $Codex)$(if ($SignedIn) { ' -SignedIn' })"
 $wsb = "$Work\agents.wsb"
 Set-Content $wsb @"
 <Configuration>
