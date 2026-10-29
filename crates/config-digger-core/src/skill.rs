@@ -456,16 +456,17 @@ mod tests {
 
     const BOTH: [Unlisted; 2] = [Unlisted::NoDescription, Unlisted::DisableModelInvocation];
 
+    const EVERY: [Unlisted; 3] = [
+        Unlisted::NoDescription,
+        Unlisted::DisableModelInvocation,
+        Unlisted::MalformedFrontmatter,
+    ];
+
     /// Why an Agent whose `malformed_frontmatter` is `reading`, and which
     /// leaves skills out of its model's list for every reason, leaves out
     /// the skill whose `SKILL.md` holds `text`.
     fn unlisted_as(reading: SkillFallback, text: &str) -> Vec<Unlisted> {
-        let every = [
-            Unlisted::NoDescription,
-            Unlisted::DisableModelInvocation,
-            Unlisted::MalformedFrontmatter,
-        ];
-        unlisted(text, &frontmatter(text, reading), &every)
+        unlisted(text, &frontmatter(text, reading), &EVERY)
     }
 
     #[test]

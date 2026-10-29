@@ -575,25 +575,34 @@ fn a_skill_whose_yaml_does_not_parse_is_unlisted_for_it() {
     );
 }
 
+/// Checks that the skill `name` whose `SKILL.md` holds `text`, in a
+/// Project and in the user's home folder, keeps its `skill_fallback` note
+/// and has the `unlisted` note of a frontmatter that does not parse.
+fn assert_unlisted_for_not_parsing_with_its_fallback(name: &str, text: &str) {
+    for entry in in_project_and_user_folder(name, text) {
+        assert!(
+            entry
+                .notes
+                .iter()
+                .any(|note| code(note.code) == "skill_fallback")
+        );
+        assert_eq!(unlisted(&entry), [MALFORMED]);
+    }
+}
+
 #[test]
 fn a_frontmatter_that_never_closes_is_unlisted_for_not_parsing() {
-    assert_eq!(
-        unlisted_in_project_and_user_folder(
-            "cd-throwaway-unclosed",
-            "---\nname: cd-throwaway-unclosed\ndescription: never closes\nbody\n"
-        ),
-        [[MALFORMED]; 2]
+    assert_unlisted_for_not_parsing_with_its_fallback(
+        "cd-throwaway-unclosed",
+        "---\nname: cd-throwaway-unclosed\ndescription: never closes\nbody\n",
     );
 }
 
 #[test]
 fn a_frontmatter_with_a_line_that_is_no_key_is_unlisted_for_not_parsing() {
-    assert_eq!(
-        unlisted_in_project_and_user_folder(
-            "cd-throwaway-no-key",
-            "---\nname: cd-throwaway-no-key\ndescription: probe\na line that is no key\n---\n"
-        ),
-        [[MALFORMED]; 2]
+    assert_unlisted_for_not_parsing_with_its_fallback(
+        "cd-throwaway-no-key",
+        "---\nname: cd-throwaway-no-key\ndescription: probe\na line that is no key\n---\n",
     );
 }
 

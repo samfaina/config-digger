@@ -719,11 +719,12 @@ on_read_failure = "ignores_file"
 # built-in one lists `no-description`, for a `SKILL.md` with no frontmatter
 # or a YAML one without the key, and `malformed-frontmatter`, for one
 # config-digger reads as malformed. The probe never checked a skill with
-# `disable-model-invocation: true`, which gets no note. Two skills of one name at different paths are both
-# listed under `/name`, and the user picks one, which Cursor records by its
-# path below `skills` [test]. Enter takes the first listed: a user's skill
-# before a Project's until one is picked, after which the order follows
-# that record, which can match either path [test].
+# `disable-model-invocation: true`, which gets no note. Two skills of one
+# name at different paths are both listed under `/name`, and the user picks
+# one, which Cursor records by its path below `skills` [test]. Enter takes
+# the first listed: a user's skill before a Project's until one is picked,
+# after which the order follows that record, which can match either path
+# [test].
 [items.skill]
 precedence = [["nested-cursor-skills", "nested-claude-skills", "nested-codex-skills", "nested-grok-skills", "nested-agents-skills"], "user-cursor-skills", "user-claude-skills", "user-codex-skills", "user-grok-skills", "user-agents-skills", "built-in-skills", "project-cursor-skills", "project-claude-skills", "project-codex-skills", "project-grok-skills", "project-agents-skills", "cursor-plugin-skills", "claude-plugin-skills"]
 competition = { block = "path-key", markers = [".cursor", ".claude", ".codex", ".grok", ".agents"] }

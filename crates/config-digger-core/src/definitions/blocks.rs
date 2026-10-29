@@ -3462,9 +3462,11 @@ pub(crate) enum Unlisted {
     /// Its frontmatter sets `disable-model-invocation` to the boolean
     /// `true`.
     DisableModelInvocation,
-    /// Its frontmatter is not YAML the Agent parses: YAML that does not
-    /// parse, one that opens with `---` and never closes, or a line that is
-    /// no key.
+    /// Its frontmatter is one config-digger reads as malformed, which the
+    /// Agent cannot parse: YAML that does not parse, a `[` or `{` value
+    /// that never closes, a line that is no key, or a frontmatter that
+    /// opens with `---` and never closes, unless the Agent reads that one
+    /// as none.
     MalformedFrontmatter,
 }
 

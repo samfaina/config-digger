@@ -2989,7 +2989,7 @@
           "const": "disable-model-invocation"
         },
         {
-          "description": "Its frontmatter is not YAML the Agent parses: YAML that does not\nparse, one that opens with `---` and never closes, or a line that is\nno key.",
+          "description": "Its frontmatter is one config-digger reads as malformed, which the\nAgent cannot parse: YAML that does not parse, a `[` or `{` value\nthat never closes, a line that is no key, or a frontmatter that\nopens with `---` and never closes, unless the Agent reads that one\nas none.",
           "type": "string",
           "const": "malformed-frontmatter"
         }
