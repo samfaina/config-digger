@@ -354,6 +354,7 @@ fn managed_checks(servers: Value, state: Value) -> Vec<(String, String, String)>
     found
 }
 
+/// A server's name, State and reason sentence, as `managed_checks` gives it.
 fn check(name: &str, state: &str, sentence: &str) -> (String, String, String) {
     (name.to_owned(), state.to_owned(), sentence.to_owned())
 }
@@ -397,6 +398,8 @@ fn beside_a_passing_server(failing: Value) -> Vec<(String, String, String)> {
     managed_checks(json!({ "failing": failing, "wiki": remote() }), json!({}))
 }
 
+/// The checks of `beside_a_passing_server` when `failing` is Invalid for
+/// `sentence`.
 fn fails(sentence: &str) -> Vec<(String, String, String)> {
     vec![
         check(

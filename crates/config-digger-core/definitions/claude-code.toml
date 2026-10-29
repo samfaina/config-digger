@@ -287,7 +287,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # `headersHelper` [docs]; no value holds a `${VAR}` reference, since it
 # expands none here [docs]; and the name holds only letters, digits, `-`
 # and `_` [docs]. Its rule against control and invisible formatting
-# characters in a key or value [docs] is not checked.
+# characters in a key or value [docs] is not checked: no ticket yet.
 [[locations]]
 id = "managed-settings-mcp"
 unverified = [

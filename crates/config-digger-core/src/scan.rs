@@ -719,7 +719,10 @@ fn reading<'r>(readers: &'r [LocationReader], path: &Path) -> Vec<&'r LocationRe
 /// Why `value`, as written, lacks the minimal shape `location` declares,
 /// its name aside. It is checked before masking, which can hide what the
 /// shape looks for, such as a reference in a header.
-fn malformed(location: &LocationDefinition, value: &serde_json::Value) -> Option<Malformed> {
+fn malformed_as_written(
+    location: &LocationDefinition,
+    value: &serde_json::Value,
+) -> Option<Malformed> {
     location.shape.as_ref()?.malformed(value)
 }
 
@@ -4286,7 +4289,7 @@ impl Scanner<'_> {
                 plugin: None,
                 switch_id: None,
                 config_hash: None,
-                malformed: malformed(location, &parked_entry.entry),
+                malformed: malformed_as_written(location, &parked_entry.entry),
             });
             read.parked.push(ScannedParked {
                 key_path,
@@ -4695,7 +4698,7 @@ impl Scanner<'_> {
             let location = definitions[entry.agent_index].location(&entry.location);
             let reading = locations_reading(definitions, &self.readers, &entry.path);
             let masked = mask::entry_read_by(location, &reading, &entry.config);
-            entry.malformed = malformed(location, &entry.config);
+            entry.malformed = malformed_as_written(location, &entry.config);
             entry.config = masked.value;
             entry.masked = masked.key_paths;
         }

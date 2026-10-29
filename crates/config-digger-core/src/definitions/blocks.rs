@@ -4942,7 +4942,7 @@ impl Conform for FieldShape {
         if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
             return Some(Malformed::Missing(self.one_of.clone()));
         }
-        let limited = self
+        let other_limited = self
             .values
             .keys()
             .chain(self.prefixes.keys())
@@ -4950,7 +4950,7 @@ impl Conform for FieldShape {
         if let Some(malformed) = self
             .required
             .iter()
-            .chain(limited)
+            .chain(other_limited)
             .find_map(|field| self.field_malformed(field, object.get(field)))
         {
             return Some(malformed);
