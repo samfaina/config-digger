@@ -2728,6 +2728,13 @@
               "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
               "$ref": "#/$defs/SkillFallback"
             },
+            "unlisted": {
+              "description": "Why the Agent leaves a skill it loads out of the skills it lists to\nits model, if it does: the user can still run such a skill, which\nkeeps its State with a note. None by default.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Unlisted"
+              }
+            },
             "block": {
               "type": "string",
               "const": "skill-folder"
@@ -2968,6 +2975,21 @@
         }
       ]
     },
+    "Unlisted": {
+      "description": "Why an Agent leaves a skill out of the skills it lists to its model,\nbecause of the skill's own `SKILL.md`. config-digger tells only of a\n`SKILL.md` with no frontmatter or with one it reads as YAML.",
+      "oneOf": [
+        {
+          "description": "It has no `description`: no frontmatter, or one without the key.",
+          "type": "string",
+          "const": "no-description"
+        },
+        {
+          "description": "Its frontmatter sets `disable-model-invocation` to the boolean\n`true`.",
+          "type": "string",
+          "const": "disable-model-invocation"
+        }
+      ]
+    },
     "SkillFolder": {
       "description": "A folder whose subfolders holding a `SKILL.md`, at the block's depth,\nare skills, each one an Entry. A folder whose name starts with `.` is\nnever read, and one without `SKILL.md` is not an Entry.",
       "type": "object",
@@ -3038,6 +3060,13 @@
         "no_name": {
           "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
           "$ref": "#/$defs/SkillFallback"
+        },
+        "unlisted": {
+          "description": "Why the Agent leaves a skill it loads out of the skills it lists to\nits model, if it does: the user can still run such a skill, which\nkeeps its State with a note. None by default.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Unlisted"
+          }
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"

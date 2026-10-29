@@ -634,16 +634,21 @@ layered = true
 # folder's name, a workspace folder's skill or a personal one [test], as
 # one code reads every location's skills [binary]. It keeps the values it
 # can read, which config-digger does not, so it may show no description
-# where VS Code has one. A skill with no description is one the user can
-# run [test], but VS Code does not list it to its model [binary]:
-# config-digger shows it Effective (#343).
+# where VS Code has one. A skill with no description, or with
+# `disable-model-invocation: true`, is one the user can run [test], but
+# VS Code does not list it to its model [binary], whatever its location,
+# as one code builds that list: config-digger shows it in its State with
+# an `unlisted` note, for a `SKILL.md` with no frontmatter or with one it
+# reads as YAML. A frontmatter config-digger reads as malformed gets no
+# note, as VS Code may keep values from it that config-digger does not
+# read (#473).
 
 # A workspace folder's `.agents`, `.github` and `.claude` skills, in that
 # order [docs, test].
 [[locations]]
 id = "folder-agents-skills"
 anchor = { block = "project", path = ".agents/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
@@ -654,7 +659,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "folder-github-skills"
 anchor = { block = "project", path = ".github/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
@@ -666,7 +671,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "folder-claude-skills"
 anchor = { block = "project", path = ".claude/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "workspace-folder"
@@ -679,7 +684,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-agents-skills"
 anchor = { block = "machine", path = "~/.agents/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "user"
@@ -690,7 +695,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-copilot-skills"
 anchor = { block = "machine", path = "~/.copilot/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "user"
@@ -702,7 +707,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "user-claude-skills"
 anchor = { block = "machine", path = "~/.claude/skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "user"
@@ -714,7 +719,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "plugin-skills"
 anchor = { block = "plugin", plugins = "agent-plugins", path = "skills" }
-format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" }
+format = { block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "plugin"
@@ -728,7 +733,7 @@ on_read_failure = "ignores_file"
 [[locations]]
 id = "extension-skills"
 anchor = { block = "plugin", plugins = ["built-in-extensions", "extensions"], path = "package.json" }
-format = { block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name" } }
+format = { block = "skill-list", list = ["contributes", "chatSkills"], field = "path", skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", unlisted = ["no-description", "disable-model-invocation"] } }
 kind = "skill"
 switch_id = "{uri_path}/SKILL.md"
 scope = "extension"

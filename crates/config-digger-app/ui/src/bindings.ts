@@ -1235,6 +1235,12 @@ export type NoteCode =
 /**  The Agent loads the skill through a fallback, under its folder's name. */
 "skill_fallback" | 
 /**
+ *  The user can run the skill, but the Agent leaves it out of the
+ *  skills it lists to its model because of its own `SKILL.md`: no
+ *  description, or `disable-model-invocation: true`.
+ */
+"unlisted" | 
+/**
  *  The skill manager is recognised only by the folder's name or where it
  *  is, which a folder made by hand there matches too.
  */

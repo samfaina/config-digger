@@ -784,6 +784,173 @@ fn vs_code_loads_a_skill_whose_frontmatter_is_not_yaml_under_its_folder_s_name()
     assert_eq!(json(skill(&inventory, "broken").state), "effective");
 }
 
+/// The codes of the notes of `entry`.
+fn note_codes(entry: &Entry) -> Vec<String> {
+    entry.notes.iter().map(|note| code(note.code)).collect()
+}
+
+/// The sentences of the `unlisted` notes of `entry`, each checked to name
+/// no switch.
+fn unlisted(entry: &Entry) -> Vec<&str> {
+    entry
+        .notes
+        .iter()
+        .filter(|note| code(note.code) == "unlisted")
+        .inspect(|note| assert!(note.switch.is_none()))
+        .map(|note| note.sentence.as_str())
+        .collect()
+}
+
+/// The fixture home with a personal skill `name` whose `SKILL.md` holds
+/// `text`.
+fn with_personal_skill(name: &str, text: &str) -> FakeFileSystem {
+    with_home(vscode()).with_file(format!(r"{HOME}\.copilot\skills\{name}\SKILL.md"), text)
+}
+
+/// The note of a skill VS Code leaves out of its model's list because its
+/// `SKILL.md` has no `description`.
+const NO_DESCRIPTION: &str = "The user can still run this skill in VS Code, but VS Code does not list it to its model: its SKILL.md has no `description`.";
+
+#[test]
+fn a_skill_with_no_frontmatter_is_one_vs_code_leaves_out_of_its_model_s_list() {
+    let inventory = inventory(&with_personal_skill(
+        "bare",
+        "A skill with no frontmatter.\n",
+    ));
+
+    let bare = &skill(&inventory, "bare").entries[0];
+    assert_eq!(code(bare.state), "effective");
+    assert!(note_codes(bare).contains(&"skill_fallback".to_owned()));
+    assert_eq!(unlisted(bare), [NO_DESCRIPTION]);
+}
+
+/// The `unlisted` notes of the skill `name` of the fixture Project `app`'s
+/// `.agents\skills`, whose `SKILL.md` holds `text`, each checked to leave
+/// the skill Effective.
+fn unlisted_in_workspace(name: &str, text: &str) -> Vec<String> {
+    let fs = with_project(with_home(vscode()), "app").with_file(
+        project("app").join(format!(r".agents\skills\{name}\SKILL.md")),
+        text,
+    );
+    let inventory = inventory_at(&fs, &project("app"));
+    let entry = &skill(&inventory, name).entries[0];
+    assert_eq!(entry.scope, "workspace-folder");
+    assert_eq!(code(entry.state), "effective");
+    unlisted(entry).into_iter().map(str::to_owned).collect()
+}
+
+#[test]
+fn a_skill_whose_yaml_frontmatter_has_no_description_is_unlisted() {
+    assert_eq!(
+        unlisted_in_workspace("plain", "---\nname: plain\n---\nbody\n"),
+        [NO_DESCRIPTION]
+    );
+}
+
+#[test]
+fn a_skill_that_sets_disable_model_invocation_to_true_is_unlisted() {
+    assert_eq!(
+        unlisted_in_workspace(
+            "manual",
+            "---\ndescription: Deploys.\ndisable-model-invocation: true\n---\n"
+        ),
+        [
+            "The user can still run this skill in VS Code, but VS Code does not list it to its model: its SKILL.md sets `disable-model-invocation: true`."
+        ]
+    );
+}
+
+#[test]
+fn a_skill_unlisted_for_both_reasons_has_one_note_naming_both() {
+    assert_eq!(
+        unlisted_in_workspace("manual", "---\ndisable-model-invocation: true\n---\n"),
+        [
+            "The user can still run this skill in VS Code, but VS Code does not list it to its model: its SKILL.md has no `description` and sets `disable-model-invocation: true`."
+        ]
+    );
+}
+
+#[test]
+fn a_skill_with_a_description_that_leaves_model_invocation_on_is_listed() {
+    for text in [
+        "---\ndescription: Deploys.\ndisable-model-invocation: false\n---\n",
+        "---\ndescription: Deploys.\n---\n",
+        // Quoted, it is a string, not the boolean.
+        "---\ndescription: Deploys.\ndisable-model-invocation: \"true\"\n---\n",
+    ] {
+        assert!(unlisted_in_workspace("deploy", text).is_empty(), "{text}");
+    }
+}
+
+#[test]
+fn a_frontmatter_config_digger_reads_as_malformed_gives_no_unlisted_note() {
+    for text in [
+        "---\ndescription: [unclosed\n---\n",
+        "---\ndisable-model-invocation: true\nnot a key\n---\n",
+        "---\ndisable-model-invocation: true\nbody\n",
+    ] {
+        assert!(unlisted_in_workspace("broken", text).is_empty(), "{text}");
+    }
+}
+
+#[test]
+fn a_shadowed_skill_with_no_description_stays_shadowed_with_the_note() {
+    let fs = with_project(
+        with_personal_skill("plain", "---\nname: plain\n---\n"),
+        "app",
+    )
+    .with_file(
+        project("app").join(r".agents\skills\plain\SKILL.md"),
+        "---\ndescription: Plain.\n---\n",
+    );
+    let inventory = inventory_at(&fs, &project("app"));
+
+    let plain = skill(&inventory, "plain");
+    assert!(unlisted(&plain.entries[0]).is_empty());
+    let personal = &plain.entries[1];
+    assert_eq!(code(personal.state), "shadowed");
+    assert_eq!(unlisted(personal), [NO_DESCRIPTION]);
+}
+
+#[test]
+fn an_extension_s_or_an_agent_plugin_s_skill_with_no_description_is_unlisted() {
+    let fs = with_home(vscode())
+        .with_file(
+            Path::new(HOME)
+                .join(r".vscode\extensions\acme.helper-1.0.0\skills\troubleshoot\SKILL.md"),
+            "---\nname: troubleshoot\n---\n",
+        )
+        .with_file(
+            review_kit().join(r"skills\triage\SKILL.md"),
+            "---\nname: triage\n---\n",
+        );
+    let inventory = inventory(&fs);
+
+    for (name, provenance) in [("troubleshoot", "extension"), ("triage", "plugin")] {
+        let entry = &skill(&inventory, name).entries[0];
+        assert_eq!(code(entry.provenance), provenance);
+        assert_eq!(code(entry.state), "effective");
+        assert_eq!(unlisted(entry), [NO_DESCRIPTION], "{name}");
+    }
+}
+
+#[test]
+fn another_agent_reading_the_same_skill_gives_it_no_unlisted_note() {
+    let fs = with_home(vscode()).with_file(
+        format!(r"{HOME}\.claude\skills\plain\SKILL.md"),
+        "---\nname: plain\ndisable-model-invocation: true\n---\n",
+    );
+    let inventory = inventory(&fs);
+
+    assert_eq!(unlisted(&skill(&inventory, "plain").entries[0]).len(), 1);
+    let claude = inventory
+        .items
+        .iter()
+        .find(|item| item.agent == "claude-code" && item.name == "plain")
+        .unwrap();
+    assert!(unlisted(&claude.entries[0]).is_empty());
+}
+
 #[test]
 fn a_personal_skill_s_skill_manager_is_its_provenance() {
     let inventory = inventory(&with_home(vscode()));

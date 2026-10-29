@@ -120,6 +120,10 @@ _Avoid_: Placeholder, dummy, shadow table
 A setting that limits part of an Entry, such as some of its tools, while the Agent still uses it. The Entry keeps its State, with a note. Disable never writes one; Enable takes away the one an Agent's definition lets it, such as a skill's item in VS Code's `chat.disabledPromptFiles.skill`.
 _Avoid_: Partial disable, partly off
 
+**Unlisted**:
+Said of a skill the Agent loads, and the user can run, that the Agent leaves out of the skills it lists to its model because of its own `SKILL.md`: no description, or `disable-model-invocation: true`. It keeps its State, with a note. Unlike a Partial switch, no setting causes it, so Disable and Enable do not touch it.
+_Avoid_: Hidden skill, user-only skill, model-disabled
+
 **Blocked**:
 Said of an Entry that the Agent will not use because of a gate outside the Entry that Enable cannot lift: an untrusted folder, a project server not yet approved, or managed policy. config-digger never lifts these gates.
 _Avoid_: Pending, denied, untrusted
