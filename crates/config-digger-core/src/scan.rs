@@ -21,6 +21,7 @@ use crate::definitions::{
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
 use crate::ports::{FileSystem, Ports};
+use crate::roots::Roots;
 use crate::store::Written;
 use crate::user_list::{self, UserList};
 use crate::{mask, park, paths, skill, version, walk};
@@ -769,7 +770,7 @@ impl Snapshot {
 
     /// The roots of the Agent home `home` of the Agent at `agent_index`,
     /// which the scan found.
-    pub fn roots(&self, agent_index: usize, home: &str) -> &BTreeMap<String, PathBuf> {
+    pub fn roots(&self, agent_index: usize, home: &str) -> &Roots {
         &self
             .homes
             .iter()
@@ -790,6 +791,17 @@ impl Snapshot {
             .iter()
             .find(|found| found.agent_index == entry.agent_index && found.home == entry.home)
             .expect("Entries come from found homes")
+    }
+
+    /// The id of the Agent home whose folder holds the file or folder of
+    /// `entry`: its own, or for one an Overlay home reads from the home
+    /// under it, that home's.
+    pub fn home_holding<'s>(&'s self, entry: &'s ScannedEntry) -> &'s str {
+        let home = self.home_of(entry);
+        match &home.over {
+            Some(under) if !entry.path.starts_with(&home.folder) => under,
+            _ => &entry.home,
+        }
     }
 
     /// The Entry that `entry`, of a Mirrored home, was copied from: the
@@ -930,9 +942,10 @@ pub(crate) struct ScannedHome {
     /// The folder its roots are in.
     pub folder: PathBuf,
     /// The path of each of its roots, by name.
-    pub roots: BTreeMap<String, PathBuf>,
+    pub roots: Roots,
     pub source: HomeSource,
-    /// Any of its roots exists.
+    /// Any of its roots exists, or for an Overlay home, the path it reads
+    /// for one, in its folder or the other home's.
     pub configured: bool,
     /// The user hid it.
     pub hidden: bool,
@@ -942,6 +955,9 @@ pub(crate) struct ScannedHome {
     pub skipped: Option<Skipped>,
     /// For a home another tool copies from one of the Agent's, which.
     pub mirror: Option<Mirror>,
+    /// For an Overlay home, the id of the home it lies over, which holds
+    /// what the overlay reads outside its own folder.
+    pub over: Option<String>,
 }
 
 /// What config-digger reads of the version that last ran against an Agent
@@ -1138,7 +1154,7 @@ impl ScannedEntry {
     pub fn file_of(
         &self,
         anchor: &Anchor,
-        roots: &BTreeMap<String, PathBuf>,
+        roots: &Roots,
         folder: Option<&Path>,
     ) -> Option<PathBuf> {
         let plugin = self.plugin.as_ref().map(|plugin| plugin.id.as_str());
@@ -1318,12 +1334,15 @@ struct FoundHome {
     folder: PathBuf,
     /// Its roots by name, and the machine-wide paths of its definition by
     /// the text that names them.
-    roots: BTreeMap<String, PathBuf>,
+    roots: Roots,
     source: HomeSource,
-    /// Any of its own roots exists.
+    /// Any of its own roots exists, or for an Overlay home, the path it
+    /// reads for one, in its folder or the other home's.
     configured: bool,
     skipped: Option<Skipped>,
     mirror: Option<Mirror>,
+    /// For an Overlay home, the id of the home it lies over there.
+    over: Option<String>,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -1741,6 +1760,7 @@ fn read_as_if(
                 last_ran,
                 skipped: home.skipped,
                 mirror: home.mirror,
+                over: home.over,
                 declared: home.declared,
                 configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
@@ -2913,6 +2933,16 @@ fn find_homes(
                 .collect();
             located.push((home, folders));
         }
+        // The id and folder of the home each Overlay home lies over, with
+        // that home, by the overlay's id.
+        let unders: Vec<(&str, &HomeDefinition, HomeFolder)> = located
+            .iter()
+            .filter_map(|(home, _)| {
+                let over = home.over.as_ref()?;
+                let (under, folders) = located.iter().find(|(under, _)| under.id == *over)?;
+                Some((home.id.as_str(), *under, folders.first()?.clone()))
+            })
+            .collect();
         // What each lookup order picks.
         let picked: Vec<(&Vec<String>, Option<HomeFolder>)> = definition
             .lookup_orders
@@ -2939,20 +2969,31 @@ fn find_homes(
                     continue;
                 }
                 // Skipped when an order holds it and none picks its folder,
-                // for what the first order that holds it picks.
+                // for what the first order that holds it and picks a home
+                // picks, or else nothing.
                 let picks_it = picked.iter().any(|(_, pick)| {
                     pick.as_ref()
                         .is_some_and(|(_, pick)| paths::canonical_key(fs, pick) == key)
                 });
-                let skipped = picked
-                    .iter()
-                    .find(|(order, _)| order.contains(&home.id))
+                let holding = || picked.iter().filter(|(order, _)| order.contains(&home.id));
+                let skipped = holding()
+                    .find(|(_, pick)| pick.is_some())
+                    .or_else(|| holding().next())
                     .filter(|_| !picks_it)
                     .map(|(_, pick)| Skipped {
                         instead: pick.as_ref().map(|(id, _)| id.clone()),
                         folder: pick.as_ref().map(|(_, folder)| folder.clone()),
                     });
-                let mut roots = home.roots_in(&folder);
+                let under = unders.iter().find(|(id, ..)| *id == home.id);
+                let mut roots = match under {
+                    Some((_, under, (_, under_folder))) => Roots::overlay(
+                        home.roots_in(&folder),
+                        &under.roots_in(under_folder),
+                        under_folder,
+                        fs,
+                    ),
+                    None => home.roots_in(&folder).into(),
+                };
                 // A definition home the user added keeps its id, so that it is
                 // the same home before and after its files appear.
                 let configured = home.configured(&roots, fs);
@@ -2977,12 +3018,13 @@ fn find_homes(
                     configured,
                     skipped,
                     mirror: None,
+                    over: under.map(|(_, _, (id, _))| id.clone()),
                 });
             }
         }
         for mirror in mirrors {
             tracing::debug!(agent = %definition.agent.id, home = %mirror.home, "mirrored home found");
-            let mut roots = mirror.roots;
+            let mut roots: Roots = mirror.roots.into();
             roots.extend(machine_paths(definition, ports));
             found.push(FoundHome {
                 agent_index,
@@ -2994,6 +3036,7 @@ fn find_homes(
                 configured: true,
                 skipped: None,
                 mirror: Some(mirror.mirror),
+                over: None,
             });
         }
         // The home an order picks is named only when it is listed, as
@@ -3036,7 +3079,7 @@ fn find_homes(
             continue;
         }
         let definition = &definitions[agent_index];
-        let mut roots = definition.added_home().roots_in(&added.folder);
+        let mut roots: Roots = definition.added_home().roots_in(&added.folder).into();
         let configured = definition.added_home().configured(&roots, fs);
         roots.extend(machine_paths(definition, ports));
         found.push(FoundHome {
@@ -3049,6 +3092,7 @@ fn find_homes(
             declared: None,
             skipped: None,
             mirror: None,
+            over: None,
         });
     }
     Ok(found)
@@ -3137,9 +3181,20 @@ fn pick(
         {
             return None;
         }
+        // An Overlay home counts while the folder of the home under it
+        // exists too.
+        let under_exists = home.over.as_ref().is_some_and(|over| {
+            located
+                .iter()
+                .filter(|(under, _)| under.id == *over)
+                .flat_map(|(_, folders)| folders)
+                .any(|(_, folder)| ports.fs.exists(folder))
+        });
         folders
             .iter()
-            .find(|(_, folder)| home.folder.used_before_it_exists() || ports.fs.exists(folder))
+            .find(|(_, folder)| {
+                home.folder.used_before_it_exists() || under_exists || ports.fs.exists(folder)
+            })
             .cloned()
     })
 }
@@ -3460,6 +3515,28 @@ fn marked_folders(
             plugin.then_some((name, child))
         })
         .collect()
+}
+
+/// The folders [`marked_folders`] finds in `folder`, and when it is a folder
+/// root of an Overlay home that the home under it holds too, those it finds
+/// there under a name the overlay's folder holds no entry by, sorted by
+/// name.
+fn overlaid_folders(
+    fs: &dyn FileSystem,
+    roots: &Roots,
+    folder: &Path,
+    marker: Option<&RelativePaths>,
+) -> Vec<(String, PathBuf)> {
+    let mut found = marked_folders(fs, folder, marker);
+    if let Some((under, overlaid)) = roots.under(folder) {
+        found.extend(
+            marked_folders(fs, under, marker)
+                .into_iter()
+                .filter(|(name, _)| !overlaid(name)),
+        );
+        found.sort_by_key(|(name, _)| name.to_lowercase());
+    }
+    found
 }
 
 /// The path `relative` names in each folder the Agent home `home` of the
@@ -4056,13 +4133,13 @@ impl Scanner<'_> {
         for _ in 1..block.depth {
             parents = parents
                 .iter()
-                .flat_map(|parent| marked_folders(fs, parent, None))
+                .flat_map(|parent| overlaid_folders(fs, &home.roots, parent, None))
                 .map(|(_, child)| child)
                 .collect();
         }
         parents
             .iter()
-            .flat_map(|parent| marked_folders(fs, parent, block.marker.as_ref()))
+            .flat_map(|parent| overlaid_folders(fs, &home.roots, parent, block.marker.as_ref()))
             .filter_map(|(id, child)| {
                 if removed.contains(&id.to_lowercase()) {
                     tracing::debug!(plugin = %id, "plugin folder marked for deletion");
@@ -4270,7 +4347,23 @@ impl Scanner<'_> {
                 });
                 continue;
             };
-            self.entries.push(ScannedEntry {
+            // It is listed too in each Overlay home over its home that reads
+            // its origin's file.
+            let fs = self.reader.fs;
+            let origin_key = paths::canonical_key(fs, &origin.path);
+            let overlays: Vec<&str> = found
+                .iter()
+                .filter(|overlay| {
+                    overlay.agent_index == home.agent_index
+                        && overlay.over.as_ref() == Some(&home.home)
+                        && location
+                            .anchor
+                            .path(&overlay.roots, None)
+                            .is_some_and(|path| paths::canonical_key(fs, &path) == origin_key)
+                })
+                .map(|overlay| overlay.home.as_str())
+                .collect();
+            let entry = ScannedEntry {
                 agent_index: home.agent_index,
                 home: home.home.clone(),
                 location: location.id.clone(),
@@ -4290,7 +4383,14 @@ impl Scanner<'_> {
                 switch_id: None,
                 config_hash: None,
                 malformed: malformed_as_written(location, &parked_entry.entry),
-            });
+            };
+            for overlay in &overlays {
+                self.entries.push(ScannedEntry {
+                    home: (*overlay).to_owned(),
+                    ..entry.clone()
+                });
+            }
+            self.entries.push(entry);
             read.parked.push(ScannedParked {
                 key_path,
                 origin: parked_entry.origin.path,
@@ -4835,10 +4935,21 @@ impl Scanner<'_> {
         depth: usize,
     ) {
         let fs = self.reader.fs;
-        let mut folders = vec![(root.to_path_buf(), 0)];
+        // A folder root of an Overlay home lists the home under it too, after
+        // it, all but the entries the overlay's folder holds.
+        let under = home.roots.under(root);
+        let mut folders: Vec<(PathBuf, usize)> = under
+            .iter()
+            .map(|(below, _)| (below.to_path_buf(), 0))
+            .collect();
+        folders.push((root.to_path_buf(), 0));
         // A link back to a folder already read would never end.
         let mut seen = BTreeSet::new();
         while let Some((folder, folder_depth)) = folders.pop() {
+            let overlaid = under
+                .as_ref()
+                .filter(|(below, _)| folder_depth == 0 && folder == *below)
+                .map(|(_, overlaid)| overlaid);
             let child_depth = folder_depth + 1;
             if format.max_depth.is_some_and(|max| child_depth > max) {
                 continue;
@@ -4875,6 +4986,7 @@ impl Scanner<'_> {
                         .walk_below
                         .as_ref()
                         .is_some_and(|walk| walk.skips(name))
+                    || overlaid.is_some_and(|overlaid| overlaid(name))
                 {
                     continue;
                 }

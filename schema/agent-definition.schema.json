@@ -1179,6 +1179,13 @@
           "type": "boolean",
           "default": false
         },
+        "over": {
+          "description": "The id of another home of the definition this one is an Overlay home\nover: the Agent sees this home's folder laid over that home's, path\nby path, as a Claude Desktop MSIX package sees its `LocalCache` over\n`%APPDATA%\\Claude`. A file root is this home's file if it exists,\nelse the other home's; a folder root lists both folders by entry\nname, this home's entry winning where both hold one. A lookup order\npicks it while its folder or the other home's exists. The other\nhome has the same roots and is no Overlay home itself.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }

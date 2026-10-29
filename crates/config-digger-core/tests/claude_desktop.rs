@@ -221,16 +221,192 @@ fn claude_user_data_dir_names_no_home_since_signed_builds_ignore_it() {
     assert_eq!(with_variable, inventory(&fs));
 }
 
+/// The Claude Desktop Item named `name` in the home `home`, if any.
+fn item_in<'i>(inventory: &'i Inventory, home: &str, name: &str) -> Option<&'i Item> {
+    inventory
+        .items
+        .iter()
+        .find(|item| item.agent == "claude-desktop" && item.home == home && item.name == name)
+}
+
 #[test]
-fn the_classic_folder_comes_before_a_package_s_local_cache() {
+fn a_package_beside_a_classic_folder_reads_its_own_user_file_and_the_classic_app_the_classic_one() {
     let fs = with_classic_at(store(), Path::new(CLASSIC));
     let inventory = inventory(&fs);
 
-    assert_eq!(json(item(&inventory, "filesystem").state), "effective");
     assert_eq!(home(&inventory, "classic").not_read, None);
-    assert_eq!(json(item(&inventory, "notes").state), "unread");
-    let not_read = home(&inventory, "msix").not_read.as_ref().unwrap();
-    assert_eq!(not_read.read_instead.as_deref(), Some("classic"));
+    assert_eq!(home(&inventory, "msix").not_read, None);
+    let notes = item_in(&inventory, "msix", "notes").unwrap();
+    assert_eq!(json(notes.state), "effective");
+    assert_eq!(
+        notes.entries[0].path,
+        msix().join("claude_desktop_config.json")
+    );
+    assert!(item_in(&inventory, "classic", "notes").is_none());
+    let filesystem = item_in(&inventory, "classic", "filesystem").unwrap();
+    assert_eq!(json(filesystem.state), "effective");
+    assert!(
+        item_in(&inventory, "msix", "filesystem").is_none(),
+        "the package's own file wins over the classic one"
+    );
+}
+
+#[test]
+fn a_package_beside_a_classic_folder_reads_the_classic_user_file_while_it_holds_none() {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    fs.delete_file(msix().join("claude_desktop_config.json"));
+    let inventory = inventory(&fs);
+
+    let classic_file = PathBuf::from(CLASSIC).join("claude_desktop_config.json");
+    for read_by in ["classic", "msix"] {
+        let filesystem = item_in(&inventory, read_by, "filesystem").unwrap();
+        assert_eq!(json(filesystem.state), "effective", "{read_by}");
+        assert_eq!(filesystem.entries[0].path, classic_file, "{read_by}");
+    }
+    assert!(item_in(&inventory, "msix", "notes").is_none());
+}
+
+/// `fs` with the extension `id`, named `name`, in the data folder
+/// `folder`, switched on or off in its settings when `enabled` says.
+fn with_extension(
+    fs: FakeFileSystem,
+    folder: &Path,
+    id: &str,
+    name: &str,
+    enabled: Option<bool>,
+) -> FakeFileSystem {
+    let manifest = serde_json::json!({
+        "manifest_version": "0.2",
+        "name": name,
+        "version": "1.0.0",
+        "server": { "type": "binary", "mcp_config": { "command": format!("{name}.exe") } },
+    });
+    let fs = fs.with_file(
+        folder
+            .join("Claude Extensions")
+            .join(id)
+            .join("manifest.json"),
+        manifest.to_string(),
+    );
+    match enabled {
+        Some(enabled) => fs.with_file(
+            folder
+                .join("Claude Extensions Settings")
+                .join(format!("{id}.json")),
+            serde_json::json!({ "isEnabled": enabled }).to_string(),
+        ),
+        None => fs,
+    }
+}
+
+#[test]
+fn a_package_beside_a_classic_folder_sees_the_extensions_of_both_its_own_winning() {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    let classic_folder = Path::new(CLASSIC);
+    let fs = with_extension(fs, classic_folder, "local.mcpb.acme.sky", "sky", Some(true));
+    let fs = with_extension(
+        fs,
+        classic_folder,
+        "local.mcpb.acme.both",
+        "both",
+        Some(false),
+    );
+    let fs = with_extension(fs, &msix(), "local.mcpb.acme.both", "both", Some(true));
+    // The package's calendar has no settings of its own.
+    let fs = fs.with_file(
+        classic_folder.join(r"Claude Extensions Settings\local.dxt.acme.calendar.json"),
+        r#"{ "isEnabled": true }"#,
+    );
+    let inventory = inventory(&fs);
+
+    let classic_extension = |id: &str| {
+        classic_folder
+            .join("Claude Extensions")
+            .join(id)
+            .join("manifest.json")
+    };
+    for read_by in ["classic", "msix"] {
+        let sky = item_in(&inventory, read_by, "sky").unwrap();
+        assert_eq!(json(sky.state), "effective", "{read_by}");
+        assert_eq!(
+            sky.entries[0].path,
+            classic_extension("local.mcpb.acme.sky")
+        );
+    }
+
+    let both = item_in(&inventory, "msix", "both").unwrap();
+    assert_eq!(json(both.state), "effective");
+    assert_eq!(both.entries.len(), 1);
+    assert_eq!(
+        both.entries[0].path,
+        extension("local.mcpb.acme.both").join("manifest.json")
+    );
+    let classic_both = item_in(&inventory, "classic", "both").unwrap();
+    assert_eq!(json(classic_both.state), "disabled");
+    assert_eq!(
+        classic_both.entries[0].path,
+        classic_extension("local.mcpb.acme.both")
+    );
+
+    let calendar = item_in(&inventory, "msix", "Calendar").unwrap();
+    assert_eq!(json(calendar.state), "effective");
+    assert!(item_in(&inventory, "classic", "Calendar").is_none());
+    assert!(item_in(&inventory, "classic", "Files").is_none());
+}
+
+#[test]
+fn a_package_beside_a_classic_folder_sees_the_skill_mirrors_of_both_its_own_winning() {
+    let mirror = fixture_folder("msix").join(r"local-agent-mode-sessions\skills-plugin\org-0001");
+    let classic_mirrors = Path::new(CLASSIC).join(r"local-agent-mode-sessions\skills-plugin");
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    let fs = load(fs, &mirror, &classic_mirrors.join("org-0001"));
+    let fs = load(fs, &mirror, &classic_mirrors.join("org-0002"));
+    let inventory = inventory(&fs);
+
+    let paths = |read_by: &str| -> Vec<PathBuf> {
+        let pdf = item_in(&inventory, read_by, "pdf").unwrap();
+        let mut paths: Vec<PathBuf> = pdf.entries.iter().map(|entry| entry.path.clone()).collect();
+        paths.sort();
+        paths
+    };
+    let skill = |mirrors: &Path, org: &str| mirrors.join(org).join(r"account-0001\skills\pdf");
+    let own_mirrors = msix().join(r"local-agent-mode-sessions\skills-plugin");
+    assert_eq!(
+        paths("msix"),
+        [
+            skill(&own_mirrors, "org-0001"),
+            skill(&classic_mirrors, "org-0002")
+        ]
+    );
+    assert_eq!(
+        paths("classic"),
+        [
+            skill(&classic_mirrors, "org-0001"),
+            skill(&classic_mirrors, "org-0002")
+        ]
+    );
+}
+
+#[test]
+fn a_package_alone_reads_its_own_user_file() {
+    let inventory = inventory(&store());
+
+    assert!(!inventory.homes.iter().any(|found| found.home == "classic"));
+    let notes = item_in(&inventory, "msix", "notes").unwrap();
+    assert_eq!(json(notes.state), "effective");
+    assert_eq!(
+        notes.entries[0].path,
+        msix().join("claude_desktop_config.json")
+    );
+}
+
+#[test]
+fn a_classic_folder_alone_is_read_by_the_classic_home_alone() {
+    let inventory = inventory(&classic());
+
+    assert!(!inventory.homes.iter().any(|found| found.home == "msix"));
+    let filesystem = item_in(&inventory, "classic", "filesystem").unwrap();
+    assert_eq!(json(filesystem.state), "effective");
 }
 
 #[test]
@@ -803,20 +979,20 @@ fn each_package_reads_its_own_local_cache_when_both_are_installed() {
 
     let with_classic = with_classic_at(both, Path::new(CLASSIC));
     let classic_too = inventory(&with_classic);
-    for skipped in ["msix", "msix-anthropicpbc"] {
-        let not_read = home(&classic_too, skipped).not_read.as_ref().unwrap();
-        assert_eq!(not_read.read_instead.as_deref(), Some("classic"));
+    for read in ["classic", "msix", "msix-anthropicpbc"] {
+        assert_eq!(home(&classic_too, read).not_read, None, "{read}");
     }
 }
 
 #[test]
 fn read_instead_names_only_a_home_that_is_listed() {
-    let fs = store().with_folder(CLASSIC);
+    let fs = store().with_folder(moved_folder(STORE_FAMILY));
     let inventory = inventory(&fs);
 
     let not_read = home(&inventory, "msix").not_read.as_ref().unwrap();
     assert_eq!(not_read.read_instead, None);
-    assert!(not_read.sentence.contains(CLASSIC), "{}", not_read.sentence);
+    let moved = moved_folder(STORE_FAMILY).display().to_string();
+    assert!(not_read.sentence.contains(&moved), "{}", not_read.sentence);
 }
 
 /// `%LOCALAPPDATA%\Claude-Data`.
@@ -928,4 +1104,152 @@ fn claude_data_on_a_network_share_comes_before_a_moved_data_folder() {
     assert_eq!(json(item(&local, "notes").state), "effective");
     let not_read = home(&local, "claude-data").not_read.as_ref().unwrap();
     assert_eq!(not_read.read_instead.as_deref(), Some("msix-moved"));
+}
+
+/// The Plan of `action` on the Item `name` of the Claude Desktop home `home`.
+fn plan_in(core: &Core, action: Action, home: &str, name: &str) -> config_digger_core::api::Plan {
+    let targets = Targets {
+        selectors: vec![name.to_owned()],
+        all: false,
+        narrowing: core.narrowing(Some("claude-desktop"), Some(home)).unwrap(),
+    };
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    core.plan(&snapshot, &Context::default(), action, &targets)
+        .unwrap()
+}
+
+#[test]
+fn disable_through_a_package_parks_a_classic_server_from_the_classic_file_and_enable_puts_it_back_there()
+ {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    fs.delete_file(msix().join("claude_desktop_config.json"));
+    let core = core_with(&fs, env());
+    let classic_file = PathBuf::from(CLASSIC).join("claude_desktop_config.json");
+    let original = fs.contents(&classic_file).unwrap();
+    let in_package = fs.files_below(msix());
+
+    // The Claude Desktop files a plan writes, beside the parked-Entry store.
+    let written = |plan: &config_digger_core::api::Plan| -> Vec<PathBuf> {
+        plan.preview()
+            .files
+            .iter()
+            .map(|file| file.path.clone())
+            .filter(|path| path.starts_with(CLASSIC) || path.starts_with(msix()))
+            .collect()
+    };
+    let disable = plan_in(&core, Action::Disable, "msix", "filesystem");
+    assert_eq!(written(&disable), std::slice::from_ref(&classic_file));
+    let preview = disable.preview();
+    let mut changed: Vec<(&str, Value)> = preview
+        .changes
+        .iter()
+        .map(|change| (change.home.as_str(), json(change.after)))
+        .collect();
+    changed.sort_by(|a, b| a.0.cmp(b.0));
+    assert_eq!(
+        changed,
+        [("classic", json("disabled")), ("msix", json("disabled"))]
+    );
+    core.execute(disable, &[]).unwrap();
+
+    let parked = fs.contents(&classic_file).unwrap();
+    assert!(!String::from_utf8_lossy(&parked).contains("filesystem"));
+    assert_eq!(
+        fs.files_below(msix()),
+        in_package,
+        "nothing is written to the package"
+    );
+    let disabled = inventory(&fs);
+    for read_by in ["classic", "msix"] {
+        let filesystem = item_in(&disabled, read_by, "filesystem").unwrap();
+        assert_eq!(json(filesystem.state), "disabled", "{read_by}");
+    }
+
+    // The package gets a file of its own, which it reads from then on.
+    fs.put_file(
+        msix().join("claude_desktop_config.json"),
+        r#"{ "mcpServers": { "notes": { "command": "notes-mcp" } } }"#,
+    );
+    let copied = inventory(&fs);
+    assert!(item_in(&copied, "msix", "filesystem").is_none());
+    assert_eq!(
+        json(item_in(&copied, "classic", "filesystem").unwrap().state),
+        "disabled"
+    );
+
+    let enable = plan_in(&core, Action::Enable, "classic", "filesystem");
+    assert_eq!(written(&enable), std::slice::from_ref(&classic_file));
+    core.execute(enable, &[]).unwrap();
+
+    assert_eq!(
+        serde_json::from_slice::<Value>(&fs.contents(&classic_file).unwrap()).unwrap(),
+        serde_json::from_slice::<Value>(&original).unwrap()
+    );
+    let enabled = inventory(&fs);
+    assert_eq!(
+        json(item_in(&enabled, "classic", "filesystem").unwrap().state),
+        "effective"
+    );
+    assert!(item_in(&enabled, "msix", "filesystem").is_none());
+}
+
+#[test]
+fn disable_through_a_package_of_a_classic_extension_writes_the_settings_the_package_reads() {
+    let classic_folder = Path::new(CLASSIC);
+    let fs = with_classic_at(store(), classic_folder);
+    let fs = with_extension(fs, classic_folder, "local.mcpb.acme.sky", "sky", Some(true));
+    let own_settings = msix().join(r"Claude Extensions Settings\local.mcpb.acme.sky.json");
+    fs.put_file(&own_settings, r#"{ "isEnabled": true }"#);
+    let core = core_with(&fs, env());
+
+    let disable = plan_in(&core, Action::Disable, "msix", "sky");
+    let written: Vec<&Path> = disable
+        .preview()
+        .files
+        .iter()
+        .map(|file| file.path.as_path())
+        .collect();
+    assert_eq!(written, [own_settings.as_path()]);
+    core.execute(disable, &[]).unwrap();
+
+    let after = inventory(&fs);
+    assert_eq!(
+        json(item_in(&after, "msix", "sky").unwrap().state),
+        "disabled"
+    );
+    assert_eq!(
+        json(item_in(&after, "classic", "sky").unwrap().state),
+        "effective"
+    );
+}
+
+#[test]
+fn remove_through_a_package_of_a_classic_server_writes_the_classic_file_alone() {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    fs.delete_file(msix().join("claude_desktop_config.json"));
+    let core = core_with(&fs, env());
+    let classic_file = PathBuf::from(CLASSIC).join("claude_desktop_config.json");
+    let in_package = fs.files_below(msix());
+
+    let remove = plan_in(&core, Action::Remove, "msix", "filesystem");
+    let mut changed: Vec<&str> = remove
+        .preview()
+        .changes
+        .iter()
+        .map(|change| change.home.as_str())
+        .collect();
+    changed.sort();
+    assert_eq!(changed, ["classic", "msix"]);
+    core.execute(remove, &[]).unwrap();
+
+    let removed = fs.contents(&classic_file).unwrap();
+    assert!(!String::from_utf8_lossy(&removed).contains("filesystem"));
+    assert_eq!(
+        fs.files_below(msix()),
+        in_package,
+        "nothing is written to the package"
+    );
+    let after = inventory(&fs);
+    assert!(item_in(&after, "classic", "filesystem").is_none());
+    assert!(item_in(&after, "msix", "filesystem").is_none());
 }

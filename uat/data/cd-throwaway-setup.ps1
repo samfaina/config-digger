@@ -13,6 +13,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   adds a git Project whose git-versioned Codex layer declares a server
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex skills whose frontmatter is not YAML
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  adds a Claude Desktop package beside a classic folder in desktop-appdata
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
@@ -22,7 +23,8 @@ param(
     [switch]$NameRule,
     [switch]$PlainString,
     [switch]$CodexLayer,
-    [switch]$Frontmatter
+    [switch]$Frontmatter,
+    [switch]$DesktopOverlay
 )
 $ErrorActionPreference = "Stop"
 
@@ -444,6 +446,23 @@ just text
 description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
+}
+
+# With -DesktopOverlay, Claude Desktop's folders as they would be in an
+# %APPDATA% and a %LOCALAPPDATA% of their own, desktop-appdata\Roaming and
+# desktop-appdata\Local, which the app reads when started with both set to
+# them: a classic %APPDATA%\Claude whose config declares a server, and the
+# Store package's LocalCache beside it, which holds no config of its own and
+# so reads the classic one.
+if ($DesktopOverlay) {
+    Write-TestFile "$Root\desktop-appdata\Roaming\Claude\claude_desktop_config.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-overlay": { "command": "npx", "args": ["-y", "cd-throwaway-overlay"] }
+  }
+}
+"@
+    Write-TestFile "$Root\desktop-appdata\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Preferences" "{}`n"
 }
 
 Write-Host "Created the throwaway homes and Projects in $Root"

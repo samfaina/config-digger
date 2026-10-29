@@ -596,6 +596,15 @@ pub(crate) struct HomeDefinition {
     /// variable names, through that variable.
     #[serde(default)]
     pub default: bool,
+    /// The id of another home of the definition this one is an Overlay home
+    /// over: the Agent sees this home's folder laid over that home's, path
+    /// by path, as a Claude Desktop MSIX package sees its `LocalCache` over
+    /// `%APPDATA%\Claude`. A file root is this home's file if it exists,
+    /// else the other home's; a folder root lists both folders by entry
+    /// name, this home's entry winning where both hold one. A lookup order
+    /// picks it while its folder or the other home's exists. The other
+    /// home has the same roots and is no Overlay home itself.
+    pub over: Option<String>,
 }
 
 /// An Agent home whose content another tool copies from a source Agent
@@ -1553,6 +1562,20 @@ impl AgentDefinition {
                     "home `{}` is the default, so its folder must be one fixed path",
                     home.id
                 ));
+            }
+            if let Some(over) = &home.over {
+                let context = |e: String| format!("home `{}` over: {e}", home.id);
+                let under = self
+                    .homes
+                    .iter()
+                    .find(|under| under.id == *over)
+                    .ok_or_else(|| context(format!("undeclared home `{over}`")))?;
+                if under.over.is_some() {
+                    return Err(context(format!("`{over}` is an Overlay home itself")));
+                }
+                if under.roots != home.roots {
+                    return Err(context(format!("`{over}` has other roots")));
+                }
             }
         }
         if self.homes.iter().filter(|home| home.default).count() > 1 {
@@ -4869,6 +4892,43 @@ uninstall = \"agent plugin uninstall",
         let text = ordered.replace("[\"default\"]", "[\"other\"]");
         assert!(
             error(&text).contains("lookup_orders names undeclared home `other`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn an_overlay_home_lies_over_a_declared_home_with_the_same_roots_that_is_no_overlay() {
+        let home = |id: &str, over: Option<&str>, root: &str| {
+            let over = over.map_or(String::new(), |over| format!("over = \"{over}\"\n"));
+            format!(
+                "[[homes]]\nid = \"{id}\"\nfolder = {{ block = \"path\", path = \"~/.{id}\" }}\n{over}roots.{root} = \".test.json\"\n"
+            )
+        };
+        let with = |homes: &[String]| {
+            VALID.replace("[[scopes]]\n", &format!("{}\n[[scopes]]\n", homes.concat()))
+        };
+        let text = with(&[home("package", Some("default"), "state")]);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let text = with(&[home("package", Some("other"), "state")]);
+        assert!(
+            error(&text).contains("home `package` over: undeclared home `other`"),
+            "{}",
+            error(&text)
+        );
+        let text = with(&[
+            home("package", Some("default"), "state"),
+            home("second", Some("package"), "state"),
+        ]);
+        assert!(
+            error(&text).contains("home `second` over: `package` is an Overlay home itself"),
+            "{}",
+            error(&text)
+        );
+        let text = with(&[home("package", Some("default"), "other")]);
+        assert!(
+            error(&text).contains("home `package` over: `default` has other roots"),
             "{}",
             error(&text)
         );

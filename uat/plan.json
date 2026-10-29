@@ -2305,6 +2305,71 @@
       ]
     },
     {
+      "id": "25",
+      "title": "Un paquete de Claude Desktop sobre la carpeta clásica",
+      "steps": [
+        {
+          "id": "25.1",
+          "title": "El servidor de la carpeta clásica sale en los dos homes de Claude Desktop",
+          "goal": "Un paquete MSIX de Claude Desktop ve su LocalCache puesto sobre %APPDATA%\\Claude: mientras no tiene un claude_desktop_config.json propio, lee el de la carpeta clásica, así que config-digger lista el mismo servidor bajo el home classic y bajo el home msix, cada uno con su State.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el APPDATA de Claude Desktop».",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Desktop.",
+            "En Agent home, elige classic.",
+            "Busca cd-throwaway-overlay en la lista Items.",
+            "En Agent home, elige msix.",
+            "Busca cd-throwaway-overlay en la lista Items otra vez.",
+            "Abre el Item y mira la ruta de su Entry."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el APPDATA de Claude Desktop",
+              "shell": "powershell",
+              "text": "$exe = \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; $env:APPDATA = 'E:\\cd-throwaway\\desktop-appdata\\Roaming'; $env:LOCALAPPDATA = 'E:\\cd-throwaway\\desktop-appdata\\Local'; & $exe"
+            }
+          ],
+          "expect": [
+            "Con el home classic elegido, la lista Items tiene «cd-throwaway-overlay», que sale «Effective».",
+            "Con el home msix elegido, la lista Items tiene «cd-throwaway-overlay» otra vez, que sale «Effective».",
+            "Bajo el home msix, su Entry está en «E:\\cd-throwaway\\desktop-appdata\\Roaming\\Claude\\claude_desktop_config.json»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con Claude Desktop",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -DesktopOverlay"
+          },
+          "covers": [
+            "#306"
+          ]
+        },
+        {
+          "id": "25.2",
+          "title": "El diálogo de Disable desde el paquete nombra el home clásico",
+          "goal": "Disable de un servidor que el paquete lee de la carpeta clásica escribe el archivo clásico, y su diálogo dice que el home classic lo lee también.",
+          "instructions": [
+            "Sigue en config-digger tal como lo dejó el paso 25.1, abierto con la orden.",
+            "En Agent home, elige msix.",
+            "En el Item cd-throwaway-overlay, pulsa Disable.",
+            "Lee el diálogo sin aplicarlo.",
+            "Pulsa Cancel.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [],
+          "expect": [
+            "El diálogo escribe «E:\\cd-throwaway\\desktop-appdata\\Roaming\\Claude\\claude_desktop_config.json».",
+            "El diálogo no escribe ningún archivo bajo «E:\\cd-throwaway\\desktop-appdata\\Local\\Packages».",
+            "Entre los cambios sale una fila de «Claude Desktop (classic)» que pasa a «Disabled».",
+            "Entre los cambios sale una fila de «Claude Desktop (msix)» que pasa a «Disabled»."
+          ],
+          "covers": [
+            "#306"
+          ]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [
