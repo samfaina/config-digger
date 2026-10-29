@@ -3453,7 +3453,7 @@ impl SkillFallback {
 /// Why an Agent leaves a skill out of the skills it lists to its model,
 /// because of the skill's own `SKILL.md`. config-digger tells only of a
 /// `SKILL.md` with no frontmatter or with one it reads as YAML.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Unlisted {
     /// It has no `description`: no frontmatter, or one without the key.

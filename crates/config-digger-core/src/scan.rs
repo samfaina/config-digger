@@ -5507,7 +5507,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
     let mut found = None;
     let mut named = None;
     let frontmatter = skill::frontmatter(text, format.malformed_frontmatter);
-    let unlisted = skill::unlisted(&frontmatter, &format.unlisted);
+    let unlisted = skill::unlisted(text, &frontmatter, &format.unlisted);
     match frontmatter {
         Ok(frontmatter) => {
             let keys = frontmatter.keys;

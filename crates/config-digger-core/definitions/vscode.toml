@@ -639,9 +639,9 @@ layered = true
 # VS Code does not list it to its model [binary], whatever its location,
 # as one code builds that list: config-digger shows it in its State with
 # an `unlisted` note, for a `SKILL.md` with no frontmatter or with one it
-# reads as YAML. A frontmatter config-digger reads as malformed gets no
-# note, as VS Code may keep values from it that config-digger does not
-# read (#473).
+# reads as YAML. A frontmatter config-digger reads as malformed, or one
+# with a `[` or `{` value that never closes, gets no note, as VS Code may
+# keep values from it that config-digger does not read (#473).
 
 # A workspace folder's `.agents`, `.github` and `.claude` skills, in that
 # order [docs, test].
