@@ -55,7 +55,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset   # deletes it and creates it again
 .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   # adds a skill behind a relative folder symlink
-.\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    # adds VS Code profiles in vscode-appdata
+.\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    # adds VS Code profiles in vscode-appdata, and a workspace file with an error in vscode-workspace
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    # adds Cursor in cursor-appdata, and a git Project with a nested skill
 .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  # adds Claude Code skills whose folder names break its name rule
 .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  # adds a Project whose Claude Code settings hold plain-string MCP lists

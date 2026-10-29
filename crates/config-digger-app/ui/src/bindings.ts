@@ -1636,6 +1636,11 @@ export type ReadFailureKind =
 
 /**  What an Agent does with a location it cannot read. */
 export type ReadFailureReaction = 
+/**
+ *  It keeps what parses on both sides of an error, and the location
+ *  contributes the Entries config-digger recovers there.
+ */
+"reads_around_error" | 
 /**  It starts without the location's Entries. */
 "ignores_file" | 
 /**  It asks about the file at startup, and otherwise starts without its Entries. */

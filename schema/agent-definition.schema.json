@@ -1441,6 +1441,11 @@
       "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
       "oneOf": [
         {
+          "description": "It keeps what parses on both sides of an error, as VS Code reads a\nJSONC file through `node-jsonc-parser`: the location contributes the\nEntries config-digger recovers the same way. Only a location read as\nJSON takes it.",
+          "type": "string",
+          "const": "reads_around_error"
+        },
+        {
           "description": "It starts without the location's Entries.",
           "type": "string",
           "const": "ignores_file"
@@ -3564,6 +3569,17 @@
           "description": "With `{project}` in the key path, whether the Agent looks the\nProject up only under a key spelled with forward slashes, such as\n`E:/projects/app` in Claude Code's `~/.claude.json`, still without\nregard to case. Omitted, any spelling of the Project's key counts.",
           "type": "boolean",
           "default": false
+        },
+        "on_read_failure": {
+          "description": "What the Agent does with the file when it does not parse. Only\n`reads_around_error` is accepted: the value is read from what parses\naround the error, as VS Code reads a workspace file's settings.\nOmitted, a file that does not parse sets nothing.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadFailureReaction"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"

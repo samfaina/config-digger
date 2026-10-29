@@ -1518,9 +1518,53 @@ fn vs_code_skips_an_mcp_file_it_cannot_parse_but_reads_a_plugin_s_around_the_err
     assert_eq!(reaction(&project(r"app\.vscode\mcp.json")), "ignores_file");
     assert_eq!(reaction(&project(r"app\.mcp.json")), "ignores_file");
     assert_eq!(reaction(&user_mcp), "ignores_file");
-    // VS Code starts the servers around the error, which config-digger
-    // cannot read (#322).
-    assert_eq!(reaction(&plugin_mcp), "unknown");
+    assert_eq!(reaction(&plugin_mcp), "reads_around_error");
+}
+
+/// `fs` with the fixture plugin's `.mcp.json` holding `,,` between its two
+/// servers.
+fn with_broken_plugin_mcp(fs: FakeFileSystem) -> FakeFileSystem {
+    fs.with_file(
+        review_kit().join(".mcp.json"),
+        "{\n  \"mcpServers\": {\n    \"linear\": { \"type\": \"http\", \"url\": \"https://mcp.linear.app/mcp\" },,\n    \"fetch\": { \"command\": \"uvx\" }\n  }\n}\n",
+    )
+}
+
+#[test]
+fn a_plugin_mcp_json_with_an_error_lists_the_servers_around_it_with_no_caveat() {
+    let inventory = inventory(&with_broken_plugin_mcp(with_home(vscode())));
+
+    let linear = item(&inventory, "linear");
+    assert_eq!(json(linear.state), "effective");
+    assert!(linear.caveats.is_empty(), "{:?}", linear.caveats);
+    let fetch = item(&inventory, "fetch");
+    assert_eq!(
+        fetch.entries[1].locator,
+        format!(r"{}\.mcp.json#mcpServers.fetch", review_kit().display())
+    );
+    assert!(fetch.caveats.is_empty(), "{:?}", fetch.caveats);
+
+    let failures: Vec<_> = inventory
+        .read_failures
+        .iter()
+        .filter(|failure| failure.agent == "vscode" && failure.home == "default")
+        .collect();
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    let failure = failures[0];
+    assert_eq!(failure.path, review_kit().join(".mcp.json"));
+    assert_eq!(code(failure.kind), "parse");
+    assert!(
+        !failure.sentence.contains("no Entries"),
+        "{}",
+        failure.sentence
+    );
+    assert_eq!(code(failure.reaction), "reads_around_error");
+    let position = failure.position.as_ref().unwrap();
+    assert_eq!((position.line, position.column), (3, 71));
+    assert_eq!(
+        failure.notes,
+        ["VS Code reads what is around the error, and config-digger lists what it keeps."]
+    );
 }
 
 #[test]
@@ -1531,6 +1575,50 @@ fn vs_code_skips_the_servers_of_a_workspace_file_it_cannot_parse() {
     let inventory = inventory_at(&fs, &file);
 
     assert_eq!(reaction(&inventory, &file), "ignores_file");
+}
+
+/// `fs` with the fixture workspace file holding `,,` after its `folders`,
+/// and settings turning on Claude Desktop's servers and adding a server.
+fn with_broken_workspace(fs: FakeFileSystem) -> FakeFileSystem {
+    with_project(fs, "multi").with_file(
+        workspace(),
+        r#"{
+	"folders": [
+		{ "path": "api" },
+		{ "path": "web" }
+	],,
+	"settings": {
+		"chat.mcp.discovery.enabled": { "claude-desktop": true },
+		"mcp": { "servers": { "docs": { "url": "https://docs.example.com/mcp" } } }
+	}
+}"#,
+    )
+}
+
+#[test]
+fn a_workspace_file_with_an_error_still_has_its_member_folders_but_not_its_servers() {
+    let inventory = inventory_at(&with_broken_workspace(vscode()), &workspace());
+
+    assert_eq!(json(item(&inventory, "api-only").state), "effective");
+    assert_eq!(json(item(&inventory, "web-only").state), "effective");
+    assert!(
+        !inventory.items.iter().any(|item| item.name == "docs"),
+        "the workspace file's own servers are skipped"
+    );
+    assert_eq!(reaction(&inventory, &workspace()), "ignores_file");
+}
+
+#[test]
+fn a_workspace_file_with_an_error_still_turns_on_another_app_s_servers() {
+    let fs = with_claude_desktop(with_broken_workspace(vscode()));
+    let inventory = inventory_at(&fs, &workspace());
+
+    // The setting turns them on: only the user's trust in each keeps it
+    // from starting, as with the setting in the user's own settings.
+    let filesystem = item(&inventory, "filesystem");
+    assert_eq!(json(filesystem.state), "blocked");
+    let reason = filesystem.entries[0].reason.as_ref().unwrap();
+    assert_eq!(code(reason.code), "not_approved");
 }
 
 #[test]

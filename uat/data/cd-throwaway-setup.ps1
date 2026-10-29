@@ -7,7 +7,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset   deletes E:\cd-throwaway and creates it again
 #   .\uat\data\cd-throwaway-setup.ps1 -Root D:\tmp\cd-throwaway -Reset
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Symlink   adds a skill behind a relative folder symlink
-#   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -VsCode    adds VS Code profiles in vscode-appdata, and a workspace file with an error
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Cursor    adds Cursor in cursor-appdata and a git Project with a nested skill
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
@@ -240,7 +240,9 @@ $manyProjects
 # own, vscode-appdata, which the app reads when started with APPDATA set to
 # it: the default profile, a profile Work with its own mcp.json, and a
 # profile Shared that shares the default profile's MCP servers. VS Code last
-# opened the Project in Work and the extra Project in Shared.
+# opened the Project in Work and the extra Project in Shared. It also opened
+# a workspace file with `,,` after its folders, which it reads around the
+# error: it opens the file's folder and skips the file's own servers.
 if ($VsCode) {
     $user = "$Root\vscode-appdata\Code\User"
     Write-TestFile "$user\mcp.json" @"
@@ -274,6 +276,32 @@ if ($VsCode) {
     },
     "emptyWindows": {}
   }
+}
+"@
+    Write-TestFile "$Root\vscode-workspace\member\.vscode\mcp.json" @"
+{
+  "servers": {
+    "cd-throwaway-vscode-member": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-member"] }
+  }
+}
+"@
+    Write-TestFile "$Root\vscode-workspace\cd-throwaway.code-workspace" @"
+{
+  "folders": [
+    { "path": "member" }
+  ],,
+  "settings": {
+    "mcp": {
+      "servers": {
+        "cd-throwaway-vscode-workspace": { "command": "npx", "args": ["-y", "cd-throwaway-vscode-workspace"] }
+      }
+    }
+  }
+}
+"@
+    Write-TestFile "$user\workspaceStorage\cd-throwaway-workspace\workspace.json" @"
+{
+  "workspace": "$uri/vscode-workspace/cd-throwaway.code-workspace"
 }
 "@
 }

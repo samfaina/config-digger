@@ -1090,6 +1090,11 @@ pub(crate) struct NameParts<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ReadFailureReaction {
+    /// It keeps what parses on both sides of an error, as VS Code reads a
+    /// JSONC file through `node-jsonc-parser`: the location contributes the
+    /// Entries config-digger recovers the same way. Only a location read as
+    /// JSON takes it.
+    ReadsAroundError,
     /// It starts without the location's Entries.
     IgnoresFile,
     /// It asks the user at startup what to do with the file, and otherwise
@@ -1217,6 +1222,12 @@ impl LocationDefinition {
     pub fn fails_plugin(&self) -> bool {
         self.on_read_failure == ReadFailureReaction::FailsPlugin
             || self.on_shape_failure == Some(ReadFailureReaction::FailsPlugin)
+    }
+
+    /// Whether the Agent keeps what parses on both sides of an error in the
+    /// location's file, which then still contributes Entries.
+    pub fn reads_around_error(&self) -> bool {
+        self.on_read_failure == ReadFailureReaction::ReadsAroundError
     }
 
     /// What the Agent does about a shape here: `unknown` unless the
@@ -1662,6 +1673,11 @@ impl AgentDefinition {
                         "a source of settings is in no plugin to react with `fails_plugin`".into(),
                     ));
                 }
+                if source.on_read_failure() == Some(ReadFailureReaction::ReadsAroundError) {
+                    return Err(context(
+                        "a source of settings is not read around its error".into(),
+                    ));
+                }
             }
             if let Some(merge) = &settings.merge
                 && !settings.control_keys.contains(&merge.key)
@@ -1794,6 +1810,17 @@ impl AgentDefinition {
                 if location.format.file().is_none() {
                     return Err(context("settings are read in a file format".into()));
                 }
+            }
+            if location.reads_around_error() && !matches!(location.format, Format::Json(_)) {
+                return Err(context(
+                    "only a location read as JSON reacts with `reads_around_error`".into(),
+                ));
+            }
+            if location.on_shape_failure == Some(ReadFailureReaction::ReadsAroundError) {
+                return Err(context(
+                    "a shape is never read around: on_shape_failure cannot be `reads_around_error`"
+                        .into(),
+                ));
             }
             if location.fails_plugin() && location.anchor.plugin().is_none() {
                 return Err(context(
@@ -4429,6 +4456,41 @@ sources = [{ anchor = { block = "home", root = "state" }, key_path = ["serversOn
     }
 
     #[test]
+    fn a_setting_reads_only_around_the_error_when_its_file_does_not_parse() {
+        let reacting = |reaction: &str, more: &str| {
+            with_policy(RULES_AND_GATES, POLICY_CHECKS).replace(
+                r#"{ anchor = { block = "home", root = "state" }, key_path = ["denied"] }"#,
+                &format!(
+                    r#"{{ anchor = {{ block = "home", root = "state" }}, key_path = ["denied"], on_read_failure = "{reaction}"{more} }}"#
+                ),
+            )
+        };
+        let text = reacting("reads_around_error", "");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for reaction in [
+            "ignores_file",
+            "asks_user",
+            "unknown",
+            "fails_plugin",
+            "stops_agent",
+        ] {
+            let text = reacting(reaction, "");
+            assert!(
+                error(&text)
+                    .contains("a setting's on_read_failure can only be `reads_around_error`"),
+                "{reaction}: {}",
+                error(&text)
+            );
+        }
+        let text = reacting("reads_around_error", ", toml = true");
+        assert!(
+            error(&text).contains("only a setting in a JSON file is read around its error"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn policy_rules_and_approvals_each_need_their_check() {
         for (check, message) in [
             ("\"policy\", ", "leaves out `policy`"),
@@ -4689,6 +4751,41 @@ locations = {locations}
         let text = with_plugin_reaction(r#"on_read_failure = "ignores_file""#, PLUGIN_LOAD);
         assert!(
             error(&text).contains("checks holds `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn only_a_location_read_as_json_reads_around_its_error() {
+        let around = r#"on_read_failure = "reads_around_error""#;
+        let text = VALID.replace(r#"on_read_failure = "ignores_file""#, around);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = text.replace(
+            r#"{ block = "json", dialect = "strict" }"#,
+            r#"{ block = "toml" }"#,
+        );
+        assert!(
+            error(&text).contains("only a location read as JSON reacts with `reads_around_error`"),
+            "{}",
+            error(&text)
+        );
+        let text = VALID.replace(
+            r#"on_read_failure = "ignores_file""#,
+            "on_read_failure = \"ignores_file\"
+on_shape_failure = \"reads_around_error\"",
+        );
+        assert!(
+            error(&text).contains("a shape is never read around"),
+            "{}",
+            error(&text)
+        );
+        let text = with_policy("", r#"["disable", "precedence"]"#).replace(
+            r#"value = "Settings""#,
+            r#"value = "Settings", on_read_failure = "reads_around_error""#,
+        );
+        assert!(
+            error(&text).contains("a source of settings is not read around its error"),
             "{}",
             error(&text)
         );

@@ -1742,7 +1742,8 @@ fn read_as_if(
         .map(|home| last_ran(&definitions[home.agent_index], home, &mut scanner.reader))
         .collect();
     // A file that is a Read failure for an Agent home yields it no Entries,
-    // even from a location of it that did parse; a shape fails only its own
+    // even from a location of it that did parse, except those a location
+    // the Agent reads around the error recovers; a shape fails only its own
     // location, which yields no Entries there. One in a settings source
     // the Agent skips, or in a home its lookup order skips, is no failure
     // of the Agent's.
@@ -1762,9 +1763,11 @@ fn read_as_if(
             })
     });
     scanner.entries.retain(|entry| {
-        !failures
-            .iter()
-            .any(|failure| failure.fails_whole(entry.agent_index, &entry.home, &entry.path))
+        let location = definitions[entry.agent_index].location(&entry.location);
+        location.reads_around_error()
+            || !failures
+                .iter()
+                .any(|failure| failure.fails_whole(entry.agent_index, &entry.home, &entry.path))
     });
     let lookups = Lookups::of(&switches, &setting_values);
     Ok(Snapshot {
@@ -2371,6 +2374,7 @@ fn read_switches(
                     &switch.anchor,
                     &switch.key_path,
                     switch.format().as_ref(),
+                    false,
                     switch.sqlite(),
                     None,
                     None,
@@ -2501,6 +2505,7 @@ fn read_rules(
                     &setting.anchor,
                     &setting.key_path,
                     format.as_ref(),
+                    setting.reads_around_error(),
                     setting.sqlite,
                     setting.table.as_deref(),
                     setting.cached_at.as_deref(),
@@ -2620,13 +2625,16 @@ impl Places<'_> {
     /// there; a missing store has no places. With `table` too, the object
     /// holds the list of the texts of that column of that table instead.
     /// With `cached_at`, each place says when the Agent cached the value,
-    /// read at that key path.
+    /// read at that key path. With `around_error`, a file that does not
+    /// parse, or is a Read failure for the Agent home, is read around its
+    /// errors instead, as VS Code reads a workspace file's settings.
     #[allow(clippy::too_many_arguments)]
     fn read(
         &self,
         anchor: &Anchor,
         key_path: &[String],
         format: &dyn Parse,
+        around_error: bool,
         sqlite: bool,
         table: Option<&str>,
         cached_at: Option<&[String]>,
@@ -2706,7 +2714,7 @@ impl Places<'_> {
                 .failures
                 .iter()
                 .any(|failure| failure.fails_whole(home.agent_index, &home.home, &path));
-            if failed {
+            if failed && !around_error {
                 unreadable.insert(path);
                 continue;
             }
@@ -2727,6 +2735,7 @@ impl Places<'_> {
             };
             let document = match read {
                 Ok(None) => None,
+                Ok(Some(text)) if around_error => format.kept_around_error(&text),
                 Ok(Some(text)) => match format.parse(&text) {
                     Ok(document) if sqlite => Some(serde_json::json!({ &key_path[0]: document })),
                     Ok(document) => Some(document),
@@ -3303,8 +3312,10 @@ const MEMBER_RANKS: usize = 1 << 16;
 
 /// The member folders of the `.code-workspace` file at `file`, in its
 /// order: each item of its `folders` names one by a `path`, relative to the
-/// file's folder or absolute, or by a `file:` `uri`. A file that cannot be
-/// read has none; the location reading it reports why.
+/// file's folder or absolute, or by a `file:` `uri`. A file that does not
+/// parse is read around its errors, as VS Code opens its folders, for every
+/// Agent; one that cannot be read has none. The location reading it reports
+/// why.
 fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
     let Some(folder) = file.parent() else {
         return Vec::new();
@@ -3313,7 +3324,7 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
         dialect: JsonDialect::Jsonc,
     };
     let document = match reader.peek(file) {
-        Ok(Some(text)) => jsonc.parse(text).ok(),
+        Ok(Some(text)) => jsonc.kept_around_error(text),
         _ => None,
     };
     let items = document
@@ -4858,7 +4869,9 @@ impl Scanner<'_> {
     }
 
     /// The file at `path` parsed in the format of `location`, `None` when
-    /// it is missing or a Read failure, which is then reported.
+    /// it is missing or a Read failure, which is then reported. For a
+    /// location the Agent reads around an error, a file that does not parse
+    /// is reported all the same, and what parses around the error is read.
     fn document(
         &mut self,
         home: &FoundHome,
@@ -4879,6 +4892,21 @@ impl Scanner<'_> {
         }
         let format = location.format.file()?;
         let text = self.reader.text(home, path, project)?;
+        if location.reads_around_error() {
+            return match format.parse_around_error(text) {
+                Ok(document) => Some(document),
+                Err(around) => {
+                    self.reader.fail(
+                        home,
+                        path,
+                        project,
+                        ReadFailureKind::Parse,
+                        around.error.position,
+                    );
+                    around.value
+                }
+            };
+        }
         match format.parse(text) {
             Ok(document) => Some(document),
             Err(error) => {

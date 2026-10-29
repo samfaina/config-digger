@@ -209,7 +209,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # `.mcp.json` [test], but it reads the plugin's next manifest instead
 # [test], which config-digger does not (#338). It reads a plugin's
 # `mcp.json` it cannot parse around the error, starting the servers on
-# both sides of it [test], which config-digger cannot (#322). For both,
+# both sides of it [test], which config-digger does not yet (#438). For both,
 # `unknown` stays, so the Items they reach keep a caveat. A manifest whose
 # `mcpServers` is neither a path, an object nor a list of either, such as
 # `42` or `[42]`, Cursor rejects whole, as one it cannot parse: it reads
@@ -262,7 +262,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # As for Cursor's own plugins, Cursor skips a manifest it cannot parse,
 # still reading the plugin's `.mcp.json` [test], and reads the next
 # manifest instead [test] (#338). It reads a `.mcp.json` it cannot parse
-# around the error [test] (#322). For both, `unknown` stays.
+# around the error [test] (#438). For both, `unknown` stays.
 [[locations]]
 id = "claude-plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }

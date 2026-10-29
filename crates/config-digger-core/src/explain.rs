@@ -1716,12 +1716,10 @@ pub(crate) fn read_failure(
 ) -> String {
     let path = path.display();
     match kind {
-        ReadFailureKind::Parse => {
-            let at = position_at(position);
-            format!(
-                "{agent_name} cannot parse {path} as {dialect}{at}, so it reads no Entries from it."
-            )
-        }
+        ReadFailureKind::Parse => format!(
+            "{}, so it reads no Entries from it.",
+            cannot_parse(agent_name, &path, dialect, position)
+        ),
         // A shape in one location is worded by `shape_failure`.
         ReadFailureKind::Shape => format!(
             "{agent_name} cannot read {path}: it is {dialect} but not an object, so it reads no Entries from it."
@@ -1736,6 +1734,32 @@ pub(crate) fn read_failure(
             "config-digger cannot read {path}, so it lists no {agent_name} Entries from it."
         ),
     }
+}
+
+/// What a file at `path` that `agent_name` reads around its error, and that
+/// does not parse in `dialect`, means. Its note says what is read.
+pub(crate) fn parse_failure_read_around(
+    agent_name: &str,
+    path: &Path,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    format!(
+        "{}.",
+        cannot_parse(agent_name, &path.display(), dialect, position)
+    )
+}
+
+/// That `agent_name` cannot parse the file at `path` in `dialect`, with
+/// where, as the start of a sentence.
+fn cannot_parse(
+    agent_name: &str,
+    path: &impl std::fmt::Display,
+    dialect: &str,
+    position: Option<(usize, usize)>,
+) -> String {
+    let at = position_at(position);
+    format!("{agent_name} cannot parse {path} as {dialect}{at}")
 }
 
 /// What a location that holds a value of another shape where its Entries
@@ -1775,6 +1799,11 @@ fn shape_words(shape: &ScannedShape) -> (&'static str, &'static str, &'static st
 /// The note of a Read failure in a file `agent_name` asks about at startup.
 pub(crate) fn asks_user(agent_name: &str) -> String {
     format!("{agent_name} will ask about this file at startup.")
+}
+
+/// The note of a Read failure in a file `agent_name` reads around the error.
+pub(crate) fn reads_around_error(agent_name: &str) -> String {
+    format!("{agent_name} reads what is around the error, and config-digger lists what it keeps.")
 }
 
 /// The warning of a Read failure in a file whose recovery by `agent_name`
