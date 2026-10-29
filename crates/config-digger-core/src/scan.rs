@@ -798,7 +798,7 @@ impl Snapshot {
     /// under it, that home's.
     pub fn home_holding<'s>(&'s self, entry: &'s ScannedEntry) -> &'s str {
         let home = self.home_of(entry);
-        match &home.under {
+        match &home.over {
             Some(under) if !entry.path.starts_with(&home.folder) => under,
             _ => &entry.home,
         }
@@ -944,7 +944,8 @@ pub(crate) struct ScannedHome {
     /// The path of each of its roots, by name.
     pub roots: Roots,
     pub source: HomeSource,
-    /// Any of its roots exists.
+    /// Any of its roots exists, or for an Overlay home, the path it reads
+    /// for one, in its folder or the other home's.
     pub configured: bool,
     /// The user hid it.
     pub hidden: bool,
@@ -956,7 +957,7 @@ pub(crate) struct ScannedHome {
     pub mirror: Option<Mirror>,
     /// For an Overlay home, the id of the home it lies over, which holds
     /// what the overlay reads outside its own folder.
-    pub under: Option<String>,
+    pub over: Option<String>,
 }
 
 /// What config-digger reads of the version that last ran against an Agent
@@ -1335,12 +1336,13 @@ struct FoundHome {
     /// the text that names them.
     roots: Roots,
     source: HomeSource,
-    /// Any of its own roots exists.
+    /// Any of its own roots exists, or for an Overlay home, the path it
+    /// reads for one, in its folder or the other home's.
     configured: bool,
     skipped: Option<Skipped>,
     mirror: Option<Mirror>,
     /// For an Overlay home, the id of the home it lies over there.
-    under: Option<String>,
+    over: Option<String>,
 }
 
 /// `extra_projects` are evaluated whether or not a registry records them.
@@ -1758,7 +1760,7 @@ fn read_as_if(
                 last_ran,
                 skipped: home.skipped,
                 mirror: home.mirror,
-                under: home.under,
+                over: home.over,
                 declared: home.declared,
                 configured: home.configured,
                 hidden: user_list.hidden_homes.iter().any(|hidden| {
@@ -3016,7 +3018,7 @@ fn find_homes(
                     configured,
                     skipped,
                     mirror: None,
-                    under: under.map(|(_, _, (id, _))| id.clone()),
+                    over: under.map(|(_, _, (id, _))| id.clone()),
                 });
             }
         }
@@ -3034,7 +3036,7 @@ fn find_homes(
                 configured: true,
                 skipped: None,
                 mirror: Some(mirror.mirror),
-                under: None,
+                over: None,
             });
         }
         // The home an order picks is named only when it is listed, as
@@ -3090,7 +3092,7 @@ fn find_homes(
             declared: None,
             skipped: None,
             mirror: None,
-            under: None,
+            over: None,
         });
     }
     Ok(found)
@@ -4353,7 +4355,7 @@ impl Scanner<'_> {
                 .iter()
                 .filter(|overlay| {
                     overlay.agent_index == home.agent_index
-                        && overlay.under.as_ref() == Some(&home.home)
+                        && overlay.over.as_ref() == Some(&home.home)
                         && location
                             .anchor
                             .path(&overlay.roots, None)

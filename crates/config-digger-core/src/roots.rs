@@ -5,7 +5,7 @@
 use crate::definitions::blocks;
 use crate::ports::FileSystem;
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 /// The path of each root of an Agent home by name, and the machine-wide
@@ -26,7 +26,7 @@ struct Under {
     /// The root's folder in the home under it.
     folder: PathBuf,
     /// The names of the entries the overlay's own folder holds, which win,
-    /// in lower case.
+    /// as [`entry_key`] has them.
     own: BTreeSet<String>,
 }
 
@@ -56,7 +56,7 @@ impl Roots {
                     let own = children
                         .iter()
                         .filter_map(|child| child.file_name())
-                        .map(|child| child.to_string_lossy().to_lowercase())
+                        .map(|child| entry_key(&child.to_string_lossy()))
                         .collect();
                     let folder = below.clone();
                     roots.under.insert(name.clone(), Under { folder, own });
@@ -78,7 +78,7 @@ impl Roots {
         let root = self.paths.get(name)?;
         let first = relative.split('/').next().unwrap_or_default();
         if let Some(under) = self.under.get(name)
-            && !under.own.contains(&first.to_lowercase())
+            && !under.own.contains(&entry_key(first))
         {
             return Some(blocks::join_relative(&under.folder, relative));
         }
@@ -91,9 +91,20 @@ impl Roots {
     pub fn under(&self, folder: &Path) -> Option<(&Path, impl Fn(&str) -> bool + '_)> {
         let (name, _) = self.paths.iter().find(|(_, path)| *path == folder)?;
         let under = self.under.get(name)?;
-        let overlaid = |entry: &str| under.own.contains(&entry.to_lowercase());
+        let overlaid = |entry: &str| under.own.contains(&entry_key(entry));
         Some((under.folder.as_path(), overlaid))
     }
+
+    /// Adds `paths`, machine-wide paths by the text that names them.
+    pub fn extend(&mut self, paths: BTreeMap<String, PathBuf>) {
+        self.paths.extend(paths);
+    }
+}
+
+/// How an entry of a folder is told from another by its name: in any case,
+/// as Windows does.
+fn entry_key(name: &str) -> String {
+    name.to_lowercase()
 }
 
 impl From<BTreeMap<String, PathBuf>> for Roots {
@@ -110,11 +121,5 @@ impl Deref for Roots {
 
     fn deref(&self) -> &Self::Target {
         &self.paths
-    }
-}
-
-impl DerefMut for Roots {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.paths
     }
 }

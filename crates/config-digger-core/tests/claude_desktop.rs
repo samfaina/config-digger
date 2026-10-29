@@ -1192,3 +1192,64 @@ fn disable_through_a_package_parks_a_classic_server_from_the_classic_file_and_en
     );
     assert!(item_in(&enabled, "msix", "filesystem").is_none());
 }
+
+#[test]
+fn disable_through_a_package_of_a_classic_extension_writes_the_settings_the_package_reads() {
+    let classic_folder = Path::new(CLASSIC);
+    let fs = with_classic_at(store(), classic_folder);
+    let fs = with_extension(fs, classic_folder, "local.mcpb.acme.sky", "sky", Some(true));
+    let own_settings = msix().join(r"Claude Extensions Settings\local.mcpb.acme.sky.json");
+    fs.put_file(&own_settings, r#"{ "isEnabled": true }"#);
+    let core = core_with(&fs, env());
+
+    let disable = plan_in(&core, Action::Disable, "msix", "sky");
+    let written: Vec<&Path> = disable
+        .preview()
+        .files
+        .iter()
+        .map(|file| file.path.as_path())
+        .collect();
+    assert_eq!(written, [own_settings.as_path()]);
+    core.execute(disable, &[]).unwrap();
+
+    let after = inventory(&fs);
+    assert_eq!(
+        json(item_in(&after, "msix", "sky").unwrap().state),
+        "disabled"
+    );
+    assert_eq!(
+        json(item_in(&after, "classic", "sky").unwrap().state),
+        "effective"
+    );
+}
+
+#[test]
+fn remove_through_a_package_of_a_classic_server_writes_the_classic_file_alone() {
+    let fs = with_classic_at(store(), Path::new(CLASSIC));
+    fs.delete_file(msix().join("claude_desktop_config.json"));
+    let core = core_with(&fs, env());
+    let classic_file = PathBuf::from(CLASSIC).join("claude_desktop_config.json");
+    let in_package = fs.files_below(msix());
+
+    let remove = plan_in(&core, Action::Remove, "msix", "filesystem");
+    let mut changed: Vec<&str> = remove
+        .preview()
+        .changes
+        .iter()
+        .map(|change| change.home.as_str())
+        .collect();
+    changed.sort();
+    assert_eq!(changed, ["classic", "msix"]);
+    core.execute(remove, &[]).unwrap();
+
+    let removed = fs.contents(&classic_file).unwrap();
+    assert!(!String::from_utf8_lossy(&removed).contains("filesystem"));
+    assert_eq!(
+        fs.files_below(msix()),
+        in_package,
+        "nothing is written to the package"
+    );
+    let after = inventory(&fs);
+    assert!(item_in(&after, "classic", "filesystem").is_none());
+    assert!(item_in(&after, "msix", "filesystem").is_none());
+}

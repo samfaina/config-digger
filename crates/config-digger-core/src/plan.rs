@@ -318,6 +318,24 @@ fn plan_with(
     Ok(planned)
 }
 
+/// The scanned Entry of `entry`, an Entry of an Item of `before`, in the
+/// home whose Item holds it, as several homes can read one file.
+fn held_in<'s>(
+    definitions: &[AgentDefinition],
+    snapshot: &'s Snapshot,
+    before: &Inventory,
+    entry: &api::Entry,
+) -> Option<&'s ScannedEntry> {
+    let item = before
+        .items
+        .iter()
+        .find(|item| item.entries.iter().any(|own| std::ptr::eq(own, entry)))?;
+    let agent = definitions
+        .iter()
+        .position(|definition| definition.agent.id == item.agent)?;
+    snapshot.entry_in(agent, &item.home, &entry.path, &entry.key_path)
+}
+
 /// The Entries an action on `selected` goes to, each once: each Entry
 /// itself, or for one of a Mirrored home, the Entry it was copied from, as
 /// `before` holds it. With them, the Mirrored homes the action reaches
@@ -333,19 +351,7 @@ fn redirected<'i, 's>(
     let mut targeted: Vec<&api::Entry> = Vec::new();
     let mut mirrored: Vec<&scan::ScannedHome> = Vec::new();
     for entry in selected {
-        // Several homes can read one file, so the Entry is the one of the
-        // home whose Item holds it.
-        let held_by = before
-            .items
-            .iter()
-            .find(|item| item.entries.iter().any(|own| std::ptr::eq(own, entry)));
-        let scanned = held_by
-            .and_then(|item| {
-                let agent = definitions
-                    .iter()
-                    .position(|definition| definition.agent.id == item.agent)?;
-                snapshot.entry_in(agent, &item.home, &entry.path, &entry.key_path)
-            })
+        let scanned = held_in(definitions, snapshot, before, entry)
             .unwrap_or_else(|| snapshot.entry(&entry.path, &entry.key_path));
         let target = match snapshot.mirror_of(scanned) {
             None => entry,
@@ -486,6 +492,19 @@ struct Targeted<'a> {
 }
 
 impl Targeted<'_> {
+    /// The scanned Entry of `entry`, one it targets. When an Overlay home
+    /// reads it, it is the one of the home whose Item holds it: the overlay
+    /// and the home under it each find its other files, such as its switch,
+    /// through their own roots. Otherwise it is the first the snapshot holds.
+    fn scanned(&self, entry: &api::Entry) -> &ScannedEntry {
+        let first = self.snapshot.entry(&entry.path, &entry.key_path);
+        let overlaid = |scanned: &ScannedEntry| self.snapshot.home_of(scanned).over.is_some();
+        match held_in(self.definitions, self.snapshot, self.before, entry) {
+            Some(held) if overlaid(held) || overlaid(first) => held,
+            _ => first,
+        }
+    }
+
     /// How many Entries it targets, Stranded ones included.
     fn count(&self) -> usize {
         self.entries.len() + self.stranded.len()
@@ -506,7 +525,7 @@ impl Targeted<'_> {
                 }
             };
             // A parked skill's folder goes from the store with its record.
-            let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+            let scanned = self.scanned(entry);
             if let Some(folder) = self
                 .snapshot
                 .parked_of(scanned)
@@ -635,7 +654,7 @@ impl Targeted<'_> {
             .iter()
             .filter(|entry| entry.state != State::Unread)
             .filter_map(|entry| {
-                let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+                let scanned = self.scanned(entry);
                 let definition = &self.definitions[scanned.agent_index];
                 if !disable::is_stand_in(definition, scanned) {
                     return None;
@@ -664,7 +683,7 @@ impl Targeted<'_> {
                     .any(|reason| reason.code == api::ReasonCode::NotApproved)
             })
             .filter_map(|entry| {
-                let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+                let scanned = self.scanned(entry);
                 let definition = &self.definitions[scanned.agent_index];
                 let location = definition.location(&scanned.location);
                 let gate = definition.rules(location.kind).gates.iter().find(|gate| {
@@ -690,7 +709,7 @@ impl Targeted<'_> {
     /// backup, each measured for Verify.
     fn removed_folder(&self, entry: &api::Entry) -> Result<PlannedFolder, Error> {
         let fs = self.ports.fs.as_ref();
-        let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+        let scanned = self.scanned(entry);
         let (op, size) = match &scanned.link {
             Some(link) => {
                 let size = folders::measure_target(fs, link.real.as_deref())?;
@@ -769,7 +788,7 @@ impl Targeted<'_> {
                     &entry.locator,
                 )));
             }
-            let scanned = self.snapshot.entry(&entry.path, &entry.key_path);
+            let scanned = self.scanned(entry);
             let definition = &self.definitions[scanned.agent_index];
             match self.action {
                 Action::Disable => {

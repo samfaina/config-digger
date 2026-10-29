@@ -200,40 +200,69 @@ await p.check("(top)", "the packaged app, started beside a classic `%APPDATA%\\C
   return { ...same(seen, { first: ["legacy"], firstLocalCache: null, both: ["msix"] }), observed: JSON.stringify({ first, both }) };
 });
 
-// An extension `cd-throwaway-<tag>` in the data folder `folder`, switched on
-// in its settings, whose server the app cannot start.
-function extension(folder, id, tag) {
+// An extension in the data folder `folder`, its id
+// `local.mcpb.acme.cd-throwaway-<tag>`, its name `cd-throwaway-<name>` and
+// its version `version`, switched on in its settings, whose server the app
+// cannot start.
+function extension(folder, tag, name, version) {
+  const id = `local.mcpb.acme.cd-throwaway-${tag}`;
   write(path.join(folder, "Claude Extensions", id, "manifest.json"), {
     manifest_version: "0.2",
-    name: `cd-throwaway-${tag}`,
-    version: "1.0.0",
+    name: `cd-throwaway-${name}`,
+    version,
     server: { type: "binary", entry_point: "missing.exe", mcp_config: { command: "${__dirname}/missing.exe" } },
   });
   write(path.join(folder, "Claude Extensions Settings", `${id}.json`), { isEnabled: true });
 }
 
-// The `cd-throwaway-ext*` extensions the app's logs name: its real
-// `%LOCALAPPDATA%\Claude\logs`, which no package virtualises, and those of
-// each data folder.
-function loggedExtensions() {
+// The lines of the app's logs that name a `cd-throwaway-ext*` extension:
+// its real `%LOCALAPPDATA%\Claude\logs`, which no package virtualises, and
+// those of each data folder.
+function extensionLines() {
   const dirs = [path.join(localAppData, "Claude", "logs"), path.join(classicData, "logs"), path.join(localCache, "logs")];
-  const names = dirs.filter((dir) => fs.existsSync(dir)).flatMap((dir) =>
-    fs.readdirSync(dir).flatMap((file) => fs.readFileSync(path.join(dir, file), "utf8").match(/cd-throwaway-ext[a-z]+/g) ?? []),
-  );
-  return [...new Set(names)].map((n) => n.slice("cd-throwaway-".length)).sort();
+  return dirs
+    .filter((dir) => fs.existsSync(dir))
+    .flatMap((dir) => fs.readdirSync(dir).map((file) => path.join(dir, file)))
+    .filter((file) => fs.statSync(file).isFile())
+    .flatMap((file) => fs.readFileSync(file, "utf8").split(/\r?\n/))
+    .filter((line) => /cd-throwaway-ext/.test(line));
+}
+
+// The extensions those lines name, by the tag of their id or name, and the
+// versions they name beside one.
+function loggedExtensions(lines) {
+  const tags = lines.flatMap((line) => line.match(/cd-throwaway-ext[a-z]+/g) ?? []).map((n) => n.slice("cd-throwaway-".length));
+  const versions = lines.flatMap((line) => line.match(/\b[12]\.0\.0-(?:classic|cache)\b/g) ?? []);
+  return { tags: [...new Set(tags)].sort(), versions: [...new Set(versions)].sort() };
 }
 
 // The folder roots of the overlay (#306): only the config file was tested
 // before, and that a folder lists the entries of both by name is inferred
-// from Microsoft's docs.
-await p.check("homes[msix]", "the packaged app beside a classic `%APPDATA%\\Claude` sees an extension held only in the classic folder, one held only in its `LocalCache`, and the `LocalCache` copy of one held in both", async () => {
-  extension(classicData, "local.mcpb.cd-throwaway.classic", "extclassic");
-  extension(localCache, "local.mcpb.cd-throwaway.cache", "extcache");
-  extension(classicData, "local.mcpb.cd-throwaway.both", "extbothclassic");
-  extension(localCache, "local.mcpb.cd-throwaway.both", "extbothcache");
-  const seen = { ...(await started(packaged)), folders: folders() };
-  const logged = loggedExtensions();
-  return { ...same({ logged }, { logged: ["extbothcache", "extcache", "extclassic"] }), observed: JSON.stringify({ logged, seen }) };
+// from Microsoft's docs. The extension held in both has one id, so its copy
+// is told by its name and its version. Signed out, as in Windows Sandbox,
+// 3.6556.2 names no extension in its logs, so the check runs only with
+// `--signed-in`, on an app someone signed in to.
+if (process.argv.includes("--signed-in")) await p.check("homes[msix]", "the packaged app beside a classic `%APPDATA%\\Claude` sees an extension held only in the classic folder, one held only in its `LocalCache`, and the `LocalCache` copy of one held in both", async () => {
+  extension(classicData, "extclassic", "extclassic", "1.0.0-classic");
+  extension(localCache, "extcache", "extcache", "1.0.0-cache");
+  extension(classicData, "extboth", "extbothclassic", "1.0.0-classic");
+  extension(localCache, "extboth", "extbothcache", "2.0.0-cache");
+  write(path.join(localCache, "claude_desktop_config.json"), config("overlay"));
+  await stop();
+  packaged();
+  const seen = await waitFor(async () => {
+    const logged = loggedExtensions(extensionLines());
+    return logged.tags.includes("extclassic") && logged.tags.includes("extcache") ? logged : null;
+  }, 120);
+  // Whatever names the copy of the one held in both comes a moment later.
+  await new Promise((r) => setTimeout(r, 15_000));
+  const lines = extensionLines();
+  const logged = loggedExtensions(lines);
+  await stop();
+  const both = logged.tags.includes("extbothcache") || logged.versions.includes("2.0.0-cache");
+  const classicBoth = logged.tags.includes("extbothclassic");
+  const result = { classic: logged.tags.includes("extclassic"), cache: logged.tags.includes("extcache"), both, classicBoth };
+  return { ...same(result, { classic: true, cache: true, both: true, classicBoth: false }), observed: JSON.stringify({ seen: !!seen, logged, lines: lines.slice(-40), folders: folders() }) };
 });
 
 // UAT step 7.6 starts the packaged app from its folder when no classic app
