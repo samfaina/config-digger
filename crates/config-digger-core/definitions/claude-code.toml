@@ -305,13 +305,15 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # [docs]; the entry holds no `command` [test], `args`, `env` or
 # `headersHelper` [docs]; no value holds a `${VAR}` reference, since it
 # expands none here [docs]; and the name holds only letters, digits, `-`
-# and `_` [docs]. Its rule against control and invisible formatting
-# characters in a key or value [docs] is not checked: no ticket yet.
+# and `_` [docs]. A dropped entry competes with no server by name: a user
+# server of its name loads, beside an entry with a command or at an
+# `http://` URL, in `managed-settings.json` or the HKLM value [test]. Its
+# rule against control and invisible formatting characters in a key or
+# value [docs] is not checked: no ticket yet.
 [[locations]]
 id = "managed-settings-mcp"
 unverified = [
   { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
-  "Whether a dropped `managedMcpServers` entry still takes precedence over a same-named server of a lower Scope is not known: it is taken not to compete by name.",
 ]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }
