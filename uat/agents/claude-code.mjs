@@ -14,7 +14,7 @@
 // what Claude Code extracts into a plugin's `.mcpb-cache`.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, gitInit, json, modelServer, probe, run, same, skill, subst, unsubst, write } from "./lib.mjs";
+import { fresh, gitInit, json, modelServer, pluginStatus, probe, run, same, sameIn, skill, subst, unsubst, write } from "./lib.mjs";
 
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
 const version = (await run(bin, ["--version"])).stdout.trim().split(" ")[0];
@@ -262,6 +262,7 @@ function verbatimSkill(dir, folder) {
     write(path.join(folder(name), ".claude-plugin", "plugin.json"), { name, version: "1.0.0" });
     write(path.join(folder(name), ".mcp.json"), { mcpServers: servers });
   }
+  skill(path.join(folder("cd-throwaway-p3"), "skills", "cd-throwaway-p3skill"), ["name: cd-throwaway-p3skill", "description: p3's skill"]);
   write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: Object.keys(plugins).map((name) => ({ name, source: `./plugins/${name}` })) });
   await claude(home, proj, "plugin", "marketplace", "add", market);
   for (const name of Object.keys(plugins)) await claude(home, proj, "plugin", "install", `${name}@cd-throwaway-market`);
@@ -322,6 +323,52 @@ function verbatimSkill(dir, folder) {
     const { stdout } = await claude(home, proj, "plugin", "list");
     write(file, kept);
     return same({ loaded: s.plugins.includes("cd-throwaway-p3"), servers: s.servers.filter((n) => n.includes("p3")), error: stdout.includes("Manifest parse error") }, { loaded: false, servers: [], error: true });
+  });
+
+  // The same plugin, with a manifest that loads or one that fails either
+  // way, on, off by `false` and off by default: whether it loads, its
+  // server, its skill, and what `claude plugin list` says of it.
+  const offSeen = (async () => {
+    const file = path.join(folder("cd-throwaway-p3"), ".claude-plugin", "plugin.json");
+    const kept = fs.readFileSync(file, "utf8");
+    const { enabledPlugins, ...offByDefault } = installed;
+    const seen = {};
+    try {
+      for (const [manifest, text] of [["loads", kept], ["does not parse", '{ "name": broken'], ["mcpServers 42", JSON.stringify({ ...JSON.parse(kept), mcpServers: 42 })]]) {
+        write(file, text);
+        for (const [switched, settings] of [["on", { ...installed, enabledPlugins: { [id(3)]: true } }], ["false", { ...installed, enabledPlugins: { [id(3)]: false } }], ["by default", offByDefault]]) {
+          write(settingsFile, settings);
+          const s = await session(home, proj);
+          const { stdout } = await claude(home, proj, "plugin", "list");
+          seen[`${manifest}, ${switched}`] = {
+            loaded: s.plugins.includes("cd-throwaway-p3"),
+            servers: s.servers.filter((n) => n.includes("cd-throwaway-p3")),
+            skills: s.skills.filter((n) => n.includes("cd-throwaway-p3")),
+            ...pluginStatus(stdout, id(3)),
+          };
+        }
+      }
+    } finally {
+      write(file, kept);
+      write(settingsFile, installed);
+    }
+    return seen;
+  })();
+  const fails = (error) => ({ loaded: false, servers: [], skills: [], status: "failed to load", error });
+  const off = { loaded: false, servers: [], skills: [], status: "disabled", error: null };
+  const offExpected = {
+    "loads, on": { loaded: true, servers: ["plugin:cd-throwaway-p3:cd-throwaway-p3srv"], skills: ["cd-throwaway-p3:cd-throwaway-p3skill"], status: "enabled", error: null },
+    "loads, false": off, "loads, by default": off,
+    "does not parse, on": fails("Manifest parse error"), "does not parse, false": off, "does not parse, by default": off,
+    "mcpServers 42, on": fails("Manifest validation failed"), "mcpServers 42, false": off, "mcpServers 42, by default": off,
+  };
+
+  await p.check("items.mcp", "an installed plugin whose manifest does not parse, or whose `mcpServers` is `42`, off by `false` or by default, is not loaded and has no server, as with a manifest that loads, and `claude plugin list` says `disabled` with no error; on, it says `failed to load` and the manifest's error", async () => {
+    return sameIn(["loaded", "servers", "status", "error"], await offSeen, offExpected);
+  });
+
+  await p.check("items.skill", "an installed plugin whose manifest fails, off by `false` or by default, has no skill, as with a manifest that loads, and `claude plugin list` reports no error", async () => {
+    return sameIn(["skills", "status", "error"], await offSeen, offExpected);
   });
 }
 

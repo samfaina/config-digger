@@ -17,7 +17,7 @@
 // folder named `claude-account-home*` in the probe root.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, json, modelServer, probe, root, run, same, skill, syncedPlugin, write } from "./lib.mjs";
+import { fresh, json, modelServer, probe, root, run, same, sameIn, skill, syncedPlugin, write } from "./lib.mjs";
 
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
 // The signed-in home sits in the probe root, and `fresh("claude-account")`
@@ -66,8 +66,8 @@ const reply = { id: "msg_x", type: "message", role: "assistant", model: "claude-
 const noFetch = { DISABLE_GROWTHBOOK: "1" };
 
 // One `claude -p` run, on `on`, the signed-in home or a copy of it: the
-// skills and plugins its init event lists, the skill lines of the request
-// its model gets, and that request.
+// skills, plugins and servers its init event lists, the skill lines of the
+// request its model gets, and that request.
 async function session({ prompt = "hi", env = {}, on = home, timeout } = {}) {
   const model = await modelServer(reply);
   const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: on, ANTHROPIC_BASE_URL: model.url, ...env }, timeout });
@@ -75,7 +75,7 @@ async function session({ prompt = "hi", env = {}, on = home, timeout } = {}) {
   const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
   const listing = model.bodies.map((b) => b.match(/The following skills are available(?:[^"\\]|\\.)*/)).find(Boolean);
   const listed = listing ? JSON.parse(`"${listing[0]}"`).split("\n").filter((l) => l.startsWith("- ")) : [];
-  return { skills: init.skills, plugins: init.plugins.map((x) => x.name), listed, sent: model.bodies.join("\n") };
+  return { skills: init.skills, plugins: init.plugins.map((x) => x.name), servers: init.mcp_servers.map((x) => x.name), listed, sent: model.bodies.join("\n") };
 }
 
 // The auth Claude Code picks in the Project, as `claude auth status` says.
@@ -260,6 +260,63 @@ try {
     const on = await loaded(offline);
     fs.rmSync(unlisted, { recursive: true });
     return same({ heldOff, cachedOff, uncached, on }, { heldOff: [], cachedOff: [], uncached: [], on: ["cd-throwaway-synced"] });
+  });
+
+  // A synced plugin with a skill, a server in its `.mcp.json` and one in
+  // its manifest's `mcpServers`, whose manifest the probe rewrites: one
+  // that loads, the control, one that does not parse, and two whose
+  // `mcpServers` the manifest's schema refuses. For each, whether the
+  // plugin loads, its servers and its skill, the `id` and the start of the
+  // error `claude plugin list --json` gives its folder, and whether the
+  // folder outlived the session. The plugin is taken out once seen.
+  const failing = "cd-throwaway-failing";
+  const failingDir = syncedPlugin(pluginBucket, failing, { generation, skills: ["cd-throwaway-fskill"] });
+  write(path.join(failingDir, ".mcp.json"), { mcpServers: { "cd-throwaway-fmcp": { command: "cmd", args: ["/c", "fmcp"] } } });
+  const loads = { name: failing, version: "1.0.0", mcpServers: { "cd-throwaway-fmanifest": { command: "cmd", args: ["/c", "fmanifest"] } } };
+  const failingSeen = (async () => {
+    const seen = {};
+    try {
+      for (const [label, manifest] of [["loads", loads], ["does not parse", '{ "name": broken'], ["mcpServers 42", { ...loads, mcpServers: 42 }], ["mcpServers [42]", { ...loads, mcpServers: [42] }]]) {
+        write(path.join(failingDir, ".claude-plugin", "plugin.json"), manifest);
+        const s = await session({ env: offline });
+        const { stdout } = await run(bin, ["plugin", "list", "--json"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: home, ...offline } });
+        const entry = JSON.parse(stdout).find((x) => x.installPath === failingDir);
+        seen[label] = {
+          loaded: s.plugins.includes(failing),
+          manifestServer: s.servers.includes(`plugin:${failing}:cd-throwaway-fmanifest`),
+          mcpServer: s.servers.includes(`plugin:${failing}:cd-throwaway-fmcp`),
+          skill: s.skills.includes(`${failing}:cd-throwaway-fskill`),
+          id: entry?.id.replace(/^synced\[\d+\]$/, "synced[<n>]") ?? null,
+          error: entry?.errors?.[0]?.split(" at ")[0] ?? null,
+          kept: fs.existsSync(failingDir),
+        };
+      }
+    } finally {
+      fs.rmSync(failingDir, { recursive: true, force: true });
+      fs.rmSync(`${failingDir}.meta.json`, { force: true });
+      const list = path.join(pluginBucket, "manifest.json");
+      write(list, { ...json(list), plugins: json(list).plugins.filter((x) => x.name !== failing) });
+    }
+    return seen;
+  })();
+  const fails = (error) => ({ loaded: false, manifestServer: false, mcpServer: false, skill: false, id: "synced[<n>]", error: `Failed to load plugin: Plugin ${failing} has ${error} manifest file`, kept: true });
+  const failingExpected = {
+    loads: { loaded: true, manifestServer: true, mcpServer: true, skill: true, id: `${failing}@synced`, error: null, kept: true },
+    "does not parse": fails("a corrupt"),
+    "mcpServers 42": fails("an invalid"),
+    "mcpServers [42]": fails("an invalid"),
+  };
+
+  await p.check("locations[synced-plugin-manifest-mcp]", "a synced plugin whose manifest does not parse, or whose `mcpServers` is `42` or `[42]`, fails to load whole, its manifest's server with it, and `claude plugin list` lists it as `synced[<n>]` with a corrupt or an invalid manifest; the folder stays, and with a manifest that loads, the plugin and that server load", async () => {
+    return sameIn(["loaded", "manifestServer", "id", "error", "kept"], await failingSeen, failingExpected);
+  });
+
+  await p.check("locations[synced-plugin-mcp]", "a synced plugin's `.mcp.json` server fails with the plugin when its manifest does not parse or its `mcpServers` is `42` or `[42]`, and loads with a manifest that loads", async () => {
+    return sameIn(["mcpServer"], await failingSeen, failingExpected);
+  });
+
+  await p.check("locations[synced-plugin-skills]", "a synced plugin's skill fails with the plugin when its manifest does not parse or its `mcpServers` is `42` or `[42]`, and loads with a manifest that loads", async () => {
+    return sameIn(["skill"], await failingSeen, failingExpected);
   });
 
   // Signed out, on copies of the signed-in home. Never `claude auth logout`
