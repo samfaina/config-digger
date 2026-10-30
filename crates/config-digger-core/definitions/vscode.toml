@@ -125,13 +125,14 @@ name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/
 # by its folders' names, not by the extensions' ids: of two extensions'
 # skills of one name, a built-in one's wins over an installed one's whose
 # folder sorts first, and within each group the one whose folder sorts
-# first [test]. VS Code loads one extension of an id: an installed
-# extension with a built-in one's id takes its place when its version is
-# higher, and is skipped when it is the same or lower [test]. Its CLI
-# refuses to install a built-in extension's id while none of that id is
-# installed [test], so such an extension is left when VS Code starts to
-# ship one the user had installed. config-digger reads both (#432). GitHub
-# Copilot Chat, which `product.json`'s
+# first [test]. VS Code loads one extension of an id, its manifest's
+# `publisher` and `name` joined by `.`, compared without regard to case: an
+# installed extension with a built-in one's id takes its place when its
+# version is higher, and is skipped when it is the same or lower [test], so
+# config-digger reads only the one VS Code loads. Its CLI refuses to install
+# a built-in extension's id while none of that id is installed [test], so
+# such an extension is left when VS Code starts to ship one the user had
+# installed. GitHub Copilot Chat, which `product.json`'s
 # `builtInExtensionsEnabledWithAutoUpdates` lets the user update, follows
 # rules of its own in VS Code's scanner [binary], which #432 leaves
 # untested. An Installation's folder holds one commit folder [disk]: one
@@ -156,6 +157,7 @@ name = { file = "package.json", key_path = ["name"] }
 id = "extensions"
 registry = { block = "plugin-folders", anchor = { block = "machine", path = "~/.vscode/extensions" }, marker = "package.json", removals = ".obsolete" }
 name = { file = "package.json", key_path = ["name"] }
+replaces = { plugins = "built-in-extensions", file = "package.json", id = [["publisher"], ["name"]], joined_by = ".", version = ["version"] }
 
 [[scopes]]
 id = "workspace-folder"

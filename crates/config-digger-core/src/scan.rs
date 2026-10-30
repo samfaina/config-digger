@@ -17,7 +17,7 @@ use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Stren
 use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
     LocationDefinition, NameParts, PLUGIN_NAME, PROJECT_KEY, PluginNames, PluginsDefinition,
-    ReadFailureReaction, References,
+    ReadFailureReaction, References, Replaces,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -1525,6 +1525,7 @@ fn read_as_if(
             .filter(|plugins| !plugins.registry.in_project())
             .flat_map(|plugins| scanner.read_plugins(home, plugins, None, &installation_folders))
             .collect();
+        scanner.drop_replaced(definition, &mut plugins);
         record_winners(definition, &[], &mut plugins);
         installed.insert((home.agent_index, home.home.clone()), plugins.clone());
         scanner.read_plugin_locations(home, definition, &plugins);
@@ -4043,6 +4044,83 @@ impl Scanner<'_> {
             self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
         found
+    }
+
+    /// Leaves out of `plugins`, read for one Agent home, each plugin that
+    /// loses to one of another list with its id, as the `replaces` of a
+    /// list of `definition` says: a plugin of that list is compared with
+    /// each of the list it replaces, and of each pair with one id, it
+    /// stays only when both versions parse and its own is higher.
+    fn drop_replaced(&mut self, definition: &AgentDefinition, plugins: &mut Vec<ScannedPlugin>) {
+        let mut dropped = vec![false; plugins.len()];
+        for list in definition.plugins.iter() {
+            let Some(replaces) = &list.replaces else {
+                continue;
+            };
+            let mut ids = Vec::with_capacity(plugins.len());
+            for plugin in plugins.iter() {
+                let compared = plugin.plugins == list.id || plugin.plugins == replaces.plugins;
+                ids.push(
+                    compared
+                        .then(|| self.replaced_id(replaces, &plugin.folder))
+                        .flatten(),
+                );
+            }
+            for (at, plugin) in plugins.iter().enumerate() {
+                let Some((id, version)) = ids[at].as_ref().filter(|_| plugin.plugins == list.id)
+                else {
+                    continue;
+                };
+                for (other, replaced) in plugins.iter().enumerate() {
+                    let Some((other_id, other_version)) = ids[other]
+                        .as_ref()
+                        .filter(|_| replaced.plugins == replaces.plugins)
+                    else {
+                        continue;
+                    };
+                    if other_id != id {
+                        continue;
+                    }
+                    let higher = version.as_ref().zip(other_version.as_ref());
+                    if higher.is_some_and(|(version, other_version)| version > other_version) {
+                        tracing::debug!(plugin = %replaced.id, by = %plugin.id, "plugin replaced");
+                        dropped[other] = true;
+                    } else {
+                        tracing::debug!(plugin = %plugin.id, by = %replaced.id, "plugin replaces none");
+                        dropped[at] = true;
+                    }
+                }
+            }
+        }
+        let mut dropped = dropped.into_iter();
+        plugins.retain(|_| !dropped.next().unwrap_or(false));
+    }
+
+    /// The id, lowercased, and the version that the file `replaces` names
+    /// gives the plugin in `folder`, `None` when it gives no id.
+    fn replaced_id(
+        &mut self,
+        replaces: &Replaces,
+        folder: &Path,
+    ) -> Option<(String, Option<version::Version>)> {
+        let text = self
+            .reader
+            .peek(&blocks::join_relative(folder, &replaces.file))
+            .ok()??;
+        let document = JsonFormat::STRICT.parse(text).ok()?;
+        let parts = replaces
+            .id
+            .iter()
+            .map(|key_path| {
+                lookup(&document, key_path)?
+                    .as_str()
+                    .filter(|part| !part.is_empty())
+            })
+            .collect::<Option<Vec<&str>>>()?;
+        let version = lookup(&document, &replaces.version)
+            .and_then(serde_json::Value::as_str)
+            .and_then(version::Version::parse);
+        Some((parts.join(&replaces.joined_by).to_lowercase(), version))
     }
 
     /// Records each name that plugins of `found`, one list of the Agent
