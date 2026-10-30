@@ -8,10 +8,12 @@
 //   node uat/agents/claude-code-machine.mjs [--bin <claude.exe>]
 //
 // What Claude Code loads is read from `claude mcp list`; whether it starts,
-// from `claude -p`.
+// from `claude -p`. For a plugin the managed settings force off, what it
+// loads is read from the init event of `claude -p --output-format
+// stream-json`, and what it reports from `claude plugin list`.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, modelServer, probe, registry, run, same, sandboxOnly, write } from "./lib.mjs";
+import { fresh, json, modelServer, pluginStatus, probe, registry, run, same, sameIn, sandboxOnly, skill, write } from "./lib.mjs";
 
 sandboxOnly();
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
@@ -176,6 +178,77 @@ await p.check("locations[managed-settings-mcp]", "an HKCU value that does not pa
       "one named, no state": one, "one named, state untrusted": one, "one named, trusted": one,
       "all, no state": all, "all, state untrusted": all, "all, trusted": all,
     });
+  });
+}
+
+// ---------------------------------------------------------------- forced-off plugins
+
+// A plugin installed from a `directory` marketplace in a home of its own,
+// with a server in its `.mcp.json` and a skill, on in the user settings.
+{
+  const pluginHome = path.join(base, "plugin-home");
+  const market = path.join(base, "market");
+  const folder = path.join(market, "plugins", "cd-throwaway-forced");
+  const manifest = path.join(folder, ".claude-plugin", "plugin.json");
+  const loads = JSON.stringify({ name: "cd-throwaway-forced", version: "1.0.0" });
+  const id = "cd-throwaway-forced@cd-throwaway-market";
+  write(manifest, loads);
+  write(path.join(folder, ".mcp.json"), { mcpServers: { "cd-throwaway-forcedsrv": stdio("forced") } });
+  skill(path.join(folder, "skills", "cd-throwaway-forcedskill"), ["name: cd-throwaway-forcedskill", "description: forced's skill"]);
+  write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: [{ name: "cd-throwaway-forced", source: "./plugins/cd-throwaway-forced" }] });
+  const pluginEnv = { ...env, CLAUDE_CONFIG_DIR: pluginHome };
+  await clear();
+  await run(bin, ["plugin", "marketplace", "add", market], { cwd: proj, env: pluginEnv });
+  await run(bin, ["plugin", "install", id], { cwd: proj, env: pluginEnv });
+  write(path.join(pluginHome, "settings.json"), { ...json(path.join(pluginHome, "settings.json")), enabledPlugins: { [id]: true } });
+
+  // On, and forced off, with a manifest that loads or one that fails
+  // either way: what the init event loads of the plugin, and what `claude
+  // plugin list` says of it.
+  const forcedSeen = (async () => {
+    const seen = {};
+    try {
+      for (const [label, text] of [["loads", loads], ["does not parse", '{ "name": broken'], ["mcpServers 42", JSON.stringify({ ...JSON.parse(loads), mcpServers: 42 })]]) {
+        write(manifest, text);
+        for (const [forced, settings] of [["on", null], ["forced off", { enabledPlugins: { [id]: false } }]]) {
+          await deploy(settings ? { file: JSON.stringify(settings) } : {});
+          const model = await modelServer(reply);
+          const { stdout } = await run(bin, ["-p", "hi", "--output-format", "stream-json", "--verbose"], { cwd: proj, env: { ...pluginEnv, ANTHROPIC_BASE_URL: model.url } });
+          model.close();
+          const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
+          const list = await run(bin, ["plugin", "list"], { cwd: proj, env: pluginEnv });
+          seen[`${label}, ${forced}`] = {
+            loaded: init.plugins.some((x) => x.name === "cd-throwaway-forced"),
+            servers: init.mcp_servers.map((x) => x.name).filter((n) => n.includes("cd-throwaway-forced")),
+            skills: init.skills.filter((n) => n.includes("cd-throwaway-forced")),
+            ...pluginStatus(list.stdout, id),
+          };
+        }
+      }
+    } finally {
+      write(manifest, loads);
+    }
+    return seen;
+  })();
+  const fails = (error) => ({ loaded: false, servers: [], skills: [], status: "failed to load", error });
+  // `claude plugin list` says `enabled` for a plugin the managed settings
+  // force off, though it does not load.
+  const off = { loaded: false, servers: [], skills: [], status: "enabled", error: null };
+  const forcedExpected = {
+    "loads, on": { loaded: true, servers: ["plugin:cd-throwaway-forced:cd-throwaway-forcedsrv"], skills: ["cd-throwaway-forced:cd-throwaway-forcedskill"], status: "enabled", error: null },
+    "loads, forced off": off,
+    "does not parse, on": fails("Manifest parse error"),
+    "does not parse, forced off": off,
+    "mcpServers 42, on": fails("Manifest validation failed"),
+    "mcpServers 42, forced off": off,
+  };
+
+  await p.check("items.mcp", "an installed plugin on in the user settings and forced off by `enabledPlugins` in `managed-settings.json`, whose manifest does not parse or whose `mcpServers` is `42`, is not loaded and has no server, as with a manifest that loads, and `claude plugin list` says `enabled` with no error; on, it says `failed to load` and the manifest's error", async () => {
+    return sameIn(["loaded", "servers", "status", "error"], await forcedSeen, forcedExpected);
+  });
+
+  await p.check("items.skill", "an installed plugin forced off by the managed settings whose manifest fails has no skill, as with a manifest that loads, and `claude plugin list` reports no error", async () => {
+    return sameIn(["skills", "status", "error"], await forcedSeen, forcedExpected);
   });
 }
 

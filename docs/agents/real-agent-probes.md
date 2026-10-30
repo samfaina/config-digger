@@ -32,6 +32,7 @@ Running the Agents:
 
 - Volta's `codex`, `gemini` and `npm` shims are `.cmd` files, which Node cannot spawn without `cmd.exe`. `run()` in `lib.mjs` handles that. On a timeout, kill the process tree with `taskkill /t /f`, or the CLI keeps its output open.
 - Orca's terminals set `CLAUDE_CODE_PLUGIN_DIRS`, which loads Orca's own plugin into every Claude Code launch and fails `claude-code.mjs`'s plugin checks. `lib.mjs` takes it out of the probes' environment; a Claude Code run by hand needs it unset.
+- `claude plugin list` lists the synced plugins too, and one that fails to load as `synced[<n>]`: find it in `--json` by its `installPath`. A plugin the managed settings force off shows `enabled` there, though it does not load: the `init` event says what loads.
 - Older Claude Code versions: `npm install --prefix E:\cd-throwaway-agents\cc-<version> @anthropic-ai/claude-code@<version>`, then pass `--bin node_modules\@anthropic-ai\claude-code-win32-x64\claude.exe`.
 - Gemini CLI prints `extensions list` on stderr. `gemini mcp list` lists an extension's servers even when the extension is off.
 

@@ -65,6 +65,15 @@ export function syncedPlugin(bucket, name, { generation, manifest = { name, vers
   return dir;
 }
 
+// What `claude plugin list`'s `stdout` says of the plugin `name`: the words
+// of its status, such as `disabled` or `failed to load`, and its error up
+// to the first colon, or null. The mark before the status differs from one
+// terminal to another.
+export function pluginStatus(stdout, name) {
+  const block = stdout.split(/\n\s*\n/).find((b) => b.includes(name)) ?? "";
+  return { status: block.match(/Status:[^a-z\n]*([^\n]*)/)?.[1].trim() ?? null, error: block.match(/Error: ([^:\n]*)/)?.[1] ?? null };
+}
+
 export async function gitInit(dir) {
   fs.mkdirSync(dir, { recursive: true });
   const { code, stderr } = await run("git", ["init", "-q"], { cwd: dir });
@@ -177,4 +186,11 @@ export function probe(agent, version) {
 export function same(observed, expected) {
   const o = JSON.stringify(observed);
   return { pass: o === JSON.stringify(expected), observed: o };
+}
+
+// `same` on the `keys` of each case, for checks that share what one set of
+// sessions saw: `observed` and `expected` map a case's label to an object.
+export function sameIn(keys, observed, expected) {
+  const cut = (cases) => Object.fromEntries(Object.entries(cases).map(([label, o]) => [label, Object.fromEntries(keys.map((k) => [k, o[k]]))]));
+  return same(cut(observed), cut(expected));
 }
