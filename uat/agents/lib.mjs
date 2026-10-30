@@ -1,5 +1,6 @@
 // What every probe shares: throwaway folders, running an Agent's CLI, a local
-// stand-in for a model API, and the checks a probe reports.
+// stand-in for a model API, a proxy that keeps an Agent off the network, and
+// the checks a probe reports.
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -66,12 +67,16 @@ export function syncedPlugin(bucket, name, { generation, manifest = { name, vers
 }
 
 // What `claude plugin list`'s `stdout` says of the plugin `name`: the words
-// of its status, such as `disabled` or `failed to load`, and its error up
-// to the first colon, or null. The mark before the status differs from one
-// terminal to another.
+// of its status, such as `disabled` or `failed to load`, its error up to
+// the first colon, and the folder of its `Read from:`, each or null. The
+// mark before the status differs from one terminal to another.
 export function pluginStatus(stdout, name) {
   const block = stdout.split(/\n\s*\n/).find((b) => b.includes(name)) ?? "";
-  return { status: block.match(/Status:[^a-z\n]*([^\n]*)/)?.[1].trim() ?? null, error: block.match(/Error: ([^:\n]*)/)?.[1] ?? null };
+  return {
+    status: block.match(/Status:[^a-z\n]*([^\n]*)/)?.[1].trim() ?? null,
+    error: block.match(/Error: ([^:\n]*)/)?.[1] ?? null,
+    readFrom: block.match(/Read from: ([^\n]*)/)?.[1].trim() ?? null,
+  };
 }
 
 export async function gitInit(dir) {
@@ -155,6 +160,40 @@ export async function modelServer(reply) {
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   return { url: `http://127.0.0.1:${server.address().port}`, bodies, close: () => server.close() };
+}
+
+// A local proxy that refuses every request, and an ssh command for git that
+// refuses every connection. An Agent launched with `env`, and the git it
+// runs, fetches nothing over HTTP(S) or ssh, and `tried()` lists what it
+// tried to reach: the host of each request, and `ssh` for each connection.
+export async function refusingProxy() {
+  const hosts = [];
+  const server = http.createServer((req, res) => {
+    hosts.push(new URL(req.url, "http://unknown").host);
+    res.writeHead(502).end();
+  });
+  // A client may reset its socket before the refusal reaches it.
+  server.on("connect", (req, socket) => {
+    hosts.push(req.url);
+    socket.on("error", () => {});
+    socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+  });
+  server.on("clientError", (_, socket) => socket.destroy());
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  // git runs the command through `sh`, the connection's arguments after it,
+  // which `#` leaves out.
+  const sshLog = path.join(root, `refused-ssh-${server.address().port}.txt`);
+  fs.rmSync(sshLog, { force: true });
+  const ssh = () => (fs.existsSync(sshLog) ? fs.readFileSync(sshLog, "utf8").split("\n").filter(Boolean) : []);
+  return {
+    env: { HTTPS_PROXY: url, HTTP_PROXY: url, NO_PROXY: "127.0.0.1", GIT_SSH_COMMAND: `echo ssh >> '${sshLog.replaceAll("\\", "/")}'; exit 1 #` },
+    tried: () => [...hosts, ...ssh()],
+    close: () => {
+      server.close();
+      fs.rmSync(sshLog, { force: true });
+    },
+  };
 }
 
 // The checks of one probe. Each check names the definition's table it tests,

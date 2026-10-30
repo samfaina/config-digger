@@ -14,7 +14,7 @@
 // what Claude Code extracts into a plugin's `.mcpb-cache`.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, gitInit, json, modelServer, pluginStatus, probe, run, same, sameIn, skill, subst, unsubst, write } from "./lib.mjs";
+import { fresh, gitInit, json, modelServer, pluginStatus, probe, refusingProxy, run, same, sameIn, skill, subst, unsubst, write } from "./lib.mjs";
 
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
 const version = (await run(bin, ["--version"])).stdout.trim().split(" ")[0];
@@ -43,6 +43,8 @@ async function session(home, cwd, { prompt = "hi", args = [], extraEnv = {}, rea
   return {
     servers: init.mcp_servers.map((s) => s.name),
     plugins: init.plugins.filter((x) => x.path !== "builtin").map((x) => x.name),
+    // The folder each plugin loads from, by its name.
+    pluginFolders: Object.fromEntries(init.plugins.map((x) => [x.name, x.path])),
     skills: init.skills,
     listed: lines(listings[0]?.[0]),
     listedAfter: (listings.at(-1) ?? []).flatMap(lines),
@@ -305,6 +307,87 @@ function verbatimSkill(dir, folder) {
     const { stdout } = await claude(home, proj, "plugin", "list");
     return same(stdout.includes(`Read from: ${folder("cd-throwaway-p3")}`), true);
   });
+
+  // p3 when the marketplace's manifest fails it, one case at a time, the
+  // manifest put back after each: which copy `claude plugin list` says it is
+  // read from, which copy a session loads, its status and error, the servers
+  // of all three plugins (ep1 wins over ep2, of the same endpoint), and the
+  // status of p1 and p2, whose entries stay as they were. The marketplace's
+  // copy gets a server of its own meanwhile, so the session tells the copies
+  // apart. Every launch goes through a proxy and an ssh command that refuse
+  // all, so the `github` source fetches nothing, and `kept` says whether the
+  // plugin's record, the marketplace's but for its `lastUpdated`, and the
+  // cache copy's `.orphaned_at` stay as they were.
+  const manifestFile = path.join(market, ".claude-plugin", "marketplace.json");
+  const installedFile = path.join(home, "plugins", "installed_plugins.json");
+  const knownFile = path.join(home, "plugins", "known_marketplaces.json");
+  const cacheCopy = json(installedFile).plugins[id(3)][0].installPath;
+  const copyOf = (dir) => (dir == null ? null : dir === cacheCopy ? "cache" : dir === folder("cd-throwaway-p3") ? "marketplace" : dir);
+  const pluginState = () => {
+    const { lastUpdated, ...marketplace } = json(knownFile)["cd-throwaway-market"];
+    return JSON.stringify([fs.readFileSync(installedFile, "utf8"), marketplace, fs.existsSync(path.join(cacheCopy, ".orphaned_at"))]);
+  };
+  const marketplace = json(manifestFile);
+  const withSource = (source) => ({ ...marketplace, plugins: marketplace.plugins.map((e) => (e.name === "cd-throwaway-p3" ? { ...e, source } : e)) });
+  // `claude plugin list` prints no `Read from:` for the cache copy.
+  const dropped = (error, servers, others) => ({ readFrom: null, loaded: null, status: "failed to load", error, servers, others, fetched: [], kept: true });
+  const enabled = ["enabled", "enabled"];
+  const ep1 = "plugin:cd-throwaway-p1:cd-throwaway-ep1";
+  const fromCache = { readFrom: null, loaded: "cache", status: "enabled", error: null, servers: [ep1, "plugin:cd-throwaway-p3:cd-throwaway-p3srv"], others: enabled, fetched: [], kept: true };
+  const failing = (cause) => `the plugins of a \`directory\` marketplace whose manifest ${cause} read neither copy: each fails to load, the marketplace failing to load, and a session starts none of their servers`;
+  const manifestCases = {
+    missing: { manifest: null, title: failing("is missing"), expected: dropped("Marketplace cd-throwaway-market failed to load", [], ["failed to load", "failed to load"]) },
+    "does not parse": { manifest: '{ "name": broken', title: failing("does not parse"), expected: dropped("Marketplace cd-throwaway-market failed to load", [], ["failed to load", "failed to load"]) },
+    "without the plugin": {
+      manifest: { ...marketplace, plugins: marketplace.plugins.filter((e) => e.name !== "cd-throwaway-p3") },
+      title: "a plugin a `directory` marketplace's manifest does not list reads neither copy: it fails to load, not found in the marketplace, and none of its servers starts, the plugins it lists loading",
+      expected: dropped("Plugin cd-throwaway-p3 not found in marketplace cd-throwaway-market", [ep1], enabled),
+    },
+    "github source": {
+      manifest: withSource({ source: "github", repo: "cd-throwaway/cd-throwaway-none" }),
+      title: "a plugin a `directory` marketplace's manifest gives a `github` source is read from its copy in the cache, and nothing is fetched",
+      expected: fromCache,
+    },
+    "../x source": { manifest: withSource("../x"), title: "a plugin a `directory` marketplace's manifest gives the source `../x` is read from its copy in the cache", expected: fromCache },
+  };
+  const manifestSeen = (async () => {
+    const kept = fs.readFileSync(manifestFile, "utf8");
+    const mcp = path.join(folder("cd-throwaway-p3"), ".mcp.json");
+    const keptMcp = fs.readFileSync(mcp, "utf8");
+    const state = pluginState();
+    const offline = await refusingProxy();
+    const seen = {};
+    try {
+      write(mcp, { mcpServers: { "cd-throwaway-p3market": stdio("p3market") } });
+      for (const [label, { manifest }] of Object.entries(manifestCases)) {
+        if (manifest === null) fs.rmSync(manifestFile);
+        else write(manifestFile, manifest);
+        const before = offline.tried().length;
+        const s = await session(home, proj, { extraEnv: offline.env });
+        const { stdout } = await run(bin, ["plugin", "list"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: home, ...offline.env } });
+        const { readFrom, status, error } = pluginStatus(stdout, id(3));
+        seen[label] = {
+          readFrom: copyOf(readFrom),
+          loaded: copyOf(s.pluginFolders["cd-throwaway-p3"]),
+          status,
+          error,
+          servers: throwaway(s.servers),
+          others: [1, 2].map((n) => pluginStatus(stdout, id(n)).status),
+          fetched: offline.tried().slice(before).filter((h) => h === "ssh" || /github/i.test(h)),
+          kept: pluginState() === state,
+        };
+        write(manifestFile, kept);
+      }
+    } finally {
+      write(manifestFile, kept);
+      write(mcp, keptMcp);
+      offline.close();
+    }
+    return seen;
+  })();
+  for (const [label, { title, expected }] of Object.entries(manifestCases)) {
+    await p.check("plugins[installed]", title, async () => same((await manifestSeen)[label], expected));
+  }
 
   await p.check("locations[plugin-mcp]", "a plugin's `.mcp.json` that does not parse leaves the plugin loaded without its servers", async () => {
     const file = path.join(folder("cd-throwaway-p3"), ".mcp.json");

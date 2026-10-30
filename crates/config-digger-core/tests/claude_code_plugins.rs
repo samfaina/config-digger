@@ -1768,6 +1768,10 @@ fn a_plugin_of_a_marketplace_of_another_kind_is_read_from_its_install_path() {
     );
 }
 
+// Claude Code reads the cache copy too for an object source. With no
+// manifest, one that does not parse or no entry of the plugin's name, it
+// loads the plugin from neither copy, and config-digger reads the cache copy
+// until #506.
 #[test]
 fn a_plugin_the_directory_marketplace_names_no_folder_for_is_read_from_its_install_path() {
     let manifest = PathBuf::from(MARKET).join(r".claude-plugin\marketplace.json");
