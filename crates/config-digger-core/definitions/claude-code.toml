@@ -71,30 +71,42 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 # The claude.ai account Claude Code is signed in to, its Signed-in account:
 # `oauthAccount` in `~/.claude.json` names it [disk]. Signing in writes it,
 # and `claude auth logout` and `/logout` take it away, the 2.1.309 to
-# 2.1.311 binaries say [binary]. Claude Code reads the skills it syncs from
-# claude.ai only from the account's folder, `<organizationUuid>_<accountUuid>`
-# [test], and its synced plugins presumably too.
+# 2.1.311 binaries say [binary]. Claude Code reads the skills and plugins
+# it syncs from claude.ai only from the account's folder,
+# `<organizationUuid>_<accountUuid>` [test]. It runs on the account by the
+# claude.ai tokens it keeps, though, `.credentials.json` on Windows: with
+# `oauthAccount` and no tokens it is signed out and reads no synced skill
+# or plugin; with tokens and no `oauthAccount` it reads none offline, and
+# online it fetches the account at start, writes `oauthAccount` back and
+# reads the synced skills [test]. config-digger reads `oauthAccount` alone
+# (#491).
 [account]
-unverified = "Claude Code is taken to read no synced skill or plugin while signed in to no claude.ai account, `oauthAccount` gone or missing an id, as the binary says (#400)."
 name = "claude.ai"
 anchor = { block = "home", root = "state_file" }
 ids = { organization = ["oauthAccount", "organizationUuid"], account = ["oauthAccount", "accountUuid"] }
 folder = "{organization}_{account}"
 
 # What takes Claude Code off the account, so that it reads none of the
-# account's synced skills and plugins in the context, as the 2.1.309 to
-# 2.1.311 binaries say [binary]: `apiKeyHelper` in a settings file, or in
-# the `env` of one a non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party
-# provider. Settings
-# files rank managed (every source), local, Project, user, and a higher
-# file's variable wins [docs]. Set in the environment config-digger runs
-# in, those variables only may: Claude Code can start in another.
-# `ANTHROPIC_API_KEY` only may wherever it is set, as Claude Code uses it
-# interactively once the user approves it, and always with `-p` [binary].
-# `primaryApiKey` in `~/.claude.json` and `CLAUDE_CODE_OAUTH_TOKEN` leave it
-# on the account [binary].
+# account's synced skills and plugins in the context. It runs on the
+# account only while its token is its own claude.ai sign-in [binary]:
+# `apiKeyHelper` in the user's or a Project's settings, or a non-empty
+# `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` in the `env` of the
+# user's or a Project's settings or in the environment, takes it off; an
+# empty one leaves it on [test]. In a Project's settings,
+# `CLAUDE_CODE_OAUTH_TOKEN` takes only the synced skills off, and the
+# synced plugins stay loaded [test] (#493). Settings files rank managed
+# (every source), local, Project, user, and a higher file's variable wins
+# [docs]. Set in the environment config-digger runs in, those variables
+# only may: Claude Code can start in another.
+#
+# A third-party provider leaves Claude Code on the account: with
+# `CLAUDE_CODE_USE_BEDROCK` it reads the synced skills, and keeps out the
+# synced plugins only because it holds the plugin sync gate off [test]. The
+# other providers leave it on alike [binary], and hold the gate off as its
+# bypass says. `ANTHROPIC_API_KEY` leaves it on under
+# `-p` [test], and `primaryApiKey` in `~/.claude.json` leaves it on [test].
 [account.off]
-unverified = "Claude Code is taken to read no synced skill or plugin while `apiKeyHelper` is set in a settings file, or while a settings file's `env` sets a non-empty `ANTHROPIC_AUTH_TOKEN` or a third-party provider; `ANTHROPIC_API_KEY` is taken to take it off the account only in some of its modes, and `primaryApiKey` and `CLAUDE_CODE_OAUTH_TOKEN` never, as the binary says (#400)."
+unverified = "`ANTHROPIC_API_KEY` is taken to leave an interactive session on the account too, whether the user approved the key or not, as the binary says (#492)."
 settings = [
   { anchor = { block = "settings", settings = "managed" }, key_path = ["apiKeyHelper"], every_source = true },
   { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["apiKeyHelper"] },
@@ -103,12 +115,7 @@ settings = [
 ]
 variables = [
   { name = "ANTHROPIC_AUTH_TOKEN", values = "non-empty" },
-  { name = "CLAUDE_CODE_USE_BEDROCK", values = "truthy" },
-  { name = "CLAUDE_CODE_USE_VERTEX", values = "truthy" },
-  { name = "CLAUDE_CODE_USE_FOUNDRY", values = "truthy" },
-  { name = "CLAUDE_CODE_USE_MANTLE", values = "truthy" },
-  { name = "CLAUDE_CODE_USE_ANTHROPIC_AWS", values = "truthy" },
-  { name = "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", values = "truthy" },
+  { name = "CLAUDE_CODE_OAUTH_TOKEN", values = "non-empty" },
 ]
 env_maps = [
   { anchor = { block = "settings", settings = "managed" }, key_path = ["env"], every_source = true },
@@ -116,7 +123,6 @@ env_maps = [
   { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["env"] },
   { anchor = { block = "home", root = "settings_file" }, key_path = ["env"] },
 ]
-may_be_off = [{ name = "ANTHROPIC_API_KEY", values = "non-empty" }]
 
 [[homes]]
 id = "default"
@@ -227,18 +233,22 @@ name = "name"
 source = "source"
 
 # Plugins synced from claude.ai, one folder each in
-# `plugins/synced/<org>_<account>/<name>~g<generation>` [disk], beside the
-# account's `manifest.json`, `.marketplaces.json`, `.last-complete-round`
-# and a `<name>~g<generation>.meta.json` per plugin, none of them a plugin,
-# and the empty file `synced/.bucket-<org>_<account>` [disk]. Claude Code
-# owns this copy and loads it with no `enabledPlugins` key [disk]. A synced
-# plugin is named by its manifest's `name`, not by its folder [disk], and
-# its switches know it as `<name>@synced` [docs]. Its Entries are
-# read-only, being a copy of the account's configuration. Like
-# `synced-skills`, its servers and skills are read only in the Signed-in
-# account's folder, and while Claude Code runs on that account: the
-# locations anchored in synced plugins take the `signed-in-account`
-# condition, and its mark.
+# `plugins/synced/<org>_<account>/<name>~g<generation>` [disk], `<name>` in
+# 2.1.309 [disk], beside the account's `manifest.json`,
+# `.marketplaces.json`, `.last-complete-round` and a
+# `<name>~g<generation>.meta.json` per plugin, none of them a plugin, and
+# the empty file `synced/.bucket-<org>_<account>` [disk]. Claude Code
+# owns this copy and loads it with no `enabledPlugins` key [disk]. It loads
+# only a plugin the account's `manifest.json` lists, and a sync round
+# deletes one claude.ai does not list [test]; config-digger reads every
+# folder (#494). A synced plugin is named by its manifest's `name`, not by
+# its folder [disk], and its switches know it as `<name>@synced` [docs].
+# Its Entries are read-only, being a copy of the
+# account's configuration. Like `synced-skills`, its servers and skills
+# are read only in the Signed-in account's folder, and while Claude Code
+# runs on that account [test]; unlike them, only while the plugin sync gate
+# is on [test]. The locations anchored in synced plugins take the gate's
+# and the `signed-in-account` conditions.
 #
 # Of same-named plugins Claude Code loads one: an installed marketplace
 # plugin, then a skills-dir plugin, then a synced one [docs]. While an
@@ -254,7 +264,6 @@ unverified = [
   "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone.",
   "An installed plugin of a synced plugin's name that fails to load, its manifest failing, is taken to keep the synced one out still.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
-  "Claude Code is taken to read a synced plugin only in the folder of the claude.ai account it is signed in to, and none while it is signed in to none or runs off that account, as it does synced skills (#400).",
 ]
 registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2 }
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
@@ -446,7 +455,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 id = "synced-plugin-manifest-mcp"
 unverified = "A synced plugin whose manifest does not parse, or whose `mcpServers` has a shape the manifest's schema refuses, is taken to fail whole, as an installed plugin does."
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
-when = [{ block = "signed-in-account" }]
+when = [{ block = "feature-gate", gate = "tengu_claudeai_plugins_sync_enabled" }, { block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
 references = { root = ["mcpServers"], bundles = { block = "mcpb-cache", extensions = [".mcpb", ".dxt"], cache = ".mcpb-cache" } }
 format = { block = "json", dialect = "strict" }
@@ -465,7 +474,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 id = "synced-plugin-mcp"
 unverified = "A synced plugin's `.mcp.json` servers are taken to fail with the plugin when its manifest does not parse, or its `mcpServers` has a shape the manifest's schema refuses, as an installed plugin's do."
 anchor = { block = "plugin", plugins = "synced", path = ".mcp.json" }
-when = [{ block = "signed-in-account" }]
+when = [{ block = "feature-gate", gate = "tengu_claudeai_plugins_sync_enabled" }, { block = "signed-in-account" }]
 name_template = "plugin:{plugin}:{name}"
 format = { block = "json", dialect = "strict" }
 root = ["mcpServers"]
@@ -888,7 +897,7 @@ unverified = [
   "A synced plugin's skills are taken to fail with the plugin when its manifest does not parse, or its `mcpServers` has a shape the manifest's schema refuses, as an installed plugin's do.",
 ]
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
-when = [{ block = "signed-in-account" }]
+when = [{ block = "feature-gate", gate = "tengu_claudeai_plugins_sync_enabled" }, { block = "signed-in-account" }]
 format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
 name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
@@ -1179,13 +1188,12 @@ env_maps = [
 
 # This gate turns the claude.ai plugin sync on, as the one above does for
 # skills: on a Max account it is on and `plugins/synced` holds the
-# account's plugins [disk]. Like the skill sync gate, it closes no
-# location: its caveat says whether Claude Code keeps the copy in step with
-# claude.ai, and it is off without a value. Its mark says what that rests
-# on.
+# account's plugins [disk]. Unlike the skill sync gate, it also closes the
+# synced plugins: Claude Code reads none while the gate is cached off or
+# not cached at all, and while `DISABLE_GROWTHBOOK` or a third-party
+# provider holds it off [test].
 [[feature_gates]]
 name = "tengu_claudeai_plugins_sync_enabled"
-unverified = "Claude Code is taken to read its synced plugins whatever the plugin sync gate holds, and to take the gate as off without a cached value, as it does with the skill sync gate."
 assumed = false
 affects = ["synced-plugin-manifest-mcp", "synced-plugin-mcp", "synced-plugin-skills"]
 lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }

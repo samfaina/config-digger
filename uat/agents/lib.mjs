@@ -38,6 +38,29 @@ export function skill(dir, frontmatter, body = "body") {
   write(path.join(dir, "SKILL.md"), `---\n${frontmatter.join("\n")}\n---\n${body}\n`);
 }
 
+// A plugin as Claude Code syncs it from claude.ai into `bucket`, an
+// account's folder of `plugins/synced`: its folder, with its manifest and a
+// skill per name of `skills`, its `.meta.json`, and its entry in the
+// bucket's `manifest.json`, without which Claude Code does not load it.
+// The folder is `<name>`, as 2.1.309 names it, or `<name>~g<generation>`
+// with a `generation`, as 2.1.310 does. `manifest` stands for the plugin
+// manifest's content, an object or raw text. Returns the plugin's folder.
+// Claude Code reads it while the gate `tengu_claudeai_plugins_sync_enabled`
+// is on, and a sync round deletes it.
+export function syncedPlugin(bucket, name, { generation, manifest = { name, version: "1.0.0" }, skills = [] } = {}) {
+  const folder = generation === undefined ? name : `${name}~g${generation}`;
+  const dir = path.join(bucket, folder);
+  write(path.join(dir, ".claude-plugin", "plugin.json"), manifest);
+  for (const s of skills) skill(path.join(dir, "skills", s), [`name: ${s}`, `description: a skill of ${name}`]);
+  write(path.join(bucket, `${folder}.meta.json`), { server_plugin_id: name, marketplace_name: "cd-throwaway-market", installation_preference: "available" });
+  const list = path.join(bucket, "manifest.json");
+  const listed = fs.existsSync(list) ? json(list) : { lastUpdated: Date.now(), plugins: [] };
+  listed.plugins = listed.plugins.filter((p) => p.name !== name);
+  listed.plugins.push({ pluginId: name, name, description: `${name}, planted by a probe`, version: "1.0.0", updatedAt: new Date().toISOString(), marketplaceName: "cd-throwaway-market", installationPreference: "available", ...(generation === undefined ? {} : { generation }) });
+  write(list, listed);
+  return dir;
+}
+
 export async function gitInit(dir) {
   fs.mkdirSync(dir, { recursive: true });
   const { code, stderr } = await run("git", ["init", "-q"], { cwd: dir });

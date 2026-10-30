@@ -1,7 +1,8 @@
 //! Claude Code's synced skills and plugins through the core `api`, with
 //! fake ports: Claude Code reads only the folder of the claude.ai account it
 //! is signed in to, `oauthAccount` in `~/.claude.json`, and none while a
-//! settings file takes it off the account.
+//! settings file or a variable takes it off the account. A third-party
+//! provider and `ANTHROPIC_API_KEY` leave it on.
 
 use config_digger_core::api::{Context, Core, Entry, Inventory, ScanOptions};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
@@ -21,13 +22,15 @@ fn skill_md(name: &str) -> String {
     format!("---\nname: {name}\ndescription: The {name} skill.\n---\n\nDo {name}.\n")
 }
 
-/// `~/.claude.json` holding `oauthAccount`, or none for `Value::Null`.
+/// `~/.claude.json` holding `oauthAccount`, or none for `Value::Null`, and
+/// the plugin sync gate cached on, without which no synced plugin is read.
 fn with_oauth_account(fs: FakeFileSystem, account: Value) -> FakeFileSystem {
-    let state = if account.is_null() {
-        json!({})
-    } else {
-        json!({ "oauthAccount": account })
-    };
+    let mut state = json!({
+        "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
+    });
+    if !account.is_null() {
+        state["oauthAccount"] = account;
+    }
     fs.with_file(in_home(".claude.json"), state.to_string())
 }
 
@@ -195,7 +198,8 @@ fn only_the_signed_in_accounts_synced_plugins_servers_and_skills_are_read() {
 
 #[test]
 fn signed_in_to_no_account_no_synced_plugin_is_read() {
-    let fs = with_synced_plugin(FakeFileSystem::new(), ACCOUNT, "ours");
+    let fs = with_oauth_account(FakeFileSystem::new(), Value::Null);
+    let fs = with_synced_plugin(fs, ACCOUNT, "ours");
 
     let inventory = inventory(&fs);
 
@@ -279,18 +283,13 @@ fn an_api_key_helper_in_a_projects_settings_takes_claude_code_off_the_account_th
 
 /// The variables that take Claude Code off the account from a settings
 /// file's `env`, each with a value that does.
-const OFF_VARIABLES: [(&str, &str); 7] = [
+const OFF_VARIABLES: [(&str, &str); 2] = [
     ("ANTHROPIC_AUTH_TOKEN", "not-a-real-secret"),
-    ("CLAUDE_CODE_USE_BEDROCK", "1"),
-    ("CLAUDE_CODE_USE_VERTEX", "true"),
-    ("CLAUDE_CODE_USE_FOUNDRY", "yes"),
-    ("CLAUDE_CODE_USE_MANTLE", "on"),
-    ("CLAUDE_CODE_USE_ANTHROPIC_AWS", "1"),
-    ("CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "TRUE"),
+    ("CLAUDE_CODE_OAUTH_TOKEN", "not-a-real-secret"),
 ];
 
 #[test]
-fn an_auth_token_or_a_provider_in_a_settings_files_env_takes_claude_code_off_the_account() {
+fn an_auth_token_or_an_oauth_token_in_a_settings_files_env_takes_claude_code_off_the_account() {
     for (name, value) in OFF_VARIABLES {
         let user = synced_home().with_file(
             in_home(r".claude\settings.json"),
@@ -327,17 +326,50 @@ fn an_auth_token_or_a_provider_in_a_settings_files_env_takes_claude_code_off_the
 }
 
 #[test]
-fn an_empty_auth_token_or_a_provider_turned_off_leaves_claude_code_on_the_account() {
+fn an_empty_auth_token_leaves_claude_code_on_the_account() {
     let fs = synced_home().with_file(
         in_home(r".claude\settings.json"),
-        json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "", "CLAUDE_CODE_USE_BEDROCK": "0" } })
-            .to_string(),
+        json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "", "CLAUDE_CODE_OAUTH_TOKEN": "" } }).to_string(),
     );
 
     assert_eq!(
         synced_states(&fs, home_env(), &Context::default()),
         all("effective", "")
     );
+}
+
+/// A third-party provider and an API key, which leave Claude Code on the
+/// account wherever they are set; `ANTHROPIC_API_KEY` in an interactive
+/// session is marked `unverified`.
+const ON_VARIABLES: [(&str, &str); 7] = [
+    ("ANTHROPIC_API_KEY", "not-a-real-secret"),
+    ("CLAUDE_CODE_USE_BEDROCK", "1"),
+    ("CLAUDE_CODE_USE_VERTEX", "true"),
+    ("CLAUDE_CODE_USE_FOUNDRY", "yes"),
+    ("CLAUDE_CODE_USE_MANTLE", "on"),
+    ("CLAUDE_CODE_USE_ANTHROPIC_AWS", "1"),
+    ("CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD", "TRUE"),
+];
+
+#[test]
+fn a_provider_or_an_api_key_leaves_claude_code_on_the_account() {
+    for (name, value) in ON_VARIABLES {
+        let user = synced_home().with_file(
+            in_home(r".claude\settings.json"),
+            json!({ "env": { name: value } }).to_string(),
+        );
+        let env = home_env().with_var(name, value);
+
+        for (fs, env, place) in [
+            (&user, home_env(), "the user settings"),
+            (&synced_home(), env, "config-digger's environment"),
+        ] {
+            let inventory = inventory_with(fs, env.clone(), &Context::default());
+            let skill = entry(&inventory, "anthropic-skills:pdf");
+            assert_eq!(skill["state"], "effective", "{name} in {place}: {skill}");
+            assert_eq!(account_caveats(fs, env), [], "{name} in {place}");
+        }
+    }
 }
 
 /// The code and sentence of each caveat of [`SYNCED`]'s Entries in no
@@ -365,10 +397,7 @@ fn account_caveats(fs: &FakeFileSystem, env: FakeEnvironment) -> Vec<(String, St
 
 #[test]
 fn a_variable_in_config_diggers_environment_may_take_claude_code_off_the_account() {
-    for (name, value) in OFF_VARIABLES
-        .into_iter()
-        .chain([("ANTHROPIC_API_KEY", "not-a-real-secret")])
-    {
+    for (name, value) in OFF_VARIABLES {
         let env = home_env().with_var(name, value);
 
         assert_eq!(
@@ -388,30 +417,12 @@ fn a_variable_in_config_diggers_environment_may_take_claude_code_off_the_account
 }
 
 #[test]
-fn an_api_key_in_a_settings_files_env_may_take_claude_code_off_the_account() {
-    let fs = synced_home().with_file(
-        in_home(r".claude\settings.json"),
-        json!({ "env": { "ANTHROPIC_API_KEY": "not-a-real-secret" } }).to_string(),
-    );
-
-    assert_eq!(
-        synced_states(&fs, home_env(), &Context::default()),
-        all("effective", "")
-    );
-    let sentence = r"`ANTHROPIC_API_KEY` in `env` of C:\Users\fixture\.claude\settings.json may take Claude Code off its claude.ai account, and then it does not read this.";
-    assert_eq!(
-        account_caveats(&fs, home_env()),
-        vec![("may_run_off_account".to_owned(), sentence.to_owned()); 3]
-    );
-}
-
-#[test]
 fn a_settings_files_env_replaces_a_variable_of_config_diggers_environment() {
     let fs = synced_home().with_file(
         in_home(r".claude\settings.json"),
-        json!({ "env": { "CLAUDE_CODE_USE_BEDROCK": "0" } }).to_string(),
+        json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "" } }).to_string(),
     );
-    let env = home_env().with_var("CLAUDE_CODE_USE_BEDROCK", "1");
+    let env = home_env().with_var("ANTHROPIC_AUTH_TOKEN", "not-a-real-secret");
 
     assert_eq!(
         synced_states(&fs, env.clone(), &Context::default()),
@@ -421,28 +432,22 @@ fn a_settings_files_env_replaces_a_variable_of_config_diggers_environment() {
 }
 
 #[test]
-fn a_primary_api_key_or_an_oauth_token_leaves_claude_code_on_the_account() {
+fn a_primary_api_key_leaves_claude_code_on_the_account() {
     let fs = synced_home().with_file(
         in_home(".claude.json"),
         json!({
             "oauthAccount": { "organizationUuid": "org-a", "accountUuid": "acct-a" },
             "primaryApiKey": "not-a-real-secret",
+            "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
         })
         .to_string(),
     );
-    let env = home_env().with_var("CLAUDE_CODE_OAUTH_TOKEN", "not-a-real-secret");
-    let user = fs.clone().with_file(
-        in_home(r".claude\settings.json"),
-        json!({ "env": { "CLAUDE_CODE_OAUTH_TOKEN": "not-a-real-secret" } }).to_string(),
-    );
 
-    for fs in [fs, user] {
-        assert_eq!(
-            synced_states(&fs, env.clone(), &Context::default()),
-            all("effective", "")
-        );
-        assert_eq!(account_caveats(&fs, env.clone()), []);
-    }
+    assert_eq!(
+        synced_states(&fs, home_env(), &Context::default()),
+        all("effective", "")
+    );
+    assert_eq!(account_caveats(&fs, home_env()), []);
 }
 
 #[test]
@@ -492,11 +497,11 @@ fn a_higher_settings_files_variable_replaces_a_lower_ones() {
     let fs = synced_home()
         .with_file(
             PathBuf::from(PROJECT).join(r".claude\settings.local.json"),
-            json!({ "env": { "CLAUDE_CODE_USE_BEDROCK": "0" } }).to_string(),
+            json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "" } }).to_string(),
         )
         .with_file(
             in_home(r".claude\settings.json"),
-            json!({ "env": { "CLAUDE_CODE_USE_BEDROCK": "1" } }).to_string(),
+            json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "not-a-real-secret" } }).to_string(),
         );
 
     assert_eq!(

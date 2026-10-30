@@ -725,31 +725,35 @@ fn cached_plugin_gate(value: Value) -> Value {
 }
 
 #[test]
-fn the_plugin_sync_gate_is_a_caveat_on_synced_plugins_that_stay_read() {
+fn synced_plugins_are_read_only_while_the_plugin_sync_gate_is_on() {
     let gate = PLUGIN_SYNC_GATE;
     let growthbook_off = FakeEnvironment::with_home(HOME).with_var("DISABLE_GROWTHBOOK", "1");
-    for (state, env, code, sentence) in [
+    for (state, env, read, code, sentence) in [
         (
             cached_plugin_gate(json!(true)),
             FakeEnvironment::with_home(HOME),
+            "effective",
             "gate_cached",
             format!("Depends on Claude Code gate `{gate}`: on as of 2 Oct 2026 07:40 UTC."),
         ),
         (
             cached_plugin_gate(json!(false)),
             FakeEnvironment::with_home(HOME),
+            "unread",
             "gate_cached",
             format!("Depends on Claude Code gate `{gate}`: off as of 2 Oct 2026 07:40 UTC."),
         ),
         (
             json!({ "cachedGrowthBookFeatures": {}, "cachedGrowthBookFeaturesAt": CACHED_AT }),
             FakeEnvironment::with_home(HOME),
+            "unread",
             "gate_assumed",
             format!("Depends on Claude Code gate `{gate}`: assumed off; cannot be read."),
         ),
         (
             cached_plugin_gate(json!(true)),
             growthbook_off,
+            "unread",
             "gate_assumed",
             format!(
                 "Depends on Claude Code gate `{gate}`: assumed off; Claude Code ignores its cached value while `DISABLE_GROWTHBOOK` is set."
@@ -760,7 +764,7 @@ fn the_plugin_sync_gate_is_a_caveat_on_synced_plugins_that_stay_read() {
 
         for name in ["demo:notes", "plugin:demo:docs"] {
             let entry = entry_json(&skill(&inventory, name).entries[0]);
-            assert_eq!(entry["state"], "effective", "{name}: {entry}");
+            assert_eq!(entry["state"], read, "{name}: {entry}");
             assert_eq!(
                 entry["caveats"],
                 json!([{
