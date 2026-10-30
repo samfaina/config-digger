@@ -39,7 +39,8 @@ function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
  * The app's tooltip, where a `title` would show the system's: `text` shown
  * next to the one element in `children` on hover after a short delay and on
  * keyboard focus, hidden on leave, on blur, on a click or a key, on a scroll
- * or a resize, and on Escape. Of tooltips inside one another, the innermost
+ * or a resize but the one a keyboard focus makes to bring the control into
+ * view, and on Escape. Of tooltips inside one another, the innermost
  * under the pointer shows, as with `title`. Screen readers get the text through `aria-describedby`, unless the
  * control's `aria-label` already says it. No `text`, no tooltip.
  */
@@ -83,6 +84,14 @@ export function Tooltip({ text, children }: { text?: string; children: ReactElem
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
   }, [state]);
+
+  // A keyboard focus that scrolls its control into view sends its scroll
+  // event before the next frame: a scroll from that frame on is not the focus's.
+  useEffect(() => {
+    if (!state.settling) return;
+    const frame = window.requestAnimationFrame(() => send("settled"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.settling]);
 
   // A scroll or a resize would leave the tooltip away from its control.
   const active = state.shown || state.waiting;

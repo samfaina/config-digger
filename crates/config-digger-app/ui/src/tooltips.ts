@@ -5,19 +5,23 @@ export const HOVER_DELAY_MS = 500;
 
 /**
  * Whether the pointer is on the control and the keyboard's focus in it,
- * whether the tooltip shows, and whether it waits for the hover delay to end.
+ * whether the tooltip shows, whether it waits for the hover delay to end, and
+ * whether a keyboard focus is settling: until the frame after it, a scroll is
+ * the one the focus made to bring the control into view, which the tooltip
+ * was placed after.
  */
-export type TooltipState = { hovered: boolean; focused: boolean; shown: boolean; waiting: boolean };
+export type TooltipState = { hovered: boolean; focused: boolean; shown: boolean; waiting: boolean; settling: boolean };
 
-export const HIDDEN: TooltipState = { hovered: false, focused: false, shown: false, waiting: false };
+export const HIDDEN: TooltipState = { hovered: false, focused: false, shown: false, waiting: false, settling: false };
 
 /**
  * What happens to the control: the pointer comes in or leaves, the hover
  * delay ends, the control gets the focus from the keyboard or a click, or
- * loses it, the control is clicked or gets another key, the window scrolls
- * or resizes, which moves the control, or Escape is pressed.
+ * loses it, the frame after a keyboard focus comes, the control is clicked or
+ * gets another key, the window scrolls or resizes, which moves the control,
+ * or Escape is pressed.
  */
-export type TooltipEvent = "enter" | "leave" | "delay" | "keyboard focus" | "pointer focus" | "blur" | "press" | "move" | "escape";
+export type TooltipEvent = "enter" | "leave" | "delay" | "keyboard focus" | "pointer focus" | "blur" | "settled" | "press" | "move" | "escape";
 
 /**
  * The next state, and whether the event was the tooltip's, so it goes no
@@ -39,13 +43,17 @@ function next(state: TooltipState, event: Exclude<TooltipEvent, "escape">): Tool
     case "leave":
       return { ...state, hovered: false, waiting: false, shown: state.shown && state.focused };
     case "keyboard focus":
-      return { ...state, focused: true, shown: true, waiting: false };
+      return { ...state, focused: true, shown: true, waiting: false, settling: true };
     case "pointer focus":
       return state;
     case "blur":
-      return { ...state, focused: false, shown: state.shown && state.hovered };
-    case "press":
+      return { ...state, focused: false, shown: state.shown && state.hovered, settling: false };
+    case "settled":
+      return { ...state, settling: false };
     case "move":
+      // The focus's own scroll left the control where the tooltip was placed.
+      return state.settling ? state : { ...state, shown: false, waiting: false };
+    case "press":
       return { ...state, shown: false, waiting: false };
   }
 }

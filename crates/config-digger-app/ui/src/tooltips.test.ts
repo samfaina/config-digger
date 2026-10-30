@@ -43,8 +43,14 @@ describe("pressing the control", () => {
 describe("the window scrolling or resizing", () => {
   test("hides the tooltip, which would be left away from its control, and cancels the hover delay", () => {
     expect(after("enter", "delay", "move").shown).toBe(false);
-    expect(after("keyboard focus", "move").shown).toBe(false);
+    expect(after("keyboard focus", "settled", "move").shown).toBe(false);
     expect(after("enter", "move", "delay").shown).toBe(false);
+  });
+
+  test("a keyboard focus's own scroll, before the frame after it, keeps the tooltip the focus shows", () => {
+    expect(after("keyboard focus", "move").shown).toBe(true);
+    expect(after("keyboard focus", "move", "move").shown).toBe(true);
+    expect(after("keyboard focus", "move", "settled", "move").shown).toBe(false);
   });
 });
 

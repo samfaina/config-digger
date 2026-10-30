@@ -1520,7 +1520,7 @@
             "Tras Enable, cd-throwaway-desktop vuelve a salir como «Effective».",
             "Bajo los botones de la skill dice «Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.», sin pasar el ratón por ningún sitio."
           ],
-          "covers": ["#209"],
+          "covers": ["#209", "#425"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.4" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/tooltips.mjs > 3.4" }
