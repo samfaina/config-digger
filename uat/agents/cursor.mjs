@@ -386,6 +386,32 @@ function localPlugins(cursor, list) {
 const manifest = (name, tags, { broken = false } = {}) =>
   broken ? `{ "name": "${name}",, "mcpServers": ${JSON.stringify(servers(...tags).mcpServers)} }` : { name, mcpServers: servers(...tags).mcpServers };
 
+// Comments, trailing commas and four errors besides `,,`, each in the
+// servers file of its own plugin, one member per line, and what Cursor
+// starts of each, as `node-jsonc-parser`'s code reads it (#438). The
+// `plugins` launch gives each to a local plugin's `mcp.json` and a Claude
+// Code plugin's `.mcp.json`. `tests/cursor.rs` reads the same texts, its
+// servers named apart.
+const member = (key, value) => `"${key}": ${JSON.stringify(value)}`;
+// `items` as code spans in a sentence, "`a`, `b` and `c`".
+const codeList = (items) => items.map((i) => `\`${i}\``).join(", ").replace(/, ([^,]*)$/, " and $1");
+// Each case's `text` takes `one`, which writes the member of the server
+// `a`, `b` or `c`; `held` names the servers the text holds.
+const serverErrors = [
+  { name: "line-comment", error: "with a `//` comment between two servers", held: ["a", "b"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  // cd-throwaway\n  ${one("b")}\n} }` },
+  { name: "block-comment", error: "with a `/* */` comment between two servers", held: ["a", "b"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  /* cd-throwaway */\n  ${one("b")}\n} }` },
+  { name: "trailing-server", error: "with a trailing comma after the last server", held: ["a", "b"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  ${one("b")},\n} }` },
+  { name: "trailing-field", error: "with a trailing comma after the last field of a server", held: ["a", "b"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  ${one("b").slice(0, -1)},}\n} }` },
+  { name: "comma", error: "around a missing comma between two servers", held: ["a", "b", "c"], kept: ["a", "b", "c"], text: (one) => `{ "mcpServers": {\n  ${one("a")}\n  ${one("b")},\n  ${one("c")}\n} }` },
+  // `a`'s key, followed by no value.
+  { name: "value", error: "around a key with no value", held: ["a", "b", "c"], kept: ["b", "c"], text: (one) => `{ "mcpServers": {\n  ${one("a").replace(/: .*/, ": ,")}\n  ${one("b")},\n  ${one("c")}\n} }` },
+  { name: "open-object", error: "around an object left open at the end of the file", held: ["a", "b"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  ${one("b")}\n` },
+  // The string runs to the end of its line, swallowing the `}` and `,`.
+  { name: "open-string", error: "around a string left open inside a server", held: ["a", "b", "c"], kept: ["a", "b"], text: (one) => `{ "mcpServers": {\n  ${one("a")},\n  ${one("b").slice(0, -1)}, "note": "open },\n  ${one("c")}\n} }` },
+];
+// The text of `c` in a servers file whose servers are `<prefix>-<a|b|c>`.
+const serverText = (c, prefix) => c.text((t) => member(`cd-throwaway-${prefix}-${t}`, server(`${prefix}-${t}`)));
+
 if (runs("plugins")) {
   const dir = fresh("plugins", base);
   const d = folders(dir);
@@ -394,6 +420,7 @@ if (runs("plugins")) {
     // A manifest that does not parse, before one that does.
     ["cd-throwaway-next", { ".cursor-plugin/plugin.json": manifest("cd-throwaway-next", ["next-first"], { broken: true }), ".claude-plugin/plugin.json": manifest("cd-throwaway-next", ["next-second"]) }],
     ["cd-throwaway-bad-mcp", { "mcp.json": broken("bad-mcp-a", "bad-mcp-b") }],
+    ...serverErrors.map((c) => [`cd-throwaway-cp-${c.name}`, { "mcp.json": serverText(c, `cp-${c.name}`) }]),
   ]);
   claudePlugins(d.claude, [
     // The manifest and `.mcp.json` both declare `cd-throwaway-shared`.
@@ -407,6 +434,7 @@ if (runs("plugins")) {
       ".claude-plugin/plugin.json": manifest("cd-throwaway-cc-next", ["cc-next-second"]),
     }],
     ["cd-throwaway-cc-bad-mcp", { ".claude-plugin/plugin.json": { name: "cd-throwaway-cc-bad-mcp" }, ".mcp.json": broken("cc-bad-mcp-a", "cc-bad-mcp-b") }],
+    ...serverErrors.map((c) => [`cd-throwaway-cc-${c.name}`, { ".claude-plugin/plugin.json": { name: `cd-throwaway-cc-${c.name}` }, ".mcp.json": serverText(c, `cc-${c.name}`) }]),
   ]);
   const tags = await launch(dir);
   const of = (...want) => want.filter((t) => tags.includes(t));
@@ -432,6 +460,16 @@ if (runs("plugins")) {
   await p.check("locations[claude-plugin-mcp]", "Cursor reads a Claude Code plugin's `.mcp.json` it cannot parse around the error: both servers start", async () =>
     same(of("cc-bad-mcp-a", "cc-bad-mcp-b"), ["cc-bad-mcp-a", "cc-bad-mcp-b"]),
   );
+  for (const [location, kind, file] of [
+    ["cursor-plugin-mcp", "cp", "a plugin's `mcp.json`"],
+    ["claude-plugin-mcp", "cc", "a Claude Code plugin's `.mcp.json`"],
+  ]) {
+    for (const { name, error, held, kept } of serverErrors) {
+      await p.check(`locations[${location}]`, `Cursor reads ${file} ${error}: of ${codeList(held)}, ${codeList(kept)} start`, async () =>
+        same(held.filter((t) => tags.includes(`${kind}-${name}-${t}`)), kept),
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------- a manifest's servers of the wrong shape

@@ -2476,7 +2476,7 @@ fn reaction(inventory: &Inventory, path: &Path) -> String {
 }
 
 #[test]
-fn cursor_skips_an_mcp_file_it_cannot_parse_and_reads_a_plugin_s_next_manifest_but_not_mcp_json() {
+fn cursor_skips_an_mcp_file_it_cannot_parse_or_reads_its_next_manifest_or_around_its_error() {
     let broken = r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
     let kit = local_plugin("kit");
     let project_mcp = project(r"app\.cursor\mcp.json");
@@ -2523,10 +2523,14 @@ fn cursor_skips_an_mcp_file_it_cannot_parse_and_reads_a_plugin_s_next_manifest_b
             file.display()
         );
     }
-    // It starts the servers around an `mcp.json`'s error, which
-    // config-digger cannot read (#438).
+    // It starts the servers around an `mcp.json`'s error.
     for file in [&kit_mcp, &docs_mcp] {
-        assert_eq!(reaction(&inventory, file), "unknown", "{}", file.display());
+        assert_eq!(
+            reaction(&inventory, file),
+            "reads_around_error",
+            "{}",
+            file.display()
+        );
     }
     // A plugin whose manifest does not parse still has its `.mcp.json` read.
     assert_eq!(code(item(&inventory, "plugin-kit-lint").state), "effective");
@@ -2543,6 +2547,204 @@ fn read_failure<'i>(inventory: &'i Inventory, path: &Path) -> &'i ReadFailure {
         .iter()
         .find(|failure| failure.agent == "cursor" && failure.path == path)
         .unwrap_or_else(|| panic!("{} is no Read failure", path.display()))
+}
+
+/// A local plugin's `mcp.json` and a Claude Code plugin's `.mcp.json`.
+fn servers_files() -> [(&'static str, PathBuf); 2] {
+    [
+        ("kit", local_plugin("kit").join("mcp.json")),
+        ("docs", plugin_cache(r"market\docs\1.0.0\.mcp.json")),
+    ]
+}
+
+/// The inventory with both of `servers_files` holding `text`, the Claude
+/// Code plugin installed and Cursor's gate importing it on.
+fn servers_files_holding(text: &str) -> Inventory {
+    let fs = with_installed(
+        cursor(),
+        json!({ "docs@market": user_install("docs") }),
+        json!({ "docs@market": true }),
+    );
+    let fs = with_gates(fs, &[("enable_cc_plugin_import", true)]);
+    let fs = servers_files()
+        .iter()
+        .fold(fs, |fs, (_, file)| fs.with_file(file, text));
+    inventory(&fs)
+}
+
+#[test]
+fn a_plugin_s_servers_file_with_an_error_lists_the_servers_around_it_with_no_caveat() {
+    let inventory = servers_files_holding(
+        r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#,
+    );
+
+    for name in [
+        "plugin-kit-a",
+        "plugin-kit-b",
+        "plugin-docs-a",
+        "plugin-docs-b",
+    ] {
+        let item = item(&inventory, name);
+        assert_eq!(code(item.state), "effective", "{name}");
+        assert!(item.caveats.is_empty(), "{name}: {:?}", item.caveats);
+    }
+    for (_, file) in servers_files() {
+        let failure = read_failure(&inventory, &file);
+        assert_eq!(code(failure.kind), "parse", "{}", file.display());
+        assert_eq!(code(failure.reaction), "reads_around_error");
+        let position = failure.position.as_ref().unwrap();
+        assert_eq!((position.line, position.column), (1, 43));
+        assert_eq!(
+            failure.notes,
+            ["Cursor reads what is around the error, and config-digger lists what it keeps."]
+        );
+    }
+}
+
+// Comments, trailing commas and four errors besides `,,`, in the texts
+// `cursor.mjs` gives the real Cursor, its servers named apart, each case
+// asserting what it started (#438).
+
+/// What config-digger reads of one plugin's servers file.
+#[derive(Debug, PartialEq)]
+struct ServersRead {
+    /// The servers it lists, by their names in the file.
+    servers: Vec<String>,
+    /// Whether the file is a Read failure, read around its error.
+    around_error: bool,
+}
+
+/// What config-digger reads of `servers_files` holding `text`, each server
+/// checked to be an Effective Item with no caveat.
+fn servers_read(text: &str) -> [ServersRead; 2] {
+    let inventory = servers_files_holding(text);
+    servers_files().map(|(plugin, file)| {
+        let prefix = format!("plugin-{plugin}-");
+        let mut servers: Vec<String> = Vec::new();
+        for item in cursor_items(&inventory) {
+            let Some(name) = item.name.strip_prefix(&prefix) else {
+                continue;
+            };
+            assert_eq!(code(item.state), "effective", "{}", item.name);
+            assert!(item.caveats.is_empty(), "{}: {:?}", item.name, item.caveats);
+            servers.push(name.to_owned());
+        }
+        servers.sort();
+        let failure = inventory
+            .read_failures
+            .iter()
+            .find(|failure| failure.agent == "cursor" && failure.path == file);
+        if let Some(failure) = failure {
+            assert_eq!(code(failure.reaction), "reads_around_error");
+        }
+        ServersRead {
+            servers,
+            around_error: failure.is_some(),
+        }
+    })
+}
+
+/// `servers`, listed from a file read with no error, in both plugins.
+fn parsed(servers: &[&str]) -> [ServersRead; 2] {
+    [(); 2].map(|()| ServersRead {
+        servers: servers.iter().map(|&name| name.to_owned()).collect(),
+        around_error: false,
+    })
+}
+
+/// `servers`, listed around the file's error, in both plugins.
+fn around_error(servers: &[&str]) -> [ServersRead; 2] {
+    parsed(servers).map(|read| ServersRead {
+        around_error: true,
+        ..read
+    })
+}
+
+#[test]
+fn a_servers_file_with_a_line_comment_between_servers_parses() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  // cd-throwaway
+  "b": {"command":"b"}
+} }"#;
+
+    assert_eq!(servers_read(text), parsed(&["a", "b"]));
+}
+
+#[test]
+fn a_servers_file_with_a_block_comment_between_servers_parses() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  /* cd-throwaway */
+  "b": {"command":"b"}
+} }"#;
+
+    assert_eq!(servers_read(text), parsed(&["a", "b"]));
+}
+
+#[test]
+fn a_servers_file_with_a_trailing_comma_after_the_last_server_parses() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  "b": {"command":"b"},
+} }"#;
+
+    assert_eq!(servers_read(text), parsed(&["a", "b"]));
+}
+
+#[test]
+fn a_servers_file_with_a_trailing_comma_after_a_server_s_last_field_parses() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  "b": {"command":"b","args":["b"],}
+} }"#;
+
+    assert_eq!(servers_read(text), parsed(&["a", "b"]));
+}
+
+#[test]
+fn a_servers_file_missing_a_comma_between_servers_lists_them_all() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"}
+  "b": {"command":"b"},
+  "c": {"command":"c"}
+} }"#;
+
+    assert_eq!(servers_read(text), around_error(&["a", "b", "c"]));
+}
+
+#[test]
+fn a_servers_file_key_with_no_value_lists_the_servers_after_it() {
+    let text = r#"{ "mcpServers": {
+  "a": ,
+  "b": {"command":"b"},
+  "c": {"command":"c"}
+} }"#;
+
+    assert_eq!(servers_read(text), around_error(&["b", "c"]));
+}
+
+#[test]
+fn a_servers_file_left_open_at_its_end_lists_its_servers() {
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  "b": {"command":"b"}
+"#;
+
+    assert_eq!(servers_read(text), around_error(&["a", "b"]));
+}
+
+#[test]
+fn a_string_left_open_in_a_server_takes_the_next_server_into_it() {
+    // The string runs to the end of its line, swallowing the `}` and `,`,
+    // so the next server is read as a member of `b`.
+    let text = r#"{ "mcpServers": {
+  "a": {"command":"a"},
+  "b": {"command":"b", "note": "open },
+  "c": {"command":"c"}
+} }"#;
+
+    assert_eq!(servers_read(text), around_error(&["a", "b"]));
 }
 
 /// The text of a manifest that does not parse.
