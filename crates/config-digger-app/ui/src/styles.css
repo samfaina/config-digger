@@ -368,9 +368,11 @@ p {
   gap: 10px;
 }
 
+/* At 270 px an Agent home's tile, beside its list's scrollbar, shows a last
+   part such as `\claude-code-synced-home` whole after the rest's «…». */
 .column {
   flex: 0 1 290px;
-  min-width: 250px;
+  min-width: 270px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1039,11 +1041,33 @@ p {
 
 .home-row {
   align-items: center;
+  white-space: nowrap;
 }
 
+/* The name of an Agent's one home that does not fit beside the Agent's goes
+   to a line of its own, so that its last part shows whole as on the tiles,
+   and a row is never taller than the block. The select of several homes
+   stays beside it, as it cuts its own value. */
+.home-row:has(> .single-home) {
+  flex-wrap: wrap;
+}
+
+.single-home {
+  display: flex;
+  min-width: 0;
+}
+
+/* A name that does not fit beside the tile's tags and badges fills the first
+   line, and they go to a second one, so that they never take its room. */
 .home-tile {
+  flex-wrap: wrap;
+  justify-content: flex-end;
   padding: 8px 12px;
   font-size: 1.0417rem;
+}
+
+.home-tile .home-name {
+  flex: 1 1 auto;
 }
 
 /* Where an Agent last opened the Project, while another of its homes is shown */

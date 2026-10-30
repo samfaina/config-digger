@@ -175,6 +175,17 @@ fn every_screen_has_what_it_shows() {
             .any(|home| home.ends_with("claude-desktop-home")),
         "{homes:?}"
     );
+    // Claude Code's homes whose last parts fill a tile in the smallest window.
+    for last in [
+        "claude-code-shape-home",
+        "claude-code-synced-home",
+        "claude-code-many-home",
+    ] {
+        assert!(
+            homes.iter().any(|home| home.ends_with(last)),
+            "{last} in {homes:?}"
+        );
+    }
     let history = fixtures["history"].as_array().unwrap();
     assert!(!history.is_empty());
     assert_eq!(fixtures["details"].as_array().unwrap().len(), history.len());

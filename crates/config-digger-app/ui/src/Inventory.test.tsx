@@ -264,6 +264,19 @@ describe("the name on an Agent home's tile", () => {
   });
 });
 
+describe("the name of an Agent's one home under All Agents", () => {
+  const row = (folder: string) =>
+    renderToStaticMarkup(
+      <HomesPane inventory={inventory({ homes: [home({ home: folder, folder, source: { kind: "added" } })] })} selection={{ agent: "all", homes: {} }} onHome={() => {}} />,
+    ).match(/<span class="dim single-home"[\s\S]*?<\/span><\/span><\/span>/)?.[0];
+
+  test("is cut before its folder's last part, as on the tiles, and stays a tab stop for its tooltip", () => {
+    expect(row(String.raw`E:\cd-throwaway\paths-that-wrap\claude-desktop-home`)).toBe(
+      String.raw`<span class="dim single-home" tabindex="0"><span class="home-name"><span class="home-name-head">E:\cd-throwaway\paths-that-wrap</span><span class="home-name-tail">\claude-desktop-home</span></span></span>`,
+    );
+  });
+});
+
 describe("a key on the closed Project field", () => {
   const first = String.raw`E:\cd-throwaway\project-a`;
   const second = String.raw`E:\cd-throwaway\project-b`;

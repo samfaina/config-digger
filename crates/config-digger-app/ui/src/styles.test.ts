@@ -405,6 +405,26 @@ describe("the Inventory at the smallest window the app allows", () => {
     expect(shrink(".home-name-tail")).toBe(1);
     expect(shrink(".home-name-head")).toBeGreaterThanOrEqual(1e6);
   });
+
+  test("moves the name of an Agent's one home under All Agents to a line of its own when it does not fit beside the Agent's", () => {
+    expect(styled(".home-row:has(> .single-home)").get("flex-wrap")).toBe("wrap");
+    expect(styled(".home-row").get("flex-wrap"), "the select of several homes stays beside the Agent's name").toBeUndefined();
+    expect(styled(".home-row").get("white-space")).toBe("nowrap");
+    // On its own line the name is cut as on the tiles, when even that line is too short.
+    expect(styled(".single-home").get("display")).toBe("flex");
+    expect(styled(".single-home").get("min-width")).toBe("0");
+  });
+
+  test("moves an Agent home tile's tags and badges to a second line when its name does not fit beside them", () => {
+    expect(styled(".home-tile").get("flex-wrap")).toBe("wrap");
+    // The name fills its line, so that a second line holds only the tags and badges.
+    expect(styled(".home-tile .home-name").get("flex")).toBe("1 1 auto");
+  });
+
+  test("leaves an Agent home's tile, beside the list's scrollbar, room for a last part such as claude-code-synced-home", () => {
+    // 270 px leaves a tile 232 px wide, and its name 193 px after the rest's «…».
+    expect(px(styled(".column").get("min-width"))).toBeGreaterThanOrEqual(270);
+  });
 });
 
 describe("text in the Inventory at the smallest window", () => {
