@@ -1682,6 +1682,7 @@
             "Desplázate hasta abajo dentro del bloque Agents.",
             "Desplázate hasta abajo dentro del bloque Entries by State.",
             "Desplázate hasta abajo dentro del bloque Agent home.",
+            "Deja el ratón sobre el home de Claude Desktop, en el bloque Agent home.",
             "En Agents, elige Claude Code.",
             "En Agent home, elige claude-code-many-home, el home que añade el paso 4.1.",
             "Sin dejar el ratón encima, lee el nombre de cada ficha del bloque Agent home.",
@@ -1696,8 +1697,10 @@
             "«Agents» muestra su título y al menos dos Agents.",
             "«Entries by State» y «Agent home» muestran cada uno su título y al menos una fila.",
             "Al desplazarte dentro de un bloque llegas a su última fila, y los otros dos bloques no se mueven.",
+            "Cada fila del bloque Agent home cabe entera en él, también tras desplazarte.",
+            "El home de Claude Desktop va en una línea propia, bajo «Claude Desktop», acaba entero en «\\claude-desktop-home», y su tooltip muestra «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» entero.",
             "«Claude Code» y «claude-code-many-home» se eligen con un clic.",
-            "Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra.",
+            "Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home» o «claude-code-synced-home», y ninguna se lee igual que otra.",
             "Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.",
             "Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».",
             "La lista de Items y el panel de la derecha tienen más o menos el mismo ancho.",
@@ -1708,7 +1711,7 @@
             "La ubicación acaba en «…» y su tooltip muestra la ruta entera.",
             "El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero."
           ],
-          "covers": ["#221", "#289"],
+          "covers": ["#221", "#289", "#426"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" }

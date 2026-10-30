@@ -5,7 +5,7 @@
 // thumb with the mouse.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SMALLEST } from "../scripts/fakeUi.ts";
-import { away, inventoryShown, rail, ROOT } from "./app";
+import { away, inventoryShown, rail, ROOT, WRAPS } from "./app";
 import { grey, lightness } from "./look";
 import { uatStep } from "./step";
 
@@ -317,13 +317,42 @@ uatStep("4.6", async ({ page, open, check }) => {
         .poll(() =>
           list.evaluate((element) => {
             const last = element.lastElementChild?.getBoundingClientRect();
-            return last === undefined || last.bottom <= element.getBoundingClientRect().bottom + 1;
+            const box = element.getBoundingClientRect();
+            return last === undefined || (last.top >= box.top - 1 && last.bottom <= box.bottom + 1);
           }),
         )
         .toBe(true);
       expect(await tops()).toEqual(before);
     }
   });
+  await check("Cada fila del bloque Agent home cabe entera en él, también tras desplazarte.", async () => {
+    const heights = await rows.homes.evaluate((list) => ({
+      list: list.clientHeight,
+      rows: [...list.querySelectorAll(".home-row")].map((row) => [row.textContent, row.getBoundingClientRect().height] as const),
+    }));
+    expect(heights.rows.length).toBeGreaterThanOrEqual(2);
+    for (const [text, height] of heights.rows) expect(height, text!).toBeLessThanOrEqual(heights.list);
+  });
+  await check(
+    String.raw`El home de Claude Desktop va en una línea propia, bajo «Claude Desktop», acaba entero en «\claude-desktop-home», y su tooltip muestra «E:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home» entero.`,
+    async () => {
+      const row = blocks.homes.locator(".home-row", { hasText: /^Claude Desktop/ });
+      const name = row.locator(".single-home");
+      const tail = name.locator(".home-name-tail");
+      const [agent, own] = [(await row.getByText("Claude Desktop", { exact: true }).boundingBox())!, (await name.boundingBox())!];
+      expect(own.y).toBeGreaterThanOrEqual(agent.y + agent.height - 1);
+      await expect(tail).toHaveText(String.raw`\claude-desktop-home`);
+      expect(await tail.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      // A scroll hides a tooltip, and the main thread may get the last scroll of the
+      // blocks' wheels only after the hover: the hover is then made again.
+      await expect(async () => {
+        await away(page);
+        await name.hover();
+        await expect(page.getByRole("tooltip")).toHaveText(String.raw`${WRAPS}\claude-desktop-home`, { timeout: 2000 });
+      }).toPass();
+    },
+  );
+  const cursorBadge = await blocks.homes.locator(".home-row", { hasText: /^Cursor/ }).locator(".badge").evaluate((badge) => badge.outerHTML);
   await check("«Claude Code» y «claude-code-many-home» se eligen con un clic.", async () => {
     const agent = page.locator(".agent-tile", { hasText: /^Claude Code/ });
     await agent.click();
@@ -333,24 +362,37 @@ uatStep("4.6", async ({ page, open, check }) => {
     await expect(home).toHaveAttribute("aria-pressed", "true");
   });
   // Each Claude Code tile's name: its parts' text, and whether each shows whole or is cut.
-  const tiles = await blocks.homes.locator(".home-name").evaluateAll((names) =>
-    names.map((name) => {
-      const part = (css: string) => {
-        const element = name.querySelector<HTMLElement>(css);
-        return element && { text: element.textContent!, cut: element.scrollWidth > element.clientWidth, ellipsis: getComputedStyle(element).textOverflow };
-      };
-      return { head: part(".home-name-head"), tail: part(".home-name-tail")! };
-    }),
-  );
-  await check("Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra.", async () => {
-    expect(tiles.length).toBeGreaterThanOrEqual(2);
-    for (const { tail } of tiles) expect(tail.cut, tail.text).toBe(false);
-    expect(tiles.map(({ tail }) => tail.text)).toContain(String.raw`\claude-code-many-home`);
+  const readTiles = () =>
+    blocks.homes.locator(".home-name").evaluateAll((elements) =>
+      elements.map((name) => {
+        const part = (css: string) => {
+          const element = name.querySelector<HTMLElement>(css);
+          return element && { text: element.textContent!, cut: element.scrollWidth > element.clientWidth, ellipsis: getComputedStyle(element).textOverflow };
+        };
+        return { head: part(".home-name-head"), tail: part(".home-name-tail")! };
+      }),
+    );
+  const tiles = await readTiles();
+  // No Claude Code home of the fixtures is a Project's Last-opened one, not read
+  // or has a Read failure of its own, so each tile is given those tags as
+  // HomesPane draws them, and the Read-failure badge All Agents drew for
+  // Cursor, to read its name beside them.
+  await blocks.homes.locator(".home-tile").evaluateAll((buttons, badge) => {
+    const marks = `<span class="marked" style="display: contents"><span class="tag">last opened here</span><span class="tag">not read</span>${badge}</span>`;
+    for (const button of buttons) button.insertAdjacentHTML("beforeend", marks);
+  }, cursorBadge);
+  const marked = await readTiles();
+  await blocks.homes.locator(".marked").evaluateAll((marks) => marks.forEach((mark) => mark.remove()));
+  await check("Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home» o «claude-code-synced-home», y ninguna se lee igual que otra.", async () => {
+    expect(tiles.map(({ tail }) => tail.text)).toEqual(expect.arrayContaining([String.raw`\claude-code-shape-home`, String.raw`\claude-code-synced-home`, String.raw`\claude-code-many-home`]));
+    for (const { tail } of [...tiles, ...marked]) expect(tail.cut, tail.text).toBe(false);
     expect(new Set(tiles.map(({ tail }) => tail.text)).size).toBe(tiles.length);
   });
   await check("Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.", async () => {
-    const many = tiles.find(({ tail }) => tail.text === String.raw`\claude-code-many-home`)!;
-    expect(many.head).toEqual({ text: ROOT, cut: true, ellipsis: "ellipsis" });
+    // The shape, synced and many homes, each with and without the tag and the badge.
+    const long = [...tiles, ...marked].filter(({ head }) => head !== null);
+    expect(long).toHaveLength(2 * 3);
+    for (const { head } of long) expect(head).toEqual({ text: ROOT, cut: true, ellipsis: "ellipsis" });
   });
   await check("Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».", async () => {
     // The fixtures' default Claude Code home is named default.

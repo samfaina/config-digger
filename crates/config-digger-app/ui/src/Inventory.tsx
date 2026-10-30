@@ -589,7 +589,7 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
           ) : (
             <Tooltip text={chosen.folder}>
               <span className="dim single-home" tabIndex={0}>
-                {chosen.home}
+                <HomeName home={chosen.home} />
               </span>
             </Tooltip>
           )}
@@ -611,7 +611,6 @@ export function HomesPane({ inventory, selection, onHome }: HomesPaneProps) {
               onClick={() => onHome(agent, home.home)}
             >
               <HomeName home={home.home} />
-              <span className="grow" />
               {opened(home) && <span className="tag">{LAST_OPENED}</span>}
               {mirrored(home)}
               {notRead(home)}
@@ -649,9 +648,10 @@ function homeTileTooltip(home: Home): string {
 }
 
 /**
- * A home's name on its tile, in two parts: its folder's last part, with the
- * separator before it, and the rest, which is cut first when the name is too
- * long for the tile, so that two homes of one Agent under one folder read apart.
+ * A home's name on its tile, or on the row of an Agent's one home, in two
+ * parts: its folder's last part, with the separator before it, and the rest,
+ * which is cut first when the name is too long for its place, so that two
+ * homes of one Agent under one folder read apart.
  */
 function HomeName({ home }: { home: string }) {
   const { rest, last } = lastPart(home);
