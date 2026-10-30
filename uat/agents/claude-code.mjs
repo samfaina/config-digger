@@ -153,8 +153,8 @@ function verbatimSkill(dir, folder) {
     for (const f of [path.join(home, "settings.json"), path.join(proj, ".claude", "settings.json"), path.join(proj, ".claude", "settings.local.json")]) fs.rmSync(f, { force: true });
     write(path.join(home, ".claude.json"), state);
   };
-  const approved = async () => {
-    const { status } = await mcpList(home, proj);
+  const approved = async (cwd = proj) => {
+    const { status } = await mcpList(home, cwd);
     return ["cd-throwaway-a", "cd-throwaway-b"].map((n) => (status[n] === undefined ? "absent" : status[n] === "Pending approval" ? "pending" : "approved"));
   };
 
@@ -166,6 +166,41 @@ function verbatimSkill(dir, folder) {
     reset({ projects: { [proj]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true } } });
     const backslashes = await approved();
     return same({ trusted, untrusted, backslashes }, { trusted: ["approved", "approved"], untrusted: ["pending", "pending"], backslashes: ["pending", "pending"] });
+  });
+
+  // The forward-slash key spelled in another case: its drive letter, its
+  // last folder's name, and the whole key.
+  const swap = (s) => (s === s.toLowerCase() ? s.toUpperCase() : s.toLowerCase());
+  const spellings = {
+    drive: swap(key[0]) + key.slice(1),
+    folder: key.slice(0, key.lastIndexOf("/") + 1) + swap(path.basename(proj)),
+    whole: swap(key),
+  };
+
+  await p.check("items.mcp.gates[0]", "the Project's state under its forward-slash key in another case is not found: neither its trust nor its approvals count, and the Project's settings do not approve", async () => {
+    const seen = {};
+    for (const [label, spelled] of Object.entries(spellings)) {
+      reset({ projects: { [spelled]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true } } });
+      seen[`${label} state`] = await approved();
+      reset({ projects: { [spelled]: { hasTrustDialogAccepted: true } } });
+      write(path.join(proj, ".claude", "settings.json"), { enableAllProjectMcpServers: true });
+      seen[`${label} settings`] = await approved();
+    }
+    const none = ["pending", "pending"];
+    return same(seen, { "drive state": none, "drive settings": none, "folder state": none, "folder settings": none, "whole state": none, "whole settings": none });
+  });
+
+  await p.check("items.mcp.gates[0]", "started in the Project spelled in another case, Claude Code finds the state under that spelling, and not under the Project's own", async () => {
+    const seen = {};
+    for (const [label, spelled] of Object.entries({ drive: spellings.drive, folder: spellings.folder })) {
+      for (const [under, k] of [["started", spelled], ["own", key]]) {
+        reset({ projects: { [k]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true } } });
+        seen[`${label}, under ${under}`] = await approved(spelled.replaceAll("/", "\\"));
+      }
+    }
+    const all = ["approved", "approved"];
+    const none = ["pending", "pending"];
+    return same(seen, { "drive, under started": all, "drive, under own": none, "folder, under started": all, "folder, under own": none });
   });
 
   await p.check("items.mcp.gates[0]", "the Project's settings files approve only in a trusted Project, the user's settings in any", async () => {
