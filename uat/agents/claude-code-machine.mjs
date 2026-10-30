@@ -112,6 +112,42 @@ await p.check("locations[managed-settings-mcp]", "a `managedMcpServers` entry wi
   return same((await servers()).names, ["cd-throwaway-https", "cd-throwaway-user"]);
 });
 
+// A dropped `managedMcpServers` entry of each kind beside a user server of
+// its name, in a home of their own. The two share a name, so which one
+// loaded is read from that name's line in `claude mcp list`: the user
+// server's command, or the managed entry's command or URL.
+{
+  const shadowHome = path.join(base, "shadow-home");
+  write(path.join(shadowHome, ".claude.json"), {
+    mcpServers: { "cd-throwaway-shadow-stdio": stdio("user-stdio"), "cd-throwaway-shadow-plain": stdio("user-plain") },
+  });
+  const dropped = {
+    "cd-throwaway-shadow-stdio": stdio("managed-stdio"),
+    "cd-throwaway-shadow-plain": { type: "http", url: "http://cd-throwaway-shadow-plain.invalid/mcp" },
+  };
+  const loaded = async () => {
+    const { stdout, stderr } = await run(bin, ["mcp", "list"], { cwd: proj, env: { ...env, CLAUDE_CONFIG_DIR: shadowHome } });
+    const lines = (stdout + stderr).split("\n").map((l) => l.trim());
+    return Object.fromEntries(Object.keys(dropped).map((n) => {
+      const line = lines.find((l) => l.startsWith(`${n}:`));
+      if (line === undefined) return [n, "nothing"];
+      if (line.includes("cmd /c user-")) return [n, "user"];
+      if (line.includes("cmd /c managed-") || line.includes("cd-throwaway-shadow-plain.invalid")) return [n, "managed"];
+      return [n, `other: ${line}`];
+    }));
+  };
+
+  await p.check("locations[managed-settings-mcp]", "a `managedMcpServers` entry with a command, or at an `http://` URL, in `managed-settings.json` or the HKLM value, is dropped and a user server of its name loads", async () => {
+    const seen = {};
+    for (const [label, sources] of [["file", { file: JSON.stringify({ managedMcpServers: dropped }) }], ["hklm", { hklmText: JSON.stringify({ managedMcpServers: dropped }) }]]) {
+      await deploy(sources);
+      seen[label] = await loaded();
+    }
+    const user = { "cd-throwaway-shadow-stdio": "user", "cd-throwaway-shadow-plain": "user" };
+    return same(seen, { file: user, hklm: user });
+  });
+}
+
 await p.check("settings[managed]", "of two admin sources that hold settings, only the higher one is read", async () => {
   await deploy({ hklmText: holding("hklm"), file: holding("file") });
   return same((await servers()).names, ["cd-throwaway-hklm", "cd-throwaway-user"]);
