@@ -189,6 +189,26 @@ export default [
         }
         return { out, same: JSON.stringify(before) === JSON.stringify(tops()) };`);
       t.check(moved.out.every((x) => x === null || x.reached) && moved.same, "al desplazarte dentro de un bloque llegas a su última fila, y los otros no se mueven", JSON.stringify(moved));
+      const homeRows = await s.exec(`
+        const list = document.querySelector(".panel.homes .home-list");
+        return { list: list?.clientHeight, rows: [...(list?.querySelectorAll(".home-row") ?? [])].map((r) => ({ text: r.textContent.trim().slice(0, 40), height: Math.round(r.getBoundingClientRect().height) })) };`);
+      t.check(homeRows.rows.length >= 2 && homeRows.rows.every((r) => r.height <= homeRows.list), "cada fila del bloque Agent home cabe entera en él, también tras desplazarte", JSON.stringify(homeRows));
+      const desktop = await s.exec(`
+        const row = [...document.querySelectorAll(".panel.homes .home-row")].find((r) => r.textContent.trim().startsWith("Claude Desktop"));
+        const name = row?.querySelector(".single-home"), tail = name?.querySelector(".home-name-tail");
+        const below = !!name && name.getBoundingClientRect().top >= row.firstElementChild.getBoundingClientRect().bottom - 1;
+        return { name: name ?? null, below, tail: tail?.textContent ?? null, whole: !!tail && tail.scrollWidth <= tail.clientWidth };`);
+      if (desktop.name) {
+        await hoverFresh(s, desktop.name);
+        await wait(900);
+      }
+      const desktopTip = desktop.name ? (await tooltip(s))?.text : null;
+      const desktopFolder = `${t.root}\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home`;
+      t.check(
+        desktop.below && desktop.tail === "\\claude-desktop-home" && desktop.whole && desktopTip === desktopFolder,
+        `el home de Claude Desktop va en una línea propia, bajo «Claude Desktop», acaba entero en «\\claude-desktop-home», y su tooltip muestra «${desktopFolder}» entero`,
+        JSON.stringify({ below: desktop.below, tail: desktop.tail, whole: desktop.whole, tooltip: desktopTip }),
+      );
       await inventoryOf(t, "Claude Code", "claude-code-many-home");
       t.check(true, "«Claude Code» y «claude-code-many-home» se eligen con un clic");
       const tiles = await s.exec(`
@@ -201,7 +221,7 @@ export default [
       const tails = tiles.map((x) => x.tail?.text);
       t.check(
         tiles.length >= 2 && tiles.every((x) => x.tail && !x.tail.cut) && tails.includes("\\claude-code-many-home") && new Set(tails).size === tiles.length,
-        "cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home», y ninguna se lee igual que otra",
+        "cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home» o «claude-code-synced-home», y ninguna se lee igual que otra",
         JSON.stringify(tiles),
       );
       const many = tiles.find((x) => x.tail?.text === "\\claude-code-many-home");

@@ -334,10 +334,13 @@ uatStep("4.6", async ({ page, open, check }) => {
     for (const [text, height] of heights.rows) expect(height, text!).toBeLessThanOrEqual(heights.list);
   });
   await check(
-    String.raw`El home de Claude Desktop acaba entero en «\claude-desktop-home», y su tooltip muestra «E:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home» entero.`,
+    String.raw`El home de Claude Desktop va en una línea propia, bajo «Claude Desktop», acaba entero en «\claude-desktop-home», y su tooltip muestra «E:\cd-throwaway\paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home» entero.`,
     async () => {
-      const name = blocks.homes.locator(".home-row", { hasText: /^Claude Desktop/ }).locator(".single-home");
+      const row = blocks.homes.locator(".home-row", { hasText: /^Claude Desktop/ });
+      const name = row.locator(".single-home");
       const tail = name.locator(".home-name-tail");
+      const [agent, own] = [(await row.getByText("Claude Desktop", { exact: true }).boundingBox())!, (await name.boundingBox())!];
+      expect(own.y).toBeGreaterThanOrEqual(agent.y + agent.height - 1);
       await expect(tail).toHaveText(String.raw`\claude-desktop-home`);
       expect(await tail.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       // A scroll hides a tooltip, and the main thread may get the last scroll of the
@@ -349,6 +352,7 @@ uatStep("4.6", async ({ page, open, check }) => {
       }).toPass();
     },
   );
+  const cursorBadge = await blocks.homes.locator(".home-row", { hasText: /^Cursor/ }).locator(".badge").evaluate((badge) => badge.outerHTML);
   await check("«Claude Code» y «claude-code-many-home» se eligen con un clic.", async () => {
     const agent = page.locator(".agent-tile", { hasText: /^Claude Code/ });
     await agent.click();
@@ -358,9 +362,9 @@ uatStep("4.6", async ({ page, open, check }) => {
     await expect(home).toHaveAttribute("aria-pressed", "true");
   });
   // Each Claude Code tile's name: its parts' text, and whether each shows whole or is cut.
-  const names = () =>
-    blocks.homes.locator(".home-name").evaluateAll((names) =>
-      names.map((name) => {
+  const readTiles = () =>
+    blocks.homes.locator(".home-name").evaluateAll((elements) =>
+      elements.map((name) => {
         const part = (css: string) => {
           const element = name.querySelector<HTMLElement>(css);
           return element && { text: element.textContent!, cut: element.scrollWidth > element.clientWidth, ellipsis: getComputedStyle(element).textOverflow };
@@ -368,14 +372,16 @@ uatStep("4.6", async ({ page, open, check }) => {
         return { head: part(".home-name-head"), tail: part(".home-name-tail")! };
       }),
     );
-  const tiles = await names();
-  // No Claude Code home of the fixtures is a Project's Last-opened one or has a
-  // Read failure of its own, so each tile is given the tag and the badge as
-  // HomesPane draws them, to read its name beside them.
-  await blocks.homes.locator(".home-tile").evaluateAll((buttons) => {
-    for (const button of buttons) button.insertAdjacentHTML("beforeend", '<span class="tag marked">last opened here</span><span class="badge marked">1</span>');
-  });
-  const marked = await names();
+  const tiles = await readTiles();
+  // No Claude Code home of the fixtures is a Project's Last-opened one, not read
+  // or has a Read failure of its own, so each tile is given those tags as
+  // HomesPane draws them, and the Read-failure badge All Agents drew for
+  // Cursor, to read its name beside them.
+  await blocks.homes.locator(".home-tile").evaluateAll((buttons, badge) => {
+    const marks = `<span class="marked" style="display: contents"><span class="tag">last opened here</span><span class="tag">not read</span>${badge}</span>`;
+    for (const button of buttons) button.insertAdjacentHTML("beforeend", marks);
+  }, cursorBadge);
+  const marked = await readTiles();
   await blocks.homes.locator(".marked").evaluateAll((marks) => marks.forEach((mark) => mark.remove()));
   await check("Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home» o «claude-code-synced-home», y ninguna se lee igual que otra.", async () => {
     expect(tiles.map(({ tail }) => tail.text)).toEqual(expect.arrayContaining([String.raw`\claude-code-shape-home`, String.raw`\claude-code-synced-home`, String.raw`\claude-code-many-home`]));
@@ -383,8 +389,9 @@ uatStep("4.6", async ({ page, open, check }) => {
     expect(new Set(tiles.map(({ tail }) => tail.text)).size).toBe(tiles.length);
   });
   await check("Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.", async () => {
+    // The shape, synced and many homes, each with and without the tag and the badge.
     const long = [...tiles, ...marked].filter(({ head }) => head !== null);
-    expect(long).toHaveLength(6);
+    expect(long).toHaveLength(2 * 3);
     for (const { head } of long) expect(head).toEqual({ text: ROOT, cut: true, ellipsis: "ellipsis" });
   });
   await check("Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».", async () => {

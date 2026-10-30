@@ -1698,7 +1698,7 @@
             "«Entries by State» y «Agent home» muestran cada uno su título y al menos una fila.",
             "Al desplazarte dentro de un bloque llegas a su última fila, y los otros dos bloques no se mueven.",
             "Cada fila del bloque Agent home cabe entera en él, también tras desplazarte.",
-            "El home de Claude Desktop acaba entero en «\\claude-desktop-home», y su tooltip muestra «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» entero.",
+            "El home de Claude Desktop va en una línea propia, bajo «Claude Desktop», acaba entero en «\\claude-desktop-home», y su tooltip muestra «E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home» entero.",
             "«Claude Code» y «claude-code-many-home» se eligen con un clic.",
             "Cada ficha de Agent home muestra entero el final de su carpeta, como «claude-code-many-home» o «claude-code-synced-home», y ninguna se lee igual que otra.",
             "Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.",
@@ -1711,7 +1711,7 @@
             "La ubicación acaba en «…» y su tooltip muestra la ruta entera.",
             "El tooltip del campo Project muestra «E:\\cd-throwaway\\many\\project-01» entero."
           ],
-          "covers": ["#221", "#289"],
+          "covers": ["#221", "#289", "#426"],
           "automation": [
             { "tool": "webdriver", "where": "local", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" },
             { "tool": "webdriver", "where": "ci", "test": "uat/auto/webdriver/steps/scrollbars.mjs > 4.6" }
