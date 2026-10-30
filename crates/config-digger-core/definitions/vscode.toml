@@ -104,17 +104,19 @@ workspace_files = true
 # `{"version": 1, "installed": [{"pluginUri", "marketplace", "name"}]}`,
 # each `pluginUri` the `file:` URI of a plugin's folder, whatever its
 # manifest: `plugin.json` at its root, in `.github\plugin`,
-# `.claude-plugin` or `.plugin`, or none [test]. A plugin from a
-# marketplace sits in VS Code's clone of it, `<host>\<owner>\<repo>` in
-# this folder [binary], and a folder directly here that `installed.json`
-# does not list is not read [test]. A plugin's id is its folder below this
-# one, so two marketplaces' plugins of one name stay apart. A plugin is
+# `.claude-plugin` or `.plugin`, or none [test]. A plugin VS Code installs
+# from a marketplace sits in VS Code's clone of it, `<host>\<owner>\<repo>`
+# in this folder, and its item names the marketplace by its URL and the
+# plugin by its name in the marketplace [test]; VS Code 1.143.1 adds the
+# folder's path below this one, `relativePath`. A folder directly here
+# that `installed.json` does not list is not read [test]. A plugin's id is
+# its folder below this one, so two marketplaces' plugins of one name stay
+# apart. A plugin is
 # named by its manifest's `name`, or else by its folder. VS Code uninstalls
 # one in the Extensions view. `chat.pluginLocations` in the user's settings
 # adds plugins by their path [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
-unverified = "A plugin VS Code installs from a real marketplace is taken to sit in its clone `<host>\\<owner>\\<repo>` and be listed in `installed.json` as the probe laid one out by hand; installing one from a marketplace in the probe would test it."
 registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri" }
 name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = ".plugin/plugin.json", key_path = ["name"] }]
 
@@ -320,8 +322,10 @@ risks = ["agent_may_drop_entries"]
 
 # An agent plugin's servers are in the `.mcp.json` at its root, whatever
 # its manifest [test], and in the file a manifest's `mcpServers` names,
-# which `plugin-manifest-mcp` reads. VS Code reads a `.mcp.json` it cannot
-# parse around the error, and starts the servers it finds there [test]: it
+# which `plugin-manifest-mcp` reads; a manifest's inline `mcpServers` takes
+# the `.mcp.json`'s place (see `plugin-manifest-mcp`). VS Code reads a
+# `.mcp.json` it cannot parse around the error, and starts the servers it
+# finds there [test]: it
 # keeps what `node-jsonc-parser`'s code keeps around `,,`, a missing comma,
 # a key with no value, which drops that key, an object left open at the
 # end of the file, and a string left open in a server, which takes the
@@ -339,19 +343,22 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "reads_around_error"
 
-# The servers of the file an agent plugin's root `plugin.json` names in
-# `mcpServers`, such as `"./servers.json"`, which VS Code reads beside the
-# plugin's `.mcp.json` [test]. Its manifest is the first of the four it
-# has, as for its name. A server the two files both name ranks the
-# `.mcp.json`'s first.
+# The servers of the file an agent plugin's manifest names in `mcpServers`,
+# such as `"./servers.json"`, which VS Code reads after the plugin's
+# `.mcp.json`, the manifest at its root, in `.claude-plugin` or in
+# `.plugin` [test]. A manifest in `.github\plugin` is not read: its
+# `mcpServers` adds nothing [test], though VS Code 1.143.1 reads it. VS
+# Code takes the first of `.plugin`, `.claude-plugin` and the root for the
+# manifest [binary]. Of a server the two files both name, VS Code starts
+# the `.mcp.json`'s only, the named file's never [test], so the
+# `.mcp.json`'s ranks first. An inline object of servers in `mcpServers`
+# takes the place of the `.mcp.json`, whose servers do not start, and a
+# list's objects are skipped, its paths read after the `.mcp.json` [test];
+# config-digger lists both files' servers, and a list's objects too,
+# ticket [#512](https://github.com/samfaina/config-digger/issues/512).
 [[locations]]
 id = "plugin-manifest-mcp"
-unverified = [
-  "A manifest in `.github/plugin`, `.claude-plugin` or `.plugin` is taken to name a file of servers in `mcpServers` as the root `plugin.json` does; the probe's `plugin-named` plugin with its manifest in each of those places would test it.",
-  "An inline `mcpServers` object of a manifest, or a list of paths and objects, is taken to add its servers as a named file does; a probe plugin whose manifest holds one would test it.",
-  "Of two servers of one name in a plugin's `.mcp.json` and the file its manifest names, the `.mcp.json`'s is taken to win; a probe plugin whose two files name one server, with `chat.mcp.collisionBehavior` at `disable`, would test it.",
-]
-anchor = { block = "plugin", plugins = "agent-plugins", path = ["plugin.json", ".github/plugin/plugin.json", ".claude-plugin/plugin.json", ".plugin/plugin.json"] }
+anchor = { block = "plugin", plugins = "agent-plugins", path = [".plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
 references = { root = ["mcpServers"] }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]

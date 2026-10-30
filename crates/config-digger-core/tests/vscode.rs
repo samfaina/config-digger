@@ -1241,6 +1241,164 @@ fn a_manifest_s_mcp_servers_file_adds_its_servers_to_the_plugin_s_mcp_json() {
     }
 }
 
+#[test]
+fn a_plugin_vs_code_installed_from_a_marketplace_is_read_where_installed_json_says() {
+    // `installed.json` as VS Code 1.143.1 writes it once it installs a
+    // plugin from a marketplace, with a `relativePath` beside its
+    // `pluginUri`, and the plugin in VS Code's clone of the marketplace.
+    let folder = Path::new(HOME)
+        .join(r".vscode\agent-plugins\cd-throwaway.invalid\cd-throwaway\market\plugins\installed");
+    let listed = r#"{"version":1,"installed":[{
+        "pluginUri":"file:///c%3A/Users/fixture/.vscode/agent-plugins/cd-throwaway.invalid/cd-throwaway/market/plugins/installed",
+        "relativePath":"cd-throwaway.invalid/cd-throwaway/market/plugins/installed",
+        "marketplace":"https://cd-throwaway.invalid/cd-throwaway/market.git",
+        "name":"cd-throwaway-installed"}]}"#;
+    let fs = with_home(vscode())
+        .with_file(installed_json(), listed)
+        .with_file(
+            folder.join("plugin.json"),
+            r#"{ "name": "cd-throwaway-installed", "version": "1.0.0" }"#,
+        )
+        .with_file(
+            folder.join(".mcp.json"),
+            r#"{ "mcpServers": { "cd-throwaway-installed": { "command": "x" } } }"#,
+        );
+    let inventory = inventory(&fs);
+
+    let entry = &item(&inventory, "cd-throwaway-installed").entries[0];
+    assert_eq!(code(entry.state), "effective");
+    assert_eq!(entry.path, folder.join(".mcp.json"));
+    let plugin = entry.plugin.as_ref().unwrap();
+    assert_eq!(
+        (plugin.id.as_str(), plugin.name.as_str()),
+        (
+            "cd-throwaway.invalid/cd-throwaway/market/plugins/installed",
+            "cd-throwaway-installed"
+        )
+    );
+}
+
+/// The default profile's server Entries of agent plugins in `inventory`,
+/// each `<name> <state> <file name>`, sorted.
+fn plugin_servers_of(inventory: &Inventory) -> Vec<String> {
+    let mut servers: Vec<String> = inventory
+        .items
+        .iter()
+        .filter(|item| item.agent == "vscode" && item.home == "default" && json(item.kind) == "mcp")
+        .flat_map(|item| item.entries.iter().map(move |entry| (&item.name, entry)))
+        .filter(|(_, entry)| entry.scope == "plugin")
+        .map(|(name, entry)| {
+            let file = entry.path.file_name().unwrap().to_string_lossy();
+            format!("{name} {} {file}", code(entry.state))
+        })
+        .collect();
+    servers.sort();
+    servers
+}
+
+#[test]
+fn a_manifest_in_claude_plugin_or_plugin_adds_the_file_its_mcp_servers_names_and_one_in_github_plugin_does_not()
+ {
+    // The probe's `manifests` launch: each manifest names `servers.json`.
+    // VS Code 1.129.1 to 1.141.0 never take `.github/plugin/plugin.json` for
+    // a plugin's manifest.
+    let manifest = r#"{ "name": "named", "mcpServers": "./servers.json" }"#;
+    let dot = |tag: &str| format!(r#"{{ "mcpServers": {{ "{tag}-dot": {{ "command": "x" }} }} }}"#);
+    let file =
+        |tag: &str| format!(r#"{{ "mcpServers": {{ "{tag}-file": {{ "command": "x" }} }} }}"#);
+    let (github, claude, open) = (
+        [dot("github"), file("github")],
+        [dot("claude"), file("claude")],
+        [dot("open"), file("open")],
+    );
+    let fs = with_listed(
+        with_home(vscode()),
+        &[
+            (
+                "github",
+                &[
+                    (".github/plugin/plugin.json", manifest),
+                    (".mcp.json", &github[0]),
+                    ("servers.json", &github[1]),
+                ],
+            ),
+            (
+                "claude",
+                &[
+                    (".claude-plugin/plugin.json", manifest),
+                    (".mcp.json", &claude[0]),
+                    ("servers.json", &claude[1]),
+                ],
+            ),
+            (
+                "open",
+                &[
+                    (".plugin/plugin.json", manifest),
+                    (".mcp.json", &open[0]),
+                    ("servers.json", &open[1]),
+                ],
+            ),
+        ],
+    );
+
+    assert_eq!(
+        plugin_servers_of(&inventory(&fs)),
+        [
+            "claude-dot effective .mcp.json",
+            "claude-file effective servers.json",
+            "github-dot effective .mcp.json",
+            "open-dot effective .mcp.json",
+            "open-file effective servers.json",
+        ]
+    );
+}
+
+#[test]
+fn of_a_server_both_a_plugin_s_mcp_json_and_its_named_file_name_the_mcp_json_s_wins() {
+    let fs = with_listed(
+        with_home(vscode()),
+        &[(
+            "clash",
+            &[
+                (
+                    "plugin.json",
+                    r#"{ "name": "clash", "mcpServers": "./servers.json" }"#,
+                ),
+                (
+                    ".mcp.json",
+                    r#"{ "mcpServers": { "cd-throwaway-clash": { "command": "dot" } } }"#,
+                ),
+                (
+                    "servers.json",
+                    r#"{ "mcpServers": { "cd-throwaway-clash": { "command": "file" } } }"#,
+                ),
+            ],
+        )],
+    );
+    let inventory = inventory(&fs);
+
+    let folder = review_kit().with_file_name("clash");
+    assert_eq!(
+        states(item(&inventory, "cd-throwaway-clash")),
+        [
+            (
+                "effective".to_owned(),
+                format!(
+                    r"{}\.mcp.json#mcpServers.cd-throwaway-clash",
+                    folder.display()
+                )
+            ),
+            (
+                "shadowed".to_owned(),
+                format!(
+                    r"{}\servers.json#mcpServers.cd-throwaway-clash",
+                    folder.display()
+                )
+            ),
+        ]
+    );
+}
+
 /// Whether a VS Code server Item of an agent plugin is listed.
 fn any_plugin_server(inventory: &Inventory) -> bool {
     inventory
